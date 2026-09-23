@@ -36,6 +36,7 @@
       "version": "0.3.0-dev",
       "dependencies": {
         "@earendil-works/pi-tui": "0.87.1",
+        "@strive/protocol": "workspace:*",
         "@xterm/headless": "6.0.0",
       },
     },

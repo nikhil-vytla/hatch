@@ -15,7 +15,7 @@ const started = (call: number, usd: number): Event => ({
 test("spend follows the ledger's rules for each outcome", () => {
   const s = new Spend();
 
-  for (const e of [
+  const events: Event[] = [
     { type: "budgetSet", usdMicros: 5_000_000 },
     started(1, 900),
     {
@@ -39,8 +39,9 @@ test("spend follows the ledger's rules for each outcome", () => {
       outcome: { kind: "broken", reason: "cut", costUsdMicros: 900, tokens: 10 },
     },
     started(4, 700),
-  ] as Event[])
-    s.apply(e);
+  ];
+
+  for (const e of events) s.apply(e);
   expect(s.summary()).toBe("$0.0013 of $5.0000 · holding $0.0007");
 });
 

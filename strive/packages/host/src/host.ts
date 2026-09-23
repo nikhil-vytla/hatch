@@ -1,11 +1,26 @@
 // The agent host: runs one session's agent loop as a client of the daemon.
 // Models are reached only through the daemon's gateway, and every tool is
 // an effect the daemon performs; the host holds no keys and touches no files.
-import { type AssistantMessage, createModels, createProvider, type Model, Type } from "@earendil-works/pi-ai";
+import {
+  type AssistantMessage,
+  createModels,
+  createProvider,
+  type ImageContent,
+  type Model,
+  type TextContent,
+  Type,
+} from "@earendil-works/pi-ai";
 import { anthropicMessagesApi } from "@earendil-works/pi-ai/api/anthropic-messages.lazy";
 import { openAICompletionsApi } from "@earendil-works/pi-ai/api/openai-completions.lazy";
-import { Agent, type AgentTool, estimateContextTokens } from "@earendil-works/pi-agent-core";
-import type { AgentConfig, EffectRequest, Entry, StriveClient, TurnEnd } from "@strive/protocol";
+import { Agent, type AgentMessage, type AgentTool, estimateContextTokens } from "@earendil-works/pi-agent-core";
+import {
+  type AgentConfig,
+  describeError,
+  type EffectRequest,
+  type Entry,
+  type StriveClient,
+  type TurnEnd,
+} from "@strive/protocol";
 import { rebuild, resultText, summaryMessage } from "./transcript";
 
 export function systemPrompt(config: AgentConfig): string {
@@ -81,24 +96,33 @@ const SUMMARIZE = [
 ].join("\n");
 
 /** The conversation as plain text for summarizing: tool output is cut short. */
-function transcriptText(messages: any[]): string {
+function transcriptText(messages: AgentMessage[]): string {
   const cut = (s: string) => (s.length > 2000 ? `${s.slice(0, 2000)} [...]` : s);
+  const partText = (c: TextContent | ImageContent) => (c.type === "text" ? c.text : "[image]");
+  const blocks: string[] = [];
 
-  return messages
-    .filter((m) => m.role !== "system")
-    .map((m) => {
-      if (m.role === "user") return `USER: ${typeof m.content === "string" ? m.content : JSON.stringify(m.content)}`;
+  for (const m of messages) {
+    switch (m.role) {
+      case "system":
+        break;
+      case "user":
+        blocks.push(`USER: ${Array.isArray(m.content) ? m.content.map(partText).join("") : m.content}`);
+        break;
+      case "toolResult":
+        blocks.push(`TOOL RESULT (${m.toolName}): ${cut(m.content.map(partText).join(""))}`);
+        break;
+      case "assistant": {
+        const parts = m.content.map((c) =>
+          c.type === "text" ? c.text : c.type === "toolCall" ? `[calls ${c.name} ${JSON.stringify(c.arguments)}]` : "",
+        );
 
-      if (m.role === "toolResult")
-        return `TOOL RESULT (${m.toolName}): ${cut(m.content.map((c: any) => c.text ?? "").join(""))}`;
+        blocks.push(`ASSISTANT: ${parts.join(" ")}`);
+        break;
+      }
+    }
+  }
 
-      const parts = m.content.map((c: any) =>
-        c.type === "text" ? c.text : c.type === "toolCall" ? `[calls ${c.name} ${JSON.stringify(c.arguments)}]` : "",
-      );
-
-      return `ASSISTANT: ${parts.join(" ")}`;
-    })
-    .join("\n\n");
+  return blocks.join("\n\n");
 }
 
 /** A tool whose work the daemon does. Refusals reach the model as errors. */
@@ -170,11 +194,7 @@ export function tools(client: StriveClient, sessionId: string): AgentTool<any>[]
   ];
 }
 
-const textOf = (m: AssistantMessage) =>
-  m.content
-    .filter((c) => c.type === "text")
-    .map((c) => (c as { text: string }).text)
-    .join("");
+const textOf = (m: AssistantMessage) => m.content.flatMap((c) => (c.type === "text" ? [c.text] : [])).join("");
 
 export class Host {
   private agent!: Agent;
@@ -226,28 +246,29 @@ export class Host {
     });
     let lastDelta = 0;
     this.agent.subscribe(async (event) => {
-      if (event.type === "message_update" && event.assistantMessageEvent.type === "text_delta") {
+      if (
+        event.type === "message_update" &&
+        event.message.role === "assistant" &&
+        event.assistantMessageEvent.type === "text_delta"
+      ) {
         const now = Date.now();
 
         if (now - lastDelta > 80) {
           lastDelta = now;
-          const text = textOf(event.message as AssistantMessage);
+          const text = textOf(event.message);
           void this.client.request("host/stream", { id: this.sessionId, turn: this.turn, text }).catch(() => {});
         }
       }
 
       if (event.type === "message_end" && event.message.role === "assistant") {
-        const m = event.message as AssistantMessage;
-
-        const toolCalls = m.content
-          .filter((c) => c.type === "toolCall")
-          .map((c) => ({ id: (c as any).id, name: (c as any).name }));
+        const m = event.message;
+        const toolCalls = m.content.flatMap((c) => (c.type === "toolCall" ? [{ id: c.id, name: c.name }] : []));
 
         await this.record({ type: "assistantMessage", turn: this.turn, text: textOf(m), toolCalls, message: m });
       }
     });
     this.lastSeq = entries.at(-1)?.seq ?? 0;
-    this.queued = waiting.map((e) => (e.event as { text: string }).text);
+    this.queued = waiting.flatMap((e) => (e.event.type === "userMessage" ? [e.event.text] : []));
     void this.drain();
   }
 
@@ -300,9 +321,9 @@ export class Host {
       messages: [{ role: "user", content: transcriptText(messages), timestamp: Date.now() }],
     });
 
-    const summary = textOf(reply as AssistantMessage).trim();
+    const summary = textOf(reply).trim();
 
-    if (!summary || (reply as AssistantMessage).stopReason === "error") return;
+    if (!summary || reply.stopReason === "error") return;
     await this.record({ type: "compacted", uptoSeq: upto, summary });
     const system = messages.filter((m) => m.role === "system").slice(0, 1);
     this.agent.state.messages = [...system, summaryMessage(summary, Date.now())];
@@ -323,7 +344,7 @@ export class Host {
 
     try {
       await this.agent.prompt(prompts.map((text) => ({ role: "user" as const, content: text, timestamp: Date.now() })));
-      const last = this.agent.state.messages.at(-1) as AssistantMessage | undefined;
+      const last = this.agent.state.messages.at(-1);
 
       if (this.timedOut) reason = { kind: "timedOut", seconds: this.config.turnSeconds };
       else if (last?.role === "assistant" && last.stopReason === "aborted") reason = { kind: "interrupted" };
@@ -331,7 +352,7 @@ export class Host {
         reason = { kind: "failed", error: last.errorMessage ?? "the model call failed" };
       else reason = { kind: "done" };
     } catch (e) {
-      reason = { kind: "failed", error: (e as Error).message };
+      reason = { kind: "failed", error: describeError(e) };
     } finally {
       clearTimeout(timer);
     }

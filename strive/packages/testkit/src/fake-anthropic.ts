@@ -2,9 +2,11 @@
 // stand-in is the point. Each request takes the next scripted reply and is
 // recorded, so tests can check exactly what the model was sent.
 
+export type Json = string | number | boolean | null | Json[] | { [key: string]: Json };
+
 export type ScriptedReply = {
   text?: string;
-  toolCalls?: { id: string; name: string; input: Record<string, unknown> }[];
+  toolCalls?: { id: string; name: string; input: { [key: string]: Json } }[];
   /** Wait this long before answering (to test interrupts). */
   delayMs?: number;
   /** Answer with this HTTP status and error message instead. */
@@ -14,7 +16,7 @@ export type ScriptedReply = {
   outputTokens?: number;
 };
 
-const sse = (event: string, data: unknown) => `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+const sse = (event: string, data: Json) => `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
 
 export class FakeAnthropic {
   readonly requests: any[] = [];

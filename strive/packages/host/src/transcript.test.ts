@@ -23,9 +23,12 @@ const effect = (n: number, callId: string, kind: "read" | "bash") =>
     record: kind === "bash" ? { kind: "bash", command: "false", timeoutMs: 1000 } : { kind: "read", path: "a.txt" },
   });
 
-const blobs: Record<string, string> = { "sha256:out1": "file text", "sha256:out2": "some output\n" };
+const blobs = new Map([
+  ["sha256:out1", "file text"],
+  ["sha256:out2", "some output\n"],
+]);
 
-const blob = async (d: string) => blobs[d]!;
+const blob = async (d: string) => blobs.get(d)!;
 
 test("prompts and replies come back in order, and other events are skipped", async () => {
   const entries = [

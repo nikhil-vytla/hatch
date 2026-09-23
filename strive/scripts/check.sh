@@ -19,6 +19,7 @@ fi
 
 bun install --frozen-lockfile --silent
 bunx biome format packages
+bunx oxlint --deny-warnings packages
 bunx tsc -p tsconfig.json
 bun test
 echo "all checks passed"

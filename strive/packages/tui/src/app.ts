@@ -13,7 +13,16 @@ import {
   Text,
   matchesKey,
 } from "@earendil-works/pi-tui";
-import { type Entry, type InitializeResult, ServerError, type SessionInfo, type StriveClient } from "@strive/protocol";
+import {
+  type ApprovalMode,
+  type Decision,
+  describeError,
+  type Entry,
+  type InitializeResult,
+  ServerError,
+  type SessionInfo,
+  type StriveClient,
+} from "@strive/protocol";
 import { formatUsd } from "./format";
 import { Spend } from "./spend";
 import { editorTheme, style } from "./theme";
@@ -43,6 +52,23 @@ export const COMMANDS: SlashCommand[] = [
 ];
 
 export const MODE_NAMES = { ask: "ask", autoEdit: "auto-edit", fullAuto: "full-auto" } as const;
+
+const MODES_BY_NAME = new Map<string, ApprovalMode>([
+  ["ask", "ask"],
+  ["auto-edit", "autoEdit"],
+  ["full-auto", "fullAuto"],
+]);
+
+const DECISION_KEYS = new Map<string, Decision>([
+  ["y", "allow"],
+  ["a", "allowSession"],
+  ["n", "deny"],
+]);
+
+/** The daemon's reason a journal failed verification (error -32011 carries `{ problem }`). */
+function hasProblem(data: unknown): data is { problem: string } {
+  return typeof data === "object" && data !== null && "problem" in data && typeof data.problem === "string";
+}
 
 /** Which session to open: `new`, `continue` (latest in this directory), or an id. */
 export type SessionMode = "new" | "continue" | { resume: string };
@@ -187,7 +213,7 @@ export class App {
     this.editor = new Editor(tui, editorTheme, { paddingX: 1 });
     this.editor.setAutocompleteProvider(new CombinedAutocompleteProvider(COMMANDS, cwd));
     this.editor.onSubmit = (text) => {
-      this.submit(text.trim()).catch((e) => this.say(style.danger((e as Error).message)));
+      this.submit(text.trim()).catch((e) => this.say(style.danger(describeError(e))));
     };
 
     this.editor.disableSubmit = true;
@@ -215,13 +241,13 @@ export class App {
         return { consume: true };
       }
 
-      const decision = { y: "allow", a: "allowSession", n: "deny" }[data];
+      const decision = DECISION_KEYS.get(data);
       const oldest = this.pending.keys().next();
 
       if (decision && !oldest.done && this.session) {
         this.client
-          .request("approval/respond", { id: this.session.id, effect: oldest.value, decision: decision as never })
-          .catch((e) => this.say(style.danger((e as Error).message)));
+          .request("approval/respond", { id: this.session.id, effect: oldest.value, decision })
+          .catch((e) => this.say(style.danger(describeError(e))));
 
         return { consume: true };
       }
@@ -262,7 +288,7 @@ export class App {
   }
 
   private async chooseSession(mode: SessionMode): Promise<string> {
-    if (typeof mode === "object") return mode.resume;
+    if (mode !== "new" && mode !== "continue") return mode.resume;
 
     if (mode === "continue") {
       const { sessions } = await this.client.request("session/list", { cwd: this.cwd });
@@ -273,18 +299,20 @@ export class App {
     return (await this.client.request("session/create", { cwd: this.cwd })).id;
   }
 
-  private explainOpenError(e: unknown, mode: SessionMode): string {
-    const id = typeof mode === "object" ? mode.resume : "this session";
+  private explainOpenError(cause: unknown, mode: SessionMode): string {
+    const id = mode !== "new" && mode !== "continue" ? mode.resume : "this session";
 
-    if (e instanceof ServerError && e.code === -32010) return `No session ${id}.`;
+    if (!(cause instanceof ServerError)) return `Could not open the session: ${describeError(cause)}`;
 
-    if (e instanceof ServerError && e.code === -32011) {
-      return `This session's journal failed verification: ${(e.data as { problem: string }).problem}.`;
+    if (cause.code === -32010) return `No session ${id}.`;
+
+    if (cause.code === -32011 && hasProblem(cause.data)) {
+      return `This session's journal failed verification: ${cause.data.problem}.`;
     }
 
-    if (e instanceof ServerError && e.code === -32602) return `${id} is not a session id.`;
+    if (cause.code === -32602) return `${id} is not a session id.`;
 
-    return `Could not open the session: ${(e as Error).message}`;
+    return `Could not open the session: ${cause.detail}`;
   }
 
   private renderFooter() {
@@ -361,8 +389,7 @@ export class App {
         await this.client.request("session/prompt", { id: this.session.id, text });
       } catch (e) {
         this.editor.setText(text);
-        const why = e instanceof ServerError ? e.detail : (e as Error).message;
-        this.say(style.danger(`Couldn't confirm your message was saved: ${why}`));
+        this.say(style.danger(`Couldn't confirm your message was saved: ${describeError(e)}`));
       }
 
       return;
@@ -384,7 +411,7 @@ export class App {
         const arg = text.slice(1).split(/\s+/)[1];
         const dollars = arg === "off" ? undefined : Number(arg);
 
-        if (arg !== "off" && !(Number.isFinite(dollars) && (dollars as number) >= 0)) {
+        if (dollars !== undefined && !(Number.isFinite(dollars) && dollars >= 0)) {
           this.say(style.danger("Use /budget <dollars>, for example /budget 10, or /budget off."));
 
           return;
@@ -398,7 +425,7 @@ export class App {
 
       case "approvals": {
         const arg = text.slice(1).split(/\s+/)[1] ?? "";
-        const mode = ({ ask: "ask", "auto-edit": "autoEdit", "full-auto": "fullAuto" } as const)[arg as "ask"];
+        const mode = MODES_BY_NAME.get(arg);
 
         if (!mode) {
           this.say(style.danger("Use /approvals ask, /approvals auto-edit or /approvals full-auto."));
@@ -436,7 +463,7 @@ export class App {
             style.danger(
               e instanceof ServerError && e.code === -32602
                 ? `No checkpoint ${arg} in this session.`
-                : (e as Error).message,
+                : describeError(e),
             ),
           );
         }

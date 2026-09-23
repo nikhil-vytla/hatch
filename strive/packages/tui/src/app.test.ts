@@ -2,7 +2,13 @@ import { afterEach, beforeEach, expect, test } from "bun:test";
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { TuiMainScreen } from "@earendil-works/pi-tui";
-import { type Entry, StriveClient } from "@strive/protocol";
+import {
+  type DaemonStatusResult,
+  type EffectRequest,
+  type SessionInfo,
+  type SessionReadResult,
+  StriveClient,
+} from "@strive/protocol";
 import { startDaemon, type TestDaemon, VirtualTerminal } from "@strive/testkit";
 import { App, parseSessionMode, type SessionMode } from "./app";
 
@@ -47,9 +53,12 @@ const enter = async (ui: Ui, text: string) => {
   ui.term.type("\r");
 };
 
-const sessions = () => JSON.parse(daemon.strive("sessions", "--all", "--json").stdout) as { id: string; cwd: string }[];
+// SAFETY: `--json` commands print the daemon's protocol result, serialized from the same
+// Rust types the TS types are generated from.
+const sessions = () => JSON.parse(daemon.strive("sessions", "--all", "--json").stdout) as SessionInfo[];
 
-const daemonClients = () => JSON.parse(daemon.strive("status", "--json").stdout).clients as number;
+// SAFETY: as for `sessions`.
+const daemonClients = () => (JSON.parse(daemon.strive("status", "--json").stdout) as DaemonStatusResult).clients;
 
 test("a new session is created in the working directory and named in the header", async () => {
   const ui = await openUi();
@@ -101,7 +110,8 @@ test("resuming a tampered session explains why and saves nothing", async () => {
   await first.term.waitFor("› original");
   first.app.quit(0);
   const id = sessions()[0]!.id;
-  const logged = JSON.parse(daemon.strive("log", id, "--json").stdout) as { entries: Entry[] };
+  // SAFETY: as for `sessions`.
+  const logged = JSON.parse(daemon.strive("log", id, "--json").stdout) as SessionReadResult;
   const seq = logged.entries.find((e) => e.event.type === "userMessage")!.seq;
   daemon.strive("stop");
   const journal = join(daemon.home, "sessions", id, "journal.jsonl");
@@ -199,10 +209,10 @@ test("/budget explains its arguments", async () => {
 });
 
 /** Starts an effect for the session from another client, as the agent would. */
-async function agentRuns(request: Record<string, unknown>) {
+async function agentRuns(request: EffectRequest) {
   const { client } = await StriveClient.connect(daemon.socket, { name: "agent", version: "0" });
   const id = sessions()[0]!.id;
-  const done = client.request("effect/run", { id, callId: "call_1", request: request as never });
+  const done = client.request("effect/run", { id, callId: "call_1", request });
 
   return { done, close: () => client.close() };
 }

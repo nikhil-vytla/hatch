@@ -1,11 +1,17 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { createServer, type Server, type Socket } from "node:net";
 import { join } from "node:path";
+import type { MethodName, Methods, NotificationName, Notifications, RpcError } from "@strive/protocol";
 
-export type FakeReply = { result: unknown } | { error: { code: number; message: string; data?: unknown } };
+export type FakeReply<M extends MethodName> = { result: Methods[M]["result"] } | { error: RpcError };
+
+export type Notify = <N extends NotificationName>(method: N, params: Notifications[N]) => void;
 
 /** Handles one request. `notify` writes a notification to this connection before the reply. */
-export type FakeHandler = (params: any, notify: (method: string, params: unknown) => void) => FakeReply;
+export type FakeHandler<M extends MethodName> = (params: Methods[M]["params"], notify: Notify) => FakeReply<M>;
+
+/** Scripted replies by method; typed by the protocol, so a fixture can't drift from the daemon. */
+export type FakeHandlers = { [M in MethodName]?: FakeHandler<M> };
 
 /**
  * A scripted daemon on a real Unix socket, for tests that need exact message
@@ -16,9 +22,9 @@ export class FakeDaemon {
   readonly socket: string;
   private readonly dir = mkdtempSync("/tmp/strv-fake-");
   private readonly server: Server;
-  readonly calls: { method: string; params: any }[] = [];
+  readonly calls: { method: string; params: unknown }[] = [];
 
-  constructor(private readonly handlers: Record<string, FakeHandler>) {
+  constructor(private readonly handlers: FakeHandlers) {
     this.socket = join(this.dir, "fake.sock");
     this.server = createServer((conn) => this.serve(conn));
   }
@@ -40,10 +46,13 @@ export class FakeDaemon {
         this.calls.push({ method: msg.method, params: msg.params });
         const out: string[] = [];
 
-        const notify = (method: string, params: unknown) =>
-          out.push(JSON.stringify({ jsonrpc: "2.0", method, params }));
+        const notify: Notify = (method, params) => out.push(JSON.stringify({ jsonrpc: "2.0", method, params }));
 
-        const reply: FakeReply =
+        // SAFETY: the handler is looked up by the request's own method, and the client under
+        // test sends that method's params (its `request` is typed by the same `Methods` map).
+        const handler = this.handlers[msg.method as MethodName] as FakeHandler<MethodName> | undefined;
+
+        const reply =
           msg.method === "initialize"
             ? {
                 result: {
@@ -52,7 +61,7 @@ export class FakeDaemon {
                   home: this.dir,
                 },
               }
-            : (this.handlers[msg.method]?.(msg.params, notify) ?? {
+            : (handler?.(msg.params, notify) ?? {
                 error: { code: -32601, message: "unknown method" },
               });
 

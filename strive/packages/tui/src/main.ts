@@ -8,7 +8,7 @@ if (process.argv[2] === "host") {
 }
 
 import { ProcessTerminal, TuiMainScreen } from "@earendil-works/pi-tui";
-import { StriveClient } from "@strive/protocol";
+import { describeError, StriveClient } from "@strive/protocol";
 import { App, parseSessionMode } from "./app";
 
 const socket = process.env.STRIVE_SOCKET;
@@ -23,7 +23,7 @@ let connected;
 try {
   connected = await StriveClient.connect(socket, { name: "strive-tui", version: process.env.STRIVE_VERSION ?? "dev" });
 } catch (e) {
-  console.error(`strive: could not reach the daemon at ${socket}: ${(e as Error).message}\nRun \`strive doctor\`.`);
+  console.error(`strive: could not reach the daemon at ${socket}: ${describeError(e)}\nRun \`strive doctor\`.`);
   process.exit(1);
 }
 

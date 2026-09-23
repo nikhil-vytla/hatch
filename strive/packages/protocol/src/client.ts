@@ -22,6 +22,42 @@ export class ServerError extends Error {
   }
 }
 
+/** A thrown value as text for a person: the daemon's own words when it sent some. */
+export function describeError(cause: unknown): string {
+  if (cause instanceof ServerError) return cause.detail;
+
+  return cause instanceof Error ? cause.message : String(cause);
+}
+
+type Notification = { method: string; params: unknown };
+
+type Response = { id: number; result?: unknown; error?: RpcError };
+
+function isNotification(msg: unknown): msg is Notification {
+  return typeof msg === "object" && msg !== null && "method" in msg && typeof msg.method === "string" && !("id" in msg);
+}
+
+function isRpcError(v: unknown): v is RpcError {
+  return (
+    typeof v === "object" &&
+    v !== null &&
+    "code" in v &&
+    typeof v.code === "number" &&
+    "message" in v &&
+    typeof v.message === "string"
+  );
+}
+
+function isResponse(msg: unknown): msg is Response {
+  return (
+    typeof msg === "object" &&
+    msg !== null &&
+    "id" in msg &&
+    typeof msg.id === "number" &&
+    (!("error" in msg) || isRpcError(msg.error))
+  );
+}
+
 type Pending = { method: string; resolve: (v: any) => void; reject: (e: Error) => void };
 
 export class StriveClient {
@@ -94,7 +130,7 @@ export class StriveClient {
   }
 
   private onMessage(line: string) {
-    let msg: any;
+    let msg: unknown;
 
     try {
       msg = JSON.parse(line);
@@ -102,13 +138,14 @@ export class StriveClient {
       return this.shutdown(new Error("daemon sent invalid JSON"));
     }
 
-    if (typeof msg.method === "string" && msg.id === undefined) {
+    if (isNotification(msg)) {
       for (const fn of this.listeners.get(msg.method) ?? []) fn(msg.params);
 
       return;
     }
 
-    const p = typeof msg.id === "number" ? this.pending.get(msg.id) : undefined;
+    if (!isResponse(msg)) return;
+    const p = this.pending.get(msg.id);
 
     if (!p) return;
     this.pending.delete(msg.id);

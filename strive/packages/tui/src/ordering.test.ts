@@ -1,16 +1,20 @@
 import { afterEach, expect, test } from "bun:test";
 import { TuiMainScreen } from "@earendil-works/pi-tui";
-import { StriveClient } from "@strive/protocol";
-import { FakeDaemon, VirtualTerminal } from "@strive/testkit";
+import { type Entry, type SessionInfo, StriveClient } from "@strive/protocol";
+import { FakeDaemon, type FakeHandlers, VirtualTerminal } from "@strive/testkit";
 import { App } from "./app";
 
 const ID = "01J8ZSESSIONAAAAAAAAAAAAAA";
 
-const session = { id: ID, cwd: "/tmp/r", createdAtMs: 0 };
+const session: SessionInfo = { id: ID, cwd: "/tmp/r", createdAtMs: 0 };
 
-const started = { seq: 1, tsMs: 0, event: { type: "sessionStarted", format: 1, cwd: "/tmp/r", striveVersion: "x" } };
+const started: Entry = {
+  seq: 1,
+  tsMs: 0,
+  event: { type: "sessionStarted", format: 1, cwd: "/tmp/r", striveVersion: "x" },
+};
 
-const message = (seq: number, text: string) => ({ seq, tsMs: 0, event: { type: "userMessage", text } });
+const message = (seq: number, text: string): Entry => ({ seq, tsMs: 0, event: { type: "userMessage", text } });
 
 let fake: FakeDaemon | undefined;
 
@@ -21,7 +25,7 @@ afterEach(() => {
   fake?.close();
 });
 
-async function open(handlers: ConstructorParameters<typeof FakeDaemon>[0]) {
+async function open(handlers: FakeHandlers) {
   fake = new FakeDaemon(handlers);
   await fake.listen();
   const term = new VirtualTerminal(100, 30);

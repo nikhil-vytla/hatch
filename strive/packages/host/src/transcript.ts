@@ -5,12 +5,10 @@
 import type { AssistantMessage, Message, ToolResultMessage } from "@earendil-works/pi-ai";
 import type { EffectOutcome, EffectRecord, Entry } from "@strive/protocol";
 
+export type ToolResultText = { text: string; isError: boolean };
+
 /** How an effect's outcome reads to the model. */
-export function resultText(
-  record: EffectRecord,
-  outcome: EffectOutcome,
-  output: string,
-): { text: string; isError: boolean } {
+export function resultText(record: EffectRecord, outcome: EffectOutcome, output: string): ToolResultText {
   switch (outcome.kind) {
     case "done": {
       const exit = record.kind === "bash" && outcome.exitCode !== undefined && outcome.exitCode !== 0;
@@ -84,6 +82,8 @@ export async function rebuild(all: Entry[], blob: (digest: string) => Promise<st
       messages.push({ role: "user", content: e.text, timestamp: tsMs });
     } else if (e.type === "assistantMessage") {
       close();
+      // SAFETY: only the host writes assistantMessage entries, and it records pi-ai's
+      // AssistantMessage as is (Host.record in host.ts); the daemon stores it untouched.
       messages.push(e.message as AssistantMessage);
       open = e.toolCalls.map((c) => ({ ...c, ts: tsMs }));
     }

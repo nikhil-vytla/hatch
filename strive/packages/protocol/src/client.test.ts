@@ -30,10 +30,16 @@ test("concurrent requests on one connection each get their own response", async 
 
 test("server errors carry the JSON-RPC code", async () => {
   const { client } = await StriveClient.connect(daemon.socket, info);
-  const err = await client.request("initialize", { protocolVersion: 999, client: info }).catch((e) => e);
-  expect((err as ServerError).code).toBe(-32003);
-  expect((err as ServerError).message).toBe("initialize: client speaks protocol 999, daemon speaks 1 (-32003)");
-  expect((err as ServerError).detail).toBe("client speaks protocol 999, daemon speaks 1");
+
+  const err = await client.request("initialize", { protocolVersion: 999, client: info }).then(
+    () => undefined,
+    (e) => e,
+  );
+
+  if (!(err instanceof ServerError)) throw new Error(`expected a ServerError, got ${err}`);
+  expect(err.code).toBe(-32003);
+  expect(err.message).toBe("initialize: client speaks protocol 999, daemon speaks 1 (-32003)");
+  expect(err.detail).toBe("client speaks protocol 999, daemon speaks 1");
   client.close();
 });
 

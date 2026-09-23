@@ -6,6 +6,13 @@ import { join, resolve } from "node:path";
 import { type Entry, type Event, StriveClient } from "@strive/protocol";
 import { FakeAnthropic, type ScriptedReply, startDaemon, type TestDaemon } from "@strive/testkit";
 
+type TurnEnded = Extract<Event, { type: "turnEnded" }>;
+
+const lastTurnEnd = (events: Event[]) => events.findLast((x): x is TurnEnded => x.type === "turnEnded");
+
+/** The parts of ~/.strive/settings.json these tests set. */
+type SettingsFile = { compactAtTokens?: number };
+
 const HOST = `bun ${resolve(import.meta.dir, "main.ts")}`;
 
 setDefaultTimeout(30_000);
@@ -131,9 +138,9 @@ test("a provider error ends the turn as failed and says why", async () => {
   const { client, id } = await setup([{ status: 400, error: "prompt is too long" }]);
   await client.request("session/prompt", { id, text: "go" });
   const e = await waitFor(client, id, turnsEnded(1));
-  const end = e.at(-1) as Extract<Event, { type: "turnEnded" }>;
-  expect(end.reason.kind).toBe("failed");
-  expect(JSON.stringify(end.reason)).toContain("prompt is too long");
+  const end = lastTurnEnd(e);
+  expect(end?.reason.kind).toBe("failed");
+  expect(JSON.stringify(end?.reason)).toContain("prompt is too long");
   expect(e.find((x) => x.type === "modelCallFinished")).toMatchObject({ outcome: { kind: "rejected", status: 400 } });
 });
 
@@ -142,9 +149,9 @@ test("running out of budget ends the turn and says so", async () => {
   await client.request("session/budget", { id, usdMicros: 10 });
   await client.request("session/prompt", { id, text: "go" });
   const e = await waitFor(client, id, turnsEnded(1));
-  const end = e.at(-1) as Extract<Event, { type: "turnEnded" }>;
-  expect(end.reason.kind).toBe("failed");
-  expect(JSON.stringify(end.reason)).toContain("session budget is left");
+  const end = lastTurnEnd(e);
+  expect(end?.reason.kind).toBe("failed");
+  expect(JSON.stringify(end?.reason)).toContain("session budget is left");
   expect(fake!.requests.length).toBe(0);
 });
 
@@ -193,7 +200,7 @@ test("the model is given the project's instructions and the skills it can load",
   expect(system).toContain(`release: Cut a release. (${join(cwd, ".strive/skills/release/SKILL.md")})`);
 });
 
-async function setupWith(settings: object, script: ScriptedReply[]) {
+async function setupWith(settings: SettingsFile, script: ScriptedReply[]) {
   fake = new FakeAnthropic(script).start();
   daemon = startDaemon({ STRIVE_UPSTREAM_ANTHROPIC: fake.url, ANTHROPIC_API_KEY: "sk-test-key", STRIVE_HOST: HOST });
   const { writeFileSync } = await import("node:fs");
