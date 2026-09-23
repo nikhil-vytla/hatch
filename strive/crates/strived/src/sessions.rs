@@ -184,6 +184,13 @@ enum Cmd {
         person: bool,
         reply: AttachReply,
     },
+    /// Ends the last turn if it started and didn't end: its host is gone.
+    /// Decided here, against what is committed, so no write slips between
+    /// the check and the end. Replies with whether it ended one.
+    EndOpenTurn {
+        reason: strive_proto::TurnEnd,
+        reply: oneshot::Sender<io::Result<bool>>,
+    },
     /// How many people are attached (clients that aren't agent hosts).
     People {
         reply: oneshot::Sender<usize>,
@@ -571,6 +578,15 @@ impl Sessions {
         Ok(rx.await.map_err(|_| writer_gone())??)
     }
 
+    /// Ends the session's open turn, if any, as failed for `error`.
+    pub async fn end_open_turn(&self, id: &SessionId, error: &str) -> Result<bool> {
+        let (_, tx) = self.writer(id).await?;
+        let (reply, rx) = oneshot::channel();
+        let reason = strive_proto::TurnEnd::Failed { error: error.to_string() };
+        tx.send(Cmd::EndOpenTurn { reason, reply }).map_err(|_| writer_gone())?;
+        Ok(rx.await.map_err(|_| writer_gone())??)
+    }
+
     /// People attached to the session; an error once the daemon is stopping.
     async fn people(&self, id: &SessionId) -> Result<usize> {
         let (_, tx) = self.writer(id).await?;
@@ -845,6 +861,21 @@ impl Writer {
             Cmd::GetMode { reply } => {
                 let _ = reply.send(self.mode);
                 return Staged::Handled;
+            }
+            Cmd::EndOpenTurn { reason, reply } => {
+                let open = self.entries.iter().rev().find_map(|e| match e.event {
+                    Event::TurnStarted { turn, .. } => Some(Some(turn)),
+                    Event::TurnEnded { .. } => Some(None),
+                    _ => None,
+                });
+                let Some(Some(turn)) = open else {
+                    let _ = reply.send(Ok(false));
+                    return Staged::Handled;
+                };
+                (
+                    vec![Event::TurnEnded { turn, reason }],
+                    Box::new(move |r: io::Result<Vec<Entry>>, _| drop(reply.send(r.map(|_| true)))),
+                )
             }
             Cmd::People { reply } => {
                 let _ = reply.send(self.subscribers.iter().filter(|(s, person)| *person && !s.is_closed()).count());

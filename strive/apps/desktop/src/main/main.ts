@@ -1,13 +1,13 @@
 // strive's desktop app: the main process. It connects to the daemon as a
 // person's client, opens the session, and bridges a fixed set of requests
 // to the renderer, which has no Node and no direct access to the daemon.
-import { readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { describeError, type MethodName, type Methods, type SessionInfo, StriveClient } from "@strive/protocol";
 import { HistorySchema, parseJson } from "@strive/workspace";
 import { app, BrowserWindow, ipcMain, type IpcMainInvokeEvent, session as electronSession, protocol } from "electron";
 import type { Opened, StriveEvent } from "../shared/bridge";
+import { loadWorkspace, saveWorkspace } from "./store";
 
 /** What the renderer may ask the daemon for: a person's actions on this session. */
 const ALLOWED: ReadonlySet<MethodName> = new Set<MethodName>([
@@ -61,11 +61,6 @@ async function openSession(client: StriveClient, args: Args): Promise<SessionInf
 /** Where the build put the preload script and renderer (bundling fixes `__dirname` at the source). */
 function built(): string {
   return join(app.getAppPath(), "out");
-}
-
-/** The workspace layout is the user's, kept with the app's own data. */
-function workspaceFile(): string {
-  return join(app.getPath("userData"), "workspace.json");
 }
 
 async function main() {
@@ -127,6 +122,9 @@ async function main() {
     e.sender === window.webContents && e.senderFrame === window.webContents.mainFrame && e.senderFrame.url === page;
 
   window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+  // WebRTC without UDP in every frame, nested widget frames included; with
+  // no proxy, that leaves it nothing to send on (see NO_WEBRTC).
+  window.webContents.setWebRTCIPHandlingPolicy("disable_non_proxied_udp");
   window.webContents.on("will-navigate", (e) => e.preventDefault());
 
   ipcMain.handle("strive:opened", (e) => {
@@ -151,17 +149,7 @@ async function main() {
     return client.request<MethodName>(method, bound);
   });
 
-  ipcMain.handle("workspace:load", (e) => {
-    if (!fromOurPage(e)) return undefined;
-
-    try {
-      const parsed = parseJson(HistorySchema, readFileSync(workspaceFile(), "utf8"));
-
-      return parsed.ok ? parsed.value : undefined;
-    } catch {
-      return undefined; // none saved yet
-    }
-  });
+  ipcMain.handle("workspace:load", (e) => (fromOurPage(e) ? loadWorkspace(app.getPath("userData")) : undefined));
 
   ipcMain.handle("workspace:save", (e, text: string) => {
     if (!fromOurPage(e)) return;
@@ -170,24 +158,7 @@ async function main() {
     const parsed = parseJson(HistorySchema, text);
 
     if (!parsed.ok) throw new Error(`not saved: ${parsed.error}`);
-    const file = workspaceFile();
-
-    // Another window may have decided proposals since this one loaded; keep
-    // those. (The layout itself is the last saver's.)
-    const onDisk = (() => {
-      try {
-        const r = parseJson(HistorySchema, readFileSync(file, "utf8"));
-
-        return r.ok ? r.value.decided : [];
-      } catch {
-        return [];
-      }
-    })();
-
-    const decided = [...new Set([...onDisk, ...parsed.value.decided])];
-    const tmp = `${file}.${process.pid}.tmp`;
-    writeFileSync(tmp, JSON.stringify({ ...parsed.value, decided }));
-    renameSync(tmp, file);
+    saveWorkspace(app.getPath("userData"), parsed.value);
   });
 
   client.onClose(() => {
@@ -206,11 +177,11 @@ protocol.registerSchemesAsPrivileged([{ scheme: "strive-widget", privileges: { s
 
 /**
  * CSP doesn't stop WebRTC, and a peer connection is a way out: a STUN server
- * named in a widget carries data to it. So WebRTC is removed from the page
- * before the widget's own code runs. A fresh realm doesn't bring it back: the
- * widget's origin is opaque, so even an about:blank frame inside it is
- * cross-origin to it. (`webrtc 'block'` is in the policy too, but Chromium
- * here doesn't enforce it; the e2e test shows the removal is what works.)
+ * named in a widget carries data to it. The window's WebRTC policy (no UDP
+ * but through a proxy, and there is none) is what stops it, in every frame.
+ * Removing WebRTC from the widget page is a second layer; it can't reach a
+ * srcdoc frame the widget makes, which gets a fresh realm. The e2e test
+ * tries all three ways against listeners of their own.
  */
 const NO_WEBRTC = `<script>for (const k of ["RTCPeerConnection", "webkitRTCPeerConnection", "RTCDataChannel"])
   Object.defineProperty(window, k, { value: undefined, writable: false, configurable: false });</script>`;

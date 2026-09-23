@@ -8,7 +8,7 @@ use std::os::unix::net::UnixStream;
 use std::time::Duration;
 
 use common::Env;
-use serde_json::json;
+use serde_json::{Value, json};
 use strive_proto::rpc::RpcError;
 
 fn session(env: &Env) -> String {
@@ -136,4 +136,41 @@ fn a_host_that_disconnects_between_turns_ends_nothing() {
     let r = env.rpc().ok("session/read", &json!({"id": id}));
     let ends = r["entries"].as_array().unwrap().iter().filter(|e| e["event"]["type"] == "turnEnded").count();
     assert_eq!(ends, 1);
+}
+
+/// A turn the host starts in its very last message, closing at once, is
+/// still ended: the cleanup waits for the host's writes to land.
+#[test]
+fn a_turn_started_just_before_the_host_disconnects_is_still_ended() {
+    let env = Env::new();
+    let started_seen = std::cell::Cell::new(false);
+    for _ in 0..20 {
+        let id = session(&env);
+        let mut s = UnixStream::connect(env.socket()).unwrap();
+        let init = json!({"jsonrpc": "2.0", "id": 0, "method": "initialize",
+            "params": {"protocolVersion": strive_proto::PROTOCOL_VERSION, "client": {"name": "h", "version": "0"}}});
+        let register = json!({"jsonrpc": "2.0", "id": 1, "method": "host/register", "params": {"id": id}});
+        let start = json!({"jsonrpc": "2.0", "id": 2, "method": "host/record",
+            "params": {"id": id, "event": {"type": "turnStarted", "turn": 1}}});
+        s.write_all(format!("{init}\n{register}\n").as_bytes()).unwrap();
+        // Registered (both replies read), so the record below is accepted.
+        let mut r = std::io::BufReader::new(s.try_clone().unwrap());
+        for _ in 0..2 {
+            let mut line = String::new();
+            std::io::BufRead::read_line(&mut r, &mut line).unwrap();
+        }
+        s.write_all(format!("{start}\n").as_bytes()).unwrap();
+        drop((r, s)); // at once: the record may still be on its way to the journal
+        std::thread::sleep(Duration::from_millis(300));
+        let mut reader = env.rpc();
+        let started_any = &started_seen;
+        common::wait_for("an open turn to be ended", Duration::from_secs(5), || {
+            let r = reader.ok("session/read", &json!({"id": id}));
+            let events: Vec<&Value> = r["entries"].as_array().unwrap().iter().map(|e| &e["event"]).collect();
+            let started = events.iter().any(|e| e["type"] == "turnStarted");
+            started_any.set(started_any.get() || started);
+            !started || events.iter().any(|e| e["type"] == "turnEnded")
+        });
+    }
+    assert!(started_seen.get(), "some turn started, so the test tested something");
 }

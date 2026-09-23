@@ -284,47 +284,53 @@ test("the window can act only on its own session", async () => {
   await app.close();
 });
 
-/** A widget that tries WebRTC against a STUN "server" at PORT, directly and from a fresh about:blank realm. */
-const rtcProbe = (port: number) => `<body><p id="out">trying</p><script>
+/**
+ * A widget that tries WebRTC three ways, each against its own STUN
+ * "server": directly, from an about:blank frame's realm, and from a srcdoc
+ * frame running its own script.
+ */
+const rtcProbe = (direct: number, blank: number, nested: number) => `<body><p id="out">trying</p><script>
 const out = document.getElementById("out");
-const tryFrom = (w, name) => {
-  try {
-    const pc = new w.RTCPeerConnection({ iceServers: [{ urls: "stun:127.0.0.1:${port}" }] });
-    pc.createDataChannel("x");
-    pc.createOffer().then((o) => pc.setLocalDescription(o));
-    out.append(" " + name + ": created");
-  } catch { out.append(" " + name + ": blocked"); }
+const offer = (w, port) => {
+  const pc = new w.RTCPeerConnection({ iceServers: [{ urls: "stun:127.0.0.1:" + port }] });
+  pc.createDataChannel("x");
+  pc.createOffer().then((o) => pc.setLocalDescription(o));
 };
-tryFrom(window, "direct");
+try { offer(window, ${direct}); out.append(" direct: created"); } catch { out.append(" direct: blocked"); }
 const f = document.createElement("iframe");
 document.body.append(f);
-if (f.contentWindow) tryFrom(f.contentWindow, "iframe"); else out.append(" iframe: none");
+try { offer(f.contentWindow, ${blank}); out.append(" blank: created"); } catch { out.append(" blank: blocked"); }
+const nested = document.createElement("iframe");
+nested.srcdoc = "<script>" + offer.toString().replace("(w, port) =>", "const go = (w, port) =>") + "; try { go(window, ${nested}); } catch {}<\\/script>";
+document.body.append(nested);
 setTimeout(() => out.append(" done"), 2500);
 </script></body>`;
 
-test("a widget can't reach the network through WebRTC", async () => {
+/** A UDP listener that counts what reaches it. */
+async function listener(): Promise<{ port: number; packets: () => number; close: () => void }> {
   let packets = 0;
-  const stun = createSocket("udp4", () => packets++);
-  await new Promise<void>((ok) => stun.bind(0, "127.0.0.1", () => ok()));
+  const socket = createSocket("udp4", () => packets++);
+  await new Promise<void>((ok) => socket.bind(0, "127.0.0.1", () => ok()));
+
+  return { port: socket.address().port, packets: () => packets, close: () => socket.close() };
+}
+
+test("a widget can't reach the network through WebRTC", async () => {
+  const [direct, blank, nested] = await Promise.all([listener(), listener(), listener()]);
   const { app, page, cwd } = await openApp();
+  const html = rtcProbe(direct.port, blank.port, nested.port);
 
   const host = await propose(cwd, "rtc probe", [
-    {
-      op: "add",
-      panel: { id: "rtc", kind: "html", title: "RTC", html: rtcProbe(stun.address().port) },
-      column: "side",
-    },
+    { op: "add", panel: { id: "rtc", kind: "html", title: "RTC", html }, column: "side" },
   ]);
 
   await page.getByRole("button", { name: "Accept" }).click();
   await page.frameLocator("iframe.widget").getByText("done").waitFor();
   await new Promise((ok) => setTimeout(ok, 500));
-  assert.equal(
-    await page.frameLocator("iframe.widget").locator("#out").textContent(),
-    "trying direct: blocked iframe: blocked done",
-  );
-  assert.equal(packets, 0, "no STUN request reached the listener");
-  stun.close();
+  const reached = { direct: direct.packets(), blank: blank.packets(), nested: nested.packets() };
+  assert.deepEqual(reached, { direct: 0, blank: 0, nested: 0 }, "no STUN request reached any listener");
+
+  for (const l of [direct, blank, nested]) l.close();
   host.close();
   await app.close();
 });

@@ -54,6 +54,9 @@ pub struct Conn {
     out: mpsc::WeakUnboundedSender<Message>,
     /// Tasks forwarding session entries to this connection.
     subscriptions: std::sync::Mutex<Vec<JoinHandle<()>>>,
+    /// host/record requests still being journaled, and a signal when one ends.
+    records: std::sync::atomic::AtomicUsize,
+    records_done: tokio::sync::Notify,
     /// Attaches under way as a person. Counted under `host_of`'s lock, so
     /// one can't finish after a registration that didn't see it.
     attaching: std::sync::atomic::AtomicUsize,
@@ -77,6 +80,8 @@ impl Conn {
             out: out.downgrade(),
             subscriptions: std::sync::Mutex::new(Vec::new()),
             attaching: std::sync::atomic::AtomicUsize::new(0),
+            records: std::sync::atomic::AtomicUsize::new(0),
+            records_done: tokio::sync::Notify::new(),
         }
     }
 
@@ -91,14 +96,16 @@ impl Conn {
 
     /// Stops forwarding session entries and gives up any host registration;
     /// called when the connection closes.
-    pub fn close(&self, state: &Arc<State>) {
+    pub fn close(self: &Arc<Self>, state: &Arc<State>) {
         let was = std::mem::replace(&mut *crate::sync::lock(&self.host_of), HostOf::Closed);
         if let HostOf::Session(sid) = was {
             state.hosts.release(&sid);
-            // A turn its host was running can't end now unless it's ended here.
-            let state = state.clone();
+            // A turn its host was running can't end now unless it's ended
+            // here, once the host's own writes (a turnStarted, say) have landed.
+            let (state, conn) = (state.clone(), self.clone());
             tokio::spawn(async move {
-                if let Err(e) = end_open_turn(&state, &sid).await {
+                conn.records_settled().await;
+                if let Err(e) = state.sessions.end_open_turn(&sid, "the agent host stopped during this turn").await {
                     crate::log!("could not end session {}'s open turn: {e:?}", sid.as_str());
                 }
             });
@@ -226,22 +233,31 @@ fn claim_host(state: &State, conn: &Conn, sid: &SessionId) -> Result<bool, RpcEr
     }
 }
 
-/// Journals a failed end for a turn that started and didn't end.
-async fn end_open_turn(state: &State, sid: &SessionId) -> Result<(), SessionError> {
-    let (_, report) = state.sessions.read(sid)?;
-    let mut open = None;
-    for e in &report.entries {
-        match e.event {
-            Event::TurnStarted { turn, .. } => open = Some(turn),
-            Event::TurnEnded { .. } => open = None,
-            _ => {}
+/// Counts a host/record as in flight until dropped.
+struct Recording<'a>(&'a Conn);
+
+impl Drop for Recording<'_> {
+    fn drop(&mut self) {
+        self.0.records.fetch_sub(1, std::sync::atomic::Ordering::SeqCst);
+        self.0.records_done.notify_waiters();
+    }
+}
+
+impl Conn {
+    /// Waits (up to 10s) until no host/record from this connection is still
+    /// being journaled.
+    async fn records_settled(&self) {
+        let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(10);
+        loop {
+            let done = self.records_done.notified();
+            if self.records.load(std::sync::atomic::Ordering::SeqCst) == 0 {
+                return;
+            }
+            if tokio::time::timeout_at(deadline, done).await.is_err() {
+                return;
+            }
         }
     }
-    if let Some(turn) = open {
-        let reason = strive_proto::TurnEnd::Failed { error: "the agent host stopped during this turn".into() };
-        state.sessions.append(sid, vec![Event::TurnEnded { turn, reason }]).await?;
-    }
-    Ok(())
 }
 
 /// Gives up a claim whose registration failed. A connection that closed
@@ -347,6 +363,8 @@ async fn route_host(state: &Arc<State>, conn: &Arc<Conn>, method: &str, params: 
             config
         }
         HostRecord::NAME => {
+            conn.records.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            let _recording = Recording(conn);
             let HostRecordParams { id, event } = parse::<HostRecord>(params)?;
             require_host(conn, &session_id(&id)?)?;
             if !matches!(

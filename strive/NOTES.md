@@ -476,3 +476,25 @@ The rest:
   bad key), and accounting counts cached input.
 - **Documented:** what `"sandbox": "off"` doesn't protect inside the
   container; the silent-cancel stop policy.
+
+## Stop-gate review after round 5
+
+Three findings, all fixed:
+- **WebRTC from nested frames:**
+  - The widget page's `NO_WEBRTC` prelude doesn't reach a nested `srcdoc` frame.
+    A per-path probe (direct, `about:blank` child, nested srcdoc) showed the nested one leaking.
+  - The window's `setWebRTCIPHandlingPolicy("disable_non_proxied_udp")` stops all three
+    by itself (3 runs). It is now the primary layer, and the prelude is a second one.
+- **Host cleanup racing queued host records:**
+  - Ending an open turn used to read the journal from disk, and could miss a
+    `turnStarted` still queued to the session actor.
+  - The connection now counts records in flight and waits for them (up to 10s).
+    The actor then ends the turn from its own entries (`Cmd::EndOpenTurn`).
+  - The new host test didn't reproduce the race on the old code in 60 runs, so
+    it stays as a guard only.
+- **Concurrent saves erasing decisions:**
+  - A read-merge-write isn't atomic across app processes. A test with 6 processes
+    × 25 saves lost 100–125 of the 150 decisions on the old code, every run.
+  - Each decision is now also a marker file in `decided/`, which is never
+    rewritten or removed, so no interleaving of saves can undo one.
+  - The layout itself is still whoever saved last.
