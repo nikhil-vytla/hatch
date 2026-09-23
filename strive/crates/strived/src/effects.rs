@@ -512,6 +512,11 @@ fn bash(scope: &Scope, command: &str, timeout_ms: u64, sandboxed: bool, cancelle
         let _ = nix::sys::signal::kill(nix::unistd::Pid::from_raw(pid), nix::sys::signal::Signal::SIGKILL);
     }
     let _ = child.wait();
+    // A fork under way at the kill can finish after the group's members were
+    // counted; the new child is still in the group, so kill the group again.
+    if !matches!(ended, Ended::Exited(_)) {
+        let _ = nix::sys::signal::killpg(nix::unistd::Pid::from_raw(root), nix::sys::signal::Signal::SIGKILL);
+    }
     // A process that escaped every kill (it daemonized) may hold the output
     // pipe open; don't wait on it.
     let (text, truncated) = output.recv_timeout(Duration::from_secs(1)).unwrap_or_default();
