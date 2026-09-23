@@ -9,7 +9,8 @@
   "dependencies": {
     "@strive/protocol": "workspace:*",
     "@earendil-works/pi-tui": "0.87.1",
-    "@strive/host": "workspace:*"
+    "@strive/host": "workspace:*",
+    "@strive/view": "workspace:*"
   },
   "devDependencies": {
     "@strive/testkit": "workspace:*"

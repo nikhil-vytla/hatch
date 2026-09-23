@@ -23,11 +23,10 @@ import {
   type SessionInfo,
   type StriveClient,
 } from "@strive/protocol";
-import { formatUsd } from "./format";
-import { Spend } from "./spend";
+import { describe as describeLines, formatUsd, type Line, MODE_NAMES, Spend } from "@strive/view";
 import { editorTheme, style } from "./theme";
 
-export { formatUsd };
+export { formatUsd, MODE_NAMES };
 
 export const COMMANDS: SlashCommand[] = [
   { name: "status", description: "Show the daemon's status" },
@@ -50,8 +49,6 @@ export const COMMANDS: SlashCommand[] = [
   { name: "help", description: "List commands and keys" },
   { name: "quit", description: "Exit strive (the daemon keeps running)" },
 ];
-
-export const MODE_NAMES = { ask: "ask", autoEdit: "auto-edit", fullAuto: "full-auto" } as const;
 
 const MODES_BY_NAME = new Map<string, ApprovalMode>([
   ["ask", "ask"],
@@ -85,110 +82,28 @@ const tilde = (p: string) => (p.startsWith(homedir()) ? `~${p.slice(homedir().le
 
 const shortId = (id: string) => `…${id.slice(-6)}`;
 
+/** An entry's transcript lines, styled for the terminal. */
 export function describe(entry: Entry): string {
-  const e = entry.event;
-
-  switch (e.type) {
-    case "sessionStarted":
-      return style.faint(`Session started in ${tilde(e.cwd)}`);
-    case "userMessage":
-      return `${style.accent("›")} ${e.text}`;
-    case "recovered":
-      return style.danger(`Recovered after a crash: discarded a partial entry (${e.discardedBytes} bytes).`);
-    case "budgetSet":
-      return style.faint(`Budget: ${budgetText(e.usdMicros, e.tokens)}`);
-    case "modelCallStarted":
-      return "";
-    case "modelCallFinished":
-      switch (e.outcome.kind) {
-        case "complete":
-          return style.faint(
-            `${e.outcome.usage.input} in · ${e.outcome.usage.output} out · ${formatUsd(e.outcome.costUsdMicros)}`,
-          );
-        case "rejected":
-          return style.danger(`The provider refused the call (HTTP ${e.outcome.status}).`);
-        case "broken":
-          return style.danger(
-            `The call broke (${e.outcome.reason}); charged its full hold of ${formatUsd(e.outcome.costUsdMicros)}.`,
-          );
-      }
-
-    case "effectStarted": {
-      const r = e.record;
-
-      switch (r.kind) {
-        case "bash":
-          return style.muted(`$ ${r.command}`);
-        case "write":
-          return style.muted(`write ${r.path} (${r.bytes} bytes)`);
-        case "read":
-        case "edit":
-          return style.muted(`${r.kind} ${r.path}`);
-        case "mcp":
-          return style.muted(`${r.server}: ${r.tool}`);
-        default:
-          return r satisfies never;
-      }
-    }
-
-    case "effectFinished":
-      switch (e.outcome.kind) {
-        case "done":
-          return e.outcome.exitCode === undefined || e.outcome.exitCode === 0
-            ? ""
-            : style.faint(`exit ${e.outcome.exitCode}`);
-        case "refused":
-          return style.danger(`Refused: ${e.outcome.reason}`);
-        case "interrupted":
-          return style.danger("Interrupted: the daemon stopped while this ran.");
-      }
-
-    case "approvalModeSet":
-      return style.faint(`Approvals: ${MODE_NAMES[e.mode]}`);
-    case "checkpointed":
-      return style.faint(`Checkpoint ${e.checkpoint}`);
-    case "rewound":
-      return style.accent(`Rewound to checkpoint ${e.to}. Undo with /rewind ${e.savedAs}.`);
-    case "turnStarted":
-      return "";
-    case "contextLoaded":
-      // Only trouble is worth a line: a server that didn't start takes its tools with it.
-      return e.mcp
-        .flatMap((s) =>
-          s.error === undefined ? [] : [style.danger(`MCP server ${s.server} didn't start: ${s.error}`)],
-        )
-        .join("\n");
-    case "compacted":
-      return style.faint("Summarized the conversation so far to keep it within the model's context.");
-    case "assistantMessage":
-      return e.text.trim();
-    case "turnEnded":
-      switch (e.reason.kind) {
-        case "done":
-          return "";
-        case "interrupted":
-          return style.muted("Interrupted.");
-        case "timedOut":
-          return style.danger(`Stopped: the turn reached its ${e.reason.seconds}s limit.`);
-        case "failed":
-          return style.danger(`The agent stopped: ${e.reason.error}`);
-      }
-
-    case "approvalRequested":
-      return style.muted(`The agent asked to ${e.description}`);
-    case "approvalDecided":
-      return style.faint(
-        `${e.decision === "deny" ? "Declined" : e.decision === "allowSession" ? "Allowed for this session" : "Allowed"} by ${e.by}`,
-      );
-  }
+  return describeLines(entry, { home: homedir() })
+    .map((line) => (line.kind === "prompt" ? `${style.accent("›")} ${line.text}` : tone(line)))
+    .join("\n");
 }
 
-function budgetText(usd?: number, tokens?: number): string {
-  if (usd === undefined && tokens === undefined) return "unlimited";
-
-  return [usd === undefined ? null : formatUsd(usd), tokens === undefined ? null : `${tokens} tokens`]
-    .filter(Boolean)
-    .join(" and ");
+function tone(line: Line): string {
+  switch (line.tone) {
+    case "plain":
+      return line.text;
+    case "accent":
+      return style.accent(line.text);
+    case "muted":
+      return style.muted(line.text);
+    case "faint":
+      return style.faint(line.text);
+    case "danger":
+      return style.danger(line.text);
+    default:
+      return line.tone satisfies never;
+  }
 }
 
 export class App {
