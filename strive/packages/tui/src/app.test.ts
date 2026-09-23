@@ -303,3 +303,19 @@ test("/rewind to a checkpoint that doesn't exist says so", async () => {
   await enter(ui, "/rewind 99");
   await ui.term.waitFor("No checkpoint 99 in this session.");
 });
+
+test("an MCP server that didn't start is shown", async () => {
+  writeFileSync(
+    join(daemon.home, "settings.json"),
+    JSON.stringify({ mcpServers: { broken: { command: "/no/such/server" } } }),
+  );
+  daemon.strive("stop"); // settings are read at start
+  daemon.strive("status");
+  const ui = await openUi();
+  await ui.term.waitFor("Session started");
+  // What an agent host does when it starts for the session.
+  const { client } = await StriveClient.connect(daemon.socket, { name: "agent", version: "0" });
+  await client.request("host/register", { id: sessions()[0]!.id });
+  client.close();
+  await ui.term.waitFor("MCP server broken didn't start: can't run /no/such/server");
+});

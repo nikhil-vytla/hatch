@@ -58,6 +58,10 @@ export type * from "./generated/InitializeResult";
 
 export type * from "./generated/InstructionFile";
 
+export type * from "./generated/McpStatus";
+
+export type * from "./generated/McpTool";
+
 export type * from "./generated/ProviderAuth";
 
 export type * from "./generated/RequestId";

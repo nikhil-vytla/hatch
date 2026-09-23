@@ -14,6 +14,7 @@ mod gateway;
 mod hosts;
 mod launch;
 mod log;
+mod mcp;
 mod methods;
 mod paths;
 mod pinned;

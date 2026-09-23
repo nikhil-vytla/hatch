@@ -77,6 +77,15 @@ pub fn gate(scope: &Scope, request: &EffectRequest, mode: ApprovalMode) -> (Gate
         },
         EffectRequest::Write { path, .. } => change("write", path),
         EffectRequest::Edit { path, .. } => change("edit", path),
+        // A server can do anything its tool does, so only full-auto skips asking.
+        EffectRequest::Mcp { server, tool, .. } => {
+            let gate = if mode == ApprovalMode::FullAuto {
+                Gate::Allow
+            } else {
+                Gate::Ask(format!("use {server}'s {tool} tool"))
+            };
+            (gate, Target(None))
+        }
         EffectRequest::Bash { command, .. } => {
             let gate = if sandboxed_command(scope, command).is_none() {
                 Gate::Ask(format!("run without a sandbox: {command}"))
@@ -110,6 +119,8 @@ pub fn perform(scope: &Scope, request: &EffectRequest, target: &Target, cancelle
         EffectRequest::Bash { command, timeout_ms } => {
             bash(scope, command, timeout_ms.unwrap_or(DEFAULT_TIMEOUT_MS).min(MAX_TIMEOUT_MS), cancelled)
         }
+        // Tool calls are async and go to the session's server (see methods.rs).
+        EffectRequest::Mcp { .. } => Result::Refused("an MCP tool call can't run as a file or command effect".into()),
     }
 }
 
@@ -475,6 +486,11 @@ pub fn record(cas: &strive_journal::cas::Cas, request: &EffectRequest) -> io::Re
         EffectRequest::Bash { command, timeout_ms } => R::Bash {
             command: command.clone(),
             timeout_ms: timeout_ms.unwrap_or(DEFAULT_TIMEOUT_MS).min(MAX_TIMEOUT_MS),
+        },
+        EffectRequest::Mcp { server, tool, arguments } => R::Mcp {
+            server: server.clone(),
+            tool: tool.clone(),
+            arguments: cas.put(&serde_json::to_vec(arguments).map_err(io::Error::other)?)?,
         },
     })
 }

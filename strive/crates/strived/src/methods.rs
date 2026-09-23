@@ -233,6 +233,15 @@ async fn host_config(state: &Arc<State>, sid: &SessionId) -> Reply {
     let workspace = std::path::PathBuf::from(&info.cwd);
     let ctx =
         tokio::task::spawn_blocking(move || crate::context::load(&workspace, &home)).await.map_err(|e| internal(&e))?;
+    let mcp = state
+        .mcp
+        .for_session(
+            &sid,
+            std::path::Path::new(&info.cwd),
+            &state.settings.mcp_servers,
+            &state.sessions.session_dir(&sid),
+        )
+        .await;
     let files = ctx
         .instructions
         .iter()
@@ -245,8 +254,11 @@ async fn host_config(state: &Arc<State>, sid: &SessionId) -> Reply {
         })
         .collect::<std::io::Result<Vec<_>>>()
         .map_err(|e| internal(&e))?;
-    let loaded =
-        Event::ContextLoaded { instructions: files, skills: ctx.skills.iter().map(|s| s.name.clone()).collect() };
+    let loaded = Event::ContextLoaded {
+        instructions: files,
+        skills: ctx.skills.iter().map(|s| s.name.clone()).collect(),
+        mcp: mcp.status.clone(),
+    };
     state.sessions.append(&sid, vec![loaded]).await.map_err(session_error)?;
     reply::<HostRegister>(AgentConfig {
         cwd: info.cwd,
@@ -262,6 +274,7 @@ async fn host_config(state: &Arc<State>, sid: &SessionId) -> Reply {
         },
         instructions: ctx.instructions,
         skills: ctx.skills,
+        mcp_tools: mcp.tools(),
     })
 }
 
@@ -403,6 +416,32 @@ async fn route_effect(state: &Arc<State>, method: &str, params: Value) -> Reply 
     }
 }
 
+/// How long an MCP tool call may run.
+const MCP_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(300);
+
+/// Calls a tool on one of the session's MCP servers.
+async fn call_mcp(
+    state: &State,
+    sid: &SessionId,
+    server: &str,
+    tool: &str,
+    arguments: Value,
+    cancelled: &std::sync::atomic::AtomicBool,
+) -> crate::effects::Result {
+    use crate::effects::Result as R;
+    use crate::mcp::Called;
+    let Some(s) = state.mcp.server(sid, server).await else {
+        return R::Refused(format!("no MCP server named {server} is running for this session"));
+    };
+    match s.call(tool, arguments, cancelled, MCP_TIMEOUT).await {
+        Called::Done { text, is_error: false, truncated } => R::Done { text, exit_code: None, truncated },
+        Called::Done { text, is_error: true, .. } => R::Refused(text),
+        Called::Failed(why) => R::Refused(format!("{server}'s {tool} failed: {why}")),
+        Called::Cancelled => R::Refused(format!("interrupted: {server}'s {tool} was cancelled")),
+        Called::TimedOut => R::Refused(format!("{server}'s {tool} didn't answer in {}s", MCP_TIMEOUT.as_secs())),
+    }
+}
+
 /// Gates, performs and journals one effect the session has started.
 async fn run_effect(
     state: &Arc<State>,
@@ -438,12 +477,18 @@ async fn run_effect(
         } else {
             // Held shared while the effect runs, so a rewind can't race it.
             let files = state.sessions.workspace_lock(&sid).read_owned().await;
-            tokio::task::spawn_blocking(move || {
-                let _files = files;
-                crate::effects::perform(&scope, &request, &target, &cancel)
-            })
-            .await
-            .map_err(|e| internal(&e))?
+            if let EffectRequest::Mcp { server, tool, arguments } = &request {
+                let result = call_mcp(state, &sid, server, tool, arguments.clone(), cancelled).await;
+                drop(files);
+                result
+            } else {
+                tokio::task::spawn_blocking(move || {
+                    let _files = files;
+                    crate::effects::perform(&scope, &request, &target, &cancel)
+                })
+                .await
+                .map_err(|e| internal(&e))?
+            }
         };
         let (outcome, text) = match result {
             crate::effects::Result::Done { text, exit_code, truncated } => {

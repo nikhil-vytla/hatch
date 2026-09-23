@@ -11,7 +11,11 @@ type TurnEnded = Extract<Event, { type: "turnEnded" }>;
 const lastTurnEnd = (events: Event[]) => events.findLast((x): x is TurnEnded => x.type === "turnEnded");
 
 /** The parts of ~/.strive/settings.json these tests set. */
-type SettingsFile = { compactAtTokens?: number; turnSeconds?: number };
+type SettingsFile = {
+  compactAtTokens?: number;
+  turnSeconds?: number;
+  mcpServers?: { [name: string]: { command: string } };
+};
 
 const HOST = `bun ${resolve(import.meta.dir, "main.ts")}`;
 
@@ -300,4 +304,29 @@ test("a turn's time limit also stops a command waiting for approval", async () =
   expect(lastTurnEnd(e)?.reason).toEqual({ kind: "timedOut", seconds: 2 });
   expect(effectOutcome(e)).toMatchObject({ outcome: { kind: "refused", reason: "interrupted: run: touch made.txt" } });
   expect(existsSync(join(cwd, "made.txt"))).toBe(false);
+});
+
+/** The fake MCP server `cargo test` builds from crates/strived/examples/fake_mcp.rs. */
+const FAKE_MCP = resolve(import.meta.dir, "../../../target/debug/examples/fake_mcp");
+
+test("the model can call an MCP server's tool, and the result comes back to it", async () => {
+  const { client, id } = await setupWith({ mcpServers: { fake: { command: FAKE_MCP } } }, [
+    { toolCalls: [{ id: "toolu_1", name: "mcp__fake__echo", input: { text: "hello" } }] },
+    { text: "It said hello." },
+  ]);
+
+  await client.request("session/approvals", { id, mode: "fullAuto" });
+  await client.request("session/prompt", { id, text: "use the echo tool" });
+  const e = await waitFor(client, id, turnsEnded(1));
+  expect(lastTurnEnd(e)?.reason).toEqual({ kind: "done" });
+  const tools = fake!.requests[0].tools.map((t: { name: string }) => t.name);
+  expect(tools).toContain("mcp__fake__echo");
+  const echo = fake!.requests[0].tools.find((t: { name: string }) => t.name === "mcp__fake__echo");
+  expect(echo.input_schema.required).toEqual(["text"]);
+  expect(e.find((x) => x.type === "effectStarted")).toMatchObject({
+    record: { kind: "mcp", server: "fake", tool: "echo" },
+  });
+  const result = fake!.requests[1].messages.at(-1).content[0];
+  expect(result).toMatchObject({ type: "tool_result", tool_use_id: "toolu_1" });
+  expect(JSON.stringify(result.content)).toContain("echo: hello");
 });

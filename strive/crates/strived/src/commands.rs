@@ -104,14 +104,22 @@ fn describe(e: &Entry) -> String {
         Event::Compacted { upto_seq, summary } => {
             format!("conversation up to #{upto_seq} summarized ({} characters)", summary.len())
         }
-        Event::ContextLoaded { instructions, skills } => {
+        Event::ContextLoaded { instructions, skills, mcp } => {
             let files: Vec<&str> = instructions.iter().map(|f| f.path.as_str()).collect();
+            let servers: Vec<String> = mcp
+                .iter()
+                .map(|s| match &s.error {
+                    Some(e) => format!("{} failed: {e}", s.server),
+                    None => format!("{}: {} tool(s)", s.server, s.tools),
+                })
+                .collect();
             format!(
-                "agent context: {} instruction file(s){}, {} skill(s){}",
+                "agent context: {} instruction file(s){}, {} skill(s){}{}",
                 files.len(),
                 if files.is_empty() { String::new() } else { format!(" ({})", files.join(", ")) },
                 skills.len(),
-                if skills.is_empty() { String::new() } else { format!(" ({})", skills.join(", ")) }
+                if skills.is_empty() { String::new() } else { format!(" ({})", skills.join(", ")) },
+                if servers.is_empty() { String::new() } else { format!("; MCP {}", servers.join(", ")) }
             )
         }
         Event::AssistantMessage { text, tool_calls, .. } => {
@@ -245,6 +253,7 @@ fn describe_effect(r: &EffectRecord) -> String {
         EffectRecord::Write { path, bytes, .. } => format!("write {path} ({bytes} bytes)"),
         EffectRecord::Edit { path, .. } => format!("edit {path}"),
         EffectRecord::Bash { command, .. } => format!("bash: {command}"),
+        EffectRecord::Mcp { server, tool, .. } => format!("mcp: {server}'s {tool}"),
     }
 }
 

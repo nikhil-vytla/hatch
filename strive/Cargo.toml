@@ -17,7 +17,7 @@ anyhow = "1.0.104"
 clap = { version = "4.6.7", features = ["derive", "env"] }
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.151"
-tokio = { version = "1.53.1", features = ["rt-multi-thread", "net", "io-util", "macros", "time", "sync", "signal"] }
+tokio = { version = "1.53.1", features = ["rt-multi-thread", "net", "io-util", "macros", "time", "sync", "signal", "process"] }
 ts-rs = "12.0.1"
 tempfile = "3.27.0"
 

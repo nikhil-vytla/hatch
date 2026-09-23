@@ -116,14 +116,19 @@ export function describe(entry: Entry): string {
     case "effectStarted": {
       const r = e.record;
 
-      const what =
-        r.kind === "bash"
-          ? `$ ${r.command}`
-          : r.kind === "write"
-            ? `write ${r.path} (${r.bytes} bytes)`
-            : `${r.kind} ${r.path}`;
-
-      return style.muted(what);
+      switch (r.kind) {
+        case "bash":
+          return style.muted(`$ ${r.command}`);
+        case "write":
+          return style.muted(`write ${r.path} (${r.bytes} bytes)`);
+        case "read":
+        case "edit":
+          return style.muted(`${r.kind} ${r.path}`);
+        case "mcp":
+          return style.muted(`${r.server}: ${r.tool}`);
+        default:
+          return r satisfies never;
+      }
     }
 
     case "effectFinished":
@@ -145,8 +150,14 @@ export function describe(entry: Entry): string {
     case "rewound":
       return style.accent(`Rewound to checkpoint ${e.to}. Undo with /rewind ${e.savedAs}.`);
     case "turnStarted":
-    case "contextLoaded":
       return "";
+    case "contextLoaded":
+      // Only trouble is worth a line: a server that didn't start takes its tools with it.
+      return e.mcp
+        .flatMap((s) =>
+          s.error === undefined ? [] : [style.danger(`MCP server ${s.server} didn't start: ${s.error}`)],
+        )
+        .join("\n");
     case "compacted":
       return style.faint("Summarized the conversation so far to keep it within the model's context.");
     case "assistantMessage":

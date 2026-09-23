@@ -18,6 +18,7 @@ import {
   describeError,
   type EffectRequest,
   type Entry,
+  type McpTool,
   type StriveClient,
   type TurnEnd,
 } from "@strive/protocol";
@@ -167,8 +168,27 @@ function tool(
   };
 }
 
-export function tools(client: StriveClient, sessionId: string): AgentTool<any>[] {
+/** Anthropic and OpenAI accept tool names of letters, digits, _ and -, up to 64. */
+const toolName = (server: string, name: string) =>
+  `mcp__${server}__${name}`.replace(/[^A-Za-z0-9_-]/g, "_").slice(0, 64);
+
+function mcpTool(client: StriveClient, sessionId: string, t: McpTool): AgentTool<any> {
+  // SAFETY: the server's inputSchema is plain JSON Schema; pi-ai validates tool
+  // arguments against plain JSON Schema as well as TypeBox schemas.
+  const parameters = t.inputSchema as ReturnType<typeof Type.Object>;
+  const description = t.description || `${t.server}'s ${t.name}`;
+
+  return tool(client, sessionId, toolName(t.server, t.name), description, parameters, (p) => ({
+    kind: "mcp",
+    server: t.server,
+    tool: t.name,
+    arguments: p,
+  }));
+}
+
+export function tools(client: StriveClient, sessionId: string, mcp: McpTool[] = []): AgentTool<any>[] {
   return [
+    ...mcp.map((t) => mcpTool(client, sessionId, t)),
     tool(
       client,
       sessionId,
@@ -252,7 +272,7 @@ export class Host {
       initialState: {
         systemPrompt: systemPrompt(this.config),
         model: model(this.config),
-        tools: tools(this.client, this.sessionId),
+        tools: tools(this.client, this.sessionId, this.config.mcpTools),
         messages: await rebuild(history, blob),
       },
       streamFn: this.models.streamSimple.bind(this.models),

@@ -453,6 +453,9 @@ pub struct AgentConfig {
     /// Instruction files (AGENTS.md, CLAUDE.md), outermost first.
     pub instructions: Vec<InstructionFile>,
     pub skills: Vec<SkillInfo>,
+    /// Tools from the MCP servers that started. The agent calls them as
+    /// `mcp` effects.
+    pub mcp_tools: Vec<McpTool>,
 }
 
 /// An event the host records: only turn and assistant events are accepted.
@@ -648,6 +651,9 @@ pub enum Event {
     ContextLoaded {
         instructions: Vec<ContextFile>,
         skills: Vec<String>,
+        /// MCP servers from settings, and how each started.
+        #[serde(default)]
+        mcp: Vec<McpStatus>,
     },
     /// The conversation up to entry `upto_seq` was summarized; from here on
     /// the agent carries the summary instead of those messages.
@@ -673,6 +679,31 @@ pub struct ContextFile {
 pub struct InstructionFile {
     pub path: String,
     pub text: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct McpTool {
+    pub server: String,
+    pub name: String,
+    pub description: String,
+    /// The tool's JSON Schema for its arguments, as the server gave it.
+    #[ts(type = "unknown")]
+    pub input_schema: serde_json::Value,
+}
+
+/// How an MCP server fared when a session's agent started.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct McpStatus {
+    pub server: String,
+    pub tools: u64,
+    /// Why it didn't start, if it didn't.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub error: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
@@ -751,6 +782,13 @@ pub enum EffectRequest {
     Write { path: String, content: String },
     /// Replaces the one occurrence of `old_text` with `new_text`.
     Edit { path: String, old_text: String, new_text: String },
+    /// Calls a tool on one of the session's MCP servers.
+    Mcp {
+        server: String,
+        tool: String,
+        #[ts(type = "unknown")]
+        arguments: serde_json::Value,
+    },
     /// Runs a shell command in the session's directory, in the sandbox.
     Bash {
         command: String,
@@ -788,6 +826,12 @@ pub enum EffectRecord {
     Bash {
         command: String,
         timeout_ms: u64,
+    },
+    Mcp {
+        server: String,
+        tool: String,
+        /// The arguments, as JSON.
+        arguments: Digest,
     },
 }
 

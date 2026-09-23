@@ -6,6 +6,7 @@ import type { Decision } from "./Decision";
 import type { Digest } from "./Digest";
 import type { EffectOutcome } from "./EffectOutcome";
 import type { EffectRecord } from "./EffectRecord";
+import type { McpStatus } from "./McpStatus";
 import type { ToolCall } from "./ToolCall";
 import type { TurnEnd } from "./TurnEnd";
 
@@ -60,4 +61,8 @@ toolCalls: Array<ToolCall>,
 /**
  * The message exactly as the agent keeps it, fed back on resume.
  */
-message: unknown, } | { "type": "turnEnded", turn: number, reason: TurnEnd, } | { "type": "contextLoaded", instructions: Array<ContextFile>, skills: Array<string>, } | { "type": "compacted", uptoSeq: number, summary: string, };
+message: unknown, } | { "type": "turnEnded", turn: number, reason: TurnEnd, } | { "type": "contextLoaded", instructions: Array<ContextFile>, skills: Array<string>, 
+/**
+ * MCP servers from settings, and how each started.
+ */
+mcp: Array<McpStatus>, } | { "type": "compacted", uptoSeq: number, summary: string, };

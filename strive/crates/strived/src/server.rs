@@ -54,6 +54,8 @@ pub struct State {
     pub gateway: Gateway,
     /// Model calls in flight. They count as activity, like connected clients.
     pub gateway_calls: AtomicU32,
+    pub mcp: crate::mcp::Servers,
+
     pub hosts: crate::hosts::Hosts,
 }
 
@@ -122,6 +124,8 @@ pub async fn run(cfg: Config) -> Result<Started> {
         models,
         gateway,
         gateway_calls: AtomicU32::new(0),
+        mcp: crate::mcp::Servers::default(),
+
         hosts: crate::hosts::Hosts::default(),
     });
     let gateway_task = tokio::spawn(axum::serve(gateway_listener, gateway::router(state.clone())).into_future());
@@ -181,6 +185,7 @@ pub async fn run(cfg: Config) -> Result<Started> {
     drop(listener);
     gateway_task.abort();
     state.sessions.shutdown().await;
+    state.mcp.stop_all().await;
     drop(lock);
     Ok(Started::Served)
 }

@@ -38,6 +38,24 @@ pub struct Settings {
     /// tokens. 0 means 80% of the model's context window.
     #[serde(default)]
     pub compact_at_tokens: u64,
+    /// MCP servers whose tools the agent may call, by name: the same shape
+    /// as Claude Code's `mcpServers`.
+    #[serde(default)]
+    pub mcp_servers: BTreeMap<String, McpServerSetting>,
+}
+
+/// A stdio MCP server: the daemon starts it in the session's directory.
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct McpServerSetting {
+    pub command: String,
+    #[serde(default)]
+    pub args: Vec<String>,
+    #[serde(default)]
+    pub env: BTreeMap<String, String>,
+    /// Only `stdio` is supported; accepted so Claude Code configs load.
+    #[serde(default, rename = "type")]
+    pub transport: Option<String>,
 }
 
 fn default_agent_max_output() -> u64 {
@@ -122,6 +140,14 @@ impl Settings {
         };
         if s.budget.usd.is_some_and(|d| !d.is_finite() || d < 0.0) {
             anyhow::bail!("{}: budget.usd must be a non-negative number of dollars", path.display());
+        }
+        for (name, server) in &s.mcp_servers {
+            if server.transport.as_deref().is_some_and(|t| t != "stdio") {
+                anyhow::bail!("{}: mcpServers.{name}: only stdio servers are supported", path.display());
+            }
+            if name.is_empty() || !name.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_') {
+                anyhow::bail!("{}: mcpServers.{name:?}: use letters, digits, - and _ in server names", path.display());
+            }
         }
         Ok(s)
     }

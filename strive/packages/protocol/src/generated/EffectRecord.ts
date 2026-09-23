@@ -5,4 +5,8 @@ import type { Digest } from "./Digest";
  * An effect as the journal records it: large payloads live in the content
  * store and are named by digest.
  */
-export type EffectRecord = { "kind": "read", path: string, offset?: number, limit?: number, } | { "kind": "write", path: string, content: Digest, bytes: number, } | { "kind": "edit", path: string, oldText: Digest, newText: Digest, } | { "kind": "bash", command: string, timeoutMs: number, };
+export type EffectRecord = { "kind": "read", path: string, offset?: number, limit?: number, } | { "kind": "write", path: string, content: Digest, bytes: number, } | { "kind": "edit", path: string, oldText: Digest, newText: Digest, } | { "kind": "bash", command: string, timeoutMs: number, } | { "kind": "mcp", server: string, tool: string, 
+/**
+ * The arguments, as JSON.
+ */
+arguments: Digest, };
