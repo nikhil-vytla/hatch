@@ -87,12 +87,13 @@ fn main() {
                     return;
                 }
             };
-            writeln!(out.lock().unwrap(), "{}", json!({"jsonrpc": "2.0", "id": id, "result": result})).unwrap();
-            // A request of its own with an absurd id, once it has listed its tools.
+            // A request of its own with an absurd id, as it lists its tools:
+            // before the listing's reply, so it arrives ahead of anything else.
             if big_id {
                 let request = json!({"jsonrpc": "2.0", "id": "x".repeat(1024 * 1024), "method": "roots/list"});
                 writeln!(out.lock().unwrap(), "{request}").unwrap();
             }
+            writeln!(out.lock().unwrap(), "{}", json!({"jsonrpc": "2.0", "id": id, "result": result})).unwrap();
         });
         if deaf {
             std::thread::sleep(std::time::Duration::from_secs(60));
