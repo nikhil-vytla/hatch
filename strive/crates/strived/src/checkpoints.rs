@@ -91,9 +91,25 @@ impl Shadow {
         let mut nested: Vec<String> =
             untracked.into_iter().filter_map(|p| p.strip_suffix('/').map(str::to_string)).collect();
         nested.extend(self.pointers()?);
+        nested.extend(self.saved_directories_with_git()?);
         nested.sort();
         nested.dedup();
         Ok(nested)
+    }
+
+    /// Directories an earlier checkpoint saved files in that have since
+    /// become repositories of their own: git lists them as neither untracked
+    /// nor pointers, so they're found by their `.git`. One check per saved
+    /// directory; ignored trees (`node_modules`, say) aren't walked.
+    fn saved_directories_with_git(&self) -> io::Result<Vec<String>> {
+        let mut dirs: HashSet<String> = HashSet::new();
+        for file in self.list(&["ls-files", "-z"])? {
+            dirs.extend(file.match_indices('/').map(|(i, _)| file[..i].to_string()));
+        }
+        let mut found: Vec<String> =
+            dirs.into_iter().filter(|d| self.work_tree.join(d).join(".git").symlink_metadata().is_ok()).collect();
+        found.sort();
+        Ok(found)
     }
 
     /// Paths the index holds as pointers to nested repositories (mode 160000).

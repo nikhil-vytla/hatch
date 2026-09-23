@@ -281,6 +281,26 @@ fn a_rewind_that_would_replace_a_nested_repository_is_refused() {
     assert_eq!(w.read("sub/work.txt").as_deref(), Some("only copy"));
 }
 
+/// A directory whose files a checkpoint already saved can become a
+/// repository of its own; git then no longer lists it as untracked, so it's
+/// found by its `.git`. A rewind that would put a file in its place, and its
+/// history with it, is refused.
+#[test]
+fn a_saved_directory_that_became_a_repository_is_not_rewound_over() {
+    let mut w = Ws::new();
+    w.write("sub", "a file, once");
+    w.prompt("first");
+    fs::remove_file(w.p("sub")).unwrap();
+    w.write("sub/work.txt", "saved by the second checkpoint");
+    w.prompt("second");
+    git(&w.p("sub"), &["init", "-q"]);
+    git(&w.p("sub"), &["-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "--allow-empty", "-m", "history"]);
+    let r = w.rewind(1);
+    let message = r["error"]["message"].as_str().unwrap_or_default().to_string();
+    assert!(message.contains("sub"), "{r}");
+    assert!(w.p("sub/.git").is_dir(), "the nested repository's history is still there");
+}
+
 /// On a case-insensitive filesystem (macOS's default) `CACHE` and `cache`
 /// are one path, so the check compares names without case.
 #[test]

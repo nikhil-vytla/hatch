@@ -240,11 +240,14 @@ fn a_host_that_sends_invalid_utf8_is_cleaned_up() {
     let register = json!({"jsonrpc": "2.0", "id": 1, "method": "host/register", "params": {"id": id}});
     let start = json!({"jsonrpc": "2.0", "id": 2, "method": "host/record",
         "params": {"id": id, "event": {"type": "turnStarted", "turn": 1}}});
-    s.write_all(format!("{init}\n{register}\n{start}\n").as_bytes()).unwrap();
+    // One at a time: after the handshake, requests run concurrently, and a
+    // record that overtook the registration would be refused.
     let mut r = std::io::BufReader::new(s.try_clone().unwrap());
-    for _ in 0..3 {
+    for message in [init, register, start] {
+        s.write_all(format!("{message}\n").as_bytes()).unwrap();
         let mut line = String::new();
         std::io::BufRead::read_line(&mut r, &mut line).unwrap();
+        assert!(!line.contains("\"error\""), "{line}");
     }
     s.write_all(&[0xFF, 0xFE, b'\n']).unwrap();
     let mut reader = env.rpc();
