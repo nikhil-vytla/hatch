@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { mkdtempSync } from "node:fs";
+import { mkdirSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { history, type Workspace } from "@strive/workspace";
@@ -27,6 +27,17 @@ test("a save doesn't undo decisions another window saved since this one loaded",
   saveWorkspace(dir, { ...history(base), decided: ["from-b"] });
 
   expect(loadWorkspace(dir)?.decided.toSorted()).toEqual(["from-a", "from-b"]);
+});
+
+test("a save that fails decides nothing, so its proposals are offered again", () => {
+  const dir = mkdtempSync(join(tmpdir(), "strv-store-"));
+  saveWorkspace(dir, history(base));
+  // The layout can't be written: its temporary file's name is taken by a directory.
+  mkdirSync(join(dir, `workspace.json.${process.pid}.tmp`));
+
+  expect(() => saveWorkspace(dir, { ...history(base), decided: ["accepted"] })).toThrow();
+
+  expect(loadWorkspace(dir)?.decided).toEqual([]);
 });
 
 // Each window is its own process, so saves from two of them interleave.

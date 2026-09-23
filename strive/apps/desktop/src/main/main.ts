@@ -1,6 +1,7 @@
 // strive's desktop app: the main process. It connects to the daemon as a
 // person's client, opens the session, and bridges a fixed set of requests
 // to the renderer, which has no Node and no direct access to the daemon.
+import { type AddressInfo, createServer } from "node:net";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { describeError, type MethodName, type Methods, type SessionInfo, StriveClient } from "@strive/protocol";
@@ -101,6 +102,7 @@ async function main() {
   electronSession.defaultSession.webRequest.onBeforeRequest({ urls: ["http://*/*", "https://*/*"] }, (_d, cb) =>
     cb({ cancel: true }),
   );
+  await refuseProxiedTraffic();
 
   const window = new BrowserWindow({
     width: 1280,
@@ -122,8 +124,8 @@ async function main() {
     e.sender === window.webContents && e.senderFrame === window.webContents.mainFrame && e.senderFrame.url === page;
 
   window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
-  // WebRTC without UDP in every frame, nested widget frames included; with
-  // no proxy, that leaves it nothing to send on (see NO_WEBRTC).
+  // WebRTC in every frame, nested widget frames included, may use only the
+  // proxy, which refuses it (see NO_WEBRTC).
   window.webContents.setWebRTCIPHandlingPolicy("disable_non_proxied_udp");
   window.webContents.on("will-navigate", (e) => e.preventDefault());
 
@@ -169,6 +171,30 @@ async function main() {
   await window.loadFile(join(built(), "renderer", "index.html"));
 }
 
+/** A TCP listener's address: a string only for a pipe, null before it listens. */
+function isInet(a: AddressInfo | string | null): a is AddressInfo {
+  return a !== null && typeof a === "object";
+}
+
+/**
+ * Points the window's traffic at a proxy of our own that closes every
+ * connection. Requests are cancelled before they get there; this is for what
+ * webRequest doesn't see, WebRTC's TCP. Loopback goes through it too, not
+ * around it as Chromium's default would.
+ */
+async function refuseProxiedTraffic(): Promise<void> {
+  const refuser = createServer((c) => c.destroy());
+  await new Promise<void>((ok) => refuser.listen(0, "127.0.0.1", ok));
+  refuser.unref();
+  const address = refuser.address();
+
+  if (!isInet(address)) throw new Error("the refusing proxy has no port");
+  await electronSession.defaultSession.setProxy({
+    proxyRules: `http://127.0.0.1:${address.port}`,
+    proxyBypassRules: "<-loopback>",
+  });
+}
+
 /** Agent widgets: pages the agent wrote, served with a policy of their own. */
 const WIDGET_POLICY =
   "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; font-src data:; webrtc 'block'";
@@ -176,12 +202,13 @@ const WIDGET_POLICY =
 protocol.registerSchemesAsPrivileged([{ scheme: "strive-widget", privileges: { standard: true } }]);
 
 /**
- * CSP doesn't stop WebRTC, and a peer connection is a way out: a STUN server
- * named in a widget carries data to it. The window's WebRTC policy (no UDP
- * but through a proxy, and there is none) is what stops it, in every frame.
- * Removing WebRTC from the widget page is a second layer; it can't reach a
- * srcdoc frame the widget makes, which gets a fresh realm. The e2e test
- * tries all three ways against listeners of their own.
+ * CSP doesn't stop WebRTC, and a peer connection is a way out: a STUN (UDP)
+ * or TURN (TCP) server named in a widget carries data to it. What stops it,
+ * in every frame, is the window's WebRTC policy: no UDP except through a
+ * proxy, and TCP only through the proxy, which refuses everything. Removing
+ * WebRTC from the widget page is a second layer; it can't reach a srcdoc
+ * frame the widget makes, which gets a fresh realm. The e2e test tries all
+ * three ways, over UDP and TCP, against listeners of their own.
  */
 const NO_WEBRTC = `<script>for (const k of ["RTCPeerConnection", "webkitRTCPeerConnection", "RTCDataChannel"])
   Object.defineProperty(window, k, { value: undefined, writable: false, configurable: false });</script>`;

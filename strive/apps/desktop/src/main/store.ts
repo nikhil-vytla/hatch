@@ -31,14 +31,17 @@ export function loadWorkspace(dir: string): History | undefined {
   }
 }
 
-/** Saves `h` in `dir`, keeping decisions other windows saved since this one loaded. */
+/**
+ * Saves `h` in `dir`, keeping decisions other windows saved since this one
+ * loaded. The layout goes first: a save that fails before it lands decides
+ * nothing, so an accepted proposal whose edit wasn't saved is offered again.
+ */
 export function saveWorkspace(dir: string, h: History): void {
-  mkdirSync(join(dir, "decided"), { recursive: true });
-
-  // Decisions first: once the layout names one, its file exists.
-  for (const key of h.decided) writeFileSync(join(dir, "decided", marker(key)), "", { flag: "a" });
   const file = join(dir, "workspace.json");
   const tmp = `${file}.${process.pid}.tmp`;
   writeFileSync(tmp, JSON.stringify({ ...h, decided: [...new Set([...decisions(dir), ...h.decided])] }));
   renameSync(tmp, file);
+  mkdirSync(join(dir, "decided"), { recursive: true });
+
+  for (const key of h.decided) writeFileSync(join(dir, "decided", marker(key)), "", { flag: "a" });
 }

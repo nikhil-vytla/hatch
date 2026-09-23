@@ -5,10 +5,10 @@ import { execFileSync } from "node:child_process";
 import { createSocket } from "node:dgram";
 import { mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
-import { connect, type Socket } from "node:net";
+import { type AddressInfo, connect, createServer, type Socket } from "node:net";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { after, before, test } from "node:test";
+import { after, afterEach, before, test } from "node:test";
 import { _electron as electron, type ElectronApplication, type Page } from "playwright";
 
 const ROOT = resolve(import.meta.dirname, "../../..");
@@ -37,6 +37,26 @@ after(() => {
     rmSync(home, { recursive: true, force: true });
   }
 });
+
+/** Every app a test opened: closed after it, pass or fail, or the run never ends. */
+const launched = new Set<ElectronApplication>();
+
+afterEach(async () => {
+  await Promise.all([...launched].map((a) => a.close().catch(() => undefined)));
+  launched.clear();
+});
+
+async function launch(args: string[]): Promise<ElectronApplication> {
+  const app = await electron.launch({
+    executablePath: electronPath,
+    args: [APP, ...args],
+    env: { ...process.env, STRIVE_SOCKET: join(home, "run/strived.sock") },
+  });
+
+  launched.add(app);
+
+  return app;
+}
 
 type Json = string | number | boolean | null | Json[] | { [key: string]: Json };
 
@@ -98,11 +118,7 @@ async function openApp(): Promise<Opened> {
   const cwd = realpathSync(mkdtempSync(join(tmpdir(), "strv-desk-ws-")));
   const userData = mkdtempSync(join(tmpdir(), "strv-desk-data-"));
 
-  const app = await electron.launch({
-    executablePath: electronPath,
-    args: [APP, `--user-data-dir=${userData}`, "--cwd", cwd],
-    env: { ...process.env, STRIVE_SOCKET: join(home, "run/strived.sock") },
-  });
+  const app = await launch([`--user-data-dir=${userData}`, "--cwd", cwd]);
 
   const page = await app.firstWindow();
   await page.getByText(`Session started in ${cwd}`).waitFor();
@@ -246,11 +262,7 @@ test("a rejected proposal isn't offered again, even after reopening", async () =
   host.close();
   await first.app.close();
 
-  const again = await electron.launch({
-    executablePath: electronPath,
-    args: [APP, `--user-data-dir=${first.userData}`, "--cwd", first.cwd, "--continue"],
-    env: { ...process.env, STRIVE_SOCKET: join(home, "run/strived.sock") },
-  });
+  const again = await launch([`--user-data-dir=${first.userData}`, "--cwd", first.cwd, "--continue"]);
 
   const page = await again.firstWindow();
   await page.getByText("The agent proposed a layout change: drop spend").waitFor();
@@ -285,64 +297,89 @@ test("the window can act only on its own session", async () => {
 });
 
 /**
- * A widget that tries WebRTC three ways, each against its own STUN
- * "server": directly, from an about:blank frame's realm, and from a srcdoc
- * frame running its own script.
+ * A widget that tries WebRTC three ways, each against its own STUN (UDP) and
+ * TURN (TCP) "servers": directly, from an about:blank frame's realm, and from
+ * a srcdoc frame running its own script.
  */
-const rtcProbe = (direct: number, blank: number, nested: number) => `<body><p id="out">trying</p><script>
+const rtcProbe = (direct: Listener, blank: Listener, nested: Listener) => `<body><p id="out">trying</p><script>
 const out = document.getElementById("out");
-const offer = (w, port) => {
-  const pc = new w.RTCPeerConnection({ iceServers: [{ urls: "stun:127.0.0.1:" + port }] });
+const offer = (w, udp, tcp) => {
+  const pc = new w.RTCPeerConnection({ iceServers: [
+    { urls: "stun:127.0.0.1:" + udp },
+    { urls: "turn:127.0.0.1:" + tcp + "?transport=tcp", username: "u", credential: "p" },
+  ] });
   pc.createDataChannel("x");
   pc.createOffer().then((o) => pc.setLocalDescription(o));
 };
-try { offer(window, ${direct}); out.append(" direct: created"); } catch { out.append(" direct: blocked"); }
+try { offer(window, ${direct.udp}, ${direct.tcp}); out.append(" direct: created"); } catch { out.append(" direct: blocked"); }
 const f = document.createElement("iframe");
 document.body.append(f);
-try { offer(f.contentWindow, ${blank}); out.append(" blank: created"); } catch { out.append(" blank: blocked"); }
+try { offer(f.contentWindow, ${blank.udp}, ${blank.tcp}); out.append(" blank: created"); } catch { out.append(" blank: blocked"); }
 const nested = document.createElement("iframe");
-nested.srcdoc = "<script>" + offer.toString().replace("(w, port) =>", "const go = (w, port) =>") + "; try { go(window, ${nested}); } catch {}<\\/script>";
+nested.srcdoc = "<script>" + offer.toString().replace("(w, udp, tcp) =>", "const go = (w, udp, tcp) =>") + "; try { go(window, ${nested.udp}, ${nested.tcp}); } catch {}<\\/script>";
 document.body.append(nested);
 setTimeout(() => out.append(" done"), 2500);
 </script></body>`;
 
-/** A UDP listener that counts what reaches it. */
-async function listener(): Promise<{ port: number; packets: () => number; close: () => void }> {
-  let packets = 0;
-  const socket = createSocket("udp4", () => packets++);
-  await new Promise<void>((ok) => socket.bind(0, "127.0.0.1", () => ok()));
+type Listener = { udp: number; tcp: number; reached: () => number; close: () => void };
 
-  return { port: socket.address().port, packets: () => packets, close: () => socket.close() };
+/** A TCP listener's address: a string only for a pipe, null before it listens. */
+function isInet(a: AddressInfo | string | null): a is AddressInfo {
+  return a !== null && typeof a === "object";
+}
+
+/** A UDP and a TCP listener that count what reaches them. */
+async function listener(): Promise<Listener> {
+  let reached = 0;
+  const udp = createSocket("udp4", () => reached++);
+  await new Promise<void>((ok) => udp.bind(0, "127.0.0.1", () => ok()));
+
+  const tcp = createServer((c) => {
+    reached++;
+    c.destroy();
+  });
+
+  await new Promise<void>((ok) => tcp.listen(0, "127.0.0.1", () => ok()));
+  const address = tcp.address();
+  assert.ok(isInet(address));
+
+  return {
+    udp: udp.address().port,
+    tcp: address.port,
+    reached: () => reached,
+    close: () => {
+      udp.close();
+      tcp.close();
+    },
+  };
 }
 
 test("a widget can't reach the network through WebRTC", async () => {
-  const [direct, blank, nested] = await Promise.all([listener(), listener(), listener()]);
-  const { app, page, cwd } = await openApp();
-  const html = rtcProbe(direct.port, blank.port, nested.port);
+  const listeners = await Promise.all([listener(), listener(), listener()]);
+  const [direct, blank, nested] = listeners;
+  const { page, cwd } = await openApp();
+  const html = rtcProbe(direct, blank, nested);
 
   const host = await propose(cwd, "rtc probe", [
     { op: "add", panel: { id: "rtc", kind: "html", title: "RTC", html }, column: "side" },
   ]);
 
-  await page.getByRole("button", { name: "Accept" }).click();
-  await page.frameLocator("iframe.widget").getByText("done").waitFor();
-  await new Promise((ok) => setTimeout(ok, 500));
-  const reached = { direct: direct.packets(), blank: blank.packets(), nested: nested.packets() };
-  assert.deepEqual(reached, { direct: 0, blank: 0, nested: 0 }, "no STUN request reached any listener");
-
-  for (const l of [direct, blank, nested]) l.close();
-  host.close();
-  await app.close();
+  try {
+    await page.getByRole("button", { name: "Accept" }).click();
+    await page.frameLocator("iframe.widget").getByText("done").waitFor();
+    await new Promise((ok) => setTimeout(ok, 500));
+    const reached = { direct: direct.reached(), blank: blank.reached(), nested: nested.reached() };
+    assert.deepEqual(reached, { direct: 0, blank: 0, nested: 0 }, "no STUN or TURN request reached any listener");
+  } finally {
+    for (const l of listeners) l.close();
+    host.close();
+  }
 });
 
 test("a decision made in one window survives another window's save", async () => {
   const a = await openApp();
 
-  const b = await electron.launch({
-    executablePath: electronPath,
-    args: [APP, `--user-data-dir=${a.userData}`, "--cwd", a.cwd, "--continue"],
-    env: { ...process.env, STRIVE_SOCKET: join(home, "run/strived.sock") },
-  });
+  const b = await launch([`--user-data-dir=${a.userData}`, "--cwd", a.cwd, "--continue"]);
 
   const pageB = await b.firstWindow();
   await pageB.getByText(`Session started in ${a.cwd}`).waitFor();

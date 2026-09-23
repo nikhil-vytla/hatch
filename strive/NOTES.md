@@ -498,3 +498,17 @@ Three findings, all fixed:
   - Each decision is now also a marker file in `decided/`, which is never
     rewritten or removed, so no interleaving of saves can undo one.
   - The layout itself is still whoever saved last.
+
+Stop-gate review of `c29c796`:
+- **TURN over TCP still got out:**
+  - `disable_non_proxied_udp` still allows TCP. The probe now gives each path a
+    TURN/TCP server as well, and the nested srcdoc frame reached it.
+  - Fix: main runs a loopback proxy that closes every connection, and points
+    the session at it with `<-loopback>`, so loopback isn't exempt.
+  - WebRTC's TCP now has only that proxy to go through. 3/3 runs pass.
+- **A failed save hid proposals:** decision markers were written before the
+  layout, so a failed layout write left an accepted proposal decided but
+  without its edit. The layout is now written first. A test injects the failure.
+- **Test hygiene:** a failed e2e test left its Electron app and sockets open,
+  so `node --test` never exited, and a dozen stale runners had piled up. Apps
+  now close in `afterEach`, and the probe closes its listeners in `finally`.
