@@ -71,6 +71,10 @@ impl RpcError {
     pub const NOT_INITIALIZED: i32 = -32002;
     /// Client and daemon speak different protocol versions.
     pub const PROTOCOL_MISMATCH: i32 = -32003;
+    /// The session does not exist.
+    pub const SESSION_NOT_FOUND: i32 = -32010;
+    /// The session's journal failed verification; `data.problem` says why.
+    pub const JOURNAL_INVALID: i32 = -32011;
 
     pub fn new(code: i32, message: impl Into<String>) -> Self {
         Self {

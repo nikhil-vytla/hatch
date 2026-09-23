@@ -3,11 +3,26 @@ import type { DaemonStatusResult } from "./DaemonStatusResult";
 import type { Empty } from "./Empty";
 import type { InitializeParams } from "./InitializeParams";
 import type { InitializeResult } from "./InitializeResult";
+import type { SessionAttachParams } from "./SessionAttachParams";
+import type { SessionAttachResult } from "./SessionAttachResult";
+import type { SessionCreateParams } from "./SessionCreateParams";
+import type { SessionInfo } from "./SessionInfo";
+import type { SessionListParams } from "./SessionListParams";
+import type { SessionListResult } from "./SessionListResult";
+import type { SessionPromptParams } from "./SessionPromptParams";
+import type { SessionPromptResult } from "./SessionPromptResult";
+import type { SessionReadResult } from "./SessionReadResult";
+import type { SessionRef } from "./SessionRef";
 
 export type Methods = {
   "initialize": { params: InitializeParams; result: InitializeResult };
   "daemon/status": { params: Empty; result: DaemonStatusResult };
   "daemon/shutdown": { params: Empty; result: Empty };
+  "session/create": { params: SessionCreateParams; result: SessionInfo };
+  "session/list": { params: SessionListParams; result: SessionListResult };
+  "session/attach": { params: SessionAttachParams; result: SessionAttachResult };
+  "session/prompt": { params: SessionPromptParams; result: SessionPromptResult };
+  "session/read": { params: SessionRef; result: SessionReadResult };
 };
 
 export type MethodName = keyof Methods;

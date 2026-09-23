@@ -16,3 +16,4 @@ __pycache__/
 /tests/
 *.bun-build
 /.audit/
+/mutants.out*/

@@ -68,6 +68,17 @@ methods! {
     Initialize = "initialize" (InitializeParams) -> InitializeResult;
     DaemonStatus = "daemon/status" (Empty) -> DaemonStatusResult;
     DaemonShutdown = "daemon/shutdown" (Empty) -> Empty;
+    SessionCreate = "session/create" (SessionCreateParams) -> SessionInfo;
+    SessionList = "session/list" (SessionListParams) -> SessionListResult;
+    SessionAttach = "session/attach" (SessionAttachParams) -> SessionAttachResult;
+    SessionPrompt = "session/prompt" (SessionPromptParams) -> SessionPromptResult;
+    SessionRead = "session/read" (SessionRef) -> SessionReadResult;
+}
+
+/// Server-to-client notifications.
+pub mod notify {
+    /// A new entry in a session this connection attached to.
+    pub const SESSION_ENTRY: &str = "session/entry";
 }
 
 /// Parameters or result with no fields. Serializes as `{}`.
@@ -124,6 +135,143 @@ pub struct DaemonStatusResult {
     pub clients: u32,
     /// Seconds with no clients before the daemon exits.
     pub idle_exit_secs: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct SessionInfo {
+    pub id: String,
+    pub cwd: String,
+    pub created_at_ms: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct SessionCreateParams {
+    pub cwd: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct SessionListParams {
+    /// Only sessions started in this directory. All sessions when absent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub cwd: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct SessionListResult {
+    /// Newest first.
+    pub sessions: Vec<SessionInfo>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct SessionRef {
+    pub id: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct SessionAttachParams {
+    pub id: String,
+    /// Return only entries after this seq (for catching up after a reconnect).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub after_seq: Option<u64>,
+}
+
+/// History up to now. Later entries arrive as `session/entry` notifications.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct SessionAttachResult {
+    pub session: SessionInfo,
+    pub entries: Vec<Entry>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct SessionPromptParams {
+    pub id: String,
+    pub text: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct SessionPromptResult {
+    pub seq: u64,
+}
+
+/// A session's journal as it is on disk, and whether it verifies.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct SessionReadResult {
+    pub session: SessionInfo,
+    /// The entries that verified, in order.
+    pub entries: Vec<Entry>,
+    pub committed: u64,
+    /// Bytes of a partial last line left by a crash; discarded on next open.
+    pub torn_bytes: u64,
+    /// Why verification failed. Absent when the journal is intact.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub problem: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct SessionEntryNotification {
+    pub session_id: String,
+    pub entry: Entry,
+}
+
+/// Something that happened in a session. Journaled in order; never edited.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(
+    tag = "type",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+#[ts(export)]
+pub enum Event {
+    SessionStarted {
+        /// Journal format version.
+        format: u32,
+        cwd: String,
+        strive_version: String,
+    },
+    UserMessage {
+        text: String,
+    },
+    /// Opening the journal found a partial last line from a crash and
+    /// discarded it.
+    Recovered {
+        discarded_bytes: u64,
+    },
+}
+
+/// A journaled event with its position and time.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct Entry {
+    /// 1 for the first entry, then consecutive.
+    pub seq: u64,
+    pub ts_ms: u64,
+    pub event: Event,
 }
 
 #[cfg(test)]
