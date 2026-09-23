@@ -4,4 +4,8 @@ export type SessionRewindResult = {
 /**
  * The checkpoint holding the files as they were before the rewind.
  */
-savedAs: number, };
+savedAs: number, 
+/**
+ * Nested repositories, left as they were: checkpoints don't hold them.
+ */
+notSaved: Array<string>, };

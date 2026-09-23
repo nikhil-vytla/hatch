@@ -325,20 +325,50 @@ async fn rewind(state: &Arc<State>, params: Value) -> Reply {
         .await
         .map_err(session_error)?
         .ok_or_else(|| RpcError::new(RpcError::INVALID_PARAMS, format!("no checkpoint {to} in this session")))?;
+    // No effect may change files while the restore runs.
+    let _files = state.sessions.workspace_lock(&sid).try_write_owned().map_err(|_| {
+        RpcError::new(
+            RpcError::INVALID_REQUEST,
+            "the agent is changing files right now; interrupt it (Esc) before rewinding",
+        )
+    })?;
     let lock = state.sessions.checkpoint_lock(&sid);
     let _held = lock.lock().await;
-    let shadow = crate::checkpoints::Shadow::new(&state.sessions.checkpoint_dir(&sid), std::path::Path::new(&info.cwd))
-        .ok_or_else(|| RpcError::new(RpcError::INTERNAL_ERROR, "checkpoints need git, which isn't available"))?;
-    let saved = tokio::task::spawn_blocking(move || {
-        let saved = shadow.snapshot(&format!("before rewinding to checkpoint {to}"))?;
-        shadow.restore(&target)?;
-        std::io::Result::Ok(saved)
+    let shadow = Arc::new(
+        crate::checkpoints::Shadow::new(&state.sessions.checkpoint_dir(&sid), std::path::Path::new(&info.cwd))
+            .ok_or_else(|| RpcError::new(RpcError::INTERNAL_ERROR, "checkpoints need git, which isn't available"))?,
+    );
+    let git = shadow.clone();
+    let target_commit = target.clone();
+    let (saved, nested) = tokio::task::spawn_blocking(move || {
+        let saved = git.snapshot(&format!("before rewinding to checkpoint {to}"))?;
+        let in_the_way = git.ignored_in_the_way(&target)?;
+        if !in_the_way.is_empty() {
+            return Err(std::io::Error::other(format!(
+                "rewinding would overwrite files git ignores, which checkpoints don't save: {}; move them aside first",
+                in_the_way.join(", ")
+            )));
+        }
+        std::io::Result::Ok((saved, git.nested_repositories()?))
     })
     .await
     .map_err(|e| internal(&e))?
-    .map_err(|e| internal(&e))?;
-    let saved_as = state.sessions.record_rewind(&sid, to, saved).await.map_err(session_error)?;
-    reply::<SessionRewind>(SessionRewindResult { saved_as })
+    .map_err(|e| RpcError::new(RpcError::INVALID_REQUEST, e.to_string()))?;
+    // Journaled before restoring: a restore that fails partway can be undone.
+    let saved_as = state.sessions.record_checkpoint(&sid, saved).await.map_err(session_error)?;
+
+    let restored =
+        tokio::task::spawn_blocking(move || shadow.restore(&target_commit)).await.map_err(|e| internal(&e))?;
+    if let Err(e) = restored {
+        return Err(RpcError::new(
+            RpcError::INTERNAL_ERROR,
+            format!(
+                "the rewind stopped partway ({e}); your files from just before it are checkpoint {saved_as}, and /rewind {saved_as} puts them back once the cause is fixed"
+            ),
+        ));
+    }
+    state.sessions.record_rewind(&sid, to, saved_as).await.map_err(session_error)?;
+    reply::<SessionRewind>(SessionRewindResult { saved_as, not_saved: nested })
 }
 
 async fn route_effect(state: &Arc<State>, method: &str, params: Value) -> Reply {
@@ -403,11 +433,17 @@ async fn run_effect(
                 }
             }
         };
-        let result = match refusal {
-            Some(why) => crate::effects::Result::Refused(why),
-            None => tokio::task::spawn_blocking(move || crate::effects::perform(&scope, &request, &target, &cancel))
-                .await
-                .map_err(|e| internal(&e))?,
+        let result = if let Some(why) = refusal {
+            crate::effects::Result::Refused(why)
+        } else {
+            // Held shared while the effect runs, so a rewind can't race it.
+            let files = state.sessions.workspace_lock(&sid).read_owned().await;
+            tokio::task::spawn_blocking(move || {
+                let _files = files;
+                crate::effects::perform(&scope, &request, &target, &cancel)
+            })
+            .await
+            .map_err(|e| internal(&e))?
         };
         let (outcome, text) = match result {
             crate::effects::Result::Done { text, exit_code, truncated } => {

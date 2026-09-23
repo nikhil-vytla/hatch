@@ -287,6 +287,17 @@ test("/rewind lists checkpoints and puts the files back", async () => {
   expect(readFileSync(file, "utf8")).toBe("v3");
 });
 
+test("/rewind says which nested repositories it left alone", async () => {
+  const ui = await openUi();
+  mkdirSync(join(CWD, "vendor/lib"), { recursive: true });
+  writeFileSync(join(CWD, "vendor/lib/x.txt"), "v1");
+  expect(Bun.spawnSync(["git", "init", "-q"], { cwd: join(CWD, "vendor/lib") }).exitCode).toBe(0);
+  await enter(ui, "first");
+  await ui.term.waitFor("› first");
+  await enter(ui, "/rewind 1");
+  await ui.term.waitFor("Left as they were (checkpoints don't hold nested repositories): vendor/lib");
+});
+
 test("/rewind to a checkpoint that doesn't exist says so", async () => {
   const ui = await openUi();
   await enter(ui, "/rewind 99");

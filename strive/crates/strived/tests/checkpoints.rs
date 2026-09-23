@@ -13,7 +13,7 @@ use serde_json::{Value, json};
 
 struct Ws {
     /// Keeps the daemon and its home alive for the test.
-    _env: Env,
+    env: Env,
     dir: tempfile::TempDir,
     id: String,
     c: Rpc,
@@ -28,7 +28,7 @@ impl Ws {
             .as_str()
             .unwrap()
             .to_string();
-        Self { _env: env, dir, id, c }
+        Self { env, dir, id, c }
     }
     fn new() -> Self {
         Self::with_vars(&[])
@@ -89,7 +89,7 @@ fn rewind_restores_changed_created_and_deleted_files() {
     fs::remove_file(w.p("c.txt")).unwrap();
 
     let r = w.rewind(1);
-    assert_eq!(r["result"], json!({"savedAs": 2}), "{r}");
+    assert_eq!(r["result"], json!({"savedAs": 2, "notSaved": []}), "{r}");
     assert_eq!(w.read("a.txt").as_deref(), Some("v1"));
     assert_eq!(w.read("c.txt").as_deref(), Some("keep me"));
     assert_eq!(w.read("new/b.txt"), None);
@@ -161,4 +161,105 @@ fn without_git_prompts_still_work_and_rewind_explains() {
     assert_eq!(w.events().last().unwrap(), &json!({"type": "userMessage", "text": "p"}));
     let r = w.rewind(1);
     assert_eq!(r["error"]["message"], "no checkpoint 1 in this session");
+}
+
+/// Checkpoints don't save ignored files, so a rewind that would replace a
+/// directory of them would destroy them for good. It is refused.
+#[test]
+fn a_rewind_that_would_overwrite_ignored_files_is_refused() {
+    let mut w = Ws::new();
+    w.write("cache", "a file, once");
+    w.prompt("first");
+    fs::remove_file(w.p("cache")).unwrap();
+    w.write("cache/valuable.txt", "only copy");
+    w.write(".gitignore", "cache/\n");
+    let r = w.rewind(1);
+    let message = r["error"]["message"].as_str().unwrap_or_default().to_string();
+    assert_eq!(
+        message,
+        "rewinding would overwrite files git ignores, which checkpoints don't save: cache/; move them aside first"
+    );
+    assert_eq!(w.read("cache/valuable.txt").as_deref(), Some("only copy"));
+    assert!(!w.events().iter().any(|e| e["type"] == "rewound"));
+}
+
+/// A file ignored only after a checkpoint saved it is still saved by the
+/// next one, so rewinding over it loses nothing.
+#[test]
+fn a_file_ignored_after_it_was_saved_survives_a_rewind() {
+    let mut w = Ws::new();
+    w.write(".env", "OLD=1");
+    w.prompt("first");
+    w.write(".env", "NEW=2");
+    w.write(".gitignore", ".env\n");
+    let saved = w.rewind(1)["result"]["savedAs"].as_u64().unwrap();
+    assert_eq!(w.read(".env").as_deref(), Some("OLD=1"));
+    assert!(w.rewind(saved).get("error").is_none());
+    assert_eq!(w.read(".env").as_deref(), Some("NEW=2"));
+}
+
+/// A restore that fails partway leaves the workspace mixed; the state before
+/// it is kept as a checkpoint, so it can be put back.
+#[test]
+fn a_failed_rewind_can_be_undone() {
+    use std::os::unix::fs::PermissionsExt;
+    let mut w = Ws::new();
+    w.write("a.txt", "a1");
+    w.write("locked/b.txt", "b1");
+    w.prompt("first");
+    w.write("a.txt", "a2");
+    w.write("locked/b.txt", "b2");
+    fs::set_permissions(w.p("locked"), fs::Permissions::from_mode(0o500)).unwrap();
+    let r = w.rewind(1);
+    fs::set_permissions(w.p("locked"), fs::Permissions::from_mode(0o700)).unwrap();
+    let message = r["error"]["message"].as_str().unwrap_or_default().to_string();
+    assert!(message.contains("/rewind 2"), "{r}");
+    let saved = w.events().into_iter().rfind(|e| e["type"] == "checkpointed").unwrap();
+    assert_eq!(saved["checkpoint"], 2);
+    assert!(w.rewind(2).get("error").is_none());
+    assert_eq!(w.read("a.txt").as_deref(), Some("a2"));
+    assert_eq!(w.read("locked/b.txt").as_deref(), Some("b2"));
+}
+
+/// A rewind while a command runs would race it: the command's writes could
+/// land after the restore, or be lost from the undo checkpoint.
+#[test]
+fn rewinding_while_an_effect_runs_is_refused() {
+    let mut w = Ws::new();
+    w.write("a.txt", "a1");
+    w.prompt("first");
+    w.c.ok("session/approvals", &json!({"id": w.id, "mode": "fullAuto"}));
+    let mut agent = w.env.rpc();
+    let params =
+        json!({"id": w.id, "callId": "call_1", "request": {"kind": "bash", "command": "sleep 2; echo a3 > a.txt"}});
+    let running = std::thread::spawn(move || agent.ok("effect/run", &params));
+    common::wait_for("the command to start", std::time::Duration::from_secs(5), || {
+        w.events().iter().any(|e| e["type"] == "effectStarted")
+    });
+    std::thread::sleep(std::time::Duration::from_millis(200));
+    let r = w.rewind(1);
+    assert_eq!(
+        r["error"]["message"], "the agent is changing files right now; interrupt it (Esc) before rewinding",
+        "{r}"
+    );
+    running.join().unwrap();
+    assert!(w.rewind(1).get("error").is_none());
+    assert_eq!(w.read("a.txt").as_deref(), Some("a1"));
+}
+
+/// Checkpoints store a nested repository as a pointer, not its files, so a
+/// rewind leaves it alone and says so.
+#[test]
+fn nested_repositories_are_left_alone_and_reported() {
+    let mut w = Ws::new();
+    w.write("sub/work.txt", "v1");
+    git(&w.p("sub"), &["init", "-q"]);
+    w.write("a.txt", "a1");
+    w.prompt("first");
+    w.write("sub/work.txt", "v2");
+    w.write("a.txt", "a2");
+    let r = w.rewind(1);
+    assert_eq!(r["result"]["notSaved"], json!(["sub"]), "{r}");
+    assert_eq!(w.read("a.txt").as_deref(), Some("a1"));
+    assert_eq!(w.read("sub/work.txt").as_deref(), Some("v2"));
 }

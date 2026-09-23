@@ -457,7 +457,13 @@ export class App {
         const checkpoint = Number(arg);
 
         try {
-          await this.client.request("session/rewind", { id: this.session.id, checkpoint });
+          const { notSaved } = await this.client.request("session/rewind", { id: this.session.id, checkpoint });
+
+          if (notSaved.length > 0) {
+            this.say(
+              style.muted(`Left as they were (checkpoints don't hold nested repositories): ${notSaved.join(", ")}`),
+            );
+          }
         } catch (e) {
           this.say(
             style.danger(

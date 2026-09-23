@@ -2,7 +2,8 @@
 //! repository kept in strive's home, never in the workspace. The user's own
 //! `.git`, index and refs are never touched, and the user's git
 //! configuration, hooks and signing don't apply. Files the workspace's
-//! `.gitignore` excludes are neither saved nor restored.
+//! `.gitignore` excludes are neither saved nor restored, and neither are
+//! nested repositories (git would store only a pointer to their HEAD).
 
 use std::io;
 use std::path::{Path, PathBuf};
@@ -23,6 +24,10 @@ impl Shadow {
     }
 
     fn run(&self, args: &[&str]) -> io::Result<String> {
+        self.run_raw(args).map(|s| s.trim().to_string())
+    }
+
+    fn run_raw(&self, args: &[&str]) -> io::Result<String> {
         let out = Command::new(&self.git)
             .args(["-c", "core.hooksPath=/dev/null", "-c", "commit.gpgsign=false", "-c", "core.autocrlf=false"])
             .args(["-c", "user.name=strive", "-c", "user.email=strive@localhost"])
@@ -45,7 +50,19 @@ impl Shadow {
                 String::from_utf8_lossy(&out.stderr).trim()
             )));
         }
-        Ok(String::from_utf8_lossy(&out.stdout).trim().to_string())
+        Ok(String::from_utf8_lossy(&out.stdout).into_owned())
+    }
+
+    /// NUL-separated output as a list.
+    fn list(&self, args: &[&str]) -> io::Result<Vec<String>> {
+        Ok(self.run_raw(args)?.split('\0').filter(|s| !s.is_empty()).map(str::to_string).collect())
+    }
+
+    /// Nested repositories in the workspace, as paths relative to it. git
+    /// lists an untracked one as a directory entry rather than its files.
+    pub fn nested_repositories(&self) -> io::Result<Vec<String>> {
+        let untracked = self.list(&["ls-files", "--others", "--exclude-standard", "-z"])?;
+        Ok(untracked.into_iter().filter_map(|p| p.strip_suffix('/').map(str::to_string)).collect())
     }
 
     /// Saves the workspace as it is now and returns the commit.
@@ -69,9 +86,46 @@ impl Shadow {
             }
             self.run(&["config", "core.bare", "false"])?;
         }
-        self.run(&["add", "-A", "."])?;
+        let nested = self.nested_repositories()?;
+        // Pointers saved by an earlier strive would be restored as empty
+        // directories; drop them.
+        let links: Vec<String> = self
+            .list(&["ls-files", "-s", "-z"])?
+            .into_iter()
+            .filter_map(|l| l.strip_prefix("160000 ").and_then(|r| r.split_once('\t')).map(|(_, p)| p.to_string()))
+            .collect();
+        if !links.is_empty() {
+            let mut args = vec!["rm", "-r", "-q", "--cached", "--ignore-unmatch", "--"];
+            args.extend(links.iter().map(String::as_str));
+            self.run(&args)?;
+        }
+        let excluded: Vec<String> = nested.iter().map(|p| format!(":(exclude,literal){p}")).collect();
+        let mut args = vec!["add", "-A", "--", "."];
+        args.extend(excluded.iter().map(String::as_str));
+        self.run(&args)?;
         self.run(&["commit", "-q", "--allow-empty", "--no-verify", "-m", message])?;
         self.run(&["rev-parse", "HEAD"])
+    }
+
+    /// Ignored files (or directories of them) that restoring `commit` would
+    /// overwrite or remove. Checkpoints don't save them, so they'd be lost.
+    pub fn ignored_in_the_way(&self, commit: &str) -> io::Result<Vec<String>> {
+        let ignored = self.list(&["ls-files", "--others", "--ignored", "--exclude-standard", "--directory", "-z"])?;
+        let restored: std::collections::HashSet<String> =
+            self.list(&["ls-tree", "-r", "--name-only", "-z", commit])?.into_iter().collect();
+        let ancestors = |p: &str| -> Vec<String> {
+            p.match_indices('/').map(|(i, _)| p[..i].to_string()).chain(std::iter::once(p.to_string())).collect()
+        };
+        let restored_dirs: std::collections::HashSet<String> = restored.iter().flat_map(|p| ancestors(p)).collect();
+        Ok(ignored
+            .into_iter()
+            .filter(|shown| {
+                let path = shown.trim_end_matches('/');
+                // The path itself, or a directory above it, is restored as a
+                // file; or it is a directory the restore puts files into.
+                ancestors(path).iter().any(|a| restored.contains(a)) || restored_dirs.contains(path)
+            })
+            .collect())
     }
 
     /// Makes the workspace match `commit`: changed files are put back,

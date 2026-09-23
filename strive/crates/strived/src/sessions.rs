@@ -152,11 +152,16 @@ enum Cmd {
         checkpoint: u64,
         reply: oneshot::Sender<Option<String>>,
     },
-    /// A rewind to `to`, with the checkpoint of the files just before it.
+    /// A checkpoint taken outside a prompt (before a rewind); replies with its number.
+    Checkpoint {
+        commit: String,
+        reply: oneshot::Sender<io::Result<u64>>,
+    },
+    /// A rewind to `to`; `saved_as` holds the files from just before it.
     Rewound {
         to: u64,
-        saved: String,
-        reply: oneshot::Sender<io::Result<u64>>,
+        saved_as: u64,
+        reply: oneshot::Sender<io::Result<Vec<Entry>>>,
     },
     /// Whether a reservation would fit, without holding it.
     CheckBudget {
@@ -211,6 +216,8 @@ pub struct Sessions {
     /// Cancel flags for effects by the agent's call id. A cancel can arrive
     /// before its effect does, so either side may create the flag.
     cancels: StdMutex<HashMap<(SessionId, String), Arc<std::sync::atomic::AtomicBool>>>,
+    /// See `workspace_lock`.
+    workspaces: StdMutex<HashMap<SessionId, Arc<tokio::sync::RwLock<()>>>>,
 }
 
 /// How an approval request ended.
@@ -248,6 +255,7 @@ impl Sessions {
             stopping: std::sync::atomic::AtomicBool::new(false),
             checkpointing: StdMutex::new(HashMap::new()),
             cancels: StdMutex::new(HashMap::new()),
+            workspaces: StdMutex::new(HashMap::new()),
         })
     }
 
@@ -375,12 +383,26 @@ impl Sessions {
         rx.await.map_err(|_| writer_gone())
     }
 
-    /// Journals a rewind; returns the checkpoint number given to `saved`.
-    pub async fn record_rewind(&self, id: &SessionId, to: u64, saved: String) -> Result<u64> {
+    /// Journals a checkpoint of the files; returns its number.
+    pub async fn record_checkpoint(&self, id: &SessionId, commit: String) -> Result<u64> {
         let (_, tx) = self.writer(id).await?;
         let (reply, rx) = oneshot::channel();
-        tx.send(Cmd::Rewound { to, saved, reply }).map_err(|_| writer_gone())?;
+        tx.send(Cmd::Checkpoint { commit, reply }).map_err(|_| writer_gone())?;
         Ok(rx.await.map_err(|_| writer_gone())??)
+    }
+
+    /// Journals a completed rewind.
+    pub async fn record_rewind(&self, id: &SessionId, to: u64, saved_as: u64) -> Result<()> {
+        let (_, tx) = self.writer(id).await?;
+        let (reply, rx) = oneshot::channel();
+        tx.send(Cmd::Rewound { to, saved_as, reply }).map_err(|_| writer_gone())?;
+        rx.await.map_err(|_| writer_gone())??;
+        Ok(())
+    }
+
+    /// Effects that change files hold this shared; a rewind holds it alone.
+    pub fn workspace_lock(&self, id: &SessionId) -> Arc<tokio::sync::RwLock<()>> {
+        crate::sync::lock(&self.workspaces).entry(id.clone()).or_default().clone()
     }
 
     /// Whether a call with this reservation would fit the budget now.
@@ -757,6 +779,7 @@ impl Writer {
     }
 
     /// Applies one command to the writer's state and returns what to append.
+    #[expect(clippy::too_many_lines, reason = "one short arm per command")]
     fn stage(&mut self, cmd: Cmd) -> Staged {
         let (events, done): (Vec<Event>, Done) = match cmd {
             Cmd::Append { events, reply } => (events, Box::new(move |r, _| drop(reply.send(r)))),
@@ -826,12 +849,14 @@ impl Writer {
                 let _ = reply.send(commit.cloned());
                 return Staged::Handled;
             }
-            Cmd::Rewound { to, saved, reply } => {
-                self.checkpoints.push(saved.clone());
-                let saved_as = self.checkpoints.len() as u64;
-                let events =
-                    vec![Event::Checkpointed { checkpoint: saved_as, commit: saved }, Event::Rewound { to, saved_as }];
-                (events, Box::new(move |r: io::Result<Vec<Entry>>, _| drop(reply.send(r.map(|_| saved_as)))))
+            Cmd::Checkpoint { commit, reply } => {
+                self.checkpoints.push(commit.clone());
+                let checkpoint = self.checkpoints.len() as u64;
+                let events = vec![Event::Checkpointed { checkpoint, commit }];
+                (events, Box::new(move |r: io::Result<Vec<Entry>>, _| drop(reply.send(r.map(|_| checkpoint)))))
+            }
+            Cmd::Rewound { to, saved_as, reply } => {
+                (vec![Event::Rewound { to, saved_as }], Box::new(move |r, _| drop(reply.send(r))))
             }
             Cmd::CheckBudget { reservation, reply } => {
                 let _ = reply.send(self.ledger.check(reservation));

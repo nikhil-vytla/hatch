@@ -505,6 +505,8 @@ pub struct SessionRewindParams {
 pub struct SessionRewindResult {
     /// The checkpoint holding the files as they were before the rewind.
     pub saved_as: u64,
+    /// Nested repositories, left as they were: checkpoints don't hold them.
+    pub not_saved: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
