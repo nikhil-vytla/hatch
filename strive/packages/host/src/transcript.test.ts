@@ -130,3 +130,72 @@ test("a tool call that never ran still gets a result, so the transcript stays va
     content: [{ type: "text", text: "this tool call did not run: the turn ended first" }],
   });
 });
+
+test("a prompt sent while a turn runs follows that turn's reply, as the model saw it", async () => {
+  const entries = [
+    at({ type: "userMessage", text: "A" }),
+    at({ type: "turnStarted", turn: 1 }),
+    at({ type: "userMessage", text: "B" }),
+    assistant("answer to A"),
+    at({ type: "turnEnded", turn: 1, reason: { kind: "done" } }),
+    at({ type: "turnStarted", turn: 2 }),
+    assistant("answer to B"),
+    at({ type: "turnEnded", turn: 2, reason: { kind: "done" } }),
+  ];
+
+  const messages = await rebuild(entries, blob);
+  expect(messages.map((m) => (m.role === "user" ? `user ${m.content}` : m.role))).toEqual([
+    "user A",
+    "assistant",
+    "user B",
+    "assistant",
+  ]);
+});
+
+// Providers drop an aborted or failed reply when it is sent back, so a result
+// for one of its tool calls would answer a call the model never sees.
+test("tool calls in an interrupted reply get no results", async () => {
+  const entries = [
+    at({ type: "userMessage", text: "go" }),
+    at({
+      type: "assistantMessage",
+      turn: 1,
+      text: "",
+      toolCalls: [{ id: "partial", name: "bash" }],
+      message: {
+        role: "assistant",
+        content: [{ type: "toolCall", id: "partial", name: "bash" }],
+        stopReason: "aborted",
+      },
+    }),
+    at({ type: "turnEnded", turn: 1, reason: { kind: "interrupted" } }),
+    at({ type: "userMessage", text: "again" }),
+  ];
+
+  const messages = await rebuild(entries, blob);
+  expect(messages.some((m) => m.role === "toolResult")).toBe(false);
+  expect(messages.at(-1)).toMatchObject({ role: "user", content: "again" });
+});
+
+test("prompts waiting across a turn's end keep the order they were sent in", async () => {
+  const entries = [
+    at({ type: "userMessage", text: "A" }),
+    at({ type: "turnStarted", turn: 1 }),
+    at({ type: "userMessage", text: "B" }),
+    assistant("answer to A"),
+    at({ type: "turnEnded", turn: 1, reason: { kind: "done" } }),
+    at({ type: "userMessage", text: "C" }),
+    at({ type: "turnStarted", turn: 2 }),
+    assistant("answer to B and C"),
+    at({ type: "turnEnded", turn: 2, reason: { kind: "done" } }),
+  ];
+
+  const messages = await rebuild(entries, blob);
+  expect(messages.map((m) => (m.role === "user" ? `user ${m.content}` : m.role))).toEqual([
+    "user A",
+    "assistant",
+    "user B",
+    "user C",
+    "assistant",
+  ]);
+});

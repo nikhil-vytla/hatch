@@ -76,20 +76,42 @@ export async function rebuild(all: Entry[], blob: (digest: string) => Promise<st
     open = [];
   };
 
+  // Prompts are held until the turn that sends them starts: one sent while
+  // a turn runs is journaled mid-turn but reaches the model with the next
+  // turn, together with any sent after this one ends.
+  let inTurn = false;
+  let held: Message[] = [];
+
+  const release = () => {
+    close();
+    messages.push(...held);
+    held = [];
+  };
+
   for (const { event: e, tsMs } of entries) {
-    if (e.type === "userMessage") {
-      close();
-      messages.push({ role: "user", content: e.text, timestamp: tsMs });
+    if (e.type === "turnStarted") {
+      release();
+      inTurn = true;
+    } else if (e.type === "turnEnded") {
+      inTurn = false;
+    } else if (e.type === "userMessage") {
+      held.push({ role: "user", content: e.text, timestamp: tsMs });
     } else if (e.type === "assistantMessage") {
-      close();
+      // Without turn markers, a reply answers the prompts before it.
+      if (inTurn) close();
+      else release();
       // SAFETY: only the host writes assistantMessage entries, and it records pi-ai's
       // AssistantMessage as is (Host.record in host.ts); the daemon stores it untouched.
-      messages.push(e.message as AssistantMessage);
-      open = e.toolCalls.map((c) => ({ ...c, ts: tsMs }));
+      const reply = e.message as AssistantMessage;
+      messages.push(reply);
+      // Providers drop an aborted or failed reply when it is sent back, so
+      // results for its calls would answer calls the model never sees.
+      const sent = reply.stopReason !== "aborted" && reply.stopReason !== "error";
+      open = sent ? e.toolCalls.map((c) => ({ ...c, ts: tsMs })) : [];
     }
   }
 
-  close();
+  release();
 
   return messages;
 }

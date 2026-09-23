@@ -215,6 +215,8 @@ export class Host {
 
   private interrupted = false;
   private lastSeq = 0;
+  /** Entries that arrive while `start` is still loading, replayed after it. */
+  private early: Entry[] | undefined = [];
   private readonly models: ReturnType<typeof createStriveModels>;
 
   constructor(
@@ -281,10 +283,20 @@ export class Host {
     });
     this.lastSeq = entries.at(-1)?.seq ?? 0;
     this.queued = waiting.flatMap((e) => (e.event.type === "userMessage" ? [e.event.text] : []));
+    const early = this.early ?? [];
+    this.early = undefined;
+
+    for (const entry of early) this.onEntry(entry);
     void this.drain();
   }
 
   onEntry(entry: Entry) {
+    if (this.early) {
+      this.early.push(entry);
+
+      return;
+    }
+
     if (entry.seq <= this.lastSeq) return;
     this.lastSeq = entry.seq;
 
