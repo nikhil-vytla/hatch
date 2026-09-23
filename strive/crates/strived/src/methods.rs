@@ -28,11 +28,25 @@ use strive_proto::{ApprovalRespond, ApprovalRespondParams, Decision, SessionAppr
 use strive_proto::{EffectCancel, EffectCancelParams, EffectRequest};
 use strive_proto::{SessionRewind, SessionRewindParams, SessionRewindResult};
 
+/// The session a connection hosts. `Closed` once it has gone, so a
+/// registration still in flight can't claim a session for it.
+enum HostOf {
+    None,
+    Session(SessionId),
+    Closed,
+}
+
+impl HostOf {
+    fn is_host(&self) -> bool {
+        matches!(self, HostOf::Session(_))
+    }
+}
+
 /// Per-connection state.
 pub struct Conn {
     initialized: std::sync::atomic::AtomicBool,
     /// The session this connection hosts the agent for, if any.
-    host_of: std::sync::Mutex<Option<SessionId>>,
+    host_of: std::sync::Mutex<HostOf>,
     /// The client's name from `initialize`, recorded with its decisions.
     client: std::sync::Mutex<String>,
     /// Weak, so neither requests in flight nor subscriptions keep a closed
@@ -46,7 +60,7 @@ impl Conn {
     pub fn new(out: &mpsc::UnboundedSender<Message>) -> Self {
         Self {
             initialized: std::sync::atomic::AtomicBool::new(false),
-            host_of: std::sync::Mutex::new(None),
+            host_of: std::sync::Mutex::new(HostOf::None),
             client: std::sync::Mutex::new(String::new()),
             out: out.downgrade(),
             subscriptions: std::sync::Mutex::new(Vec::new()),
@@ -65,8 +79,9 @@ impl Conn {
     /// Stops forwarding session entries and gives up any host registration;
     /// called when the connection closes.
     pub fn close(&self, state: &State) {
-        if let Some(sid) = crate::sync::lock(&self.host_of).take() {
-            state.hosts.unregister(&sid);
+        let was = std::mem::replace(&mut *crate::sync::lock(&self.host_of), HostOf::Closed);
+        if let HostOf::Session(sid) = was {
+            state.hosts.release(&sid);
         }
         for t in crate::sync::lock(&self.subscriptions).drain(..) {
             t.abort();
@@ -143,7 +158,7 @@ async fn route(state: &Arc<State>, conn: &Arc<Conn>, method: &str, params: Value
         m if m.starts_with("host/") => route_host(state, conn, m, params).await,
         ApprovalRespond::NAME => {
             let ApprovalRespondParams { id, effect, decision } = parse::<ApprovalRespond>(params)?;
-            if crate::sync::lock(&conn.host_of).is_some() {
+            if crate::sync::lock(&conn.host_of).is_host() {
                 return Err(RpcError::new(RpcError::NOT_A_PERSON, "an agent host can't decide on approvals"));
             }
             let by = crate::sync::lock(&conn.client).clone();
@@ -168,68 +183,103 @@ async fn route(state: &Arc<State>, conn: &Arc<Conn>, method: &str, params: Value
     }
 }
 
+/// Makes this connection the session's one host; whether it newly became so.
+/// Under the connection's host lock, so it can't race `Conn::close`.
+fn claim_host(state: &State, conn: &Conn, sid: &SessionId) -> Result<bool, RpcError> {
+    let mut host = crate::sync::lock(&conn.host_of);
+    match &*host {
+        HostOf::Closed => Err(RpcError::new(RpcError::INVALID_REQUEST, "the connection is closing")),
+        HostOf::Session(s) if s == sid => Ok(false),
+        HostOf::Session(_) => {
+            Err(RpcError::new(RpcError::INVALID_PARAMS, "this connection already hosts another session"))
+        }
+        HostOf::None if state.hosts.claim(sid) => {
+            *host = HostOf::Session(sid.clone());
+            Ok(true)
+        }
+        HostOf::None => Err(RpcError::new(RpcError::HOST_EXISTS, "another agent host is running this session")),
+    }
+}
+
+fn release_host(state: &State, conn: &Conn) {
+    let mut host = crate::sync::lock(&conn.host_of);
+    if let HostOf::Session(sid) = std::mem::replace(&mut *host, HostOf::None) {
+        state.hosts.release(&sid);
+    }
+}
+
+/// Refuses agent requests from anything but the session's registered host.
+fn require_host(conn: &Conn, sid: &SessionId) -> Result<(), RpcError> {
+    match &*crate::sync::lock(&conn.host_of) {
+        HostOf::Session(s) if s == sid => Ok(()),
+        _ => Err(RpcError::new(RpcError::NOT_THE_HOST, "only the session's agent host may do this")),
+    }
+}
+
+/// What the agent is given for a session it now hosts.
+async fn host_config(state: &Arc<State>, sid: &SessionId) -> Reply {
+    let sid = sid.clone();
+    let info = state.sessions.info(&sid).await.map_err(session_error)?;
+    let model_id = state.settings.model.clone();
+    let model = state.models.get(&model_id).copied().ok_or_else(|| {
+        RpcError::new(
+            RpcError::INVALID_PARAMS,
+            format!("no price is known for {model_id}; add it under \"models\" in ~/.strive/settings.json"),
+        )
+    })?;
+    let provider = if model_id.starts_with("claude") { "anthropic" } else { "openai" };
+    let urls = state.gateway.info(&sid).map_err(|e| internal(&e))?;
+    let home = state.home.root.canonicalize().map_err(|e| internal(&e))?;
+    let workspace = std::path::PathBuf::from(&info.cwd);
+    let ctx =
+        tokio::task::spawn_blocking(move || crate::context::load(&workspace, &home)).await.map_err(|e| internal(&e))?;
+    let files = ctx
+        .instructions
+        .iter()
+        .map(|f| {
+            Ok(strive_proto::ContextFile {
+                path: f.path.clone(),
+                digest: state.cas.put(f.text.as_bytes())?,
+                bytes: f.text.len() as u64,
+            })
+        })
+        .collect::<std::io::Result<Vec<_>>>()
+        .map_err(|e| internal(&e))?;
+    let loaded =
+        Event::ContextLoaded { instructions: files, skills: ctx.skills.iter().map(|s| s.name.clone()).collect() };
+    state.sessions.append(&sid, vec![loaded]).await.map_err(session_error)?;
+    reply::<HostRegister>(AgentConfig {
+        cwd: info.cwd,
+        base_url: if provider == "anthropic" { urls.anthropic } else { urls.openai },
+        provider: provider.into(),
+        model: model_id,
+        context_window: model.context_window,
+        max_output: model.max_output.min(state.settings.agent_max_output),
+        turn_seconds: state.settings.turn_seconds,
+        compact_at_tokens: match state.settings.compact_at_tokens {
+            0 => model.context_window / 5 * 4,
+            n => n,
+        },
+        instructions: ctx.instructions,
+        skills: ctx.skills,
+    })
+}
+
 async fn route_host(state: &Arc<State>, conn: &Arc<Conn>, method: &str, params: Value) -> Reply {
     match method {
         HostRegister::NAME => {
             let SessionRef { id } = parse::<HostRegister>(params)?;
             let sid = session_id(&id)?;
-            let info = state.sessions.info(&sid).await.map_err(session_error)?;
-            let model_id = state.settings.model.clone();
-            let model = state.models.get(&model_id).copied().ok_or_else(|| {
-                RpcError::new(
-                    RpcError::INVALID_PARAMS,
-                    format!("no price is known for {model_id}; add it under \"models\" in ~/.strive/settings.json"),
-                )
-            })?;
-            let provider = if model_id.starts_with("claude") { "anthropic" } else { "openai" };
-            let urls = state.gateway.info(&sid).map_err(|e| internal(&e))?;
-            let home = state.home.root.canonicalize().map_err(|e| internal(&e))?;
-            let workspace = std::path::PathBuf::from(&info.cwd);
-            let ctx = tokio::task::spawn_blocking(move || crate::context::load(&workspace, &home))
-                .await
-                .map_err(|e| internal(&e))?;
-            let files = ctx
-                .instructions
-                .iter()
-                .map(|f| {
-                    Ok(strive_proto::ContextFile {
-                        path: f.path.clone(),
-                        digest: state.cas.put(f.text.as_bytes())?,
-                        bytes: f.text.len() as u64,
-                    })
-                })
-                .collect::<std::io::Result<Vec<_>>>()
-                .map_err(|e| internal(&e))?;
-            let loaded = Event::ContextLoaded {
-                instructions: files,
-                skills: ctx.skills.iter().map(|s| s.name.clone()).collect(),
-            };
-            state.sessions.append(&sid, vec![loaded]).await.map_err(session_error)?;
-            {
-                let mut host = crate::sync::lock(&conn.host_of);
-                if host.is_none() {
-                    state.hosts.register(&sid);
-                    *host = Some(sid.clone());
-                }
+            let claimed = claim_host(state, conn, &sid)?;
+            let config = host_config(state, &sid).await;
+            if config.is_err() && claimed {
+                release_host(state, conn);
             }
-            reply::<HostRegister>(AgentConfig {
-                cwd: info.cwd,
-                base_url: if provider == "anthropic" { urls.anthropic } else { urls.openai },
-                provider: provider.into(),
-                model: model_id,
-                context_window: model.context_window,
-                max_output: model.max_output.min(state.settings.agent_max_output),
-                turn_seconds: state.settings.turn_seconds,
-                compact_at_tokens: match state.settings.compact_at_tokens {
-                    0 => model.context_window / 5 * 4,
-                    n => n,
-                },
-                instructions: ctx.instructions,
-                skills: ctx.skills,
-            })
+            config
         }
         HostRecord::NAME => {
             let HostRecordParams { id, event } = parse::<HostRecord>(params)?;
+            require_host(conn, &session_id(&id)?)?;
             if !matches!(
                 event,
                 Event::TurnStarted { .. }
@@ -247,6 +297,7 @@ async fn route_host(state: &Arc<State>, conn: &Arc<Conn>, method: &str, params: 
         }
         HostStream::NAME => {
             let HostStreamParams { id, turn, text } = parse::<HostStream>(params)?;
+            require_host(conn, &session_id(&id)?)?;
             state.sessions.push(&session_id(&id)?, Push::Delta { turn, text }).await.map_err(session_error)?;
             reply::<HostStream>(Empty {})
         }
@@ -390,7 +441,7 @@ async fn route_session(state: &Arc<State>, conn: &Arc<Conn>, method: &str, param
         SessionAttach::NAME => {
             let SessionAttachParams { id, after_seq } = parse::<SessionAttach>(params)?;
             let sid = session_id(&id)?;
-            let person = crate::sync::lock(&conn.host_of).is_none();
+            let person = !crate::sync::lock(&conn.host_of).is_host();
             let (session, entries, mut stream) =
                 state.sessions.attach(&sid, after_seq.unwrap_or(0), person).await.map_err(session_error)?;
             let weak = conn.out.clone();

@@ -19,7 +19,7 @@ const START_GRACE: Duration = Duration::from_secs(20);
 
 #[derive(Default)]
 struct Slot {
-    registered: u32,
+    registered: bool,
     starting: Option<Instant>,
 }
 
@@ -29,21 +29,28 @@ pub struct Hosts {
 }
 
 impl Hosts {
-    pub fn register(&self, id: &SessionId) {
+    /// Registers a host for the session; false if one already is. One host
+    /// per session: two would both answer every prompt.
+    pub fn claim(&self, id: &SessionId) -> bool {
         let mut slots = crate::sync::lock(&self.slots);
         let slot = slots.entry(id.clone()).or_default();
-        slot.registered += 1;
+        if slot.registered {
+            return false;
+        }
+        slot.registered = true;
         slot.starting = None;
+        true
     }
 
     /// Connections registered as hosts: they don't keep the daemon awake.
     pub fn count(&self) -> u32 {
-        crate::sync::lock(&self.slots).values().map(|s| s.registered).sum()
+        let n = crate::sync::lock(&self.slots).values().filter(|s| s.registered).count();
+        u32::try_from(n).unwrap_or(u32::MAX)
     }
 
-    pub fn unregister(&self, id: &SessionId) {
+    pub fn release(&self, id: &SessionId) {
         if let Some(slot) = crate::sync::lock(&self.slots).get_mut(id) {
-            slot.registered = slot.registered.saturating_sub(1);
+            slot.registered = false;
         }
     }
 
@@ -53,7 +60,7 @@ impl Hosts {
         {
             let mut slots = crate::sync::lock(&self.slots);
             let slot = slots.entry(id.clone()).or_default();
-            if slot.registered > 0 || slot.starting.is_some_and(|t| t.elapsed() < START_GRACE) {
+            if slot.registered || slot.starting.is_some_and(|t| t.elapsed() < START_GRACE) {
                 return;
             }
             slot.starting = Some(Instant::now());

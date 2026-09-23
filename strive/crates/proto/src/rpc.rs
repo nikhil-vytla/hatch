@@ -75,6 +75,10 @@ impl RpcError {
     pub const APPROVAL_NOT_PENDING: i32 = -32012;
     /// Only a person decides on approvals; an agent host can't.
     pub const NOT_A_PERSON: i32 = -32013;
+    /// Another host is already registered for the session.
+    pub const HOST_EXISTS: i32 = -32014;
+    /// Only the session's registered host speaks for its agent.
+    pub const NOT_THE_HOST: i32 = -32015;
 
     pub fn new(code: i32, message: impl Into<String>) -> Self {
         Self { code, message: message.into(), data: None }

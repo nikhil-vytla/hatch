@@ -333,10 +333,12 @@ fn racing_creates_and_attaches_keep_one_writer_per_journal() {
 fn host_stream_reaches_attached_clients_without_being_journaled() {
     let env = Env::new();
     let id = create(&env, "/tmp/repo");
+    let mut host = env.rpc();
+    host.ok("host/register", &json!({"id": id}));
     let mut ui = env.rpc();
     ui.ok("session/attach", &json!({"id": id}));
     let before = env.rpc().ok("session/read", &json!({"id": id}))["entries"].as_array().unwrap().len();
-    env.rpc().ok("host/stream", &json!({"id": id, "turn": 1, "text": "Working on it"}));
+    host.ok("host/stream", &json!({"id": id, "turn": 1, "text": "Working on it"}));
     let n = ui.notification();
     assert_eq!(n["method"], "session/delta");
     assert_eq!(n["params"], json!({"sessionId": id, "turn": 1, "text": "Working on it"}));
@@ -349,6 +351,7 @@ fn hosts_may_record_only_turns_and_replies() {
     let env = Env::new();
     let id = create(&env, "/tmp/repo");
     let mut c = env.rpc();
+    c.ok("host/register", &json!({"id": id}));
     let r = c.call("host/record", &json!({"id": id, "event": {"type": "budgetSet", "usdMicros": 999_999_999}}));
     assert_eq!(r["error"]["code"], -32602);
     assert_eq!(r["error"]["message"], "a host records only turns and assistant messages");
