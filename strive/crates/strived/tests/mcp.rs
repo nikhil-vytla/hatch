@@ -31,17 +31,34 @@ struct Ws {
 impl Ws {
     /// A session whose settings name the fake server (and a broken one).
     fn new(vars: &[(&str, &str)]) -> Self {
+        Self::build(vars, &[])
+    }
+    /// The same, with extra environment for the fake server.
+    fn with_env(server_env: &[(&str, &str)]) -> Self {
+        Self::build(&[], server_env)
+    }
+    fn build(vars: &[(&str, &str)], server_env: &[(&str, &str)]) -> Self {
         let env = Env::with_vars(vars);
         let dir = tempfile::Builder::new().prefix("strv-mcp").tempdir_in("/tmp").unwrap();
         let log = env.home.path().join("fake-notifications.log");
 
-        let settings = json!({"mcpServers": {
-                        // Through a shell, as servers started with npx are: the server is
-            // a grandchild of the daemon.
-            "fake": {"command": "/bin/sh", "args": ["-c", "\"$0\"; true", fake_server()], "env": {"FAKE_VAR": "from settings", "FAKE_MCP_LOG": log,
-                                "FAKE_MCP_PID": env.home.path().join("fake.pid"), "FAKE_MCP_STUBBORN": "1"}},
-            "broken": {"command": fake_server(), "env": {"FAKE_MCP_BROKEN": "1"}},
-        }});
+        // Through a shell, as servers started with npx are: the server is a
+        // grandchild of the daemon.
+        let mut fake = json!({
+            "command": "/bin/sh",
+            "args": ["-c", "\"$0\"; true", fake_server()],
+            "env": {
+                "FAKE_VAR": "from settings",
+                "FAKE_MCP_LOG": log,
+                "FAKE_MCP_PID": env.home.path().join("fake.pid"),
+                "FAKE_MCP_STUBBORN": "1",
+            },
+        });
+        for (k, v) in server_env {
+            fake["env"][*k] = json!(v);
+        }
+        let broken = json!({"command": fake_server(), "env": {"FAKE_MCP_BROKEN": "1"}});
+        let settings = json!({"mcpServers": {"fake": fake, "broken": broken}});
         std::fs::write(env.home.path().join("settings.json"), settings.to_string()).unwrap();
         let mut host = env.rpc();
         let cwd = dir.path().canonicalize().unwrap();
@@ -73,11 +90,11 @@ fn the_agent_is_given_every_tool_and_the_journal_says_which_servers_started() {
         .map(|t| (t["server"].as_str().unwrap().into(), t["name"].as_str().unwrap().into()))
         .collect();
     let names: Vec<&str> = tools.iter().map(|(_, n)| n.as_str()).collect();
-    assert_eq!(names, ["echo", "fail", "slow", "where"], "both pages of tools/list");
+    assert_eq!(names, ["echo", "fail", "slow", "patient", "where"], "both pages of tools/list");
     assert!(tools.iter().all(|(s, _)| s == "fake"));
     assert_eq!(w.config["mcpTools"][0]["inputSchema"]["required"], json!(["text"]));
     let loaded = w.events().into_iter().find(|e| e["type"] == "contextLoaded").unwrap();
-    assert_eq!(loaded["mcp"][1], json!({"server": "fake", "tools": 4}));
+    assert_eq!(loaded["mcp"][1], json!({"server": "fake", "tools": 5}));
     assert_eq!(loaded["mcp"][0]["server"], "broken");
     assert_eq!(loaded["mcp"][0]["tools"], 0);
     assert!(loaded["mcp"][0]["error"].as_str().unwrap().contains("exited during initialize"), "{loaded}");
@@ -126,25 +143,86 @@ fn a_tool_call_asks_first_unless_approvals_are_full_auto() {
     assert_eq!(pending.join().unwrap()["text"], "echo: x");
 }
 
+impl Ws {
+    fn server_pid(&self) -> String {
+        std::fs::read_to_string(self.env.home.path().join("fake.pid")).unwrap().trim().to_string()
+    }
+    /// Starts a call to `tool` on another connection and cancels it once
+    /// the server has it; returns the result and how long the cancel took.
+    fn cancel_call(&mut self, tool: &str) -> (Value, Duration) {
+        let mut agent = self.env.rpc();
+        let params = json!({"id": self.id, "callId": "call_c",
+            "request": {"kind": "mcp", "server": "fake", "tool": tool, "arguments": {}}});
+        let running = std::thread::spawn(move || agent.ok("effect/run", &params));
+        let needle = format!("call \"{tool}\"");
+        common::wait_for("the server to get the call", Duration::from_secs(5), || {
+            std::fs::read_to_string(&self.log).is_ok_and(|l| l.contains(&needle))
+        });
+        let started = Instant::now();
+        self.host.ok("effect/cancel", &json!({"id": self.id, "callId": "call_c"}));
+        let r = running.join().unwrap();
+        (r, started.elapsed())
+    }
+}
+
+fn alive(pid: &str) -> bool {
+    std::process::Command::new("kill").args(["-0", pid]).status().unwrap().success()
+}
+
+/// A server that honors the cancellation answers at once and keeps running.
 #[test]
 fn a_cancelled_tool_call_is_cancelled_at_the_server_too() {
     let mut w = Ws::new(&[]);
     w.mode("fullAuto");
-    let mut agent = w.env.rpc();
-    let params = json!({"id": w.id, "callId": "call_slow",
-        "request": {"kind": "mcp", "server": "fake", "tool": "slow", "arguments": {}}});
-    let running = std::thread::spawn(move || agent.ok("effect/run", &params));
-    common::wait_for("the server to get the call", Duration::from_secs(5), || {
-        std::fs::read_to_string(&w.log).is_ok_and(|l| l.contains("call \"slow\""))
-    });
+    let pid = w.server_pid();
+    let (r, took) = w.cancel_call("patient");
+    assert!(took < Duration::from_millis(1500), "cancelled after {took:?}");
+    assert_eq!(r["outcome"], json!({"kind": "refused", "reason": "interrupted: fake's patient was cancelled"}));
+    assert!(std::fs::read_to_string(&w.log).unwrap().contains("notifications/cancelled"));
+    assert!(alive(&pid), "a server that answered the cancellation keeps running");
+    assert_eq!(w.call("echo", &json!({"text": "still here"}))["text"], "echo: still here");
+    assert_eq!(w.server_pid(), pid);
+}
+
+/// A server that goes on with a cancelled call could still change files
+/// after the effect ended (and a rewind began), so it is stopped, and
+/// started again for the next call.
+#[test]
+fn a_server_that_ignores_a_cancellation_is_stopped_and_restarted() {
+    let mut w = Ws::new(&[]);
+    w.mode("fullAuto");
+    let pid = w.server_pid();
+    let (r, took) = w.cancel_call("slow");
+    assert!(took >= Duration::from_secs(2) && took < Duration::from_secs(4), "cancelled after {took:?}");
+    assert_eq!(r["outcome"]["reason"], "interrupted: fake's slow was cancelled");
+    common::wait_for("the old server to be gone", Duration::from_secs(2), || !alive(&pid));
+    assert_eq!(w.call("echo", &json!({"text": "again"}))["text"], "echo: again");
+    assert_ne!(w.server_pid(), pid, "a new server answered");
+}
+
+/// A server that stops reading its input would block every write to it.
+/// The stalled write stops it, and the call fails rather than hanging.
+#[test]
+fn a_server_that_stops_reading_is_stopped() {
+    let mut w = Ws::with_env(&[("FAKE_MCP_DEAF", "1")]);
+    w.mode("fullAuto");
+    w.host.wait_up_to(Duration::from_secs(20));
     let started = Instant::now();
-    w.host.ok("effect/cancel", &json!({"id": w.id, "callId": "call_slow"}));
-    let r = running.join().unwrap();
-    assert!(started.elapsed() < Duration::from_secs(2), "cancelled after {:?}", started.elapsed());
-    assert_eq!(r["outcome"], json!({"kind": "refused", "reason": "interrupted: fake's slow was cancelled"}));
-    common::wait_for("the server to hear of it", Duration::from_secs(2), || {
-        std::fs::read_to_string(&w.log).is_ok_and(|l| l.contains("notifications/cancelled"))
-    });
+    // Far more than a pipe holds, so the write can't finish.
+    let r = w.call("echo", &json!({"text": "x".repeat(4 * 1024 * 1024)}));
+    assert!(started.elapsed() < Duration::from_secs(15), "failed after {:?}", started.elapsed());
+    assert_eq!(r["outcome"]["kind"], "refused", "{r}");
+    assert!(r["outcome"]["reason"].as_str().unwrap().contains("exited during the call"), "{r}");
+}
+
+/// A server whose tool list never ends (the same next cursor, over and
+/// over) still finishes starting.
+#[test]
+fn a_tool_list_that_loops_still_ends() {
+    let w = Ws::with_env(&[("FAKE_MCP_LOOP", "1")]);
+    let names: Vec<&str> =
+        w.config["mcpTools"].as_array().unwrap().iter().map(|t| t["name"].as_str().unwrap()).collect();
+    assert_eq!(names, ["echo", "echo"], "the first page, and the one its cursor named, and no more");
 }
 
 #[test]

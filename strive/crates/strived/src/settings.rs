@@ -45,7 +45,7 @@ pub struct Settings {
 }
 
 /// A stdio MCP server: the daemon starts it in the session's directory.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct McpServerSetting {
     pub command: String,

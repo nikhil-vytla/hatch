@@ -2,10 +2,15 @@
 //! the session's directory. The agent reaches their tools only through `mcp`
 //! effects, so every call is gated, journaled and cancellable like any other
 //! effect. Servers speak newline-delimited JSON-RPC over stdio.
+//!
+//! A server is user-configured and runs unsandboxed, as in other agents. The
+//! daemon kills its process group when the daemon stops, when a write to it
+//! stalls, and when it doesn't answer a call it was told is cancelled; a
+//! process that leaves the group (`setsid`) is out of reach.
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fmt::Write as _;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex as StdMutex};
@@ -14,15 +19,23 @@ use std::time::Duration;
 use serde_json::{Value, json};
 use strive_proto::{McpStatus, McpTool};
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
-use tokio::process::{Child, ChildStdin};
-use tokio::sync::{Mutex, oneshot};
+use tokio::process::{Child, ChildStdin, ChildStdout};
+use tokio::sync::{Mutex, OnceCell, mpsc, oneshot};
 use tokio::task::JoinHandle;
 
 use crate::sessions::SessionId;
 use crate::settings::McpServerSetting;
 
 const PROTOCOL_VERSION: &str = "2025-06-18";
-const START_TIMEOUT: Duration = Duration::from_secs(30);
+/// How long one request may take while a server starts.
+const REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
+/// How long a whole start (initialize and every tools/list page) may take.
+const START_TIMEOUT: Duration = Duration::from_secs(60);
+const MAX_PAGES: usize = 100;
+/// A write that takes longer means the server has stopped reading.
+const WRITE_TIMEOUT: Duration = Duration::from_secs(10);
+/// How long a server has to answer a call it was told is cancelled.
+const CANCEL_GRACE: Duration = Duration::from_secs(2);
 /// A tool call's result is cut to this much text.
 const RESULT_KEEP: usize = 256 * 1024;
 /// A line from a server longer than this ends the connection.
@@ -31,21 +44,37 @@ const MAX_LINE: u64 = 16 * 1024 * 1024;
 /// Every session's servers, started when its agent first registers.
 #[derive(Default)]
 pub struct Servers {
-    by_session: Mutex<HashMap<SessionId, Arc<Started>>>,
+    sessions: StdMutex<HashMap<SessionId, Arc<OnceCell<Started>>>>,
 }
 
-pub struct Started {
-    servers: Vec<Arc<Server>>,
+/// One session's servers. Each session starts its own, so a slow server
+/// holds up only its session.
+struct Started {
+    slots: Vec<Slot>,
+    status: Vec<McpStatus>,
+}
+
+/// A configured server: the running process, restarted when it has died.
+struct Slot {
+    name: String,
+    setting: McpServerSetting,
+    cwd: PathBuf,
+    log: PathBuf,
+    tools: Vec<McpTool>,
+    current: Mutex<Option<Arc<Server>>>,
+}
+
+/// What the agent is told about a session's servers.
+pub struct Summary {
     pub status: Vec<McpStatus>,
-}
-
-impl Started {
-    pub fn tools(&self) -> Vec<McpTool> {
-        self.servers.iter().flat_map(|s| s.tools.iter().cloned()).collect()
-    }
+    pub tools: Vec<McpTool>,
 }
 
 impl Servers {
+    fn session(&self, id: &SessionId) -> Arc<OnceCell<Started>> {
+        crate::sync::lock(&self.sessions).entry(id.clone()).or_default().clone()
+    }
+
     /// The session's servers, starting them if this is the first ask.
     pub async fn for_session(
         &self,
@@ -53,39 +82,70 @@ impl Servers {
         cwd: &Path,
         settings: &BTreeMap<String, McpServerSetting>,
         log_dir: &Path,
-    ) -> Arc<Started> {
-        // Held while starting, so one session's servers start once.
-        let mut map = self.by_session.lock().await;
-        if let Some(s) = map.get(id) {
-            return s.clone();
-        }
-        let mut servers = Vec::new();
-        let mut status = Vec::new();
-        for (name, setting) in settings {
-            let log = log_dir.join(format!("mcp-{name}.log"));
-            match Server::start(name, setting, cwd, &log).await {
-                Ok(s) => {
-                    status.push(McpStatus { server: name.clone(), tools: s.tools.len() as u64, error: None });
-                    servers.push(Arc::new(s));
+    ) -> Summary {
+        let session = self.session(id);
+        let started = session
+            .get_or_init(|| async {
+                let mut slots = Vec::new();
+                let mut status = Vec::new();
+                for (name, setting) in settings {
+                    let log = log_dir.join(format!("mcp-{name}.log"));
+                    match start_bounded(name, setting, cwd, &log).await {
+                        Ok(server) => {
+                            let tools = server.tools.len() as u64;
+                            status.push(McpStatus { server: name.clone(), tools, error: None });
+                            slots.push(Slot {
+                                name: name.clone(),
+                                setting: setting.clone(),
+                                cwd: cwd.to_path_buf(),
+                                log,
+                                tools: server.tools.clone(),
+                                current: Mutex::new(Some(Arc::new(server))),
+                            });
+                        }
+                        Err(why) => {
+                            crate::log!("MCP server {name} for session {} didn't start: {why}", id.as_str());
+                            status.push(McpStatus { server: name.clone(), tools: 0, error: Some(why) });
+                        }
+                    }
                 }
-                Err(why) => {
-                    crate::log!("MCP server {name} for session {} didn't start: {why}", id.as_str());
-                    status.push(McpStatus { server: name.clone(), tools: 0, error: Some(why) });
+                Started { slots, status }
+            })
+            .await;
+        Summary {
+            status: started.status.clone(),
+            tools: started.slots.iter().flat_map(|s| s.tools.iter().cloned()).collect(),
+        }
+    }
+
+    /// The session's running server by name, restarted if it died.
+    pub async fn server(&self, id: &SessionId, name: &str) -> Result<Arc<Server>, String> {
+        let session = self.session(id);
+        let slot = session
+            .get()
+            .and_then(|s| s.slots.iter().find(|s| s.name == name))
+            .ok_or_else(|| format!("no MCP server named {name} is running for this session"))?;
+        let mut current = slot.current.lock().await;
+        if let Some(s) = current.as_ref().filter(|s| !s.is_dead()) {
+            return Ok(s.clone());
+        }
+        crate::log!("restarting MCP server {name} for session {}", id.as_str());
+        let server = Arc::new(start_bounded(&slot.name, &slot.setting, &slot.cwd, &slot.log).await?);
+        *current = Some(server.clone());
+        Ok(server)
+    }
+
+    /// Kills every server now, even ones a call still holds.
+    pub async fn stop_all(&self) {
+        let sessions: Vec<Arc<OnceCell<Started>>> = crate::sync::lock(&self.sessions).drain().map(|(_, s)| s).collect();
+        for session in sessions {
+            let Some(started) = session.get() else { continue };
+            for slot in &started.slots {
+                if let Some(s) = slot.current.lock().await.take() {
+                    s.kill();
                 }
             }
         }
-        let started = Arc::new(Started { servers, status });
-        map.insert(id.clone(), started.clone());
-        started
-    }
-
-    pub async fn server(&self, id: &SessionId, name: &str) -> Option<Arc<Server>> {
-        self.by_session.lock().await.get(id)?.servers.iter().find(|s| s.name == name).cloned()
-    }
-
-    /// Stops every server (dropping the last reference kills its process group).
-    pub async fn stop_all(&self) {
-        self.by_session.lock().await.clear();
     }
 }
 
@@ -95,19 +155,23 @@ type Pending = Arc<StdMutex<HashMap<u64, oneshot::Sender<Reply>>>>;
 pub struct Server {
     pub name: String,
     pub tools: Vec<McpTool>,
-    stdin: Arc<Mutex<ChildStdin>>,
+    /// Lines to write, in order, by the writer task: queueing never blocks.
+    outbox: mpsc::UnboundedSender<Value>,
     pending: Pending,
     next_id: AtomicU64,
+    /// Once set, the server takes no more requests.
+    dead: Arc<AtomicBool>,
     pgid: i32,
-    reader: JoinHandle<()>,
+    tasks: [JoinHandle<()>; 2],
     _child: Child,
 }
 
 impl Drop for Server {
     fn drop(&mut self) {
-        // The whole group: servers started through npx or a shell have children.
-        let _ = nix::sys::signal::killpg(nix::unistd::Pid::from_raw(self.pgid), nix::sys::signal::Signal::SIGKILL);
-        self.reader.abort();
+        self.kill();
+        for t in &self.tasks {
+            t.abort();
+        }
     }
 }
 
@@ -117,6 +181,20 @@ pub enum Called {
     Failed(String),
     Cancelled,
     TimedOut,
+}
+
+/// Starts a server, giving up after `START_TIMEOUT` however it stalls.
+async fn start_bounded(name: &str, setting: &McpServerSetting, cwd: &Path, log: &Path) -> Result<Server, String> {
+    match tokio::time::timeout(START_TIMEOUT, Server::start(name, setting, cwd, log)).await {
+        Ok(r) => r,
+        Err(_) => Err(format!("it didn't finish starting in {}s", START_TIMEOUT.as_secs())),
+    }
+}
+
+fn kill_group(pgid: i32, dead: &AtomicBool) {
+    dead.store(true, Ordering::SeqCst);
+    // The whole group: servers started through npx or a shell have children.
+    let _ = nix::sys::signal::killpg(nix::unistd::Pid::from_raw(pgid), nix::sys::signal::Signal::SIGKILL);
 }
 
 impl Server {
@@ -146,17 +224,20 @@ impl Server {
         let (Some(stdin), Some(stdout)) = (child.stdin.take(), child.stdout.take()) else {
             return Err("its stdio wasn't piped".into());
         };
-        let stdin = Arc::new(Mutex::new(stdin));
+        let dead = Arc::new(AtomicBool::new(false));
         let pending: Pending = Arc::default();
-        let reader = tokio::spawn(read_replies(stdout, stdin.clone(), pending.clone()));
+        let (outbox, queued) = mpsc::unbounded_channel();
+        let writer = tokio::spawn(write_lines(stdin, queued, pgid, dead.clone()));
+        let reader = tokio::spawn(read_replies(stdout, outbox.clone(), pending.clone(), dead.clone()));
         let mut server = Server {
             name: name.to_string(),
             tools: Vec::new(),
-            stdin,
+            outbox,
             pending,
             next_id: AtomicU64::new(1),
+            dead,
             pgid,
-            reader,
+            tasks: [writer, reader],
             _child: child,
         };
         let init = json!({
@@ -165,9 +246,10 @@ impl Server {
             "clientInfo": {"name": "strive", "version": env!("CARGO_PKG_VERSION")},
         });
         server.ask("initialize", init).await?;
-        server.notify("notifications/initialized", json!({})).await?;
+        server.notify("notifications/initialized", json!({}));
         let mut cursor: Option<String> = None;
-        loop {
+        let mut seen = HashSet::new();
+        for _ in 0..MAX_PAGES {
             let params = cursor.as_ref().map_or_else(|| json!({}), |c| json!({"cursor": c}));
             let page = server.ask("tools/list", params).await?;
             for t in page["tools"].as_array().into_iter().flatten() {
@@ -180,49 +262,66 @@ impl Server {
                 });
             }
             match page["nextCursor"].as_str() {
-                Some(next) => cursor = Some(next.to_string()),
-                None => break,
+                // A cursor seen before would loop forever.
+                Some(next) if seen.insert(next.to_string()) => cursor = Some(next.to_string()),
+                _ => return Ok(server),
             }
         }
         Ok(server)
     }
 
+    pub fn is_dead(&self) -> bool {
+        self.dead.load(Ordering::SeqCst)
+    }
+
+    /// Kills the server's process group; it takes no more requests.
+    pub fn kill(&self) {
+        kill_group(self.pgid, &self.dead);
+    }
+
     /// Sends a request and waits for its reply during startup.
     async fn ask(&self, method: &str, params: Value) -> Result<Value, String> {
-        let (_, reply) = self.send(method, params).await?;
-        match tokio::time::timeout(START_TIMEOUT, reply).await {
+        let (_, reply) = self.send(method, params)?;
+        match tokio::time::timeout(REQUEST_TIMEOUT, reply).await {
             Ok(Ok(r)) => r.map_err(|e| format!("{method} failed: {e}")),
             Ok(Err(_)) => Err(format!("it exited during {method}")),
-            Err(_) => Err(format!("no reply to {method} in {}s", START_TIMEOUT.as_secs())),
+            Err(_) => Err(format!("no reply to {method} in {}s", REQUEST_TIMEOUT.as_secs())),
         }
     }
 
-    async fn send(&self, method: &str, params: Value) -> Result<(u64, oneshot::Receiver<Reply>), String> {
+    /// Queues a request; its reply arrives on the receiver.
+    fn send(&self, method: &str, params: Value) -> Result<(u64, oneshot::Receiver<Reply>), String> {
+        if self.is_dead() {
+            return Err("the server has stopped".into());
+        }
         let id = self.next_id.fetch_add(1, Ordering::Relaxed);
         let (tx, rx) = oneshot::channel();
         crate::sync::lock(&self.pending).insert(id, tx);
-        let msg = json!({"jsonrpc": "2.0", "id": id, "method": method, "params": params});
-        if let Err(e) = write_line(&self.stdin, &msg).await {
+        let mut msg = json!({"jsonrpc": "2.0", "id": id, "method": method});
+        msg["params"] = params;
+        if self.outbox.send(msg).is_err() {
             crate::sync::lock(&self.pending).remove(&id);
-            // A server that has exited closes its end: the same failure as
-            // seeing it exit while waiting for the reply.
-            if e.kind() == std::io::ErrorKind::BrokenPipe {
-                return Err(format!("it exited during {method}"));
-            }
-            return Err(format!("can't write to it: {e}"));
+            return Err(format!("it exited during {method}"));
         }
         Ok((id, rx))
     }
 
-    async fn notify(&self, method: &str, params: Value) -> Result<(), String> {
-        let msg = json!({"jsonrpc": "2.0", "method": method, "params": params});
-        write_line(&self.stdin, &msg).await.map_err(|e| format!("can't write to it: {e}"))
+    fn notify(&self, method: &str, params: Value) {
+        let mut msg = json!({"jsonrpc": "2.0", "method": method});
+        msg["params"] = params;
+        let _ = self.outbox.send(msg); // a dead server needs no notice
     }
 
-    /// Calls a tool. `cancelled` is polled; a cancelled call is also
-    /// cancelled at the server.
+    /// Calls a tool. `cancelled` is polled. A cancelled call is cancelled at
+    /// the server too, and a server that doesn't answer within
+    /// `CANCEL_GRACE` is killed: until the call returns, its effect holds the
+    /// workspace, so nothing (a rewind, say) can race a tool that ignores
+    /// the cancellation.
     pub async fn call(&self, tool: &str, arguments: Value, cancelled: &AtomicBool, timeout: Duration) -> Called {
-        let (id, mut reply) = match self.send("tools/call", json!({"name": tool, "arguments": arguments})).await {
+        if cancelled.load(Ordering::SeqCst) {
+            return Called::Cancelled;
+        }
+        let (id, mut reply) = match self.send("tools/call", json!({"name": tool, "arguments": arguments})) {
             Ok(r) => r,
             Err(why) => return Called::Failed(why),
         };
@@ -239,23 +338,49 @@ impl Server {
                 _ = poll.tick() => if cancelled.load(Ordering::SeqCst) { break Called::Cancelled },
             }
         };
+        self.notify("notifications/cancelled", json!({"requestId": id}));
+        // Any answer (a result or an error) means it has stopped working on it.
+        if tokio::time::timeout(CANCEL_GRACE, &mut reply).await.is_err() {
+            crate::log!("MCP server {} didn't answer a cancelled call; stopping it", self.name);
+            self.kill();
+        }
         crate::sync::lock(&self.pending).remove(&id);
-        let _ = self.notify("notifications/cancelled", json!({"requestId": id})).await; // best effort
         gave_up
     }
 }
 
-async fn write_line(stdin: &Mutex<ChildStdin>, msg: &Value) -> std::io::Result<()> {
-    let mut line = serde_json::to_vec(msg).map_err(std::io::Error::other)?;
-    line.push(b'\n');
-    let mut w = stdin.lock().await;
-    w.write_all(&line).await?;
-    w.flush().await
+/// Writes queued lines to the server. A write that stalls means the server
+/// stopped reading: it is killed rather than left to block everyone.
+async fn write_lines(
+    mut stdin: ChildStdin,
+    mut queued: mpsc::UnboundedReceiver<Value>,
+    pgid: i32,
+    dead: Arc<AtomicBool>,
+) {
+    while let Some(msg) = queued.recv().await {
+        let Ok(mut line) = serde_json::to_vec(&msg) else { continue };
+        line.push(b'\n');
+        let written = tokio::time::timeout(WRITE_TIMEOUT, async {
+            stdin.write_all(&line).await?;
+            stdin.flush().await
+        })
+        .await;
+        if !matches!(written, Ok(Ok(()))) {
+            kill_group(pgid, &dead);
+            return;
+        }
+    }
 }
 
 /// Routes replies to their requests, and refuses requests from the server
-/// (strive offers it no sampling, roots or elicitation).
-async fn read_replies(stdout: tokio::process::ChildStdout, stdin: Arc<Mutex<ChildStdin>>, pending: Pending) {
+/// (strive offers it no sampling, roots or elicitation). When the server's
+/// output ends, the server is marked dead and every waiting call fails.
+async fn read_replies(
+    stdout: ChildStdout,
+    outbox: mpsc::UnboundedSender<Value>,
+    pending: Pending,
+    dead: Arc<AtomicBool>,
+) {
     let mut r = BufReader::new(stdout);
     let mut line = Vec::new();
     loop {
@@ -280,14 +405,14 @@ async fn read_replies(stdout: tokio::process::ChildStdout, stdin: Arc<Mutex<Chil
             (Some(id), Some(_)) => {
                 let refusal =
                     json!({"jsonrpc": "2.0", "id": id, "error": {"code": -32601, "message": "not supported"}});
-                if write_line(&stdin, &refusal).await.is_err() {
-                    break;
-                }
+                let _ = outbox.send(refusal); // queued, so the reader never waits on a write
             }
             _ => {} // a notification
         }
     }
-    crate::sync::lock(&pending).clear(); // dropping the senders fails every waiting call
+    // Marked before the senders drop, so no call slips in after the last reply.
+    dead.store(true, Ordering::SeqCst);
+    crate::sync::lock(&pending).clear();
 }
 
 /// A tool result's content as text for the model.

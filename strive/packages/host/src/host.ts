@@ -168,17 +168,35 @@ function tool(
   };
 }
 
-/** Anthropic and OpenAI accept tool names of letters, digits, _ and -, up to 64. */
-const toolName = (server: string, name: string) =>
-  `mcp__${server}__${name}`.replace(/[^A-Za-z0-9_-]/g, "_").slice(0, 64);
+/**
+ * Names for MCP tools that providers accept (letters, digits, _ and -, up to
+ * 64) and that stay distinct: `a.b` and `a_b` would both become `a_b`, so a
+ * name that would collide gets a short hash of its server and tool.
+ */
+export function mcpToolNames(tools: McpTool[]): string[] {
+  const plain = (t: McpTool) => `mcp__${t.server}__${t.name}`.replace(/[^A-Za-z0-9_-]/g, "_");
+  const counts = new Map<string, number>();
 
-function mcpTool(client: StriveClient, sessionId: string, t: McpTool): AgentTool<any> {
+  for (const t of tools) counts.set(plain(t).slice(0, 64), (counts.get(plain(t).slice(0, 64)) ?? 0) + 1);
+
+  return tools.map((t) => {
+    const name = plain(t);
+
+    if (name.length <= 64 && counts.get(name) === 1) return name;
+
+    const hash = Bun.hash(`${t.server}\0${t.name}`).toString(36).slice(0, 8);
+
+    return `${name.slice(0, 55)}_${hash}`;
+  });
+}
+
+function mcpTool(client: StriveClient, sessionId: string, t: McpTool, name: string): AgentTool<any> {
   // SAFETY: the server's inputSchema is plain JSON Schema; pi-ai validates tool
   // arguments against plain JSON Schema as well as TypeBox schemas.
   const parameters = t.inputSchema as ReturnType<typeof Type.Object>;
   const description = t.description || `${t.server}'s ${t.name}`;
 
-  return tool(client, sessionId, toolName(t.server, t.name), description, parameters, (p) => ({
+  return tool(client, sessionId, name, description, parameters, (p) => ({
     kind: "mcp",
     server: t.server,
     tool: t.name,
@@ -187,8 +205,10 @@ function mcpTool(client: StriveClient, sessionId: string, t: McpTool): AgentTool
 }
 
 export function tools(client: StriveClient, sessionId: string, mcp: McpTool[] = []): AgentTool<any>[] {
+  const names = mcpToolNames(mcp);
+
   return [
-    ...mcp.map((t) => mcpTool(client, sessionId, t)),
+    ...mcp.map((t, i) => mcpTool(client, sessionId, t, names[i] ?? t.name)),
     tool(
       client,
       sessionId,

@@ -289,7 +289,7 @@ async fn host_config(state: &Arc<State>, sid: &SessionId) -> Reply {
         },
         instructions: ctx.instructions,
         skills: ctx.skills,
-        mcp_tools: mcp.tools(),
+        mcp_tools: mcp.tools,
     })
 }
 
@@ -447,8 +447,13 @@ async fn call_mcp(
 ) -> crate::effects::Result {
     use crate::effects::Result as R;
     use crate::mcp::Called;
-    let Some(s) = state.mcp.server(sid, server).await else {
-        return R::Refused(format!("no MCP server named {server} is running for this session"));
+    // Cancelled while it waited (for approval, or for the server to restart).
+    if cancelled.load(std::sync::atomic::Ordering::SeqCst) {
+        return R::Refused(format!("interrupted: {server}'s {tool} was cancelled"));
+    }
+    let s = match state.mcp.server(sid, server).await {
+        Ok(s) => s,
+        Err(why) => return R::Refused(why),
     };
     match s.call(tool, arguments, cancelled, MCP_TIMEOUT).await {
         Called::Done { text, is_error: false, truncated } => R::Done { text, exit_code: None, truncated },

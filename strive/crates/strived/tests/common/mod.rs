@@ -133,6 +133,10 @@ impl Rpc {
         assert_eq!(v["id"], id);
         v
     }
+    /// Waits up to `limit` for each reply, for calls that take a while.
+    pub fn wait_up_to(&mut self, limit: Duration) {
+        self.r.get_ref().set_read_timeout(Some(limit)).unwrap();
+    }
     /// Calls a method and returns its result, failing on an error response.
     pub fn ok(&mut self, method: &str, params: &Value) -> Value {
         let v = self.call(method, params);
