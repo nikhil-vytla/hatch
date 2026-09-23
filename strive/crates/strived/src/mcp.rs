@@ -204,6 +204,11 @@ impl Server {
         let msg = json!({"jsonrpc": "2.0", "id": id, "method": method, "params": params});
         if let Err(e) = write_line(&self.stdin, &msg).await {
             crate::sync::lock(&self.pending).remove(&id);
+            // A server that has exited closes its end: the same failure as
+            // seeing it exit while waiting for the reply.
+            if e.kind() == std::io::ErrorKind::BrokenPipe {
+                return Err(format!("it exited during {method}"));
+            }
             return Err(format!("can't write to it: {e}"));
         }
         Ok((id, rx))

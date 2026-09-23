@@ -289,6 +289,26 @@ fn the_sandbox_blocks_writes_outside_the_workspace_and_reading_strive_state() {
     assert_eq!(text, "inside\n");
 }
 
+/// Unix sockets outside the workspace (a Docker daemon, the user's D-Bus)
+/// can start processes outside the sandbox, so commands can't reach them.
+#[test]
+fn the_sandbox_blocks_unix_sockets_outside_it() {
+    if !sandboxed() {
+        return;
+    }
+    let mut w = Ws::new();
+    // Not under /tmp or /run, which the Linux sandbox replaces: like a socket
+    // in the user's home (Docker Desktop's is ~/.docker/run/docker.sock).
+    let outside = tempfile::Builder::new().prefix("sock").tempdir_in(env!("CARGO_TARGET_TMPDIR")).unwrap();
+    let path = outside.path().join("service.sock");
+    let _listener = std::os::unix::net::UnixListener::bind(&path).unwrap();
+    let deps = std::env::current_exe().unwrap().parent().unwrap().to_path_buf();
+    let probe = deps.parent().unwrap().join("examples/sock_probe");
+    assert!(probe.is_file(), "{} is missing: `cargo test` builds it, or `cargo build --examples`", probe.display());
+    let text = w.text(json!({"kind": "bash", "command": format!("{} {}", probe.display(), path.display())}));
+    assert!(text.starts_with("refused"), "{text}");
+}
+
 #[test]
 fn the_sandbox_blocks_the_network() {
     if !sandboxed() {

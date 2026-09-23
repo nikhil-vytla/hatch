@@ -295,9 +295,16 @@ fn edit(p: &Path, shown: &str, old: &str, new: &str) -> Result {
     }
 }
 
+/// A sandboxed command, with any descriptors it needs kept open until it is
+/// spawned.
+struct Sandboxed {
+    cmd: Command,
+    keep: Option<std::os::fd::OwnedFd>,
+}
+
 /// The command that runs `bash -c command` in the sandbox, or `None` where
 /// there is no sandbox.
-fn sandboxed_command(scope: &Scope, command: &str) -> Option<Command> {
+fn sandboxed_command(scope: &Scope, command: &str) -> Option<Sandboxed> {
     let ws = scope.workspace.display();
     let home = scope.strive_home.display();
     if cfg!(target_os = "macos") {
@@ -322,18 +329,56 @@ fn sandboxed_command(scope: &Scope, command: &str) -> Option<Command> {
         );
         let mut c = Command::new("/usr/bin/sandbox-exec");
         c.args(["-p", &profile, "/bin/bash", "-c", command]);
-        return Some(c);
+        return Some(Sandboxed { cmd: c, keep: None });
     }
     let bwrap = which("bwrap")?;
+    let filter = no_unix_sockets()?;
     let mut c = Command::new(bwrap);
     // A private /tmp and /run: the host's hold sockets (the user's D-Bus and
     // systemd, X11, Docker) that can start processes outside the sandbox.
     c.args(["--ro-bind", "/", "/", "--dev", "/dev", "--proc", "/proc", "--tmpfs", "/tmp", "--tmpfs", "/run"]);
     c.args(["--bind"]).arg(&scope.workspace).arg(&scope.workspace);
     c.args(["--tmpfs"]).arg(&scope.strive_home);
+    // As on macOS, no Unix sockets: one elsewhere (a Docker daemon under the
+    // user's home, say) could start processes outside the sandbox.
+    c.arg("--seccomp").arg(std::os::fd::AsRawFd::as_raw_fd(&filter).to_string());
     // Its own PID namespace: every process the command starts dies with it.
     c.args(["--unshare-net", "--unshare-pid", "--die-with-parent", "--", "/bin/bash", "-c", command]);
-    Some(c)
+    Some(Sandboxed { cmd: c, keep: Some(filter) })
+}
+
+/// A seccomp program for bubblewrap in which creating a Unix socket fails
+/// with EPERM (`socketpair`, which reaches nothing outside, still works), as
+/// the read end of a pipe holding it. `None` if it can't be built, so the
+/// command runs unsandboxed only with a person's approval.
+#[cfg(target_os = "linux")]
+fn no_unix_sockets() -> Option<std::os::fd::OwnedFd> {
+    use seccompiler::{
+        BpfProgram, SeccompAction, SeccompCmpArgLen, SeccompCmpOp, SeccompCondition, SeccompFilter, SeccompRule,
+    };
+    use std::io::Write as _;
+    let arch = std::env::consts::ARCH.try_into().ok()?;
+    let unix = SeccompCondition::new(0, SeccompCmpArgLen::Dword, SeccompCmpOp::Eq, libc::AF_UNIX as u64).ok()?;
+    let rules = [(libc::SYS_socket, vec![SeccompRule::new(vec![unix]).ok()?])].into_iter().collect();
+    let filter =
+        SeccompFilter::new(rules, SeccompAction::Allow, SeccompAction::Errno(libc::EPERM as u32), arch).ok()?;
+    let program: BpfProgram = filter.try_into().ok()?;
+    let mut bytes = Vec::with_capacity(program.len() * 8);
+    for f in &program {
+        bytes.extend(f.code.to_ne_bytes());
+        bytes.extend([f.jt, f.jf]);
+        bytes.extend(f.k.to_ne_bytes());
+    }
+    // Inherited by bubblewrap (pipe(2) doesn't set close-on-exec), which reads
+    // it to the end; the program is far smaller than a pipe's buffer.
+    let (read, write) = nix::unistd::pipe().ok()?;
+    std::fs::File::from(write).write_all(&bytes).ok()?;
+    Some(read)
+}
+
+#[cfg(not(target_os = "linux"))]
+fn no_unix_sockets() -> Option<std::os::fd::OwnedFd> {
+    None
 }
 
 fn which(bin: &str) -> Option<PathBuf> {
@@ -359,11 +404,13 @@ enum Ended {
 fn bash(scope: &Scope, command: &str, timeout_ms: u64, cancelled: &AtomicBool) -> Result {
     // Without a sandbox the gate always asks, so reaching here unconfined
     // means a person approved exactly that.
-    let mut cmd = sandboxed_command(scope, command).unwrap_or_else(|| {
+    let (mut cmd, keep) = if let Some(Sandboxed { cmd, keep }) = sandboxed_command(scope, command) {
+        (cmd, keep)
+    } else {
         let mut c = Command::new("/bin/bash");
         c.args(["-c", command]);
-        c
-    });
+        (c, None)
+    };
     let (mut reader, writer) = match io::pipe() {
         Ok(p) => p,
         Err(e) => return Result::Refused(format!("can't run the command: {e}")),
@@ -380,6 +427,7 @@ fn bash(scope: &Scope, command: &str, timeout_ms: u64, cancelled: &AtomicBool) -
         Err(e) => return Result::Refused(format!("can't run the command: {e}")),
     };
     drop(cmd);
+    drop(keep);
     let (captured, output) = std::sync::mpsc::channel();
     std::thread::spawn(move || {
         let _ = captured.send(capture(&mut reader));
