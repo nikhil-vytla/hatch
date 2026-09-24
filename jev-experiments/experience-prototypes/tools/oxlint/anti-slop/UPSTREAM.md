@@ -7,5 +7,6 @@
 - Dependencies: `oxlint@1.85.0` and `@oxlint/plugins@1.85.0`, pinned exactly (upstream pins 1.78.0; the install skill says to use the current matching pair)
 - Rules: every generic rule plus `oxc/no-accumulating-spread`, at `error`. Effect rules not enabled (no direct `effect` dependency).
 - Local additions: TypeScript and React correctness rules (`no-explicit-any`, `consistent-type-imports`, `no-unused-vars`, `eqeqeq`, hooks rules).
+- Formatting: `oxfmt@0.70.0` via `bun run format:arena` (config `jev-experiments/.oxfmtrc.json`), run after `oxlint --fix` so readable-spacing and formatting stay stable together.
 - Scope: `bun run lint:arena` covers the arena (`src/arena`, `packages/arena/src`). Older code is not yet linted; widen the paths as it is cleaned.
 - Deviations from upstream: none in the rule sources.

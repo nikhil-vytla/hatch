@@ -3,7 +3,10 @@ import { readFileSync } from "node:fs";
 import { heuristic, randomPlayer, recorded, TetrisArena, type RecordedEvent } from "./tetris";
 
 const games = readFileSync(new URL("../../../roadmap/tetris/games.jsonl", import.meta.url), "utf8")
-  .trim().split("\n").map((line) => JSON.parse(line));
+  .trim()
+  .split("\n")
+  .map((line) => JSON.parse(line));
+
 const LANDING_LANE = 1;
 
 function runRealtime(arena: TetrisArena, untilMs: number) {
@@ -13,17 +16,35 @@ function runRealtime(arena: TetrisArena, untilMs: number) {
 
 describe("real-time arena", () => {
   for (const game of games) {
-    const seed = game.summary.seed, expected = game.summary.lanes[LANDING_LANE];
+    const seed = game.summary.seed,
+      expected = game.summary.lanes[LANDING_LANE];
+
     test(`replays the recorded Jev landing game on seed ${seed} exactly`, () => {
       const events: RecordedEvent[] = game.events.filter((e: any) => e.lane === LANDING_LANE);
       const arena = new TetrisArena(seed, [recorded(events)]);
       runRealtime(arena, game.summary.worldMs);
       const lane = arena.lanes[0];
       expect(lane.stats.missing).toBe(0);
-      expect({ pieces: lane.game.pieces, lines: lane.game.lines, score: lane.game.score, status: lane.game.status })
-        .toEqual({ pieces: expected.pieces, lines: expected.lines, score: expected.score, status: expected.status });
-      expect({ applied: lane.stats.applied, stale: lane.stats.stale, failed: lane.stats.failed })
-        .toEqual({ applied: expected.stats.accepted, stale: expected.stats.stale, failed: expected.stats.failed });
+      expect({
+        pieces: lane.game.pieces,
+        lines: lane.game.lines,
+        score: lane.game.score,
+        status: lane.game.status,
+      }).toEqual({
+        pieces: expected.pieces,
+        lines: expected.lines,
+        score: expected.score,
+        status: expected.status,
+      });
+      expect({
+        applied: lane.stats.applied,
+        stale: lane.stats.stale,
+        failed: lane.stats.failed,
+      }).toEqual({
+        applied: expected.stats.accepted,
+        stale: expected.stats.stale,
+        failed: expected.stats.failed,
+      });
     });
   }
 
@@ -52,7 +73,13 @@ describe("real-time arena", () => {
   });
 
   test("runs repeat exactly", () => {
-    const play = () => { const a = new TetrisArena(42, [heuristic(), randomPlayer(3), heuristic(300)]); runRealtime(a, 15_000); return JSON.stringify(a.lanes.map((l) => [l.game.board, l.game.score, l.stats])); };
+    const play = () => {
+      const a = new TetrisArena(42, [heuristic(), randomPlayer(3), heuristic(300)]);
+      runRealtime(a, 15_000);
+
+      return JSON.stringify(a.lanes.map((l) => [l.game.board, l.game.score, l.stats]));
+    };
+
     expect(play()).toBe(play());
   }, 20_000);
 });
@@ -60,6 +87,7 @@ describe("real-time arena", () => {
 describe("turn-based arena", () => {
   test("places one piece per lane per turn, so only choices differ", async () => {
     const arena = new TetrisArena(7, [heuristic(), randomPlayer()], "turns");
+
     for (let i = 0; i < 30; i++) await arena.turn();
     const [planner, random] = arena.lanes;
     expect(planner.game.pieces).toBe(30);
@@ -71,6 +99,7 @@ describe("turn-based arena", () => {
     const game = games.find((g) => g.summary.seed === 7);
     const events: RecordedEvent[] = game.events.filter((e: any) => e.lane === LANDING_LANE);
     const arena = new TetrisArena(7, [recorded(events)], "turns");
+
     for (let i = 0; i < 40 && !arena.over; i++) await arena.turn();
     const lane = arena.lanes[0];
     expect(lane.stats.applied).toBeGreaterThan(0);
