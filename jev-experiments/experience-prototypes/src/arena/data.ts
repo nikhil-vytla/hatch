@@ -1,26 +1,46 @@
-/** Loads the arena index once and any chunk on demand, caching both. */
-import type { ArenaIndex, Card } from "../../../packages/arena/src/data/schema";
+/** Loads the arena index and chunks, parsing each at the boundary, and keeps view state in the URL. */
+import type { z } from "zod";
+import {
+  arenaIndexSchema,
+  type ArenaIndex,
+  type Card,
+  type Estimate,
+  type MetricDef,
+} from "../../../packages/arena/src/data/schema";
 
 let index: Promise<ArenaIndex> | null = null;
 
-const chunks = new Map<string, Promise<any>>();
+const chunks = new Map<string, Promise<unknown>>();
 
-export const loadIndex = () =>
-  (index ??= fetch("/arena/index.json").then((r) => {
-    if (!r.ok) throw new Error("The arena data is not built. Run bun run build.");
+export function loadIndex(): Promise<ArenaIndex> {
+  index ??= fetch("/arena/index.json")
+    .then((r) => {
+      if (!r.ok) throw new Error(`arena/index.json: HTTP ${r.status}`);
 
-    return r.json();
-  }));
+      return r.json();
+    })
+    .then((json) => {
+      const parsed = arenaIndexSchema.safeParse(json);
 
-export const loadChunk = <T = any>(path: string): Promise<T> => {
-  if (!chunks.has(path))
-    chunks.set(
-      path,
-      fetch(`/arena/${path}`).then((r) => r.json()),
-    );
+      if (parsed.success) return parsed.data;
+      console.error("arena/index.json does not match its schema", parsed.error.issues);
+      throw new Error("arena/index.json does not match its schema");
+    });
 
-  return chunks.get(path)!;
-};
+  return index;
+}
+
+/** Fetches a chunk once and parses it with the caller's schema. */
+export function loadChunk<S extends z.ZodType>(path: string, schema: S): Promise<z.infer<S>> {
+  let pending = chunks.get(path);
+
+  if (!pending) {
+    pending = fetch(`/arena/${path}`).then((r) => r.json());
+    chunks.set(path, pending);
+  }
+
+  return pending.then((json) => schema.parse(json));
+}
 
 /** Card view state, kept in the hash so any view can be shared. */
 export type View = {
@@ -32,68 +52,102 @@ export type View = {
   seed?: string;
   wf?: string;
   qt?: string;
-  /** identity prototype variant */ v?: string;
 };
 
+const KEYS = ["lens", "m", "g", "seed", "wf", "qt"] as const;
+
 export function readView(hash = location.hash): View | null {
-  const m = hash.match(/^#\/arena(?:\/([^?]+))?(?:\?(.*))?$/);
+  const match = hash.match(/^#\/arena(?:\/([^?]+))?(?:\?(.*))?$/);
 
-  if (!m) return null;
-  const p = new URLSearchParams(m[2] ?? "");
-  const get = (k: string) => p.get(k) ?? undefined;
+  if (!match) return null;
+  const params = new URLSearchParams(match[2] ?? "");
+  const view: View = { card: match[1] ?? "", c: params.get("c")?.split(",").filter(Boolean) };
 
-  return {
-    card: m[1] ?? "",
-    c: p.get("c")?.split(",").filter(Boolean),
-    lens: get("lens"),
-    m: get("m"),
-    g: get("g"),
-    seed: get("seed"),
-    wf: get("wf"),
-    qt: get("qt"),
-    v: get("v"),
-  };
+  for (const key of KEYS) {
+    const value = params.get(key);
+
+    if (value) view[key] = value;
+  }
+
+  return view;
 }
 
-export function writeView(v: View, replace = false) {
-  const p = new URLSearchParams();
+export function viewHash(view: View) {
+  const params = new URLSearchParams();
 
-  if (v.c) p.set("c", v.c.join(","));
+  if (view.c) params.set("c", view.c.join(","));
 
-  for (const k of ["lens", "m", "g", "seed", "wf", "qt", "v"] as const) if (v[k]) p.set(k, v[k]!);
+  for (const key of KEYS) {
+    const value = view[key];
 
-  const q = p.toString().replaceAll("%2C", ","),
-    hash = `#/arena${v.card ? `/${v.card}` : ""}${q ? `?${q}` : ""}`;
+    if (value) params.set(key, value);
+  }
+
+  const query = params.toString().replaceAll("%2C", ",");
+
+  return `#/arena${view.card ? `/${view.card}` : ""}${query ? `?${query}` : ""}`;
+}
+
+/** Contestant changes add a history entry; lens, metric and slice changes replace it. */
+export function writeView(view: View, mode: "push" | "replace" = "replace") {
+  const hash = viewHash(view);
 
   if (hash === location.hash) return;
 
-  if (replace) history.replaceState(null, "", hash);
-  else history.pushState(null, "", hash);
+  if (mode === "push") history.pushState(null, "", hash);
+  else history.replaceState(null, "", hash);
   window.dispatchEvent(new HashChangeEvent("hashchange"));
 }
 
-/** The default contestants for a card, limited to one protocol group. */
+/** Default contestants for a card, limited to one protocol group. */
 export function defaults(card: Card, group?: string) {
-  const g = card.protocolGroups.find((x) => x.hash === group) ?? null;
+  const selected = card.protocolGroups.find((g) => g.hash === group);
 
   return card.contestants
     .filter(
-      (c) => c.default && (!g || c.kind === "code" || c.runSets.some((r) => g.runSets.includes(r))),
+      (c) =>
+        c.default &&
+        (!selected || c.kind === "code" || c.runSets.some((r) => selected.runSets.includes(r))),
     )
     .map((c) => c.id);
 }
 
-export const formatValue = (unit: string, v: number | undefined | null) => {
-  if (v == null || Number.isNaN(v)) return "—";
+/**
+ * Formats a number in its metric's unit. Means over seeds keep one decimal so a
+ * column of means aligns; raw counts stay whole.
+ */
+export function formatNumber(metric: Pick<MetricDef, "unit">, value?: number, mean = false) {
+  if (value === undefined || Number.isNaN(value)) return "—";
 
-  if (unit === "%") return `${(v * 100).toFixed(1)}%`;
+  switch (metric.unit) {
+    case "%":
+      return `${(value * 100).toFixed(1)}%`;
+    case "ms":
+      return value >= 1000 ? `${(value / 1000).toFixed(2)} s` : `${Math.round(value)} ms`;
+    case "s":
+      return `${value.toFixed(1)} s`;
+    case "lines":
+    case "pieces":
+    case "count":
+      return mean || !Number.isInteger(value) ? value.toFixed(1) : String(value);
+    default:
+      return value.toFixed(3);
+  }
+}
 
-  if (unit === "ms") return v >= 1000 ? `${(v / 1000).toFixed(2)} s` : `${Math.round(v)} ms`;
+/** Formats an estimate; per-seed estimates are means. */
+export const formatValue = (metric: Pick<MetricDef, "unit">, estimate?: Estimate) =>
+  formatNumber(metric, estimate?.value, Boolean(estimate?.perItem));
 
-  if (unit === "s") return `${v.toFixed(1)} s`;
+/** "±2.2pp" for percentages, "±0.004" otherwise; empty when there is no interval. */
+export function formatSpread(metric: Pick<MetricDef, "unit">, estimate?: Estimate) {
+  if (estimate?.lo === undefined || estimate.hi === undefined) return "";
+  const half = (estimate.hi - estimate.lo) / 2;
 
-  if (unit === "lines" || unit === "pieces" || unit === "count")
-    return Number.isInteger(v) ? String(v) : v.toFixed(1);
+  return metric.unit === "%" ? `±${(half * 100).toFixed(1)}pp` : `±${formatNumber(metric, half)}`;
+}
 
-  return v.toFixed(3);
-};
+/** Lowercases only a leading capital that begins a normal word, so "P(clean)" survives. */
+export function inSentence(label: string) {
+  return /^[A-Z][a-z]/.test(label) ? label[0].toLowerCase() + label.slice(1) : label;
+}
