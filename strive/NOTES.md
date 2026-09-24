@@ -797,3 +797,70 @@ the tests act as it, registering over RPC and recording `proposalMade`.
   (`the_sandbox_blocks_unix_sockets_outside_it`). `check.sh` ran with
   `CARGO_TARGET_DIR=/tmp/m7t`, with `target` symlinked there for the TS
   tests.
+
+## 2026-09-23: Desktop pass 3, the conversation first
+
+Used first: scripted sessions against a fake model at 1280, 1000, 860 and
+720 px, with the palette, changes pane, expanded tools and a waiting
+approval, a session with no key, and a real Haiku run. Harnesses and shots
+are in /tmp/ui-shot (not committed; before/ and after/).
+- **What was wrong:**
+  - The side column took a third of the window and repeated the
+    conversation.
+  - At 860 px the changes pane was drawn over the conversation without
+    hiding it.
+  - The model chip wrapped at narrow widths and couldn't pick anything.
+  - The conversation's drag handle floated over the first line of text.
+  - A missing key showed up only as raw provider JSON after a prompt.
+- **Layout:**
+  - The default workspace places only the transcript. The other panels
+    exist but aren't placed, so drags and agent proposals keep working.
+  - ⌘K shows or hides each panel, and shown panels have a hide button.
+  - Spend is a meter in the composer's footer. Each prompt offers Rewind on
+    hover, which asks first.
+  - A saved layout carries its own base, so people who saved one keep it.
+- **Model picker:** `model/list` and `session/model` (journaled as
+  `modelSet`, used by host registration).
+  - The model can be chosen only before the first prompt, since a host may
+    start on it then. After that the picker says switching mid-session
+    isn't supported and offers a new session.
+  - The real Haiku run picked Haiku over a Sonnet default through the chip:
+    12.2s, $0.0286.
+- **Onboarding:** the empty state says where the agent works, what the
+  approval mode lets it do, the budget and how to undo.
+  - With no key for the model it gives the `strive auth` command, and the
+    window checks again on focus.
+  - Failed turns read the provider's message instead of its JSON.
+- **Narrow windows:** below 900 px the sidebar opens over the conversation.
+  Container queries size the pane, side panels and rail by the space they
+  actually have.
+- **Look:** Geist and Geist Mono, vendored as two variable woff2 files
+  (140 KB) with the OFL. The `geist` npm package pulls in Next.js as a
+  peer.
+  - Also: one token set with radii by role, focus rings, and short
+    ease-out motion that is off under reduced motion.
+- **Packaging:** `electron-builder --dir` (install.sh's step) builds a
+  working app. The packaged binary ran a fake-model session with both fonts
+  loaded from the asar.
+- **Environment traps:**
+  - This worktree's path is long enough that
+    `the_sandbox_blocks_unix_sockets_outside_it` hits `SUN_LEN`.
+    `CARGO_TARGET_DIR=/tmp/ui-target` (with `target` symlinked there) fixes
+    it. `env!` bakes the old path in, so touch the tests to rebuild.
+  - Two one-off failures in the gate were
+    `a_client_that_leaves_while_the_provider_stalls_closes_the_call` and a
+    `WouldBlock` (5 s read timeout) in `a_started_host_gets_no_provider_keys`.
+    The first didn't reproduce in 40 reruns under load, and other agents
+    were running strive suites on the machine at the time. It gives the request
+    300 ms to reach the gateway before dropping it. Under IO load that may
+    not be enough, so nothing is journaled to close. That's a guess, not
+    shown.
+  - A panicking test can leave its daemon running. Two were stopped by PID.
+- **Not done:**
+  - Switching models mid-session: the host would have to re-register.
+  - A sticky model choice for new sessions.
+  - Setting a key from the window: `auth/set` stays off the bridge, so a
+    compromised renderer can't swap the user's key.
+  - A checkpoint timeline in the changes pane: rewind lives on prompts and
+    in ⌘K.
+  - Light theme.

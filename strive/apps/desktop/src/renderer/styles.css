@@ -170,7 +170,7 @@ button.quiet.danger { color: var(--bad); }
 .activity li { display: flex; align-items: center; gap: 9px; padding: 3px 0; color: var(--muted); overflow: hidden; }
 .activity .mono { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .dot { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--good); }
-.dot.running { background: var(--accent); animation: pulse 1.6s infinite; }
+.dot.running, .dot.working { background: var(--accent); animation: pulse 1.6s infinite; }
 .dot.waiting { background: var(--warn); }
 .dot.failed, .dot.refused { background: var(--bad); }
 .waiting-line { display: flex; align-items: center; gap: 8px; color: var(--muted); }
