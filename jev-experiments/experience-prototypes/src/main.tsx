@@ -12,7 +12,7 @@ import "./pages/reading-workspace.css";
 
 const ExperimentPage = lazy(() => import("./pages/experiment").then(m => ({ default: m.ExperimentPage })));
 const AboutPage = lazy(() => import("./pages/about").then(m => ({ default: m.AboutPage })));
-const ArenaPage = lazy(() => import("./arena/arena-page").then(m => ({ default: m.ArenaPage })));
+const ArenaPage = lazy(() => import("./arena/page").then(m => ({ default: m.ArenaPage })));
 const NotesIndex = lazy(() => import("./notes").then(m => ({ default: m.NotesIndex })));
 const ExperimentNote = lazy(() => import("./notes").then(m => ({ default: m.ExperimentNote })));
 
@@ -257,11 +257,12 @@ function App() {
     return () => cancelAnimationFrame(frame);
   }, [route]);
   useEffect(() => {
+    // The arena page titles its own entries.
+    if (route.startsWith("#/arena")) return;
     const label = route.startsWith("#/notes/")
       ? route.split("/")[2].replaceAll("-", " ")
       : route.startsWith("#/notes") ? "Notes"
       : route === "#/about" || route === "#about" ? "About"
-      : route.startsWith("#/arena") ? "Arena"
       : id ? lookup(id).title : "Play";
     document.title = `${label.charAt(0).toUpperCase()}${label.slice(1)} · Jev experiments`;
   }, [route, id]);

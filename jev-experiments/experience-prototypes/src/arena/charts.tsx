@@ -1,0 +1,466 @@
+import { scaleLinear } from "d3-scale";
+import { useEffect, useState } from "react";
+import type { MetricDef } from "../../../packages/arena/src/data/schema";
+import { predsSchema, targetsSchema } from "../../../packages/arena/src/data/chunks";
+import { score } from "../../../packages/arena/src/score";
+import { formatNumber, formatSpread, formatValue, inSentence, loadChunk } from "./data";
+import { colorVars, compareBy, type CardModel } from "./model";
+
+const domainOf = (m: MetricDef): [number, number] => m.domain ?? [0, m.unit === "%" ? 1 : 1];
+
+/** A screen-reader copy of the figure's numbers. */
+function DataTable({ model: m, metrics }: { model: CardModel; metrics: MetricDef[] }) {
+  return (
+    <table className="sr-only">
+      <caption>{m.card.title}</caption>
+      <thead>
+        <tr>
+          <th scope="col">Contestant</th>
+          {metrics.map((mm) => (
+            <th key={mm.id} scope="col">
+              {mm.label}
+            </th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {m.shown.map((id) => (
+          <tr key={id}>
+            <th scope="row">{m.nameOf(id)}</th>
+            {metrics.map((mm) => (
+              <td key={mm.id}>
+                {formatValue(mm, m.estimate(id, mm))} {formatSpread(mm, m.estimate(id, mm))}
+              </td>
+            ))}
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+// ---------------------------------------------------------------- bars
+export function Bars({ model: m }: { model: CardModel }) {
+  const metric = m.metric;
+  const x = scaleLinear().domain(domainOf(metric)).range([0, 100]).clamp(true);
+  const ticks = x.ticks(4);
+  const rows = m.ranked(metric, m.shown);
+  const missing = m.shown.filter((id) => !rows.includes(id));
+  const focused = m.focus ? m.estimate(m.focus) : undefined;
+  const pct = (v: number) => `${x(v)}%`;
+
+  return (
+    <div className="bars" onMouseLeave={() => m.setFocus(null)}>
+      {rows.map((id) => {
+        const e = m.estimate(id);
+        const c = m.contestant(id);
+
+        if (!e) return null;
+
+        const detail = e.perItem
+          ? `Seeds: ${e.perItem.map((p) => `${p.item} ${formatNumber(metric, p.value)}`).join(", ")}`
+          : e.lo !== undefined && e.hi !== undefined
+            ? `95% interval ${formatNumber(metric, e.lo)} to ${formatNumber(metric, e.hi)} over ${e.n} cases`
+            : "";
+
+        return (
+          <button
+            key={id}
+            type="button"
+            className="bar-row"
+            data-dim={m.focus !== null && m.focus !== id}
+            data-kind={c?.kind}
+            style={colorVars(c)}
+            aria-describedby={`bar-detail-${id}`}
+            onMouseEnter={() => m.setFocus(id)}
+            onFocus={() => m.setFocus(id)}
+            onBlur={() => m.setFocus(null)}
+          >
+            <span className="bar-name">
+              <span className="swatch" aria-hidden="true" />
+              {m.nameOf(id)}
+              {e.coverage && (
+                <small>
+                  {" "}
+                  · {e.coverage.covered} of {e.coverage.of} seeds
+                </small>
+              )}
+            </span>
+            <span className="bar-track" aria-hidden="true">
+              {focused?.lo !== undefined && focused.hi !== undefined && (
+                <span
+                  className="bar-band"
+                  style={{
+                    left: pct(focused.lo),
+                    width: `calc(${pct(focused.hi)} - ${pct(focused.lo)})`,
+                  }}
+                />
+              )}
+              <span className="bar-fill" style={{ width: pct(e.value) }} />
+              {e.lo !== undefined && e.hi !== undefined && (
+                <span
+                  className="bar-whisker"
+                  style={{ left: pct(e.lo), width: `calc(${pct(e.hi)} - ${pct(e.lo)})` }}
+                />
+              )}
+              {e.perItem?.map((p) => (
+                <span key={p.item} className="bar-seed" style={{ left: pct(p.value) }} />
+              ))}
+            </span>
+            <span className="bar-value">
+              {formatValue(metric, e)}
+              <small>
+                {formatSpread(metric, e) || (e.perItem ? `mean of ${e.perItem.length}` : "")}
+              </small>
+            </span>
+            <span id={`bar-detail-${id}`} className="bar-detail" data-open={m.focus === id}>
+              {detail}
+            </span>
+          </button>
+        );
+      })}
+      <div className="bar-axis" aria-hidden="true">
+        <span />
+        <span className="bar-ticks">
+          {ticks.map((t) => (
+            <span key={t} style={{ left: pct(t) }}>
+              {formatNumber(metric, t)}
+            </span>
+          ))}
+          {metric.better === "lower" && <em className="bar-better">← better</em>}
+        </span>
+        <span />
+      </div>
+      {missing.length > 0 && (
+        <p className="muted">
+          No {inSentence(metric.label)} for {missing.map((id) => m.nameOf(id, true)).join(", ")}
+          {metric.timing ? ": code players make no model calls." : "."}
+        </p>
+      )}
+      <DataTable model={m} metrics={[metric]} />
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------- scatter
+type Point = { id: string; x: number; y: number };
+
+/** Points nobody beats on both measures. */
+function frontier(points: Point[], mx: MetricDef, my: MetricDef) {
+  const beats = (a: Point, b: Point) =>
+    compareBy(mx, a.x, b.x) <= 0 && compareBy(my, a.y, b.y) <= 0 && (a.x !== b.x || a.y !== b.y);
+
+  return points.filter((p) => !points.some((q) => beats(q, p)));
+}
+
+export function Scatter({ model: m }: { model: CardModel }) {
+  const [xId, yId] = m.card.tradeoff ?? [
+    m.card.metrics[0].id,
+    m.card.metrics[1]?.id ?? m.card.metrics[0].id,
+  ];
+
+  const mx = m.card.metrics.find((mm) => mm.id === xId) ?? m.card.metrics[0];
+  const my = m.card.metrics.find((mm) => mm.id === yId) ?? m.card.metrics[0];
+
+  const points: Point[] = m.shown.flatMap((id) => {
+    const ex = m.estimate(id, mx),
+      ey = m.estimate(id, my);
+
+    return ex && ey ? [{ id, x: ex.value, y: ey.value }] : [];
+  });
+
+  const skipped = m.shown.filter((id) => !points.some((p) => p.id === id));
+
+  const W = 720,
+    H = 340,
+    L = 56,
+    R = 24,
+    T = 20,
+    B = 48;
+
+  // Better is always up and to the right: flip an axis whose smaller values are better.
+  const [dx0, dx1] = domainOf(mx),
+    [dy0, dy1] = domainOf(my);
+
+  const x = scaleLinear()
+    .domain(mx.better === "higher" ? [dx0, dx1] : [dx1, dx0])
+    .range([L, W - R])
+    .nice();
+
+  const y = scaleLinear()
+    .domain(my.better === "higher" ? [dy0, dy1] : [dy1, dy0])
+    .range([H - B, T])
+    .nice();
+
+  const front = frontier(points, mx, my).sort((a, b) => x(a.x) - x(b.x));
+
+  // Keep labels at least 15px apart vertically, with a leader line when one moves.
+  const labels = [...points]
+    .map((p) => ({ ...p, sx: x(p.x), sy: y(p.y), ly: y(p.y) }))
+    .sort((a, b) => a.sy - b.sy);
+
+  for (let i = 1; i < labels.length; i++)
+    if (Math.abs(labels[i].sx - labels[i - 1].sx) < 180 && labels[i].ly - labels[i - 1].ly < 15)
+      labels[i].ly = labels[i - 1].ly + 15;
+
+  if (points.length < 2)
+    return (
+      <p className="muted">
+        Add at least two contestants that have both {inSentence(mx.label)} and{" "}
+        {inSentence(my.label)}.
+      </p>
+    );
+
+  return (
+    <div className="scatter">
+      <svg
+        viewBox={`0 0 ${W} ${H}`}
+        role="group"
+        aria-label={`${my.label} against ${inSentence(mx.label)}`}
+        onMouseLeave={() => m.setFocus(null)}
+      >
+        {x.ticks(5).map((t) => (
+          <g key={`x${t}`} className="tick">
+            <line x1={x(t)} x2={x(t)} y1={T} y2={H - B} />
+            <text x={x(t)} y={H - B + 18} textAnchor="middle">
+              {formatNumber(mx, t)}
+            </text>
+          </g>
+        ))}
+        {y.ticks(5).map((t) => (
+          <g key={`y${t}`} className="tick">
+            <line x1={L} x2={W - R} y1={y(t)} y2={y(t)} />
+            <text x={L - 8} y={y(t) + 4} textAnchor="end">
+              {formatNumber(my, t)}
+            </text>
+          </g>
+        ))}
+        <text className="axis-title" x={W - R} y={H - 8} textAnchor="end">
+          {mx.label} ({mx.better === "higher" ? "higher" : "lower"} is better) →
+        </text>
+        <text className="axis-title" x={L} y={T - 6}>
+          ↑ {my.label} ({my.better === "higher" ? "higher" : "lower"} is better)
+        </text>
+        {front.length > 1 && (
+          <polyline
+            className="frontier"
+            points={front.map((p) => `${x(p.x)},${y(p.y)}`).join(" ")}
+          />
+        )}
+        {labels.map((p) => {
+          const onFront = front.some((f) => f.id === p.id);
+          const c = m.contestant(p.id);
+          const right = p.sx < W * 0.66;
+
+          return (
+            <g
+              key={p.id}
+              className="point"
+              data-dim={m.focus !== null && m.focus !== p.id}
+              data-front={onFront}
+              style={colorVars(c)}
+              tabIndex={0}
+              role="img"
+              aria-label={`${m.nameOf(p.id)}: ${formatNumber(mx, p.x)} ${inSentence(mx.label)}, ${formatNumber(my, p.y)} ${inSentence(my.label)}${onFront ? ", on the frontier" : ""}`}
+              onMouseEnter={() => m.setFocus(p.id)}
+              onFocus={() => m.setFocus(p.id)}
+              onBlur={() => m.setFocus(null)}
+            >
+              {p.ly !== p.sy && (
+                <line
+                  className="leader"
+                  x1={p.sx}
+                  y1={p.sy}
+                  x2={p.sx + (right ? 10 : -10)}
+                  y2={p.ly}
+                />
+              )}
+              <circle cx={p.sx} cy={p.sy} r={7} />
+              <text x={p.sx + (right ? 12 : -12)} y={p.ly + 4} textAnchor={right ? "start" : "end"}>
+                {m.nameOf(p.id, true)}{" "}
+                <tspan className="point-value">
+                  {formatNumber(mx, p.x)} · {formatNumber(my, p.y)}
+                </tspan>
+              </text>
+            </g>
+          );
+        })}
+      </svg>
+      {skipped.length > 0 && (
+        <p className="muted">
+          Not plotted: {skipped.map((id) => m.nameOf(id, true)).join(", ")}
+          {mx.timing || my.timing
+            ? ", code players make no model calls."
+            : ", no value for one axis."}
+        </p>
+      )}
+      <DataTable model={m} metrics={[mx, my]} />
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------- per seed
+export function PerSeed({ model: m }: { model: CardModel }) {
+  const metric = m.metric;
+  const items = m.card.items ?? [];
+  const lead = m.ranked(metric, m.models.length ? m.models : m.shown)[0];
+
+  const per = (id: string, item: string) =>
+    m.estimate(id)?.perItem?.find((p) => p.item === item)?.value;
+
+  return (
+    <div className="table-wrap">
+      <table className="grid">
+        <thead>
+          <tr>
+            <th scope="col">Contestant</th>
+            {items.map((it) => (
+              <th key={it.id} scope="col">
+                {it.label}
+              </th>
+            ))}
+            {lead && <th scope="col">Against {m.nameOf(lead, true)}</th>}
+          </tr>
+        </thead>
+        <tbody>
+          {m.shown.map((id) => {
+            const pairs = items.flatMap((it) => {
+              const a = per(id, it.id),
+                b = per(lead, it.id);
+
+              return a !== undefined && b !== undefined ? [[a, b] as const] : [];
+            });
+
+            const wins = pairs.filter(([a, b]) => compareBy(metric, a, b) < 0).length;
+            const ties = pairs.filter(([a, b]) => a === b).length;
+
+            return (
+              <tr key={id} style={colorVars(m.contestant(id))} data-kind={m.contestant(id)?.kind}>
+                <th scope="row">
+                  <span className="swatch" aria-hidden="true" />
+                  {m.nameOf(id)}
+                </th>
+                {items.map((it) => {
+                  const v = per(id, it.id);
+
+                  const best =
+                    v !== undefined &&
+                    m.shown.every((o) => {
+                      const w = per(o, it.id);
+
+                      return w === undefined || compareBy(metric, v, w) <= 0;
+                    });
+
+                  return (
+                    <td key={it.id} data-best={best}>
+                      {v === undefined ? "·" : formatNumber(metric, v)}
+                    </td>
+                  );
+                })}
+                {lead && (
+                  <td className="muted">
+                    {id === lead
+                      ? "—"
+                      : `better on ${wins} of ${pairs.length}${ties ? `, tied on ${ties}` : ""}`}
+                  </td>
+                )}
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------- calibration
+type Bin = { conf: number; agree: number; count: number };
+
+export function Calibration({ model: m }: { model: CardModel }) {
+  const [bins, setBins] = useState<Record<string, Bin[]> | null>(null);
+  const { targets: targetsPath, preds } = m.card.chunks;
+  const lineup = m.shown.join(",");
+  const { wf, qt } = m.view;
+
+  useEffect(() => {
+    if (!targetsPath || !preds) return;
+    let alive = true;
+
+    (async () => {
+      const targets = await loadChunk(targetsPath, targetsSchema);
+      const out: Record<string, Bin[]> = {};
+
+      for (const id of lineup.split(",").filter(Boolean)) {
+        const path = preds[id];
+
+        if (!path) continue;
+        const p = await loadChunk(path, predsSchema);
+
+        const answers = targets.rows.flatMap((r, i) =>
+          (!wf || r.wf === wf) && (!qt || r.type === qt)
+            ? [{ prediction: p.p[i], reference: r.target }]
+            : [],
+        );
+
+        out[id] = score(answers).reliability.map((b) => ({
+          conf: b.confidence,
+          agree: b.agreement,
+          count: b.count,
+        }));
+      }
+
+      if (alive) setBins(out);
+    })();
+
+    return () => {
+      alive = false;
+    };
+  }, [lineup, wf, qt, targetsPath, preds]);
+
+  if (!bins) return <p className="muted">Loading predictions…</p>;
+  const S = 150;
+
+  return (
+    <div className="calibration">
+      {m.shown.map((id, i) => (
+        <figure key={id} style={colorVars(m.contestant(id))}>
+          <svg
+            viewBox={`-26 -8 ${S + 34} ${S + 30}`}
+            role="img"
+            aria-label={`${m.nameOf(id)}: agreement by stated confidence. Dots on the diagonal are well calibrated.`}
+          >
+            <rect className="frame" x={0} y={0} width={S} height={S} />
+            <line className="diag" x1={0} y1={S} x2={S} y2={0} />
+            {[0, 0.5, 1].map((t) => (
+              <g key={t} className="tick">
+                <text x={t * S} y={S + 14} textAnchor="middle">
+                  {t * 100}%
+                </text>
+                {i === 0 && (
+                  <text x={-6} y={S - t * S + 4} textAnchor="end">
+                    {t * 100}%
+                  </text>
+                )}
+              </g>
+            ))}
+            {bins[id]?.map((b) => (
+              <circle
+                key={b.conf}
+                cx={b.conf * S}
+                cy={S - b.agree * S}
+                r={Math.max(2.5, Math.sqrt(b.count) / 2.2)}
+              />
+            ))}
+          </svg>
+          <figcaption>
+            <span className="swatch" aria-hidden="true" />
+            {m.nameOf(id, true)}
+          </figcaption>
+        </figure>
+      ))}
+      <p className="calibration-axes muted">
+        Across: stated confidence. Up: how often the top answer agrees with the reference.
+      </p>
+    </div>
+  );
+}
