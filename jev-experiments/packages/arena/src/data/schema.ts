@@ -6,7 +6,9 @@
 export type Id = string;
 
 export type MetricDef = {
-  id: Id; label: string; unit: "%" | "ms" | "s" | "lines" | "pieces" | "count" | "";
+  id: Id;
+  label: string;
+  unit: "%" | "ms" | "s" | "lines" | "pieces" | "count" | "";
   better: "higher" | "lower";
   axis: "accuracy" | "calibration" | "speed" | "cost" | "robustness" | "outcome";
   /** One sentence shown on hover: what the number means and how it was measured. */
@@ -18,8 +20,10 @@ export type MetricDef = {
  * games with a handful of seeds carry one value per seed instead of an interval.
  */
 export type Estimate = {
-  value: number; n: number;
-  lo?: number; hi?: number;
+  value: number;
+  n: number;
+  lo?: number;
+  hi?: number;
   perItem?: { item: string; value: number }[];
   method: "bootstrap-case" | "per-seed" | "count" | "none";
   /** Share of the n items this contestant actually covers, when partial. */
@@ -27,8 +31,12 @@ export type Estimate = {
 };
 
 export type ContestantKind = "hosted" | "local" | "code";
+
 export type Contestant = {
-  id: Id; name: string; short: string; kind: ContestantKind;
+  id: Id;
+  name: string;
+  short: string;
+  kind: ContestantKind;
   /** The model behind it, e.g. "typesafe-ai/jev"; absent for code players. */
   model?: string;
   /** How it is asked or how it plays, e.g. "judge each spot". */
@@ -37,7 +45,9 @@ export type Contestant = {
 };
 
 export type RunSet = {
-  id: Id; label: string; recordedAt: string;
+  id: Id;
+  label: string;
+  recordedAt: string;
   source: "recorded" | "computed";
   /** Canonical protocol; runs are comparable only when these hashes match. */
   protocol: Record<string, string | number | boolean>;
@@ -50,7 +60,10 @@ export type RunSet = {
 export type CardContestant = Contestant & { default: boolean; runSets: Id[] };
 
 export type Card = {
-  id: Id; title: string; question: string; family: "game" | "judgement-set" | "robustness";
+  id: Id;
+  title: string;
+  question: string;
+  family: "game" | "judgement-set" | "robustness";
   /** What "right" means, so copy never says accuracy when it means agreement. */
   reference: "world-outcome" | "soft-teacher" | "authored-labels" | "self-consistency";
   metrics: MetricDef[];
@@ -80,4 +93,9 @@ export type Card = {
   protocolGroups: { hash: string; label: string; runSets: Id[] }[];
 };
 
-export type ArenaIndex = { schema: "arena.index/1"; generatedAt: string; runSets: RunSet[]; cards: Card[] };
+export type ArenaIndex = {
+  schema: "arena.index/1";
+  generatedAt: string;
+  runSets: RunSet[];
+  cards: Card[];
+};
