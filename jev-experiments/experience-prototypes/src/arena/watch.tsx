@@ -141,7 +141,7 @@ export function Watch({ model: m }: { model: CardModel }) {
   const seed = m.view.seed ?? card.items?.[0]?.id ?? "7";
   const [game, setGame] = useState<{ arena: TetrisArena; ids: string[] } | null>(null);
   const [running, setRunning] = useState(false);
-  const [speed, setSpeed] = useState(mode === "turns" ? 4 : 2);
+  const [speed, setSpeed] = useState(1);
   const [announcement, setAnnouncement] = useState("");
   const [generation, setGeneration] = useState(0);
   const [, setFrame] = useState(0);

@@ -332,7 +332,8 @@ export function ArenaPage() {
 
   useEffect(() => {
     if (!view.card) document.title = "Arena · Jev experiments";
-  }, [view.card]);
+    else if (index && !card) document.title = "No such entry · Arena · Jev experiments";
+  }, [view.card, index, card]);
 
   return (
     <main id="main-content" tabIndex={-1} className="arena">

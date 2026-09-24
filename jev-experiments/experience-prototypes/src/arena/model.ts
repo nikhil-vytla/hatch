@@ -111,7 +111,20 @@ export function useCardModel(card: Card, view: View, hasKey: boolean) {
           ];
         });
 
-  /** One sentence about the figure on screen, rebuilt whenever the lineup, metric or slice changes. */
+  const protocolsInView = new Set(
+    ids
+      .flatMap((id) => contestant(id)?.runSets ?? [])
+      .flatMap((rs) => {
+        const g = card.protocolGroups.find((p) => p.runSets.includes(rs));
+
+        return g ? [g.hash] : [];
+      }),
+  );
+
+  /**
+   * One sentence about the figure on screen, rebuilt whenever the lineup, metric or slice changes.
+   * It says "leads" only when the 95% intervals separate; otherwise it gives the numbers and hedges.
+   */
   const finding = (() => {
     const order = ranked(metric, models.length ? models : shown);
 
@@ -119,11 +132,43 @@ export function useCardModel(card: Card, view: View, hasKey: boolean) {
     const lead = order[0];
     const last = order[order.length - 1];
 
-    const parts = [
-      order.length > 1
-        ? `${nameOf(lead, true)} ${card.family === "robustness" ? "moves least" : "leads"} on ${inSentence(metric.label)} with ${formatValue(metric, estimate(lead))}. ${nameOf(last, true)} ${card.family === "robustness" ? "moves most" : "trails"} with ${formatValue(metric, estimate(last))}.`
-        : `${nameOf(lead, true)}: ${formatValue(metric, estimate(lead))} ${inSentence(metric.label)}.`,
-    ];
+    const a = estimate(lead),
+      b = estimate(last);
+
+    const robust = card.family === "robustness";
+    const parts: string[] = [];
+
+    if (protocolsInView.size > 1)
+      parts.push(
+        "This lineup mixes runs recorded under different protocols, so compare with care.",
+      );
+
+    if (order.length === 1 || !a || !b) {
+      parts.push(`${metric.label}: ${nameOf(lead, true)} ${formatValue(metric, a)}.`);
+    } else {
+      const separated =
+        a.lo !== undefined &&
+        a.hi !== undefined &&
+        b.lo !== undefined &&
+        b.hi !== undefined &&
+        (a.lo > b.hi || b.lo > a.hi);
+
+      const values = `${nameOf(lead, true)} ${formatValue(metric, a)}, ${nameOf(last, true)} ${formatValue(metric, b)}`;
+
+      if (separated)
+        parts.push(
+          `${metric.label}: ${nameOf(lead, true)} ${robust ? "moves least" : "leads"} with ${formatValue(metric, a)}; ${nameOf(last, true)} ${robust ? "moves most" : "trails"} with ${formatValue(metric, b)}. Their 95% intervals do not overlap.`,
+        );
+      else if (a.lo !== undefined && b.lo !== undefined)
+        parts.push(
+          `${metric.label}: ${values}. Their 95% intervals overlap, so this is not a clear gap.`,
+        );
+      else if (a.perItem)
+        parts.push(
+          `${metric.label}: ${values} (means of ${a.perItem.length} seeds${a.perItem.length < 5 ? ", too few to call a clear gap" : ""}).`,
+        );
+      else parts.push(`${metric.label}: ${values}.`);
+    }
 
     const refs = ranked(metric, shown.filter(isCode));
 
@@ -137,16 +182,6 @@ export function useCardModel(card: Card, view: View, hasKey: boolean) {
 
     return parts.join(" ");
   })();
-
-  const protocolsInView = new Set(
-    ids
-      .flatMap((id) => contestant(id)?.runSets ?? [])
-      .flatMap((rs) => {
-        const g = card.protocolGroups.find((p) => p.runSets.includes(rs));
-
-        return g ? [g.hash] : [];
-      }),
-  );
 
   const set = (patch: Partial<View>, mode: "push" | "replace" = "replace") =>
     writeView({ ...view, card: card.id, ...patch }, mode);
@@ -194,7 +229,7 @@ export function caption(m: CardModel) {
     case "per-item":
       return `${metric.label} on each seed. Every contestant gets the same pieces in the same order; bold marks the best on that seed.`;
     case "scatter":
-      return `${y.label} against ${inSentence(x.label)}. Better is up and to the right on both axes; the dashed line joins contestants nobody beats on both.`;
+      return `${y.label} against ${inSentence(x.label)}. Better is up and to the right on both axes. Filled circles are models no other model beats on both; squares are code players, shown for reference.`;
     case "table":
       return "Every measure for the contestants in this figure. Select a column heading to sort.";
     case "reliability":
