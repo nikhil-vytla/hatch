@@ -613,10 +613,18 @@ fn a_client_that_leaves_before_the_response_starts_closes_the_call() {
     assert_eq!(s.last("modelCallFinished")["outcome"]["reason"], "the client disconnected before the response began");
 }
 
+/// A client that leaves while the provider has no text for it yet: the call
+/// is closed at the gateway's next write to it. A provider that is only
+/// slow still sends pings (Anthropic every few seconds), and those are the
+/// writes; one that sends nothing at all is cut off at the idle limit
+/// instead (next test). A client gone before the headers went out is
+/// noticed only by a write, so a fake provider silent for 20s made this test
+/// wait on timing it doesn't promise.
 #[test]
 fn a_client_that_leaves_while_the_provider_stalls_closes_the_call() {
-    let events = vec![SSE[0].to_string(), SSE[1].to_string()];
-    let s = setup(Reply::Sse(events, 20_000, false), &[("ANTHROPIC_API_KEY", "k")]);
+    let ping = "event: ping\ndata: {\"type\":\"ping\"}\n\n".to_string();
+    let events: Vec<String> = [SSE[0].to_string()].into_iter().chain(std::iter::repeat_n(ping, 200)).collect();
+    let s = setup(Reply::Sse(events, 100, false), &[("ANTHROPIC_API_KEY", "k")]);
     s.leave_once_started(
         reqwest::Client::new()
             .post(format!("{}/v1/messages", s.base))
