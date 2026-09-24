@@ -7,6 +7,7 @@
  * described in one plain sentence, and the model judges each sentence on its
  * own. Code then picks the best-judged landing.
  */
+import { z } from "zod";
 import { boardFeatures, type Landing } from "../../../live-worlds/tetris/engine";
 import { optionCriteria, type Answer, type Contestant, type Question } from "./tetris";
 import { DECISION_INSTRUCTIONS } from "../../../live-worlds/tetris/session";
@@ -35,6 +36,34 @@ export type WireAnswer = {
   probabilities?: Record<string, number> | null;
   confidence?: number | null;
 };
+
+const wireAnswerSchema = z.object({
+  value: z.union([z.string(), z.number()]),
+  probabilities: z.record(z.string(), z.number()).nullish(),
+  confidence: z.number().nullish(),
+});
+
+/** A recorded gateway response, parsed before replay reads it. */
+const wireResponseSchema = z.object({ answers: z.record(z.string(), wireAnswerSchema) });
+
+/** What a failed send may carry: the gateway client attaches its attempts and a retry hint. */
+const sendFailureSchema = z
+  .object({
+    message: z.string().optional().catch(undefined),
+    attempts: z
+      .array(
+        z.object({ status: z.unknown(), retryAfterMs: z.number().optional().catch(undefined) }),
+      )
+      .optional()
+      .catch(undefined),
+    retryAfterMs: z.number().optional().catch(undefined),
+  })
+  .catch({});
+
+type SendFailure = z.infer<typeof sendFailureSchema>;
+
+/** The spot sentences the perfect reader reads from a request's state. */
+const readerStateSchema = z.object({ spots: z.record(z.string(), z.string()) });
 
 export type Send = (
   body: Wire,
@@ -249,29 +278,42 @@ export function framedJev(
 ): Contestant {
   const memory = new Map<string, number>();
 
-  const failure =
-    (q: Question, body: Wire, started: number) =>
-    (error: any): Answer => {
-      const ms = performance.now() - started;
-      record?.({
-        framing,
-        pieceId: q.pieceId,
-        board: q.state.board,
-        body,
-        error: String(error?.message ?? error),
-        attempts: (error?.attempts ?? []).map((a: any) => ({
-          status: a.status,
-          retryAfterMs: a.retryAfterMs,
-        })),
-        ms,
-      });
+  const remembered = (sentence: string) => {
+    const v = memory.get(sentence);
 
-      return {
-        error: String(error?.message ?? error),
-        latencyMs: ms,
-        retryAfterMs: typeof error?.retryAfterMs === "number" ? error.retryAfterMs : undefined,
-      };
-    };
+    if (v === undefined) throw new Error(`No judgement remembered for "${sentence}"`);
+
+    return v;
+  };
+
+  /** `text` is the rejection as a string, used when it carries no message. */
+  const failure = (
+    q: Question,
+    body: Wire,
+    started: number,
+    detail: SendFailure,
+    text: string,
+  ): Answer => {
+    const ms = performance.now() - started;
+    const message = detail.message ?? text;
+    record?.({
+      framing,
+      pieceId: q.pieceId,
+      board: q.state.board,
+      body,
+      error: message,
+      attempts: (detail.attempts ?? []).map((a) => ({
+        status: a.status,
+        retryAfterMs: a.retryAfterMs,
+      })),
+      ms,
+    });
+
+    return { error: message, latencyMs: ms, retryAfterMs: detail.retryAfterMs };
+  };
+
+  const onFailure = (q: Question, body: Wire, started: number) => (error: Error | string) =>
+    failure(q, body, started, sendFailureSchema.parse(error), String(error));
 
   return {
     id: `jev-${framing}`,
@@ -299,10 +341,14 @@ export function framedJev(
         };
 
         const finish = (response?: { answers: Record<string, WireAnswer> }): Answer => {
-          fresh.forEach((g, i) => memory.set(g.sentence, Number(response!.answers[`s${i}`].value)));
+          // Without a response nothing was asked: every judgement is already remembered.
+          if (response)
+            fresh.forEach((g, i) =>
+              memory.set(g.sentence, Number(response.answers[`s${i}`].value)),
+            );
 
           const judged = Object.fromEntries(
-            groups.map((g) => [g.sentence, memory.get(g.sentence)!]),
+            groups.map((g) => [g.sentence, remembered(g.sentence)]),
           );
 
           const out = best(groups, (g) => judged[g.sentence]),
@@ -329,7 +375,7 @@ export function framedJev(
         };
 
         return fresh.length
-          ? send(body, signal).then(finish, failure(q, body, started))
+          ? send(body, signal).then(finish, onFailure(q, body, started))
           : Promise.resolve(finish());
       }
 
@@ -337,8 +383,11 @@ export function framedJev(
         // Every spot stays in view as context; only sentences without a confident judgement are asked.
         const groups = spots(q);
 
-        const settled = (g: (typeof groups)[number]) =>
-          memory.has(g.sentence) && Math.abs(memory.get(g.sentence)! - 0.5) >= CONFIDENT_MARGIN;
+        const settled = (g: (typeof groups)[number]) => {
+          const v = memory.get(g.sentence);
+
+          return v !== undefined && Math.abs(v - 0.5) >= CONFIDENT_MARGIN;
+        };
 
         const ask = groups.filter((g) => !settled(g));
 
@@ -360,10 +409,11 @@ export function framedJev(
         };
 
         const finish = (response?: { answers: Record<string, WireAnswer> }): Answer => {
-          ask.forEach((g) => memory.set(g.sentence, Number(response!.answers[g.key].value)));
+          if (response)
+            ask.forEach((g) => memory.set(g.sentence, Number(response.answers[g.key].value)));
 
           const judged = Object.fromEntries(
-            groups.map((g) => [g.sentence, memory.get(g.sentence)!]),
+            groups.map((g) => [g.sentence, remembered(g.sentence)]),
           );
 
           const out = best(groups, (g) => judged[g.sentence]),
@@ -390,7 +440,7 @@ export function framedJev(
         };
 
         return ask.length
-          ? send(body, signal).then(finish, failure(q, body, started))
+          ? send(body, signal).then(finish, onFailure(q, body, started))
           : Promise.resolve(finish());
       }
 
@@ -422,7 +472,7 @@ export function framedJev(
             latencyMs: ms,
           };
         },
-        failure(q, built.body, started),
+        onFailure(q, built.body, started),
       );
     },
   };
@@ -453,7 +503,14 @@ export function recordedFraming(exchanges: Exchange[], framing: FramingId): Cont
 
       if (x.error || !x.response)
         return { receiveAt: at, answer: { error: x.error ?? "Recorded failure", latencyMs: x.ms } };
-      const out = buildRequest(framing, q).read((x.response as any).answers);
+      const response = wireResponseSchema.safeParse(x.response);
+
+      if (!response.success)
+        return {
+          receiveAt: at,
+          answer: { error: "Recorded response is malformed", latencyMs: x.ms },
+        };
+      const out = buildRequest(framing, q).read(response.data.answers);
 
       return {
         receiveAt: at,
@@ -474,12 +531,13 @@ export function recordedFraming(exchanges: Exchange[], framing: FramingId): Cont
  */
 export function perfectReader(): Contestant {
   const read: Send = async (body) => {
-    const st = body.state as any;
+    const state = readerStateSchema.safeParse(body.state);
+    const sentences = state.success ? state.data.spots : {};
 
     return {
       answers: Object.fromEntries(
         Object.entries(body.questions).map(([key]) => {
-          const s: string = st.spots?.[key] ?? "";
+          const s = sentences[key] ?? "";
 
           const holes = /no new holes/.test(s) ? 0 : 1,
             bump = ["no bump", "a small bump", "a big bump", "a tall tower"].findIndex((b) =>

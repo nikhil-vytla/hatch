@@ -10,7 +10,7 @@ const load = (name: string) => {
 
 // The first real-time recording predates backoff: it re-asked failures after a fixed 400 ms.
 const games = [
-  ...load("realtime.replay.json").map((g: any) => ({
+  ...load("realtime.replay.json").map((g: { retryPolicy?: "fixed" | "backoff" }) => ({
     ...g,
     retryPolicy: g.retryPolicy ?? "fixed",
   })),

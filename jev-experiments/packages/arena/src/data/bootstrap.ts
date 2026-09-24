@@ -1,3 +1,5 @@
+export type Interval = { lo: number; hi: number };
+
 /** Seeded percentile bootstrap over items (cases), so intervals are reproducible. */
 export function rng(seed: number) {
   let s = seed >>> 0;
@@ -20,7 +22,7 @@ export function bootstrap<T>(
   statistic: (sample: T[]) => number,
   resamples = 1000,
   seed = 20260923,
-): { lo: number; hi: number } {
+): Interval {
   if (items.length < 2) return { lo: NaN, hi: NaN };
 
   const random = rng(seed),
@@ -42,15 +44,15 @@ export function bootstrap<T>(
   };
 }
 
-/** Several statistics from the same resamples, one pass. */
+/** Several statistics from the same resamples, one pass; keyed by statistic name. */
 export function bootstrapMany<T, K extends string>(
   items: T[][],
   statistic: (sample: T[]) => Record<K, number>,
   resamples = 1000,
   seed = 20260923,
-): Record<K, { lo: number; hi: number }> {
+): Map<string, Interval> {
   const random = rng(seed),
-    values = new Map<K, number[]>();
+    values = new Map<string, number[]>();
 
   for (let r = 0; r < resamples; r++) {
     const sample: T[] = [];
@@ -58,18 +60,23 @@ export function bootstrapMany<T, K extends string>(
     for (let i = 0; i < items.length; i++)
       sample.push(...items[Math.floor(random() * items.length)]);
 
-    for (const [k, v] of Object.entries(statistic(sample)) as [K, number][])
-      (values.get(k) ?? values.set(k, []).get(k)!).push(v);
+    const stats = statistic(sample);
+
+    for (const k in stats) {
+      const list = values.get(k) ?? [];
+      list.push(stats[k]);
+      values.set(k, list);
+    }
   }
 
-  const out = {} as Record<K, { lo: number; hi: number }>;
+  const out = new Map<string, Interval>();
 
   for (const [k, v] of values) {
     v.sort((a, b) => a - b);
-    out[k] = {
+    out.set(k, {
       lo: v[Math.floor(0.025 * (resamples - 1))],
       hi: v[Math.ceil(0.975 * (resamples - 1))],
-    };
+    });
   }
 
   return out;

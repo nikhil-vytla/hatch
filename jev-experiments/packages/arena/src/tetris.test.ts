@@ -20,7 +20,10 @@ describe("real-time arena", () => {
       expected = game.summary.lanes[LANDING_LANE];
 
     test(`replays the recorded Jev landing game on seed ${seed} exactly`, () => {
-      const events: RecordedEvent[] = game.events.filter((e: any) => e.lane === LANDING_LANE);
+      const events: RecordedEvent[] = game.events.filter(
+        (e: RecordedEvent) => e.lane === LANDING_LANE,
+      );
+
       const arena = new TetrisArena(seed, [recorded(events)]);
       runRealtime(arena, game.summary.worldMs);
       const lane = arena.lanes[0];
@@ -65,7 +68,11 @@ describe("real-time arena", () => {
 
   test("a recording that no longer matches the board reports where it ends", () => {
     const game = games.find((g) => g.summary.seed === 19);
-    const events: RecordedEvent[] = game.events.filter((e: any) => e.lane === LANDING_LANE);
+
+    const events: RecordedEvent[] = game.events.filter(
+      (e: RecordedEvent) => e.lane === LANDING_LANE,
+    );
+
     const arena = new TetrisArena(7, [recorded(events)]);
     runRealtime(arena, 20_000);
     expect(arena.lanes[0].recordingEnded).not.toBeNull();
@@ -97,7 +104,11 @@ describe("turn-based arena", () => {
 
   test("uses recorded answers while boards match and marks where they stop", async () => {
     const game = games.find((g) => g.summary.seed === 7);
-    const events: RecordedEvent[] = game.events.filter((e: any) => e.lane === LANDING_LANE);
+
+    const events: RecordedEvent[] = game.events.filter(
+      (e: RecordedEvent) => e.lane === LANDING_LANE,
+    );
+
     const arena = new TetrisArena(7, [recorded(events)], "turns");
 
     for (let i = 0; i < 40 && !arena.over; i++) await arena.turn();
