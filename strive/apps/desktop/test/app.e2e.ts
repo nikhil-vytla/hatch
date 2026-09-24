@@ -301,6 +301,28 @@ test("a new session with no key for its model says how to add one, and sees one 
   rpc.close();
 });
 
+test("a narrow window puts the sessions away and opens them over the conversation, and the changes pane covers it", async () => {
+  const { app, page } = await openApp();
+  const sidebar = page.getByRole("complementary", { name: "sessions sidebar" });
+  await sidebar.waitFor();
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.setSize(780, 700));
+  await sidebar.waitFor({ state: "detached" });
+  const composer = page.getByPlaceholder("Ask strive to do anything…");
+  const wide = await composer.boundingBox();
+  assert.ok(wide && wide.width > 600, `the conversation has the width: ${JSON.stringify(wide)}`);
+  await page.getByRole("button", { name: "show sessions" }).click();
+  await sidebar.waitFor();
+  assert.deepEqual(await composer.boundingBox(), wide, "over the conversation, not beside it");
+  await page.getByRole("button", { name: "close sessions" }).click();
+  await sidebar.waitFor({ state: "detached" });
+  await page.getByRole("button", { name: "changes", exact: true }).click();
+  const pane = await page.getByRole("complementary", { name: "changes" }).boundingBox();
+  const viewport = await page.evaluate(() => innerWidth);
+  assert.ok(pane && pane.x < 1 && pane.width >= viewport - 1, `the pane covers the width: ${JSON.stringify(pane)}`);
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.setSize(1280, 820));
+  await sidebar.waitFor();
+});
+
 test("the command palette finds an action by a few letters and runs it", async () => {
   const { page, cwd } = await openApp();
   await page.keyboard.press("Meta+k");

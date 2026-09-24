@@ -106,16 +106,35 @@ export function App({ bridge, opened, onSwitch }: Props) {
         },
   );
 
-  const [sidebar, setSidebar] = useState(() => localStorage.getItem(SIDEBAR_KEY) !== "hidden");
+  const [docked, setDocked] = useState(() => localStorage.getItem(SIDEBAR_KEY) !== "hidden");
+  const narrow = useNarrow();
+  // A narrow window has no room for the sessions beside the conversation: they open over it, until put away.
+  const [drawer, setDrawer] = useState(false);
+  const sidebar = narrow ? drawer : docked;
 
-  const toggleSidebar = () =>
-    setSidebar((open) => {
+  const toggleSidebar = () => {
+    if (narrow) {
+      setDrawer((open) => !open);
+
+      return;
+    }
+
+    setDocked((open) => {
       localStorage.setItem(SIDEBAR_KEY, open ? "hidden" : "shown");
 
       return !open;
     });
+  };
 
-  const switchTo = (to?: string) => act(onSwitch(to));
+  useEffect(() => {
+    if (!narrow) setDrawer(false);
+  }, [narrow]);
+
+  const switchTo = (to?: string) => {
+    setDrawer(false);
+    act(onSwitch(to));
+  };
+
   const [changes, setChanges] = useState(() => localStorage.getItem(CHANGES_KEY) === "shown");
   const [palette, setPalette] = useState(false);
 
@@ -191,15 +210,27 @@ export function App({ bridge, opened, onSwitch }: Props) {
   };
 
   return (
-    <div className={`app ${opened.platform === "darwin" ? "mac" : ""} ${sidebar ? "with-sidebar" : ""}`}>
+    <div
+      className={`app ${opened.platform === "darwin" ? "mac" : ""} ${sidebar && !narrow ? "with-sidebar" : ""} ${narrow ? "narrow" : ""}`}
+    >
       {sidebar && (
-        <Sidebar bridge={bridge} opened={opened} model={model} onSwitch={switchTo} onToggle={toggleSidebar} />
+        <Sidebar
+          bridge={bridge}
+          opened={opened}
+          model={model}
+          onSwitch={switchTo}
+          onToggle={toggleSidebar}
+          drawer={narrow}
+        />
+      )}
+      {sidebar && narrow && (
+        <button type="button" className="scrim" aria-label="close sessions" onClick={() => setDrawer(false)} />
       )}
       <div className="main-area">
         <Titlebar
           model={model}
           opened={opened}
-          sidebar={sidebar}
+          sidebar={sidebar && !narrow}
           onToggle={toggleSidebar}
           changes={changes}
           onChanges={toggleChanges}
@@ -258,6 +289,23 @@ export function App({ bridge, opened, onSwitch }: Props) {
   );
 }
 
+/** Below this width the sessions sidebar opens over the conversation instead of beside it. */
+const NARROW = "(max-width: 899px)";
+
+function useNarrow(): boolean {
+  const [narrow, setNarrow] = useState(() => matchMedia(NARROW).matches);
+
+  useEffect(() => {
+    const query = matchMedia(NARROW);
+    const changed = () => setNarrow(query.matches);
+    query.addEventListener("change", changed);
+
+    return () => query.removeEventListener("change", changed);
+  }, []);
+
+  return narrow;
+}
+
 /** A time ago as a list shows it: now, 5m, 3h, 2d. */
 function ago(ms: number, now: number): string {
   const m = Math.floor((now - ms) / 60_000);
@@ -277,10 +325,12 @@ type SidebarProps = {
   model: SessionModel;
   onSwitch: (id?: string) => void;
   onToggle: () => void;
+  /** Opened over the conversation, in a narrow window. */
+  drawer: boolean;
 };
 
 /** This project's sessions: the one shown, and the others to switch to. */
-function Sidebar({ bridge, opened, model, onSwitch, onToggle }: SidebarProps) {
+function Sidebar({ bridge, opened, model, onSwitch, onToggle, drawer }: SidebarProps) {
   const [sessions, setSessions] = useState<SessionInfo[]>([]);
   const prompts = model.conversation.items.filter((i) => i.kind === "user").length;
   const [now, setNow] = useState(Date.now());
@@ -301,7 +351,7 @@ function Sidebar({ bridge, opened, model, onSwitch, onToggle }: SidebarProps) {
   const waiting = model.conversation.waiting().length > 0;
 
   return (
-    <aside className="sidebar">
+    <aside className={`sidebar ${drawer ? "drawer" : ""}`} aria-label="sessions sidebar">
       <div className="sidebar-top">
         <button
           type="button"
