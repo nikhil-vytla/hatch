@@ -3,7 +3,7 @@
 // dragging, which records an edit in the workspace history.
 import { closestCorners, DndContext, type DragEndEvent, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
-import type { ApprovalMode, Decision, Digest, SessionInfo } from "@strive/protocol";
+import type { ApprovalMode, Decision, Digest, ModelListResult, SessionInfo } from "@strive/protocol";
 import { formatUsd as exactUsd, MODE_NAMES } from "@strive/view";
 import {
   DEFAULT_WORKSPACE,
@@ -32,6 +32,7 @@ import { Diff } from "./DiffView";
 import { Icon, type IconName } from "./icons";
 import { Markdown } from "./MarkdownView";
 import { SessionModel } from "./model";
+import { ModelPicker } from "./ModelPicker";
 
 type Props = { bridge: Bridge; opened: Opened; onSwitch: (id?: string) => Promise<void> };
 
@@ -149,6 +150,20 @@ export function App({ bridge, opened, onSwitch }: Props) {
     return () => window.removeEventListener("keydown", keys);
   });
 
+  const [models, setModels] = useState<ModelListResult>();
+  const [keyed, setKeyed] = useState<ReadonlySet<string>>(new Set());
+
+  // Which models there are and which providers have keys: asked again on request, since keys change outside the app.
+  const loadFacts = useCallback(() => {
+    bridge.request("model/list", {}).then(setModels, () => undefined);
+    bridge.request("auth/status", {}).then(
+      (r) => setKeyed(new Set(r.providers.filter((p) => p.source !== "none").map((p) => p.provider))),
+      () => undefined,
+    );
+  }, [bridge]);
+
+  useEffect(loadFacts, [loadFacts]);
+
   const loadChanges = useCallback(
     (checkpoint: number) => bridge.request("session/changes", { id, checkpoint }),
     [bridge, id],
@@ -162,6 +177,10 @@ export function App({ bridge, opened, onSwitch }: Props) {
     setMode: (mode) => act(bridge.request("session/approvals", { id, mode })),
     blob: (digest) => bridge.blob(digest),
     workspace: opened.session.cwd,
+    setModel: (model) => act(bridge.request("session/model", { id, model })),
+    newSession: () => switchTo(),
+    models,
+    keyed,
   };
 
   return (
@@ -333,6 +352,12 @@ type SessionActions = {
   blob: (digest: Digest) => Promise<string>;
   /** The session's directory, which paths are shown from. */
   workspace: string;
+  setModel: (model: string) => void;
+  newSession: () => void;
+  /** The daemon's priced models, once loaded. */
+  models?: ModelListResult;
+  /** Providers the daemon has a key for. */
+  keyed: ReadonlySet<string>;
 };
 
 /** Dollars as people read them: cents from a dollar up or for whole cents, four places otherwise. */
@@ -1122,6 +1147,11 @@ function Output({ text }: { text: string }) {
 
 const MODES: ApprovalMode[] = ["ask", "autoEdit", "fullAuto"];
 
+/** The model the session's agent uses: the one it last called, else the one chosen for it, else settings'. */
+function currentModel(model: SessionModel, list?: ModelListResult): string | undefined {
+  return model.modelName ?? model.chosenModel ?? list?.default;
+}
+
 function Composer({ model, opened, session }: { model: SessionModel; opened: Opened; session: SessionActions }) {
   const [text, setText] = useState("");
   const box = useRef<HTMLTextAreaElement>(null);
@@ -1180,11 +1210,14 @@ function Composer({ model, opened, session }: { model: SessionModel; opened: Ope
               ))}
             </select>
           </label>
-          {model.modelName && (
-            <span className="chip" title="The model the agent is using">
-              <Icon name="spark" /> {model.modelName}
-            </span>
-          )}
+          <ModelPicker
+            models={session.models?.models}
+            current={currentModel(model, session.models)}
+            keyed={session.keyed}
+            locked={model.prompted}
+            onPick={session.setModel}
+            onNewSession={session.newSession}
+          />
           <span className="spacer" />
           {model.working ? (
             <button

@@ -131,6 +131,15 @@ enum Cmd {
     GetMode {
         reply: oneshot::Sender<ApprovalMode>,
     },
+    /// Chooses the agent's model; refused (with why) once there is a prompt.
+    SetModel {
+        model: String,
+        reply: oneshot::Sender<std::result::Result<io::Result<Vec<Entry>>, String>>,
+    },
+    /// The model chosen for the session, if one was.
+    GetModel {
+        reply: oneshot::Sender<Option<String>>,
+    },
     /// Journals an approval request; replies with how many attached clients received it.
     Ask {
         effect: u64,
@@ -544,6 +553,25 @@ impl Sessions {
         Ok(rx.await.map_err(|_| writer_gone())??)
     }
 
+    /// Journals the model the session's agent starts with, or says why it can't.
+    pub async fn set_model(&self, id: &SessionId, model: String) -> Result<std::result::Result<Vec<Entry>, String>> {
+        let (_, tx) = self.writer(id).await?;
+        let (reply, rx) = oneshot::channel();
+        tx.send(Cmd::SetModel { model, reply }).map_err(|_| writer_gone())?;
+        match rx.await.map_err(|_| writer_gone())? {
+            Ok(written) => Ok(Ok(written?)),
+            Err(why) => Ok(Err(why)),
+        }
+    }
+
+    /// The model chosen for the session; `None` means the one in settings.
+    pub async fn model(&self, id: &SessionId) -> Result<Option<String>> {
+        let (_, tx) = self.writer(id).await?;
+        let (reply, rx) = oneshot::channel();
+        tx.send(Cmd::GetModel { reply }).map_err(|_| writer_gone())?;
+        rx.await.map_err(|_| writer_gone())
+    }
+
     pub async fn mode(&self, id: &SessionId) -> Result<ApprovalMode> {
         let (_, tx) = self.writer(id).await?;
         let (reply, rx) = oneshot::channel();
@@ -793,6 +821,10 @@ struct Writer {
     /// Checkpoint commits; checkpoint n is `checkpoints[n - 1]`.
     checkpoints: Vec<String>,
     mode: ApprovalMode,
+    /// The model chosen for the agent, and whether a prompt is journaled
+    /// (staged ones included), after which it can't change.
+    model: Option<String>,
+    prompted: bool,
     /// The last turn started, and the one still open (staged ones included).
     last_turn: u64,
     open_turn: Option<u64>,
@@ -860,6 +892,11 @@ fn spawn_writer(
             })
             .collect(),
         mode,
+        model: events.iter().rev().find_map(|e| match e {
+            Event::ModelSet { model } => Some(model.clone()),
+            _ => None,
+        }),
+        prompted: events.iter().any(|e| matches!(e, Event::UserMessage { .. })),
         subscribers: Vec::new(),
         verify,
     };
@@ -980,6 +1017,20 @@ impl Writer {
                 let _ = reply.send(self.mode);
                 return Staged::Handled;
             }
+            Cmd::SetModel { model, reply } => {
+                if self.prompted {
+                    let why = "this session already has a prompt, so its agent may be running on its model; \
+                               start a new session to use another";
+                    let _ = reply.send(Err(why.into()));
+                    return Staged::Handled;
+                }
+                self.model = Some(model.clone());
+                (vec![Event::ModelSet { model }], Box::new(move |r, _| drop(reply.send(Ok(r)))))
+            }
+            Cmd::GetModel { reply } => {
+                let _ = reply.send(self.model.clone());
+                return Staged::Handled;
+            }
             Cmd::EndOpenTurn { turn, reason, reply } => {
                 if self.open_turn() != Some(turn) {
                     let _ = reply.send(Ok(false));
@@ -1053,6 +1104,7 @@ impl Writer {
                     events.push(Event::Checkpointed { checkpoint: self.checkpoints.len() as u64, commit });
                 }
                 events.push(Event::UserMessage { text });
+                self.prompted = true;
                 (events, Box::new(move |r, _| drop(reply.send(r))))
             }
             Cmd::CheckpointCommit { checkpoint, reply } => {

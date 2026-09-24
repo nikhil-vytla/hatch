@@ -251,6 +251,35 @@ test("the changes pane shows what changed since the last prompt, file by file", 
   assert.equal(await notes.locator(".row.add").textContent(), "1+const a = 2;");
 });
 
+test("the model chip picks the agent's model before the first prompt, and says why it can't after", async () => {
+  const { page, cwd } = await openApp();
+  const chip = page.getByRole("button", { name: "model: claude-sonnet-4-5" });
+  await chip.click();
+  const menu = page.getByRole("dialog", { name: "models" });
+  await menu.getByRole("option", { name: /gpt-5-mini/ }).waitFor();
+  await menu.getByRole("option", { name: /claude-haiku-4-5/ }).click();
+  await page.getByRole("button", { name: "model: claude-haiku-4-5" }).waitFor();
+  const id = sessionId(cwd);
+  const log = () => JSON.parse(strive("log", id, "--json"));
+  const chosen = log().entries.filter((e: { event: { type: string } }) => e.event.type === "modelSet");
+  assert.deepEqual(
+    chosen.map((e: { event: { model: string } }) => e.event.model),
+    ["claude-haiku-4-5"],
+  );
+  await page.getByPlaceholder("Ask strive to do anything…").fill("go");
+  await page.keyboard.press("Enter");
+  await page.locator(".msg.user", { hasText: "go" }).waitFor();
+  await page.getByRole("button", { name: "model: claude-haiku-4-5" }).click();
+  await menu.getByText("switching mid-session isn't supported").waitFor();
+  const other = menu.getByRole("option", { name: /claude-opus-4-5/ });
+  assert.equal(await other.getAttribute("aria-disabled"), "true");
+  await other.click({ force: true });
+  await menu.getByRole("button", { name: /New session/ }).click();
+  await page.getByText("What should we work on?").waitFor();
+  const unchanged = log().entries.filter((e: { event: { type: string } }) => e.event.type === "modelSet");
+  assert.equal(unchanged.length, 1, "the disabled pick changed nothing");
+});
+
 test("the command palette finds an action by a few letters and runs it", async () => {
   const { page, cwd } = await openApp();
   await page.keyboard.press("Meta+k");

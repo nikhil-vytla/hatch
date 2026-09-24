@@ -158,6 +158,10 @@ session, the daemon starts one: `strive-tui host --session ID`, one binary
 with one runtime. A host registers with `host/register`, which returns the
 agent config (model, gateway URL, limits, project context, MCP tools), then
 attaches to the session. Hosts don't count as clients for idle exit.
+- **The model** is the session's own if a person chose one with
+  `session/model` (journaled as `modelSet`), else settings'. It can be
+  chosen only before the first prompt, since a host may start on it then;
+  `model/list` lists the priced models to choose from.
 - One host per session: registration is exclusive.
 - A host must register before it attaches.
 - Only the session's host may record turns or stream text for it.

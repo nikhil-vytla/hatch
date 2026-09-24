@@ -43,6 +43,7 @@ const OWN = new Set([
   // The composer shows these as they stand.
   "approvalModeSet",
   "budgetSet",
+  "modelSet",
 ]);
 
 export class Conversation {

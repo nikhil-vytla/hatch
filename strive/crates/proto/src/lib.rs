@@ -93,6 +93,8 @@ methods! {
     HostRecord = "host/record" (HostRecordParams) -> Appended;
     HostStream = "host/stream" (HostStreamParams) -> Empty;
     SessionInterrupt = "session/interrupt" (SessionRef) -> Empty;
+    ModelList = "model/list" (Empty) -> ModelListResult;
+    SessionModel = "session/model" (SessionModelParams) -> Appended;
 }
 
 /// A server-to-client notification: its wire name plus payload type.
@@ -345,6 +347,40 @@ pub struct ProviderAuth {
     /// Where the key came from: `file` (strive auth), `env` (the daemon's
     /// environment when it started), or `none`.
     pub source: String,
+}
+
+/// The models the gateway will price, so an agent can use them.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct ModelListResult {
+    /// By id.
+    pub models: Vec<ModelInfo>,
+    /// The model in settings: what a session uses unless one is chosen.
+    pub default: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct ModelInfo {
+    pub id: String,
+    /// `anthropic` or `openai`: whose key its calls need.
+    pub provider: String,
+    pub context_window: u64,
+    /// Micro-dollars per million tokens.
+    pub input_usd_micros: u64,
+    pub output_usd_micros: u64,
+}
+
+/// Chooses the model a session's agent starts with. Refused once the
+/// session has a prompt: its agent may already be running on another.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct SessionModelParams {
+    pub id: String,
+    pub model: String,
 }
 
 /// A session's journal as it is on disk, and whether it verifies.
@@ -1015,6 +1051,11 @@ pub enum Event {
     Compacted {
         upto_seq: u64,
         summary: String,
+    },
+    /// The model this session's agent uses, in place of the one in settings.
+    /// Chosen before the first prompt, since the agent starts with it.
+    ModelSet {
+        model: String,
     },
 }
 

@@ -35,9 +35,15 @@ const ALLOWED: ReadonlySet<MethodName> = new Set<MethodName>([
   "session/budget",
   "session/rewind",
   "session/changes",
+  "session/model",
   "approval/respond",
   "daemon/status",
+  "model/list",
+  "auth/status",
 ]);
+
+/** Allowed requests that aren't about a session: read-only facts about the daemon. */
+const UNBOUND: ReadonlySet<MethodName> = new Set<MethodName>(["daemon/status", "model/list", "auth/status"]);
 
 type Mode = { kind: "new" } | { kind: "continue" } | { kind: "resume"; id: string };
 
@@ -215,7 +221,7 @@ async function main() {
     if (!fromOurPage(e) || !ALLOWED.has(method)) throw new Error(`${method} isn't available to the window`);
 
     // The window acts on the session it shows only, whatever id it sends.
-    const bound = method === "daemon/status" ? params : { ...params, id: current.id };
+    const bound = UNBOUND.has(method) ? params : { ...params, id: current.id };
 
     return current.client.request<MethodName>(method, bound);
   });

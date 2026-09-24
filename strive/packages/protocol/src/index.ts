@@ -62,6 +62,12 @@ export type * from "./generated/McpStatus";
 
 export type * from "./generated/McpTool";
 
+export type * from "./generated/ModelInfo";
+
+export type * from "./generated/ModelListResult";
+
+export type * from "./generated/SessionModelParams";
+
 export type * from "./generated/ProviderAuth";
 
 export type * from "./generated/RequestId";

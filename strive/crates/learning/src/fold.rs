@@ -97,7 +97,8 @@ pub fn fold(entries: &[Entry]) -> Vec<Folded> {
             | Event::ContextLoaded { .. }
             | Event::LearnRequested { .. }
             | Event::LayoutProposed { .. }
-            | Event::Compacted { .. } => {}
+            | Event::Compacted { .. }
+            | Event::ModelSet { .. } => {}
         }
     }
     out.into_iter()

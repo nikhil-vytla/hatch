@@ -112,6 +112,8 @@ export function describe(entry: Entry, options: DescribeOptions = {}): Line[] {
       return e.mcp.flatMap((s) =>
         s.error === undefined ? [] : note("danger", `MCP server ${s.server} didn't start: ${s.error}`),
       );
+    case "modelSet":
+      return note("faint", `Model: ${e.model}`);
     case "compacted":
       return note("faint", "Summarized the conversation so far to keep it within the model's context.");
     case "layoutProposed":

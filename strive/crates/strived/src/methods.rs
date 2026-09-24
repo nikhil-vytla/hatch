@@ -27,8 +27,31 @@ use strive_proto::{
 };
 use strive_proto::{ApprovalRespond, ApprovalRespondParams, Decision, SessionApprovals, SessionApprovalsParams};
 use strive_proto::{EffectCancel, EffectCancelParams, EffectRequest};
+use strive_proto::{ModelInfo, ModelList, ModelListResult, SessionModel, SessionModelParams};
 use strive_proto::{SessionChanges, SessionChangesParams, SessionChangesResult};
 use strive_proto::{SessionRewind, SessionRewindParams, SessionRewindResult};
+
+/// Journals a priced model for the session's agent, before its first prompt.
+async fn choose_model(state: &Arc<State>, SessionModelParams { id, model }: SessionModelParams) -> Reply {
+    if state.models.get(&model).is_none() {
+        return Err(RpcError::new(
+            RpcError::INVALID_PARAMS,
+            format!("no price is known for {model}; add it under \"models\" in ~/.strive/settings.json"),
+        ));
+    }
+    let entries = state
+        .sessions
+        .set_model(&session_id(&id)?, model)
+        .await
+        .map_err(session_error)?
+        .map_err(|why| RpcError::new(RpcError::INVALID_REQUEST, why))?;
+    reply::<SessionModel>(Appended { seq: entries[0].seq })
+}
+
+/// Whose API a model is called through, and so whose key it needs.
+fn provider_of(model: &str) -> &'static str {
+    if model.starts_with("claude") { "anthropic" } else { "openai" }
+}
 
 /// The session a connection hosts. `Closed` once it has gone, so a
 /// registration still in flight can't claim a session for it.
@@ -191,6 +214,21 @@ async fn route(state: &Arc<State>, conn: &Arc<Conn>, method: &str, params: Value
                 .collect();
             reply::<AuthStatus>(AuthStatusResult { providers })
         }
+        ModelList::NAME => {
+            parse::<ModelList>(params)?;
+            let models = state
+                .models
+                .iter()
+                .map(|(id, m)| ModelInfo {
+                    id: id.to_string(),
+                    provider: provider_of(id).into(),
+                    context_window: m.context_window,
+                    input_usd_micros: m.price.input,
+                    output_usd_micros: m.price.output,
+                })
+                .collect();
+            reply::<ModelList>(ModelListResult { models, default: state.settings.model.clone() })
+        }
         m if m.starts_with("effect/") => route_effect(state, m, params).await,
         m if m.starts_with("host/") => route_host(state, conn, m, params).await,
         m if m.starts_with("learning/") || m.starts_with("proposal/") => {
@@ -328,7 +366,8 @@ fn host_may_record(event: &Event, kind: SessionKind) -> bool {
         | Event::GateFinished { .. }
         | Event::ProposalDecided { .. }
         | Event::ProposalApplied { .. }
-        | Event::ProposalRolledBack { .. } => false,
+        | Event::ProposalRolledBack { .. }
+        | Event::ModelSet { .. } => false,
     }
 }
 
@@ -344,14 +383,15 @@ fn require_host(conn: &Conn, sid: &SessionId) -> Result<(), RpcError> {
 async fn host_config(state: &Arc<State>, sid: &SessionId) -> Reply {
     let sid = sid.clone();
     let info = state.sessions.info(&sid).await.map_err(session_error)?;
-    let model_id = state.settings.model.clone();
+    let chosen = state.sessions.model(&sid).await.map_err(session_error)?;
+    let model_id = chosen.unwrap_or_else(|| state.settings.model.clone());
     let model = state.models.get(&model_id).copied().ok_or_else(|| {
         RpcError::new(
             RpcError::INVALID_PARAMS,
             format!("no price is known for {model_id}; add it under \"models\" in ~/.strive/settings.json"),
         )
     })?;
-    let provider = if model_id.starts_with("claude") { "anthropic" } else { "openai" };
+    let provider = provider_of(&model_id);
     let urls = state.gateway.info(&sid).map_err(|e| internal(&e))?;
     let home = state.home.root.canonicalize().map_err(|e| internal(&e))?;
     let workspace = std::path::PathBuf::from(&info.cwd);
@@ -832,6 +872,10 @@ async fn route_session(state: &Arc<State>, conn: &Arc<Conn>, method: &str, param
             let SessionApprovalsParams { id, mode } = parse::<SessionApprovals>(params)?;
             let entries = state.sessions.set_mode(&session_id(&id)?, mode).await.map_err(session_error)?;
             reply::<SessionApprovals>(Appended { seq: entries[0].seq })
+        }
+        SessionModel::NAME => {
+            require_person(conn)?;
+            choose_model(state, parse::<SessionModel>(params)?).await
         }
         SessionBudget::NAME => {
             require_person(conn)?;

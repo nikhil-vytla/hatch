@@ -383,3 +383,61 @@ fn a_session_is_listed_by_its_first_prompt() {
             >= listed["sessions"][0]["createdAtMs"].as_u64().unwrap()
     );
 }
+
+/// The priced models are listed, with settings' own as the default.
+#[test]
+fn the_priced_models_are_listed() {
+    let env = Env::new();
+    let r = env.rpc().ok("model/list", &json!({}));
+    assert_eq!(r["default"], "claude-sonnet-4-5");
+    let haiku = r["models"].as_array().unwrap().iter().find(|m| m["id"] == "claude-haiku-4-5").unwrap();
+    assert_eq!(
+        haiku,
+        &json!({"id": "claude-haiku-4-5", "provider": "anthropic", "contextWindow": 200_000,
+                "inputUsdMicros": 1_000_000, "outputUsdMicros": 5_000_000})
+    );
+    let gpt = r["models"].as_array().unwrap().iter().find(|m| m["id"] == "gpt-5").unwrap();
+    assert_eq!(gpt["provider"], "openai");
+}
+
+/// A model chosen before the first prompt is the one the agent starts
+/// with, after a restart too. Once there's a prompt it can't change.
+#[test]
+fn a_model_chosen_before_the_first_prompt_is_the_agents() {
+    let env = Env::new();
+    let id = create(&env, "/tmp/repo");
+    let mut c = env.rpc();
+    let unpriced = c.call("session/model", &json!({"id": id, "model": "claude-imaginary-9"}));
+    assert_eq!(unpriced["error"]["code"], -32602, "{unpriced}");
+    c.ok("session/model", &json!({"id": id, "model": "claude-haiku-4-5"}));
+    c.ok("session/prompt", &json!({"id": id, "text": "go"}));
+    let late = c.call("session/model", &json!({"id": id, "model": "claude-opus-4-5"}));
+    assert_eq!(late["error"]["code"], -32600, "{late}");
+    assert!(late["error"]["message"].as_str().unwrap().contains("start a new session"), "{late}");
+    env.stop();
+    let config = env.rpc().ok("host/register", &json!({"id": id}));
+    assert_eq!(config["model"], "claude-haiku-4-5");
+    let r = env.rpc().ok("session/read", &json!({"id": id}));
+    let chosen: Vec<Value> = events(&r["entries"]).into_iter().filter(|e| e["type"] == "modelSet").collect();
+    assert_eq!(chosen, vec![json!({"type": "modelSet", "model": "claude-haiku-4-5"})]);
+}
+
+/// Without a choice, the agent uses the model in settings.
+#[test]
+fn a_session_without_a_chosen_model_uses_the_settings_one() {
+    let env = Env::new();
+    let id = create(&env, "/tmp/repo");
+    let config = env.rpc().ok("host/register", &json!({"id": id}));
+    assert_eq!(config["model"], "claude-sonnet-4-5");
+}
+
+/// The agent's host can't pick its own model.
+#[test]
+fn a_host_cannot_choose_the_model() {
+    let env = Env::new();
+    let id = create(&env, "/tmp/repo");
+    let mut host = env.rpc();
+    host.ok("host/register", &json!({"id": id}));
+    let r = host.call("session/model", &json!({"id": id, "model": "claude-haiku-4-5"}));
+    assert_eq!(r["error"]["message"], "only a person can do this, not the agent's host");
+}

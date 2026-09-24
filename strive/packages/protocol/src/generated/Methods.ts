@@ -17,6 +17,7 @@ import type { HostStreamParams } from "./HostStreamParams";
 import type { InitializeParams } from "./InitializeParams";
 import type { InitializeResult } from "./InitializeResult";
 import type { LearningRunParams } from "./LearningRunParams";
+import type { ModelListResult } from "./ModelListResult";
 import type { ProjectRef } from "./ProjectRef";
 import type { ProposalDecideParams } from "./ProposalDecideParams";
 import type { ProposalListResult } from "./ProposalListResult";
@@ -31,6 +32,7 @@ import type { SessionCreateParams } from "./SessionCreateParams";
 import type { SessionInfo } from "./SessionInfo";
 import type { SessionListParams } from "./SessionListParams";
 import type { SessionListResult } from "./SessionListResult";
+import type { SessionModelParams } from "./SessionModelParams";
 import type { SessionPromptParams } from "./SessionPromptParams";
 import type { SessionReadResult } from "./SessionReadResult";
 import type { SessionRef } from "./SessionRef";
@@ -66,6 +68,8 @@ export type Methods = {
   "host/record": { params: HostRecordParams; result: Appended };
   "host/stream": { params: HostStreamParams; result: Empty };
   "session/interrupt": { params: SessionRef; result: Empty };
+  "model/list": { params: Empty; result: ModelListResult };
+  "session/model": { params: SessionModelParams; result: Appended };
 };
 
 export type MethodName = keyof Methods;

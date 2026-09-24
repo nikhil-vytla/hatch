@@ -209,6 +209,11 @@ impl Models {
         self
     }
 
+    /// Every priced model, by id.
+    pub fn iter(&self) -> impl Iterator<Item = (&str, &Model)> {
+        self.0.iter().map(|(id, m)| (id.as_str(), m))
+    }
+
     /// The entry for `model`, or for the model it is a dated release of
     /// (`claude-haiku-4-5-20251001`, `gpt-4.1-2025-04-14`). Any other
     /// suffix names a different model (`gpt-5-pro` is not `gpt-5`) and gets
@@ -408,7 +413,8 @@ impl Ledger {
                 | Event::GateFinished { .. }
                 | Event::ProposalDecided { .. }
                 | Event::ProposalApplied { .. }
-                | Event::ProposalRolledBack { .. } => {}
+                | Event::ProposalRolledBack { .. }
+                | Event::ModelSet { .. } => {}
             }
         }
         for r in abandoned.values() {

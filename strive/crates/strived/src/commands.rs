@@ -128,6 +128,7 @@ pub fn describe(e: &Entry) -> String {
         Event::ProposalApplied { proposal, before: None, .. } => format!("proposal #{proposal} applied: file created"),
         Event::ProposalApplied { proposal, .. } => format!("proposal #{proposal} applied: file replaced"),
         Event::ProposalRolledBack { proposal, by } => format!("proposal #{proposal} rolled back by {by}"),
+        Event::ModelSet { model } => format!("model: {model}"),
         Event::Compacted { upto_seq, summary } => {
             format!("conversation up to #{upto_seq} summarized ({} characters)", summary.len())
         }

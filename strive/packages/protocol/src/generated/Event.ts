@@ -116,4 +116,4 @@ callId?: string, label: string,
 /**
  * The workspace ops, as the agent gave them; the app parses them.
  */
-ops: unknown, } | { "type": "compacted", uptoSeq: number, summary: string, };
+ops: unknown, } | { "type": "compacted", uptoSeq: number, summary: string, } | { "type": "modelSet", model: string, };
