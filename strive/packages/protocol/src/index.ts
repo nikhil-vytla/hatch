@@ -108,6 +108,8 @@ export type * from "./generated/Gate";
 
 export type * from "./generated/GateOutcome";
 
+export type * from "./generated/LearnedFile";
+
 export type * from "./generated/LearningRunParams";
 
 export type * from "./generated/ProjectRef";

@@ -119,6 +119,13 @@ impl Dir {
     }
 }
 
+impl Dir {
+    /// Removes a file (never a directory) from this directory.
+    pub fn remove(&self, name: &OsStr) -> Result<(), Error> {
+        Ok(unlinkat(&self.0, name, UnlinkatFlags::NoRemoveDir)?)
+    }
+}
+
 fn is_regular(s: &FileStat) -> bool {
     SFlag::from_bits_truncate(s.st_mode) & SFlag::S_IFMT == SFlag::S_IFREG
 }

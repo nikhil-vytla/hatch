@@ -15,6 +15,7 @@ strive-proto.workspace = true
 strive-journal.workspace = true
 strive-budget.workspace = true
 strive-gateway.workspace = true
+strive-learning.workspace = true
 hex = "0.4.3"
 nix = { version = "0.31.3", features = ["fs", "signal"] }
 ulid = "3.0.0"

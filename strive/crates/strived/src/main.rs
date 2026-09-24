@@ -15,11 +15,13 @@ mod effects;
 mod gateway;
 mod hosts;
 mod launch;
+mod learning;
 mod log;
 mod mcp;
 mod methods;
 mod paths;
 mod pinned;
+mod review;
 mod run;
 
 mod server;
@@ -117,6 +119,20 @@ enum Cmd {
         #[arg(long)]
         json: bool,
     },
+    /// Ask this project's learner to study its sessions and propose changes
+    /// to the agent's memory and skills, then show what it proposed.
+    Learn {
+        /// A work session to study (repeatable); default: those since it last looked.
+        #[arg(long = "session", value_name = "ID")]
+        sessions: Vec<String>,
+    },
+    /// List the learner's proposals here; with an id, show one (its diff,
+    /// evidence, prediction and checks), or accept, reject or roll it back.
+    Review {
+        id: Option<u64>,
+        #[arg(requires = "id", value_parser = ["accept", "reject", "rollback"])]
+        action: Option<String>,
+    },
     /// Run the daemon in the foreground (normally started for you).
     #[command(hide = true)]
     Daemon {
@@ -144,6 +160,7 @@ fn main() -> ExitCode {
     }
 }
 
+#[expect(clippy::too_many_lines, reason = "one short arm per command")]
 async fn run(cli: Cli) -> Result<ExitCode> {
     let home = Home::discover()?;
     match cli.command {
@@ -201,6 +218,17 @@ async fn run(cli: Cli) -> Result<ExitCode> {
         }
         Some(Cmd::Sessions { all, json }) => {
             commands::sessions(&mut launch::ensure(&home, "strive-sessions").await?.0, all, json).await
+        }
+        Some(Cmd::Learn { sessions }) => {
+            review::learn(&mut launch::ensure(&home, "strive-learn").await?.0, &home.root, sessions).await
+        }
+        Some(Cmd::Review { id, action }) => {
+            let action = action.map(|a| match a.as_str() {
+                "accept" => review::Action::Accept,
+                "reject" => review::Action::Reject,
+                _ => review::Action::Rollback,
+            });
+            review::review(&mut launch::ensure(&home, "strive-review").await?.0, id, action).await
         }
         Some(Cmd::Status { json }) => {
             let (mut c, _) = launch::ensure(&home, "strive-status").await?;

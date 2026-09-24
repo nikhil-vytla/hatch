@@ -5,8 +5,8 @@ use std::process::ExitCode;
 use anyhow::{Result, anyhow};
 use strive_budget::format_usd;
 use strive_proto::{
-    ApprovalMode, CallOutcome, Decision, EffectOutcome, EffectRecord, Entry, Event, SessionInfo, SessionList,
-    SessionListParams, SessionRead, SessionReadResult, SessionRef, TurnEnd,
+    ApprovalMode, CallOutcome, Decision, EffectOutcome, EffectRecord, Entry, Event, ProposalDecision, SessionInfo,
+    SessionList, SessionListParams, SessionRead, SessionReadResult, SessionRef, TurnEnd,
 };
 
 use crate::client::{Client, ServerError};
@@ -22,7 +22,7 @@ async fn list(c: &mut Client, all: bool) -> Result<Vec<SessionInfo>> {
 /// Readable sessions, and the ids of unreadable ones (only with `all`).
 async fn listing(c: &mut Client, all: bool) -> Result<(Vec<SessionInfo>, Vec<String>)> {
     let cwd = if all { None } else { Some(cwd()?) };
-    let r = c.request::<SessionList>(SessionListParams { cwd }).await?;
+    let r = c.request::<SessionList>(SessionListParams { cwd, kind: None }).await?;
     Ok((r.sessions, r.unreadable))
 }
 
@@ -107,17 +107,31 @@ pub fn describe(e: &Entry) -> String {
             "asked the learner to study recent sessions".into()
         }
         Event::LearnRequested { sessions } => format!("asked the learner to study {}", sessions.join(", ")),
-        Event::ProposalMade { proposal, .. } => format!("learner proposed #{}: {}", e.seq, proposal.summary),
-        Event::GateFinished { proposal, gate, verdict, detail } => {
-            format!("proposal #{proposal}: {gate:?} check {verdict:?}: {detail}").to_lowercase()
-        }
-        Event::ProposalDecided { proposal, decision, by } => format!("proposal #{proposal} {decision:?} by {by}"),
-        Event::ProposalApplied { proposal, .. } => format!("proposal #{proposal} applied"),
+        Event::ProposalMade { proposal, .. } => format!(
+            "learner proposed #{} ({}): {}",
+            e.seq,
+            strive_learning::describe(&proposal.artifact),
+            proposal.summary
+        ),
+        Event::GateFinished { proposal, gate, verdict, detail } => format!(
+            "proposal #{proposal}: {} check {}: {detail}",
+            crate::review::gate_name(*gate),
+            crate::review::verdict_name(*verdict)
+        ),
+        Event::ProposalDecided { proposal, decision, by } => format!(
+            "proposal #{proposal} {} by {by}",
+            match decision {
+                ProposalDecision::Accept => "accepted",
+                ProposalDecision::Reject => "rejected",
+            }
+        ),
+        Event::ProposalApplied { proposal, before: None, .. } => format!("proposal #{proposal} applied: file created"),
+        Event::ProposalApplied { proposal, .. } => format!("proposal #{proposal} applied: file replaced"),
         Event::ProposalRolledBack { proposal, by } => format!("proposal #{proposal} rolled back by {by}"),
         Event::Compacted { upto_seq, summary } => {
             format!("conversation up to #{upto_seq} summarized ({} characters)", summary.len())
         }
-        Event::ContextLoaded { instructions, skills, mcp } => {
+        Event::ContextLoaded { instructions, skills, mcp, learned } => {
             let files: Vec<&str> = instructions.iter().map(|f| f.path.as_str()).collect();
             let servers: Vec<String> = mcp
                 .iter()
@@ -127,12 +141,20 @@ pub fn describe(e: &Entry) -> String {
                 })
                 .collect();
             format!(
-                "agent context: {} instruction file(s){}, {} skill(s){}{}",
+                "agent context: {} instruction file(s){}, {} skill(s){}{}{}",
                 files.len(),
                 if files.is_empty() { String::new() } else { format!(" ({})", files.join(", ")) },
                 skills.len(),
                 if skills.is_empty() { String::new() } else { format!(" ({})", skills.join(", ")) },
-                if servers.is_empty() { String::new() } else { format!("; MCP {}", servers.join(", ")) }
+                if servers.is_empty() { String::new() } else { format!("; MCP {}", servers.join(", ")) },
+                match learned.as_deref() {
+                    None => String::new(),
+                    Some([]) => "; the learner was given no memory or skills".to_string(),
+                    Some(files) => format!(
+                        "; the learner was given {}",
+                        files.iter().map(|f| f.path.as_str()).collect::<Vec<_>>().join(", ")
+                    ),
+                }
             )
         }
         Event::AssistantMessage { text, tool_calls, .. } => {
@@ -181,7 +203,10 @@ pub async fn log(c: &mut Client, id: Option<String>, json: bool) -> Result<ExitC
 
 pub async fn verify(c: &mut Client, id: Option<String>, all: bool) -> Result<ExitCode> {
     let ids = if all {
-        let (sessions, unreadable) = listing(c, true).await?;
+        let (mut sessions, unreadable) = listing(c, true).await?;
+        // Learning journals record who accepted what: they're checked too.
+        let learning = SessionListParams { cwd: None, kind: Some(strive_proto::SessionKind::Learning) };
+        sessions.extend(c.request::<SessionList>(learning).await?.sessions);
         all_ids(&sessions, &unreadable)
     } else {
         vec![resolve(c, id).await?]

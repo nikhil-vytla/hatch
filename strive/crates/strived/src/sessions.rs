@@ -18,7 +18,8 @@ use std::sync::{Arc, Mutex as StdMutex};
 use strive_budget::{Ledger, Limits, Refusal, Reservation, charge, open_calls};
 use strive_journal::{Journal, Key, OpenError, Problem, Report};
 use strive_proto::{
-    ApprovalMode, CallOutcome, Decision, Digest, EffectOutcome, EffectRecord, Entry, Event, SessionInfo,
+    ApprovalMode, CallOutcome, Decision, Digest, EffectOutcome, EffectRecord, Entry, Event, Gate, SessionInfo,
+    SessionKind, Verdict,
 };
 use tokio::sync::{Mutex, mpsc, oneshot};
 
@@ -193,6 +194,12 @@ enum Cmd {
         reason: strive_proto::TurnEnd,
         reply: oneshot::Sender<io::Result<bool>>,
     },
+    /// A proposal and its gates' outcomes, which name it by the seq it gets.
+    Propose {
+        made: Event,
+        gates: Vec<(Gate, Verdict, String)>,
+        reply: oneshot::Sender<io::Result<Vec<Entry>>>,
+    },
     /// A host's record, checked against the journal before it's staged.
     HostRecord {
         event: Event,
@@ -300,14 +307,20 @@ impl Sessions {
     }
 
     /// Creates a session whose budget starts at `limits` and approvals at `mode`.
-    pub async fn create(&self, cwd: String, limits: Limits, mode: ApprovalMode) -> Result<SessionInfo> {
+    pub async fn create(
+        &self,
+        cwd: String,
+        limits: Limits,
+        mode: ApprovalMode,
+        kind: Option<SessionKind>,
+    ) -> Result<SessionInfo> {
         let id = {
             let mut g = crate::sync::lock(&self.ids);
             SessionId(g.generate().map_err(|e| io::Error::other(e.to_string()))?.to_string())
         };
         let ts = epoch_ms();
         let first = Event::SessionStarted {
-            kind: None,
+            kind,
             format: FORMAT,
             cwd: cwd.clone(),
             strive_version: env!("CARGO_PKG_VERSION").into(),
@@ -334,25 +347,29 @@ impl Sessions {
             created_at_ms: ts,
             title: None,
             last_active_ms: Some(ts),
-            kind: None,
+            kind,
         };
         let (tx, thread) = spawn_writer(journal, entries, self.verifier(&id));
         live.insert(id, Live { info: info.clone(), tx, thread });
         Ok(info)
     }
 
-    /// Sessions started in `cwd` (or all of them), newest first, and the ids
-    /// of sessions whose first entry can't be read. Reads only each
-    /// journal's first line; verification happens on attach and read.
-    pub fn list(&self, cwd: Option<&str>) -> io::Result<(Vec<SessionInfo>, Vec<String>)> {
+    /// Sessions of `kind` started in `cwd` (or all of them), newest first,
+    /// and the ids of sessions whose first entry can't be read. Those have
+    /// no known kind, so they're listed with work sessions, and only when
+    /// not filtering by directory. Reads only each journal's first lines;
+    /// verification happens on attach and read.
+    pub fn list(&self, cwd: Option<&str>, kind: SessionKind) -> io::Result<(Vec<SessionInfo>, Vec<String>)> {
         let mut sessions = Vec::new();
         let mut unreadable = Vec::new();
         for dir in fs::read_dir(&self.root)? {
             let dir = dir?;
             let Some(id) = dir.file_name().to_str().and_then(SessionId::parse) else { continue };
             match peek_info(&id, &dir.path()) {
-                Some(info) if cwd.is_none_or(|c| c == info.cwd) => sessions.push(info),
-                None if cwd.is_none() => unreadable.push(id.0),
+                Some(info) if cwd.is_none_or(|c| c == info.cwd) && info.kind.unwrap_or_default() == kind => {
+                    sessions.push(info);
+                }
+                None if cwd.is_none() && kind == SessionKind::Work => unreadable.push(id.0),
                 _ => {}
             }
         }
@@ -601,6 +618,25 @@ impl Sessions {
         let reason = strive_proto::TurnEnd::Failed { error: error.to_string() };
         tx.send(Cmd::EndOpenTurn { turn, reason, reply }).map_err(|_| writer_gone())?;
         Ok(rx.await.map_err(|_| writer_gone())??)
+    }
+
+    /// Journals a proposal followed by its gates' outcomes, in one commit.
+    pub async fn propose(
+        &self,
+        id: &SessionId,
+        made: Event,
+        gates: Vec<(Gate, Verdict, String)>,
+    ) -> Result<Vec<Entry>> {
+        let (_, tx) = self.writer(id).await?;
+        let (reply, rx) = oneshot::channel();
+        tx.send(Cmd::Propose { made, gates, reply }).map_err(|_| writer_gone())?;
+        Ok(rx.await.map_err(|_| writer_gone())??)
+    }
+
+    /// A session's info from its journal's first lines, unverified; `None`
+    /// if there's no such session or its start can't be read.
+    pub fn peek(&self, id: &SessionId) -> Option<SessionInfo> {
+        peek_info(id, &self.dir(id))
     }
 
     /// Journals a host's record, or says why it doesn't fit the journal.
@@ -953,6 +989,18 @@ impl Writer {
                     vec![Event::TurnEnded { turn, reason }],
                     Box::new(move |r: io::Result<Vec<Entry>>, _| drop(reply.send(r.map(|_| true)))),
                 )
+            }
+            Cmd::Propose { made, gates, reply } => {
+                // The proposal's id is the seq it's about to get.
+                let proposal = self.journal.next_seq();
+                let mut events = vec![made];
+                events.extend(gates.into_iter().map(|(gate, verdict, detail)| Event::GateFinished {
+                    proposal,
+                    gate,
+                    verdict,
+                    detail,
+                }));
+                (events, Box::new(move |r, _| drop(reply.send(r))))
             }
             Cmd::HostRecord { event, reply } => {
                 if let Err(why) = self.fits(&event) {

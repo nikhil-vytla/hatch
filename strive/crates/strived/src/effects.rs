@@ -182,7 +182,7 @@ fn resolve(scope: &Scope, path: &str, writing: bool) -> Access {
 
 /// Canonicalizes the longest existing prefix and appends the rest, with `..`
 /// resolved lexically only after symlinks in the existing part are followed.
-fn real_path(p: &Path) -> Option<PathBuf> {
+pub fn real_path(p: &Path) -> Option<PathBuf> {
     let mut existing = p.to_path_buf();
     let mut rest = Vec::new();
     while fs::symlink_metadata(&existing).is_err() {

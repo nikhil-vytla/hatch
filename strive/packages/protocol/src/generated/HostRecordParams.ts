@@ -2,6 +2,8 @@
 import type { Event } from "./Event";
 
 /**
- * An event the host records: only turn and assistant events are accepted.
+ * An event the host records: turns, assistant messages and summaries; a
+ * work session's host also layout proposals, a learning session's host
+ * `proposalMade`.
  */
 export type HostRecordParams = { id: string, event: Event, };

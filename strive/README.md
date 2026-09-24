@@ -5,11 +5,12 @@ one you can review, measure and undo. Proposed changes to its memory and
 skills are gated against the current version before they're kept. Budgets,
 a verifiable session log and an OS sandbox are on by default.
 
-> **Status: early.** Milestones M0 to M5 are done. strive runs a coding
+> **Status: early.** Stage 1 (M0 to M6) is done. strive runs a coding
 > agent in any repository, with a verifiable session journal, budgets,
 > approvals, a sandbox and checkpoints. It reads the project's AGENTS.md
 > and skills, uses MCP servers, and has a terminal UI and a desktop app.
-> Headless runs are next; see [ROADMAP.md](docs/ROADMAP.md). The earlier Python research implementation
+> Headless runs work. Stage 2's reviewed proposals (M7) are in the daemon;
+> the learner that makes them is next; see [ROADMAP.md](docs/ROADMAP.md). The earlier Python research implementation
 > is at git tag `strive-py-final`.
 
 ## Install
@@ -38,6 +39,10 @@ strive stop           # stop the daemon (it also exits when idle)
 strive app            # the desktop app on a new session here (-c and -r as for strive)
 strive run "fix the failing test" --approvals full-auto --json
                       # one task, headless; exits 0 done, 1 failed, 3 timed out, 4 interrupted
+strive learn          # ask this project's learner to study its sessions (--session ID for chosen ones)
+strive review         # what the learner proposed here, and each proposal's status
+strive review 12      # one proposal: its diff, evidence, prediction and checks
+strive review 12 accept    # write it (or reject; rollback undoes an accepted one)
 ```
 
 In the TUI, type what you want done. The agent reads and changes files in
@@ -73,6 +78,14 @@ The agent follows the project's `AGENTS.md` (or `CLAUDE.md`) files and
 knows its skills (`SKILL.md` under `.strive/skills`, `.claude/skills` or
 `~/.strive/skills`). Long conversations are summarized before they
 outgrow the model's context.
+
+The project's learner studies its sessions and proposes changes to
+`.strive/memory.md` and `.strive/skills`. It can't change a file itself.
+strive checks each proposal (its path, size, form, secrets, instructions
+that would weaken strive, and evidence from real sessions here), and nothing
+changes until you accept it with `strive review`. Accepting writes the file
+only if it's still as the learner saw it; rolling back restores it. The
+agent reads the accepted memory, labeled as reviewed, after `AGENTS.md`.
 
 ## Benchmarks
 

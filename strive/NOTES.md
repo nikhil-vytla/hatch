@@ -746,3 +746,54 @@ fails the test.
   `gateFinished`, and `.strive/memory.md` among `instructions`. The
   tests play these with `FakeDaemon`; `FakeDaemon.push` sends a
   notification outside any reply (interrupts, late entries).
+
+## 2026-09-23: M7, proposals in the daemon
+
+Built against ADR-0016. The learner (M8) is another agent's work; here
+the tests act as it, registering over RPC and recording `proposalMade`.
+
+- **Choices:**
+  - Learning sessions are left out of `session/list` unless it asks for
+    `kind: learning`. `strive sessions`, continue and the desktop's
+    sidebar never show them. `strive verify --all` asks for both.
+  - A project's learning session is the oldest one for its real path.
+    `learning/open` finds or creates it under one lock.
+  - `learning/run` is people only, like approvals. A prompt, an effect or
+    an MCP tool in a learning session is refused.
+  - The gate's pure parts are a library crate, `strive-learning`, so
+    mutation testing covers them. The daemon adds the path on disk and
+    the evidence.
+  - `before` is the file as the learner was shown it, not as it is when
+    the proposal lands. The learner's `host/register` gets its memory and
+    skills whole (`learnedFiles`), and `contextLoaded.learned` journals
+    their digests. A file edited while the learner worked is never
+    written over.
+  - A stale accept still returns ok: it journals the decision, and the
+    status says stale. `strive review ID accept` exits 1 and says so.
+- **Protocol additions** (all optional fields):
+  - `SessionListParams.kind`
+  - `ProposalMade.before` and `ProposalState.before`
+  - `AgentConfig.learnedFiles`, with `LearnedFile`
+  - `ContextLoaded.learned`
+- **Tests:**
+  - `crates/strived/tests/learning.rs` runs against the real daemon, one
+    test per rule and refusal.
+  - `crates/learning/tests` covers the text checks and the fold.
+  - A crash between a proposal and its gates is built with
+    `strive_journal` directly: the journal such a crash leaves. The next
+    `proposal/list` runs the missing gates.
+- **A race in two gateway tests, explained and fixed:** the
+  client-leaves tests gave up on their request after a fixed 300 ms. With
+  the suite under more load (this milestone adds a few dozen daemons), the
+  request could still be on its way, so no call started and there was
+  nothing to close. They now leave once `modelCallStarted` is journaled.
+- **Known limits:**
+  - A command a work session runs can change the file between the
+    compare and the write. Agent writes and edits can't: they wait.
+  - The weakening phrases are a list. They catch plain instructions, not
+    paraphrases. The judge (M9) is where meaning gets checked.
+- **Worktree note:** this worktree's path is long enough that sockets
+  under `CARGO_TARGET_TMPDIR` pass macOS's 104-byte limit
+  (`the_sandbox_blocks_unix_sockets_outside_it`). `check.sh` ran with
+  `CARGO_TARGET_DIR=/tmp/m7t`, with `target` symlinked there for the TS
+  tests.

@@ -229,6 +229,11 @@ pub struct SessionListParams {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub cwd: Option<String>,
+    /// Only sessions of this kind; work sessions when absent, so the lists
+    /// people pick a session from never offer a project's learner.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub kind: Option<SessionKind>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
@@ -482,6 +487,23 @@ pub struct AgentConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub kind: Option<SessionKind>,
+    /// For the learner only: the project's memory and skills, each file's
+    /// whole text exactly as it is, so it can propose a whole new file. A
+    /// file missing here didn't exist (or can't be proposed over: not a
+    /// regular file, reached through a symlink, or over 64 KiB). Accepting
+    /// a proposal writes only over the file as given here.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub learned_files: Option<Vec<LearnedFile>>,
+}
+
+/// A memory or skill file as the learner is shown it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct LearnedFile {
+    pub artifact: Artifact,
+    pub text: String,
 }
 
 /// What a session is for.
@@ -624,6 +646,11 @@ pub struct ProposalState {
     pub id: u64,
     pub made_at_ms: u64,
     pub proposal: Proposal,
+    /// The file as the learner was shown it, in the content store (none: it
+    /// didn't exist). Its diff is from this to the new content.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub before: Option<Digest>,
     pub status: ProposalStatus,
     pub gates: Vec<GateOutcome>,
 }
@@ -656,7 +683,9 @@ pub enum ProposalStatus {
     RolledBack,
 }
 
-/// An event the host records: only turn and assistant events are accepted.
+/// An event the host records: turns, assistant messages and summaries; a
+/// work session's host also layout proposals, a learning session's host
+/// `proposalMade`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
@@ -908,6 +937,12 @@ pub enum Event {
         /// MCP servers from settings, and how each started.
         #[serde(default)]
         mcp: Vec<McpStatus>,
+        /// A learning session's only: the memory and skill files its host
+        /// was given (`AgentConfig.learnedFiles`), by path in the project.
+        /// A proposal's `before` is the file as last given here.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[ts(optional)]
+        learned: Option<Vec<ContextFile>>,
     },
     /// A person asked the project's learner to study sessions (none named:
     /// the ones since it last looked). Journaled in the learning session;
@@ -926,6 +961,13 @@ pub enum Event {
         #[ts(optional)]
         call_id: Option<String>,
         proposal: Proposal,
+        /// The file as the learner was last shown it (`contextLoaded`'s
+        /// `learned`), in the content store; none: it didn't exist.
+        /// Recorded by the daemon, never the host: accepting writes only
+        /// over this same file.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[ts(optional)]
+        before: Option<Digest>,
     },
     /// A check of a proposal finished.
     GateFinished {

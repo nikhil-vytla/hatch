@@ -11,8 +11,9 @@ use strive_proto::{
     DaemonShutdown, DaemonStatus, DaemonStatusResult, EffectOutcome, EffectRun, EffectRunParams, EffectRunResult,
     Empty, Initialize, InitializeParams, InitializeResult, Method, Notification, PROTOCOL_VERSION, ProviderAuth,
     SessionAttach, SessionAttachParams, SessionAttachResult, SessionBudget, SessionBudgetParams, SessionCreate,
-    SessionCreateParams, SessionEntry, SessionEntryNotification, SessionGateway, SessionList, SessionListParams,
-    SessionListResult, SessionPrompt, SessionPromptParams, SessionRead, SessionReadResult, SessionRef,
+    SessionCreateParams, SessionEntry, SessionEntryNotification, SessionGateway, SessionKind, SessionList,
+    SessionListParams, SessionListResult, SessionPrompt, SessionPromptParams, SessionRead, SessionReadResult,
+    SessionRef,
 };
 use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
@@ -125,7 +126,7 @@ impl Conn {
     }
 }
 
-type Reply = Result<Value, RpcError>;
+pub type Reply = Result<Value, RpcError>;
 
 pub async fn dispatch(
     state: &Arc<State>,
@@ -192,6 +193,9 @@ async fn route(state: &Arc<State>, conn: &Arc<Conn>, method: &str, params: Value
         }
         m if m.starts_with("effect/") => route_effect(state, m, params).await,
         m if m.starts_with("host/") => route_host(state, conn, m, params).await,
+        m if m.starts_with("learning/") || m.starts_with("proposal/") => {
+            crate::learning::route(state, conn, m, params).await
+        }
         ApprovalRespond::NAME => {
             let ApprovalRespondParams { id, effect, decision } = parse::<ApprovalRespond>(params)?;
             require_person(conn)?;
@@ -282,11 +286,50 @@ fn release_host(state: &State, conn: &Conn) {
 /// Decisions that belong to a person: an agent host can't loosen its own
 /// limits. (The host runs as the user, so this guards against the agent's
 /// mistakes, not a hostile host; see docs/ARCHITECTURE.md.)
-fn require_person(conn: &Conn) -> Result<(), RpcError> {
+pub fn require_person(conn: &Conn) -> Result<(), RpcError> {
     if crate::sync::lock(&conn.host_of).is_host() {
         return Err(RpcError::new(RpcError::NOT_A_PERSON, "only a person can do this, not the agent's host"));
     }
     Ok(())
+}
+
+/// The client's name from `initialize`, recorded with what it decides.
+pub fn client_name(conn: &Conn) -> String {
+    crate::sync::lock(&conn.client).clone()
+}
+
+/// What a session's host may record. Everything else in a journal is the
+/// daemon's to write: effects, gates, decisions, what was applied.
+fn host_may_record(event: &Event, kind: SessionKind) -> bool {
+    match event {
+        Event::TurnStarted { .. }
+        | Event::AssistantMessage { .. }
+        | Event::TurnEnded { .. }
+        | Event::Compacted { .. } => true,
+        Event::LayoutProposed { .. } => kind == SessionKind::Work,
+        // Only the learner proposes; a work session's agent changing what
+        // every later agent is given would skip review.
+        Event::ProposalMade { .. } => kind == SessionKind::Learning,
+        Event::SessionStarted { .. }
+        | Event::UserMessage { .. }
+        | Event::Recovered { .. }
+        | Event::BudgetSet { .. }
+        | Event::ModelCallStarted { .. }
+        | Event::ModelCallFinished { .. }
+        | Event::EffectStarted { .. }
+        | Event::EffectFinished { .. }
+        | Event::ApprovalModeSet { .. }
+        | Event::ApprovalRequested { .. }
+        | Event::ApprovalDecided { .. }
+        | Event::Checkpointed { .. }
+        | Event::Rewound { .. }
+        | Event::ContextLoaded { .. }
+        | Event::LearnRequested { .. }
+        | Event::GateFinished { .. }
+        | Event::ProposalDecided { .. }
+        | Event::ProposalApplied { .. }
+        | Event::ProposalRolledBack { .. } => false,
+    }
 }
 
 /// Refuses agent requests from anything but the session's registered host.
@@ -312,17 +355,46 @@ async fn host_config(state: &Arc<State>, sid: &SessionId) -> Reply {
     let urls = state.gateway.info(&sid).map_err(|e| internal(&e))?;
     let home = state.home.root.canonicalize().map_err(|e| internal(&e))?;
     let workspace = std::path::PathBuf::from(&info.cwd);
-    let ctx =
-        tokio::task::spawn_blocking(move || crate::context::load(&workspace, &home)).await.map_err(|e| internal(&e))?;
-    let mcp = state
-        .mcp
-        .for_session(
-            &sid,
-            std::path::Path::new(&info.cwd),
-            &state.settings.mcp_servers,
-            &state.sessions.session_dir(&sid),
-        )
-        .await;
+    let learning = info.kind == Some(SessionKind::Learning);
+    let (ctx, learned) = tokio::task::spawn_blocking(move || {
+        let learned = learning.then(|| crate::context::learned(&workspace, &home));
+        (crate::context::load(&workspace, &home), learned)
+    })
+    .await
+    .map_err(|e| internal(&e))?;
+    // What the learner is shown is journaled: its proposals are checked
+    // against, and written only over, these same files.
+    let shown = learned
+        .as_ref()
+        .map(|files| {
+            files
+                .iter()
+                .map(|(artifact, text)| {
+                    Ok(strive_proto::ContextFile {
+                        path: strive_learning::relative_path(artifact).map_err(std::io::Error::other)?,
+                        digest: state.cas.put(text.as_bytes())?,
+                        bytes: text.len() as u64,
+                    })
+                })
+                .collect::<std::io::Result<Vec<_>>>()
+        })
+        .transpose()
+        .map_err(|e| internal(&e))?;
+    // The learner has no effect tools, and an MCP tool is one.
+    let mcp = match info.kind.unwrap_or_default() {
+        SessionKind::Learning => crate::mcp::Summary { status: Vec::new(), tools: Vec::new() },
+        SessionKind::Work => {
+            state
+                .mcp
+                .for_session(
+                    &sid,
+                    std::path::Path::new(&info.cwd),
+                    &state.settings.mcp_servers,
+                    &state.sessions.session_dir(&sid),
+                )
+                .await
+        }
+    };
     let files = ctx
         .instructions
         .iter()
@@ -339,6 +411,7 @@ async fn host_config(state: &Arc<State>, sid: &SessionId) -> Reply {
         instructions: files,
         skills: ctx.skills.iter().map(|s| s.name.clone()).collect(),
         mcp: mcp.status.clone(),
+        learned: shown,
     };
     state.sessions.append(&sid, vec![loaded]).await.map_err(session_error)?;
     reply::<HostRegister>(AgentConfig {
@@ -357,6 +430,9 @@ async fn host_config(state: &Arc<State>, sid: &SessionId) -> Reply {
         skills: ctx.skills,
         mcp_tools: mcp.tools,
         kind: info.kind,
+        learned_files: learned.map(|files| {
+            files.into_iter().map(|(artifact, text)| strive_proto::LearnedFile { artifact, text }).collect()
+        }),
     })
 }
 
@@ -376,19 +452,26 @@ async fn route_host(state: &Arc<State>, conn: &Arc<Conn>, method: &str, params: 
             conn.records.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
             let _recording = Recording(conn);
             let HostRecordParams { id, event } = parse::<HostRecord>(params)?;
-            require_host(conn, &session_id(&id)?)?;
-            if !matches!(
-                event,
-                Event::TurnStarted { .. }
-                    | Event::AssistantMessage { .. }
-                    | Event::TurnEnded { .. }
-                    | Event::Compacted { .. }
-                    | Event::LayoutProposed { .. }
-            ) {
+            let sid = session_id(&id)?;
+            require_host(conn, &sid)?;
+            let info = state.sessions.info(&sid).await.map_err(session_error)?;
+            let kind = info.kind.unwrap_or_default();
+            if !host_may_record(&event, kind) {
                 return Err(RpcError::new(
                     RpcError::INVALID_PARAMS,
-                    "a host records only turns, assistant messages, summaries and layout proposals",
+                    match kind {
+                        SessionKind::Work => {
+                            "a host records only turns, assistant messages, summaries and layout proposals"
+                        }
+                        SessionKind::Learning => {
+                            "a learning session's host records only turns, assistant messages, summaries and proposals"
+                        }
+                    },
                 ));
+            }
+            if let Event::ProposalMade { call_id, proposal, before } = event {
+                let entries = crate::learning::propose(state, &sid, &info.cwd, call_id, proposal, before).await?;
+                return reply::<HostRecord>(Appended { seq: entries[0].seq });
             }
             let opened = match &event {
                 Event::TurnStarted { turn, .. } => Some(Some(*turn)),
@@ -397,7 +480,7 @@ async fn route_host(state: &Arc<State>, conn: &Arc<Conn>, method: &str, params: 
             };
             let entries = state
                 .sessions
-                .host_record(&session_id(&id)?, event)
+                .host_record(&sid, event)
                 .await
                 .map_err(session_error)?
                 .map_err(|why| RpcError::new(RpcError::INVALID_PARAMS, why))?;
@@ -420,6 +503,12 @@ async fn prompt(state: &Arc<State>, params: Value) -> Reply {
     let SessionPromptParams { id, text } = parse::<SessionPrompt>(params)?;
     let sid = session_id(&id)?;
     let info = state.sessions.info(&sid).await.map_err(session_error)?;
+    if info.kind == Some(SessionKind::Learning) {
+        return Err(RpcError::new(
+            RpcError::INVALID_REQUEST,
+            "this is a project's learning session; ask it to study sessions with `strive learn` (learning/run)",
+        ));
+    }
     let commit = checkpoint(state, &sid, &info.cwd, &format!("before: {text}")).await;
     let entries = state.sessions.prompt(&sid, text, commit).await.map_err(session_error)?;
     state.hosts.ensure(&sid, &state.home.socket(), &state.sessions.session_dir(&sid).join("host.log"));
@@ -515,6 +604,12 @@ async fn route_effect(state: &Arc<State>, method: &str, params: Value) -> Reply 
             let EffectRunParams { id, call_id, request } = parse::<EffectRun>(params)?;
             let sid = session_id(&id)?;
             let info = state.sessions.info(&sid).await.map_err(session_error)?;
+            if info.kind == Some(SessionKind::Learning) {
+                return Err(RpcError::new(
+                    RpcError::INVALID_REQUEST,
+                    "the learner can't change files or run commands; it can only propose changes for a person to review",
+                ));
+            }
             let scope = crate::effects::Scope {
                 workspace: workspace_of(&info.cwd)?,
                 strive_home: state.home.root.canonicalize().map_err(|e| internal(&e))?,
@@ -659,16 +754,17 @@ async fn route_session(state: &Arc<State>, conn: &Arc<Conn>, method: &str, param
             reply::<SessionCreate>(
                 state
                     .sessions
-                    .create(cwd, state.settings.budget.limits(), state.settings.approvals)
+                    .create(cwd, state.settings.budget.limits(), state.settings.approvals, None)
                     .await
                     .map_err(session_error)?,
             )
         }
         SessionList::NAME => {
-            let SessionListParams { cwd } = parse::<SessionList>(params)?;
+            let SessionListParams { cwd, kind } = parse::<SessionList>(params)?;
             // Sessions keep their directory's real path; so does the filter.
             let cwd = cwd.map(|c| std::path::Path::new(&c).canonicalize().map_or(c, |p| p.display().to_string()));
-            let (sessions, unreadable) = state.sessions.list(cwd.as_deref()).map_err(|e| internal(&e))?;
+            let (sessions, unreadable) =
+                state.sessions.list(cwd.as_deref(), kind.unwrap_or_default()).map_err(|e| internal(&e))?;
             reply::<SessionList>(SessionListResult { sessions, unreadable })
         }
         SessionAttach::NAME => {
@@ -766,19 +862,19 @@ fn initialize(state: &Arc<State>, conn: &Arc<Conn>, p: &InitializeParams) -> Rep
     })
 }
 
-fn parse<M: Method>(params: Value) -> Result<M::Params, RpcError> {
+pub fn parse<M: Method>(params: Value) -> Result<M::Params, RpcError> {
     serde_json::from_value(params).map_err(|e| RpcError::new(RpcError::INVALID_PARAMS, e.to_string()))
 }
 
-fn reply<M: Method>(result: M::Result) -> Reply {
+pub fn reply<M: Method>(result: M::Result) -> Reply {
     serde_json::to_value(result).map_err(|e| internal(&e))
 }
 
-fn session_id(s: &str) -> Result<SessionId, RpcError> {
+pub fn session_id(s: &str) -> Result<SessionId, RpcError> {
     SessionId::parse(s).ok_or_else(|| RpcError::new(RpcError::INVALID_PARAMS, format!("not a session id: {s:?}")))
 }
 
-fn session_error(e: SessionError) -> RpcError {
+pub fn session_error(e: SessionError) -> RpcError {
     match e {
         SessionError::NotFound => RpcError::new(RpcError::SESSION_NOT_FOUND, "no such session"),
         SessionError::Invalid(p) => {
@@ -791,7 +887,7 @@ fn session_error(e: SessionError) -> RpcError {
     }
 }
 
-fn internal(e: &dyn std::fmt::Display) -> RpcError {
+pub fn internal(e: &dyn std::fmt::Display) -> RpcError {
     RpcError::new(RpcError::INTERNAL_ERROR, e.to_string())
 }
 
@@ -801,7 +897,7 @@ fn internal(e: &dyn std::fmt::Display) -> RpcError {
 /// part of the path is followed again every time, so one swapped for a
 /// symlink (a directory under /tmp, replaced) would lead effects, the
 /// sandbox's writable area and checkpoints somewhere else entirely.
-fn workspace_of(cwd: &str) -> Result<std::path::PathBuf, RpcError> {
+pub fn workspace_of(cwd: &str) -> Result<std::path::PathBuf, RpcError> {
     let real = std::path::Path::new(cwd).canonicalize().map_err(|e| {
         RpcError::new(RpcError::INTERNAL_ERROR, format!("the session's directory {cwd} is missing: {e}"))
     })?;

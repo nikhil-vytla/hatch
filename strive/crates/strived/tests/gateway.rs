@@ -173,6 +173,27 @@ impl Setup {
             (r.status().as_u16(), r.bytes().await.unwrap().to_vec())
         })
     }
+    /// Sends a request and gives up on it (dropping the connection) once the
+    /// gateway has journaled the call's start. A fixed wait can end, under
+    /// load, before the request reaches the gateway: then there's no call
+    /// to close.
+    fn leave_once_started<F: std::future::Future>(&self, send: F) {
+        let deadline = std::time::Instant::now() + Duration::from_secs(5);
+        self.rt.block_on(async {
+            tokio::pin!(send);
+            loop {
+                tokio::select! {
+                    _ = &mut send => return,
+                    () = tokio::time::sleep(Duration::from_millis(50)) => {
+                        if self.count("modelCallStarted") == 1 {
+                            return;
+                        }
+                        assert!(std::time::Instant::now() < deadline, "the call never started");
+                    }
+                }
+            }
+        });
+    }
     fn messages(&self, body: &str) -> (u16, Vec<u8>) {
         self.post(&format!("{}/v1/messages", self.base), body)
     }
@@ -587,10 +608,7 @@ fn a_response_past_the_size_limit_is_cut_off_and_charged_its_hold() {
 fn a_client_that_leaves_before_the_response_starts_closes_the_call() {
     let s = setup(Reply::Hang, &[("ANTHROPIC_API_KEY", "k")]);
     let url = format!("{}/v1/messages", s.base);
-    s.rt.block_on(async {
-        let send = reqwest::Client::new().post(url).body(BODY).send();
-        let _ = tokio::time::timeout(Duration::from_millis(300), send).await;
-    });
+    s.leave_once_started(reqwest::Client::new().post(url).body(BODY).send());
     common::wait_for("the call to be closed", Duration::from_secs(5), || s.count("modelCallFinished") == 1);
     assert_eq!(s.last("modelCallFinished")["outcome"]["reason"], "the client disconnected before the response began");
 }
@@ -599,13 +617,12 @@ fn a_client_that_leaves_before_the_response_starts_closes_the_call() {
 fn a_client_that_leaves_while_the_provider_stalls_closes_the_call() {
     let events = vec![SSE[0].to_string(), SSE[1].to_string()];
     let s = setup(Reply::Sse(events, 20_000, false), &[("ANTHROPIC_API_KEY", "k")]);
-    s.rt.block_on(async {
-        let r = reqwest::Client::new()
+    s.leave_once_started(
+        reqwest::Client::new()
             .post(format!("{}/v1/messages", s.base))
             .body(BODY.replace("\"max_tokens\":100", "\"max_tokens\":100,\"stream\":true"))
-            .send();
-        let _ = tokio::time::timeout(Duration::from_millis(300), r).await;
-    });
+            .send(),
+    );
     common::wait_for("the call to be closed", Duration::from_secs(5), || s.count("modelCallFinished") == 1);
     let reason = s.last("modelCallFinished")["outcome"]["reason"].clone();
     assert!(

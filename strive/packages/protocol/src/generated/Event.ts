@@ -79,7 +79,13 @@ message: unknown, } | { "type": "turnEnded", turn: number, reason: TurnEnd, } | 
 /**
  * MCP servers from settings, and how each started.
  */
-mcp: Array<McpStatus>, } | { "type": "learnRequested", 
+mcp: Array<McpStatus>, 
+/**
+ * A learning session's only: the memory and skill files its host
+ * was given (`AgentConfig.learnedFiles`), by path in the project.
+ * A proposal's `before` is the file as last given here.
+ */
+learned?: Array<ContextFile>, } | { "type": "learnRequested", 
 /**
  * The work sessions to study; empty: those since the learner last looked.
  */
@@ -87,7 +93,14 @@ sessions: Array<string>, } | { "type": "proposalMade",
 /**
  * The learner's tool call that made it, whose result it is.
  */
-callId?: string, proposal: Proposal, } | { "type": "gateFinished", proposal: number, gate: Gate, verdict: Verdict, 
+callId?: string, proposal: Proposal, 
+/**
+ * The file as the learner was last shown it (`contextLoaded`'s
+ * `learned`), in the content store; none: it didn't exist.
+ * Recorded by the daemon, never the host: accepting writes only
+ * over this same file.
+ */
+before?: Digest, } | { "type": "gateFinished", proposal: number, gate: Gate, verdict: Verdict, 
 /**
  * What it found, for a person reviewing the proposal.
  */

@@ -57,6 +57,8 @@ pub struct State {
     pub mcp: crate::mcp::Servers,
 
     pub hosts: crate::hosts::Hosts,
+    /// One proposal operation at a time per project.
+    pub learning: crate::learning::Locks,
 }
 
 impl State {
@@ -127,6 +129,7 @@ pub async fn run(cfg: Config) -> Result<Started> {
         mcp: crate::mcp::Servers::default(),
 
         hosts: crate::hosts::Hosts::default(),
+        learning: crate::learning::Locks::default(),
     });
     let gateway_task = tokio::spawn(axum::serve(gateway_listener, gateway::router(state.clone())).into_future());
     log!("daemon {} listening on {} (pid {})", state.info.build, socket.display(), state.info.pid);

@@ -22,6 +22,7 @@ calls go through the daemon's gateway. Why: [ADR-0015](adrs/0015-rebuild-daemon-
 | `crates/journal` | Authenticated session journals: format, verification, crash recovery |
 | `crates/budget` | Prices, costs, reservations and the ledger rebuilt from journal events |
 | `crates/gateway` | Provider wire formats: which API, what a request asks for, usage from bodies and streams |
+| `crates/learning` | Trusted learning's pure parts: where proposals write, the static gate's text checks, proposal status |
 | `crates/strived` | The `strive` binary: CLI, launcher, daemon, sessions |
 | `packages/protocol` | Generated TS types + the typed socket client |
 | `packages/tui` | The terminal client; its binary also runs the agent host |
@@ -160,7 +161,8 @@ attaches to the session. Hosts don't count as clients for idle exit.
 - One host per session: registration is exclusive.
 - A host must register before it attaches.
 - Only the session's host may record turns or stream text for it.
-- A host can't answer approvals, change approval modes or budgets, or rewind.
+- A host can't answer approvals, change approval modes or budgets, rewind,
+  ask the learner to run, or decide on or roll back a proposal.
 
 **Trust.** The daemon enforces what the agent may *ask* for: every file
 change, command and model call goes through it. The host itself still
@@ -175,6 +177,9 @@ Confining the host process to the daemon's socket and gateway is planned.
   down to the workspace, after `~/.strive/AGENTS.md`.
 - **Skills:** SKILL.md files from `.strive/skills`, `.claude/skills` and
   `~/.strive/skills`.
+- **Memory:** `.strive/memory.md`, the last instruction file, labeled as
+  memory a person reviewed. Its `@` lines stay text. The same rules
+  apply: regular files only, never from strive's home.
 - **MCP servers:** the stdio servers in `mcpServers` in settings.
   - They are started for the session in its directory, without strive's
     variables or provider keys.
@@ -220,6 +225,30 @@ and a tool call that never ran gets an explicit result.
 - If a host's connection closes mid-turn, the daemon ends that turn as
   failed, so anyone waiting on it (`strive run`) finds out.
 
+## Trusted learning
+
+Why: [ADR-0016](adrs/0016-trusted-learning.md). The learner proposes; the
+daemon checks; a person decides; the daemon writes.
+
+**The learning session.** Each project directory has one, found or created
+by `learning/open`. Its `sessionStarted` says `kind: learning`.
+- Lists people pick from leave it out: `session/list` returns work
+  sessions unless asked for `kind: learning`, so `strive sessions`,
+  continue and the desktop's sidebar never offer it. `strive verify --all`
+  asks for both, since the learning journal records who accepted what.
+- `learning/run` (people only) journals `learnRequested`, naming work
+  sessions of the project or none, and starts the session's host. Prompts
+  to a learning session are refused.
+
+**What its host may do.** Its `host/register` returns `kind: learning`,
+no MCP tools, and `learnedFiles`: the project's memory and skills, each
+whole and exactly as on disk. Files a proposal couldn't replace are left
+out: not regular, reached through a symlink, in strive's home, or over
+64 KiB. `contextLoaded.learned` journals their digests.
+- It records turns, messages, summaries and `proposalMade`. Nothing else:
+  no gates, decisions or layouts, and no effects.
+- A work session's host can't record `proposalMade`.
+
 **The learner.** A learning session's host (`AgentConfig.kind` is
 `learning`, [ADR-0016](adrs/0016-trusted-learning.md)) runs the learner
 with the same turn machinery: a `learnRequested` entry is a turn's
@@ -233,6 +262,73 @@ prompt, as `userMessage` is for the coding agent.
   daemon's refusal. At most three are recorded a turn.
 - Read tools' output isn't journaled, so on resume their calls say to
   call them again.
+
+**A proposal.** On `proposalMade` the daemon, holding the project's lock:
+1. runs the static gate;
+2. takes `before`, the file as the learner was last shown it (none if it
+   wasn't there), from the latest `contextLoaded`. A host can't supply it;
+3. journals the proposal and every gate's `gateFinished` in one commit.
+   The proposal's id is its entry's seq.
+
+**The static gate** (`strive-learning` for the text, the daemon for the
+machine). Every finding is listed in the gate's detail:
+- **Path:** a skill name is 1 to 40 of `a-z0-9-`. The file resolves
+  inside the project's `.strive/` with no symlink on the way, is a regular
+  file if it exists, and isn't in strive's home (a project at `~`).
+- **Size:** memory ≤ 16 KiB, a skill ≤ 32 KiB.
+- **Form:** a skill's frontmatter names it and describes it; the summary
+  is one line; there is a rationale and a prediction.
+- **Secrets**, in the content, summary and rationale: key shapes (`sk-`,
+  GitHub, Slack, Google, AWS, private keys) and the stored API keys by
+  value. The detail never repeats the secret.
+- **Weakening strive:** phrases that bypass approvals, weaken the sandbox,
+  touch strive's own state or settings (its home, the journal, memory and
+  skills themselves), or tell the agent to ignore the user; piping a
+  download to a shell. The lists are broad on purpose: a false alarm
+  costs a look.
+- **Evidence:** at least one session. Each is a work session of this
+  project whose journal verifies, and each cited seq is one of its entries.
+
+The judge and replay gates (M9, M10) are journaled as skipped, saying
+they aren't built yet, or that the static check failed.
+
+**Status**, folded from the learning journal:
+
+| Status | When |
+| --- | --- |
+| `checking` | a gate has no verdict yet |
+| `failed` | a gate failed |
+| `ready` | every gate passed or was skipped |
+| `rejected` | a person rejected it |
+| `applied` | accepted and written (`proposalApplied`) |
+| `stale` | accepted, but the file wasn't as the learner saw it, so nothing was written |
+| `rolledBack` | an applied one, undone |
+
+Gates a crash cut short (a proposal with no verdicts) are run again on the
+next `proposal/list` or decision.
+
+**Deciding.** `proposal/decide` and `proposal/rollback` are people only,
+as approvals are. Both hold the file (as an agent's write does) and the
+project's directory against rewinds.
+- **Accept** works only on a `ready` proposal. If the file's digest is
+  still `before`, the daemon writes the content with a pinned write and
+  journals `proposalDecided` and `proposalApplied {before, after}`
+  together. Otherwise it journals the accept alone: `stale`.
+- **Reject** journals `proposalDecided`, for one not yet decided.
+- **Rollback** works on an `applied` proposal whose file is still `after`:
+  it writes `before` back, or removes a file that didn't exist, then
+  journals `proposalRolledBack`.
+- The file is written before its record. A crash between leaves the file
+  changed and the proposal `ready`; accepting it again finds the file
+  isn't `before` and marks it stale, so nothing is written twice.
+- A command a work session runs can change the file between the compare
+  and the write. Writes and edits the agent asks for can't: they wait for
+  the file.
+
+`strive learn` requests a run and follows the learning journal as
+`strive run` follows a turn, then lists what was proposed. `strive review`
+lists proposals, shows one (its diff against `before`, evidence,
+prediction and checks) and accepts, rejects or rolls it back.
 
 ## The desktop app
 

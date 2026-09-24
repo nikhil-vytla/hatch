@@ -1,0 +1,16 @@
+[package]
+name = "strive-learning"
+description = "Trusted learning: where proposals write, the static gate's text checks, and proposal status."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+strive-proto.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true
+
+[lints]
+workspace = true

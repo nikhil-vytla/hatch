@@ -65,58 +65,83 @@ pub async fn run(c: &mut Client, opts: Options) -> Result<ExitCode> {
     if !opts.json {
         eprintln!("strive: session {id} (strive log {id} shows it again)");
     }
+    let follow = Follow { home: &opts.home, id: &id, shown, prompt, json: opts.json, who: "the agent" };
+    Ok(follow.until_turn_ends(c).await?.0)
+}
 
-    let mut turn: Option<u64> = None;
-    let started = tokio::time::Instant::now();
-    let mut interrupted = false;
-    loop {
-        let note = tokio::select! {
-            n = c.notification() => n?,
-            _ = tokio::signal::ctrl_c(), if !interrupted => {
-                interrupted = true;
-                c.request::<SessionInterrupt>(SessionRef { id: id.clone() }).await?;
+/// Following a session this client is attached to, as it happens.
+pub struct Follow<'a> {
+    /// strive's home, where the session's host log is.
+    pub home: &'a std::path::Path,
+    pub id: &'a str,
+    /// Entries up to this seq were shown already.
+    pub shown: u64,
+    /// The prompt (or learning request) whose turn to follow.
+    pub prompt: u64,
+    pub json: bool,
+    /// Who runs the turn, for a message when it never starts.
+    pub who: &'a str,
+}
+
+impl Follow<'_> {
+    /// Shows each new entry until the turn that took the prompt ends; how it
+    /// ended, and the entries shown.
+    pub async fn until_turn_ends(&self, c: &mut Client) -> Result<(ExitCode, Vec<Entry>)> {
+        let Self { home, id, shown, prompt, json, who } = *self;
+        let mut seen = Vec::new();
+        let mut turn: Option<u64> = None;
+        let started = tokio::time::Instant::now();
+        let mut interrupted = false;
+        loop {
+            let note = tokio::select! {
+                n = c.notification() => n?,
+                _ = tokio::signal::ctrl_c(), if !interrupted => {
+                    interrupted = true;
+                    c.request::<SessionInterrupt>(SessionRef { id: id.to_string() }).await?;
+                    continue;
+                }
+                () = tokio::time::sleep_until(started + START_TIMEOUT), if turn.is_none() => {
+                    let log = home.join("sessions").join(id).join("host.log");
+                    let tail = std::fs::read_to_string(&log).unwrap_or_default();
+                    let lines: Vec<&str> = tail.lines().collect();
+                    let last = lines.get(lines.len().saturating_sub(8)..).unwrap_or_default();
+                    bail!(
+                        "{who} didn't start within {}s (see `strive doctor`); {} ends:\n{}",
+                        START_TIMEOUT.as_secs(),
+                        log.display(),
+                        if last.is_empty() { "(nothing: the host may not have started at all)".to_string() } else { last.join("\n") }
+                    );
+                }
+            };
+            if note.method.as_deref() != Some("session/entry") {
                 continue;
             }
-                        () = tokio::time::sleep_until(started + START_TIMEOUT), if turn.is_none() => {
-                let log = opts.home.join("sessions").join(&id).join("host.log");
-                let tail = std::fs::read_to_string(&log).unwrap_or_default();
-                let lines: Vec<&str> = tail.lines().collect();
-                let last = lines.get(lines.len().saturating_sub(8)..).unwrap_or_default();
-                bail!(
-                    "the agent didn't start within {}s (see `strive doctor`); {} ends:\n{}",
-                    START_TIMEOUT.as_secs(),
-                    log.display(),
-                    if last.is_empty() { "(nothing: the host may not have started at all)".to_string() } else { last.join("\n") }
-                );
+            let entry: SessionEntryNotification =
+                serde_json::from_value(note.params.unwrap_or_default()).context("a session/entry notification")?;
+            if entry.session_id != id {
+                continue;
             }
-        };
-        if note.method.as_deref() != Some("session/entry") {
-            continue;
-        }
-        let entry: SessionEntryNotification =
-            serde_json::from_value(note.params.unwrap_or_default()).context("a session/entry notification")?;
-        if entry.session_id != id {
-            continue;
-        }
-        let entry = entry.entry;
-        if entry.seq <= shown {
-            continue; // shown from the attach already
-        }
-        show(&entry, opts.json)?;
-        match &entry.event {
-            // The turn that took this run's prompt.
-            Event::TurnStarted { turn: n, through_seq }
-                if through_seq.is_none_or(|s| s >= prompt) && turn.is_none() =>
-            {
-                turn = Some(*n);
-                // An interrupt reaches only a host that is listening: one sent
-                // before the turn began may have found none, so send it again.
-                if interrupted {
-                    c.request::<SessionInterrupt>(SessionRef { id: id.clone() }).await?;
+            let entry = entry.entry;
+            if entry.seq <= shown {
+                continue; // shown from the attach already
+            }
+            show(&entry, json)?;
+            seen.push(entry.clone());
+            match &entry.event {
+                // The turn that took this prompt.
+                Event::TurnStarted { turn: n, through_seq }
+                    if through_seq.is_none_or(|s| s >= prompt) && turn.is_none() =>
+                {
+                    turn = Some(*n);
+                    // An interrupt reaches only a host that is listening: one sent
+                    // before the turn began may have found none, so send it again.
+                    if interrupted {
+                        c.request::<SessionInterrupt>(SessionRef { id: id.to_string() }).await?;
+                    }
                 }
+                Event::TurnEnded { turn: n, reason } if Some(*n) == turn => return Ok((exit_code(reason), seen)),
+                _ => {}
             }
-            Event::TurnEnded { turn: n, reason } if Some(*n) == turn => return Ok(exit_code(reason)),
-            _ => {}
         }
     }
 }
