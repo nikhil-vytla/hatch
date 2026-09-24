@@ -6,13 +6,23 @@
  */
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { gunzipSync } from "node:zlib";
 import { join, resolve } from "node:path";
-import { score, argmax } from "../score";
+import { z } from "zod";
+import { score } from "../score";
+import { PALETTE } from "./palette";
 import { bootstrap, bootstrapMany } from "./bootstrap";
 import { heuristic, randomPlayer, TetrisArena, type Contestant as Player } from "../tetris";
 import { perfectReader } from "../tetris-framings";
-import type { ArenaIndex, Card, CardContestant, Estimate, MetricDef, RunSet } from "./schema";
+import { timedReplaySchema } from "./chunks";
+import {
+  arenaIndexSchema,
+  type ArenaIndex,
+  type Card,
+  type CardContestant,
+  type Estimate,
+  type MetricDef,
+  type RunSet,
+} from "./schema";
 import { readRecord } from "../../../../experience-prototypes/scripts/records";
 import { CASES, comparePreferences } from "../../../../cafe-jev/cases";
 import {
@@ -27,6 +37,146 @@ import {
 } from "../../../../cafe-jev/engine";
 import { keywordAnswers, priorAnswers, tokensFor } from "../cafe-baselines";
 
+// ---------------------------------------------------------------- inputs
+// Every recording and study file is parsed here. Where a chunk echoes its input,
+// the schema's key order follows the file, so the chunk keeps the same bytes.
+
+const studySchema = z.object({
+  provenance: z.object({ revision: z.string(), license: z.string() }),
+  hardware: z.string(),
+  workflows: z.array(z.string()),
+  models: z.array(
+    z.object({
+      id: z.string(),
+      name: z.string(),
+      url: z.string().nullish(),
+      case_latency_ms: z.object({ median: z.number() }).nullish(),
+    }),
+  ),
+  cases: z.array(
+    z.object({
+      id: z.string(),
+      workflow: z.string(),
+      /** Shown as JSON on the case view, never interpreted. */
+      state: z.unknown(),
+      questions: z.array(
+        z.object({
+          key: z.string(),
+          type: z.string(),
+          instructions: z.string(),
+          keys: z.array(z.string()),
+          options: z.array(z.string()).optional(),
+          target: z.array(z.number()),
+          predictions: z.record(z.string(), z.array(z.number())),
+        }),
+      ),
+    }),
+  ),
+});
+
+type StudyQuestion = z.infer<typeof studySchema>["cases"][number]["questions"][number];
+
+const wireAnswerSchema = z.object({
+  value: z.union([z.string(), z.number()]),
+  probabilities: z.record(z.string(), z.number()).nullish(),
+  confidence: z.number().nullish(),
+});
+
+/** One recorded turn exchange; echoed into the turns replay chunks. */
+const turnsExchangeSchema = z.object({
+  seed: z.number(),
+  framing: z.string(),
+  pieceId: z.number(),
+  board: z.array(z.string()),
+  ms: z.number(),
+  response: z.looseObject({ answers: z.record(z.string(), wireAnswerSchema) }).optional(),
+  error: z.string().optional(),
+});
+
+const turnsSummarySchema = z.object({
+  games: z.array(
+    z.object({
+      seed: z.number(),
+      lanes: z.array(
+        z.object({
+          framing: z.string(),
+          name: z.string().optional(),
+          lines: z.number(),
+          pieces: z.number(),
+          status: z.string(),
+        }),
+      ),
+    }),
+  ),
+});
+
+const realtimeDesignSchema = z.enum([
+  "landing-choice",
+  "spot-clean",
+  "spot-clean-cached",
+  "spot-clean-confident",
+]);
+
+type RealtimeDesign = z.infer<typeof realtimeDesignSchema>;
+
+const realtimeRunSchema = z.object({
+  games: z.array(
+    z.object({
+      seed: z.number(),
+      design: realtimeDesignSchema,
+      worldMs: z.number(),
+      lines: z.number(),
+      failed: z.number(),
+      memoryHits: z.number().nullish(),
+      /** Echoed into the timed replay chunks; the site parses them with the same schema. */
+      events: timedReplaySchema.shape.events,
+    }),
+  ),
+});
+
+const cafeRecordSchema = z.object({
+  manifest: z.object({ created: z.string() }),
+  result: z.object({
+    menuRevision: z.string(),
+    rows: z.array(
+      z.object({
+        id: z.string(),
+        response: z.object({
+          answers: z.record(
+            z.string(),
+            z.object({
+              value: z.string(),
+              confidence: z.number().optional(),
+              probabilities: z.record(z.string(), z.number()).optional(),
+            }),
+          ),
+        }),
+      }),
+    ),
+  }),
+});
+
+type CafeRow = z.infer<typeof cafeRecordSchema>["result"]["rows"][number];
+
+const probabilityMap = z.record(z.string(), z.number());
+
+/** Echoed into robustness.rows.json. */
+const robustnessSchema = z.object({
+  rows: z.array(
+    z.object({
+      seed: z.number(),
+      pieceId: z.number(),
+      sentences: z.array(z.string()),
+      original: probabilityMap.nullish(),
+      again: probabilityMap.nullish(),
+      reversed: probabilityMap.nullish(),
+      separate: probabilityMap.nullish(),
+    }),
+  ),
+});
+
+const readJson = (path: string) => JSON.parse(readFileSync(path, "utf8"));
+
 const here = resolve(import.meta.dir, "../..");
 
 const lab = resolve(here, "../..");
@@ -35,19 +185,19 @@ const recordings = resolve(here, "recordings");
 
 const sha = (s: string) => createHash("sha256").update(s).digest("hex");
 
-const canonical = (o: Record<string, unknown>) =>
+const canonical = (o: RunSet["protocol"]) =>
   JSON.stringify(
     Object.keys(o)
       .sort()
       .map((k) => [k, o[k]]),
   );
 
-const readJsonl = (path: string) =>
+const readJsonl = <T>(path: string, schema: z.ZodType<T>) =>
   readFileSync(path, "utf8")
     .trim()
     .split("\n")
     .filter(Boolean)
-    .map((l) => JSON.parse(l));
+    .map((l) => schema.parse(JSON.parse(l)));
 
 const round = (x: number, d = 4) => Math.round(x * 10 ** d) / 10 ** d;
 
@@ -61,19 +211,20 @@ const median = (xs: number[]) => {
 const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / (xs.length || 1);
 
 const COLORS = {
-  jev: "#1f6f4a",
-  jev2: "#3f9a6b",
-  jev3: "#86c29a",
-  jev4: "#b7dcc2",
-  laya: "#3d5a99",
-  laya2: "#7a94cf",
-  laya3: "#b3c3e8",
-  qwen: "#9b5a2e",
-  qwen2: "#cf9a70",
-  smol: "#8c6d9f",
-  code: "#6b6b6b",
-  code2: "#9a9a9a",
-  code3: "#c4c4c4",
+  jev: PALETTE.jev,
+  jev2: PALETTE.jevTeal,
+  jev3: PALETTE.jevOlive,
+  jev4: PALETTE.jevMoss,
+  laya: PALETTE.laya,
+  laya2: PALETTE.layaIndigo,
+  laya3: PALETTE.layaSlate,
+  qwen: PALETTE.qwen,
+  qwen2: PALETTE.qwenSand,
+  qwen3: PALETTE.qwenPlum,
+  smol: PALETTE.small,
+  code: PALETTE.code,
+  code2: PALETTE.codeMid,
+  code3: PALETTE.codeLight,
 };
 
 function runSet(
@@ -97,31 +248,32 @@ function runSet(
   };
 }
 
-const perSeed = (values: { item: string; value: number }[], of?: number): Estimate => ({
-  value: mean(values.map((v) => v.value)),
-  n: values.length,
-  perItem: values,
-  method: "per-seed",
-  ...(of && values.length < of ? { coverage: { covered: values.length, of } } : {}),
-});
+const perSeed = (values: { item: string; value: number }[], of?: number): Estimate => {
+  const e: Estimate = {
+    value: mean(values.map((v) => v.value)),
+    n: values.length,
+    perItem: values,
+    method: "per-seed",
+  };
+
+  if (of && values.length < of) e.coverage = { covered: values.length, of };
+
+  return e;
+};
+
+/** metric → estimate, for one contestant. */
+type Estimates = Card["results"][string];
 
 // ---------------------------------------------------------------- the typed-decisions study
 function studyCard(out: string): Card {
-  const doc = JSON.parse(
-    readFileSync(
-      resolve(here, "../../experience-prototypes/public/data/local-models.json"),
-      "utf8",
-    ),
-  ).result;
+  const doc = studySchema.parse(
+    readJson(resolve(here, "../../experience-prototypes/public/data/local-models.json")).result,
+  );
 
-  const models: any[] = doc.models;
+  const models = doc.models;
 
-  const kind = (id: string) =>
-    (id === "jev"
-      ? "hosted"
-      : id === "uniform" || id === "train-prior"
-        ? "code"
-        : "local") as CardContestant["kind"];
+  const kind = (id: string): CardContestant["kind"] =>
+    id === "jev" ? "hosted" : id === "uniform" || id === "train-prior" ? "code" : "local";
 
   const color = (id: string) =>
     ({
@@ -131,7 +283,7 @@ function studyCard(out: string): Card {
       "laya-base": COLORS.laya3,
       "Qwen3-4B-Instruct-2507-4bit": COLORS.qwen,
       "Qwen3-0.6B-4bit": COLORS.qwen2,
-      "Qwen3-0.6B-4bit-sequence": "#e2c1a3",
+      "Qwen3-0.6B-4bit-sequence": COLORS.qwen3,
       "SmolLM2-360M-Instruct": COLORS.smol,
       "train-prior": COLORS.code,
       uniform: COLORS.code3,
@@ -194,9 +346,9 @@ function studyCard(out: string): Card {
   ];
 
   // Columnar targets, aligned row by row with every prediction chunk.
-  const rows: { c: number; q: any; wf: string; type: string }[] = [];
-  doc.cases.forEach((c: any, ci: number) =>
-    c.questions.forEach((q: any) => rows.push({ c: ci, q, wf: c.workflow, type: q.type })),
+  const rows: { c: number; q: StudyQuestion; wf: string; type: string }[] = [];
+  doc.cases.forEach((c, ci) =>
+    c.questions.forEach((q) => rows.push({ c: ci, q, wf: c.workflow, type: q.type })),
   );
 
   const byCase = (filter: (r: (typeof rows)[number]) => boolean) => {
@@ -226,7 +378,9 @@ function studyCard(out: string): Card {
   }
 
   const stats = (id: string, sample: number[]) => {
-    const f = facts.get(id)!;
+    const f = facts.get(id);
+
+    if (!f) throw new Error(`No per-decision facts for ${id}`);
 
     let hits = 0,
       br = 0,
@@ -259,15 +413,15 @@ function studyCard(out: string): Card {
     return { agreement: hits / n, brier: br / n, confidentWrong: cw / n, ece };
   };
 
-  const estimate = (id: string, idx: number[][]): Record<string, Estimate> => {
+  const estimate = (id: string, idx: number[][]) => {
     const point = stats(id, idx.flat()),
       n = idx.length;
 
     const intervals = bootstrapMany(idx, (s) => stats(id, s), 1000);
-    const ci = (k: keyof typeof point) => intervals[k];
+    const ci = (k: keyof typeof point) => intervals.get(k);
     const m = models.find((x) => x.id === id);
 
-    return {
+    const out: Estimates = {
       agreement: { value: point.agreement, n, ...ci("agreement"), method: "bootstrap-case" },
       ece: { value: point.ece, n, ...ci("ece"), method: "bootstrap-case" },
       brier: { value: point.brier, n, ...ci("brier"), method: "bootstrap-case" },
@@ -277,10 +431,11 @@ function studyCard(out: string): Card {
         ...ci("confidentWrong"),
         method: "bootstrap-case",
       },
-      ...(m?.case_latency_ms
-        ? { latency: { value: m.case_latency_ms.median, n, method: "none" as const } }
-        : {}),
     };
+
+    if (m?.case_latency_ms) out.latency = { value: m.case_latency_ms.median, n, method: "none" };
+
+    return out;
   };
 
   const all = byCase(() => true);
@@ -319,7 +474,7 @@ function studyCard(out: string): Card {
       type: r.type,
       wf: r.wf,
       keys: r.q.keys,
-      target: r.q.target.map((x: number) => round(x)),
+      target: r.q.target.map((x) => round(x)),
     })),
   };
 
@@ -328,11 +483,11 @@ function studyCard(out: string): Card {
     join(out, "typed-decisions.cases.json"),
     JSON.stringify({
       schema: "arena.cases/1",
-      cases: doc.cases.map((c: any) => ({
+      cases: doc.cases.map((c) => ({
         id: c.id,
         workflow: c.workflow,
         state: c.state,
-        questions: c.questions.map((q: any) => ({
+        questions: c.questions.map((q) => ({
           key: q.key,
           type: q.type,
           instructions: q.instructions,
@@ -351,7 +506,7 @@ function studyCard(out: string): Card {
       JSON.stringify({
         schema: "arena.preds/1",
         contestant: m.id,
-        p: rows.map((r) => r.q.predictions[m.id].map((x: number) => round(x))),
+        p: rows.map((r) => r.q.predictions[m.id].map((x) => round(x))),
       }),
     );
   }
@@ -484,11 +639,11 @@ const GAME_METRICS: MetricDef[] = [
 ];
 
 async function turnsCard(out: string): Promise<Card> {
-  const a = readJsonl(join(recordings, "tetris-framings.replay.jsonl")),
-    aSum = JSON.parse(readFileSync(join(recordings, "tetris-framings-summary.json"), "utf8"));
+  const a = readJsonl(join(recordings, "tetris-framings.replay.jsonl"), turnsExchangeSchema),
+    aSum = turnsSummarySchema.parse(readJson(join(recordings, "tetris-framings-summary.json")));
 
-  const b = readJsonl(join(recordings, "turns-more-seeds.replay.jsonl")),
-    bSum = JSON.parse(readFileSync(join(recordings, "turns-more-seeds-summary.json"), "utf8"));
+  const b = readJsonl(join(recordings, "turns-more-seeds.replay.jsonl"), turnsExchangeSchema),
+    bSum = turnsSummarySchema.parse(readJson(join(recordings, "turns-more-seeds-summary.json")));
 
   const protocol = {
     game: "tetris",
@@ -539,17 +694,18 @@ async function turnsCard(out: string): Promise<Card> {
   ] as const)
     for (const g of sum.games)
       for (const lane of g.lanes) {
-        const framing = lane.framing as string;
+        const framing = lane.framing;
 
-        if (!framing || framing.startsWith("Code")) continue;
+        // Code lanes recorded beside Jev (e.g. "heuristic-0") are recomputed below.
+        if (!framing || framing.startsWith("Code") || lane.name?.startsWith("Code")) continue;
         const id = `jev.${framing}`;
         (games[id] ??= {})[g.seed] = {
           lines: lane.lines,
           pieces: lane.pieces,
           over: lane.status === "over",
           ms: rows
-            .filter((x: any) => x.seed === g.seed && x.framing === framing && !x.error)
-            .map((x: any) => x.ms),
+            .filter((x) => x.seed === g.seed && x.framing === framing && !x.error)
+            .map((x) => x.ms),
         };
       }
 
@@ -608,7 +764,7 @@ async function turnsCard(out: string): Promise<Card> {
   for (const [id, per] of Object.entries(replay))
     for (const [seed, path] of Object.entries(per)) {
       const framing = id.slice(4),
-        rows = [...a, ...b].filter((x: any) => x.framing === framing && String(x.seed) === seed);
+        rows = [...a, ...b].filter((x) => x.framing === framing && String(x.seed) === seed);
 
       writeFileSync(
         join(out, path),
@@ -621,7 +777,7 @@ async function turnsCard(out: string): Promise<Card> {
     name: string,
     short: string,
     kind: CardContestant["kind"],
-    color: string,
+    color: CardContestant["color"],
     def: boolean,
     runSets: string[],
     policy?: string,
@@ -721,7 +877,7 @@ async function turnsCard(out: string): Promise<Card> {
 
 // ---------------------------------------------------------------- Tetris, real time
 async function realtimeCard(out: string): Promise<Card> {
-  const load = (f: string) => JSON.parse(readFileSync(join(recordings, f), "utf8"));
+  const load = (f: string) => realtimeRunSchema.parse(readJson(join(recordings, f)));
 
   const runs = [
     {
@@ -769,50 +925,46 @@ async function realtimeCard(out: string): Promise<Card> {
 
   const contestants: CardContestant[] = [];
 
-  const names: Record<string, [string, string]> = {
+  const names = {
     "landing-choice": ["Jev · pick one landing", "Pick one landing"],
     "spot-clean": ["Jev · judge each spot", "Judge each spot"],
     "spot-clean-cached": ["Jev · judge each spot, remembering all", "Remember all"],
     "spot-clean-confident": ["Jev · judge each spot, remembering confident", "Remember confident"],
-  };
+  } satisfies Record<RealtimeDesign, [string, string]>;
 
-  const colors: Record<string, string> = {
+  const colors = {
     "landing-choice": COLORS.qwen,
     "spot-clean": COLORS.jev,
     "spot-clean-cached": COLORS.jev4,
     "spot-clean-confident": COLORS.jev2,
-  };
+  } satisfies Record<RealtimeDesign, CardContestant["color"]>;
 
   runs.forEach((r, ri) => {
     const doc = load(r.file),
       suffix = r.retry === "fixed-400ms" ? "fixed" : "backoff";
 
-    const designs = [...new Set(doc.games.map((g: any) => g.design))] as string[];
+    const designs = [...new Set(doc.games.map((g) => g.design))];
 
     for (const d of designs) {
       const id = `jev.${d}@${suffix}`,
-        games = doc.games.filter((g: any) => g.design === d);
+        games = doc.games.filter((g) => g.design === d);
 
       results[id] = {
-        lines: perSeed(games.map((g: any) => ({ item: String(g.seed), value: g.lines }))),
-        gameTime: perSeed(
-          games.map((g: any) => ({ item: String(g.seed), value: g.worldMs / 1000 })),
-        ),
-        failed: perSeed(games.map((g: any) => ({ item: String(g.seed), value: g.failed }))),
+        lines: perSeed(games.map((g) => ({ item: String(g.seed), value: g.lines }))),
+        gameTime: perSeed(games.map((g) => ({ item: String(g.seed), value: g.worldMs / 1000 }))),
+        failed: perSeed(games.map((g) => ({ item: String(g.seed), value: g.failed }))),
         decisionMs: {
           value: median(
-            games.flatMap((g: any) =>
-              g.events
-                .filter((e: any) => e.status === "applied" && e.latencyMs != null)
-                .map((e: any) => e.latencyMs),
+            games.flatMap((g) =>
+              g.events.flatMap((e) =>
+                e.status === "applied" && e.latencyMs !== undefined ? [e.latencyMs] : [],
+              ),
             ),
           ),
           n: games.length,
           method: "none",
         },
-        memory: perSeed(
-          games.map((g: any) => ({ item: String(g.seed), value: g.memoryHits ?? 0 })),
-        ),
+        memory: perSeed(games.map((g) => ({ item: String(g.seed), value: g.memoryHits ?? 0 }))),
       };
 
       for (const g of games) {
@@ -916,11 +1068,11 @@ async function realtimeCard(out: string): Promise<Card> {
  * each case, written before the calls but not independently annotated.
  */
 export function cafeCard(out: string): Card {
-  const record = readRecord(resolve(lab, "cafe-jev/cafe.jsonl")),
+  const record = cafeRecordSchema.parse(readRecord(resolve(lab, "cafe-jev/cafe.jsonl"))),
     doc = record.result,
-    recordedOn = String(record.manifest.created).slice(0, 10);
+    recordedOn = record.manifest.created.slice(0, 10);
 
-  const rows: any[] = doc.rows;
+  const rows = doc.rows;
 
   const gold = (c: (typeof CASES)[number], f: Field) => {
     const e = c.expected[f];
@@ -931,15 +1083,15 @@ export function cafeCard(out: string): Card {
   };
 
   // A per-field prior fitted on these same cases: how often each token is the expected one.
-  const prior = Object.fromEntries(
-    FIELDS.map((f) => {
-      const counts = Object.fromEntries(tokensFor(f).map((t) => [t, 0]));
+  const fitPrior = (f: Field) => {
+    const counts = Object.fromEntries(tokensFor(f).map((t) => [t, 0]));
 
-      for (const c of CASES) counts[gold(c, f)]++;
+    for (const c of CASES) counts[gold(c, f)]++;
 
-      return [f, Object.fromEntries(Object.entries(counts).map(([t, n]) => [t, n / CASES.length]))];
-    }),
-  ) as Record<Field, Record<string, number>>;
+    return Object.fromEntries(Object.entries(counts).map(([t, n]) => [t, n / CASES.length]));
+  };
+
+  const prior = new Map(FIELDS.map((f) => [f, fitPrior(f)]));
 
   const contestants = [
     {
@@ -971,16 +1123,20 @@ export function cafeCard(out: string): Card {
     },
   ];
 
-  const caseRows = CASES.map((c) => ({ c, row: rows.find((r) => r.id === c.id)! }));
+  const caseRows = CASES.map((c) => {
+    const row = rows.find((r) => r.id === c.id);
 
-  if (caseRows.some((x) => !x.row)) throw new Error("A declared café case has no recorded row");
+    if (!row) throw new Error("A declared café case has no recorded row");
 
-  const answersFor = (id: string, c: (typeof CASES)[number], row: any) =>
+    return { c, row };
+  });
+
+  const answersFor = (id: string, c: (typeof CASES)[number], row: CafeRow) =>
     id === "jev"
       ? row.response.answers
       : id === "code.keywords"
         ? keywordAnswers(c.input)
-        : priorAnswers(c.input, prior);
+        : priorAnswers(c.input, (f) => prior.get(f) ?? fitPrior(f));
 
   type Outcome = {
     exact: boolean;
@@ -997,12 +1153,12 @@ export function cafeCard(out: string): Card {
   for (const ct of contestants)
     outcomes[ct.id] = caseRows.map(({ c, row }) => {
       const answers = answersFor(ct.id, c, row),
-        decision = interpret({ answers } as any, c.input);
+        decision = interpret({ answers }, c.input);
 
       const cmp = comparePreferences(decision.preferences, c.expected);
       const expectedFeasible = candidates(c.expected, c.input.inventory);
 
-      const same = (a: any[], b: any[]) =>
+      const same = <T>(a: T[], b: T[]) =>
         JSON.stringify(a.map((r) => JSON.stringify(r)).sort()) ===
         JSON.stringify(b.map((r) => JSON.stringify(r)).sort());
 
@@ -1117,7 +1273,7 @@ export function cafeCard(out: string): Card {
         {
           value: v,
           n: idx.length,
-          ...ci[k as keyof typeof point],
+          ...ci.get(k),
           method: "bootstrap-case" as const,
         },
       ]),
@@ -1169,9 +1325,9 @@ export function cafeCard(out: string): Card {
           suggested: Object.fromEntries(
             contestants.map((ct) => [ct.short, outcomes[ct.id][ci].suggested ?? "nothing"]),
           ),
-          breaksARequirement: contestants
-            .filter((ct) => outcomes[ct.id][ci].violation)
-            .map((ct) => ct.short),
+          breaksARequirement: contestants.flatMap((ct) =>
+            outcomes[ct.id][ci].violation ? [ct.short] : [],
+          ),
         },
         questions: FIELDS.map((f) => ({
           key: f,
@@ -1231,25 +1387,30 @@ export function cafeCard(out: string): Card {
 
 // ---------------------------------------------------------------- robustness
 function robustnessCard(out: string): Card {
-  const doc = JSON.parse(
-    readFileSync(join(recordings, "robustness-position-summary.json"), "utf8"),
+  const doc = robustnessSchema.parse(
+    readJson(join(recordings, "robustness-position-summary.json")),
   );
 
-  const rows: any[] = doc.rows;
+  const rows = doc.rows;
 
-  const variants: [string, string, string][] = [
-    ["again", "Asked again, same order", COLORS.code2],
-    ["reversed", "Reversed order, labels reassigned", COLORS.jev2],
-    ["separate", "Each sentence asked alone", COLORS.qwen],
+  const variants: ["again" | "reversed" | "separate", string, CardContestant["color"]][] = [
+    ["again", "Asked again, same order", PALETTE.conditionA],
+    ["reversed", "Reversed order, labels reassigned", PALETTE.conditionB],
+    ["separate", "Each sentence asked alone", PALETTE.conditionC],
   ];
 
   const results: Card["results"] = {};
 
   for (const [key] of variants) {
-    const usable = rows.filter((r) => r.original && r[key]);
+    const usable = rows.flatMap((r) => {
+      const original = r.original,
+        variant = r[key];
+
+      return original && variant ? [{ sentences: r.sentences, original, variant }] : [];
+    });
 
     const perBoard = usable.map((r) =>
-      r.sentences.map((s: string) => Math.abs(r.original[s] - r[key][s])),
+      r.sentences.map((s) => Math.abs(r.original[s] - r.variant[s])),
     );
 
     const best = (j: Record<string, number>, order: string[]) =>
@@ -1264,15 +1425,15 @@ function robustnessCard(out: string): Card {
         method: "bootstrap-case",
       },
       moved: {
-        value: all.filter((d: number) => d > 0.2).length / (all.length || 1),
+        value: all.filter((d) => d > 0.2).length / (all.length || 1),
         n: usable.length,
         ...bootstrap(perBoard, (s) => s.filter((d) => d > 0.2).length / (s.length || 1), 1000),
         method: "bootstrap-case",
       },
       sameChoice: {
         value:
-          usable.filter((r) => best(r.original, r.sentences) === best(r[key], r.sentences)).length /
-          (usable.length || 1),
+          usable.filter((r) => best(r.original, r.sentences) === best(r.variant, r.sentences))
+            .length / (usable.length || 1),
         n: usable.length,
         method: "count",
       },
@@ -1342,6 +1503,73 @@ function robustnessCard(out: string): Card {
   };
 }
 
+/** Metrics that measure a model call; code players make none, so they are omitted for them. */
+const TIMING = new Set(["decisionMs", "latency", "failed", "memory"]);
+
+const TRADEOFF = new Map<string, [string, string]>([
+  ["tetris-turns", ["decisionMs", "lines"]],
+  ["tetris-realtime", ["gameTime", "lines"]],
+  ["spot-robustness", ["meanChange", "sameChoice"]],
+  ["typed-decisions", ["ece", "agreement"]],
+  ["cafe", ["violation", "exact"]],
+]);
+
+const INSIGHTS = new Map(
+  Object.entries({
+    "tetris-turns":
+      "Asking Jev to judge each spot in a sentence, and letting code compare, cleared about twice as many lines as asking it to pick one landing from a list. It still trails the hand-written planner by about two lines.",
+    "tetris-realtime":
+      "With gravity running, judging each spot still clears the most lines, but rate limits stretch the game. Remembering only confident judgements keeps most of the lines in about half the time.",
+    "spot-robustness":
+      "Asking twice barely moves Jev's judgement; reversing the order never changed a chosen spot. Asking about spots one at a time moves judgements most, so batching helps as well as saving requests.",
+    "typed-decisions":
+      "Jev agrees with the reference most often and its stated confidence tracks how often it agrees. Qwen3-4B, scored on its label probabilities, is often confident and wrong.",
+    cafe: "Jev never served a drink that breaks a stated requirement. The keyword reader, written after reading these exact cases, gets more preferences exactly right but breaks a requirement in 3.9% of cases.",
+  }),
+);
+
+/** A readable upper bound for a scale: 1, 2, 2.5 or 5 times a power of ten. */
+function niceCeil(v: number) {
+  if (v <= 0) return 1;
+  const p = 10 ** Math.floor(Math.log10(v));
+
+  return ([1, 2, 2.5, 5, 10].find((m) => m * p >= v) ?? 10) * p;
+}
+
+function finalize(card: Card): Card {
+  const code = new Set(card.contestants.filter((c) => c.kind === "code").map((c) => c.id));
+
+  const tables = [
+    card.results,
+    ...Object.values(card.slices ?? {}).flatMap((f) => Object.values(f)),
+  ];
+
+  for (const table of tables)
+    for (const [cid, perMetric] of Object.entries(table))
+      if (code.has(cid)) for (const m of TIMING) delete perMetric[m];
+
+  const metrics = card.metrics.map((m) => {
+    const values = tables.flatMap((t) =>
+      Object.values(t).flatMap((pm) => {
+        const e = pm[m.id];
+
+        return e ? [e.value, e.hi ?? e.value, ...(e.perItem?.map((p) => p.value) ?? [])] : [];
+      }),
+    );
+
+    const domain: [number, number] =
+      m.unit === "%" ? [0, 1] : [0, niceCeil(Math.max(0, ...values.filter(Number.isFinite)))];
+
+    const out: MetricDef = { ...m, domain };
+
+    if (TIMING.has(m.id)) out.timing = true;
+
+    return out;
+  });
+
+  return { ...card, metrics, tradeoff: TRADEOFF.get(card.id), insight: INSIGHTS.get(card.id) };
+}
+
 export async function buildArena(outDir: string) {
   rmSync(outDir, { recursive: true, force: true });
   mkdirSync(outDir, { recursive: true });
@@ -1352,7 +1580,7 @@ export async function buildArena(outDir: string) {
     robustnessCard(outDir),
     studyCard(outDir),
     cafeCard(outDir),
-  ];
+  ].map(finalize);
 
   const runSets: RunSet[] = [
     runSet(
@@ -1382,7 +1610,8 @@ export async function buildArena(outDir: string) {
     cards,
   };
 
-  writeFileSync(join(outDir, "index.json"), JSON.stringify(index));
+  // Parse our own output: a card that does not match the schema fails the build.
+  writeFileSync(join(outDir, "index.json"), JSON.stringify(arenaIndexSchema.parse(index)));
 
   return index;
 }

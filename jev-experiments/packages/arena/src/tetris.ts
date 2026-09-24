@@ -305,7 +305,7 @@ export class TetrisArena {
       const p = lane.pending;
 
       if (p && p.answer && p.receiveAt !== undefined && p.receiveAt <= this.clockMs)
-        this.receive(lane, p);
+        this.receive(lane, p, p.answer);
     });
   }
   private track(lane: Lane) {
@@ -373,9 +373,10 @@ export class TetrisArena {
     if (!q) return;
     const entry = this.record(i, q);
     lane.nextRequestAt = this.clockMs + INTERVAL_MS;
-    const pending: Pending = { question: q, entry, abort: new AbortController() };
+    const abort = new AbortController();
+    const pending: Pending = { question: q, entry, abort };
     lane.pending = pending;
-    const reply = lane.contestant.ask(q, "realtime", pending.abort!.signal);
+    const reply = lane.contestant.ask(q, "realtime", abort.signal);
 
     if (reply instanceof Promise) {
       const revision = lane.revision;
@@ -384,14 +385,15 @@ export class TetrisArena {
           if (lane.pending === pending && lane.revision === revision) {
             pending.answer = answer;
             pending.receiveAt = this.clockMs;
-            this.receive(lane, pending);
+            this.receive(lane, pending, answer);
           }
         },
         (error) => {
           if (lane.pending === pending && lane.revision === revision) {
-            pending.answer = { error: String(error?.message ?? error) };
+            const failure: Answer = { error: String(error?.message ?? error) };
+            pending.answer = failure;
             pending.receiveAt = this.clockMs;
-            this.receive(lane, pending);
+            this.receive(lane, pending, failure);
           }
         },
       );
@@ -405,14 +407,13 @@ export class TetrisArena {
       pending.answer = reply.answer;
       pending.receiveAt = reply.receiveAt;
 
-      if (reply.receiveAt <= this.clockMs) this.receive(lane, pending);
+      if (reply.receiveAt <= this.clockMs) this.receive(lane, pending, reply.answer);
     }
   }
-  private receive(lane: Lane, p: Pending) {
+  private receive(lane: Lane, p: Pending, a: Answer) {
     lane.pending = null;
 
-    const a = p.answer!,
-      q = p.question,
+    const q = p.question,
       latencyMs = a.latencyMs ?? this.clockMs - q.sentAt;
 
     if ("error" in a) {
@@ -519,28 +520,28 @@ export class TetrisArena {
       if (!r) continue;
       const { lane, q, entry, answer, missing } = r;
 
-      if (missing !== null) {
+      if (missing !== null || answer === null) {
         if (lane.recordingEnded === null) lane.recordingEnded = q.pieceId;
-        this.resolve(lane, entry, "missing", { reason: missing });
+        this.resolve(lane, entry, "missing", { reason: missing ?? "No answer" });
         command(lane.game, "drop");
         continue;
       }
 
-      if ("error" in answer!) {
+      if ("error" in answer) {
         this.resolve(lane, entry, "failed", {
-          reason: answer!.error,
-          latencyMs: answer!.latencyMs,
+          reason: answer.error,
+          latencyMs: answer.latencyMs,
         });
         command(lane.game, "drop");
         continue;
       }
 
-      const target = q.options.find((o) => o.id === (answer as any).choice);
+      const target = q.options.find((o) => o.id === answer.choice);
 
       if (!target) {
         this.resolve(lane, entry, "failed", {
           reason: "Answer is not one of the offered landings",
-          choice: (answer as any).choice,
+          choice: answer.choice,
         });
         command(lane.game, "drop");
         continue;
@@ -549,9 +550,9 @@ export class TetrisArena {
       for (const input of target.path) command(lane.game, input);
       this.resolve(lane, entry, "applied", {
         choice: target.id,
-        probabilities: (answer as any).probabilities,
-        confidence: (answer as any).confidence,
-        latencyMs: answer!.latencyMs,
+        probabilities: answer.probabilities,
+        confidence: answer.confidence,
+        latencyMs: answer.latencyMs,
       });
     }
   }
@@ -574,7 +575,9 @@ export function heuristic(
     name,
     source: "code",
     ask(q) {
-      const pick = chooseLanding(q.options)!;
+      const pick = chooseLanding(q.options);
+
+      if (!pick) throw new Error(`No reachable landing for piece ${q.pieceId}`);
 
       return {
         receiveAt: q.sentAt + delayMs,
@@ -617,7 +620,12 @@ export type RecordedEvent = {
   answer?: string;
   reason?: string;
   state: Question["state"];
-  response?: any;
+  response?: RecordedResponse;
+};
+
+/** The part of a recorded gateway response the replay reads. */
+type RecordedResponse = {
+  answers?: { decision?: { probabilities?: Probabilities; confidence?: number | null } };
 };
 
 const sameWorld = (a: Question["state"], b: Question["state"], includeTime: boolean) =>
@@ -649,7 +657,7 @@ export function recorded(
   const toAnswer = (e: RecordedEvent): Answer => {
     const d = e.response?.answers?.decision;
 
-    if (e.status === "failed" || typeof e.answer !== "string")
+    if (e.status === "failed" || e.answer === undefined)
       return { error: e.reason ?? "Provider failure in the recording", latencyMs: e.latencyMs };
 
     return {

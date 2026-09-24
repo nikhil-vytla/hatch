@@ -1,14 +1,29 @@
 import { describe, expect, test } from "bun:test";
+import { z } from "zod";
 import { TetrisArena, heuristic } from "./tetris";
-import { buildRequest, framedJev, spots, type Send } from "./tetris-framings";
+import {
+  buildRequest,
+  framedJev,
+  spots,
+  type Exchange,
+  type FramingId,
+  type Send,
+} from "./tetris-framings";
+
+type RecordedExchange = Exchange & { seed: number };
+
+type RecordedLane = { framing: FramingId; pieces: number; lines: number; score: number };
+
+const spotsState = z.object({ spots: z.record(z.string(), z.string()) });
 
 /** A perfect reader of the sentences: this bounds what the framing's information allows. */
 const idealReader: Send = async (body) => {
-  const state = body.state as any;
+  const state = spotsState.safeParse(body.state);
+  const sentences = state.success ? state.data.spots : {};
 
   const answers = Object.fromEntries(
     Object.entries(body.questions).map(([key, q]) => {
-      const s: string = state.spots?.[key] ?? "";
+      const s = sentences[key] ?? "";
 
       const holes = /no new holes/.test(s) ? 0 : 1,
         bump = ["no bump", "a small bump", "a big bump", "a tall tower"].findIndex((b) =>
@@ -41,7 +56,9 @@ async function play(contestants: ReturnType<typeof framedJev>[], pieces = 40, se
 describe("spot framings", () => {
   test("group landings by sentence and describe them in words", async () => {
     const arena = new TetrisArena(7, [heuristic()], "turns");
-    const q = (arena as any).question(0);
+    const q = arena["question"](0);
+
+    if (!q) throw new Error("The first piece has no question");
     const groups = spots(q);
     expect(groups.length).toBeGreaterThan(1);
     expect(groups.length).toBeLessThanOrEqual(q.options.length);
@@ -77,17 +94,17 @@ describe("recorded framing games", () => {
   for (const game of summary.games) {
     test(`replays seed ${game.seed} exactly in turns`, async () => {
       const { recordedFraming } = await import("./tetris-framings");
-      const mine = exchanges.filter((x: any) => x.seed === game.seed);
+      const mine = exchanges.filter((x: RecordedExchange) => x.seed === game.seed);
 
       const arena = new TetrisArena(
         game.seed,
-        game.lanes.map((l: any) => recordedFraming(mine, l.framing)),
+        game.lanes.map((l: RecordedLane) => recordedFraming(mine, l.framing)),
         "turns",
       );
 
       for (let i = 0; i < game.pieceLimit && !arena.over; i++) await arena.turn();
       expect(arena.lanes.map((l) => [l.game.pieces, l.game.lines, l.game.score])).toEqual(
-        game.lanes.map((l: any) => [l.pieces, l.lines, l.score]),
+        game.lanes.map((l: RecordedLane) => [l.pieces, l.lines, l.score]),
       );
       expect(arena.lanes.every((l) => l.stats.missing === 0)).toBe(true);
     });
@@ -97,19 +114,18 @@ describe("recorded framing games", () => {
 describe("remembering judgements", () => {
   test("asks only about new sentences and answers repeats from memory", async () => {
     const seen: number[] = [],
-      exchanges: any[] = [];
+      exchanges: Exchange[] = [];
 
     const counting: Send = async (body, signal) => {
       seen.push(Object.keys(body.questions).length);
-      const st = body.state as any;
 
+      // The reader only needs the sentences, which the cached framing puts in each question.
       return idealReader(
         {
           ...body,
           state: {
-            ...st,
             spots: Object.fromEntries(
-              Object.entries(body.questions).map(([k, q]) => [k, (q as any).instructions]),
+              Object.entries(body.questions).map(([k, q]) => [k, q.instructions]),
             ),
           },
         },
@@ -129,7 +145,7 @@ describe("remembering judgements", () => {
     expect(fromMemory).toBeGreaterThan(0);
     expect(exchanges.some((x) => !x.body && x.ms === 0)).toBe(true);
     expect(seen.reduce((a, b) => a + b, 0)).toBeLessThan(
-      exchanges.reduce((s, x) => s + Object.keys(x.judged).length, 0),
+      exchanges.reduce((s, x) => s + Object.keys(x.judged ?? {}).length, 0),
     );
   });
 });
@@ -169,7 +185,7 @@ describe("more seeds", () => {
     test(`replays seed ${game.seed} exactly in turns`, async () => {
       const { recordedFraming } = await import("./tetris-framings");
       const { heuristic } = await import("./tetris");
-      const mine = exchanges.filter((x: any) => x.seed === game.seed);
+      const mine = exchanges.filter((x: RecordedExchange) => x.seed === game.seed);
 
       const arena = new TetrisArena(
         game.seed,
@@ -184,7 +200,7 @@ describe("more seeds", () => {
 
       for (let i = 0; i < 40 && !arena.over; i++) await arena.turn();
       expect(arena.lanes.map((l) => [l.game.pieces, l.game.lines, l.game.score])).toEqual(
-        game.lanes.map((l: any) => [l.pieces, l.lines, l.score]),
+        game.lanes.map((l: RecordedLane) => [l.pieces, l.lines, l.score]),
       );
     });
   }
