@@ -6,7 +6,7 @@
 import { join } from "node:path";
 import { type Static, Type } from "@earendil-works/pi-ai";
 import type { AgentTool } from "@earendil-works/pi-agent-core";
-import { type AgentConfig, describeError, type Entry, type StriveClient } from "@strive/protocol";
+import { type AgentConfig, type Artifact, describeError, type Entry, type StriveClient } from "@strive/protocol";
 import type { AgentMode } from "./host";
 import { renderSession, renderSessions } from "./journal-view";
 import { NOT_RECORDED, notKept, PromptReader, proposalResult, type StaticGate } from "./learning-records";
@@ -84,17 +84,28 @@ What cost a session time and will come up again:
 
 End with a short plain report: which sessions you read (and how far), what you proposed and why, and what you considered and dropped. When you proposed nothing, say so plainly and say why: nothing recurred, it's already covered, or the evidence was too thin.`;
 
+/** A memory or skill file's text exactly as it is, if the daemon gave it to the learner. */
+function learned(config: AgentConfig, artifact: Artifact): string | undefined {
+  return config.learnedFiles?.find(
+    (f) =>
+      f.artifact.kind === artifact.kind &&
+      (f.artifact.kind === "memory" || (artifact.kind === "skill" && f.artifact.name === artifact.name)),
+  )?.text;
+}
+
 /** The learner's system prompt: its rules, then the project's current memory, instructions and skills. */
 export function learnerPrompt(config: AgentConfig): string {
   const memoryPath = join(config.cwd, MEMORY);
-  const memory = config.instructions.find((f) => f.path === memoryPath);
-  const others = config.instructions.filter((f) => f !== memory);
+  // The memory as it is on disk (what a proposal replaces), not as sessions
+  // load it: they see it under a label that isn't part of the file.
+  const memory = learned(config, { kind: "memory" });
+  const others = config.instructions.filter((f) => f.path !== memoryPath);
   const parts = [RULES.replace("{cwd}", config.cwd)];
 
   parts.push(
     memory === undefined
       ? `# Current memory (${MEMORY})\n\nThere is none yet. A memory proposal creates it.`
-      : `# Current memory (${MEMORY})\n\n${memory.text.trim()}`,
+      : `# Current memory (${MEMORY})\n\n${memory.trim()}`,
   );
 
   parts.push(
@@ -312,15 +323,17 @@ class Learner {
   }
 
   private artifact(artifact: Static<ReturnType<typeof artifactSchema>>): string {
-    if (artifact.kind === "memory") {
-      const memory = this.config.instructions.find((f) => f.path === join(this.config.cwd, MEMORY));
+    const text = learned(this.config, artifact);
 
-      return memory === undefined
+    if (artifact.kind === "memory")
+      return text === undefined
         ? `There is no ${MEMORY} yet. A memory proposal creates it.`
-        : `${MEMORY} as sessions load it now:\n\n${memory.text}`;
-    }
+        : `${MEMORY} exactly as it is now (a proposal replaces all of it):\n\n${text}`;
 
     const target = join(this.config.cwd, ".strive/skills", artifact.name, "SKILL.md");
+
+    if (text !== undefined) return `${target} exactly as it is now (a proposal replaces all of it):\n\n${text}`;
+
     const skill = this.config.skills.find((s) => s.name === artifact.name);
 
     if (skill === undefined) return `There is no skill named ${artifact.name}. A proposal for it creates ${target}.`;
@@ -331,7 +344,7 @@ class Learner {
       return `${artifact.name} is loaded from ${skill.path}, outside this project's .strive/skills. A proposal for it would add a second skill of that name at ${target}. Its frontmatter:\n\n${known}`;
 
     return [
-      `${target} exists. Only its frontmatter reaches the learner, not its steps:`,
+      `${target} exists, but its text didn't reach the learner (too large, or not a regular file). Only its frontmatter:`,
       "",
       known,
       "",

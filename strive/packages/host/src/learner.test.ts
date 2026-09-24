@@ -415,18 +415,25 @@ test("read_session reads only this project's work sessions", async () => {
   });
 });
 
-test("read_artifact shows the current memory, and says what it can't show of a skill", async () => {
+test("read_artifact shows memory and skills exactly as they are, and says what it can't show", async () => {
   const memory = "- Use `bun test packages/host` for the host tests: the root run needs a display.";
+  const release = "---\nname: release\ndescription: Cut a release.\n---\n1. `bun run build`\n2. Tag it.\n";
 
   const { model } = await learn({
     config: {
       instructions: [
         { path: `${CWD}/AGENTS.md`, text: "Use bun." },
-        { path: `${CWD}/.strive/memory.md`, text: memory },
+        // As sessions load it: under a label that isn't part of the file.
+        { path: `${CWD}/.strive/memory.md`, text: `Reviewed memory: ...\n\n${memory}` },
       ],
       skills: [
         { name: "release", description: "Cut a release.", path: `${CWD}/.strive/skills/release/SKILL.md` },
+        { name: "huge", description: "Too big to send.", path: `${CWD}/.strive/skills/huge/SKILL.md` },
         { name: "global", description: "Everywhere.", path: "/home/u/.strive/skills/global/SKILL.md" },
+      ],
+      learnedFiles: [
+        { artifact: { kind: "memory" }, text: memory },
+        { artifact: { kind: "skill", name: "release" }, text: release },
       ],
     },
     script: [
@@ -436,6 +443,7 @@ test("read_artifact shows the current memory, and says what it can't show of a s
           { id: "a2", name: "read_artifact", input: { artifact: { kind: "skill", name: "release" } } },
           { id: "a3", name: "read_artifact", input: { artifact: { kind: "skill", name: "deploy" } } },
           { id: "a4", name: "read_artifact", input: { artifact: { kind: "skill", name: "global" } } },
+          { id: "a5", name: "read_artifact", input: { artifact: { kind: "skill", name: "huge" } } },
         ],
       },
       { text: "done" },
@@ -443,14 +451,18 @@ test("read_artifact shows the current memory, and says what it can't show of a s
   });
 
   const r = toolResults(model.requests[1]);
-  expect(r.get("a1")?.text).toBe(`.strive/memory.md as sessions load it now:\n\n${memory}`);
-  expect(r.get("a2")?.text).toContain("Only its frontmatter reaches the learner, not its steps");
-  expect(r.get("a2")?.text).toContain("---\nname: release\ndescription: Cut a release.\n---");
-  expect(r.get("a2")?.text).toContain("don't propose a change to this skill");
+  expect(r.get("a1")?.text).toBe(
+    `.strive/memory.md exactly as it is now (a proposal replaces all of it):\n\n${memory}`,
+  );
+  expect(r.get("a2")?.text).toBe(
+    `${CWD}/.strive/skills/release/SKILL.md exactly as it is now (a proposal replaces all of it):\n\n${release}`,
+  );
   expect(r.get("a3")?.text).toBe(
     `There is no skill named deploy. A proposal for it creates ${CWD}/.strive/skills/deploy/SKILL.md.`,
   );
   expect(r.get("a4")?.text).toContain("outside this project's .strive/skills");
+  expect(r.get("a5")?.text).toContain("its text didn't reach the learner");
+  expect(r.get("a5")?.text).toContain("don't propose a change to this skill");
 });
 
 test("interrupting stops a learner turn", async () => {
@@ -641,9 +653,10 @@ test("the learner's system prompt states its rules, and gives the current memory
     config("http://x", {
       instructions: [
         { path: `${CWD}/AGENTS.md`, text: "Use bun, not npm." },
-        { path: `${CWD}/.strive/memory.md`, text: "- A remembered bullet: because." },
+        { path: `${CWD}/.strive/memory.md`, text: "Reviewed memory: ...\n\n- A remembered bullet: because." },
       ],
       skills: [{ name: "release", description: "Cut a release.", path: `${CWD}/.strive/skills/release/SKILL.md` }],
+      learnedFiles: [{ artifact: { kind: "memory" }, text: "- A remembered bullet: because." }],
     }),
   );
 
@@ -655,6 +668,8 @@ test("the learner's system prompt states its rules, and gives the current memory
   };
 
   expect(section("Current memory (.strive/memory.md)")).toContain("- A remembered bullet: because.");
+  // The file as it is, not the label sessions see it under: a proposal starts from this text.
+  expect(section("Current memory (.strive/memory.md)")).not.toContain("Reviewed memory");
   expect(section("Project instructions")).toContain(`## ${CWD}/AGENTS.md\n\nUse bun, not npm.`);
   expect(section("Project instructions")).not.toContain("remembered bullet");
   expect(section("Skills")).toContain(`- release: Cut a release. (${CWD}/.strive/skills/release/SKILL.md)`);
