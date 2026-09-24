@@ -939,6 +939,14 @@ async function realtimeCard(out: string): Promise<Card> {
     "spot-clean-confident": COLORS.jev2,
   } satisfies Record<RealtimeDesign, CardContestant["color"]>;
 
+  /** The fixed-retry run gets its own colours, so the same design from two protocols never matches. */
+  const fixedColors = {
+    "landing-choice": COLORS.qwen,
+    "spot-clean": COLORS.jev3,
+    "spot-clean-cached": COLORS.laya3,
+    "spot-clean-confident": COLORS.jev3,
+  } satisfies Record<RealtimeDesign, CardContestant["color"]>;
+
   runs.forEach((r, ri) => {
     const doc = load(r.file),
       suffix = r.retry === "fixed-400ms" ? "fixed" : "backoff";
@@ -984,11 +992,12 @@ async function realtimeCard(out: string): Promise<Card> {
       contestants.push({
         id,
         name: `${names[d][0]} · ${suffix === "fixed" ? "fixed retries" : "backoff"}`,
-        short: names[d][1],
+        // The earlier run's lanes carry their protocol so a mixed lineup stays legible.
+        short: suffix === "fixed" ? `${names[d][1]} (fixed)` : names[d][1],
         kind: "hosted",
         model: "typesafe-ai/jev",
         policy: `${names[d][1].toLowerCase()}; ${suffix === "fixed" ? "re-asks every 400 ms after a failure" : "backs off 0.4–4 s after a failure"}`,
-        color: colors[d],
+        color: suffix === "fixed" ? fixedColors[d] : colors[d],
         default: suffix === "backoff" && d !== "spot-clean-cached",
         runSets: [sets[ri].id],
       });

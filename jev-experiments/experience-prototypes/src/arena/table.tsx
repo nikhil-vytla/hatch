@@ -18,7 +18,7 @@ export function Table({ model: m }: { model: CardModel }) {
 
   return (
     <div className="table-wrap">
-      <table className="grid dense">
+      <table className="results dense">
         <thead>
           <tr>
             <th scope="col">Contestant</th>

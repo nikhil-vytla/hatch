@@ -1,5 +1,5 @@
 import { scaleLinear } from "d3-scale";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, type RefObject } from "react";
 import type { MetricDef } from "../../../packages/arena/src/data/schema";
 import { predsSchema, targetsSchema } from "../../../packages/arena/src/data/chunks";
 import { score } from "../../../packages/arena/src/score";
@@ -11,31 +11,33 @@ const domainOf = (m: MetricDef): [number, number] => m.domain ?? [0, m.unit === 
 /** A screen-reader copy of the figure's numbers. */
 function DataTable({ model: m, metrics }: { model: CardModel; metrics: MetricDef[] }) {
   return (
-    <table className="sr-only">
-      <caption>{m.card.title}</caption>
-      <thead>
-        <tr>
-          <th scope="col">Contestant</th>
-          {metrics.map((mm) => (
-            <th key={mm.id} scope="col">
-              {mm.label}
-            </th>
-          ))}
-        </tr>
-      </thead>
-      <tbody>
-        {m.shown.map((id) => (
-          <tr key={id}>
-            <th scope="row">{m.nameOf(id)}</th>
+    <div className="sr-only">
+      <table>
+        <caption>{m.card.title}</caption>
+        <thead>
+          <tr>
+            <th scope="col">Contestant</th>
             {metrics.map((mm) => (
-              <td key={mm.id}>
-                {formatValue(mm, m.estimate(id, mm))} {formatSpread(mm, m.estimate(id, mm))}
-              </td>
+              <th key={mm.id} scope="col">
+                {mm.label}
+              </th>
             ))}
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {m.shown.map((id) => (
+            <tr key={id}>
+              <th scope="row">{m.nameOf(id)}</th>
+              {metrics.map((mm) => (
+                <td key={mm.id}>
+                  {formatValue(mm, m.estimate(id, mm))} {formatSpread(mm, m.estimate(id, mm))}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 
@@ -127,9 +129,8 @@ export function Bars({ model: m }: { model: CardModel }) {
               {formatNumber(metric, t)}
             </span>
           ))}
-          {metric.better === "lower" && <em className="bar-better">← better</em>}
         </span>
-        <span />
+        <em className="bar-better">{metric.better === "lower" ? "← better" : "better →"}</em>
       </div>
       {missing.length > 0 && (
         <p className="muted">
@@ -143,6 +144,34 @@ export function Bars({ model: m }: { model: CardModel }) {
 }
 
 // ---------------------------------------------------------------- scatter
+/** The element's content width, following resizes. */
+function useWidth(ref: RefObject<HTMLDivElement | null>) {
+  const [width, setWidth] = useState(720);
+
+  useEffect(() => {
+    const el = ref.current;
+
+    if (!el) return;
+    const observer = new ResizeObserver(([entry]) => setWidth(entry.contentRect.width));
+
+    observer.observe(el);
+
+    return () => observer.disconnect();
+  }, [ref]);
+
+  return width;
+}
+
+/** From zero (or the lowest value, if negative) to a little past the highest value. */
+function extent(values: number[], metric: MetricDef): [number, number] {
+  const lo = Math.min(0, ...values),
+    hi = Math.max(...values);
+
+  if (!(hi > lo)) return domainOf(metric);
+
+  return [lo, hi + (hi - lo) * 0.12];
+}
+
 type Point = { id: string; x: number; y: number };
 
 /** Points nobody beats on both measures. */
@@ -171,16 +200,28 @@ export function Scatter({ model: m }: { model: CardModel }) {
 
   const skipped = m.shown.filter((id) => !points.some((p) => p.id === id));
 
-  const W = 720,
-    H = 340,
-    L = 56,
+  const box = useRef<HTMLDivElement>(null);
+  const width = useWidth(box);
+
+  // Drawn at its real width so text stays at its CSS size on phones and when zoomed.
+  const W = Math.max(280, Math.min(820, width)),
+    narrow = W < 520,
+    H = narrow ? 280 : 340,
+    L = narrow ? 44 : 56,
     R = 24,
     T = 20,
     B = 48;
 
   // Better is always up and to the right: flip an axis whose smaller values are better.
-  const [dx0, dx1] = domainOf(mx),
-    [dy0, dy1] = domainOf(my);
+  // The range comes from the points (keeping zero) so small differences stay visible.
+  const [dx0, dx1] = extent(
+      points.map((p) => p.x),
+      mx,
+    ),
+    [dy0, dy1] = extent(
+      points.map((p) => p.y),
+      my,
+    );
 
   const x = scaleLinear()
     .domain(mx.better === "higher" ? [dx0, dx1] : [dx1, dx0])
@@ -192,7 +233,11 @@ export function Scatter({ model: m }: { model: CardModel }) {
     .range([H - B, T])
     .nice();
 
-  const front = frontier(points, mx, my).sort((a, b) => x(a.x) - x(b.x));
+  const front = frontier(
+    points.filter((p) => !m.isCode(p.id)),
+    mx,
+    my,
+  ).sort((a, b) => x(a.x) - x(b.x));
 
   // Keep labels at least 15px apart vertically, with a leader line when one moves.
   const labels = [...points]
@@ -200,26 +245,33 @@ export function Scatter({ model: m }: { model: CardModel }) {
     .sort((a, b) => a.sy - b.sy);
 
   for (let i = 1; i < labels.length; i++)
-    if (Math.abs(labels[i].sx - labels[i - 1].sx) < 180 && labels[i].ly - labels[i - 1].ly < 15)
+    if (
+      Math.abs(labels[i].sx - labels[i - 1].sx) < (narrow ? 120 : 180) &&
+      labels[i].ly - labels[i - 1].ly < 15
+    )
       labels[i].ly = labels[i - 1].ly + 15;
 
   if (points.length < 2)
     return (
-      <p className="muted">
-        Add at least two contestants that have both {inSentence(mx.label)} and{" "}
-        {inSentence(my.label)}.
-      </p>
+      <div ref={box}>
+        <p className="muted">
+          Add at least two contestants that have both {inSentence(mx.label)} and{" "}
+          {inSentence(my.label)}.
+        </p>
+      </div>
     );
 
   return (
-    <div className="scatter">
+    <div className="scatter" ref={box}>
       <svg
+        width={W}
+        height={H}
         viewBox={`0 0 ${W} ${H}`}
         role="group"
         aria-label={`${my.label} against ${inSentence(mx.label)}`}
         onMouseLeave={() => m.setFocus(null)}
       >
-        {x.ticks(5).map((t) => (
+        {x.ticks(narrow ? 3 : 5).map((t) => (
           <g key={`x${t}`} className="tick">
             <line x1={x(t)} x2={x(t)} y1={T} y2={H - B} />
             <text x={x(t)} y={H - B + 18} textAnchor="middle">
@@ -250,7 +302,8 @@ export function Scatter({ model: m }: { model: CardModel }) {
         {labels.map((p) => {
           const onFront = front.some((f) => f.id === p.id);
           const c = m.contestant(p.id);
-          const right = p.sx < W * 0.66;
+          const right = p.sx < W * 0.6;
+          const code = m.isCode(p.id);
 
           return (
             <g
@@ -261,7 +314,7 @@ export function Scatter({ model: m }: { model: CardModel }) {
               style={colorVars(c)}
               tabIndex={0}
               role="img"
-              aria-label={`${m.nameOf(p.id)}: ${formatNumber(mx, p.x)} ${inSentence(mx.label)}, ${formatNumber(my, p.y)} ${inSentence(my.label)}${onFront ? ", on the frontier" : ""}`}
+              aria-label={`${m.nameOf(p.id)}${code ? " (code reference)" : ""}: ${formatNumber(mx, p.x)} ${inSentence(mx.label)}, ${formatNumber(my, p.y)} ${inSentence(my.label)}${onFront ? ", on the frontier" : ""}`}
               onMouseEnter={() => m.setFocus(p.id)}
               onFocus={() => m.setFocus(p.id)}
               onBlur={() => m.setFocus(null)}
@@ -275,12 +328,19 @@ export function Scatter({ model: m }: { model: CardModel }) {
                   y2={p.ly}
                 />
               )}
-              <circle cx={p.sx} cy={p.sy} r={7} />
+              {code ? (
+                <rect x={p.sx - 6} y={p.sy - 6} width={12} height={12} />
+              ) : (
+                <circle cx={p.sx} cy={p.sy} r={7} />
+              )}
               <text x={p.sx + (right ? 12 : -12)} y={p.ly + 4} textAnchor={right ? "start" : "end"}>
-                {m.nameOf(p.id, true)}{" "}
-                <tspan className="point-value">
-                  {formatNumber(mx, p.x)} · {formatNumber(my, p.y)}
-                </tspan>
+                {m.nameOf(p.id, true)}
+                {!narrow && (
+                  <tspan className="point-value">
+                    {" "}
+                    {formatNumber(mx, p.x)} · {formatNumber(my, p.y)}
+                  </tspan>
+                )}
               </text>
             </g>
           );
@@ -310,7 +370,7 @@ export function PerSeed({ model: m }: { model: CardModel }) {
 
   return (
     <div className="table-wrap">
-      <table className="grid">
+      <table className="results">
         <thead>
           <tr>
             <th scope="col">Contestant</th>
