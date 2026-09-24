@@ -10,7 +10,8 @@
     "test": "bun ../live-worlds/prepare.ts && bun test server ../local-models-and-games/arcade/engine.test.ts ../local-models-and-games/integrity.test.ts ../music-arranger-v2 ../outcome-framing/*.test.ts ../cafe-jev ../judgment-reliability ../quality-and-simulation-review/paste-transactions.test.ts ../quality-and-simulation-review/composition-stream.test.ts ../visual-search/*.test.ts ../wardrobe-lab/*.test.ts ../icon-studio/*.test.ts ../live-worlds",
     "start": "bun scripts/start.ts",
     "record": "bun scripts/record.ts",
-    "recover": "bun scripts/recover.ts && ../.venv/bin/python scripts/metrics.py"
+    "recover": "bun scripts/recover.ts && ../.venv/bin/python scripts/metrics.py",
+    "lint:arena": "cd .. && experience-prototypes/node_modules/.bin/oxlint -c .oxlintrc.json experience-prototypes/src/arena packages/arena/src"
   },
   "dependencies": {
     "@fal-ai/client": "^1.10.1",
@@ -30,12 +31,14 @@
     "zod": "^4.0.0"
   },
   "devDependencies": {
+    "@oxlint/plugins": "1.85.0",
     "@tailwindcss/vite": "^4.2.1",
     "@types/node": "^26.6.2",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@types/three": "^0.186.0",
     "@vitejs/plugin-react": "^5.1.4",
+    "oxlint": "1.85.0",
     "tailwindcss": "^4.2.1",
     "typescript": "~5.9.3",
     "vite": "^7.3.0"
