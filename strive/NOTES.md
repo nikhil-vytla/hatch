@@ -864,3 +864,39 @@ are in /tmp/ui-shot (not committed; before/ and after/).
   - A checkpoint timeline in the changes pane: rewind lives on prompts and
     in ⌘K.
   - Light theme.
+
+## 2026-09-24: Stage 2's loop on a real model
+
+The three branches merged cleanly after conflict resolution:
+- M8, the learner (`babac84`);
+- M7, the daemon side (`0fda53e`);
+- desktop pass 3 (six commits).
+
+The learner reads memory and skills from `learnedFiles`, exactly as on
+disk. Sessions see memory under a "Reviewed memory" label, and that label
+must not end up inside a proposal.
+
+**Real run (Haiku 4.5, CLI only, about $0.06).** The setup: a repo whose
+root holds deliberately failing example tests (`fixtures/`), where the
+real suite is `bun test src`.
+1. The first session ran `bun test` at the root and hit the failing
+   fixture.
+2. In the second, the user corrected it.
+3. `strive learn` proposed one memory rule, citing entries in both
+   sessions, with the prediction that future sessions run `bun test src`
+   first. The static check passed, and it cost about $0.02.
+4. `strive review 16` showed it; `accept` wrote `.strive/memory.md`.
+5. A third session, given the first one's prompt, ran `bun test src` first
+   and said it did so because of the project memory. The prediction held.
+
+**One flaw.** The learner told the two sessions' story in the wrong order,
+even though `list_sessions` said "newest first". The list is now in the
+order the sessions started, numbered, with a test.
+
+**Two more flaky tests.**
+- `a_client_that_leaves_while_the_provider_stalls` failed under load. A
+  client gone before the headers are sent is noticed only at the next
+  write, and the fake provider wrote nothing for 20s. It now pings, as
+  real providers do.
+- The TUI's `/rewind` test is reported to fail about 1 in 5 runs. It's
+  still to be looked into.

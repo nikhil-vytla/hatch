@@ -2,7 +2,7 @@
 // sees of it, how pages split it, and how long outputs are cut.
 import { expect, test } from "bun:test";
 import type { Entry, Event, SessionReadResult } from "@strive/protocol";
-import { cut, renderSession, tokens } from "./journal-view";
+import { cut, renderSession, renderSessions, tokens } from "./journal-view";
 
 const CWD = "/tmp/proj";
 
@@ -253,4 +253,12 @@ test("cutting keeps the start and the end, and says how much went", () => {
   const out = cut(text, 100);
   expect(out).toBe(`${"a".repeat(40)}\n[... 900 characters cut ...]\n${"z".repeat(60)}`);
   expect(cut("short", 100)).toBe("short");
+});
+
+test("sessions are listed in the order they started, numbered, whatever order they come in", () => {
+  const at = (id: string, createdAtMs: number) => ({ id, cwd: "/p", createdAtMs, title: id });
+  const listed = renderSessions("/p", [at("late", 3000), at("early", 1000), at("middle", 2000)], undefined);
+  const lines = listed.split("\n").slice(1);
+  expect(lines.map((l) => l.split(" ").slice(0, 2).join(" "))).toEqual(["1. early", "2. middle", "3. late"]);
+  expect(listed.split("\n")[0]).toContain("in the order they started");
 });

@@ -618,8 +618,8 @@ test("a learner resumes after a restart: its history replays, a cut-off turn is 
   // Sessions active since the request before this one are marked new.
   const listed = toolResults(model.requests[1]).get("t1")?.text ?? "";
   expect(listed).toContain(`"new" marks those active since you last looked (${when(second)})`);
-  expect(listed.split("\n").find((l) => l.startsWith(W1))).toEndWith("[new]");
-  expect(listed.split("\n").find((l) => l.startsWith(W0))).not.toContain("[new]");
+  expect(listed.split("\n").find((l) => l.includes(W1))).toEndWith("[new]");
+  expect(listed.split("\n").find((l) => l.includes(W0))).not.toContain("[new]");
 });
 
 test("a turn that takes two waiting requests marks sessions new since the first one's cutoff", async () => {
@@ -645,7 +645,7 @@ test("a turn that takes two waiting requests marks sessions new since the first 
 
   const listed = toolResults(model.requests[1]).get("t1")?.text ?? "";
   expect(listed).toContain(`since you last looked (${when(first)})`);
-  expect(listed.split("\n").find((l) => l.startsWith(W1))).toEndWith("[new]");
+  expect(listed.split("\n").find((l) => l.includes(W1))).toEndWith("[new]");
 });
 
 test("the learner's system prompt states its rules, and gives the current memory, instructions and skills", () => {

@@ -232,7 +232,7 @@ class Learner {
       name: "list_sessions",
       label: "list_sessions",
       description:
-        "List this project's work sessions, newest first: id, title (the first prompt), when each started and was last active.",
+        "List this project's work sessions in the order they started, numbered: id, title (the first prompt), when each started and was last active.",
       parameters: Type.Object({}),
       execute: async () => {
         const { sessions } = await this.client.request("session/list", { cwd: this.config.cwd });

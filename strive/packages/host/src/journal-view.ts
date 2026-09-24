@@ -258,21 +258,27 @@ export async function renderSession(read: SessionReadResult, blob: Blob, opts: R
   return `${top}\n\n${shown}\n\n${end}`;
 }
 
-/** Work sessions as list_sessions shows them, newest first. */
+/**
+ * Work sessions as list_sessions shows them: the most recent, numbered in
+ * the order they started. Read as a story (a mistake, then its correction),
+ * the order matters, and a model reading "newest first" took the list for
+ * that order anyway.
+ */
 export function renderSessions(cwd: string, sessions: SessionInfo[], sinceMs: number | undefined): string {
   if (sessions.length === 0) return `There are no work sessions in ${cwd} yet.`;
   const MAX = 50;
   const since = sinceMs === undefined ? "" : ` "new" marks those active since you last looked (${when(sinceMs)}).`;
+  const recent = sessions.toSorted((a, b) => b.createdAtMs - a.createdAtMs).slice(0, MAX);
 
-  const lines = sessions.slice(0, MAX).map((s) => {
+  const lines = recent.toReversed().map((s, i) => {
     const title = s.title === undefined ? "(no prompt yet)" : `"${s.title}"`;
     const active = s.lastActiveMs ?? s.createdAtMs;
     const isNew = sinceMs !== undefined && active > sinceMs ? " [new]" : "";
 
-    return `${s.id} ${title}, started ${when(s.createdAtMs)}, last active ${when(active)}${isNew}`;
+    return `${i + 1}. ${s.id} ${title}, started ${when(s.createdAtMs)}, last active ${when(active)}${isNew}`;
   });
 
-  const more = sessions.length > MAX ? `\n(${sessions.length - MAX} older sessions not shown)` : "";
+  const more = sessions.length > MAX ? `(${sessions.length - MAX} older sessions not shown)\n` : "";
 
-  return `Work sessions in ${cwd}, newest first.${since}\n${lines.join("\n")}${more}`;
+  return `Work sessions in ${cwd}, in the order they started: 1 is the earliest shown.${since}\n${more}${lines.join("\n")}`;
 }
