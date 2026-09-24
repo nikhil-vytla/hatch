@@ -29,3 +29,6 @@ await vite({
   logLevel: "warn",
   build: { outDir: `${here}/out/renderer`, emptyOutDir: true },
 });
+
+// The bundled fonts' licence (SIL OFL) travels with them.
+await Bun.write(`${here}/out/renderer/assets/OFL-Geist.txt`, Bun.file(`${here}/src/renderer/fonts/OFL.txt`));

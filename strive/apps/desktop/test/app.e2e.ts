@@ -189,6 +189,19 @@ test("code in a reply is highlighted in the window, under its CSP", async () => 
   host.close();
 });
 
+test("the window's own fonts load under its CSP", async () => {
+  const { page } = await openApp();
+  await page.evaluate(() => document.fonts.ready);
+
+  const loaded = await page.evaluate(() =>
+    [...document.fonts].flatMap((f) => (f.status === "loaded" ? [f.family.replaceAll('"', "")] : [])),
+  );
+
+  assert.ok(loaded.includes("Geist"), `loaded: ${loaded.join(", ")}`);
+  const family = await page.getByText("What should we work on?").evaluate((h) => getComputedStyle(h).fontFamily);
+  assert.match(family, /^"?Geist"?,/);
+});
+
 test("a new session starts from the sidebar, and the old one is a click away", async () => {
   const { page } = await openApp();
   await page.getByPlaceholder("Ask strive to do anything…").fill("the first task");

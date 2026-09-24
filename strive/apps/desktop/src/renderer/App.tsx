@@ -963,7 +963,10 @@ function PromptRail({ prompts }: { prompts: { seq: number; text: string }[] }) {
           className="tick"
           aria-label={p.text}
           onClick={() =>
-            document.getElementById(`msg-${p.seq}`)?.scrollIntoView({ block: "start", behavior: "smooth" })
+            document.getElementById(`msg-${p.seq}`)?.scrollIntoView({
+              block: "start",
+              behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth",
+            })
           }
         >
           <span className="card">{p.text.length > 120 ? `${p.text.slice(0, 117)}…` : p.text}</span>
