@@ -713,3 +713,36 @@ fails the test.
   can't un-send one.
 - **A context-usage ring:** needs the context window in the renderer.
 - **Bundled Geist fonts.**
+
+## 2026-09-23: M8, the learner (host side)
+
+- **Shape:** `host.ts` keeps the turn machinery (queue, turn records,
+  interrupts, time limit, compaction, resume) and takes an `AgentMode`:
+  a system prompt, tools, a summary prompt, and hooks. `kind: learning`
+  picks `learnerMode` (`learner.ts`). The gateway model setup moved to
+  `gateway.ts`, shared by both.
+- **Prompts:** `learnRequested` is a turn prompt like `userMessage`. Its
+  text names the previous request's time ("active since …"), so
+  `PromptReader` reads entries in journal order, live and on resume.
+- **Resume:** the host can journal only turns, replies and proposals, so
+  the read tools' output isn't in the journal. On resume their calls get
+  "this output isn't kept; call it again", and a `propose_change` with
+  no `proposalMade` gets "nothing was recorded". A recorded proposal
+  replays as its id plus the journaled static gate, so a resumed learner
+  sees what a live one saw (unless the gate landed after the live 5s
+  wait).
+- **A race the tests caught:** a reply's tool calls run in parallel, so
+  the three-a-run limit must be counted before `host/record` is awaited,
+  not after. Counted after, four proposals in one reply recorded four.
+- **Paging:** an effect's start and result are separate blocks. Merged,
+  a page break between them showed the result twice.
+- **Gap:** the daemon gives the learner a skill's name, description and
+  path, not its text (`AgentConfig.skills`, `contextLoaded.skills`).
+  Reading the file would be a file effect. `read_artifact` says so, and
+  the prompt says not to propose changes to a skill it can't see. M7
+  could send skill texts in a learning session's `AgentConfig`.
+- **Needs M7 to be real:** `host/register` returning `kind: learning`,
+  `host/record` accepting `proposalMade`, the static gate's
+  `gateFinished`, and `.strive/memory.md` among `instructions`. The
+  tests play these with `FakeDaemon`; `FakeDaemon.push` sends a
+  notification outside any reply (interrupts, late entries).

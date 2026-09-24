@@ -220,6 +220,20 @@ and a tool call that never ran gets an explicit result.
 - If a host's connection closes mid-turn, the daemon ends that turn as
   failed, so anyone waiting on it (`strive run`) finds out.
 
+**The learner.** A learning session's host (`AgentConfig.kind` is
+`learning`, [ADR-0016](adrs/0016-trusted-learning.md)) runs the learner
+with the same turn machinery: a `learnRequested` entry is a turn's
+prompt, as `userMessage` is for the coding agent.
+- Its tools read, and nothing else: `list_sessions` (`session/list`),
+  `read_session` (`session/read` and `blob/get`, rendered in pages within
+  a token budget), `read_artifact` (memory and skills from its config)
+  and `propose_change`, which records `proposalMade`. It has no effect
+  tools and no MCP tools.
+- A proposal's result is its id and the daemon's static check, or the
+  daemon's refusal. At most three are recorded a turn.
+- Read tools' output isn't journaled, so on resume their calls say to
+  call them again.
+
 ## The desktop app
 
 `strive app` opens an Electron app on the session (`apps/desktop`).

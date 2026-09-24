@@ -1,17 +1,7 @@
 // The agent host: runs one session's agent loop as a client of the daemon.
 // Models are reached only through the daemon's gateway, and every tool is
 // an effect the daemon performs; the host holds no keys and touches no files.
-import {
-  type AssistantMessage,
-  createModels,
-  createProvider,
-  type ImageContent,
-  type Model,
-  type TextContent,
-  Type,
-} from "@earendil-works/pi-ai";
-import { anthropicMessagesApi } from "@earendil-works/pi-ai/api/anthropic-messages.lazy";
-import { openAICompletionsApi } from "@earendil-works/pi-ai/api/openai-completions.lazy";
+import { type ImageContent, type TextContent, Type } from "@earendil-works/pi-ai";
 import { Agent, type AgentMessage, type AgentTool, estimateContextTokens } from "@earendil-works/pi-agent-core";
 import {
   type AgentConfig,
@@ -23,7 +13,10 @@ import {
   type StriveClient,
   type TurnEnd,
 } from "@strive/protocol";
-import { PROPOSED, rebuild, resultText, summaryMessage } from "./transcript";
+import { createStriveModels, model, textOf } from "./gateway";
+import { learnerMode } from "./learner";
+import { PromptReader } from "./learning-records";
+import { isPrompt, PROPOSED, rebuild, resultText, summaryMessage, type Unjournaled } from "./transcript";
 
 export function systemPrompt(config: AgentConfig): string {
   const parts = [base(config.cwd)];
@@ -57,38 +50,6 @@ function base(cwd: string): string {
     "Read before you edit. Keep changes small and focused on what was asked. Run the project's tests when they are relevant.",
     "When you are done, reply with a short summary of what you changed and anything left open.",
   ].join("\n");
-}
-
-function model(config: AgentConfig): Model<any> {
-  return {
-    id: config.model,
-    name: config.model,
-    api: config.provider === "anthropic" ? "anthropic-messages" : "openai-completions",
-    provider: "strive",
-    baseUrl: config.baseUrl,
-    reasoning: false,
-    input: ["text"],
-    // strive prices calls in the gateway; the agent loop doesn't.
-    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-    contextWindow: config.contextWindow,
-    maxTokens: config.maxOutput,
-  };
-}
-
-function createStriveModels(m: Model<any>) {
-  const models = createModels();
-  models.setProvider(
-    createProvider({
-      id: "strive",
-      name: "strive gateway",
-      // The gateway replaces this with the real key, which only the daemon holds.
-      auth: { apiKey: { name: "strive", resolve: async () => ({ auth: { apiKey: "strive-gateway" } }) } },
-      models: [m],
-      api: { "anthropic-messages": anthropicMessagesApi(), "openai-completions": openAICompletionsApi() },
-    }),
-  );
-
-  return models;
 }
 
 const SUMMARIZE = [
@@ -319,14 +280,38 @@ export function tools(client: StriveClient, sessionId: string, mcp: McpTool[] = 
   ];
 }
 
-const textOf = (m: AssistantMessage) => m.content.flatMap((c) => (c.type === "text" ? [c.text] : [])).join("");
+/** What the session's agent is: the coding agent, or the learner. The turn machinery is shared. */
+export type AgentMode = {
+  systemPrompt: string;
+  tools: AgentTool<any>[];
+  /** The instruction for summarizing a long conversation. */
+  summarize: string;
+  /** On resume, what a tool call with nothing in the journal is told. */
+  unjournaled?: Unjournaled;
+  /** Sees each journal entry that reaches the host, in order. */
+  onEntry?: (entry: Entry) => void;
+  /** A turn starts, taking the prompts with these seqs. */
+  turnStarted?: (prompts: number[]) => void;
+};
+
+function codingMode(client: StriveClient, sessionId: string, config: AgentConfig): AgentMode {
+  return {
+    systemPrompt: systemPrompt(config),
+    tools: tools(client, sessionId, config.mcpTools),
+    summarize: SUMMARIZE,
+  };
+}
+
+export function modeFor(client: StriveClient, sessionId: string, config: AgentConfig): AgentMode {
+  return config.kind === "learning" ? learnerMode(client, sessionId, config) : codingMode(client, sessionId, config);
+}
 
 export class Host {
   private agent!: Agent;
   private turn = 0;
   /** Stops the running turn's own model calls (the summary); the agent has its own abort. */
   private turnAbort?: AbortController;
-  /** Prompts not yet sent, with their journal seqs. */
+  /** Prompts (a person's messages, or learning requests) not yet sent, with their journal seqs. */
   private queued: { text: string; seq: number }[] = [];
   private running = false;
   private timedOut = false;
@@ -342,6 +327,8 @@ export class Host {
   /** Entries that arrive while `start` is still loading, replayed after it. */
   private early: Entry[] | undefined = [];
   private readonly models: ReturnType<typeof createStriveModels>;
+  private readonly mode: AgentMode;
+  private readonly prompts = new PromptReader();
 
   constructor(
     private readonly client: StriveClient,
@@ -349,6 +336,7 @@ export class Host {
     private readonly config: AgentConfig,
   ) {
     this.models = createStriveModels(model(config));
+    this.mode = modeFor(client, sessionId, config);
   }
 
   /** Resumes from the journal and handles prompts as they arrive. */
@@ -371,15 +359,15 @@ export class Host {
     // the next turn, not replayed as history. (Older journals don't record
     // what a turn took; for them it took everything before its start.)
     const since = lastStart?.event.type === "turnStarted" ? (lastStart.event.throughSeq ?? lastStart.seq) : 0;
-    const waiting = entries.filter((e) => e.seq > since && e.event.type === "userMessage");
-    const history = entries.filter((e) => !waiting.includes(e));
+    const waiting = new Set(entries.filter((e) => e.seq > since && isPrompt(e)));
+    const history = entries.filter((e) => !waiting.has(e));
     this.conversationSeq = Math.max(0, ...history.map((e) => e.seq));
     this.agent = new Agent({
       initialState: {
-        systemPrompt: systemPrompt(this.config),
+        systemPrompt: this.mode.systemPrompt,
         model: model(this.config),
-        tools: tools(this.client, this.sessionId, this.config.mcpTools),
-        messages: await rebuild(history, blob),
+        tools: this.mode.tools,
+        messages: await rebuild(history, blob, this.mode.unjournaled),
       },
       streamFn: this.models.streamSimple.bind(this.models),
       toolExecution: "parallel",
@@ -408,7 +396,15 @@ export class Host {
       }
     });
     this.lastSeq = entries.at(-1)?.seq ?? 0;
-    this.queued = waiting.flatMap((e) => (e.event.type === "userMessage" ? [{ text: e.event.text, seq: e.seq }] : []));
+    this.queued = [];
+
+    for (const e of entries) {
+      this.mode.onEntry?.(e);
+      const text = this.prompts.read(e);
+
+      if (text !== undefined && waiting.has(e)) this.queued.push({ text, seq: e.seq });
+    }
+
     const early = this.early ?? [];
     this.early = undefined;
 
@@ -425,9 +421,11 @@ export class Host {
 
     if (entry.seq <= this.lastSeq) return;
     this.lastSeq = entry.seq;
+    this.mode.onEntry?.(entry);
+    const text = this.prompts.read(entry);
 
-    if (entry.event.type === "userMessage") {
-      this.queued.push({ text: entry.event.text, seq: entry.seq });
+    if (text !== undefined) {
+      this.queued.push({ text, seq: entry.seq });
       void this.drain();
     }
   }
@@ -473,7 +471,7 @@ export class Host {
     const reply = await this.models.completeSimple(
       model(this.config),
       {
-        systemPrompt: SUMMARIZE,
+        systemPrompt: this.mode.summarize,
         messages: [{ role: "user", content: transcriptText(messages), timestamp: Date.now() }],
       },
       { signal },
@@ -495,6 +493,7 @@ export class Host {
     this.timedOut = false;
     this.interrupted = false;
     const taken = prompts.at(-1)?.seq;
+    this.mode.turnStarted?.(prompts.map((p) => p.seq));
     await this.record({ type: "turnStarted", turn: this.turn, throughSeq: taken });
     this.conversationSeq = Math.max(this.conversationSeq, taken ?? 0);
 

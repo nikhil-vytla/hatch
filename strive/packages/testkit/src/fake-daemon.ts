@@ -23,6 +23,7 @@ export class FakeDaemon {
   private readonly dir = mkdtempSync("/tmp/strv-fake-");
   private readonly server: Server;
   readonly calls: { method: string; params: unknown }[] = [];
+  private readonly conns = new Set<Socket>();
 
   constructor(private readonly handlers: FakeHandlers) {
     this.socket = join(this.dir, "fake.sock");
@@ -33,7 +34,14 @@ export class FakeDaemon {
     return new Promise((resolve) => this.server.listen(this.socket, resolve));
   }
 
+  /** Sends a notification to every connection, when no request prompts it (an interrupt, say). */
+  push<N extends NotificationName>(method: N, params: Notifications[N]) {
+    for (const conn of this.conns) conn.write(`${JSON.stringify({ jsonrpc: "2.0", method, params })}\n`);
+  }
+
   private serve(conn: Socket) {
+    this.conns.add(conn);
+    conn.on("close", () => this.conns.delete(conn));
     let buffer = "";
     conn.setEncoding("utf8");
     conn.on("data", (chunk: string) => {

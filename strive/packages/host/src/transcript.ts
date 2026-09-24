@@ -4,6 +4,7 @@
 // effect records (what actually ran), never from the host.
 import type { AssistantMessage, Message, ToolResultMessage } from "@earendil-works/pi-ai";
 import type { EffectOutcome, EffectRecord, Entry } from "@strive/protocol";
+import { PromptReader, proposalResult, type StaticGate } from "./learning-records";
 
 /** What propose_layout tells the model, live and on resume. */
 export const PROPOSED = "Proposed. The person will accept or reject it in the desktop app.";
@@ -36,6 +37,11 @@ export function summaryMessage(summary: string, timestamp: number): Message {
   return { role: "user", content: `[A summary of the conversation so far]\n\n${summary}`, timestamp };
 }
 
+/** An entry that is a turn's prompt: a person's message, or a learning request. */
+export function isPrompt(e: Entry): boolean {
+  return e.event.type === "userMessage" || e.event.type === "learnRequested";
+}
+
 /** An assistant message as pi-ai makes it, as far as replay relies on it. */
 function isAssistantMessage(v: unknown): v is AssistantMessage {
   return (
@@ -48,7 +54,14 @@ function isAssistantMessage(v: unknown): v is AssistantMessage {
   );
 }
 
-export async function rebuild(all: Entry[], blob: (digest: string) => Promise<string>): Promise<Message[]> {
+/** On resume, what a tool call with nothing in the journal is told, by tool name. */
+export type Unjournaled = (toolName: string) => ToolResultText | undefined;
+
+export async function rebuild(
+  all: Entry[],
+  blob: (digest: string) => Promise<string>,
+  unjournaled: Unjournaled = () => undefined,
+): Promise<Message[]> {
   // The latest summary replaces everything it covers, except prompts no turn
   // had taken by then: those follow it, before the entries after it.
   const compacted = all.findLast((e) => e.event.type === "compacted");
@@ -59,19 +72,27 @@ export async function rebuild(all: Entry[], blob: (digest: string) => Promise<st
     if (e.seq <= upto && e.event.type === "turnStarted") taken = Math.max(taken, e.event.throughSeq ?? e.seq);
   }
 
-  const entries = all.filter(
-    (e) => e.seq > upto || (compacted !== undefined && e.seq > taken && e.event.type === "userMessage"),
-  );
+  const entries = all.filter((e) => e.seq > upto || (compacted !== undefined && e.seq > taken && isPrompt(e)));
+  const kept = new Set(entries);
 
   const records = new Map<number, { callId: string; record: EffectRecord }>();
   const results = new Map<string, { text: string; isError: boolean; ts: number }>();
+  const gates = new Map<number, StaticGate>();
 
-  for (const { event: e, tsMs } of entries) {
+  for (const { event: e } of all) {
+    if (e.type === "gateFinished" && e.gate === "static") gates.set(e.proposal, e);
+  }
+
+  for (const { event: e, tsMs, seq } of entries) {
     if (e.type === "effectStarted") records.set(e.effect, { callId: e.callId, record: e.record });
 
     // A tool that runs no effect: its journaled entry is its result.
     if (e.type === "layoutProposed" && e.callId !== undefined)
       results.set(e.callId, { text: PROPOSED, isError: false, ts: tsMs });
+
+    // A proposal's id is its entry's seq; its result says how the daemon's static check went.
+    if (e.type === "proposalMade" && e.callId !== undefined)
+      results.set(e.callId, { ...proposalResult(seq, gates.get(seq)), ts: tsMs });
 
     if (e.type === "effectFinished") {
       const started = records.get(e.effect);
@@ -89,7 +110,10 @@ export async function rebuild(all: Entry[], blob: (digest: string) => Promise<st
 
   const close = () => {
     for (const call of open) {
-      const r = results.get(call.id) ?? { text: NOT_RUN, isError: true, ts: call.ts };
+      const r = results.get(call.id) ?? {
+        ...(unjournaled(call.name) ?? { text: NOT_RUN, isError: true }),
+        ts: call.ts,
+      };
 
       const result: ToolResultMessage = {
         role: "toolResult",
@@ -111,6 +135,8 @@ export async function rebuild(all: Entry[], blob: (digest: string) => Promise<st
   // turn, together with any sent after this one ends.
   let inTurn = false;
   let held: { seq: number; message: Message }[] = [];
+  // Every entry passes through, so a request's text knows the request before it.
+  const prompts = new PromptReader();
 
   /** Releases held prompts up to `through` (all of them without it). */
   const release = (through = Number.POSITIVE_INFINITY) => {
@@ -119,14 +145,19 @@ export async function rebuild(all: Entry[], blob: (digest: string) => Promise<st
     held = held.filter((h) => h.seq > through);
   };
 
-  for (const { event: e, tsMs, seq } of entries) {
+  for (const entry of all) {
+    const prompt = prompts.read(entry);
+
+    if (!kept.has(entry)) continue;
+    const { event: e, tsMs, seq } = entry;
+
     if (e.type === "turnStarted") {
       release(e.throughSeq);
       inTurn = true;
     } else if (e.type === "turnEnded") {
       inTurn = false;
-    } else if (e.type === "userMessage") {
-      held.push({ seq, message: { role: "user", content: e.text, timestamp: tsMs } });
+    } else if (prompt !== undefined) {
+      held.push({ seq, message: { role: "user", content: prompt, timestamp: tsMs } });
     } else if (e.type === "assistantMessage") {
       const reply = e.message;
 
