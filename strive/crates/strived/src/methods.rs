@@ -356,6 +356,7 @@ async fn host_config(state: &Arc<State>, sid: &SessionId) -> Reply {
         instructions: ctx.instructions,
         skills: ctx.skills,
         mcp_tools: mcp.tools,
+        kind: info.kind,
     })
 }
 

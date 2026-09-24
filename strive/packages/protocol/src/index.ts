@@ -100,6 +100,36 @@ export type * from "./generated/SessionReadResult";
 
 export type * from "./generated/SessionRef";
 
+export type * from "./generated/Artifact";
+
+export type * from "./generated/Evidence";
+
+export type * from "./generated/Gate";
+
+export type * from "./generated/GateOutcome";
+
+export type * from "./generated/LearningRunParams";
+
+export type * from "./generated/ProjectRef";
+
+export type * from "./generated/Proposal";
+
+export type * from "./generated/ProposalDecideParams";
+
+export type * from "./generated/ProposalDecision";
+
+export type * from "./generated/ProposalListResult";
+
+export type * from "./generated/ProposalRef";
+
+export type * from "./generated/ProposalState";
+
+export type * from "./generated/ProposalStatus";
+
+export type * from "./generated/SessionKind";
+
+export type * from "./generated/Verdict";
+
 export type * from "./generated/SessionChangesParams";
 
 export type * from "./generated/SessionChangesResult";

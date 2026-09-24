@@ -402,7 +402,13 @@ impl Ledger {
                 | Event::AssistantMessage { .. }
                 | Event::TurnEnded { .. }
                 | Event::ContextLoaded { .. }
-                | Event::Compacted { .. } => {}
+                | Event::Compacted { .. }
+                | Event::LearnRequested { .. }
+                | Event::ProposalMade { .. }
+                | Event::GateFinished { .. }
+                | Event::ProposalDecided { .. }
+                | Event::ProposalApplied { .. }
+                | Event::ProposalRolledBack { .. } => {}
             }
         }
         for r in abandoned.values() {

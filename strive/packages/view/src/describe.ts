@@ -152,6 +152,28 @@ export function describe(entry: Entry, options: DescribeOptions = {}): Line[] {
       return note("faint", `${verb} by ${e.by}`);
     }
 
+    // The learning session's own events: what the learner was asked, what it
+    // proposed, and what became of each proposal.
+    case "learnRequested":
+      return note(
+        "muted",
+        e.sessions.length === 0
+          ? "Asked to learn from recent sessions"
+          : `Asked to learn from ${e.sessions.join(", ")}`,
+      );
+    case "proposalMade":
+      return note("accent", `Proposed #${entry.seq}: ${e.proposal.summary}`);
+    case "gateFinished":
+      return note(
+        e.verdict === "fail" ? "danger" : "faint",
+        `#${e.proposal} ${e.gate} check: ${e.verdict}. ${e.detail}`,
+      );
+    case "proposalDecided":
+      return note("muted", `#${e.proposal} ${e.decision === "accept" ? "accepted" : "rejected"} by ${e.by}`);
+    case "proposalApplied":
+      return note("accent", `#${e.proposal} applied`);
+    case "proposalRolledBack":
+      return note("muted", `#${e.proposal} rolled back by ${e.by}`);
     default:
       return e satisfies never;
   }

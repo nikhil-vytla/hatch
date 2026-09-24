@@ -53,6 +53,7 @@ fn clock(ms: u64) -> String {
     )
 }
 
+#[expect(clippy::too_many_lines, reason = "one short arm per event")]
 pub fn describe(e: &Entry) -> String {
     match &e.event {
         Event::SessionStarted { cwd, .. } => format!("started in {cwd}"),
@@ -102,6 +103,17 @@ pub fn describe(e: &Entry) -> String {
         }
         Event::TurnStarted { turn, .. } => format!("turn {turn} started"),
         Event::LayoutProposed { label, .. } => format!("agent proposed a layout change: {label}"),
+        Event::LearnRequested { sessions } if sessions.is_empty() => {
+            "asked the learner to study recent sessions".into()
+        }
+        Event::LearnRequested { sessions } => format!("asked the learner to study {}", sessions.join(", ")),
+        Event::ProposalMade { proposal, .. } => format!("learner proposed #{}: {}", e.seq, proposal.summary),
+        Event::GateFinished { proposal, gate, verdict, detail } => {
+            format!("proposal #{proposal}: {gate:?} check {verdict:?}: {detail}").to_lowercase()
+        }
+        Event::ProposalDecided { proposal, decision, by } => format!("proposal #{proposal} {decision:?} by {by}"),
+        Event::ProposalApplied { proposal, .. } => format!("proposal #{proposal} applied"),
+        Event::ProposalRolledBack { proposal, by } => format!("proposal #{proposal} rolled back by {by}"),
         Event::Compacted { upto_seq, summary } => {
             format!("conversation up to #{upto_seq} summarized ({} characters)", summary.len())
         }

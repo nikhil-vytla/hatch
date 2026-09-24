@@ -84,6 +84,11 @@ methods! {
             ApprovalRespond = "approval/respond" (ApprovalRespondParams) -> Empty;
     SessionRewind = "session/rewind" (SessionRewindParams) -> SessionRewindResult;
     SessionChanges = "session/changes" (SessionChangesParams) -> SessionChangesResult;
+    LearningOpen = "learning/open" (ProjectRef) -> SessionInfo;
+    LearningRun = "learning/run" (LearningRunParams) -> Appended;
+    ProposalList = "proposal/list" (ProjectRef) -> ProposalListResult;
+    ProposalDecide = "proposal/decide" (ProposalDecideParams) -> Appended;
+    ProposalRollback = "proposal/rollback" (ProposalRef) -> Appended;
     HostRegister = "host/register" (SessionRef) -> AgentConfig;
     HostRecord = "host/record" (HostRecordParams) -> Appended;
     HostStream = "host/stream" (HostStreamParams) -> Empty;
@@ -204,6 +209,9 @@ pub struct SessionInfo {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub last_active_ms: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub kind: Option<SessionKind>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
@@ -470,6 +478,182 @@ pub struct AgentConfig {
     /// Tools from the MCP servers that started. The agent calls them as
     /// `mcp` effects.
     pub mcp_tools: Vec<McpTool>,
+    /// What the session is for: a learning session's host runs the learner.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub kind: Option<SessionKind>,
+}
+
+/// What a session is for.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub enum SessionKind {
+    /// A person's work with the agent.
+    #[default]
+    Work,
+    /// The project's learner: it studies work sessions and proposes changes
+    /// to the agent's memory and skills, which people review.
+    Learning,
+}
+
+/// A project: the directory its sessions work in.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct ProjectRef {
+    pub cwd: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct LearningRunParams {
+    pub cwd: String,
+    /// Work sessions to study; none: those since the learner last looked.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub sessions: Option<Vec<String>>,
+}
+
+/// A change the learner proposes: a whole file's new text, why, the
+/// evidence, and what should happen if it's right.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct Proposal {
+    pub artifact: Artifact,
+    /// The file's whole new text. Memory and skills are small; a whole file
+    /// can be checked, shown and undone exactly.
+    pub content: String,
+    /// One line: what it changes, for a list.
+    pub summary: String,
+    /// Why, in the learner's words.
+    pub rationale: String,
+    /// The sessions (and entries in them) that led to it.
+    pub evidence: Vec<Evidence>,
+    /// A falsifiable claim about what the change will do, checked later.
+    pub prediction: String,
+}
+
+/// What a proposal changes. Paths are fixed by kind, inside the project:
+/// memory is `.strive/memory.md`, a skill `.strive/skills/<name>/SKILL.md`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase", tag = "kind")]
+#[ts(export)]
+pub enum Artifact {
+    Memory,
+    Skill { name: String },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct Evidence {
+    pub session: String,
+    /// Entries in it, by seq.
+    #[serde(default)]
+    pub seqs: Vec<u64>,
+    /// What those entries show.
+    pub note: String,
+}
+
+/// A check a proposal goes through before a person sees it as ready.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub enum Gate {
+    /// The daemon's own checks: path, size, secrets, instructions that
+    /// would weaken strive's safeguards.
+    Static,
+    /// A model, outside the learner's authority, judging it against
+    /// sessions the learner didn't see.
+    Judge,
+    /// Past tasks run again with and without it.
+    Replay,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub enum Verdict {
+    Pass,
+    Fail,
+    /// Not run, and why is in the detail.
+    Skipped,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub enum ProposalDecision {
+    Accept,
+    Reject,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct ProposalRef {
+    pub cwd: String,
+    pub proposal: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct ProposalDecideParams {
+    pub cwd: String,
+    pub proposal: u64,
+    pub decision: ProposalDecision,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct ProposalListResult {
+    /// Newest first.
+    pub proposals: Vec<ProposalState>,
+}
+
+/// A proposal as it stands, folded from the learning session's journal.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct ProposalState {
+    pub id: u64,
+    pub made_at_ms: u64,
+    pub proposal: Proposal,
+    pub status: ProposalStatus,
+    pub gates: Vec<GateOutcome>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct GateOutcome {
+    pub gate: Gate,
+    pub verdict: Verdict,
+    pub detail: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub enum ProposalStatus {
+    /// Checks still running.
+    Checking,
+    /// Every check passed or was skipped; waiting for a person.
+    Ready,
+    /// A check failed; a person may still look, but it can't be accepted.
+    Failed,
+    Rejected,
+    /// Accepted and written.
+    Applied,
+    /// Accepted, but the file had changed since it was proposed, so it
+    /// wasn't written.
+    Stale,
+    RolledBack,
 }
 
 /// An event the host records: only turn and assistant events are accepted.
@@ -608,6 +792,10 @@ pub enum Event {
         format: u32,
         cwd: String,
         strive_version: String,
+        /// What the session is for; a work session when absent.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[ts(optional)]
+        kind: Option<SessionKind>,
     },
     UserMessage {
         text: String,
@@ -720,6 +908,53 @@ pub enum Event {
         /// MCP servers from settings, and how each started.
         #[serde(default)]
         mcp: Vec<McpStatus>,
+    },
+    /// A person asked the project's learner to study sessions (none named:
+    /// the ones since it last looked). Journaled in the learning session;
+    /// its host takes it as a prompt.
+    LearnRequested {
+        /// The work sessions to study; empty: those since the learner last looked.
+        #[serde(default)]
+        sessions: Vec<String>,
+    },
+    /// The learner proposed a change to what the agent is given (its memory
+    /// or a skill). Nothing changes until a person accepts it. Its id is
+    /// this entry's seq.
+    ProposalMade {
+        /// The learner's tool call that made it, whose result it is.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[ts(optional)]
+        call_id: Option<String>,
+        proposal: Proposal,
+    },
+    /// A check of a proposal finished.
+    GateFinished {
+        proposal: u64,
+        gate: Gate,
+        verdict: Verdict,
+        /// What it found, for a person reviewing the proposal.
+        detail: String,
+    },
+    /// A person accepted or rejected a proposal.
+    ProposalDecided {
+        proposal: u64,
+        decision: ProposalDecision,
+        /// The client that decided.
+        by: String,
+    },
+    /// An accepted proposal was written: the file as it was (none if it
+    /// didn't exist) and as it is now.
+    ProposalApplied {
+        proposal: u64,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[ts(optional)]
+        before: Option<Digest>,
+        after: Digest,
+    },
+    /// An applied proposal was undone: the file is back as it was.
+    ProposalRolledBack {
+        proposal: u64,
+        by: String,
     },
     /// The agent proposed a change to the desktop workspace's layout. It
     /// changes nothing until a person accepts it in the desktop app.

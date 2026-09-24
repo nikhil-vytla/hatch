@@ -6,9 +6,14 @@ import type { Decision } from "./Decision";
 import type { Digest } from "./Digest";
 import type { EffectOutcome } from "./EffectOutcome";
 import type { EffectRecord } from "./EffectRecord";
+import type { Gate } from "./Gate";
 import type { McpStatus } from "./McpStatus";
+import type { Proposal } from "./Proposal";
+import type { ProposalDecision } from "./ProposalDecision";
+import type { SessionKind } from "./SessionKind";
 import type { ToolCall } from "./ToolCall";
 import type { TurnEnd } from "./TurnEnd";
+import type { Verdict } from "./Verdict";
 
 /**
  * Something that happened in a session. Journaled in order; never edited.
@@ -17,7 +22,11 @@ export type Event = { "type": "sessionStarted",
 /**
  * Journal format version.
  */
-format: number, cwd: string, striveVersion: string, } | { "type": "userMessage", text: string, } | { "type": "recovered", discardedBytes: number, } | { "type": "budgetSet", usdMicros?: number, tokens?: number, } | { "type": "modelCallStarted", 
+format: number, cwd: string, striveVersion: string, 
+/**
+ * What the session is for; a work session when absent.
+ */
+kind?: SessionKind, } | { "type": "userMessage", text: string, } | { "type": "recovered", discardedBytes: number, } | { "type": "budgetSet", usdMicros?: number, tokens?: number, } | { "type": "modelCallStarted", 
 /**
  * Numbers this session's calls; pairs with `ModelCallFinished`.
  */
@@ -70,7 +79,23 @@ message: unknown, } | { "type": "turnEnded", turn: number, reason: TurnEnd, } | 
 /**
  * MCP servers from settings, and how each started.
  */
-mcp: Array<McpStatus>, } | { "type": "layoutProposed", 
+mcp: Array<McpStatus>, } | { "type": "learnRequested", 
+/**
+ * The work sessions to study; empty: those since the learner last looked.
+ */
+sessions: Array<string>, } | { "type": "proposalMade", 
+/**
+ * The learner's tool call that made it, whose result it is.
+ */
+callId?: string, proposal: Proposal, } | { "type": "gateFinished", proposal: number, gate: Gate, verdict: Verdict, 
+/**
+ * What it found, for a person reviewing the proposal.
+ */
+detail: string, } | { "type": "proposalDecided", proposal: number, decision: ProposalDecision, 
+/**
+ * The client that decided.
+ */
+by: string, } | { "type": "proposalApplied", proposal: number, before?: Digest, after: Digest, } | { "type": "proposalRolledBack", proposal: number, by: string, } | { "type": "layoutProposed", 
 /**
  * The agent's tool call that made the proposal, whose result it is.
  */
