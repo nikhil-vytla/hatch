@@ -17,6 +17,8 @@ type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   actions: PaletteAction[];
+  /** Panels to show beside the conversation, or hide. */
+  panels: PaletteAction[];
   modes: { current: ApprovalMode; set: (m: ApprovalMode) => void };
   checkpoints: { n: number; label: string }[];
   onRewind: (n: number) => void;
@@ -31,6 +33,7 @@ export function Palette({
   open,
   onOpenChange,
   actions,
+  panels,
   modes,
   checkpoints,
   onRewind,
@@ -68,6 +71,13 @@ export function Palette({
             <Command.Item key={a.id} value={a.label} onSelect={choose(a.run)}>
               <span>{a.label}</span>
               {a.keys && <kbd>{a.keys}</kbd>}
+            </Command.Item>
+          ))}
+        </Command.Group>
+        <Command.Group heading="Panels">
+          {panels.map((a) => (
+            <Command.Item key={a.id} value={a.label} onSelect={choose(a.run)}>
+              <span>{a.label}</span>
             </Command.Item>
           ))}
         </Command.Group>

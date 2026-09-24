@@ -126,6 +126,22 @@ async function openApp(): Promise<Opened> {
   return { app, page, cwd, userData };
 }
 
+/** Waits for the checkpoint taken before the last prompt: the prompt offers a rewind to it. */
+async function checkpointed(page: Page): Promise<void> {
+  await page.locator(".msg.user").last().getByRole("button", { name: "rewind to before this prompt" }).waitFor();
+}
+
+/** Runs a palette command by typing its name. */
+async function command(page: Page, name: string): Promise<void> {
+  await page.keyboard.press("Meta+k");
+  const palette = page.getByRole("dialog", { name: "Command palette" });
+  await palette.waitFor();
+  await page.keyboard.type(name);
+  await palette.getByRole("option", { name, exact: true }).waitFor();
+  await page.keyboard.press("Enter");
+  await palette.waitFor({ state: "detached" });
+}
+
 function sessionId(cwd: string): string {
   const sessions: { id: string; cwd: string }[] = JSON.parse(strive("sessions", "--all", "--json"));
   const s = sessions.find((x) => x.cwd === cwd);
@@ -223,7 +239,7 @@ test("the changes pane shows what changed since the last prompt, file by file", 
   writeFileSync(join(cwd, "notes.ts"), "const a = 1;\n");
   await page.getByPlaceholder("Ask strive to do anything…").fill("change things");
   await page.keyboard.press("Enter");
-  await page.locator(".checkpoints li").first().waitFor();
+  await checkpointed(page);
   writeFileSync(join(cwd, "notes.ts"), "const a = 2;\n");
   writeFileSync(join(cwd, "new.txt"), "hello\n");
   await page.getByRole("button", { name: "changes", exact: true }).click();
@@ -270,7 +286,7 @@ test("the changes pane follows a rewind", async () => {
   writeFileSync(join(cwd, "a.txt"), "v1\n");
   await page.getByPlaceholder("Ask strive to do anything…").fill("first");
   await page.keyboard.press("Enter");
-  await page.locator(".checkpoints li").first().waitFor();
+  await checkpointed(page);
   writeFileSync(join(cwd, "a.txt"), "v2\n");
   await page.getByRole("button", { name: "changes", exact: true }).click();
   const pane = page.getByRole("complementary", { name: "changes" });
@@ -289,7 +305,7 @@ test("a change deep in a long file shows in the pane, with the unchanged lines f
   writeFileSync(join(cwd, "long.txt"), `${lines.join("\n")}\n`);
   await page.getByPlaceholder("Ask strive to do anything…").fill("first");
   await page.keyboard.press("Enter");
-  await page.locator(".checkpoints li").first().waitFor();
+  await checkpointed(page);
   lines[449] = "LINE 450";
   writeFileSync(join(cwd, "long.txt"), `${lines.join("\n")}\n`);
   await page.getByRole("button", { name: "changes", exact: true }).click();
@@ -305,7 +321,7 @@ test("a change at line 2,000 stays in view when the lines above it are opened", 
   writeFileSync(join(cwd, "big.txt"), `${lines.join("\n")}\n`);
   await page.getByPlaceholder("Ask strive to do anything…").fill("first");
   await page.keyboard.press("Enter");
-  await page.locator(".checkpoints li").first().waitFor();
+  await checkpointed(page);
   lines[1999] = "LINE 2000";
   writeFileSync(join(cwd, "big.txt"), `${lines.join("\n")}\n`);
   await page.getByRole("button", { name: "changes", exact: true }).click();
@@ -350,6 +366,7 @@ test("Rewind in the checkpoints panel puts the files back", async () => {
   writeFileSync(join(cwd, "notes.txt"), "v1");
   await page.getByPlaceholder("Ask strive to do anything…").fill("first");
   await page.keyboard.press("Enter");
+  await command(page, "Show checkpoints");
   await page.locator(".checkpoints li", { hasText: "before “first”" }).waitFor();
   writeFileSync(join(cwd, "notes.txt"), "v2");
   await page.locator(".checkpoints li", { hasText: "before “first”" }).getByRole("button", { name: "Rewind" }).click();
@@ -358,8 +375,44 @@ test("Rewind in the checkpoints panel puts the files back", async () => {
   await app.close();
 });
 
+test("Rewind on a prompt asks first, then puts the files back as they were before it", async () => {
+  const { page, cwd } = await openApp();
+  writeFileSync(join(cwd, "notes.txt"), "v1");
+  await page.getByPlaceholder("Ask strive to do anything…").fill("first");
+  await page.keyboard.press("Enter");
+  await checkpointed(page);
+  writeFileSync(join(cwd, "notes.txt"), "v2");
+  const prompt = page.locator(".msg.user", { hasText: "first" });
+  await prompt.hover();
+  await prompt.getByRole("button", { name: "rewind to before this prompt" }).click();
+  await prompt.getByRole("button", { name: "Cancel" }).click();
+  assert.equal(readFileSync(join(cwd, "notes.txt"), "utf8"), "v2", "cancelled: nothing restored");
+  await prompt.hover();
+  await prompt.getByRole("button", { name: "rewind to before this prompt" }).click();
+  await prompt.getByRole("button", { name: "Restore files" }).click();
+  await page.getByText("Rewound to checkpoint 1.").waitFor();
+  assert.equal(readFileSync(join(cwd, "notes.txt"), "utf8"), "v1");
+});
+
+test("the conversation has the window to itself until a panel is shown, which is saved and can be hidden", async () => {
+  const { page, userData } = await openApp();
+  assert.equal(await page.locator("[data-panel]").count(), 1, "only the conversation");
+  assert.equal(await page.locator('[data-panel="transcript"] .handle').count(), 0, "nowhere to drag it");
+  await command(page, "Show spend");
+  await page.locator('[data-column="side"] [data-panel="spend"]').waitFor();
+  await page.locator('[data-panel="transcript"] .handle').waitFor({ state: "attached" });
+  const saved = JSON.parse(readFileSync(join(userData, "workspace.json"), "utf8"));
+  assert.deepEqual(saved.edits.at(-1).ops, [{ op: "move", panel: "spend", column: "side" }]);
+  await page.locator('[data-panel="spend"]').hover();
+  await page.getByRole("button", { name: "hide spend" }).click();
+  await page.locator('[data-panel="spend"]').waitFor({ state: "detached" });
+  await command(page, "Show spend");
+  await page.locator('[data-panel="spend"]').waitFor();
+});
+
 test("a panel dragged to another column stays there, and is saved", async () => {
   const { app, page, userData } = await openApp();
+  await command(page, "Show spend");
   const spend = page.locator('[data-panel="spend"] .handle');
   const main = page.locator('[data-column="main"]');
   const from = await spend.boundingBox();
@@ -452,19 +505,19 @@ test("an agent's layout proposal changes nothing until accepted, and can be undo
 
 test("a rejected proposal isn't offered again, even after reopening", async () => {
   const first = await openApp();
-  const host = await propose(first.cwd, "drop spend", [{ op: "remove", panel: "spend" }]);
-  await first.page.getByText("The agent proposes: drop spend").waitFor();
+  const host = await propose(first.cwd, "show spend", [{ op: "move", panel: "spend", column: "side" }]);
+  await first.page.getByText("The agent proposes: show spend").waitFor();
   await first.page.getByRole("button", { name: "Reject" }).click();
-  await first.page.getByText("The agent proposes: drop spend").waitFor({ state: "detached" });
+  await first.page.getByText("The agent proposes: show spend").waitFor({ state: "detached" });
   host.close();
   await first.app.close();
 
   const again = await launch([`--user-data-dir=${first.userData}`, "--cwd", first.cwd, "--continue"]);
 
   const page = await again.firstWindow();
-  await page.getByText("The agent proposed a layout change: drop spend").waitFor();
-  assert.equal(await page.getByText("The agent proposes: drop spend").count(), 0);
-  assert.equal(await page.locator('[data-panel="spend"]').count(), 1);
+  await page.getByText("The agent proposed a layout change: show spend").waitFor();
+  assert.equal(await page.getByText("The agent proposes: show spend").count(), 0);
+  assert.equal(await page.locator('[data-panel="spend"]').count(), 0, "the rejected change isn't applied");
   await again.close();
 });
 
@@ -629,7 +682,8 @@ test("a decision made in one window survives another window's save", async () =>
   const host = await propose(a.cwd, "drop spend", [{ op: "remove", panel: "spend" }]);
   await a.page.getByRole("button", { name: "Reject" }).click();
   await a.page.getByText("The agent proposes: drop spend").waitFor({ state: "detached" });
-  // B still offers it, but a save from B (a drag) must not undo A's rejection.
+  // B still offers it, but saves from B (showing a panel, a drag) must not undo A's rejection.
+  await command(pageB, "Show spend");
   const spend = pageB.locator('[data-panel="spend"] .handle');
   const main = pageB.locator('[data-column="main"]');
   const from = await spend.boundingBox();

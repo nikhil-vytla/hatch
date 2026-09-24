@@ -139,7 +139,15 @@ button.quiet.danger { color: var(--bad); }
 .handle { display: grid; place-items: center; width: 18px; height: 18px; margin-left: -4px; border-radius: 5px; color: var(--faint); cursor: grab; opacity: 0.55; transition: opacity 120ms, background 120ms; }
 .panel:hover .handle { opacity: 1; }
 .handle:hover { background: var(--surface-2); color: var(--muted); }
-.kind-transcript > .panel-head { position: absolute; top: 0; left: 0; z-index: 2; }
+/* The conversation's handle, only when there's somewhere to drag it: a grabber at its top edge. */
+.kind-transcript > .panel-head { position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 2; padding: 2px 0 0; }
+.kind-transcript > .panel-head .handle { width: 36px; height: 14px; margin: 0; opacity: 0; }
+.kind-transcript > .panel-head .handle .icon { transform: rotate(90deg); }
+.kind-transcript:hover > .panel-head .handle, .kind-transcript > .panel-head .handle:focus-visible { opacity: 0.8; }
+.column:empty { display: none; }
+.panel-head .hide { width: 22px; height: 22px; margin: -2px -4px -2px 0; opacity: 0; }
+.panel-head .hide .icon { width: 13px; height: 13px; }
+.panel:hover .panel-head .hide, .panel-head .hide:focus-visible { opacity: 1; }
 
 /* Spend */
 .spend .figure { font-size: 26px; font-weight: 600; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; margin: 2px 0 0; }
@@ -407,6 +415,14 @@ pre.diff { padding: 6px 0; }
 .msg.reply:hover .msg-actions, .msg-actions:focus-within { opacity: 1; }
 .msg-actions .copy { display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px; font-size: 12px; }
 .msg-actions .icon { width: 13px; height: 13px; }
+.msg.user { position: relative; flex-direction: column; align-items: flex-end; }
+.msg.user .msg-actions { bottom: -27px; z-index: 1; }
+.msg.user:hover .msg-actions { opacity: 1; }
+.rewind-confirm { display: flex; align-items: center; gap: 8px; margin-top: 8px; max-width: 78%; padding: 8px 8px 8px 12px; border-radius: 12px; background: var(--accent-soft); border: 1px solid rgb(139 124 246 / 0.3); font-size: 13px; color: var(--muted); }
+.rewind-confirm span { flex: 1; }
+.rewind-confirm button { flex: none; padding: 3px 10px; font-size: 12.5px; }
+.spend-meter { display: inline-flex; align-items: center; gap: 8px; font-variant-numeric: tabular-nums; }
+.meter.mini { width: 44px; height: 4px; margin: 0; }
 
 /* The prompt rail: a tick per prompt at the conversation's left. */
 .rail { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; gap: 7px; z-index: 3; }

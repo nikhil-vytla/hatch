@@ -2,13 +2,20 @@
 // dragging; the agent proposes edits to it. Both are the same ID-addressed
 // ops, so an edit still applies after the layout has changed around it.
 
-import { LIMITS, type Op, type Workspace } from "./schema";
+import { LIMITS, type Op, type PanelKind, type Workspace } from "./schema";
 
+/**
+ * The conversation alone: approvals are answered in it, spend and
+ * checkpoints sit in the window's chrome, and activity repeats its tool
+ * rows. The other panels exist but aren't placed, so a person (or an
+ * accepted proposal) shows one by moving it into a column. A saved layout
+ * carries its own base, so changing this never rearranges a saved one.
+ */
 export const DEFAULT_WORKSPACE: Workspace = {
   version: 1,
   columns: [
     { id: "main", grow: 2, panels: ["transcript"] },
-    { id: "side", grow: 1, panels: ["approvals", "spend", "checkpoints", "activity"] },
+    { id: "side", grow: 1, panels: [] },
   ],
   panels: [
     { id: "transcript", kind: "transcript" },
@@ -101,4 +108,26 @@ export function applyOps(w: Workspace, ops: Op[]): Applied {
   }
 
   return { ok: true, workspace: current };
+}
+
+/** Whether a column places the panel, so it's on screen. */
+export const placed = (w: Workspace, panel: string): boolean => w.columns.some((c) => c.panels.includes(panel));
+
+/** The built-in panels a person can show and hide. */
+export type SidePanel = Exclude<PanelKind, "transcript" | "html">;
+
+/**
+ * The ops that put a built-in panel on screen, at the end of the side
+ * column (or the last column, in a layout without one): a move for one
+ * that exists but isn't placed, an add for one that was removed, none for
+ * one already showing.
+ */
+export function showPanel(w: Workspace, kind: SidePanel): Op[] {
+  const column = (w.columns.find((c) => c.id === "side") ?? w.columns.at(-1))?.id;
+
+  if (column === undefined || placed(w, kind)) return [];
+
+  return w.panels.some((p) => p.id === kind)
+    ? [{ op: "move", panel: kind, column }]
+    : [{ op: "add", panel: { id: kind, kind }, column }];
 }

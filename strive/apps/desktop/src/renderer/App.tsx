@@ -11,11 +11,15 @@ import {
   fold,
   type History,
   history as newHistory,
+  type Op,
   type Panel,
   ProposalSchema,
   parseJson,
+  placed,
   record,
+  type SidePanel,
   setReverted,
+  showPanel,
   type Workspace,
 } from "@strive/workspace";
 import { type ReactNode, useCallback, useEffect, useLayoutEffect, useReducer, useRef, useState } from "react";
@@ -77,7 +81,30 @@ export function App({ bridge, opened, onSwitch }: Props) {
   };
 
   const workspace = fold(layout).workspace;
-  const inline = workspace.columns.some((c) => c.panels.includes("transcript"));
+  const inline = placed(workspace, "transcript");
+
+  /** A person's edit to the layout, recorded like a drag. */
+  const change = (label: string, ops: Op[]) => {
+    const r = record(layout, "person", label, ops);
+
+    if (r.ok) edit(r.history);
+    else setError(`The layout didn't change: ${r.error}`);
+  };
+
+  const panelActions = SIDE_PANELS.map((kind) =>
+    placed(workspace, kind)
+      ? {
+          id: `hide-${kind}`,
+          label: `Hide ${TITLES[kind].toLowerCase()}`,
+          run: () => change(`hide ${kind}`, [{ op: "remove", panel: kind }]),
+        }
+      : {
+          id: `show-${kind}`,
+          label: `Show ${TITLES[kind].toLowerCase()}`,
+          run: () => change(`show ${kind}`, showPanel(workspace, kind)),
+        },
+  );
+
   const [sidebar, setSidebar] = useState(() => localStorage.getItem(SIDEBAR_KEY) !== "hidden");
 
   const toggleSidebar = () =>
@@ -150,6 +177,7 @@ export function App({ bridge, opened, onSwitch }: Props) {
           onToggle={toggleSidebar}
           changes={changes}
           onChanges={toggleChanges}
+          onPalette={() => setPalette(true)}
         />
         {closed && (
           <div className="banner danger">
@@ -173,6 +201,7 @@ export function App({ bridge, opened, onSwitch }: Props) {
               ? [{ id: "interrupt", label: "Interrupt the agent", keys: "Esc", run: session.interrupt }]
               : []),
           ]}
+          panels={panelActions}
           modes={{ current: model.mode, set: session.setMode }}
           checkpoints={model.checkpoints}
           onRewind={session.rewind}
@@ -183,11 +212,8 @@ export function App({ bridge, opened, onSwitch }: Props) {
         <div className={`work ${changes ? "with-changes" : ""}`}>
           <Columns
             workspace={workspace}
-            onMove={(panel, column, before) => {
-              const r = record(layout, "person", `move ${panel}`, [{ op: "move", panel, column, before }]);
-
-              if (r.ok) edit(r.history);
-            }}
+            onMove={(panel, column, before) => change(`move ${panel}`, [{ op: "move", panel, column, before }])}
+            onHide={(panel) => change(`hide ${panel}`, [{ op: "remove", panel }])}
             render={(panel) => (
               <PanelView panel={panel} model={model} opened={opened} session={session} inline={inline} />
             )}
@@ -309,9 +335,9 @@ type SessionActions = {
   workspace: string;
 };
 
-/** Dollars as people read them: cents from a dollar up, four places below. */
+/** Dollars as people read them: cents from a dollar up or for whole cents, four places otherwise. */
 function formatUsd(micros: number): string {
-  return micros >= 1_000_000 ? `$${(micros / 1_000_000).toFixed(2)}` : exactUsd(micros);
+  return micros >= 1_000_000 || micros % 10_000 === 0 ? `$${(micros / 1_000_000).toFixed(2)}` : exactUsd(micros);
 }
 
 /** A path under the user's home written with `~`. */
@@ -330,9 +356,10 @@ type TitlebarProps = {
   onToggle: () => void;
   changes: boolean;
   onChanges: () => void;
+  onPalette: () => void;
 };
 
-function Titlebar({ model, opened, sidebar, onToggle, changes, onChanges }: TitlebarProps) {
+function Titlebar({ model, opened, sidebar, onToggle, changes, onChanges, onPalette }: TitlebarProps) {
   const first = model.conversation.items.find((i) => i.kind === "user");
   const title = first?.kind === "user" ? first.text : "New session";
 
@@ -358,13 +385,9 @@ function Titlebar({ model, opened, sidebar, onToggle, changes, onChanges }: Titl
         </span>
       )}
       <span className="spacer" />
-      {model.working ? (
-        <span className="status working">
-          <span className="pulse" /> Working
-        </span>
-      ) : (
-        <span className="status">Ready</span>
-      )}
+      <button type="button" className="icon-button" onClick={onPalette} title="Commands (⌘K)" aria-label="commands">
+        <Icon name="command" />
+      </button>
       <button
         type="button"
         className={`icon-button ${changes ? "on" : ""}`}
@@ -432,12 +455,15 @@ function Proposals({
 type ColumnsProps = {
   workspace: Workspace;
   onMove: (panel: string, column: string, before?: string) => void;
+  onHide: (panel: string) => void;
   render: (panel: Panel) => ReactNode;
 };
 
-function Columns({ workspace, onMove, render }: ColumnsProps) {
+function Columns({ workspace, onMove, onHide, render }: ColumnsProps) {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
   const panels = new Map(workspace.panels.map((p) => [p.id, p]));
+  // The conversation alone has nowhere to go: no handle to drag it by.
+  const arranged = workspace.columns.some((c) => c.panels.some((p) => p !== "transcript"));
 
   const onDragEnd = ({ active, over }: DragEndEvent) => {
     if (!over || active.id === over.id) return;
@@ -472,7 +498,12 @@ function Columns({ workspace, onMove, render }: ColumnsProps) {
 
                 return panel
                   ? [
-                      <Sortable key={pid} panel={panel}>
+                      <Sortable
+                        key={pid}
+                        panel={panel}
+                        movable={panel.kind !== "transcript" || arranged}
+                        onHide={() => onHide(pid)}
+                      >
                         {render(panel)}
                       </Sortable>,
                     ]
@@ -494,15 +525,22 @@ const TITLES: Record<Exclude<Panel["kind"], "html">, string> = {
   activity: "Activity",
 };
 
+/** The panels a person can show beside the conversation, in the palette's order. */
+const SIDE_PANELS: SidePanel[] = ["spend", "checkpoints", "activity", "approvals"];
+
 const panelTitle = (p: Panel) => (p.kind === "html" ? p.title : TITLES[p.kind]);
 
-function Sortable({ panel, children }: { panel: Panel; children: ReactNode }) {
+type SortableProps = { panel: Panel; movable: boolean; onHide: () => void; children: ReactNode };
+
+function Sortable({ panel, movable, onHide, children }: SortableProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: panel.id });
 
   const style = {
     transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
     transition,
   };
+
+  const transcript = panel.kind === "transcript";
 
   return (
     <div
@@ -511,12 +549,30 @@ function Sortable({ panel, children }: { panel: Panel; children: ReactNode }) {
       className={`panel kind-${panel.kind} ${isDragging ? "dragging" : ""}`}
       data-panel={panel.id}
     >
-      <div className="panel-head">
-        <div className="handle" {...attributes} {...listeners} aria-label={`move ${panel.id}`}>
-          <Icon name="grip" />
+      {(movable || !transcript) && (
+        <div className="panel-head">
+          {movable && (
+            <div className="handle" {...attributes} {...listeners} aria-label={`move ${panel.id}`}>
+              <Icon name="grip" />
+            </div>
+          )}
+          {!transcript && (
+            <>
+              <h2>{panelTitle(panel)}</h2>
+              <span className="spacer" />
+              <button
+                type="button"
+                className="icon-button hide"
+                onClick={onHide}
+                aria-label={`hide ${panel.id}`}
+                title="Hide (show it again from ⌘K)"
+              >
+                <Icon name="x" />
+              </button>
+            </>
+          )}
         </div>
-        {panel.kind !== "transcript" && <h2>{panelTitle(panel)}</h2>}
-      </div>
+      )}
       {children}
     </div>
   );
@@ -623,6 +679,34 @@ function SpendView({ model }: { model: SessionModel }) {
   );
 }
 
+/** The session's spend against its limit, small enough for the composer's footer. */
+function SpendMeter({ spend: s }: { spend: SessionModel["spend"] }) {
+  const share = s.usdLimit ? Math.min(1, s.spentUsd / s.usdLimit) : 0;
+  const tokens = s.spentTokens > 0 ? ` · ${compact(s.spentTokens)} tokens` : "";
+  const limit = s.usdLimit === undefined ? "no limit" : `of ${formatUsd(s.usdLimit)}`;
+
+  return (
+    <span className="spend-meter" title={`${formatUsd(s.spentUsd)} ${limit} for this session${tokens}`}>
+      {s.usdLimit !== undefined && (
+        <span
+          className={`meter mini ${share > 0.8 ? "high" : ""}`}
+          role="meter"
+          aria-label="spend"
+          aria-valuenow={share}
+          aria-valuemin={0}
+          aria-valuemax={1}
+        >
+          <span style={{ width: `${share * 100}%` }} />
+        </span>
+      )}
+      <span className="figures">
+        {formatUsd(s.spentUsd)}
+        {s.usdLimit !== undefined && <span className="faint"> / {formatUsd(s.usdLimit)}</span>}
+      </span>
+    </span>
+  );
+}
+
 function compact(n: number): string {
   return n < 1000 ? String(n) : n < 1_000_000 ? `${(n / 1000).toFixed(1)}k` : `${(n / 1_000_000).toFixed(1)}M`;
 }
@@ -658,6 +742,7 @@ function Transcript({ model, opened, session }: { model: SessionModel; opened: O
               item={item}
               session={session}
               live={model.working && i === lastTools && i === items.length - 1}
+              checkpoint={item.kind === "user" ? model.before.get(item.seq) : undefined}
             />
           ))}
           {model.live && (
@@ -691,9 +776,18 @@ function Transcript({ model, opened, session }: { model: SessionModel; opened: O
 /** Past this, a prompt shows folded, with "Show more". */
 const LONG_PROMPT = { chars: 700, lines: 12 };
 
-function UserMessage({ id, text }: { id: string; text: string }) {
+type UserMessageProps = {
+  id: string;
+  text: string;
+  /** The checkpoint taken just before this prompt, if one was. */
+  checkpoint?: number;
+  onRewind: (checkpoint: number) => void;
+};
+
+function UserMessage({ id, text, checkpoint, onRewind }: UserMessageProps) {
   const long = text.length > LONG_PROMPT.chars || text.split("\n").length > LONG_PROMPT.lines;
   const [open, setOpen] = useState(false);
+  const [confirming, setConfirming] = useState(false);
 
   return (
     <div className="msg user" id={id}>
@@ -705,6 +799,39 @@ function UserMessage({ id, text }: { id: string; text: string }) {
           </button>
         )}
       </div>
+      {confirming && checkpoint !== undefined ? (
+        <div className="rewind-confirm" role="group" aria-label="rewind">
+          <span>Put the files back as they were before this prompt? What's there now is saved first.</span>
+          <button type="button" className="quiet" onClick={() => setConfirming(false)}>
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="primary"
+            onClick={() => {
+              setConfirming(false);
+              onRewind(checkpoint);
+            }}
+          >
+            Restore files
+          </button>
+        </div>
+      ) : (
+        <div className="msg-actions">
+          <CopyButton text={text} label="copy prompt" />
+          {checkpoint !== undefined && (
+            <button
+              type="button"
+              className="quiet copy"
+              aria-label="rewind to before this prompt"
+              title={`Restore the files to checkpoint ${checkpoint}`}
+              onClick={() => setConfirming(true)}
+            >
+              <Icon name="rewind" /> Rewind
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -808,10 +935,12 @@ function Empty({ opened }: { opened: Opened }) {
   );
 }
 
-function ItemView({ item, session, live }: { item: Item; session: SessionActions; live: boolean }) {
+type ItemProps = { item: Item; session: SessionActions; live: boolean; checkpoint?: number };
+
+function ItemView({ item, session, live, checkpoint }: ItemProps) {
   switch (item.kind) {
     case "user":
-      return <UserMessage id={`msg-${item.seq}`} text={item.text} />;
+      return <UserMessage id={`msg-${item.seq}`} text={item.text} checkpoint={checkpoint} onRewind={session.rewind} />;
     case "reply":
       return (
         <div className="msg reply">
@@ -1079,10 +1208,7 @@ function Composer({ model, opened, session }: { model: SessionModel; opened: Ope
           <Icon name="folder" /> {tilde(opened.session.cwd, opened.home)}
         </span>
         <span className="spacer" />
-        <span>
-          {formatUsd(s.spentUsd)}
-          {s.usdLimit !== undefined && ` of ${formatUsd(s.usdLimit)}`}
-        </span>
+        <SpendMeter spend={s} />
       </div>
     </div>
   );

@@ -21,6 +21,8 @@ export class SessionModel {
   live = "";
   readonly spend = new Spend();
   readonly checkpoints: { n: number; label: string }[] = [];
+  /** The checkpoint taken just before each prompt, by the prompt's seq: what rewinding to it restores. */
+  readonly before = new Map<number, number>();
   readonly activity: Activity[] = [];
   readonly proposals: Proposal[] = [];
   mode: ApprovalMode = "autoEdit";
@@ -60,7 +62,11 @@ export class SessionModel {
         this.labelNext = e.checkpoint;
         break;
       case "userMessage":
-        if (this.labelNext !== undefined) this.label(this.labelNext, `before “${e.text}”`);
+        if (this.labelNext !== undefined) {
+          this.label(this.labelNext, `before “${e.text}”`);
+          this.before.set(entry.seq, this.labelNext);
+        }
+
         this.labelNext = undefined;
         break;
       case "rewound":

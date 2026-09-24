@@ -34,3 +34,16 @@ test("activity shows each effect and how it ended", () => {
   m.apply(at({ type: "effectFinished", effect: 1, outcome: { kind: "refused", reason: "no" }, durationMs: 1 }));
   expect(m.activity).toEqual([{ effect: 1, what: "$ false", outcome: "refused" }]);
 });
+
+test("a prompt knows the checkpoint taken just before it, and one sent without a checkpoint has none", () => {
+  const m = new SessionModel("s1");
+  m.apply(at({ type: "checkpointed", checkpoint: 1, commit: "a" }));
+  const first = at({ type: "userMessage", text: "one" });
+  m.apply(first);
+  const second = at({ type: "userMessage", text: "two" });
+  m.apply(second);
+  m.apply(at({ type: "checkpointed", checkpoint: 2, commit: "b" }));
+  const third = at({ type: "userMessage", text: "three" });
+  m.apply(third);
+  expect([m.before.get(first.seq), m.before.get(second.seq), m.before.get(third.seq)]).toEqual([1, undefined, 2]);
+});

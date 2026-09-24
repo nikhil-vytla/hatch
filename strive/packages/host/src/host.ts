@@ -187,6 +187,7 @@ function proposeLayout(client: StriveClient, sessionId: string): AgentTool<typeo
     label: "propose_layout",
     description: [
       "Propose a change to the person's desktop workspace: columns (main, side) of panels (transcript, spend, approvals, checkpoints, activity).",
+      "By default only the transcript is placed (in main); the other panels exist but show only once moved into a column.",
       "Ops: move {panel, column, before?}, add {panel: {id, kind, title?, html?}, column, before?}, remove {panel}, resize {column, grow}.",
       "An html panel is a small self-contained page you write (a chart, a checklist); it runs sandboxed with no network.",
       "Nothing changes until the person accepts it in the desktop app.",
