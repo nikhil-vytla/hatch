@@ -11,7 +11,8 @@
     "start": "bun scripts/start.ts",
     "record": "bun scripts/record.ts",
     "recover": "bun scripts/recover.ts && ../.venv/bin/python scripts/metrics.py",
-    "lint:arena": "cd .. && experience-prototypes/node_modules/.bin/oxlint -c .oxlintrc.json experience-prototypes/src/arena packages/arena/src"
+    "lint:arena": "cd .. && experience-prototypes/node_modules/.bin/oxlint -c .oxlintrc.json experience-prototypes/src/arena packages/arena/src",
+    "format:arena": "cd .. && experience-prototypes/node_modules/.bin/oxfmt -c .oxfmtrc.json experience-prototypes/src/arena packages/arena/src packages/arena/scripts"
   },
   "dependencies": {
     "@fal-ai/client": "^1.10.1",
@@ -38,6 +39,7 @@
     "@types/react-dom": "^19.2.3",
     "@types/three": "^0.186.0",
     "@vitejs/plugin-react": "^5.1.4",
+    "oxfmt": "0.70.0",
     "oxlint": "1.85.0",
     "tailwindcss": "^4.2.1",
     "typescript": "~5.9.3",
