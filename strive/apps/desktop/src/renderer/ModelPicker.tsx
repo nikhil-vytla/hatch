@@ -11,7 +11,7 @@ type Props = {
   /** The model the session uses (or will). */
   current?: string;
   /** Providers with a key: a model of any other can't be called. */
-  keyed: ReadonlySet<string>;
+  keyed?: ReadonlySet<string>;
   /** The session has a prompt, so its model is fixed. */
   locked: boolean;
   onPick: (model: string) => void;
@@ -130,7 +130,7 @@ export function ModelPicker({ models, current, keyed, locked, onPick, onNewSessi
                 >
                   <span className="check">{selected && <Icon name="check" />}</span>
                   <span className="name">{m.id}</span>
-                  {!keyed.has(m.provider) && <span className="tag">no {m.provider} key</span>}
+                  {keyed && !keyed.has(m.provider) && <span className="tag">no {m.provider} key</span>}
                   <span className="meta">
                     {contextSize(m.contextWindow)} · {perMillion(m.inputUsdMicros)} / {perMillion(m.outputUsdMicros)}
                   </span>

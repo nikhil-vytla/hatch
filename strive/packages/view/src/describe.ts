@@ -1,6 +1,7 @@
 // What each journal entry looks like in a transcript, for every client: the
 // TUI and the desktop app render the same lines, each in its own way.
 import type { Entry } from "@strive/protocol";
+import * as v from "valibot";
 import { formatUsd } from "./format";
 
 /** How a line reads: emphasis, not colour, so each client picks its own. */
@@ -30,6 +31,32 @@ export function budgetText(usd?: number, tokens?: number): string {
   if (tokens !== undefined) parts.push(`${tokens} tokens`);
 
   return parts.join(" and ");
+}
+
+/** The error body both providers' APIs (and strive's gateway) fail with. */
+const ErrorBody = v.object({ error: v.object({ message: v.string() }) });
+
+/**
+ * A failed turn's error as a person reads it: an SDK's `401 {"error":
+ * {"message": ...}}` becomes its message and the status; anything else is
+ * shown as it is.
+ */
+export function readableError(error: string): string {
+  const m = /^(\d{3}) (\{.*\})$/s.exec(error.trim());
+
+  if (!m) return error;
+
+  let parsed: v.SafeParseResult<typeof ErrorBody>;
+
+  try {
+    parsed = v.safeParse(ErrorBody, JSON.parse(m[2] ?? ""));
+  } catch {
+    return error; // not JSON after all
+  }
+
+  const message = parsed.success ? parsed.output.error.message.replace(/^strive: /, "") : undefined;
+
+  return message ? `${message.charAt(0).toUpperCase()}${message.slice(1)} (HTTP ${m[1]}).` : error;
 }
 
 /** The lines an entry adds to a transcript; none for entries that add nothing. */
@@ -136,7 +163,7 @@ export function describe(entry: Entry, options: DescribeOptions = {}): Line[] {
         case "timedOut":
           return note("danger", `Stopped: the turn reached its ${e.reason.seconds}s limit.`);
         case "failed":
-          return note("danger", `The agent stopped: ${e.reason.error}`);
+          return note("danger", `The agent stopped: ${readableError(e.reason.error)}`);
         default:
           return e.reason satisfies never;
       }

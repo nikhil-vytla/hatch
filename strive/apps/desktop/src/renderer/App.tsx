@@ -151,7 +151,7 @@ export function App({ bridge, opened, onSwitch }: Props) {
   });
 
   const [models, setModels] = useState<ModelListResult>();
-  const [keyed, setKeyed] = useState<ReadonlySet<string>>(new Set());
+  const [keyed, setKeyed] = useState<ReadonlySet<string>>();
 
   // Which models there are and which providers have keys: asked again on request, since keys change outside the app.
   const loadFacts = useCallback(() => {
@@ -162,7 +162,13 @@ export function App({ bridge, opened, onSwitch }: Props) {
     );
   }, [bridge]);
 
-  useEffect(loadFacts, [loadFacts]);
+  useEffect(() => {
+    loadFacts();
+    // A key added with `strive auth` in a terminal shows when the person comes back.
+    window.addEventListener("focus", loadFacts);
+
+    return () => window.removeEventListener("focus", loadFacts);
+  }, [loadFacts]);
 
   const loadChanges = useCallback(
     (checkpoint: number) => bridge.request("session/changes", { id, checkpoint }),
@@ -181,6 +187,7 @@ export function App({ bridge, opened, onSwitch }: Props) {
     newSession: () => switchTo(),
     models,
     keyed,
+    recheck: loadFacts,
   };
 
   return (
@@ -357,7 +364,9 @@ type SessionActions = {
   /** The daemon's priced models, once loaded. */
   models?: ModelListResult;
   /** Providers the daemon has a key for. */
-  keyed: ReadonlySet<string>;
+  keyed?: ReadonlySet<string>;
+  /** Asks for the models and keys again. */
+  recheck: () => void;
 };
 
 /** Dollars as people read them: cents from a dollar up or for whole cents, four places otherwise. */
@@ -760,7 +769,7 @@ function Transcript({ model, opened, session }: { model: SessionModel; opened: O
       <PromptRail prompts={items.flatMap((i) => (i.kind === "user" ? [{ seq: i.seq, text: i.text }] : []))} />
       <div className="scroller" ref={scrollRef}>
         <div className="thread" ref={contentRef}>
-          {!items.some((i) => i.kind === "user") && <Empty opened={opened} />}
+          {!items.some((i) => i.kind === "user") && <Empty opened={opened} model={model} session={session} />}
           {items.map((item, i) => (
             <ItemView
               key={`${item.kind}-${item.seq}`}
@@ -945,7 +954,28 @@ function clock(ms: number): string {
   return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${String(s % 60).padStart(2, "0")}s`;
 }
 
-function Empty({ opened }: { opened: Opened }) {
+const PROVIDERS = new Map([
+  ["anthropic", { name: "Anthropic", variable: "ANTHROPIC_API_KEY" }],
+  ["openai", { name: "OpenAI", variable: "OPENAI_API_KEY" }],
+]);
+
+/** What each approval mode lets the agent do, as the empty state explains it. */
+const MODE_MEANING: Record<ApprovalMode, string> = {
+  ask: "every change and command asks you first",
+  autoEdit: "edits in this folder go ahead; commands ask you first",
+  fullAuto: "edits and sandboxed commands go ahead without asking",
+};
+
+type EmptyProps = { opened: Opened; model: SessionModel; session: SessionActions };
+
+/** A session with no prompt yet: where the agent works, what it may do, and anything missing to start. */
+function Empty({ opened, model, session }: EmptyProps) {
+  const current = currentModel(model, session.models);
+  const provider = session.models?.models.find((m) => m.id === current)?.provider;
+  const missing = provider !== undefined && session.keyed !== undefined && !session.keyed.has(provider);
+  const who = provider === undefined ? undefined : (PROVIDERS.get(provider) ?? { name: provider, variable: "" });
+  const limit = model.spend.usdLimit;
+
   return (
     <div className="empty">
       <div className="mark">
@@ -953,8 +983,47 @@ function Empty({ opened }: { opened: Opened }) {
       </div>
       <h1>What should we work on?</h1>
       <p>
-        strive works in <span className="mono">{tilde(opened.session.cwd, opened.home)}</span>. Commands run in a
-        sandbox, every step is journaled, and you can rewind the files to before any prompt.
+        Describe a change, a bug or a question. The agent reads and edits files in{" "}
+        <span className="mono">{tilde(opened.session.cwd, opened.home)}</span> and runs commands in a sandbox.
+      </p>
+      {missing && who && (
+        <div className="setup" role="status">
+          <Icon name="key" />
+          <div className="grow">
+            <strong>Add an {who.name} API key to start.</strong>
+            <p>
+              {current} needs one. In a terminal, run <code>strive auth {provider}</code> and paste your key
+              {who.variable && (
+                <>
+                  , or set <code>{who.variable}</code> before strive starts
+                </>
+              )}
+              .
+            </p>
+          </div>
+          <button type="button" onClick={session.recheck}>
+            Check again
+          </button>
+        </div>
+      )}
+      <dl className="facts">
+        <div>
+          <dt>Approvals</dt>
+          <dd>
+            {MODE_NAMES[model.mode]}: {MODE_MEANING[model.mode]}
+          </dd>
+        </div>
+        <div>
+          <dt>Budget</dt>
+          <dd>{limit === undefined ? "no limit for this session" : `${formatUsd(limit)} for this session`}</dd>
+        </div>
+        <div>
+          <dt>Undo</dt>
+          <dd>files are saved before each prompt; hover a prompt to rewind to it</dd>
+        </div>
+      </dl>
+      <p className="keys">
+        <kbd>⌘K</kbd> commands <kbd>⌘D</kbd> changes <kbd>⌘B</kbd> sessions <kbd>⇧↵</kbd> new line
       </p>
     </div>
   );

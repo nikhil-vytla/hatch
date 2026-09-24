@@ -181,6 +181,19 @@ button.quiet.danger { color: var(--bad); }
 .empty .mark .icon { width: 22px; height: 22px; }
 .empty h1 { margin: 0 0 8px; font-size: 20px; font-weight: 600; color: var(--text); letter-spacing: -0.01em; }
 .empty p { margin: 0; line-height: 1.6; }
+.empty .setup { display: flex; align-items: flex-start; gap: 12px; margin: 22px 0 0; padding: 12px 12px 12px 14px; border-radius: 12px; background: var(--warn-soft); border: 1px solid rgb(250 204 21 / 0.22); text-align: left; }
+.empty .setup > .icon { margin-top: 3px; color: var(--warn); }
+.empty .setup strong { color: var(--text); font-weight: 600; }
+.empty .setup p { margin-top: 2px; font-size: 13px; }
+.empty .setup button { flex: none; align-self: center; }
+.empty code, .empty .setup code { font-family: var(--mono); font-size: 12px; padding: 1px 5px; border-radius: 5px; background: var(--surface-2); color: var(--text); }
+.facts { display: grid; gap: 6px; margin: 22px 0 0; padding: 12px 14px; border-radius: 12px; background: var(--surface); border: 1px solid var(--line); text-align: left; font-size: 13px; }
+.facts div { display: flex; gap: 12px; }
+.facts dt { flex: none; width: 76px; color: var(--faint); }
+.facts dd { margin: 0; color: var(--muted); }
+.empty .keys { margin-top: 18px; font-size: 12px; color: var(--faint); }
+.empty .keys kbd { margin: 0 4px 0 10px; padding: 1px 6px; border-radius: 5px; background: var(--surface-2); border: 1px solid var(--line); font: 11px var(--mono); color: var(--muted); }
+.empty .keys kbd:first-child { margin-left: 0; }
 
 .msg.user { display: flex; justify-content: flex-end; margin-top: 10px; }
 .msg.user .bubble {

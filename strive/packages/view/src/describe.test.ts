@@ -13,6 +13,23 @@ test("prompts and replies are marked so each client can render them its own way"
   );
 });
 
+test("a turn that failed on a provider's error body says its message, not the JSON", () => {
+  const failed = (error: string) =>
+    describe(entry({ type: "turnEnded", turn: 1, reason: { kind: "failed", error } }))[0]?.text;
+
+  const body = JSON.stringify({
+    error: { message: "strive: no anthropic API key; run `strive auth anthropic`", type: "authentication_error" },
+    type: "error",
+  });
+
+  expect(failed(`401 ${body}`)).toBe(
+    "The agent stopped: No anthropic API key; run `strive auth anthropic` (HTTP 401).",
+  );
+  expect(failed("socket hang up")).toBe("The agent stopped: socket hang up");
+  expect(failed("500 {not json")).toBe("The agent stopped: 500 {not json");
+  expect(failed('400 {"detail":"x"}')).toBe('The agent stopped: 400 {"detail":"x"}');
+});
+
 test("a reply with no text (only tool calls) adds no line", () => {
   const e: Event = {
     type: "assistantMessage",

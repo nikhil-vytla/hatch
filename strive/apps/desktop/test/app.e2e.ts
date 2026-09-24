@@ -21,8 +21,15 @@ const electronPath: string = createRequire(import.meta.url)("electron");
 
 let home: string;
 
+/** strive's environment here: no provider keys, so the daemon these tests start never holds a real one. */
+function keyless(): NodeJS.ProcessEnv {
+  const { ANTHROPIC_API_KEY: _a, OPENAI_API_KEY: _o, ...rest } = process.env;
+
+  return rest;
+}
+
 function strive(...args: string[]): string {
-  return execFileSync(STRIVE, args, { env: { ...process.env, STRIVE_HOME: home, STRIVE_HOST: "none" } }).toString();
+  return execFileSync(STRIVE, args, { env: { ...keyless(), STRIVE_HOME: home, STRIVE_HOST: "none" } }).toString();
 }
 
 before(() => {
@@ -50,7 +57,7 @@ async function launch(args: string[]): Promise<ElectronApplication> {
   const app = await electron.launch({
     executablePath: electronPath,
     args: [APP, ...args],
-    env: { ...process.env, STRIVE_SOCKET: join(home, "run/strived.sock") },
+    env: { ...keyless(), STRIVE_SOCKET: join(home, "run/strived.sock") },
   });
 
   launched.add(app);
@@ -278,6 +285,20 @@ test("the model chip picks the agent's model before the first prompt, and says w
   await page.getByText("What should we work on?").waitFor();
   const unchanged = log().entries.filter((e: { event: { type: string } }) => e.event.type === "modelSet");
   assert.equal(unchanged.length, 1, "the disabled pick changed nothing");
+});
+
+test("a new session with no key for its model says how to add one, and sees one once it's added", async () => {
+  const { page } = await openApp();
+  const setup = page.getByRole("status").filter({ hasText: "Add an Anthropic API key to start." });
+  await setup.getByText("strive auth anthropic").waitFor();
+  const rpc = await Rpc.open();
+  // A stand-in: nothing here calls a provider (the tests' hosts are off).
+  const set = await rpc.call("auth/set", { provider: "anthropic", apiKey: "sk-ant-e2e-not-a-key" });
+  assert.equal(set.error, undefined, JSON.stringify(set));
+  await setup.getByRole("button", { name: "Check again" }).click();
+  await setup.waitFor({ state: "detached" });
+  await page.getByText("What should we work on?").waitFor();
+  rpc.close();
 });
 
 test("the command palette finds an action by a few letters and runs it", async () => {
