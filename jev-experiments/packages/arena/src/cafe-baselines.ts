@@ -10,6 +10,7 @@ import {
   candidates,
   emptyPreferences,
   type Field,
+  type ModelResponse,
   type PublicInput,
 } from "../../../cafe-jev/engine";
 
@@ -19,19 +20,21 @@ export const tokensFor = (field: Field) => [
   "conflicting",
 ];
 
-type Answers = Record<string, { value: string; probabilities?: Record<string, number> }>;
+type Answers = ModelResponse["answers"];
 
-const NUMBERS: Record<string, number> = {
-  two: 2,
-  three: 3,
-  four: 4,
-  five: 5,
-  six: 6,
-  seven: 7,
-  eight: 8,
-  nine: 9,
-  ten: 10,
-};
+type TokenPick = { value: string; turn: number; probabilities?: Record<string, number> };
+
+const NUMBERS = new Map([
+  ["two", 2],
+  ["three", 3],
+  ["four", 4],
+  ["five", 5],
+  ["six", 6],
+  ["seven", 7],
+  ["eight", 8],
+  ["nine", 9],
+  ["ten", 10],
+]);
 
 const NEGATION = /\b(no|not|without|don't|dont|doesn't|never|zero|nothing)\b|-free\b|\bfree of\b/;
 
@@ -69,7 +72,10 @@ function clause(text: string): Partial<Record<Field, string>> {
     /\b(\d+|two|three|four|five|six|seven|eight|nine|ten) dollars?\b/.exec(t);
 
   if (money) {
-    const amount = Number.isFinite(Number(money[1])) ? Number(money[1]) : NUMBERS[money[1]];
+    const amount = Number.isFinite(Number(money[1]))
+      ? Number(money[1])
+      : (NUMBERS.get(money[1]) ?? NaN);
+
     const cents = Math.round(amount * 100);
     out.budget = [300, 400, 500, 600, 800].includes(cents) ? String(cents) : "unsupported";
   }
@@ -95,7 +101,9 @@ export function keywordAnswers(input: PublicInput): Answers {
       const lower = piece.toLowerCase();
 
       if (DROP.test(lower)) {
-        for (const f of Object.keys(clause(lower)) as Field[]) delete state[f];
+        const cleared = clause(lower);
+
+        for (const f of FIELDS) if (cleared[f] !== undefined) delete state[f];
 
         for (const f of FIELDS) if (lower.includes(f === "sweet" ? "sweet" : f)) delete state[f];
         continue;
@@ -103,7 +111,12 @@ export function keywordAnswers(input: PublicInput): Answers {
 
       const strength = SOFT.test(lower) ? "preferred" : "required";
 
-      for (const [f, v] of Object.entries(clause(lower)) as [Field, string][]) {
+      const stated = clause(lower);
+
+      for (const f of FIELDS) {
+        const v = stated[f];
+
+        if (v === undefined) continue;
         const token = seen[f] && seen[f] !== v ? "conflicting" : `${strength}_${v}`;
         seen[f] = v;
         state[f] = { token, turn: turn.id };
@@ -111,44 +124,34 @@ export function keywordAnswers(input: PublicInput): Answers {
     }
   }
 
-  return fromTokens(
-    input,
-    Object.fromEntries(
-      FIELDS.map((f) => [
-        f,
-        state[f] ? { value: state[f]!.token, turn: state[f]!.turn } : { value: "unknown", turn: 0 },
-      ]),
-    ) as any,
-  );
+  return fromTokens(input, (f) => {
+    const s = state[f];
+
+    return s ? { value: s.token, turn: s.turn } : { value: "unknown", turn: 0 };
+  });
 }
 
 /** Answers with a fixed distribution per field (e.g. how often each token is correct across the cases). */
 export function priorAnswers(
   input: PublicInput,
-  prior: Record<Field, Record<string, number>>,
+  prior: (field: Field) => Record<string, number>,
 ): Answers {
-  const picks = Object.fromEntries(
-    FIELDS.map((f) => {
-      const [token] = Object.entries(prior[f]).sort((a, b) => b[1] - a[1])[0];
-      const last = input.transcript.filter((t) => t.kind === "customer").at(-1)?.id ?? 1;
+  return fromTokens(input, (f) => {
+    const probabilities = prior(f);
+    const [token] = Object.entries(probabilities).sort((a, b) => b[1] - a[1])[0];
+    const last = input.transcript.filter((t) => t.kind === "customer").at(-1)?.id ?? 1;
 
-      return [f, { value: token, turn: last, probabilities: prior[f] }];
-    }),
-  );
-
-  return fromTokens(input, picks as any);
+    return { value: token, turn: last, probabilities };
+  });
 }
 
 /** Adds source turns and lets code pick the best legal drink family for the extracted preferences. */
-function fromTokens(
-  input: PublicInput,
-  picks: Record<Field, { value: string; turn: number; probabilities?: Record<string, number> }>,
-): Answers {
+function fromTokens(input: PublicInput, pick: (field: Field) => TokenPick): Answers {
   const answers: Answers = {};
   const prefs = emptyPreferences();
 
   for (const f of FIELDS) {
-    const { value, turn, probabilities } = picks[f];
+    const { value, turn, probabilities } = pick(f);
     answers[f] = {
       value,
       probabilities:
@@ -159,7 +162,7 @@ function fromTokens(
 
     if (m)
       prefs[f] = {
-        status: m[1] as "required" | "preferred",
+        status: m[1] === "required" ? "required" : "preferred",
         value: m[2],
         sourceTurn: turn,
         evidence: null,

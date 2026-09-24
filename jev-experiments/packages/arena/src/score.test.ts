@@ -9,6 +9,8 @@ const study = JSON.parse(
   ),
 ).result;
 
+type StudyCase = { questions: { predictions: Record<string, number[]>; target: number[] }[] };
+
 describe("scorer", () => {
   test("counts confident disagreements and bins confidence", () => {
     const card = score([
@@ -24,8 +26,8 @@ describe("scorer", () => {
 
   test("reproduces every recorded model metric in the local-model study", () => {
     for (const model of study.models) {
-      const answers = study.cases.flatMap((c: any) =>
-        c.questions.map((q: any) => ({ prediction: q.predictions[model.id], reference: q.target })),
+      const answers = study.cases.flatMap((c: StudyCase) =>
+        c.questions.map((q) => ({ prediction: q.predictions[model.id], reference: q.target })),
       );
 
       const card = score(answers);
