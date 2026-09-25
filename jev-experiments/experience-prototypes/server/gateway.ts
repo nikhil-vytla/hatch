@@ -79,6 +79,8 @@ export function retryDelay(
         : Math.min(12000, 700 * 2 ** attempt),
   );
 }
+const SCORE_MISMATCH =
+  "Native Score disagrees with its distribution under the declared rounding allowance.";
 const transient = new Set([408, 429, 500, 502, 503, 504]);
 function answersFromProvider(
   raw: any,
@@ -103,6 +105,8 @@ function answersFromProvider(
       attempts,
     );
   const answers: Record<string, any> = Object.create(null);
+  // A Score that disagrees with its own distribution drops only that answer; the rest stand.
+  const rejected: { question_id: string; code: string; message: string }[] = [];
   for (const [id, q] of Object.entries(body.questions)) {
     const a = raw.answers?.[id],
       v = a?.[q.type],
@@ -181,14 +185,14 @@ function answersFromProvider(
       );
       current.scoreChecks ??= [];
       current.scoreChecks.push({ questionId: id, result });
-      if (!result.accepted)
-        throw new GatewayError(
-          "Native Score disagrees with its distribution under the declared rounding allowance.",
-          502,
-          attempts,
-          0,
-          "native_score_mismatch",
-        );
+      if (!result.accepted) {
+        rejected.push({
+          question_id: id,
+          code: "native_score_mismatch",
+          message: SCORE_MISMATCH,
+        });
+        continue;
+      }
     }
     if (a.legend != null) {
       const expected =
@@ -230,7 +234,9 @@ function answersFromProvider(
       ...(a.legend == null ? {} : { legend: a.legend }),
     };
   }
-  return answers;
+  if (rejected.length === Object.keys(body.questions).length)
+    throw new GatewayError(SCORE_MISMATCH, 502, attempts, 0, "native_score_mismatch");
+  return { answers, rejected };
 }
 
 /** Metadata survives semantic rejection; missing or malformed observations never become zero. */
@@ -426,13 +432,15 @@ export async function evaluate(
           );
         delay = attempt.retryAfterMs;
       } else {
-        const answers = answersFromProvider(raw, body, attempts, attempt);
+        const { answers, rejected } = answersFromProvider(raw, body, attempts, attempt);
+        if (rejected.length) attempt.issues.push("native_score_mismatch");
         finish();
         if (options.signal?.aborted) throw cancelled();
         const accounting = requestAccounting(attempts);
         const usage = accounting.usage;
         return {
           answers,
+          rejected,
           latency_ms: Date.now() - started,
           service_latency_ms: attempt.requestMs,
           retries: attempts.length - 1,

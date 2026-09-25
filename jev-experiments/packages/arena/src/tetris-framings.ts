@@ -195,8 +195,13 @@ export function buildRequest(framing: FramingId, q: Question): Built {
     body: { state, questions },
     read(answers) {
       // Code compares: the best-judged sentence wins; ties keep the leftmost, as in Laya.
+      // The gateway may drop a Score that disagrees with its distribution; that spot goes unjudged.
+      const present = groups.filter((g) => Object.hasOwn(answers, g.key));
+
+      if (!present.length) throw new Error("No spot was judged.");
+
       const judged = Object.fromEntries(
-        groups.map((g) => {
+        present.map((g) => {
           const a = answers[g.key];
 
           return [
@@ -208,14 +213,14 @@ export function buildRequest(framing: FramingId, q: Question): Built {
         }),
       );
 
-      let best = groups[0];
+      let best = present[0];
 
-      for (const g of groups) if (judged[g.key] > judged[best.key]) best = g;
+      for (const g of present) if (judged[g.key] > judged[best.key]) best = g;
       const total = Object.values(judged).reduce((s, v) => s + v, 0) || 1;
 
       // Spread each sentence's judgement over the landings it describes, for display.
       const probabilities = Object.fromEntries(
-        groups.flatMap((g) =>
+        present.flatMap((g) =>
           g.landings.map((l) => [l.id, judged[g.key] / total / g.landings.length]),
         ),
       );
