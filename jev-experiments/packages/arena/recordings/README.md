@@ -71,3 +71,16 @@ Files for run 2: `realtime-2.replay.json` and `realtime-2.jsonl.gz`. Every game 
 Files: `realtime.replay.json` (every decision with world send and arrival times; replays exactly) and `realtime.jsonl.gz` (every request and reply).
 
 Record new runs with `bun jev-experiments/packages/arena/scripts/record-framings.ts` or `record-realtime.ts` after moving these files; the recorders refuse to overwrite them.
+
+## One box (every keystroke prefix)
+
+- `one-box.jsonl.gz`: Jev answering One box's 14 questions (after anishfn/shapeshift) for all
+  5,666 distinct prefixes of the 200 authored phrases in `src/one-box/phrases.json`, recorded
+  24–25 Sep 2026 by `scripts/record-one-box.ts`, one request at a time. Word-end prefixes were
+  asked first, then the rest. Every attempt is kept, including about 40% that came back busy
+  and were asked again; the recorded latency is the successful attempt's (median 224 ms, 90th
+  percentile 381 ms). No Score was dropped by the gateway. The raw log is kept locally and
+  gitignored; the compare script reads either.
+- Development split (150 phrases; held-out 50 not yet scored), `scripts/one-box-compare.ts`:
+  Jev's box ends on the right card for 98.0% of phrases under either request policy; the
+  keyword classifier for 67.3%.
