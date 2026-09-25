@@ -73,16 +73,43 @@ fn exits_when_idle() {
     wait_for("idle exit", Duration::from_secs(5), || !env.socket().exists());
 }
 
+/// A copy of `strive` that looks like another build: build ids compare the
+/// executable's length and mtime, and a rebuild changes the mtime.
+fn older_build(env: &Env) -> std::path::PathBuf {
+    let old = env.home.path().join("old-strive");
+    std::fs::copy(&env.exe, &old).unwrap();
+    let f = std::fs::File::options().write(true).open(&old).unwrap();
+    f.set_modified(std::time::SystemTime::now() - Duration::from_secs(3600)).unwrap();
+    old
+}
+
 #[test]
 fn replaces_a_stale_daemon_from_another_build() {
     let env = Env::new();
-    let old = env.home.path().join("old-strive");
-    std::fs::copy(&env.exe, &old).unwrap();
+    let old = older_build(&env);
     let out = env.cmd(&old, &["status", "--json"]);
     let old_status: Value = serde_json::from_slice(&out.stdout).unwrap();
     let new_status = env.status();
     assert_ne!(old_status["server"]["build"], new_status["server"]["build"]);
     assert_ne!(pid(&old_status), pid(&new_status), "the stale daemon should have been replaced");
+}
+
+/// Cargo puts a fresh copy of `strive` in place on every run, rebuilt or not:
+/// same bytes, same mtime, a new inode. A daemon started from the previous
+/// copy is the same build, and a launcher must not shut it down under the
+/// sessions it's running.
+#[test]
+fn a_fresh_copy_of_the_same_build_keeps_the_daemon() {
+    let env = Env::new();
+    let running = pid(&env.status());
+    let copy = env.home.path().join("same-strive");
+    std::fs::copy(&env.exe, &copy).unwrap();
+    let mtime = std::fs::metadata(&env.exe).unwrap().modified().unwrap();
+    std::fs::File::options().write(true).open(&copy).unwrap().set_modified(mtime).unwrap();
+    let out = env.cmd(&copy, &["status", "--json"]);
+    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    let status: Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(pid(&status), running, "the daemon was replaced by a copy of its own build");
 }
 
 /// Race: a daemon that is exiting has unlinked its socket but still holds the
@@ -105,9 +132,8 @@ fn stop_then_start_hands_off_cleanly() {
 #[test]
 fn concurrent_launchers_replace_a_stale_daemon_once() {
     let env = Env::new();
-    let old = env.home.path().join("old-strive");
     for _ in 0..5 {
-        std::fs::copy(&env.exe, &old).unwrap();
+        let old = older_build(&env);
         let stale = env.cmd(&old, &["status", "--json"]);
         assert!(stale.status.success());
         let children: Vec<_> = (0..6)

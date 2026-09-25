@@ -2,7 +2,7 @@
 //! `~/.strive` by default, overridable with `STRIVE_HOME` (tests use this).
 
 use std::fs;
-use std::os::unix::fs::{MetadataExt, PermissionsExt};
+use std::os::unix::fs::PermissionsExt;
 use std::path::PathBuf;
 
 use anyhow::{Context, Result};
@@ -45,10 +45,12 @@ impl Home {
     }
 }
 
-/// Identifies this exact binary: version plus the executable file's inode, size
-/// and mtime. A rebuilt, upgraded or copied `strive` gets a new build id, so it
-/// can tell that a running daemon may be stale and replace it. A false "stale"
-/// only costs a daemon restart; a false "current" would run old code.
+/// Identifies this exact binary: version plus the executable file's size and
+/// mtime. A rebuilt or upgraded `strive` gets a new build id, so it can tell
+/// that a running daemon may be stale and replace it. The inode is left out:
+/// cargo puts a fresh copy in place on every run, and a false "stale" shuts
+/// down a daemon under the sessions it's running. A false "current" would
+/// need another build with the same size and nanosecond mtime.
 pub fn build_id() -> String {
     let version = env!("CARGO_PKG_VERSION");
     let stamp = std::env::current_exe()
@@ -56,7 +58,7 @@ pub fn build_id() -> String {
         .ok()
         .and_then(|m| {
             let mtime = m.modified().ok()?.duration_since(std::time::UNIX_EPOCH).ok()?;
-            Some(format!("{:x}-{:x}-{:x}", m.ino(), m.len(), mtime.as_nanos()))
+            Some(format!("{:x}-{:x}", m.len(), mtime.as_nanos()))
         })
         .unwrap_or_else(|| "unknown".into());
     format!("{version}+{stamp}")
