@@ -58,7 +58,35 @@ function Sketch({ card }: { card: Card }) {
   );
 }
 
+/** Focuses a page's heading when it mounts, so keyboard and screen-reader users start at the top. */
+function useHeadingFocus() {
+  const heading = useRef<HTMLHeadingElement>(null);
+
+  useEffect(() => {
+    heading.current?.focus({ preventScroll: true });
+  }, []);
+
+  return heading;
+}
+
+function NotFound({ name }: { name: string }) {
+  const heading = useHeadingFocus();
+
+  return (
+    <div className="journal">
+      <h1 ref={heading} tabIndex={-1} className="not-found">
+        There is no entry called “{name}”.
+      </h1>
+      <p>
+        <a href="#/arena">See all entries</a>.
+      </p>
+    </div>
+  );
+}
+
 function Overview({ index }: { index: ArenaIndex }) {
+  const heading = useHeadingFocus();
+
   const generated = new Date(index.generatedAt).toLocaleDateString("en-GB", {
     day: "numeric",
     month: "long",
@@ -69,7 +97,9 @@ function Overview({ index }: { index: ArenaIndex }) {
     <div className="journal">
       <header className="masthead">
         <p className="kicker">Arena · {generated}</p>
-        <h1>Same question, different minds</h1>
+        <h1 ref={heading} tabIndex={-1}>
+          Same question, different minds
+        </h1>
         <p className="lede">
           Each entry puts one situation to several decision-makers and records what happened. The
           figures are live: add or remove contestants, change the measure, or replay the games.
@@ -108,9 +138,10 @@ function KeyNumbers({ model: m }: { model: CardModel }) {
             <span className="muted">{metric.label}</span>
             <b>{formatValue(metric, estimate)}</b>
             <span>
+              {metric.better === "higher" ? "Highest: " : "Lowest: "}
               {winners
                 .slice(0, 3)
-                .map((id) => m.nameOf(id, true))
+                .map((id) => m.label(id))
                 .join(", ")}
               {winners.length > 3 ? ` +${winners.length - 3}` : ""}
             </span>
@@ -152,8 +183,6 @@ function CardArticle({ card, view }: { card: Card; view: View }) {
 
   const slices =
     card.slices && ["bars", "scatter", "table", "reliability", "case"].includes(m.lens);
-
-  const [x, y] = card.tradeoff ?? [card.metrics[0].id, card.metrics[1]?.id];
 
   useEffect(() => {
     document.title = `${card.title} · Arena · Jev experiments`;
@@ -207,9 +236,9 @@ function CardArticle({ card, view }: { card: Card; view: View }) {
                     ))}
                   </Tabs.List>
                 </Tabs.Root>
-                <label className="measure">
-                  <span>{measureApplies ? "Measure" : "Axes"}</span>
-                  {measureApplies ? (
+                {measureApplies && (
+                  <label className="measure">
+                    <span>Measure</span>
                     <select value={m.metric.id} onChange={(e) => m.set({ m: e.target.value })}>
                       {card.metrics.map((mm) => (
                         <option key={mm.id} value={mm.id}>
@@ -217,14 +246,8 @@ function CardArticle({ card, view }: { card: Card; view: View }) {
                         </option>
                       ))}
                     </select>
-                  ) : (
-                    <output>
-                      {m.lens === "scatter"
-                        ? `${card.metrics.find((mm) => mm.id === x)?.label} × ${card.metrics.find((mm) => mm.id === y)?.label}`
-                        : "All measures"}
-                    </output>
-                  )}
-                </label>
+                  </label>
+                )}
                 {slices && (
                   <>
                     <label className="measure">
@@ -340,11 +363,7 @@ export function ArenaPage() {
       {error && <p className="notice">{error}</p>}
       {!index && !error && <Skeleton entry={Boolean(view.card)} />}
       {index && !view.card && <Overview index={index} />}
-      {index && view.card && !card && (
-        <p className="notice">
-          There is no entry called “{view.card}”. <a href="#/arena">See all entries</a>.
-        </p>
-      )}
+      {index && view.card && !card && <NotFound name={view.card} />}
       {card && <CardArticle key={card.id} card={card} view={view} />}
       <Toaster position="bottom-center" toastOptions={{ className: "toast" }} />
     </main>

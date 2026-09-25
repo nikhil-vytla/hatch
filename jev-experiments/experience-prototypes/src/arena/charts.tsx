@@ -3,8 +3,9 @@ import { useEffect, useRef, useState, type RefObject } from "react";
 import type { MetricDef } from "../../../packages/arena/src/data/schema";
 import { predsSchema, targetsSchema } from "../../../packages/arena/src/data/chunks";
 import { score } from "../../../packages/arena/src/score";
-import { formatNumber, formatSpread, formatValue, inSentence, loadChunk } from "./data";
+import { formatNumber, formatSpread, formatValue, inSentence, loadChunk, tickFormat } from "./data";
 import { colorVars, compareBy, type CardModel } from "./model";
+import { TableScroll } from "./table";
 
 const domainOf = (m: MetricDef): [number, number] => m.domain ?? [0, m.unit === "%" ? 1 : 1];
 
@@ -16,7 +17,7 @@ function DataTable({ model: m, metrics }: { model: CardModel; metrics: MetricDef
         <caption>{m.card.title}</caption>
         <thead>
           <tr>
-            <th scope="col">Contestant</th>
+            <th scope="col">{m.noun === "condition" ? "Condition" : "Contestant"}</th>
             {metrics.map((mm) => (
               <th key={mm.id} scope="col">
                 {mm.label}
@@ -46,100 +47,116 @@ export function Bars({ model: m }: { model: CardModel }) {
   const metric = m.metric;
   const x = scaleLinear().domain(domainOf(metric)).range([0, 100]).clamp(true);
   const ticks = x.ticks(4);
+  const tick = tickFormat(metric, ticks);
   const rows = m.ranked(metric, m.shown);
   const missing = m.shown.filter((id) => !rows.includes(id));
   const focused = m.focus ? m.estimate(m.focus) : undefined;
   const pct = (v: number) => `${x(v)}%`;
 
   return (
-    <div className="bars" onMouseLeave={() => m.setFocus(null)}>
-      {rows.map((id) => {
-        const e = m.estimate(id);
-        const c = m.contestant(id);
+    <>
+      <div
+        className="bars"
+        role="list"
+        aria-label={`${metric.label} by ${m.noun}`}
+        onMouseLeave={() => m.setFocus(null)}
+      >
+        {rows.map((id) => {
+          const e = m.estimate(id);
+          const c = m.contestant(id);
 
-        if (!e) return null;
+          if (!e) return null;
 
-        const detail = e.perItem
-          ? `Seeds: ${e.perItem.map((p) => `${p.item} ${formatNumber(metric, p.value)}`).join(", ")}`
-          : e.lo !== undefined && e.hi !== undefined
-            ? `95% interval ${formatNumber(metric, e.lo)} to ${formatNumber(metric, e.hi)} over ${e.n} cases`
-            : "";
+          const detail = e.perItem
+            ? `Seeds: ${e.perItem.map((p) => `${p.item} ${formatNumber(metric, p.value)}`).join(", ")}`
+            : e.lo !== undefined && e.hi !== undefined
+              ? `95% interval ${formatNumber(metric, e.lo)} to ${formatNumber(metric, e.hi)} over ${e.n} cases`
+              : "";
 
-        return (
-          <button
-            key={id}
-            type="button"
-            className="bar-row"
-            data-dim={m.focus !== null && m.focus !== id}
-            data-kind={c?.kind}
-            style={colorVars(c)}
-            aria-describedby={`bar-detail-${id}`}
-            onMouseEnter={() => m.setFocus(id)}
-            onFocus={() => m.setFocus(id)}
-            onBlur={() => m.setFocus(null)}
-          >
-            <span className="bar-name">
-              <span className="swatch" aria-hidden="true" />
-              {m.nameOf(id)}
-              {e.coverage && (
-                <small>
-                  {" "}
-                  · {e.coverage.covered} of {e.coverage.of} seeds
-                </small>
-              )}
-            </span>
-            <span className="bar-track" aria-hidden="true">
-              {focused?.lo !== undefined && focused.hi !== undefined && (
-                <span
-                  className="bar-band"
-                  style={{
-                    left: pct(focused.lo),
-                    width: `calc(${pct(focused.hi)} - ${pct(focused.lo)})`,
-                  }}
-                />
-              )}
-              <span className="bar-fill" style={{ width: pct(e.value) }} />
-              {e.lo !== undefined && e.hi !== undefined && (
-                <span
-                  className="bar-whisker"
-                  style={{ left: pct(e.lo), width: `calc(${pct(e.hi)} - ${pct(e.lo)})` }}
-                />
-              )}
-              {e.perItem?.map((p) => (
-                <span key={p.item} className="bar-seed" style={{ left: pct(p.value) }} />
-              ))}
-            </span>
-            <span className="bar-value">
-              {formatValue(metric, e)}
-              <small>
-                {formatSpread(metric, e) || (e.perItem ? `mean of ${e.perItem.length}` : "")}
-              </small>
-            </span>
-            <span id={`bar-detail-${id}`} className="bar-detail" data-open={m.focus === id}>
-              {detail}
-            </span>
-          </button>
-        );
-      })}
-      <div className="bar-axis" aria-hidden="true">
-        <span />
-        <span className="bar-ticks">
-          {ticks.map((t) => (
-            <span key={t} style={{ left: pct(t) }}>
-              {formatNumber(metric, t)}
-            </span>
-          ))}
-        </span>
-        <em className="bar-better">{metric.better === "lower" ? "← better" : "better →"}</em>
+          const spread = formatSpread(metric, e);
+
+          // A focusable list item, not a button: focusing shows the detail, there is nothing to press.
+          return (
+            <div
+              key={id}
+              role="listitem"
+              tabIndex={0}
+              className="bar-row"
+              data-dim={m.focus !== null && m.focus !== id}
+              data-kind={c?.kind}
+              style={colorVars(c)}
+              aria-label={`${m.nameOf(id)}, ${formatValue(metric, e)}${spread ? ` ${spread}` : ""}`}
+              aria-describedby={detail ? `bar-detail-${id}` : undefined}
+              onMouseEnter={() => m.setFocus(id)}
+              onFocus={() => m.setFocus(id)}
+              onBlur={() => m.setFocus(null)}
+            >
+              <span className="bar-name" aria-hidden="true">
+                <span className="swatch" />
+                {m.nameOf(id)}
+                {e.coverage && (
+                  <small>
+                    {" "}
+                    · {e.coverage.covered} of {e.coverage.of} seeds
+                  </small>
+                )}
+              </span>
+              <span className="bar-track" aria-hidden="true">
+                {focused?.lo !== undefined && focused.hi !== undefined && (
+                  <span
+                    className="bar-band"
+                    style={{
+                      left: pct(focused.lo),
+                      width: `calc(${pct(focused.hi)} - ${pct(focused.lo)})`,
+                    }}
+                  />
+                )}
+                <span className="bar-fill" style={{ width: pct(e.value) }} />
+                {e.lo !== undefined && e.hi !== undefined && (
+                  <span
+                    className="bar-whisker"
+                    style={{ left: pct(e.lo), width: `calc(${pct(e.hi)} - ${pct(e.lo)})` }}
+                  />
+                )}
+                {e.perItem?.map((p) => (
+                  <span key={p.item} className="bar-seed" style={{ left: pct(p.value) }} />
+                ))}
+              </span>
+              <span className="bar-value" aria-hidden="true">
+                {formatValue(metric, e)}
+                <small>{spread || (e.perItem ? `mean of ${e.perItem.length}` : "")}</small>
+              </span>
+              <span
+                id={`bar-detail-${id}`}
+                className="bar-detail"
+                data-open={m.focus === id}
+                aria-hidden="true"
+              >
+                {detail}
+              </span>
+            </div>
+          );
+        })}
+        <div className="bar-axis" aria-hidden="true">
+          <span />
+          <span className="bar-ticks">
+            {ticks.map((t) => (
+              <span key={t} style={{ left: pct(t) }}>
+                {tick(t)}
+              </span>
+            ))}
+          </span>
+          <em className="bar-better">{metric.better === "lower" ? "← better" : "better →"}</em>
+        </div>
       </div>
       {missing.length > 0 && (
         <p className="muted">
-          No {inSentence(metric.label)} for {missing.map((id) => m.nameOf(id, true)).join(", ")}
+          No {inSentence(metric.label)} for {missing.map((id) => m.label(id)).join(", ")}
           {metric.timing ? ": code players make no model calls." : "."}
         </p>
       )}
       <DataTable model={m} metrics={[metric]} />
-    </div>
+    </>
   );
 }
 
@@ -233,6 +250,9 @@ export function Scatter({ model: m }: { model: CardModel }) {
     .range([H - B, T])
     .nice();
 
+  const tickX = tickFormat(mx, x.ticks(narrow ? 3 : 5)),
+    tickY = tickFormat(my, y.ticks(5));
+
   const front = frontier(
     points.filter((p) => !m.isCode(p.id)),
     mx,
@@ -275,7 +295,7 @@ export function Scatter({ model: m }: { model: CardModel }) {
           <g key={`x${t}`} className="tick">
             <line x1={x(t)} x2={x(t)} y1={T} y2={H - B} />
             <text x={x(t)} y={H - B + 18} textAnchor="middle">
-              {formatNumber(mx, t)}
+              {tickX(t)}
             </text>
           </g>
         ))}
@@ -283,7 +303,7 @@ export function Scatter({ model: m }: { model: CardModel }) {
           <g key={`y${t}`} className="tick">
             <line x1={L} x2={W - R} y1={y(t)} y2={y(t)} />
             <text x={L - 8} y={y(t) + 4} textAnchor="end">
-              {formatNumber(my, t)}
+              {tickY(t)}
             </text>
           </g>
         ))}
@@ -334,7 +354,7 @@ export function Scatter({ model: m }: { model: CardModel }) {
                 <circle cx={p.sx} cy={p.sy} r={7} />
               )}
               <text x={p.sx + (right ? 12 : -12)} y={p.ly + 4} textAnchor={right ? "start" : "end"}>
-                {m.nameOf(p.id, true)}
+                {m.label(p.id)}
                 {!narrow && (
                   <tspan className="point-value">
                     {" "}
@@ -348,7 +368,7 @@ export function Scatter({ model: m }: { model: CardModel }) {
       </svg>
       {skipped.length > 0 && (
         <p className="muted">
-          Not plotted: {skipped.map((id) => m.nameOf(id, true)).join(", ")}
+          Not plotted: {skipped.map((id) => m.label(id)).join(", ")}
           {mx.timing || my.timing
             ? ", code players make no model calls."
             : ", no value for one axis."}
@@ -369,17 +389,17 @@ export function PerSeed({ model: m }: { model: CardModel }) {
     m.estimate(id)?.perItem?.find((p) => p.item === item)?.value;
 
   return (
-    <div className="table-wrap">
+    <TableScroll>
       <table className="results">
         <thead>
           <tr>
-            <th scope="col">Contestant</th>
+            <th scope="col">{m.noun === "condition" ? "Condition" : "Contestant"}</th>
             {items.map((it) => (
               <th key={it.id} scope="col">
                 {it.label}
               </th>
             ))}
-            {lead && <th scope="col">Against {m.nameOf(lead, true)}</th>}
+            {lead && <th scope="col">Against {m.label(lead)}</th>}
           </tr>
         </thead>
         <tbody>
@@ -429,7 +449,7 @@ export function PerSeed({ model: m }: { model: CardModel }) {
           })}
         </tbody>
       </table>
-    </div>
+    </TableScroll>
   );
 }
 
@@ -482,45 +502,46 @@ export function Calibration({ model: m }: { model: CardModel }) {
 
   return (
     <div className="calibration">
-      {m.shown.map((id, i) => (
-        <figure key={id} style={colorVars(m.contestant(id))}>
-          <svg
-            viewBox={`-26 -8 ${S + 34} ${S + 30}`}
-            role="img"
-            aria-label={`${m.nameOf(id)}: agreement by stated confidence. Dots on the diagonal are well calibrated.`}
-          >
-            <rect className="frame" x={0} y={0} width={S} height={S} />
-            <line className="diag" x1={0} y1={S} x2={S} y2={0} />
-            {[0, 0.5, 1].map((t) => (
-              <g key={t} className="tick">
-                <text x={t * S} y={S + 14} textAnchor="middle">
-                  {t * 100}%
-                </text>
-                {i === 0 && (
+      {m.shown.map((id) => {
+        // One-hot answers (keyword rules, say) state no graded confidence: every dot sits at 100%.
+        const graded = bins[id]?.some((b) => b.conf < 0.95) ?? false;
+
+        return (
+          <figure key={id} style={colorVars(m.contestant(id))} data-kind={m.contestant(id)?.kind}>
+            <svg
+              viewBox={`-26 -8 ${S + 34} ${S + 30}`}
+              role="img"
+              aria-label={`${m.nameOf(id)}: agreement by stated confidence. Dots on the diagonal are well calibrated.`}
+            >
+              <rect className="frame" x={0} y={0} width={S} height={S} />
+              <line className="diag" x1={0} y1={S} x2={S} y2={0} />
+              {[0, 0.5, 1].map((t) => (
+                <g key={t} className="tick">
+                  <text x={t * S} y={S + 14} textAnchor="middle">
+                    {t * 100}%
+                  </text>
                   <text x={-6} y={S - t * S + 4} textAnchor="end">
                     {t * 100}%
                   </text>
-                )}
-              </g>
-            ))}
-            {bins[id]?.map((b) => (
-              <circle
-                key={b.conf}
-                cx={b.conf * S}
-                cy={S - b.agree * S}
-                r={Math.max(2.5, Math.sqrt(b.count) / 2.2)}
-              />
-            ))}
-          </svg>
-          <figcaption>
-            <span className="swatch" aria-hidden="true" />
-            {m.nameOf(id, true)}
-          </figcaption>
-        </figure>
-      ))}
-      <p className="calibration-axes muted">
-        Across: stated confidence. Up: how often the top answer agrees with the reference.
-      </p>
+                </g>
+              ))}
+              {bins[id]?.map((b) => (
+                <circle
+                  key={b.conf}
+                  cx={b.conf * S}
+                  cy={S - b.agree * S}
+                  r={Math.max(2.5, Math.sqrt(b.count) / 2.2)}
+                />
+              ))}
+            </svg>
+            <figcaption>
+              <span className="swatch" aria-hidden="true" />
+              {m.label(id)}
+            </figcaption>
+            {!graded && <p className="muted small">States no graded confidence.</p>}
+          </figure>
+        );
+      })}
     </div>
   );
 }

@@ -77,6 +77,15 @@ export function useCardModel(card: Card, view: View, hasKey: boolean) {
   const nameOf = (id: string, short = false) =>
     (short ? contestant(id)?.short : contestant(id)?.name) ?? id;
 
+  /** The short name when no other contestant on the card shares it, otherwise the full name. */
+  const label = (id: string) => {
+    const short = contestant(id)?.short;
+
+    return short && pool.filter((c) => c.short === short).length === 1 ? short : nameOf(id);
+  };
+
+  /** What this card compares: robustness entries set conditions side by side, not contestants. */
+  const noun = card.family === "robustness" ? "condition" : "contestant";
   const isCode = (id: string) => contestant(id)?.kind === "code";
   const estimate = (id: string, m: MetricDef = metric) => results[id]?.[m.id];
   const shown = ids.filter((id) => results[id]);
@@ -92,15 +101,20 @@ export function useCardModel(card: Card, view: View, hasKey: boolean) {
       .sort((a, b) => compareBy(m, a.value, b.value))
       .map((r) => r.id);
 
-  /** Best model per metric; code players are references and never win a tile. Ties keep every name. */
+  /**
+   * Best model per metric; code players are references and never win a tile. Ties keep every
+   * name. With fewer than two models there is nobody to beat, and a measure where every model
+   * scores the same says nothing, so neither gets a tile.
+   */
   const tiles: Tile[] =
-    card.family === "robustness"
+    card.family === "robustness" || models.length < 2
       ? []
       : card.metrics.slice(0, 4).flatMap((m) => {
-          const order = ranked(m, models.length ? models : shown);
+          const order = ranked(m, models);
           const best = order[0] && estimate(order[0], m);
+          const worst = order.length && estimate(order[order.length - 1], m);
 
-          if (!best) return [];
+          if (!best || !worst || order.length < 2 || best.value === worst.value) return [];
 
           return [
             {
@@ -144,7 +158,7 @@ export function useCardModel(card: Card, view: View, hasKey: boolean) {
       );
 
     if (order.length === 1 || !a || !b) {
-      parts.push(`${metric.label}: ${nameOf(lead, true)} ${formatValue(metric, a)}.`);
+      parts.push(`${metric.label}: ${label(lead)} ${formatValue(metric, a)}.`);
     } else {
       const separated =
         a.lo !== undefined &&
@@ -153,11 +167,15 @@ export function useCardModel(card: Card, view: View, hasKey: boolean) {
         b.hi !== undefined &&
         (a.lo > b.hi || b.lo > a.hi);
 
-      const values = `${nameOf(lead, true)} ${formatValue(metric, a)}, ${nameOf(last, true)} ${formatValue(metric, b)}`;
+      const values = `${label(lead)} ${formatValue(metric, a)}, ${label(last)} ${formatValue(metric, b)}`;
 
-      if (separated)
+      if (robust)
         parts.push(
-          `${metric.label}: ${nameOf(lead, true)} ${robust ? "moves least" : "leads"} with ${formatValue(metric, a)}; ${nameOf(last, true)} ${robust ? "moves most" : "trails"} with ${formatValue(metric, b)}. Their 95% intervals do not overlap.`,
+          `${label(lead)} moved judgements least (${formatValue(metric, a)} ${inSentence(metric.label)}); ${inSentence(label(last))} moved them most (${formatValue(metric, b)}).${separated ? "" : " Their 95% intervals overlap, so this is not a clear gap."}`,
+        );
+      else if (separated)
+        parts.push(
+          `${metric.label}: ${label(lead)} leads with ${formatValue(metric, a)}; ${label(last)} trails with ${formatValue(metric, b)}. Their 95% intervals do not overlap.`,
         );
       else if (a.lo !== undefined && b.lo !== undefined)
         parts.push(
@@ -174,7 +192,7 @@ export function useCardModel(card: Card, view: View, hasKey: boolean) {
 
     if (refs.length)
       parts.push(
-        `${refs.length === 1 ? "Code reference:" : "Code references:"} ${refs.map((id) => `${nameOf(id, true)} ${formatValue(metric, estimate(id))}`).join(", ")}.`,
+        `${refs.length === 1 ? "Code reference:" : "Code references:"} ${refs.map((id) => `${label(id)} ${formatValue(metric, estimate(id))}`).join(", ")}.`,
       );
 
     if (metric.timing && shown.some(isCode))
@@ -207,6 +225,8 @@ export function useCardModel(card: Card, view: View, hasKey: boolean) {
     set,
     contestant,
     nameOf,
+    label,
+    noun,
     isCode,
     estimate,
     ranked,
@@ -227,13 +247,13 @@ export function caption(m: CardModel) {
     case "bars":
       return `${metric.help} ${metric.better === "higher" ? "Longer bars are better." : "Shorter bars are better."}`;
     case "per-item":
-      return `${metric.label} on each seed. Every contestant gets the same pieces in the same order; bold marks the best on that seed.`;
+      return `${metric.label} on each seed. Every ${m.noun} gets the same pieces in the same order; bold marks the best on that seed.`;
     case "scatter":
       return `${y.label} against ${inSentence(x.label)}. Better is up and to the right on both axes. Filled circles are models no other model beats on both; squares are code players, shown for reference.`;
     case "table":
       return "Every measure for the contestants in this figure. Select a column heading to sort.";
     case "reliability":
-      return "Each dot is a confidence bin, sized by how many decisions fall in it. Dots on the diagonal mean stated confidence matches how often the top answer agrees with the reference.";
+      return "Across: stated confidence. Up: how often the top answer agrees with the reference. Each dot is a confidence bin, sized by how many decisions fall in it; dots on the diagonal mean the confidence is honest.";
     case "case":
       return "One case: the reference distribution beside each contestant's. An outline marks an answer that is confident and disagrees.";
     case "board":

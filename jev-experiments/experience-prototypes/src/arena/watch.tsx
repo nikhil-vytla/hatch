@@ -16,9 +16,12 @@ import {
   recordedFraming,
 } from "../../../packages/arena/src/tetris-framings";
 import { run } from "../api";
-import { loadChunk } from "./data";
+import { formatNumber, loadChunk } from "./data";
 import { Face, type Mood } from "./face";
 import { colorVars, LIVE_ID, type CardModel } from "./model";
+
+/** Milliseconds per piece at 1× in turn mode: slow enough to follow each landing. */
+const TURN_MS = 700;
 
 const PIECE_LIMIT = 40;
 
@@ -159,12 +162,14 @@ export function Watch({ model: m }: { model: CardModel }) {
     };
   });
 
-  const finish = useEffectEvent((done: TetrisArena, ids: string[]) => {
+  const announceFinish = (done: TetrisArena, ids: string[]) => {
     setRunning(false);
     setAnnouncement(
-      `Finished. ${done.lanes.map((l, i) => `${m.nameOf(ids[i], true)} ${l.game.lines} lines${l.game.status === "over" ? `, topped out at piece ${l.game.pieces}` : ""}`).join("; ")}.`,
+      `Finished. ${done.lanes.map((l, i) => `${m.label(ids[i])} ${l.game.lines} lines${l.game.status === "over" ? `, topped out at piece ${l.game.pieces}` : ""}`).join("; ")}.`,
     );
-  });
+  };
+
+  const finish = useEffectEvent(announceFinish);
 
   useEffect(() => {
     let alive = true;
@@ -194,7 +199,7 @@ export function Watch({ model: m }: { model: CardModel }) {
       if (arena.mode === "realtime") {
         arena.advance((now - last) * speed);
         last = now;
-      } else if (!busy && now - last > 240 / speed) {
+      } else if (!busy && now - last > TURN_MS / speed) {
         busy = true;
         last = now;
         void arena.turn().then(() => {
@@ -232,8 +237,6 @@ export function Watch({ model: m }: { model: CardModel }) {
     return undefined;
   };
 
-  /** Lanes use short names unless two lanes share one, e.g. the same design from two protocols. */
-  const shortNames = game.ids.map((id) => m.nameOf(id, true));
   const piece = Math.min(PIECE_LIMIT, Math.max(0, ...arena.lanes.map((l) => l.game.pieces)) + 1);
 
   return (
@@ -250,7 +253,16 @@ export function Watch({ model: m }: { model: CardModel }) {
         {mode === "turns" && (
           <button
             type="button"
-            onClick={() => void arena.turn().then(() => setFrame((f) => f + 1))}
+            onClick={() =>
+              void arena.turn().then(() => {
+                if (arena.over) {
+                  arena.stop();
+                  announceFinish(arena, game.ids);
+                }
+
+                setFrame((f) => f + 1);
+              })
+            }
             disabled={running || arena.over}
           >
             Next piece
@@ -272,7 +284,7 @@ export function Watch({ model: m }: { model: CardModel }) {
         <label>
           Speed
           <select value={speed} onChange={(e) => setSpeed(Number(e.target.value))}>
-            {[1, 2, 4, 8].map((s) => (
+            {[0.5, 1, 2, 4].map((s) => (
               <option key={s} value={s}>
                 {s}×
               </option>
@@ -313,11 +325,9 @@ export function Watch({ model: m }: { model: CardModel }) {
             <article key={id ?? i} className="lane" style={colorVars(c)} data-kind={c?.kind}>
               <header>
                 <Face kind={c?.kind ?? "hosted"} mood={moodOf(arena, i)} />
-                <h4 title={lane.contestant.name}>
-                  {shortNames.filter((n) => n === shortNames[i]).length > 1
-                    ? lane.contestant.name
-                    : shortNames[i]}
-                </h4>
+                <p className="lane-name" title={lane.contestant.name}>
+                  {m.label(id)}
+                </p>
               </header>
               <Board game={lane.game} target={lane.plan?.target} />
               <dl className="lane-stats">
@@ -332,7 +342,7 @@ export function Watch({ model: m }: { model: CardModel }) {
                 {c?.kind !== "code" && (
                   <div className="wide">
                     <dt>Answer</dt>
-                    <dd>{answer === null ? "—" : `${Math.round(answer)} ms`}</dd>
+                    <dd>{answer === null ? "—" : formatNumber({ unit: "ms" }, answer)}</dd>
                   </div>
                 )}
                 {c?.kind !== "code" && lane.stats.failed > 0 && (

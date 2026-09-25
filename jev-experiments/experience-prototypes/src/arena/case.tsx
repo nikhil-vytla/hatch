@@ -14,22 +14,44 @@ const top = (p: number[]) => p.indexOf(Math.max(...p));
 
 const words = (s: string) => s.replaceAll("_", " ");
 
+/** Up to this many options, a distribution is drawn as labelled rows; more become unlabelled columns. */
+const ROW_LIMIT = 5;
+
 function Distribution({
   values,
+  keys,
   highlight,
   label,
 }: {
   values: number[];
+  keys: string[];
   highlight: number;
   label: string;
 }) {
   const sum = values.reduce((a, b) => a + b, 0) || 1;
+  const share = (v: number) => `${Math.max(3, (v / sum) * 100)}%`;
+
+  if (values.length <= ROW_LIMIT)
+    return (
+      <div className="dist-rows" role="img" aria-label={label}>
+        {values.map((v, k) => (
+          <span key={keys[k]} className="dist-row" data-top={k === highlight}>
+            <span className="dist-label" title={words(keys[k])}>
+              {words(keys[k])}
+            </span>
+            <span className="dist-bar">
+              <span style={{ width: share(v) }} />
+            </span>
+          </span>
+        ))}
+      </div>
+    );
 
   return (
     <div className="dist" role="img" aria-label={label}>
       {values.map((v, k) => (
-        <span key={k} data-top={k === highlight}>
-          <span style={{ height: `${Math.max(3, (v / sum) * 100)}%` }} />
+        <span key={keys[k]} data-top={k === highlight}>
+          <span style={{ height: share(v) }} />
         </span>
       ))}
     </div>
@@ -89,12 +111,12 @@ export function CaseView({ model: m }: { model: CardModel }) {
   return (
     <div className="case">
       <div className="case-head">
-        <h3>
+        <h2>
           Case {position + 1} of {list.length}{" "}
           <span className="muted">
             · {facet}: {words(c.workflow)}
           </span>
-        </h3>
+        </h2>
         <div className="case-nav">
           <button type="button" onClick={() => setIndex(position - 1)}>
             Previous
@@ -120,10 +142,11 @@ export function CaseView({ model: m }: { model: CardModel }) {
             <p>
               <b>{q?.instructions ?? words(r.key)}</b> <span className="muted">{r.type}</span>
             </p>
-            <div className="answers">
+            <div className="answers" data-rows={r.keys.length <= ROW_LIMIT}>
               <figure>
                 <Distribution
                   values={r.target}
+                  keys={r.keys}
                   highlight={ref}
                   label={`Reference: ${words(r.keys[ref])}`}
                 />
@@ -147,11 +170,12 @@ export function CaseView({ model: m }: { model: CardModel }) {
                   <figure key={id} data-wrong={wrong} style={colorVars(m.contestant(id))}>
                     <Distribution
                       values={p}
+                      keys={r.keys}
                       highlight={t}
                       label={`${m.nameOf(id)}: ${words(r.keys[t])} at ${Math.round(confidence * 100)}%${wrong ? ", confident and disagrees with the reference" : ""}`}
                     />
                     <figcaption>
-                      {m.nameOf(id, true)}
+                      {m.label(id)}
                       <br />
                       <span>
                         {words(r.keys[t])} · {Math.round(confidence * 100)}%

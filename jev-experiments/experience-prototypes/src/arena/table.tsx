@@ -1,6 +1,38 @@
-import { useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { formatSpread, formatValue } from "./data";
 import { colorVars, compareBy, type CardModel } from "./model";
+
+/**
+ * A horizontally scrolling table wrapper that fades its end edge only while more columns are
+ * hidden past it, so the fade is a cue rather than decoration.
+ */
+export function TableScroll({ children }: { children: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [more, setMore] = useState(false);
+
+  useEffect(() => {
+    const el = ref.current;
+
+    if (!el) return;
+    const check = () => setMore(el.scrollLeft + el.clientWidth < el.scrollWidth - 1);
+    const observer = new ResizeObserver(check);
+
+    observer.observe(el);
+    el.addEventListener("scroll", check, { passive: true });
+    check();
+
+    return () => {
+      observer.disconnect();
+      el.removeEventListener("scroll", check);
+    };
+  }, []);
+
+  return (
+    <div className="table-wrap" ref={ref} data-more={more}>
+      {children}
+    </div>
+  );
+}
 
 /** Every measure for the contestants in the figure; column headings sort. */
 export function Table({ model: m }: { model: CardModel }) {
@@ -17,11 +49,11 @@ export function Table({ model: m }: { model: CardModel }) {
   });
 
   return (
-    <div className="table-wrap">
+    <TableScroll>
       <table className="results dense">
         <thead>
           <tr>
-            <th scope="col">Contestant</th>
+            <th scope="col">{m.noun === "condition" ? "Condition" : "Contestant"}</th>
             {m.card.metrics.map((mm) => (
               <th
                 key={mm.id}
@@ -88,6 +120,6 @@ export function Table({ model: m }: { model: CardModel }) {
           ))}
         </tbody>
       </table>
-    </div>
+    </TableScroll>
   );
 }
