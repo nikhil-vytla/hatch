@@ -8,6 +8,7 @@
     ".opencode/**",
     "**/.playwright-cli/**",
     "experience-prototypes/tools/oxlint/anti-slop/**",
+    "packages/arena/src/shapeshift/upstream/**",
     "**/dist/**",
     "**/node_modules/**",
     "experience-prototypes/public/**"
