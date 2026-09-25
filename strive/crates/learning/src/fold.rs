@@ -58,6 +58,9 @@ pub fn fold(entries: &[Entry]) -> Vec<Folded> {
                     // short, say) replaces its earlier outcome.
                     gates.retain(|g| g.gate != *gate);
                     gates.push(GateOutcome { gate: *gate, verdict: *verdict, detail: detail.clone() });
+                    // Listed in the order the checks run, not the order their
+                    // verdicts were journaled in.
+                    gates.sort_by_key(|g| crate::GATES.iter().position(|x| *x == g.gate));
                 }
             }
             Event::ProposalDecided { proposal, decision, .. } => {

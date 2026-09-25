@@ -141,3 +141,19 @@ fn statuses_and_artifacts_read_as_a_person_says_them() {
     assert_eq!(strive_learning::describe(&Artifact::Memory), "memory");
     assert_eq!(strive_learning::describe(&Artifact::Skill { name: "release".into() }), "skill release");
 }
+
+/// Checks are listed in the order they run, whatever order their verdicts
+/// were journaled in (a replay skip can be journaled before the judge's).
+#[test]
+fn gates_are_listed_in_the_order_they_run() {
+    let events = vec![
+        started(),
+        made("m", None),
+        gate(2, Gate::Replay, Verdict::Skipped),
+        gate(2, Gate::Static, Verdict::Pass),
+        gate(2, Gate::Judge, Verdict::Pass),
+    ];
+    let folded = fold(&journal(events));
+    let order: Vec<Gate> = folded[0].state.gates.iter().map(|g| g.gate).collect();
+    assert_eq!(order, vec![Gate::Static, Gate::Judge, Gate::Replay]);
+}
