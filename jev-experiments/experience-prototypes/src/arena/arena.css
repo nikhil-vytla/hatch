@@ -176,8 +176,12 @@
   letter-spacing: -0.015em;
   margin: 0 0 16px;
 }
-.entry h1:focus {
+.arena h1[tabindex="-1"]:focus {
   outline: none;
+}
+.not-found {
+  font: 400 clamp(28px, 3.6vw, 40px) / 1.15 var(--serif);
+  margin: 0 0 12px;
 }
 .finding {
   font-size: 17px;
@@ -350,6 +354,13 @@
   opacity: 0.45;
   cursor: default;
 }
+/* Add and its count wrap as one unit, so the count never sits alone on a line. */
+.picker-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
 .picker-count {
   font: 12px var(--mono);
   color: var(--muted);
@@ -411,34 +422,33 @@
 .picker-option[data-selected="true"] {
   background: var(--soft);
 }
+.picker-empty .text-button {
+  min-height: 32px;
+  margin-inline-start: 8px;
+}
 .picker-empty {
   padding: 16px 8px;
   color: var(--muted);
 }
 
 /* ---------------------------------------------------------------- bars */
+/* Rows and the axis share the list's columns (subgrid), so names take only the room they need. */
 .bars {
-  --name: minmax(180px, 280px);
-  --value: 112px;
   display: grid;
-  gap: 4px;
+  grid-template-columns: fit-content(240px) minmax(0, 1fr) max-content;
+  column-gap: 16px;
+  row-gap: 4px;
 }
 .bar-row {
   display: grid;
-  grid-template-columns: var(--name) minmax(0, 1fr) var(--value);
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
   grid-template-rows: auto auto;
-  column-gap: 16px;
   align-items: center;
   width: 100%;
   min-height: 44px;
   padding: 4px 8px;
-  border: 0;
   border-radius: var(--radius);
-  background: none;
-  color: inherit;
-  font: inherit;
-  text-align: left;
-  cursor: default;
 }
 .bar-row:hover,
 .bar-row:focus-visible {
@@ -539,8 +549,8 @@
 }
 .bar-axis {
   display: grid;
-  grid-template-columns: var(--name) minmax(0, 1fr) var(--value);
-  column-gap: 16px;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
   padding: 4px 8px 0;
 }
 .bar-ticks {
@@ -559,6 +569,9 @@
 }
 .bar-ticks > span:first-child {
   translate: 0 0;
+}
+.bar-ticks > span:last-child:not(:first-child) {
+  translate: -100% 0;
 }
 .bar-better {
   padding-top: 4px;
@@ -634,8 +647,12 @@
 .table-wrap {
   overflow-x: auto;
 }
-.table-wrap:has(.results.dense) {
+.table-wrap[data-more="true"] {
   mask-image: linear-gradient(90deg, #000 calc(100% - 24px), transparent);
+}
+/* On the dark surface the fade alone is hard to see; a hairline marks the cut edge. */
+:root[data-theme="dark"] .table-wrap[data-more="true"] {
+  border-inline-end: 1px solid var(--line);
 }
 .results {
   width: 100%;
@@ -741,9 +758,8 @@ th[aria-sort="descending"] .sort {
   font-size: 14px;
   margin-top: 4px;
 }
-.calibration-axes {
-  flex-basis: 100%;
-  margin: 0;
+.calibration figure > p {
+  margin: 2px 0 0;
 }
 
 /* ---------------------------------------------------------------- case */
@@ -754,7 +770,7 @@ th[aria-sort="descending"] .sort {
   align-items: center;
   justify-content: space-between;
 }
-.case-head h3 {
+.case-head h2 {
   font: 400 20px/1.3 var(--serif);
   margin: 0;
 }
@@ -805,6 +821,45 @@ th[aria-sort="descending"] .sort {
 .answers figure {
   margin: 0;
   width: 116px;
+}
+.answers[data-rows="true"] figure {
+  width: 188px;
+}
+.dist-rows {
+  display: grid;
+  gap: 3px;
+}
+.dist-row {
+  display: grid;
+  grid-template-columns: 100px minmax(0, 1fr);
+  gap: 6px;
+  align-items: center;
+  font-size: 12px;
+  color: var(--muted);
+}
+.dist-row[data-top="true"] {
+  color: var(--ink);
+}
+.dist-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dist-bar {
+  height: 10px;
+  background: var(--soft);
+}
+.dist-bar > span {
+  display: block;
+  height: 100%;
+  background: color-mix(in oklab, var(--c) 35%, var(--muted));
+}
+.dist-row[data-top="true"] .dist-bar > span {
+  background: var(--c);
+}
+.answers figure[data-wrong="true"] .dist-rows {
+  outline: 2px solid var(--coral);
+  outline-offset: 3px;
 }
 .answers figcaption {
   font-size: 12px;
@@ -895,7 +950,7 @@ th[aria-sort="descending"] .sort {
   min-height: calc(2lh + 8px);
   margin-bottom: 8px;
 }
-.lane h4 {
+.lane-name {
   font-size: 14px;
   font-weight: 500;
   margin: 0;
@@ -1114,7 +1169,7 @@ th[aria-sort="descending"] .sort {
     gap: 4px;
     min-height: calc(28px + 2lh + 4px);
   }
-  .lane h4 {
+  .lane-name {
     font-size: 12px;
   }
   .tabs {
@@ -1127,10 +1182,11 @@ th[aria-sort="descending"] .sort {
     flex: none;
   }
   .bars {
-    --value: 88px;
+    grid-template-columns: minmax(0, 1fr);
   }
   .bar-row {
-    grid-template-columns: minmax(0, 1fr) var(--value);
+    grid-template-columns: minmax(0, 1fr) max-content;
+    column-gap: 16px;
   }
   .bar-row .bar-track {
     grid-column: 1 / -1;

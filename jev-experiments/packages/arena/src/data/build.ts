@@ -634,7 +634,7 @@ const GAME_METRICS: MetricDef[] = [
     unit: "ms",
     better: "lower",
     axis: "speed",
-    help: "Median time from question to usable answer across the contestant's decisions. Code players answer instantly.",
+    help: "Median time from question to usable answer across the contestant's decisions. Code players make no model calls, so they have no time here.",
   },
 ];
 
@@ -1115,7 +1115,7 @@ export function cafeCard(out: string): Card {
     {
       id: "code.keywords",
       name: "Keyword reader",
-      short: "Keywords",
+      short: "Keyword reader",
       kind: "code" as const,
       policy:
         "keyword and negation rules written after reading these cases and their expected answers; an optimistic ceiling for rules, not a held-out baseline; one-hot answers",
@@ -1124,7 +1124,7 @@ export function cafeCard(out: string): Card {
     {
       id: "code.prior",
       name: "Most common answer",
-      short: "Prior",
+      short: "Most common answer",
       kind: "code" as const,
       policy:
         "answers each field with its most common expected token across these same cases; optimistic because it is fitted on the evaluation set",
