@@ -1,12 +1,12 @@
 import { describe, expect, test } from "bun:test";
-import { toIntentResult, type WireAnswers } from "./adapter";
+import { toReading, type WireAnswers } from "./adapter";
 import { keystrokes, outcome, replay, TYPING, type AnswerFor } from "./replay";
-import { mockClassify } from "./upstream/jev/mock";
-import { questions } from "./upstream/jev/questions";
+import { keyword as classify } from "./keyword";
+import { QUESTIONS, type Intent } from "./questions";
 
 const keyword =
   (latencyMs: number): AnswerFor =>
-  (key) => ({ result: mockClassify(key), latencyMs });
+  (key) => ({ reading: classify(key), latencyMs });
 
 describe("keystrokes", () => {
   test("a steady typist who pauses after each word", () => {
@@ -50,11 +50,11 @@ describe("replay", () => {
   test("a wrong commit on the way counts even when the final card is right", () => {
     // Commits "reminder" for every prefix until the last word, then "event".
     const answerFor: AnswerFor = (key) => {
-      const intent = key.endsWith("zoom") ? "event" : key.length > 8 ? "reminder" : "none";
+      const intent: Intent = key.endsWith("zoom") ? "event" : key.length > 8 ? "reminder" : "none";
 
       return {
-        result: {
-          ...mockClassify(key),
+        reading: {
+          ...classify(key),
           intent: { value: intent, confidence: 0.9, probabilities: { [intent]: 0.9 } },
         },
         latencyMs: 1,
@@ -76,7 +76,7 @@ describe("replay", () => {
 describe("adapter", () => {
   const wire = (drop: string[] = []): WireAnswers =>
     Object.fromEntries(
-      Object.entries(questions).flatMap(([key, q]): [string, WireAnswers[string]][] => {
+      Object.entries(QUESTIONS).flatMap(([key, q]): [string, WireAnswers[string]][] => {
         if (drop.includes(key)) return [];
 
         if (q.type === "noul")
@@ -89,27 +89,29 @@ describe("adapter", () => {
       }),
     );
 
-  test("maps the 14 answers onto upstream's result", () => {
-    const { result, dropped } = toIntentResult(wire(), {
-      latencyMs: 640,
-      model: "typesafe-ai/jev",
-    });
+  test("maps the 14 answers onto a reading", () => {
+    const { reading, dropped } = toReading(wire());
 
-    expect(result.intent).toEqual({
+    expect(reading.intent).toEqual({
       value: "event",
       confidence: 0.7,
       probabilities: { event: 0.7 },
     });
-    expect(result.readiness).toBe(1);
-    expect(result.signals.urgency).toEqual({ score: 1, confidence: 0.6 });
-    expect(result.questionCount).toBe(14);
+    expect(reading.readiness).toEqual({ score: 1, confidence: 0.6 });
+    expect(reading.isQuestion).toBe(0.2);
     expect(dropped).toEqual([]);
   });
 
   test("names a Score the gateway dropped instead of hiding it", () => {
-    const { result, dropped } = toIntentResult(wire(["urgency"]), { latencyMs: 1, model: "m" });
+    const { reading, dropped } = toReading(wire(["urgency"]));
 
     expect(dropped).toEqual(["urgency"]);
-    expect(result.signals.urgency).toEqual({ score: 0, confidence: 0 });
+    expect(reading.urgency).toEqual({ score: 0, confidence: 0 });
+  });
+
+  test("rejects a choice that is not one of the question's options", () => {
+    const answers = { ...wire(), tone: { value: "grumpy", probabilities: null, confidence: 0.9 } };
+
+    expect(() => toReading(answers)).toThrow('tone: "grumpy" is not an option.');
   });
 });
