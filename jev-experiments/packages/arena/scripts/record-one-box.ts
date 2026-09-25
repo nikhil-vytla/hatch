@@ -96,7 +96,28 @@ function shuffled<T>(xs: T[], seed = 20260924) {
   return a;
 }
 
-const todo = shuffled([...prefixes.keys()]).filter((k) => !done.has(k));
+/**
+ * Word-end prefixes first (all upstream's cancel-on-keystroke policy ever lands), then the rest,
+ * each group in seeded shuffled order. Added after the first ~250 prefixes, when busy replies
+ * capped the run at about 22 answers a minute; asked keys are never re-asked.
+ */
+const wordEnds = new Set<string>();
+
+for (const p of doc.phrases) {
+  const chars = Array.from(p.text);
+
+  chars.forEach((c, i) => {
+    if (i === chars.length - 1 || chars[i + 1] === " ")
+      wordEnds.add(normalizeKey(chars.slice(0, i + 1).join("")));
+  });
+}
+
+const order = shuffled([...prefixes.keys()]);
+
+const todo = [
+  ...order.filter((k) => wordEnds.has(k)),
+  ...order.filter((k) => !wordEnds.has(k)),
+].filter((k) => !done.has(k));
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /**
