@@ -92,6 +92,7 @@ The daemon journals a `GateFinished` for each check it runs.
    daemon's own call, under the learning session's budget, with a fixed
    rubric. A fail blocks acceptance; a skip (no key, no held-out sessions)
    is shown as such.
+   [ADR-0017](0017-judge-gate.md) records how it is built.
 3. **`replay`** (M10): tasks mined from past sessions with checkable
    outcomes are run again with `strive run`, with and without the change.
    Three runs each, and the difference is reported.

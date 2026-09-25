@@ -32,6 +32,8 @@ pub struct Locks {
     open: tokio::sync::Mutex<()>,
     /// Per learning session: proposing, checking, deciding, rolling back.
     projects: StdMutex<HashMap<SessionId, Arc<tokio::sync::Mutex<()>>>>,
+    /// Proposals the judge is working on.
+    pub judging: crate::judge::Running,
 }
 
 impl Locks {
@@ -40,7 +42,6 @@ impl Locks {
     }
 }
 
-const JUDGE_SKIPPED: &str = "not run: the model judge isn't built yet";
 const REPLAY_SKIPPED: &str = "not run: replaying past tasks isn't built yet";
 const AFTER_FAILURE: &str = "not run: the static check failed";
 /// The most of a file as it is now that is read to keep or compare.
@@ -146,9 +147,10 @@ async fn run(state: &Arc<State>, cwd: &str, sessions: Vec<String>) -> Reply {
 }
 
 /// Journals a proposal the learning session's host made, with the file's
-/// digest as it is now and the outcome of each gate.
+/// digest as it is now and the outcome of each gate that can be decided at
+/// once. A judge call, if one is needed, starts once it's journaled.
 pub async fn propose(
-    state: &State,
+    state: &Arc<State>,
     sid: &SessionId,
     cwd: &str,
     call_id: Option<String>,
@@ -164,12 +166,64 @@ pub async fn propose(
     let lock = state.learning.project(sid);
     let _held = lock.lock().await;
     let findings = static_gate(state, cwd, &proposal).await?;
+    let entries = journal(state, sid)?;
     let before = match strive_learning::relative_path(&proposal.artifact) {
-        Ok(rel) => shown(&journal(state, sid)?, &rel),
+        Ok(rel) => shown(&entries, &rel),
         Err(_) => None,
     };
+    let (verdict, detail) = strive_learning::verdict(&findings);
+    let judge = judge_plan(state, cwd, verdict, &proposal, before, crate::server::epoch_ms(), &entries);
+    let mut gates = vec![(Gate::Static, verdict, detail)];
+    let call = match judge {
+        crate::judge::Plan::Now(v, why) => {
+            gates.push((Gate::Judge, v, why));
+            None
+        }
+        crate::judge::Plan::Call(call) => Some(call),
+    };
+    gates.push((Gate::Replay, Verdict::Skipped, replay_skipped(verdict)));
     let made = Event::ProposalMade { call_id, proposal, before };
-    state.sessions.propose(sid, made, outcomes(&findings)).await.map_err(session_error)
+    let written = state.sessions.propose(sid, made, gates).await.map_err(session_error)?;
+    if let (Some(call), Some(made)) = (call, written.first()) {
+        crate::judge::start(state, sid, made.seq, call);
+    }
+    Ok(written)
+}
+
+/// The judge's plan, given the static gate's verdict: nothing to judge
+/// after a static failure.
+fn judge_plan(
+    state: &State,
+    cwd: &str,
+    static_verdict: Verdict,
+    proposal: &Proposal,
+    before: Option<Digest>,
+    made_at_ms: u64,
+    learning: &[Entry],
+) -> crate::judge::Plan {
+    match static_verdict {
+        Verdict::Fail => crate::judge::Plan::Now(Verdict::Skipped, AFTER_FAILURE.into()),
+        Verdict::Pass | Verdict::Skipped => crate::judge::plan(state, cwd, proposal, before, made_at_ms, learning),
+    }
+}
+
+fn replay_skipped(static_verdict: Verdict) -> String {
+    match static_verdict {
+        Verdict::Fail => AFTER_FAILURE.into(),
+        Verdict::Pass | Verdict::Skipped => REPLAY_SKIPPED.into(),
+    }
+}
+
+/// Journals the judge's verdict on proposal `id`, unless it has one.
+pub async fn judged(state: &State, sid: &SessionId, id: u64, verdict: Verdict, detail: String) -> Result<(), RpcError> {
+    let lock = state.learning.project(sid);
+    let _held = lock.lock().await;
+    if crate::judge::has_verdict(&journal(state, sid)?, id) {
+        return Ok(());
+    }
+    let event = Event::GateFinished { proposal: id, gate: Gate::Judge, verdict, detail };
+    state.sessions.append(sid, vec![event]).await.map_err(session_error)?;
+    Ok(())
 }
 
 /// The file at `rel` as the learner was last shown it; none if it wasn't
@@ -181,21 +235,6 @@ fn shown(entries: &[Entry], rel: &str) -> Option<Digest> {
         _ => None,
     })?;
     learned.iter().find(|f| f.path == rel).map(|f| f.digest)
-}
-
-/// Every gate's outcome, given the static gate's findings. The judge and
-/// the replay aren't built yet, so they're skipped, saying so.
-fn outcomes(findings: &[Finding]) -> Vec<(Gate, Verdict, String)> {
-    let (verdict, detail) = strive_learning::verdict(findings);
-    let later = |reason: &str| match verdict {
-        Verdict::Fail => AFTER_FAILURE.to_string(),
-        Verdict::Pass | Verdict::Skipped => reason.to_string(),
-    };
-    vec![
-        (Gate::Static, verdict, detail),
-        (Gate::Judge, Verdict::Skipped, later(JUDGE_SKIPPED)),
-        (Gate::Replay, Verdict::Skipped, later(REPLAY_SKIPPED)),
-    ]
 }
 
 /// The static gate: the proposal's own text, where its file resolves (and
@@ -330,20 +369,39 @@ fn journal(state: &State, sid: &SessionId) -> Result<Vec<Entry>, RpcError> {
 }
 
 /// The project's proposals, oldest first, after finishing any checks a
-/// crash cut short: gates without a verdict are run again. Call with the
-/// project's lock held.
-async fn settled(state: &State, sid: &SessionId, cwd: &str) -> Result<Vec<Folded>, RpcError> {
-    let folded = strive_learning::fold(&journal(state, sid)?);
+/// crash cut short: gates without a verdict are run again, and a judge
+/// call that isn't running is started. Call with the project's lock held.
+async fn settled(state: &Arc<State>, sid: &SessionId, cwd: &str) -> Result<Vec<Folded>, RpcError> {
+    let entries = journal(state, sid)?;
+    let folded = strive_learning::fold(&entries);
     let mut events = Vec::new();
+    let mut calls = Vec::new();
     for f in folded.iter().filter(|f| f.state.status == ProposalStatus::Checking) {
-        let findings = static_gate(state, cwd, &f.state.proposal).await?;
-        let have: Vec<Gate> = f.state.gates.iter().map(|g| g.gate).collect();
-        events.extend(
-            outcomes(&findings)
-                .into_iter()
-                .filter(|(gate, ..)| !have.contains(gate))
-                .map(|(gate, verdict, detail)| Event::GateFinished { proposal: f.state.id, gate, verdict, detail }),
-        );
+        let id = f.state.id;
+        let had = |gate: Gate| f.state.gates.iter().find(|g| g.gate == gate).map(|g| g.verdict);
+        let static_verdict = if let Some(v) = had(Gate::Static) {
+            v
+        } else {
+            let (v, detail) = strive_learning::verdict(&static_gate(state, cwd, &f.state.proposal).await?);
+            events.push(Event::GateFinished { proposal: id, gate: Gate::Static, verdict: v, detail });
+            v
+        };
+        if had(Gate::Judge).is_none() && !state.learning.judging.has(sid, id) {
+            let p = &f.state;
+            match judge_plan(state, cwd, static_verdict, &p.proposal, p.before, p.made_at_ms, &entries) {
+                crate::judge::Plan::Now(verdict, detail) => {
+                    events.push(Event::GateFinished { proposal: id, gate: Gate::Judge, verdict, detail });
+                }
+                crate::judge::Plan::Call(call) => calls.push((id, call)),
+            }
+        }
+        if had(Gate::Replay).is_none() {
+            let detail = replay_skipped(static_verdict);
+            events.push(Event::GateFinished { proposal: id, gate: Gate::Replay, verdict: Verdict::Skipped, detail });
+        }
+    }
+    for (id, call) in calls {
+        crate::judge::start(state, sid, id, call);
     }
     if events.is_empty() {
         return Ok(folded);
@@ -354,7 +412,7 @@ async fn settled(state: &State, sid: &SessionId, cwd: &str) -> Result<Vec<Folded
 
 /// The proposal, with the project's lock held while the caller acts on it.
 async fn proposal(
-    state: &State,
+    state: &Arc<State>,
     cwd: &str,
     id: u64,
 ) -> Result<(SessionId, Folded, tokio::sync::OwnedMutexGuard<()>), RpcError> {
@@ -365,7 +423,7 @@ async fn proposal(
     Ok((sid, f, held))
 }
 
-async fn decide(state: &State, cwd: &str, id: u64, decision: ProposalDecision, by: String) -> Reply {
+async fn decide(state: &Arc<State>, cwd: &str, id: u64, decision: ProposalDecision, by: String) -> Reply {
     let (sid, f, _held) = proposal(state, cwd, id).await?;
     let status = f.state.status;
     let name = strive_learning::status_name(status);
@@ -428,7 +486,7 @@ async fn apply(state: &State, sid: &SessionId, cwd: &str, f: &Folded, by: String
 }
 
 /// Puts an applied proposal's file back as it was, if it's still as applied.
-async fn rollback(state: &State, cwd: &str, id: u64, by: String) -> Reply {
+async fn rollback(state: &Arc<State>, cwd: &str, id: u64, by: String) -> Reply {
     let (sid, f, _held) = proposal(state, cwd, id).await?;
     let applied = match (f.state.status, f.applied) {
         (ProposalStatus::Applied, Some(applied)) => applied,

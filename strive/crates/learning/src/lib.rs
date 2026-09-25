@@ -1,13 +1,17 @@
 //! Trusted learning's pure parts (ADR-0016):
 //! - where a proposal's artifact lives in the project;
 //! - the static gate's checks of a proposal's own text;
-//! - a proposal's status, folded from the learning session's journal.
+//! - a proposal's status, folded from the learning session's journal;
+//! - the judge gate's rubric, request and strict reading of its answer,
+//!   and how a work session is rendered for it.
 //!
 //! The daemon adds what needs the machine: the path as it resolves on
 //! disk, the file's digest, and whether the evidence's sessions exist.
 
 mod checks;
 mod fold;
+pub mod judge;
+pub mod render;
 
 pub use checks::{Finding, Rule, check, frontmatter, verdict};
 pub use fold::{Applied, Folded, fold};

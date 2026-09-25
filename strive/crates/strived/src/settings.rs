@@ -27,6 +27,10 @@ pub struct Settings {
     /// The model the agent uses.
     #[serde(default = "default_model")]
     pub model: String,
+    /// The model the judge gate uses; the agent's `model` when unset. It
+    /// must be an Anthropic model.
+    #[serde(default)]
+    pub judge_model: Option<String>,
     /// The longest a turn may run before it is stopped.
     #[serde(default = "default_turn_seconds")]
     pub turn_seconds: u64,

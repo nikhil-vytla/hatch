@@ -14,6 +14,7 @@ mod doctor;
 mod effects;
 mod gateway;
 mod hosts;
+mod judge;
 mod launch;
 mod learning;
 mod log;

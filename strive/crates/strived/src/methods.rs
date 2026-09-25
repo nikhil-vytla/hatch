@@ -49,7 +49,7 @@ async fn choose_model(state: &Arc<State>, SessionModelParams { id, model }: Sess
 }
 
 /// Whose API a model is called through, and so whose key it needs.
-fn provider_of(model: &str) -> &'static str {
+pub fn provider_of(model: &str) -> &'static str {
     if model.starts_with("claude") { "anthropic" } else { "openai" }
 }
 

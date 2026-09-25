@@ -8,6 +8,8 @@ still hold.
 
 | ADR | Decision | Status |
 | --- | --- | --- |
+| [0017](0017-judge-gate.md) | The judge gate is the daemon's own model call | Accepted; M9 implemented |
+| [0016](0016-trusted-learning.md) | Trusted learning: proposals, the daemon's checks, a person's decision | Accepted; M7, M8, M9 implemented |
 | [0015](0015-rebuild-daemon-and-host.md) | Rebuild as a usable agent on a Rust daemon with thin clients | Accepted; M0 implemented |
 | [0009](0009-harness-as-model.md) | Harness pluggability through bounded generation | Historical (Python); Accepted; native profiles and funded execution separately gated |
 | [0010](0010-benchmark-adapter-tau2.md) | General BenchmarkAdapter, tau2 telecom first | Historical (Python); Accepted; installed workload qualification required |

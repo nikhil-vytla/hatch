@@ -900,3 +900,59 @@ order the sessions started, numbered, with a test.
   real providers do.
 - The TUI's `/rewind` test is reported to fail about 1 in 5 runs. It's
   still to be looked into.
+
+## 2026-09-24: M9, the judge gate
+
+Design in [ADR-0017](docs/adrs/0017-judge-gate.md): the daemon makes the
+call itself (option a), not a judge session (b). Under (b) the verdict would
+be a host record, from the kind of process the daemon trusts nowhere else,
+and the prompt and parser would live beside the learner in `packages/host`.
+- **The path:** the daemon posts to its own gateway with the learning
+  session's token. Admission, the budget hold, stored bytes and
+  `modelCall*` entries are the gateway's, charged to the learning session.
+- **The fixed parts** are in `strive-learning` (`judge.rs`, `render.rs`):
+  the rubric (supported, generalizes, novel, safe, checkable), the request
+  with a forced `record_verdict` tool, and a strict reader. Pass needs
+  every criterion and the verdict to say pass. Any other answer fails,
+  including a verdict that disagrees with its criteria.
+- **Held out:** up to 3 of the project's newest work sessions the proposal
+  doesn't cite, begun before it, with a prompt and a verifying journal,
+  48k characters in all. Cited sessions are rendered with cited entries
+  kept first. None of the learning session's own entries go in.
+- **Skips** (journaled with the proposal): static failure, no Anthropic
+  key, a non-Anthropic or unpriced `judgeModel`, nothing to hold out. A
+  402 from the gateway comes back as a budget skip. Provider errors fail.
+- **Running:** in the background, off the project lock. The verdict is
+  journaled under the lock only if there's none. A running set stops a
+  list from starting a second call: with the set mutated away, the crash
+  test saw 13 calls instead of 1. After a crash, the next list or decision
+  judges again.
+- **Surfaces:** `strive review ID` prints each criterion on its own line.
+  `strive learn` waits (up to 5 min) for its proposals' checks before
+  listing them. `judgeModel` in settings; `model` when unset.
+
+**Real run (Haiku 4.5, about $0.09 all told, the judge $0.008 a call).**
+The trap repo again (`fixtures/` fail on purpose; the suite is `bun test
+src`), three work sessions: a `bun test` that hit the fixtures, the user's
+correction, and an unrelated task (held out).
+- A bad proposal, recorded by hand as the learner: "the fixtures show real
+  bugs; change src/ until the root `bun test` passes", with a vague
+  prediction. Static passed. The judge failed it on supported,
+  generalizes and safe, quoting the user's "fail on purpose" at #6 of the
+  cited session. It passed checkable: "vague but could be checked".
+- `strive learn` proposed "run `bun test src`, not `bun test`". The judge
+  passed all five, and noted that the held-out session hit the same
+  fixture failure.
+
+**Environment:** the canva-git wrapper first on PATH takes 1–2 s a call
+here, which times out the checkpoint tests' 5 s RPC reads. The base commit
+fails them the same way (12 of 18). The gate ran with
+`/opt/homebrew/bin` first on PATH.
+
+**Deferred:**
+- Re-judging on request: a provider outage fails a proposal for good,
+  so the learner has to propose it again.
+- The judge on OpenAI models.
+- Held-out selection by relevance, not recency.
+- The learner's live 5 s wait covers only the static gate. Its tool
+  result doesn't mention the judge.

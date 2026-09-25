@@ -44,7 +44,17 @@ pub async fn learn(c: &mut Client, home: &std::path::Path, sessions: Vec<String>
         println!("the learner proposed nothing");
         return Ok(code);
     }
-    let all = c.request::<ProposalList>(ProjectRef { cwd }).await?.proposals;
+    let mut all = c.request::<ProposalList>(ProjectRef { cwd: cwd.clone() }).await?.proposals;
+    let checking =
+        |all: &[ProposalState]| all.iter().any(|p| made.contains(&p.id) && p.status == ProposalStatus::Checking);
+    if checking(&all) {
+        eprintln!("strive: waiting for the judge to check what the learner proposed");
+        let deadline = std::time::Instant::now() + JUDGE_WAIT;
+        while checking(&all) && std::time::Instant::now() < deadline {
+            tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+            all = c.request::<ProposalList>(ProjectRef { cwd: cwd.clone() }).await?.proposals;
+        }
+    }
     let mine: Vec<&ProposalState> = all.iter().filter(|p| made.contains(&p.id)).collect();
     println!("{} proposal{}:", mine.len(), if mine.len() == 1 { "" } else { "s" });
     for p in &mine {
@@ -53,6 +63,10 @@ pub async fn learn(c: &mut Client, home: &std::path::Path, sessions: Vec<String>
     println!("`strive review ID` shows one with its diff, and accepts or rejects it");
     Ok(code)
 }
+
+/// How long `strive learn` waits for the judge before listing proposals
+/// still being checked.
+const JUDGE_WAIT: std::time::Duration = std::time::Duration::from_secs(300);
 
 /// One proposal in a list.
 fn line(p: &ProposalState) -> String {
@@ -155,7 +169,12 @@ async fn show(c: &mut Client, p: &ProposalState, rel: &str) -> Result<()> {
     }
     writeln!(out, "\nchecks")?;
     for g in &p.gates {
-        writeln!(out, "  {:<7} {:<8} {}", gate_name(g.gate), verdict_name(g.verdict), g.detail)?;
+        let mut lines = g.detail.lines();
+        let first = lines.next().unwrap_or_default();
+        writeln!(out, "  {:<7} {:<8} {first}", gate_name(g.gate), verdict_name(g.verdict))?;
+        for l in lines {
+            writeln!(out, "{:19}{l}", "")?;
+        }
     }
     let old = match p.before {
         Some(digest) => c.request::<BlobGet>(BlobGetParams { digest }).await?.text,

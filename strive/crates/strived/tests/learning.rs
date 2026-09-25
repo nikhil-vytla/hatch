@@ -391,9 +391,10 @@ fn a_proposal_that_passes_is_ready_with_the_later_gates_skipped() {
         .map(|g| (g["gate"].as_str().unwrap(), g["verdict"].as_str().unwrap()))
         .collect();
     assert_eq!(gates, vec![("static", "pass"), ("judge", "skipped"), ("replay", "skipped")]);
-    for g in &p["gates"].as_array().unwrap()[1..] {
-        assert!(g["detail"].as_str().unwrap().contains("isn't built yet"), "{g}");
-    }
+    let details: Vec<&str> =
+        p["gates"].as_array().unwrap()[1..].iter().map(|g| g["detail"].as_str().unwrap()).collect();
+    assert!(details[0].contains("no Anthropic API key"), "{details:?}");
+    assert!(details[1].contains("isn't built yet"), "{details:?}");
     let made = &events(&env, &id, "proposalMade")[0];
     assert_eq!(made["proposal"], memory("Use bun.\n", &work));
 

@@ -293,8 +293,32 @@ machine). Every finding is listed in the gate's detail:
 - **Evidence:** at least one session. Each is a work session of this
   project whose journal verifies, and each cited seq is one of its entries.
 
-The judge and replay gates (M9, M10) are journaled as skipped, saying
-they aren't built yet, or that the static check failed.
+**The judge gate** ([ADR-0017](adrs/0017-judge-gate.md)): the daemon's
+own model call, through its gateway with the learning session's token, so
+it is admitted, held, journaled and charged like any call of that session.
+- **What it's shown**, as one JSON document the system prompt calls data:
+  the proposal, the file it replaces and the other memory and skills as
+  the learner was shown them, the cited sessions (cited entries kept
+  first), and up to three held-out sessions: the project's newest work
+  sessions the proposal doesn't cite, begun before it, with a prompt and a
+  journal that verifies. Nothing of the learning session's own goes in.
+- **The rubric** (`strive_learning::judge::RUBRIC`): supported, generalizes,
+  novel, safe, checkable. The model must answer with one forced
+  `record_verdict` call. It passes only if every criterion and the verdict
+  say pass. An answer that can't be read strictly fails.
+- **Skipped**, with the reason, and journaled with the proposal: after a
+  static failure, with no Anthropic key, no price for the model, or no
+  session to hold out. Skipped later if the learning session's budget
+  can't pay. Failed if the provider refuses or the call breaks.
+- **In the background:** otherwise the proposal stays `checking` while the
+  call runs, without the project's lock. The verdict is journaled under the
+  lock, and only if there isn't one. A set of running judges keeps a list
+  from starting a second. After a crash, the next list or decision judges
+  again.
+- The model is `judgeModel` in settings, else `model`.
+
+The replay gate (M10) is journaled as skipped, saying it isn't built yet,
+or that the static check failed.
 
 **Status**, folded from the learning journal:
 
