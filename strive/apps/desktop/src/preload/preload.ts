@@ -13,6 +13,7 @@ const bridge: Bridge = {
   switchTo: (id) => ipcRenderer.invoke("strive:switch", id),
   learning: () => ipcRenderer.invoke("strive:learning"),
   proposalBefore: (proposal) => ipcRenderer.invoke("strive:proposal-before", proposal),
+  cited: (session, seqs) => ipcRenderer.invoke("strive:cited", session, seqs),
   onEvent: (listener) => {
     ipcRenderer.on("strive:event", (_, event: StriveEvent) => listener(event));
   },

@@ -35,6 +35,7 @@ import { useStickToBottom } from "use-stick-to-bottom";
 import type { Bridge, Opened } from "../shared/bridge";
 import { type Item, label, summarize, type Tool } from "./conversation";
 import { ChangesPane } from "./ChangesPane";
+import { focusEntry, onFocus, takeFocus } from "./focus";
 import { LearnedPane } from "./LearnedPane";
 import { errorText, Journal, latestRun } from "./learning";
 import { Palette } from "./Palette";
@@ -200,8 +201,14 @@ export function App({ bridge, opened, onSwitch }: Props) {
 
   const cwd = opened.session.cwd;
 
+  const [outsideReview, setOutsideReview] = useState<string[]>([]);
+
   const loadProposals = useCallback(
-    () => bridge.request("proposal/list", { cwd }).then((r) => setProposals(r.proposals)),
+    () =>
+      bridge.request("proposal/list", { cwd }).then((r) => {
+        setProposals(r.proposals);
+        setOutsideReview(r.changedOutsideReview);
+      }),
     [bridge, cwd],
   );
 
@@ -232,12 +239,18 @@ export function App({ bridge, opened, onSwitch }: Props) {
     bridge.sessions().then(setProjectSessions, () => undefined);
     void loadProposals().catch((e: Error) => setError(`Couldn't list what the learner proposed: ${errorText(e)}`));
     void readLearning().catch(() => undefined);
+    // Back from an editor, the pane sees a learned file changed there.
+    const again = () => void loadProposals().catch(() => undefined);
+    window.addEventListener("focus", again);
+
+    return () => window.removeEventListener("focus", again);
   }, [learned, bridge, loadProposals, readLearning]);
 
   const run = latestRun(journal.entries);
 
   const learning = {
     before: useCallback((proposal: number) => bridge.proposalBefore(proposal), [bridge]),
+    cited: useCallback((session: string, seqs: number[]) => bridge.cited(session, seqs), [bridge]),
     decide: async (proposal: number, decision: ProposalDecision) => {
       await bridge.request("proposal/decide", { cwd, proposal, decision });
       await loadProposals();
@@ -415,6 +428,7 @@ export function App({ bridge, opened, onSwitch }: Props) {
           {learned && (
             <LearnedPane
               proposals={proposals}
+              outsideReview={outsideReview}
               run={run}
               sessions={projectSessions}
               currentSession={id}
@@ -424,7 +438,12 @@ export function App({ bridge, opened, onSwitch }: Props) {
               decide={learning.decide}
               rollback={learning.rollback}
               learn={learning.learn}
-              onSwitch={(to) => switchTo(to)}
+              cited={learning.cited}
+              onShow={(to, seq) => {
+                if (seq !== undefined) focusEntry(to, seq);
+
+                if (to !== id) switchTo(to);
+              }}
               onClose={toggleLearned}
             />
           )}
@@ -973,10 +992,49 @@ function duration(ms: number): string {
 function Transcript({ model, opened, session }: { model: SessionModel; opened: Opened; session: SessionActions }) {
   // Follows new output while the view is at the bottom; a scroll up (wheel,
   // keys, drag) lets go, and the pill or a new prompt takes it back.
-  const { scrollRef, contentRef, isAtBottom, scrollToBottom } = useStickToBottom({
+  const { scrollRef, contentRef, isAtBottom, scrollToBottom, stopScroll } = useStickToBottom({
     initial: "instant",
     resize: "smooth",
   });
+
+  // An entry the Learned pane's evidence points to: the item that holds it
+  // (the last to start at or before it) comes into view, marked for a moment.
+  useEffect(() => {
+    const sessionId = opened.session.id;
+    let frame = 0;
+
+    const go = () => {
+      const seq = takeFocus(sessionId);
+
+      if (seq === undefined) return;
+      // After the first paint, which puts the view at the bottom.
+      frame = requestAnimationFrame(() => {
+        const held = [...(contentRef.current?.querySelectorAll<HTMLElement>("[data-seq]") ?? [])].filter(
+          (el) => Number(el.dataset.seq) <= seq,
+        );
+
+        const target = held.at(-1);
+
+        if (!target) return;
+        stopScroll();
+        target.scrollIntoView({
+          block: "center",
+          behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth",
+        });
+        target.classList.add("focused");
+        // As long as the mark's animation in styles.css.
+        setTimeout(() => target.classList.remove("focused"), 1600);
+      });
+    };
+
+    go();
+    const stop = onFocus(go);
+
+    return () => {
+      stop();
+      cancelAnimationFrame(frame);
+    };
+  }, [opened.session.id, contentRef, stopScroll]);
 
   const items = model.conversation.items;
   const lastTools = items.findLastIndex((i) => i.kind === "tools");
@@ -1029,19 +1087,20 @@ const LONG_PROMPT = { chars: 700, lines: 12 };
 
 type UserMessageProps = {
   id: string;
+  seq: number;
   text: string;
   /** The checkpoint taken just before this prompt, if one was. */
   checkpoint?: number;
   onRewind: (checkpoint: number) => void;
 };
 
-function UserMessage({ id, text, checkpoint, onRewind }: UserMessageProps) {
+function UserMessage({ id, seq, text, checkpoint, onRewind }: UserMessageProps) {
   const long = text.length > LONG_PROMPT.chars || text.split("\n").length > LONG_PROMPT.lines;
   const [open, setOpen] = useState(false);
   const [confirming, setConfirming] = useState(false);
 
   return (
-    <div className="msg user" id={id}>
+    <div className="msg user" id={id} data-seq={seq}>
       <div className={`bubble ${long && !open ? "folded" : ""}`}>
         {text}
         {long && (
@@ -1254,10 +1313,18 @@ type ItemProps = { item: Item; session: SessionActions; live: boolean; checkpoin
 function ItemView({ item, session, live, checkpoint }: ItemProps) {
   switch (item.kind) {
     case "user":
-      return <UserMessage id={`msg-${item.seq}`} text={item.text} checkpoint={checkpoint} onRewind={session.rewind} />;
+      return (
+        <UserMessage
+          id={`msg-${item.seq}`}
+          seq={item.seq}
+          text={item.text}
+          checkpoint={checkpoint}
+          onRewind={session.rewind}
+        />
+      );
     case "reply":
       return (
-        <div className="msg reply">
+        <div className="msg reply" data-seq={item.seq}>
           <Markdown text={item.text} />
           <div className="msg-actions">
             <CopyButton text={item.text} label="copy reply" />
@@ -1265,28 +1332,36 @@ function ItemView({ item, session, live, checkpoint }: ItemProps) {
         </div>
       );
     case "tools":
-      return <ToolGroup tools={item.tools} session={session} live={live} />;
+      return <ToolGroup seq={item.seq} tools={item.tools} session={session} live={live} />;
     case "turn": {
       const cost = item.costUsdMicros > 0 ? ` · ${formatUsd(item.costUsdMicros)}` : "";
 
       return item.reason.kind === "done" ? (
-        <div className="turn-meta">
+        <div className="turn-meta" data-seq={item.seq}>
           Worked for {duration(item.durationMs)}
           {cost}
         </div>
       ) : (
-        <div className="turn-meta">{cost.slice(3)}</div>
+        <div className="turn-meta" data-seq={item.seq}>
+          {cost.slice(3)}
+        </div>
       );
     }
 
     case "notice":
-      return <div className={`notice ${item.tone}`}>{item.text}</div>;
+      return (
+        <div className={`notice ${item.tone}`} data-seq={item.seq}>
+          {item.text}
+        </div>
+      );
     default:
       return item satisfies never;
   }
 }
 
-function ToolGroup({ tools, session, live }: { tools: Tool[]; session: SessionActions; live: boolean }) {
+type ToolGroupProps = { seq: number; tools: Tool[]; session: SessionActions; live: boolean };
+
+function ToolGroup({ seq, tools, session, live }: ToolGroupProps) {
   const active = tools.some((t) => t.status === "running" || t.status === "waiting");
   // Open while the agent is at it, closed once it has moved on, unless the
   // person has said otherwise by clicking.
@@ -1295,7 +1370,7 @@ function ToolGroup({ tools, session, live }: { tools: Tool[]; session: SessionAc
   const waiting = tools.some((t) => t.status === "waiting");
 
   return (
-    <div className="tools">
+    <div className="tools" data-seq={seq}>
       <button type="button" className="tools-head" aria-expanded={open} onClick={() => setChosen(!open)}>
         <Icon name="chevron" className={open ? "open" : ""} />
         <span>{summarize(tools)}</span>

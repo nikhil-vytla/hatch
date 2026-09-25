@@ -1295,3 +1295,61 @@ profile now allows that directory (asked of `getconf` once; the crate
 forbids `unsafe`) and the daemon's TMPDIR when it's safe, and sets the
 command's TMPDIR to one of them. On Linux, commands get `TMPDIR=/tmp`, the
 sandbox's private one.
+## 2026-09-24: the Learned pane, review aids (desktop only)
+
+Four things from "what bb suggests" item 5, in `apps/desktop` only, over
+reads the daemon already has. No daemon change was needed.
+- **Changed outside review.** `proposal/list`'s `changedOutsideReview`
+  shows as a warn-toned notice atop the list: the paths, and what it means
+  (new sessions read the file unreviewed, rolling back a proposal for it is
+  refused, an older proposal goes stale). A proposal for such a file says
+  so under its status. The list reloads when the pane opens and when the
+  window regains focus, so an edit made in an editor shows on return.
+- **Cited entries inline.** Each evidence entry from one of the project's
+  sessions has a collapsed "Show what it cites". Opening it calls a new
+  bridge call, `cited(session, seqs)`. The main process checks the session
+  is in `session/list { cwd }`, reads it (`session/read`), picks the cited
+  entries plus the other half of each cited effect (`shared/cited.ts`), and
+  fetches only those effects' outputs, cut to 4000 characters, head and
+  tail. `blob/get` for the page stays limited to the shown session. Each
+  entry's `#seq` switches to its session (if needed) and scrolls the
+  conversation to the item holding that seq, marked for 1.6 s; the session
+  link does the same for the first cited seq. Items carry `data-seq`; a
+  small module (`renderer/focus.ts`) holds the request across the remount
+  a switch causes, and `stopScroll` keeps stick-to-bottom from pulling the
+  view back.
+- **Judge by criterion.** `strive_learning::judge::detail` has a stable
+  shape: an outcome line, an optional summary, then five `pass|FAIL id:
+  reason` lines in rubric order (tested in crates/learning). `readJudge`
+  parses exactly that and nothing looser; anything else (skipped, an
+  unreadable answer) shows as before, as plain text. I didn't render
+  free-text details as markdown: gate details are plain sentences, and
+  markdown would mangle underscores in paths. If M10 changes the format,
+  the e2e test below fails and the pane falls back to plain text.
+- **Per-file history.** "Proposals for <path>" lists every proposal for
+  the same artifact path, newest first, the shown one marked, the others a
+  click away. Hidden when the proposal is the file's only one.
+
+Tests. e2e (`app.e2e.ts`): the hand-edit-after-accept notice (absent
+before the edit, present after, and the daemon refusing the rollback the
+notice warns of); cited entries (collapsed, then the prompt, the command
+brought in by its cited result, the exit and output; another project's
+session refused; a click scrolls the prompt into view, away from the
+bottom); the judge by criterion against a daemon of the test's own whose
+upstream is a fake Anthropic returning `record_verdict` (a stand-in key,
+never a real one); per-file history. Unit: `readJudge` (both shapes, and
+five near-misses left unread), `fileHistory`, `pick`, `blocks`, `cut`.
+Checked that the tests can fail: dropping the main process's session check
+failed the cited test ("ok":"read"), and dropping `focusEntry` failed it
+at the scroll wait.
+
+Look: screenshots in /tmp/pane2-shot (not committed), from a harness with
+its own daemon and fake judge. Fixed from the first pass: the focus mark
+covered the prompt's whole row, not its bubble.
+
+Deferred:
+- The pane's own scroll and opened evidence reset after an evidence click
+  switches sessions, as the app remounts per session.
+- Held-out session ids in the judge's head line aren't turned into
+  session titles.
+- No amend-then-accept or per-bullet blame (bb item 5's other half).

@@ -426,6 +426,13 @@ prediction and checks) and accepts, rejects or rolls it back.
     (`onLearning`), which shows a run's progress; `learning()` reads the
     journal whole (`session/read`). A run that ends with proposals
     notifies a person who isn't looking.
+  - Review aids, all from existing reads: `changedOutsideReview` shows as a
+    notice; `cited(session, seqs)` reads cited entries (with the other half
+    of a cited effect and its output) from one of the project's sessions
+    only, and a cited seq scrolls the conversation to it; the judge's
+    detail is read by criterion when it has the daemon's line shape, else
+    shown as is; the other proposals for the same file come from
+    `proposal/list`.
 
 ## Effects
 

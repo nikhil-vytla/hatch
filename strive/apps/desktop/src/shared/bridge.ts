@@ -10,6 +10,7 @@ import type {
   SessionReadResult,
 } from "@strive/protocol";
 import type { History } from "@strive/workspace";
+import type { Cited } from "./cited";
 
 export type Opened = {
   init: InitializeResult;
@@ -40,6 +41,11 @@ export type Bridge = {
   learning(): Promise<SessionReadResult | null>;
   /** The file one of this project's proposals replaces, as the learner read it; null if there was none. */
   proposalBefore(proposal: number): Promise<string | null>;
+  /**
+   * The entries of one of this project's sessions that evidence cites, with
+   * the other half of each cited effect and its output.
+   */
+  cited(session: string, seqs: number[]): Promise<Cited>;
   /** Listens for the window's lifetime (a function returned across the bridge isn't callable). */
   onEvent(listener: (event: StriveEvent) => void): void;
   /** Entries journaled in the project's learning session, once `learning` has found it. */

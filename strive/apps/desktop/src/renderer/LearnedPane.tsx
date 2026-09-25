@@ -1,16 +1,30 @@
 // What the learner proposed for this project, for a person to review: each
 // proposal's diff, why, its evidence and the daemon's checks, and Accept,
 // Reject or Roll back. The same as `strive review`.
-import type { ProposalDecision, ProposalState, SessionInfo } from "@strive/protocol";
+import type { Evidence, GateOutcome, ProposalDecision, ProposalState, SessionInfo } from "@strive/protocol";
 import { useEffect, useState } from "react";
+import type { Cited } from "../shared/cited";
+import { blocks } from "./cited";
 import { Diff } from "./DiffView";
 import { Icon } from "./icons";
 import { Markdown } from "./MarkdownView";
-import { artifactName, artifactPath, errorText, GATE_NAMES, type Run, STATUS_NAMES, VERDICT_NAMES } from "./learning";
+import {
+  artifactName,
+  artifactPath,
+  errorText,
+  fileHistory,
+  GATE_NAMES,
+  type Run,
+  readJudge,
+  STATUS_NAMES,
+  VERDICT_NAMES,
+} from "./learning";
 
 type Props = {
   /** Newest first; none until loaded. */
   proposals?: ProposalState[];
+  /** Learned files, by path in the project, that aren't what an accepted proposal last left there. */
+  outsideReview: string[];
   run?: Run;
   /** This project's work sessions. */
   sessions: SessionInfo[];
@@ -21,7 +35,9 @@ type Props = {
   decide: (proposal: number, decision: ProposalDecision) => Promise<void>;
   rollback: (proposal: number) => Promise<void>;
   learn: () => Promise<void>;
-  onSwitch: (session: string) => void;
+  cited: (session: string, seqs: number[]) => Promise<Cited>;
+  /** Shows one of this project's sessions, and the entry `seq` in it if given. */
+  onShow: (session: string, seq?: number) => void;
   onClose: () => void;
 };
 
@@ -116,7 +132,35 @@ function Learning({ run }: { run: Run }) {
   );
 }
 
-function List({ proposals, run, onSelect, learn }: Props) {
+/** Learned files someone changed without a proposal, and what that means for review. */
+function OutsideReview({ paths }: { paths: string[] }) {
+  if (paths.length === 0) return null;
+
+  const one = paths.length === 1;
+
+  return (
+    <section className="outside-review" aria-label="changed outside review">
+      <h4>
+        <Icon name="pencil" /> Changed outside review
+      </h4>
+      <ul>
+        {paths.map((p) => (
+          <li key={p} className="mono">
+            {p}
+          </li>
+        ))}
+      </ul>
+      <p>
+        {one ? "This file isn't" : "These files aren't"} what an accepted proposal last left there: edited by hand or by
+        another tool, or written without a proposal. New sessions read {one ? "it" : "them"} as{" "}
+        {one ? "it is" : "they are"}, unreviewed. Rolling back a proposal for {one ? "it" : "one"} is refused, and a
+        proposal made before the change goes stale if accepted.
+      </p>
+    </section>
+  );
+}
+
+function List({ proposals, outsideReview, run, onSelect, learn }: Props) {
   const now = Date.now();
 
   if (proposals === undefined) return <div className="changes-body" />;
@@ -124,6 +168,7 @@ function List({ proposals, run, onSelect, learn }: Props) {
   return (
     <div className="changes-body">
       {run?.running && <Learning run={run} />}
+      <OutsideReview paths={outsideReview} />
       {proposals.length === 0 ? (
         <div className="learned-empty">
           <div className="mark">
@@ -191,6 +236,8 @@ type Confirming = "accept" | "rollback";
 
 function Detail({
   proposal: p,
+  proposals,
+  outsideReview,
   sessions,
   currentSession,
   before,
@@ -198,7 +245,9 @@ function Detail({
   rollback,
   run,
   learn,
-  onSwitch,
+  cited,
+  onShow,
+  onSelect,
 }: Props & { proposal: ProposalState }) {
   const path = artifactPath(p.proposal.artifact);
   const [old, setOld] = useState<{ text: string | null } | { failed: string }>();
@@ -236,6 +285,8 @@ function Detail({
   };
 
   const known = new Map(sessions.map((s) => [s.id, s]));
+  const history = fileHistory(proposals ?? [], p);
+  const now = Date.now();
 
   return (
     <div className="changes-body learned-detail" data-proposal={p.id}>
@@ -249,6 +300,12 @@ function Detail({
           <span className="mono">{path}</span> · proposed {new Date(p.madeAtMs).toLocaleString()}
         </p>
         <p className={`status-note ${p.status}`}>{statusNote(p, path)}</p>
+        {outsideReview.includes(path) && (
+          <p className="status-note outside">
+            <span className="mono">{path}</span> has changed outside review: it isn't what an accepted proposal last
+            left there.
+          </p>
+        )}
         {p.status === "stale" && <Learn run={run} learn={learn} />}
       </header>
 
@@ -288,37 +345,17 @@ function Detail({
       <section className="learned-section">
         <h4>Evidence</h4>
         <ul className="evidence">
-          {p.proposal.evidence.map((e, i) => {
-            const s = known.get(e.session);
-            const name = s?.title ?? "New session";
-
-            return (
-              // Evidence has no identity beyond its place in the proposal.
-              <li key={`${e.session}-${i}`}>
-                <div className="evidence-head">
-                  {s === undefined ? (
-                    <span className="mono faint" title="Not one of this project's sessions">
-                      {e.session}
-                    </span>
-                  ) : s.id === currentSession ? (
-                    <span className="session-name" title={s.id}>
-                      {name} <span className="faint">(shown)</span>
-                    </span>
-                  ) : (
-                    <button type="button" className="link" title={s.id} onClick={() => onSwitch(s.id)}>
-                      {name}
-                    </button>
-                  )}
-                  {e.seqs.length > 0 && (
-                    <span className="faint small">
-                      {e.seqs.length === 1 ? "entry" : "entries"} {e.seqs.join(", ")}
-                    </span>
-                  )}
-                </div>
-                <p className="prose">{e.note}</p>
-              </li>
-            );
-          })}
+          {p.proposal.evidence.map((e, i) => (
+            // Evidence has no identity beyond its place in the proposal.
+            <EvidenceItem
+              key={`${p.id}-${e.session}-${i}`}
+              evidence={e}
+              session={known.get(e.session)}
+              shown={e.session === currentSession}
+              cited={cited}
+              onShow={onShow}
+            />
+          ))}
         </ul>
       </section>
 
@@ -326,16 +363,182 @@ function Detail({
         <h4>Checks</h4>
         <ul className="checks">
           {p.gates.map((g) => (
-            <li key={g.gate} data-gate={g.gate}>
-              <span className="gate">{GATE_NAMES[g.gate]}</span>
-              <span className={`badge verdict-${g.verdict}`}>{VERDICT_NAMES[g.verdict]}</span>
-              <span className="detail">{g.detail}</span>
-            </li>
+            <Check key={g.gate} gate={g} />
           ))}
           {p.gates.length === 0 && <li className="faint small">None has finished yet.</li>}
         </ul>
       </section>
+
+      {history.length > 1 && (
+        <section className="learned-section">
+          <h4>Proposals for {path}</h4>
+          <ol className="file-history" aria-label="proposals for this file">
+            {history.map((q) => (
+              <li key={q.id} className={q.id === p.id ? "this" : undefined}>
+                <Badge status={q.status} />
+                {q.id === p.id ? (
+                  <span className="summary" aria-current="true">
+                    {q.proposal.summary}
+                  </span>
+                ) : (
+                  <button type="button" className="link summary" onClick={() => onSelect(q.id)} data-proposal={q.id}>
+                    {q.proposal.summary}
+                  </button>
+                )}
+                <span className="when faint small" title={new Date(q.madeAtMs).toLocaleString()}>
+                  {ago(q.madeAtMs, now)}
+                </span>
+              </li>
+            ))}
+          </ol>
+        </section>
+      )}
     </div>
+  );
+}
+
+type EvidenceProps = {
+  evidence: Evidence;
+  /** The cited session, if it's one of this project's. */
+  session?: SessionInfo;
+  /** Whether the window shows that session now. */
+  shown: boolean;
+  cited: Props["cited"];
+  onShow: Props["onShow"];
+};
+
+type Loaded = { cited: Cited } | { failed: string };
+
+/** One piece of evidence: its session, the note, and the entries it cites, opened on request. */
+function EvidenceItem({ evidence: e, session: s, shown, cited, onShow }: EvidenceProps) {
+  const [open, setOpen] = useState(false);
+  const [loaded, setLoaded] = useState<Loaded>();
+  const name = s?.title ?? "New session";
+
+  useEffect(() => {
+    if (!open || loaded || s === undefined) return;
+
+    let live = true;
+    cited(s.id, e.seqs).then(
+      (c) => live && setLoaded({ cited: c }),
+      (err: Error) => live && setLoaded({ failed: errorText(err) }),
+    );
+
+    return () => {
+      live = false;
+    };
+  }, [open, loaded, s, e.seqs, cited]);
+
+  const first = e.seqs.length > 0 ? Math.min(...e.seqs) : undefined;
+
+  return (
+    <li>
+      <div className="evidence-head">
+        {s === undefined ? (
+          <span className="mono faint" title="Not one of this project's sessions">
+            {e.session}
+          </span>
+        ) : shown ? (
+          <span className="session-name" title={s.id}>
+            {name} <span className="faint">(shown)</span>
+          </span>
+        ) : (
+          <button type="button" className="link" title={s.id} onClick={() => onShow(s.id, first)}>
+            {name}
+          </button>
+        )}
+        {e.seqs.length > 0 && (
+          <span className="faint small">
+            {e.seqs.length === 1 ? "entry" : "entries"} {e.seqs.join(", ")}
+          </span>
+        )}
+      </div>
+      <p className="prose">{e.note}</p>
+      {s !== undefined && e.seqs.length > 0 && (
+        <>
+          <button type="button" className="quiet cited-toggle" aria-expanded={open} onClick={() => setOpen(!open)}>
+            <Icon name="chevron" className={open ? "open" : ""} />
+            {open ? "Hide" : "Show"} what {e.seqs.length === 1 ? "it cites" : `the ${e.seqs.length} entries say`}
+          </button>
+          {open && <CitedEntries loaded={loaded} seqs={e.seqs} cwd={s.cwd} onShow={(seq) => onShow(s.id, seq)} />}
+        </>
+      )}
+    </li>
+  );
+}
+
+function CitedEntries({
+  loaded,
+  seqs,
+  cwd,
+  onShow,
+}: {
+  loaded?: Loaded;
+  seqs: number[];
+  cwd: string;
+  onShow: (seq: number) => void;
+}) {
+  if (loaded === undefined) return <p className="faint small cited-note">Loading…</p>;
+
+  if ("failed" in loaded) return <p className="danger small cited-note">Couldn't read the session: {loaded.failed}</p>;
+
+  const shown = blocks(loaded.cited, seqs, cwd);
+
+  return (
+    <div className="cited" role="list" aria-label="cited entries">
+      {shown.blocks.map((b) => (
+        <div key={b.seq} className={`cited-entry ${b.cited ? "named" : ""}`} role="listitem" data-seq={b.seq}>
+          <div className="cited-head">
+            <button type="button" className="seq" title="Show it in the conversation" onClick={() => onShow(b.seq)}>
+              #{b.seq}
+            </button>
+            <span className="who">{b.who}</span>
+          </div>
+          {b.style === "markdown" ? (
+            <Markdown text={b.text} />
+          ) : (
+            <p className={b.style === "code" ? "code" : "prose"}>{b.text}</p>
+          )}
+          {b.output !== undefined && <pre className="output">{b.output}</pre>}
+        </div>
+      ))}
+      {shown.missing.length > 0 && (
+        <p className="danger small cited-note">
+          The session has no {shown.missing.length === 1 ? "entry" : "entries"} {shown.missing.join(", ")}.
+        </p>
+      )}
+    </div>
+  );
+}
+
+/** A check's outcome; the judge's, when its detail reads by criterion, one line per criterion. */
+function Check({ gate: g }: { gate: GateOutcome }) {
+  const judged = g.gate === "judge" ? readJudge(g.detail) : undefined;
+
+  return (
+    <li data-gate={g.gate}>
+      <span className="gate">{GATE_NAMES[g.gate]}</span>
+      <span className={`badge verdict-${g.verdict}`}>{VERDICT_NAMES[g.verdict]}</span>
+      {judged === undefined ? (
+        <span className="detail">{g.detail}</span>
+      ) : (
+        <div className="detail judged">
+          <p className="judge-head">{judged.head}</p>
+          {judged.summary && <p className="judge-summary">{judged.summary}</p>}
+          <ul className="criteria" aria-label="criteria">
+            {judged.criteria.map((c) => (
+              <li key={c.id} data-criterion={c.id} className={c.pass ? "pass" : "fail"}>
+                <span className="mark" role="img" aria-label={c.pass ? "passed" : "failed"}>
+                  <Icon name={c.pass ? "check" : "x"} />
+                </span>
+                <span className="name">{c.name}</span>
+                <span className="reason">{c.reason}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </li>
   );
 }
 

@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
-import type { Entry, Event, Proposal } from "@strive/protocol";
-import { latestRun } from "./learning";
+import type { Entry, Event, Proposal, ProposalState } from "@strive/protocol";
+import { fileHistory, latestRun, readJudge } from "./learning";
 
 const PROPOSAL: Proposal = {
   artifact: { kind: "memory" },
@@ -68,4 +68,73 @@ test("a run that stops says why", () => {
   );
 
   expect(latestRun(failed)).toMatchObject({ running: false, stopped: "no API key for anthropic" });
+});
+
+// Judge details as `strive_learning::judge::detail` and `unreadable` write them (crates/learning/tests/judge.rs).
+const failedDetail = [
+  "failed novel, safe (claude-haiku-4-5, held out session s1)",
+  "It repeats memory and would skip the tests.",
+  "pass supported: session 1 shows `bun test` failing at the root",
+  "pass generalizes: nothing held out contradicts it",
+  "FAIL novel: memory already says this",
+  "FAIL safe: it tells the agent to skip failing tests",
+  "pass checkable: a later journal would show which command ran",
+].join("\n");
+
+test("a judge detail reads by criterion, each passed or failed, with its reason", () => {
+  const read = readJudge(failedDetail);
+
+  expect(read?.head).toBe("failed novel, safe (claude-haiku-4-5, held out session s1)");
+  expect(read?.summary).toBe("It repeats memory and would skip the tests.");
+
+  expect(read?.criteria.map((c) => [c.id, c.pass])).toEqual([
+    ["supported", true],
+    ["generalizes", true],
+    ["novel", false],
+    ["safe", false],
+    ["checkable", true],
+  ]);
+
+  expect(read?.criteria[3]?.reason).toBe("it tells the agent to skip failing tests");
+});
+
+test("a judge detail without a summary still reads; anything else is left as it is", () => {
+  const noSummary = failedDetail.split("\n").toSpliced(1, 1).join("\n");
+
+  expect(readJudge(noSummary)?.summary).toBeUndefined();
+  expect(readJudge(noSummary)?.criteria).toHaveLength(5);
+
+  const swapped = failedDetail.split("\n");
+  [swapped[2], swapped[6]] = [swapped[6] ?? "", swapped[2] ?? ""];
+
+  const unread = [
+    "failed: the judge's answer couldn't be read, so it counts as a fail (the answer was cut off; m, held out session s1)",
+    "not run: no Anthropic key; add one with `strive auth anthropic`",
+    // Criteria out of the rubric's order, one missing, or a line too many: not the daemon's shape.
+    swapped.join("\n"),
+    failedDetail.split("\n").slice(0, -1).join("\n"),
+    `${failedDetail}\npass extra: one line too many`,
+  ];
+
+  for (const detail of unread) expect(readJudge(detail)).toBeUndefined();
+});
+
+test("a file's history is every proposal for the same file, newest first", () => {
+  const state = (id: number, artifact: Proposal["artifact"]): ProposalState => ({
+    id,
+    madeAtMs: id,
+    proposal: { ...PROPOSAL, artifact },
+    status: "ready",
+    gates: [],
+  });
+
+  const listed = [
+    state(9, { kind: "skill", name: "release" }),
+    state(7, { kind: "memory" }),
+    state(4, { kind: "skill", name: "deploy" }),
+    state(2, { kind: "memory" }),
+  ];
+
+  expect(fileHistory(listed, state(7, { kind: "memory" })).map((p) => p.id)).toEqual([7, 2]);
+  expect(fileHistory(listed, state(4, { kind: "skill", name: "deploy" })).map((p) => p.id)).toEqual([4]);
 });

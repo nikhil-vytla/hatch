@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { createSocket } from "node:dgram";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { createServer as createHttpServer } from "node:http";
 import { createRequire } from "node:module";
 import { type AddressInfo, connect, createServer, type Socket } from "node:net";
 import { tmpdir } from "node:os";
@@ -57,11 +58,11 @@ afterEach(async () => {
   launched.clear();
 });
 
-async function launch(args: string[]): Promise<ElectronApplication> {
+async function launch(args: string[], at = home): Promise<ElectronApplication> {
   const app = await electron.launch({
     executablePath: electronPath,
     args: [APP, ...args],
-    env: { ...keyless(), STRIVE_SOCKET: join(home, "run/strived.sock") },
+    env: { ...keyless(), STRIVE_SOCKET: join(at, "run/strived.sock") },
   });
 
   launched.add(app);
@@ -102,8 +103,9 @@ class Rpc {
     });
   }
 
-  static async open(): Promise<Rpc> {
-    const socket = connect(join(home, "run/strived.sock"));
+  /** A connection to the daemon whose home is `at`: the shared one unless a test starts its own. */
+  static async open(at = home): Promise<Rpc> {
+    const socket = connect(join(at, "run/strived.sock"));
     await new Promise((ok) => socket.once("connect", ok));
     const rpc = new Rpc(socket);
     await rpc.call("initialize", { protocolVersion: 1, client: { name: "e2e", version: "0" } });
@@ -125,11 +127,11 @@ class Rpc {
 
 type Opened = { app: ElectronApplication; page: Page; cwd: string; userData: string };
 
-async function openApp(): Promise<Opened> {
+async function openApp(at = home): Promise<Opened> {
   const cwd = realpathSync(mkdtempSync(join(tmpdir(), "strv-desk-ws-")));
   const userData = mkdtempSync(join(tmpdir(), "strv-desk-data-"));
 
-  const app = await launch([`--user-data-dir=${userData}`, "--cwd", cwd]);
+  const app = await launch([`--user-data-dir=${userData}`, "--cwd", cwd], at);
 
   const page = await app.firstWindow();
   await page.getByText(`Session started in ${cwd}`).waitFor();
@@ -538,6 +540,7 @@ test("the window has no Node, only the app's bridge", async () => {
     process: false,
     bridge: [
       "blob",
+      "cited",
       "learning",
       "loadWorkspace",
       "onClosed",
@@ -809,26 +812,28 @@ type Learner = { host: Rpc; id: string };
  * A connection registered as the project's learner. Registering shows it
  * the project's memory as it is now: a proposal's "before".
  */
-async function learner(cwd: string): Promise<Learner> {
-  const rpc = await Rpc.open();
+async function learner(cwd: string, at = home): Promise<Learner> {
+  const rpc = await Rpc.open(at);
   const id = String(resultOf(await rpc.call("learning/open", { cwd })).id);
   rpc.close();
-  const host = await Rpc.open();
+  const host = await Rpc.open(at);
   resultOf(await host.call("host/register", { id }));
 
   return { host, id };
 }
 
-type Proposed = { summary: string; content: string; evidence?: string; note?: string };
+type Proposed = { summary: string; content: string; evidence?: string; seqs?: number[]; note?: string };
 
-/** Proposes a change to the project's memory, citing a work session's first entry; its id. */
+/** Proposes a change to the project's memory, citing a work session's entries (its first by default); its id. */
 async function proposeMemory(l: Learner, cwd: string, p: Proposed): Promise<number> {
   const proposal = {
     artifact: { kind: "memory" },
     content: p.content,
     summary: p.summary,
     rationale: `Why: ${p.summary}.`,
-    evidence: [{ session: p.evidence ?? sessionId(cwd), seqs: [1], note: p.note ?? "the session began here" }],
+    evidence: [
+      { session: p.evidence ?? sessionId(cwd), seqs: p.seqs ?? [1], note: p.note ?? "the session began here" },
+    ],
     prediction: `Later sessions follow: ${p.summary}.`,
   };
 
@@ -1120,5 +1125,281 @@ test("Learn from recent sessions starts a run that the pane follows until its pr
   resultOf(await l.host.call("host/record", { id: l.id, event: ended }));
   await learning.waitFor({ state: "detached" });
   await pane.locator(`.learned-item[data-proposal="${id}"]`, { hasText: "Run the tests with bun" }).waitFor();
+  l.host.close();
+});
+
+/** Closes the Learned pane and opens it again, as a person coming back to it does. */
+async function reopenLearned(page: Page) {
+  await page.keyboard.press("Meta+l");
+  await page.getByRole("complementary", { name: "learned" }).waitFor({ state: "detached" });
+
+  return learnedPane(page);
+}
+
+test("a learned file edited by hand after an accept shows as changed outside review", async () => {
+  const { page, cwd } = await openApp();
+  const l = await learner(cwd);
+  const id = await proposeMemory(l, cwd, { summary: "Run the tests with bun", content: "- Run `bun test`.\n" });
+  const older = await proposeMemory(l, cwd, { summary: "Sort the changelog", content: "- Sort it.\n" });
+  let pane = await openProposal(page, id);
+  await pane.getByRole("button", { name: "Accept" }).click();
+  await pane.getByRole("button", { name: "Write it" }).click();
+  await pane.locator(".learned-title .badge", { hasText: "applied" }).waitFor();
+  // As the accepted proposal left it: nothing to say.
+  await pane.getByRole("button", { name: "all proposals" }).click();
+  await pane.locator(`.learned-item[data-proposal="${older}"]`).waitFor();
+  const notice = pane.getByRole("region", { name: "changed outside review" });
+  assert.equal(await notice.count(), 0);
+
+  writeMemory(cwd, "- Run `bun test`.\n- A rule nobody reviewed.\n");
+  pane = await reopenLearned(page);
+  await notice.waitFor();
+  assert.deepEqual(await notice.locator("li").allTextContents(), [".strive/memory.md"]);
+  await notice.getByText("New sessions read it as it is, unreviewed.", { exact: false }).waitFor();
+  // The proposal says so too, and the daemon refuses to roll it back over the edit, as the notice warns.
+  await pane.locator(`.learned-item[data-proposal="${id}"]`).click();
+  const detail = pane.locator(`.learned-detail[data-proposal="${id}"]`);
+  await detail.locator(".status-note.outside", { hasText: ".strive/memory.md has changed outside review" }).waitFor();
+  await detail.getByRole("button", { name: "Roll back" }).click();
+  await detail.getByRole("group", { name: "confirm rollback" }).getByRole("button", { name: "Roll back" }).click();
+  await detail.getByText(`.strive/memory.md has changed since proposal #${id} was applied`, { exact: false }).waitFor();
+  assert.equal(readFileSync(memoryFile(cwd), "utf8"), "- Run `bun test`.\n- A rule nobody reviewed.\n");
+  l.host.close();
+});
+
+test("evidence opens to the entries it cites, and a click on one shows it in its session", async () => {
+  const { page, cwd } = await openApp();
+  const rpc = await Rpc.open();
+  const work = String(resultOf(await rpc.call("session/create", { cwd })).id);
+  const text = "run the tests and tell me what fails";
+  const asked = Number(resultOf(await rpc.call("session/prompt", { id: work, text })).seq);
+
+  // Enough after the prompt that it starts out of view.
+  for (let i = 1; i <= 16; i++)
+    resultOf(await rpc.call("session/prompt", { id: work, text: `later note ${i}\nsecond line\nthird line` }));
+
+  resultOf(await rpc.call("session/approvals", { id: work, mode: "fullAuto" }));
+  const host = await Rpc.open();
+  resultOf(await host.call("host/register", { id: work }));
+  const command = "echo 1 test failed; exit 3";
+  resultOf(await host.call("effect/run", { id: work, callId: "b1", request: { kind: "bash", command } }));
+  host.close();
+  const log: { entries: { seq: number; event: { type: string } }[] } = JSON.parse(strive("log", work, "--json"));
+  const ran = log.entries.find((e) => e.event.type === "effectStarted")?.seq;
+  const finished = log.entries.find((e) => e.event.type === "effectFinished")?.seq;
+  assert.ok(ran !== undefined && finished !== undefined, JSON.stringify(log));
+  const l = await learner(cwd);
+
+  const id = await proposeMemory(l, cwd, {
+    summary: "Say which test failed",
+    content: "- Name the failing test.\n",
+    evidence: work,
+    seqs: [asked, finished],
+    note: "the user asked, and one test failed",
+  });
+
+  const pane = await openProposal(page, id);
+  const item = pane.locator(".evidence > li");
+  await item.getByText("the user asked, and one test failed").waitFor();
+  assert.equal(await item.getByRole("list", { name: "cited entries" }).count(), 0, "closed until asked for");
+  await item.getByRole("button", { name: "Show what the 2 entries say" }).click();
+  const cited = item.getByRole("list", { name: "cited entries" });
+  await cited.locator(`[data-seq="${asked}"]`, { hasText: text }).waitFor();
+  // The cited result brings its command along.
+  assert.equal(await cited.locator(`[data-seq="${ran}"] .code`).textContent(), command);
+  await cited.locator(`[data-seq="${finished}"] .who`, { hasText: `Result of #${ran}` }).waitFor();
+  await cited.locator(`[data-seq="${finished}"]`, { hasText: "Exit 3" }).waitFor();
+  assert.equal(await cited.locator(`[data-seq="${finished}"] .output`).textContent(), "1 test failed");
+
+  // Only this project's sessions: code in the window naming another project's session is refused.
+  const theirs = String(
+    resultOf(await rpc.call("session/create", { cwd: realpathSync(mkdtempSync(join(tmpdir(), "strv-desk-other-"))) }))
+      .id,
+  );
+
+  const tried = await page.evaluate(
+    (session) =>
+      Object.getOwnPropertyDescriptor(window, "strive")
+        ?.value.cited(session, [1])
+        .then(
+          () => ({ ok: "read" }),
+          (e: Error) => ({ error: e.message }),
+        ),
+    theirs,
+  );
+
+  assert.ok("error" in tried && /isn't one of this project's/.test(tried.error), JSON.stringify(tried));
+  rpc.close();
+
+  // A click on the prompt shows its session, scrolled to the prompt.
+  await cited.getByRole("button", { name: `#${asked}` }).click();
+  await page.locator(`.msg.user[data-seq="${asked}"]`).waitFor();
+
+  await page.waitForFunction((seq) => {
+    const el = document.querySelector(`.msg.user[data-seq="${seq}"]`);
+    const view = el?.closest(".scroller");
+
+    if (!el || !view) return false;
+
+    const a = el.getBoundingClientRect();
+    const b = view.getBoundingClientRect();
+
+    return a.top >= b.top && a.bottom <= b.bottom;
+  }, asked);
+
+  // Away from the latest, which is where a session opens otherwise.
+  await page.getByRole("button", { name: "Jump to latest" }).waitFor();
+  l.host.close();
+});
+
+/** A fake Anthropic API answering every call with `body`: the judge's model, for a daemon of a test's own. */
+async function fakeAnthropic(body: Json): Promise<{ url: string; close: () => void }> {
+  const server = createHttpServer((req, res) => {
+    req.resume();
+    req.on("end", () => {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify(body));
+    });
+  });
+
+  await new Promise<void>((ok) => server.listen(0, "127.0.0.1", ok));
+  const address = server.address();
+  assert.ok(isInet(address));
+
+  return { url: `http://127.0.0.1:${address.port}`, close: () => server.close() };
+}
+
+test("the judge's reasons show by criterion, each marked passed or failed", async () => {
+  const mark = (pass: boolean, reason: string) => ({ pass, reason });
+
+  const verdict = {
+    criteria: {
+      supported: mark(true, "The cited prompt asks for exactly this."),
+      generalizes: mark(true, "Nothing held out contradicts it."),
+      novel: mark(false, "Memory already says to run `bun test`."),
+      safe: mark(true, "It weakens no safeguard."),
+      checkable: mark(true, "A later journal shows which command ran."),
+    },
+    verdict: "fail",
+    summary: "Sound, but memory already covers it.",
+  };
+
+  const model = await fakeAnthropic({
+    id: "msg_judge",
+    type: "message",
+    role: "assistant",
+    model: "claude-haiku-4-5",
+    content: [{ type: "tool_use", id: "toolu_1", name: "record_verdict", input: verdict }],
+    stop_reason: "tool_use",
+    usage: { input_tokens: 900, output_tokens: 120 },
+  });
+
+  // A daemon of its own, whose judge is the fake above with a stand-in key: the shared one's upstreams are dead.
+  const own = mkdtempSync(join(tmpdir(), "strv-desk-judge-"));
+  writeFileSync(join(own, "settings.json"), JSON.stringify({ judgeModel: "claude-haiku-4-5" }));
+
+  const env = {
+    ...keyless(),
+    STRIVE_HOME: own,
+    STRIVE_HOST: "none",
+    STRIVE_UPSTREAM_ANTHROPIC: model.url,
+    ANTHROPIC_API_KEY: "sk-test-judge",
+  };
+
+  execFileSync(STRIVE, ["status"], { env });
+
+  try {
+    const { app, page, cwd } = await openApp(own);
+    const rpc = await Rpc.open(own);
+    const work = String(resultOf(await rpc.call("session/create", { cwd })).id);
+    const seq = Number(resultOf(await rpc.call("session/prompt", { id: work, text: "run the tests with bun" })).seq);
+    // A session the judge can hold out.
+    const held = String(resultOf(await rpc.call("session/create", { cwd })).id);
+    resultOf(await rpc.call("session/prompt", { id: held, text: "fix the parser" }));
+    rpc.close();
+    const l = await learner(cwd, own);
+
+    const id = await proposeMemory(l, cwd, {
+      summary: "Run the tests with bun",
+      content: "- Run `bun test`.\n",
+      evidence: work,
+      seqs: [seq],
+    });
+
+    const pane = await openProposal(page, id);
+    const judge = pane.locator("[data-gate=judge]");
+    const criteria = judge.getByRole("list", { name: "criteria" });
+    await criteria.locator("li").nth(4).waitFor();
+
+    const marks = await criteria
+      .locator("li")
+      .evaluateAll((els) =>
+        els.map((e) => [e.getAttribute("data-criterion"), e.querySelector(".mark")?.getAttribute("aria-label")]),
+      );
+
+    assert.deepEqual(marks, [
+      ["supported", "passed"],
+      ["generalizes", "passed"],
+      ["novel", "failed"],
+      ["safe", "passed"],
+      ["checkable", "passed"],
+    ]);
+
+    await judge
+      .locator("[data-criterion=novel] .reason", { hasText: "Memory already says to run `bun test`." })
+      .waitFor();
+    await judge.locator(".judge-summary", { hasText: "Sound, but memory already covers it." }).waitFor();
+    await judge.locator(".judge-head", { hasText: "failed novel (claude-haiku-4-5, held out session" }).waitFor();
+    await judge.locator(".badge", { hasText: "failed" }).waitFor();
+    l.host.close();
+    await app.close();
+  } finally {
+    execFileSync(STRIVE, ["stop"], { env });
+    model.close();
+    rmSync(own, { recursive: true, force: true });
+  }
+});
+
+test("a proposal shows the other proposals for its file, and one is a click away", async () => {
+  const { page, cwd } = await openApp();
+  const l = await learner(cwd);
+  const first = await proposeMemory(l, cwd, { summary: "Run the tests with bun", content: "- Run `bun test`.\n" });
+  const pane = await openProposal(page, first);
+  await pane.getByRole("button", { name: "Reject" }).click();
+  await pane.locator(".learned-title .badge", { hasText: "rejected" }).waitFor();
+  // Alone, it has no history to show.
+  assert.equal(await pane.getByRole("list", { name: "proposals for this file" }).count(), 0);
+
+  const skill = {
+    artifact: { kind: "skill", name: "release" },
+    content: "---\nname: release\ndescription: How to cut a release.\n---\nTag, then push.\n",
+    summary: "How to release",
+    rationale: "Asked twice.",
+    evidence: [{ session: sessionId(cwd), seqs: [1], note: "the session began here" }],
+    prediction: "Releases follow it.",
+  };
+
+  resultOf(await l.host.call("host/record", { id: l.id, event: { type: "proposalMade", proposal: skill } }));
+
+  const second = await proposeMemory(l, cwd, {
+    summary: "Run the tests with bun, in src",
+    content: "- `bun test src`.\n",
+  });
+
+  await pane.getByRole("button", { name: "all proposals" }).click();
+  await pane.locator(`.learned-item[data-proposal="${second}"]`).click();
+  const history = pane.getByRole("list", { name: "proposals for this file" });
+  await history.locator("li").nth(1).waitFor();
+
+  // Memory's proposals only, newest first, the one shown marked; the skill's isn't among them.
+  assert.deepEqual(await history.locator("li .summary").allTextContents(), [
+    "Run the tests with bun, in src",
+    "Run the tests with bun",
+  ]);
+
+  assert.deepEqual(await history.locator("li .badge").allTextContents(), ["ready", "rejected"]);
+  assert.equal(await history.locator("[aria-current]").textContent(), "Run the tests with bun, in src");
+  await history.getByRole("button", { name: "Run the tests with bun", exact: true }).click();
+  await pane.locator(`.learned-detail[data-proposal="${first}"]`).waitFor();
   l.host.close();
 });

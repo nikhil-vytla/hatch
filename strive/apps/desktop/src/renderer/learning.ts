@@ -1,7 +1,7 @@
 // What the Learned pane shows of the project's learning: proposals as
 // people read them, and the state of the latest run, folded from the
 // learning session's journal.
-import type { Artifact, Entry, Gate, ProposalStatus, Verdict } from "@strive/protocol";
+import type { Artifact, Entry, Gate, ProposalState, ProposalStatus, Verdict } from "@strive/protocol";
 
 /**
  * A failed bridge call as a person reads it: the main process's message,
@@ -118,4 +118,55 @@ export class Journal {
   get entries(): Entry[] {
     return [...this.bySeq.values()].sort((a, b) => a.seq - b.seq);
   }
+}
+
+/** The judge's rubric (ADR-0017), in the order its detail lists it, each as a reviewer reads it. */
+export const CRITERIA = [
+  ["supported", "Supported by the cited evidence"],
+  ["generalizes", "Holds for sessions it didn't cite"],
+  ["novel", "Not already covered"],
+  ["safe", "Can't mislead the agent or weaken a safeguard"],
+  ["checkable", "Its prediction can be checked"],
+] as const;
+
+export type Criterion = { id: (typeof CRITERIA)[number][0]; name: string; pass: boolean; reason: string };
+
+export type JudgeReading = {
+  /** The outcome, the judge's model and what was held out. */
+  head: string;
+  summary?: string;
+  criteria: Criterion[];
+};
+
+/**
+ * A judge detail read by criterion, when it's in the daemon's shape
+ * (`strive_learning::judge::detail`): the outcome, an optional summary, then
+ * one `pass id: reason` or `FAIL id: reason` line per criterion in the
+ * rubric's order. Anything else (a skipped judge, an unreadable answer)
+ * isn't read, and is shown as it is.
+ */
+export function readJudge(detail: string): JudgeReading | undefined {
+  const lines = detail.split("\n");
+
+  if (lines.length < CRITERIA.length + 1 || lines.length > CRITERIA.length + 2) return undefined;
+
+  const [head, summary] = lines.slice(0, -CRITERIA.length);
+  const marks = lines.slice(-CRITERIA.length);
+  const criteria: Criterion[] = [];
+
+  for (const [i, [id, name]] of CRITERIA.entries()) {
+    const m = new RegExp(`^(pass|FAIL) ${id}: (.*)$`).exec(marks[i] ?? "");
+
+    if (!m) return undefined;
+    criteria.push({ id, name, pass: m[1] === "pass", reason: m[2] ?? "" });
+  }
+
+  return head === undefined ? undefined : { head, summary, criteria };
+}
+
+/** The proposals for the same file as `p`, newest first, `p` among them: the file's history as review sees it. */
+export function fileHistory(proposals: readonly ProposalState[], p: ProposalState): ProposalState[] {
+  const path = artifactPath(p.proposal.artifact);
+
+  return proposals.filter((q) => artifactPath(q.proposal.artifact) === path);
 }

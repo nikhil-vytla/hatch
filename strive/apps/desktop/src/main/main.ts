@@ -23,6 +23,7 @@ import {
   protocol,
 } from "electron";
 import type { StriveEvent } from "../shared/bridge";
+import { type Cited, cut, OUTPUT_LIMIT, outputsOf, pick } from "../shared/cited";
 import { Connection } from "./connection";
 import { Learning } from "./learning";
 import { learnedNotice, type Notice, noticeFor } from "./notify";
@@ -283,6 +284,32 @@ async function main() {
     return found.before === undefined
       ? null
       : (await current.client.request("blob/get", { digest: found.before })).text;
+  });
+
+  // The entries a proposal's evidence cites, from one of this project's sessions only, with their outputs.
+  // Whatever the page sends: the session must be one the project lists, and seqs only select among its entries.
+  ipcMain.handle("strive:cited", async (e, session: string, seqs: number[]): Promise<Cited> => {
+    if (!fromOurPage(e)) throw new Error("not available to this frame");
+
+    const { sessions } = await current.client.request("session/list", { cwd });
+
+    if (!sessions.some((s) => s.id === session)) throw new Error("that session isn't one of this project's");
+
+    const { entries } = await current.client.request("session/read", { id: session });
+    const picked = pick(entries, seqs);
+    const outputs: Cited["outputs"] = {};
+
+    for (const digest of new Set(outputsOf(picked))) {
+      // An output that's gone from the store is shown as missing, not as a failure of the whole read.
+      const text = await current.client.request("blob/get", { digest }).then(
+        (r) => r.text,
+        () => undefined,
+      );
+
+      if (text !== undefined) outputs[digest] = cut(text, OUTPUT_LIMIT);
+    }
+
+    return { entries: picked, outputs };
   });
 
   ipcMain.handle("workspace:load", (e) => (fromOurPage(e) ? loadWorkspace(app.getPath("userData")) : undefined));

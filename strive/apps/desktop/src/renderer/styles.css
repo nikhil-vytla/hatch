@@ -429,16 +429,74 @@ button.learn .icon { width: 14px; height: 14px; color: var(--accent-text); }
 .learned-section .md > :first-child { margin-top: 0; }
 .learned-section .md > :last-child { margin-bottom: 0; }
 .evidence, .checks { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
-.evidence li { padding-left: 10px; border-left: 2px solid var(--line-2); }
+.evidence > li { padding-left: 10px; border-left: 2px solid var(--line-2); }
 .evidence-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 2px; }
 .evidence .prose { color: var(--muted); }
 button.link { padding: 0; border: 0; background: transparent; color: var(--accent-text); font-weight: 500; text-align: left; }
 button.link:hover { background: transparent; text-decoration: underline; text-underline-offset: 2px; }
 .session-name { font-weight: 500; }
-.checks li { display: grid; grid-template-columns: 56px 64px 1fr; align-items: baseline; gap: 4px 10px; font-size: 13px; }
+.checks > li { display: grid; grid-template-columns: 56px 64px 1fr; align-items: baseline; gap: 4px 10px; font-size: 13px; }
 .checks .gate { color: var(--muted); }
 .checks .badge { justify-self: start; }
 .checks .detail { grid-column: 3; color: var(--muted); white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12.5px; }
+
+/* The judge's detail, by criterion: under the gate and its verdict, the full width of the pane. */
+.checks .detail.judged { grid-column: 1 / -1; white-space: normal; margin-top: 4px; }
+.judge-head { margin: 0; color: var(--faint); font-size: 12px; }
+.judge-summary { margin: 4px 0 0; color: var(--text); line-height: 1.5; }
+.criteria { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.criteria li { display: grid; grid-template-columns: 16px 1fr; gap: 1px 8px; align-items: baseline; }
+.criteria .mark { display: inline-grid; place-items: center; width: 16px; height: 16px; border-radius: 5px; align-self: start; margin-top: 1px; }
+.criteria .mark .icon { width: 12px; height: 12px; stroke-width: 2; }
+.criteria .pass .mark { background: var(--good-soft); color: var(--good); }
+.criteria .fail .mark { background: var(--bad-soft); color: var(--bad); }
+.criteria .name { color: var(--text); font-weight: 500; font-size: 12.5px; }
+.criteria .fail .name { color: var(--bad); }
+.criteria .reason { grid-column: 2; color: var(--muted); font-size: 12.5px; line-height: 1.5; overflow-wrap: anywhere; }
+
+/* Learned files changed without a proposal: a notice atop the list, and a line in a proposal about one. */
+.outside-review { margin: 10px 12px 2px; padding: 10px 12px; border-radius: var(--r-item); background: var(--warn-soft); border: 1px solid rgb(250 204 21 / 0.2); font-size: 13px; animation: fade-in var(--fast) ease-out; }
+.outside-review h4 { display: flex; align-items: center; gap: 6px; margin: 0 0 6px; font-size: 13px; font-weight: 550; color: var(--warn); }
+.outside-review h4 .icon { width: 14px; height: 14px; }
+.outside-review ul { list-style: none; margin: 0 0 6px; padding: 0; }
+.outside-review li { font-size: 12px; color: var(--text); }
+.outside-review p { margin: 0; color: var(--muted); line-height: 1.5; }
+.status-note.outside { padding: 8px 10px; border-radius: var(--r-item); background: var(--warn-soft); border: 1px solid rgb(250 204 21 / 0.2); color: var(--text); }
+.status-note.outside .mono { font-size: 12px; }
+
+/* The entries a piece of evidence cites, opened under its note. */
+button.cited-toggle { display: inline-flex; align-items: center; gap: 4px; margin: 4px 0 0 -6px; padding: 2px 6px; font-size: 12px; color: var(--faint); }
+button.cited-toggle .icon { width: 12px; height: 12px; transition: transform var(--fast) var(--ease-out); }
+button.cited-toggle .icon.open { transform: rotate(90deg); }
+.cited { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; padding: 10px; border-radius: var(--r-item); background: var(--surface); border: 1px solid var(--line); animation: rise 200ms var(--ease-out); }
+.cited-entry { min-width: 0; }
+.cited-entry:not(.named) { opacity: 0.8; }
+.cited-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 2px; font-size: 11.5px; }
+.cited-head .who { color: var(--faint); font-weight: 500; }
+button.seq { padding: 0 4px; border: 0; border-radius: 4px; background: var(--hover); color: var(--muted); font: 11px var(--mono); font-variant-numeric: tabular-nums; }
+button.seq:hover { background: var(--accent-soft); color: var(--accent-text); }
+.cited-entry .prose, .cited-entry .code { margin: 0; font-size: 13px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--text); }
+.cited-entry .code { font: 12px/1.5 var(--mono); }
+.cited-entry .md { font-size: 13px; }
+.cited-entry pre.output { margin: 4px 0 0; padding: 7px 9px; max-height: 180px; overflow: auto; border-radius: 6px; background: var(--code-bg); border: 1px solid var(--line); font: 11.5px/1.5 var(--mono); color: var(--muted); white-space: pre-wrap; overflow-wrap: anywhere; }
+.cited-note { margin: 6px 0 0; }
+
+/* A learned file's proposals, newest first; the one shown is marked. */
+.file-history { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.file-history li { display: grid; grid-template-columns: auto 1fr auto; align-items: baseline; gap: 8px; padding: 5px 8px; margin: 0 -8px; border-radius: 6px; font-size: 13px; }
+.file-history li.this { background: var(--surface); }
+.file-history .summary { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.file-history li.this .summary { color: var(--text); font-weight: 500; }
+.file-history button.summary { font-weight: 450; color: var(--muted); }
+.file-history button.summary:hover { color: var(--text); }
+.file-history .when { font-variant-numeric: tabular-nums; }
+
+/* The conversation's item an evidence link brought into view, marked for a moment. */
+.focused { animation: focus-mark 1.6s var(--ease-out); border-radius: var(--r-item); }
+/* A prompt's row is the thread's width; the mark goes on its bubble. */
+.msg.user.focused { animation: none; }
+.msg.user.focused .bubble { animation: focus-mark 1.6s var(--ease-out); }
+@keyframes focus-mark { from { box-shadow: 0 0 0 2px var(--accent-line); background-color: var(--accent-soft); } }
 
 /* The command palette (⌘K). */
 .palette-overlay { position: fixed; inset: 0; background: rgb(0 0 0 / 0.5); z-index: 40; animation: fade-in var(--fast) ease-out; }
