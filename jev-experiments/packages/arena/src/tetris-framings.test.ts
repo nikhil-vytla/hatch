@@ -205,3 +205,22 @@ describe("more seeds", () => {
     });
   }
 });
+
+test("a spot whose Score the gateway dropped goes unjudged instead of failing the decision", () => {
+  const q = new TetrisArena(7, [heuristic()], "turns")["question"](0);
+
+  if (!q) throw new Error("The first piece has no question");
+  const built = buildRequest("spot-score", q);
+  const keys = Object.keys(built.body.questions);
+
+  const answers = Object.fromEntries(
+    keys
+      .slice(1)
+      .map((k, i) => [k, { value: i === 0 ? 3 : 1, probabilities: null, confidence: null }]),
+  );
+
+  const out = built.read(answers);
+
+  expect(out.judged[keys[0]]).toBeUndefined();
+  expect(out.judged[keys[1]]).toBe(1);
+});
