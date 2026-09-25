@@ -7,7 +7,7 @@
  * upstream's questions, exactly as upstream's client sends it. Prefixes are asked in a seeded
  * shuffled order so latency drift over the run is not tied to any phrase or intent.
  *
- * Transport: one request at a time with a short gap. A busy reply (429/503) is waited out and
+ * Transport: one request at a time with a 700 ms gap. A busy reply (429/503) is waited out and
  * asked again, and every attempt is logged; the recorded latency is the successful attempt's
  * service latency, which is what a visitor's box would wait for. A Score the gateway drops is
  * kept as dropped. Weak answers are never re-asked.
@@ -45,12 +45,15 @@ const doc = phrasesSchema.parse(
 /** Every prefix key and the phrases that produce it. */
 const prefixes = new Map<string, string[]>();
 
-for (const p of doc.phrases)
-  for (let i = 1; i <= p.text.length; i++) {
-    const endsWord = i === p.text.length || p.text[i] === " ";
+for (const p of doc.phrases) {
+  // Whole characters, as a typist produces them: an emoji is one keystroke, never half of one.
+  const chars = Array.from(p.text);
+
+  for (let i = 1; i <= chars.length; i++) {
+    const endsWord = i === chars.length || chars[i] === " ";
 
     if (scope === "words" && !endsWord) continue;
-    const k = normalizeKey(p.text.slice(0, i));
+    const k = normalizeKey(chars.slice(0, i).join(""));
 
     if (k.length < 2) continue;
     const ids = prefixes.get(k) ?? [];
@@ -58,6 +61,7 @@ for (const p of doc.phrases)
     if (!ids.includes(p.id)) ids.push(p.id);
     prefixes.set(k, ids);
   }
+}
 
 const done = new Set<string>();
 
@@ -95,6 +99,12 @@ function shuffled<T>(xs: T[], seed = 20260924) {
 const todo = shuffled([...prefixes.keys()]).filter((k) => !done.has(k));
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+/**
+ * Pause between requests. The first 150 prefixes ran at 150 ms and about half the attempts
+ * came back busy; a longer gap asks the provider less often.
+ */
+const GAP_MS = 700;
+
 console.log(
   `${prefixes.size} prefixes in scope "${scope}", ${done.size} recorded, ${todo.length} to ask.`,
 );
@@ -102,7 +112,7 @@ console.log(
 let n = 0;
 
 for (const k of todo) {
-  let backoff = 1000;
+  let backoff = 2000;
 
   for (let attempt = 1; ; attempt++) {
     const at = new Date().toISOString();
@@ -146,7 +156,7 @@ for (const k of todo) {
   }
 
   if (++n % 50 === 0) console.log(`${n} / ${todo.length}`);
-  await wait(150);
+  await wait(GAP_MS);
 }
 
 console.log("Done.");

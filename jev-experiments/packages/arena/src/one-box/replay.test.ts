@@ -9,6 +9,10 @@ const keyword =
   (key) => ({ reading: classify(key), latencyMs });
 
 describe("keystrokes", () => {
+  test("an emoji is one keystroke, never half a character", () => {
+    expect(keystrokes("🏈 go").map((k) => k.text)).toEqual(["🏈", "🏈 ", "🏈 g", "🏈 go"]);
+  });
+
   test("a steady typist who pauses after each word", () => {
     const keys = keystrokes("hi yo");
 
