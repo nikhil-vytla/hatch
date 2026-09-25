@@ -1,0 +1,2151 @@
+{
+  "note": "Upstream Shapeshift 5e24166: sha256 (16 hex) of the keyword classifier's output on every prefix of each text, and of the UI state the calm rules show after each prefix. The port must reproduce both exactly.",
+  "rounding": "1e-9",
+  "rows": [
+    {
+      "text": "dinner with priya friday 8pm",
+      "keyword": "9da1eac51d7f7049",
+      "calm": "9352d19503f9b844"
+    },
+    {
+      "text": "remind me to call mom tomorrow",
+      "keyword": "a4c02bea3aa719e9",
+      "calm": "6c09b410dd985367"
+    },
+    {
+      "text": "buy milk, eggs, bread and coffee",
+      "keyword": "45eb5892ac770814",
+      "calm": "f5d892187888bee5"
+    },
+    {
+      "text": "25 min focus",
+      "keyword": "5be1e2e110baab3c",
+      "calm": "2097513e5a70a2d4"
+    },
+    {
+      "text": "timer 10 minutes",
+      "keyword": "3d179f766fb6d8bf",
+      "calm": "8f1ae5c1f39a5345"
+    },
+    {
+      "text": "meditate every morning",
+      "keyword": "e45223572b2d5c40",
+      "calm": "7068c02737037c88"
+    },
+    {
+      "text": "gym 3x a week",
+      "keyword": "c728940602c9dd66",
+      "calm": "55c78bc1dc9292be"
+    },
+    {
+      "text": "#ff6b35",
+      "keyword": "11978d520426b0a5",
+      "calm": "c0053df99563068f"
+    },
+    {
+      "text": "a warm sunset orange",
+      "keyword": "51486289410c5f39",
+      "calm": "cde7521672033e16"
+    },
+    {
+      "text": "minecraft diamond",
+      "keyword": "a7356144e816bf36",
+      "calm": "05489b982b8d1ce8"
+    },
+    {
+      "text": "tiffany blue",
+      "keyword": "46369f6763791135",
+      "calm": "af326aa75ff17801"
+    },
+    {
+      "text": "discord blurple",
+      "keyword": "3107b80802f5c1e3",
+      "calm": "2148b77c07b0ae8b"
+    },
+    {
+      "text": "the color of the ocean",
+      "keyword": "ab920a8c712c3737",
+      "calm": "d3bbd8f29564ae84"
+    },
+    {
+      "text": "split 2400 between 3",
+      "keyword": "bd961b8db273b8d7",
+      "calm": "76f9a3829c4c0451"
+    },
+    {
+      "text": "spent 450 on uber",
+      "keyword": "a836ee6323f7cbc9",
+      "calm": "119175c0e1967459"
+    },
+    {
+      "text": "5 miles in km",
+      "keyword": "218989e2f502a0be",
+      "calm": "d95a9ac7b12e1fa4"
+    },
+    {
+      "text": "72f to c",
+      "keyword": "34698fd678f4d46d",
+      "calm": "65b2bb748c7ce235"
+    },
+    {
+      "text": "18% of 3450",
+      "keyword": "24ca66216c31c070",
+      "calm": "400b4361ecff5abd"
+    },
+    {
+      "text": "(120+80)*3",
+      "keyword": "2b2e08ffccda3880",
+      "calm": "3ea8bd976de8917e"
+    },
+    {
+      "text": "flight to goa next weekend",
+      "keyword": "58d5e4061fd6b2d5",
+      "calm": "a849023ebd93cf17"
+    },
+    {
+      "text": "pizza or burgers for friday?",
+      "keyword": "4281b49f4789a708",
+      "calm": "cb5e7b796688cade"
+    },
+    {
+      "text": "rahul 98200 12345 rahul@mail.com",
+      "keyword": "2d332f644531a70f",
+      "calm": "7d62b5a3333c7b7f"
+    },
+    {
+      "text": "https://vercel.com/blog check later",
+      "keyword": "8087ddf7f4cba150",
+      "calm": "f4cec750ab97f068"
+    },
+    {
+      "text": "i keep thinking about how quiet the city felt this morning",
+      "keyword": "424656b600f02c12",
+      "calm": "1fc37a6b8e96e0a7"
+    },
+    {
+      "text": "days until christmas",
+      "keyword": "cbc28fff8fa6e59b",
+      "calm": "7cec6b19ca903622"
+    },
+    {
+      "text": "how many days till my birthday on dec 12",
+      "keyword": "dacd843bb846050c",
+      "calm": "a51b4faac1532a07"
+    },
+    {
+      "text": "3pm pst in ist",
+      "keyword": "54aa7ac7d75e4bc0",
+      "calm": "c1d3b4d92b76a552"
+    },
+    {
+      "text": "what time is it in tokyo",
+      "keyword": "61fc83916713708e",
+      "calm": "f19cf01d84d21117"
+    },
+    {
+      "text": "roll 2d6",
+      "keyword": "117237d1d82f733a",
+      "calm": "1e01b13c71b0c981"
+    },
+    {
+      "text": "flip a coin",
+      "keyword": "b7f87b9028a5f1b2",
+      "calm": "cedf34d8076f3b54"
+    },
+    {
+      "text": "random number 1-100",
+      "keyword": "fd5d69c96b3b5711",
+      "calm": "982415ec39a080d8"
+    },
+    {
+      "text": "read 12 books this year, 4 done",
+      "keyword": "93a44842c8053aac",
+      "calm": "6a16f1377953932b"
+    },
+    {
+      "text": "4 of 10 workouts",
+      "keyword": "51e1eb592282f8d1",
+      "calm": "ac6045696ed370f9"
+    },
+    {
+      "text": "dinner with priya friday 8pm on zoom",
+      "keyword": "b464d0fe36775adf",
+      "calm": "407634556535ad24"
+    },
+    {
+      "text": "remind me to pay rent tomorrow urgent",
+      "keyword": "edcd19f652be279f",
+      "calm": "187dc4422f4d777b"
+    },
+    {
+      "text": "a",
+      "keyword": "848927156a3c1ee4",
+      "calm": "24af729edb50426a"
+    },
+    {
+      "text": "lunch with priya thursday 1pm",
+      "keyword": "72ce0ed6d12abf7e",
+      "calm": "76cb56d76b03d0ad"
+    },
+    {
+      "text": "zoom call with the design team tomorrow at 10",
+      "keyword": "bf5afddfd9536359",
+      "calm": "369bfc4a9d9e557f"
+    },
+    {
+      "text": "Dinner at Marco's place on Saturday, 7:30pm",
+      "keyword": "4a98d3535aa43ea1",
+      "calm": "672f1975db021549"
+    },
+    {
+      "text": "phone call with mum sunday evening",
+      "keyword": "bccd8a995e7c99cf",
+      "calm": "687cec9b7a1811e4"
+    },
+    {
+      "text": "standup moved to 9:15, same google meet link",
+      "keyword": "16b7a0dc07167d0e",
+      "calm": "176dbf5873a418db"
+    },
+    {
+      "text": "hey so we should finally do that dinner we keep talking about, next saturday around 7 at the new thai place on 5th, i'll book it if you're in",
+      "keyword": "740406d53bc71284",
+      "calm": "acf2a5f9b4cfe2ad"
+    },
+    {
+      "text": "catch up with Leo over coffee at Blue Bottle wed 4pm",
+      "keyword": "1350a9da980ef62c",
+      "calm": "b3dc444dd3cf9877"
+    },
+    {
+      "text": "facetime grandma saturday morning",
+      "keyword": "abc2375cc6bfd8ce",
+      "calm": "5561d48e617fc912"
+    },
+    {
+      "text": "remind me to call the dentist tomorrow",
+      "keyword": "468e53a13f9265d3",
+      "calm": "7793d726da9ff415"
+    },
+    {
+      "text": "remind me to take the chicken out of the freezer at 5",
+      "keyword": "93ed6a8c8d16d3d5",
+      "calm": "0c012ef608a74ca1"
+    },
+    {
+      "text": "don't let me forget to pay the electricity bill by friday",
+      "keyword": "4b5dd4392f6165ad",
+      "calm": "5c4b89f915b53b36"
+    },
+    {
+      "text": "remind me to water the plants when I get home",
+      "keyword": "494eb99706f128ad",
+      "calm": "dd58b9f3d675d02a"
+    },
+    {
+      "text": "Remind me to email Ana the signed contract before noon today",
+      "keyword": "36df6540268cdc3f",
+      "calm": "19111c9847f02356"
+    },
+    {
+      "text": "remind me in 20 min to move the laundry to the dryer",
+      "keyword": "d8dcce0a79ba88e9",
+      "calm": "33b7005d42d9fc35"
+    },
+    {
+      "text": "ping me tonight to renew my passport, it expires next week",
+      "keyword": "3f8800b1f01a008c",
+      "calm": "c39a7f7de918705e"
+    },
+    {
+      "text": "REMIND ME TO SUBMIT THE VISA FORM RIGHT NOW, DEADLINE IS IN AN HOUR",
+      "keyword": "09831a4f062fac46",
+      "calm": "04c626837c25ec39"
+    },
+    {
+      "text": "milk, eggs, bread, coffee filters",
+      "keyword": "5e86080761d9dece",
+      "calm": "64e217dde10d2cb5"
+    },
+    {
+      "text": "buy: bananas, oat milk, rice, dish soap, batteries",
+      "keyword": "d61186a055e5faeb",
+      "calm": "dd668a9cc6f7f131"
+    },
+    {
+      "text": "clean bathroom, fold laundry, vacuum, take out recycling",
+      "keyword": "f1a9285df4beea4e",
+      "calm": "a32b3025280a2257"
+    },
+    {
+      "text": "todo: reply to Sam, book dentist, fix bike light",
+      "keyword": "1773cab0960b045e",
+      "calm": "2ee5e74d28a9cc61"
+    },
+    {
+      "text": "groceries - tomatoes onions garlic coriander paneer",
+      "keyword": "fe82f76337771bbe",
+      "calm": "3a9af4c444661c2c"
+    },
+    {
+      "text": "before we leave: pack chargers, print tickets, water plants, lock windows",
+      "keyword": "e3f37a7008a790a4",
+      "calm": "9a979e5f0e794f39"
+    },
+    {
+      "text": "need to get sunscreen, flip flops and a beach towel",
+      "keyword": "1e22fcd3e1cae7f4",
+      "calm": "baa3faba6f349e6c"
+    },
+    {
+      "text": "things for the weekend: mow lawn, call plumber, pick up dry cleaning, wash car",
+      "keyword": "117c9edb5defd397",
+      "calm": "23aaed76dc06a844"
+    },
+    {
+      "text": "25 min focus session",
+      "keyword": "e2e89b0936165b3e",
+      "calm": "a144e54091e05ba7"
+    },
+    {
+      "text": "start a stopwatch",
+      "keyword": "7343519add3c4604",
+      "calm": "beefeeae3d28bb42"
+    },
+    {
+      "text": "5 minute break",
+      "keyword": "58d71382d60f00ad",
+      "calm": "7152497ee12909c5"
+    },
+    {
+      "text": "set a timer for 12 minutes for the pasta",
+      "keyword": "45eb9656b540eda5",
+      "calm": "c97ffa7928775270"
+    },
+    {
+      "text": "deep work block, 90 minutes, no distractions",
+      "keyword": "82f214ea43586fc1",
+      "calm": "a2f897bd84ba132c"
+    },
+    {
+      "text": "time my run",
+      "keyword": "f9dac1e669ed4687",
+      "calm": "ae0cc62b3545935c"
+    },
+    {
+      "text": "15 min rest between sets",
+      "keyword": "1e04193221c5996c",
+      "calm": "8594cef38b7ad7b7"
+    },
+    {
+      "text": "drink 8 glasses of water daily",
+      "keyword": "4f45873ac148411b",
+      "calm": "8206aa40f5bf39bc"
+    },
+    {
+      "text": "go to the gym mon wed fri",
+      "keyword": "e97fd6b602c26b9b",
+      "calm": "cd0f595455d82222"
+    },
+    {
+      "text": "read for 20 minutes before bed every night",
+      "keyword": "19d1c1b14b740307",
+      "calm": "28dbef83e8ac59ac"
+    },
+    {
+      "text": "practice guitar every day",
+      "keyword": "7a10fae9ee87af0c",
+      "calm": "9f509516ba1b7e78"
+    },
+    {
+      "text": "call dad every sunday",
+      "keyword": "0fbbec5c81995e93",
+      "calm": "df6dafa4b5a26b1d"
+    },
+    {
+      "text": "floss nightly",
+      "keyword": "77fc61a1296b2243",
+      "calm": "948f647331fbc05c"
+    },
+    {
+      "text": "Weekly review every Friday afternoon",
+      "keyword": "58996df2cbfcdf0b",
+      "calm": "441c936064f36b67"
+    },
+    {
+      "text": "#ff6b35 for the header",
+      "keyword": "7899fcac07f4ee9a",
+      "calm": "74e22bbc2c735d13"
+    },
+    {
+      "text": "rgb(30, 60, 120)",
+      "keyword": "94504da3ca91c58f",
+      "calm": "5e76304b63a70442"
+    },
+    {
+      "text": "a soft pastel pink",
+      "keyword": "b19d37f9be719114",
+      "calm": "52c6f1e835f133c4"
+    },
+    {
+      "text": "deep forest green",
+      "keyword": "bae6670cea93232d",
+      "calm": "ae4de6472522cc0d"
+    },
+    {
+      "text": "warm terracotta orange",
+      "keyword": "5bc959eee41d942c",
+      "calm": "98e1cb628208ab63"
+    },
+    {
+      "text": "light grey, almost off-white",
+      "keyword": "60dcf3b00fde5f1a",
+      "calm": "549ea70c2db3bffc"
+    },
+    {
+      "text": "neon lime green",
+      "keyword": "c616ad954f4f725b",
+      "calm": "534a0fa8cd24aa19"
+    },
+    {
+      "text": "calm ocean blue",
+      "keyword": "13701c405c95c603",
+      "calm": "2148b77c07b0ae8b"
+    },
+    {
+      "text": "split 90 between 3",
+      "keyword": "86468eb818b4225a",
+      "calm": "f3850bbcd9cc4215"
+    },
+    {
+      "text": "split $240 dinner bill four ways",
+      "keyword": "84a7e04d3736f0b4",
+      "calm": "d98f677db6dfff0e"
+    },
+    {
+      "text": "divide ₹3600 rent between me, Arjun and Kabir",
+      "keyword": "0ea9e64eb23d7f8a",
+      "calm": "3a12315e30b7d0c3"
+    },
+    {
+      "text": "uber was 42, split with maya",
+      "keyword": "2f09ec1694978bad",
+      "calm": "fd8a5ac566a21665"
+    },
+    {
+      "text": "split the €75 groceries between 5 flatmates",
+      "keyword": "009f73bc923d3a20",
+      "calm": "f52a0faa2fb30e58"
+    },
+    {
+      "text": "we owe 1,250 for the cabin, split evenly among 6",
+      "keyword": "144909cf6f1f5f9a",
+      "calm": "8102b9f534e9cf6f"
+    },
+    {
+      "text": "£60 pizza split 4 ways incl tip",
+      "keyword": "aa8ef7d0b8cddc65",
+      "calm": "de04c26ee6ffb13c"
+    },
+    {
+      "text": "split 18.50 between jo and me",
+      "keyword": "96bfb156a3564379",
+      "calm": "0478baed76455781"
+    },
+    {
+      "text": "spent 12 on lunch",
+      "keyword": "9489e6fe88e85901",
+      "calm": "119175c0e1967459"
+    },
+    {
+      "text": "$45 gas",
+      "keyword": "68ee96592d61b976",
+      "calm": "e1c02a89824b562a"
+    },
+    {
+      "text": "netflix 15.49",
+      "keyword": "0882e1acf938f53d",
+      "calm": "948f647331fbc05c"
+    },
+    {
+      "text": "paid ₹850 for groceries at the market",
+      "keyword": "a25f7f7f3cab88fd",
+      "calm": "296486218b8f10ba"
+    },
+    {
+      "text": "bought a new phone case, 25 dollars",
+      "keyword": "4f0c941f5fbc737a",
+      "calm": "b295fdca10d4aaf2"
+    },
+    {
+      "text": "movie tickets 28",
+      "keyword": "dd2df3b490949081",
+      "calm": "4768503df156a9e1"
+    },
+    {
+      "text": "pharmacy £9.20 for cold meds",
+      "keyword": "ec7185df16b53ec6",
+      "calm": "e9742d755bebeb8a"
+    },
+    {
+      "text": "cab to airport 60 bucks",
+      "keyword": "51830a741c0490b9",
+      "calm": "7fb4a7cbf3708a7a"
+    },
+    {
+      "text": "5 miles to km",
+      "keyword": "218989e2f502a0be",
+      "calm": "d95a9ac7b12e1fa4"
+    },
+    {
+      "text": "350 f in c",
+      "keyword": "da98e26561f73dc3",
+      "calm": "12d3039b87cc0158"
+    },
+    {
+      "text": "how many cups is 500 ml",
+      "keyword": "d373aebb710b582d",
+      "calm": "7848e253205ba340"
+    },
+    {
+      "text": "12 oz to grams",
+      "keyword": "4702a4a74b9ae80f",
+      "calm": "b369d524cf2b61e4"
+    },
+    {
+      "text": "6 feet 2 in cm",
+      "keyword": "6aa25b2f1784a59d",
+      "calm": "11c813c505186ab8"
+    },
+    {
+      "text": "convert 2.5 kg to pounds",
+      "keyword": "d4cc18dda16419da",
+      "calm": "c0193dd43d785695"
+    },
+    {
+      "text": "100 km/h in mph",
+      "keyword": "7392f64559e5f507",
+      "calm": "2c135e62a63d1107"
+    },
+    {
+      "text": "3 tablespoons in teaspoons",
+      "keyword": "571904d7ca899df1",
+      "calm": "e7adfb162cbd2b79"
+    },
+    {
+      "text": "15% of 80",
+      "keyword": "f88a48c3185669cc",
+      "calm": "d87c7ee2009d7d43"
+    },
+    {
+      "text": "234 * 17",
+      "keyword": "cb3f405b39cdb067",
+      "calm": "6e4d22fcf0428ace"
+    },
+    {
+      "text": "what's an 18% tip on 64",
+      "keyword": "924a1baba0c86b38",
+      "calm": "89294395b37b07da"
+    },
+    {
+      "text": "(120 + 45) / 3",
+      "keyword": "317b8014e07c7ef0",
+      "calm": "c36d7bad2b638d2a"
+    },
+    {
+      "text": "sqrt 144",
+      "keyword": "0b2df66a8d9caed7",
+      "calm": "9494f0abd70d43e0"
+    },
+    {
+      "text": "20% off 149.99",
+      "keyword": "7cd8073d5e9f5b08",
+      "calm": "53446b5405abe856"
+    },
+    {
+      "text": "1200 minus 15 percent",
+      "keyword": "3c47814f006c0beb",
+      "calm": "67a4fcdff3bd8ca4"
+    },
+    {
+      "text": "how much is 7 times 8",
+      "keyword": "a9d7dc8f3fec8cb2",
+      "calm": "ad95239ae7feb99e"
+    },
+    {
+      "text": "flight to tokyo in march",
+      "keyword": "49195f77047007da",
+      "calm": "ab43ae1c003904f7"
+    },
+    {
+      "text": "train to paris next weekend for a mini holiday",
+      "keyword": "b2a49cf8b2fe87cc",
+      "calm": "48534e87522a8be2"
+    },
+    {
+      "text": "business trip to chicago oct 12-15, fly out monday",
+      "keyword": "42b7b03fd7010b6f",
+      "calm": "55dee980e1ebb4d2"
+    },
+    {
+      "text": "road trip to big sur with the girls in june",
+      "keyword": "4a9be396e32628cb",
+      "calm": "102bc641f6cf5055"
+    },
+    {
+      "text": "book a hotel in lisbon for 3 nights",
+      "keyword": "f8f5152953bd106f",
+      "calm": "3f98cd80764773a6"
+    },
+    {
+      "text": "bus to boston friday to visit my sister",
+      "keyword": "db6d161f08cc7d95",
+      "calm": "0778084f5ebcf770"
+    },
+    {
+      "text": "client visit in Bangalore the week of the 14th, need a flight there and a hotel near the office for four nights, company is paying",
+      "keyword": "99577bdd1965127e",
+      "calm": "57cadc3a4fa63db5"
+    },
+    {
+      "text": "weekend in the lake district, driving up saturday",
+      "keyword": "67cc632a8e6b3e42",
+      "calm": "7e8423c21225408f"
+    },
+    {
+      "text": "pizza or thai tonight? vote",
+      "keyword": "07ac74f556fb15f3",
+      "calm": "c6e4b022f06abe18"
+    },
+    {
+      "text": "team vote: offsite in denver, austin or nashville",
+      "keyword": "09caf8e9d20b8c80",
+      "calm": "66ca639e45191143"
+    },
+    {
+      "text": "which movie friday: dune, barbie, or oppenheimer?",
+      "keyword": "92c97974ccf7ea3a",
+      "calm": "a9a7cfb8d4a17b96"
+    },
+    {
+      "text": "poll: best day for book club — tue, wed, thu",
+      "keyword": "81c4baf9c8b98ea6",
+      "calm": "bfca4f55ea54a3a6"
+    },
+    {
+      "text": "should we get a dog or a cat? everyone vote!",
+      "keyword": "14dd7f05a6a88e4b",
+      "calm": "25cbc5b260937af3"
+    },
+    {
+      "text": "Where should we go for brunch? Tartine, Plow or Zazie",
+      "keyword": "4c447daa6d1e6c6b",
+      "calm": "3926c2db9a7e3151"
+    },
+    {
+      "text": "vote on the logo: A or B",
+      "keyword": "78e605f6d5d06fe2",
+      "calm": "8f8a46f3c4834bea"
+    },
+    {
+      "text": "quick poll for the team: tabs or spaces",
+      "keyword": "f9f035959c5d0ad3",
+      "calm": "554c56f1a81a0812"
+    },
+    {
+      "text": "Sam 555-0142",
+      "keyword": "d0fef4b78ce83bb7",
+      "calm": "46cb7631f758e683"
+    },
+    {
+      "text": "Priya priya.sharma@example.com",
+      "keyword": "3d56c59b48017bc4",
+      "calm": "21f7da2ffb9da8cb"
+    },
+    {
+      "text": "save contact: Diego Ramirez, 555-0198, diego@example.com",
+      "keyword": "20991d06a940eefa",
+      "calm": "a315def0832f79a6"
+    },
+    {
+      "text": "plumber Mike (555) 555-0117",
+      "keyword": "99d2802ecbd504a0",
+      "calm": "93101ded54069b0f"
+    },
+    {
+      "text": "new number for Aunt Rosa: 555-0163",
+      "keyword": "7e34eaa76306fda0",
+      "calm": "3c8104c8a9f02bcd"
+    },
+    {
+      "text": "Hana from the conference hana.k@example.com",
+      "keyword": "7fdd51dae4fc0f9e",
+      "calm": "6f49504a08a64a71"
+    },
+    {
+      "text": "Dr. Patel dentist 555-0100",
+      "keyword": "d32a6ea19d5147d9",
+      "calm": "e7adfb162cbd2b79"
+    },
+    {
+      "text": "Tom's work email tom@example.com",
+      "keyword": "bf6d27eddbfee30b",
+      "calm": "05cbfb873b8fbf16"
+    },
+    {
+      "text": "https://example.com/recipes/lasagna for sunday",
+      "keyword": "dcdac80ab4cc7bea",
+      "calm": "c855c1581f0c0f5a"
+    },
+    {
+      "text": "read later: https://blog.example.com/rust-async",
+      "keyword": "b5e561ff4a0047c2",
+      "calm": "a73ecf9ade50d60a"
+    },
+    {
+      "text": "www.example.org/menu save this",
+      "keyword": "0c63c7eaddb131ee",
+      "calm": "e9253805ac50e78e"
+    },
+    {
+      "text": "check this out example.com/deals great sale on tents",
+      "keyword": "5f89dfd766d5ee63",
+      "calm": "c33c33b0b614865c"
+    },
+    {
+      "text": "https://video.example.com/watch?v=abc123XYZ sourdough tutorial",
+      "keyword": "d67a92134a373583",
+      "calm": "b191d3d67981c658"
+    },
+    {
+      "text": "save https://docs.example.com/api/v2 for the integration",
+      "keyword": "4057a22c3f7fa43a",
+      "calm": "d962f2d614580ba9"
+    },
+    {
+      "text": "http://example.net/article?id=4471 good piece on sleep",
+      "keyword": "a843844cdee454de",
+      "calm": "75f18f29bedec24f"
+    },
+    {
+      "text": "github.com/example/dotfiles - steal the zsh config",
+      "keyword": "7b82162287f435c9",
+      "calm": "6353af975cc1eea2"
+    },
+    {
+      "text": "how many days till my birthday on nov 3",
+      "keyword": "5d53bcee53337255",
+      "calm": "b121b8f765e8ba13"
+    },
+    {
+      "text": "countdown to our wedding june 14!!",
+      "keyword": "0ca85afdd42688e6",
+      "calm": "41aaceebc17fbee9"
+    },
+    {
+      "text": "days until summer vacation",
+      "keyword": "56f45d54aa1fca86",
+      "calm": "3258eed6f0b21158"
+    },
+    {
+      "text": "how long until new year's",
+      "keyword": "a9a4056ce16d687f",
+      "calm": "ca9addd5a406ecd6"
+    },
+    {
+      "text": "count down to the marathon on april 20",
+      "keyword": "23d79593cf69ceb2",
+      "calm": "946dea63c1de5bd7"
+    },
+    {
+      "text": "days left until the product launch dec 1",
+      "keyword": "b4883016f4338c53",
+      "calm": "91644b6ba45e08bd"
+    },
+    {
+      "text": "diwali countdown",
+      "keyword": "b196cf73dac6e802",
+      "calm": "140b63e3dcf6da9e"
+    },
+    {
+      "text": "3pm EST in london time",
+      "keyword": "2a9b5d031bbd0d43",
+      "calm": "cb23f97610033e7e"
+    },
+    {
+      "text": "9am pacific to IST",
+      "keyword": "1276d87c33a9a4c2",
+      "calm": "fe6c3a01df6a66cb"
+    },
+    {
+      "text": "time in sydney right now",
+      "keyword": "e33d6439907dbb93",
+      "calm": "6c50e871d7c4b1fd"
+    },
+    {
+      "text": "if it's 6pm in berlin what time is it in new york",
+      "keyword": "4bcac4bb01f5b0a7",
+      "calm": "cec0e7ac99b477ad"
+    },
+    {
+      "text": "convert 14:00 CET to singapore time",
+      "keyword": "105fe8d63ad7330b",
+      "calm": "b1ef5ef6e0b6c500"
+    },
+    {
+      "text": "noon in NYC = ? in LA",
+      "keyword": "d5d6a80c9ac1817d",
+      "calm": "20285bf4f1d94650"
+    },
+    {
+      "text": "what's the time difference between dubai and toronto",
+      "keyword": "87dc1db0208c3ff5",
+      "calm": "e8d2de88fd40a146"
+    },
+    {
+      "text": "roll a d20",
+      "keyword": "73b7043830fb687b",
+      "calm": "18b0934951e202cc"
+    },
+    {
+      "text": "pick a random name: ana, ben, cleo, dev",
+      "keyword": "1056671bb1d9d044",
+      "calm": "7545d2db52b44803"
+    },
+    {
+      "text": "roll 2 dice",
+      "keyword": "b7f87b9028a5f1b2",
+      "calm": "cedf34d8076f3b54"
+    },
+    {
+      "text": "let fate decide who does the dishes tonight",
+      "keyword": "158efabcf778784b",
+      "calm": "d20d9454914de9e3"
+    },
+    {
+      "text": "give me a random letter",
+      "keyword": "5d2fe4b47d0bb231",
+      "calm": "60b3d8e906562562"
+    },
+    {
+      "text": "read 24 books this year, 5 done",
+      "keyword": "93a44842c8053aac",
+      "calm": "6a16f1377953932b"
+    },
+    {
+      "text": "saved $3,200 of $10,000 for the house deposit",
+      "keyword": "a2842578aa00b3be",
+      "calm": "5c602e82c199539c"
+    },
+    {
+      "text": "ran 42 of 100 miles this month",
+      "keyword": "abc6a8cbfb371104",
+      "calm": "7c0d199bb88649c0"
+    },
+    {
+      "text": "lose 10 lbs, down 3 so far",
+      "keyword": "3110194a294e05d7",
+      "calm": "fa56770b56bb6532"
+    },
+    {
+      "text": "7/30 days of yoga completed",
+      "keyword": "1e7a8564385492d4",
+      "calm": "dbdfed1b020856ca"
+    },
+    {
+      "text": "emergency fund ₹50,000 target, at ₹18,000 now",
+      "keyword": "f6eca845c17155e4",
+      "calm": "9456491266d03eae"
+    },
+    {
+      "text": "write 50,000 words for nanowrimo, at 12k",
+      "keyword": "d48f3ff071d10d26",
+      "calm": "7bbc9aab43063f2f"
+    },
+    {
+      "text": "pushup challenge 350 of 1000",
+      "keyword": "87950a5599909c84",
+      "calm": "2b664db4fabeefbc"
+    },
+    {
+      "text": "idea: an app that tells you which houseplants are safe for cats",
+      "keyword": "3515ba5f8ec3e222",
+      "calm": "a92ed85aa4804f74"
+    },
+    {
+      "text": "the best conversations always seem to happen on long walks",
+      "keyword": "156e8be470e71987",
+      "calm": "d601d7ae5acb8691"
+    },
+    {
+      "text": "so grateful for how the team rallied today",
+      "keyword": "fc7ce2e22a0aa1fe",
+      "calm": "b79cc1b67e088d52"
+    },
+    {
+      "text": "notes: Q3 budget approved, hiring freeze lifted, Jo leads onboarding",
+      "keyword": "25f9871f88604caa",
+      "calm": "7d09a9448a6d12f2"
+    },
+    {
+      "text": "can't believe how stressful this week has been, nothing is going right",
+      "keyword": "94004b75b929fa5f",
+      "calm": "7d9f09b695c96469"
+    },
+    {
+      "text": "book rec from Jo: The Overstory",
+      "keyword": "7a3c7b9026a27474",
+      "calm": "170cab8167108aa8"
+    },
+    {
+      "text": "SO excited for the concert!!!",
+      "keyword": "d48477dc904b8b37",
+      "calm": "d367524c93e31a07"
+    },
+    {
+      "text": "lunch or dinner friday?",
+      "keyword": "a94ac8c2afbf232d",
+      "calm": "a32941d1468d34ae"
+    },
+    {
+      "text": "coffee sam 3",
+      "keyword": "28d21a158b0ddded",
+      "calm": "e3728adb0d0e6b7b"
+    },
+    {
+      "text": "split 1200 dinner",
+      "keyword": "e3397a48589c994b",
+      "calm": "f33656e30ca21ec4"
+    },
+    {
+      "text": "what time works for the call, 2pm or 4pm?",
+      "keyword": "bceb4ebeb3eaa459",
+      "calm": "b5263ec74e7344f8"
+    },
+    {
+      "text": "gym 6am",
+      "keyword": "4ddc63d7f86df774",
+      "calm": "d92b3788cef7c0ab"
+    },
+    {
+      "text": "call mom",
+      "keyword": "5c25248253383670",
+      "calm": "2122b41e159012ca"
+    },
+    {
+      "text": "dentist tuesday 3pm",
+      "keyword": "d8ce956ef2bd0b62",
+      "calm": "0785651ffe7cb1bb"
+    },
+    {
+      "text": "water plants every 3 days",
+      "keyword": "0a04e441783d3764",
+      "calm": "d0cb010e083850d5"
+    },
+    {
+      "text": "remind me to stretch every hour",
+      "keyword": "829fd8fc13bf6781",
+      "calm": "1e43b47e7bf7d2b3"
+    },
+    {
+      "text": "paid 60 for dinner, sam owes me half",
+      "keyword": "5c94afd9f89a7f3b",
+      "calm": "187837449ceb844b"
+    },
+    {
+      "text": "50 usd in inr",
+      "keyword": "2f352bf773d3fa24",
+      "calm": "948f647331fbc05c"
+    },
+    {
+      "text": "tokyo in april?",
+      "keyword": "16abc9cb2a259ce3",
+      "calm": "297cad9d49da9e2f"
+    },
+    {
+      "text": "3pm tokyo",
+      "keyword": "e7ae7d1cbcda2615",
+      "calm": "5d5bd93340a8b1bc"
+    },
+    {
+      "text": "marathon oct 5",
+      "keyword": "122bc99afc857db9",
+      "calm": "3310218efeb8ecda"
+    },
+    {
+      "text": "save for new laptop $1500",
+      "keyword": "88bd674e601a38ea",
+      "calm": "24c226deaf3f2f26"
+    },
+    {
+      "text": "run 5k 3x a week",
+      "keyword": "80ecc640f96623a8",
+      "calm": "d8335a37f4ac7233"
+    },
+    {
+      "text": "blue or green for the kitchen?",
+      "keyword": "8d12cd2551cfdf13",
+      "calm": "1171480593e02c51"
+    },
+    {
+      "text": "sam's birthday march 3",
+      "keyword": "fc594e6bea53afaf",
+      "calm": "859f39383ec96e65"
+    },
+    {
+      "text": "meet anna at the airport 6pm",
+      "keyword": "23092ea3aa1ff79a",
+      "calm": "c0bc589abe1b0e7a"
+    },
+    {
+      "text": "pick one: tacos, ramen, burgers",
+      "keyword": "c3a3acfd2d4e7b22",
+      "calm": "1378a8d2f3ac5e30"
+    },
+    {
+      "text": "5km in 28 min, pace?",
+      "keyword": "ac19f6fe38d0cdb6",
+      "calm": "c2292f07b268ae1b"
+    },
+    {
+      "text": "flight lands 9pm london, what's that in delhi",
+      "keyword": "f8d4e221e2468975",
+      "calm": "787c93cefcc95e6e"
+    },
+    {
+      "text": "12 books this year",
+      "keyword": "2f7645dbdff432dc",
+      "calm": "9aab7177169b33f7"
+    },
+    {
+      "text": "rent due on the 1st",
+      "keyword": "b0d0c357394223b3",
+      "calm": "415003729a148569"
+    },
+    {
+      "text": "nina 555-0177 re: couch pickup sat",
+      "keyword": "efe964ba8a2becba",
+      "calm": "66c8c6ec515be729"
+    },
+    {
+      "text": "https://example.com/tickets concert friday 8pm",
+      "keyword": "694a8e5317a9341d",
+      "calm": "c855c1581f0c0f5a"
+    },
+    {
+      "text": "yoga class tues 7pm",
+      "keyword": "aa14ccfa9870ec9f",
+      "calm": "f6448b7e1bc8229f"
+    },
+    {
+      "text": "pizza night w/ roommates, $48 total",
+      "keyword": "beadc4e0c49a945a",
+      "calm": "34a967bf97467fdd"
+    },
+    {
+      "text": "vacation fund 2k of 5k, bali in dec",
+      "keyword": "fb954f27784584cc",
+      "calm": "9b7a2173cd212bd0"
+    },
+    {
+      "text": "brainstorm podcast names: echo, driftwood, low tide",
+      "keyword": "be7653f9f30f64d9",
+      "calm": "af047fd320f9c2d7"
+    },
+    {
+      "text": "remind me why I love this song",
+      "keyword": "a9c10264d634987c",
+      "calm": "6c09b410dd985367"
+    },
+    {
+      "text": "the red flag at work today was my manager ignoring the deadline again",
+      "keyword": "78df079f8ee963be",
+      "calm": "afa66505113ff389"
+    },
+    {
+      "text": "paid €40 + $25 for the museum and lunch in rome",
+      "keyword": "773827c17e8e4ee5",
+      "calm": "f01440646351d432"
+    },
+    {
+      "text": "spent ₹1,200 on a kurta and £15 on socks online",
+      "keyword": "d807535661f95639",
+      "calm": "9a2f90691e6f0341"
+    },
+    {
+      "text": "ok so notes from the call with the landlord: he says the boiler gets serviced next month, deposit comes back within 10 days after we leave, and we can paint the spare room if it's white after",
+      "keyword": "a1d7477cf8227d09",
+      "calm": "127198088188b939"
+    },
+    {
+      "text": "remnd me to by bred tmrw",
+      "keyword": "1f79aeb1808a896b",
+      "calm": "03ae11d0a2126914"
+    },
+    {
+      "text": "🍕🍕 friday 8pm w/ the crew 🎉",
+      "keyword": "ab3c2c0743bc931c",
+      "calm": "a2d4b82ee87d7b85"
+    },
+    {
+      "text": "need to grab milk and also pick up the kids and then drop off the parcel and call the bank",
+      "keyword": "f25a7525abaf6294",
+      "calm": "d414ed4e7d4158ae"
+    },
+    {
+      "text": "colour for the nursery walls, a pale sage",
+      "keyword": "72ffd4dccd10d781",
+      "calm": "6af387e78593dc3a"
+    },
+    {
+      "text": "chapter 3:16 had the best line in the whole book",
+      "keyword": "8b766ba41bab4c54",
+      "calm": "d07bc33546d9ce67"
+    },
+    {
+      "text": "BA 1130 to heathrow thursday, window seat",
+      "keyword": "a18c250b64b99d49",
+      "calm": "24d7383b9657ed62"
+    },
+    {
+      "text": "oranges 3, apples 6, bananas, a lemon",
+      "keyword": "669db5fd9dceb31a",
+      "calm": "f6f485aea75d8b14"
+    },
+    {
+      "text": "my timer for patience is running out with this landlord",
+      "keyword": "7f516852184f73a3",
+      "calm": "228db9ba06fb8689"
+    },
+    {
+      "text": "Split pea soup: 2 cups peas, 1 onion, 6 cups stock, simmer an hour",
+      "keyword": "77792ec97727b0e4",
+      "calm": "5d8aaadfac947c51"
+    },
+    {
+      "text": "thinking we could convert the spare room into an office by spring",
+      "keyword": "97b7b28d4490c6fc",
+      "calm": "266284859ba060f7"
+    },
+    {
+      "text": "the 5 by 5 rule: if it won't matter in 5 years don't spend more than 5 minutes on it",
+      "keyword": "fce6657a81859cfd",
+      "calm": "76bc10c1c2b95dc8"
+    },
+    {
+      "text": "remember to flip the mattress this weekend",
+      "keyword": "d1fe6f484809cbfe",
+      "calm": "9749ce3b7aeb8d16"
+    },
+    {
+      "text": "₹500 recharge done for mum's phone",
+      "keyword": "2be586c07f8b5d00",
+      "calm": "b9a3ce727413b326"
+    },
+    {
+      "text": "lunch was 4 of us at 1800 rupees, how much each?",
+      "keyword": "f390d5bfb26802b5",
+      "calm": "2525ec7bb7fcbd4e"
+    },
+    {
+      "text": "rgb lights for the gaming setup, 49.99",
+      "keyword": "723f0d701c1338c3",
+      "calm": "d0e162f2097d1625"
+    },
+    {
+      "text": "burnt orange like fall leaves",
+      "keyword": "3e7e5923b34a9820",
+      "calm": "a420938921240d6a"
+    },
+    {
+      "text": "remind me why I picked this major",
+      "keyword": "c5ed4d15fc912c64",
+      "calm": "d380c2d5f386efd7"
+    },
+    {
+      "text": "work trip to Austin 3/10-3/13, need a hotel near downtown",
+      "keyword": "18c5877712da134e",
+      "calm": "7b1d98322fbb528d"
+    },
+    {
+      "text": "book a cabin in the smokies for 4 nights",
+      "keyword": "fe02bdee7bf0feff",
+      "calm": "3559de40258154d8"
+    },
+    {
+      "text": "spent £40 on a jersey in London and $12 at the airport",
+      "keyword": "6758c832973367ef",
+      "calm": "b63edb28afae893d"
+    },
+    {
+      "text": "401k goal $25k this year, at $9,300",
+      "keyword": "57bc859b08cc7774",
+      "calm": "15512c7dfc808f37"
+    },
+    {
+      "text": "amtrak to DC for the conference next thursday",
+      "keyword": "ae5c332c3899ea57",
+      "calm": "128363679e7fc13a"
+    },
+    {
+      "text": "best part of the week was saturday pancakes with the kids",
+      "keyword": "a0497c8d6f6fcc8b",
+      "calm": "36bd7837077e296f"
+    },
+    {
+      "text": "Hulu 17.99",
+      "keyword": "e09b8108e2ab5116",
+      "calm": "3b1c891a3a2a6781"
+    },
+    {
+      "text": "Target: paper towels, toothpaste, dog food, lightbulbs",
+      "keyword": "61986e1623bb4834",
+      "calm": "511c940f30b79e5d"
+    },
+    {
+      "text": "a mile in feet",
+      "keyword": "1329fbd54e3366a1",
+      "calm": "27117dfba935b799"
+    },
+    {
+      "text": "pizza night with the roommates, $54 total",
+      "keyword": "2f0451c5aac70dae",
+      "calm": "70de03526abfb7fa"
+    },
+    {
+      "text": "ok notes from the call with the HOA: they're repaving the lot on 10/3, no parking 7am to 5pm, pool closes after labor day, and we can paint the front door any color from the approved list",
+      "keyword": "804fb4992023f0ae",
+      "calm": "fff0e60d627044d0"
+    },
+    {
+      "text": "gym 5:30am",
+      "keyword": "b64c268058d503dd",
+      "calm": "78d43c7182b3a51d"
+    },
+    {
+      "text": "zoom with the product team tomorrow at 10am",
+      "keyword": "a22efa76a34aec92",
+      "calm": "12b58307f03a038c"
+    },
+    {
+      "text": "split 210 between me, Carlos and Ben",
+      "keyword": "bd8de1527bf2058d",
+      "calm": "a9e9b5e372698b24"
+    },
+    {
+      "text": "Super Bowl party at Jake's, Sunday 5:30, bring chips",
+      "keyword": "b8a46477df68ab05",
+      "calm": "cd272d5b1a0bff77"
+    },
+    {
+      "text": "25 books this year",
+      "keyword": "2f7645dbdff432dc",
+      "calm": "9aab7177169b33f7"
+    },
+    {
+      "text": "take my vitamins daily",
+      "keyword": "281fd9c4873fa1ab",
+      "calm": "7068c02737037c88"
+    },
+    {
+      "text": "rgb(255, 99, 71)",
+      "keyword": "87496cc9296b5fa6",
+      "calm": "5e76304b63a70442"
+    },
+    {
+      "text": "$127 at Trader Joe's for groceries",
+      "keyword": "0bd5fb8f761c7fcb",
+      "calm": "a8f50c563a1054a7"
+    },
+    {
+      "text": "save: coach Dave, (555) 555-0182",
+      "keyword": "973620b06a84899f",
+      "calm": "5f91a3644cd19955"
+    },
+    {
+      "text": "save https://video.example.com/watch?v=q9Lx2 how to fix a running toilet",
+      "keyword": "2f3bedc4fce9b8f8",
+      "calm": "aeead274d789d515"
+    },
+    {
+      "text": "uber home was $38, split with Jess",
+      "keyword": "5e7d8e8d123e8e55",
+      "calm": "d3d95dfe55702252"
+    },
+    {
+      "text": "timer 45 min for the lasagna",
+      "keyword": "98652f301f1b7a11",
+      "calm": "b216d4de3353ad45"
+    },
+    {
+      "text": "my patience timer is running out with this contractor",
+      "keyword": "86aa956883e7ec7d",
+      "calm": "2aa23f8dfd9a7151"
+    },
+    {
+      "text": "call the pediatrician",
+      "keyword": "84fc0960b6b5bb09",
+      "calm": "0000b3336345a8a5"
+    },
+    {
+      "text": "brunch for 4 came to 1145 after tip, what's each person's share?",
+      "keyword": "9a88aad1949eabaf",
+      "calm": "202d8ea0d5f28b53"
+    },
+    {
+      "text": "paid $60 for gas, Jess owes me half",
+      "keyword": "ec06670b4a76d658",
+      "calm": "08d62205e3c2126f"
+    },
+    {
+      "text": "rent due the 1st",
+      "keyword": "8d09e4524232b3ef",
+      "calm": "4b6aef03d8e671ad"
+    },
+    {
+      "text": "remind me to pick up my prescription at CVS after work",
+      "keyword": "3a040f8925926758",
+      "calm": "17675a5e76a8965e"
+    },
+    {
+      "text": "lift weights tues thurs sat",
+      "keyword": "6aa7f064767068e7",
+      "calm": "333e184db01ee072"
+    },
+    {
+      "text": "hot pink, super bright",
+      "keyword": "e29956ae2e8357c5",
+      "calm": "f0c5c7938cf8b0a6"
+    },
+    {
+      "text": "a plain gray for the hallway walls",
+      "keyword": "82c658c66475d3f2",
+      "calm": "74ea088a5f207e2f"
+    },
+    {
+      "text": "2:30pm PT in chicago time",
+      "keyword": "7b82d783ffb7335d",
+      "calm": "981cd76f22944224"
+    },
+    {
+      "text": "20% tip on $86",
+      "keyword": "18912e995fb77d72",
+      "calm": "27117dfba935b799"
+    },
+    {
+      "text": "stopwatch for my plank",
+      "keyword": "63bd43c644d491e8",
+      "calm": "2e890ca964ecb869"
+    },
+    {
+      "text": "DoorDash $23.40",
+      "keyword": "1fdf48def2adc090",
+      "calm": "8cb1b9170dce6066"
+    },
+    {
+      "text": "this week: file expense report, request PTO, bump 401k contribution, cancel old gym membership",
+      "keyword": "3bc3b29ba02db18c",
+      "calm": "fe384e720c2bd94c"
+    },
+    {
+      "text": "split pea soup: 2 cups peas, 1 onion, 6 cups broth, simmer an hour",
+      "keyword": "77792ec97727b0e4",
+      "calm": "5d8aaadfac947c51"
+    },
+    {
+      "text": "REMIND ME TO RENEW MY CAR REGISTRATION TODAY, IT EXPIRES AT MIDNIGHT",
+      "keyword": "5cd8cb2abf9794bd",
+      "calm": "8b16037ca53f2954"
+    },
+    {
+      "text": "pack soccer bag, finish science project, sign permission slip",
+      "keyword": "6d8dc1e54d05ece5",
+      "calm": "62fd69b10f71055c"
+    },
+    {
+      "text": "split the $1,800 airbnb 6 ways",
+      "keyword": "32eccabf78a31ee4",
+      "calm": "4159cf5d062d6a1a"
+    },
+    {
+      "text": "1,450 x 12",
+      "keyword": "fd5de7a325e178f4",
+      "calm": "efbaba8870474b6b"
+    },
+    {
+      "text": "divide $2,400 rent three ways",
+      "keyword": "cd9080a6d58c863e",
+      "calm": "772bac37bc94178c"
+    },
+    {
+      "text": "(38 + 44 + 51) / 3",
+      "keyword": "7a574562ebcd3546",
+      "calm": "f104023a9986e00a"
+    },
+    {
+      "text": "sage or navy for the bedroom?",
+      "keyword": "8dc1055d40e5d7d6",
+      "calm": "50adfce99fdd39d6"
+    },
+    {
+      "text": "Rachel rachel.m@example.com",
+      "keyword": "e286e57db1600bce",
+      "calm": "2eee32b9a933529b"
+    },
+    {
+      "text": "grab a birthday card, wrapping paper and a gift card for Mia's party",
+      "keyword": "f9dea5a7fe8df26d",
+      "calm": "c3318686368d7299"
+    },
+    {
+      "text": "split the $90 concert tickets with Ashley",
+      "keyword": "c0d9c6398bdbf226",
+      "calm": "e61cbf3ed584cc5c"
+    },
+    {
+      "text": "family movie night pick: Moana, Cars, or Frozen",
+      "keyword": "1c3153ac59bb873d",
+      "calm": "6ca5906c477ec923"
+    },
+    {
+      "text": "soccer practice tues 6pm",
+      "keyword": "4c3abbd1ef8d4b93",
+      "calm": "fe44346e9b4c293d"
+    },
+    {
+      "text": "should we do white elephant or secret santa this year?",
+      "keyword": "e4aef5a3e35e4cfd",
+      "calm": "c14245e55ea70f1d"
+    },
+    {
+      "text": "let chance pick who takes out the trash tonight",
+      "keyword": "7473d68310868dee",
+      "calm": "79754f437b90b858"
+    },
+    {
+      "text": "pick a random kid to go first: Liam, Ava, Noah",
+      "keyword": "33b594fdfc2c5432",
+      "calm": "6a29f785fb3021cb"
+    },
+    {
+      "text": "2 gallons in quarts",
+      "keyword": "ac180cf1489e7900",
+      "calm": "12b13065339a1d5b"
+    },
+    {
+      "text": "babysitter Hannah 555-0156, hannah@example.com",
+      "keyword": "a13a43cfca1e17a6",
+      "calm": "325c901849ba3cd9"
+    },
+    {
+      "text": "flight lands 8pm ET, what's that in LA time",
+      "keyword": "6a399f2c4a832ccb",
+      "calm": "92f74f3088c606e5"
+    },
+    {
+      "text": "Mike 555-0147 re: couch on marketplace",
+      "keyword": "5aaabbbc820f1ea7",
+      "calm": "e96ff040859833a9"
+    },
+    {
+      "text": "john 3:16 sign behind the end zone again",
+      "keyword": "163671f9e842b56a",
+      "calm": "0d0d7a6a7dcc9dd4"
+    },
+    {
+      "text": "new sneakers $89",
+      "keyword": "26eaea596dbebb6b",
+      "calm": "4768503df156a9e1"
+    },
+    {
+      "text": "trader joe's: frozen gyoza, bananas, everything bagel seasoning",
+      "keyword": "a79cca3b7f623c06",
+      "calm": "ab9a9e8e8ba4fe91"
+    },
+    {
+      "text": "random letter for scattergories",
+      "keyword": "ccbae818c3dd7fe5",
+      "calm": "9a8bb439ce6fd76c"
+    },
+    {
+      "text": "time in honolulu right now",
+      "keyword": "6ec0a61d4dd19ed5",
+      "calm": "5095c05bce4bad18"
+    },
+    {
+      "text": "remind me to move the car before street cleaning at 8am",
+      "keyword": "701a3845c7da1489",
+      "calm": "625afef5ede9831d"
+    },
+    {
+      "text": "Tyler's email tyler@example.com",
+      "keyword": "2e54bc38290dd243",
+      "calm": "a52026b40b56ce94"
+    },
+    {
+      "text": "set a timer for 8 minutes",
+      "keyword": "81917f50afd643d2",
+      "calm": "82d29e1104aea27e"
+    },
+    {
+      "text": "journal every night before bed",
+      "keyword": "0d62e06312290a6e",
+      "calm": "9d9f0a4d404c4ece"
+    },
+    {
+      "text": "$50 refill on my phone plan",
+      "keyword": "b054e66b9cdec239",
+      "calm": "39a21cbfc8d497f4"
+    },
+    {
+      "text": "don't let me forget to sign Emma's field trip form tonight",
+      "keyword": "4ff1e11f14740f73",
+      "calm": "629d5a0b44380153"
+    },
+    {
+      "text": "split $150 dinner",
+      "keyword": "1c2bb93290cf4bee",
+      "calm": "d6d353db3ada3ac0"
+    },
+    {
+      "text": "save for a new iPhone, $1,000",
+      "keyword": "9cd5af40583b1bdd",
+      "calm": "46ae768814097f30"
+    },
+    {
+      "text": "dentist wed 9am",
+      "keyword": "798d92212d3c29b2",
+      "calm": "a2974f5ade601a12"
+    },
+    {
+      "text": "3pm ET in PT",
+      "keyword": "fe6c427a108abe07",
+      "calm": "31f9b17241375eba"
+    },
+    {
+      "text": "practice piano 20 min each weekday",
+      "keyword": "a139b1d1ce0cc7d8",
+      "calm": "7d2f71a36f1aaa10"
+    },
+    {
+      "text": "random number 1 to 50",
+      "keyword": "14afba2e203d0b4c",
+      "calm": "34e13cc0fb2d197b"
+    },
+    {
+      "text": "favorite quote from the podcast: slow is smooth, smooth is fast",
+      "keyword": "f539ce006344ae3d",
+      "calm": "c08f6d51652f3a7c"
+    },
+    {
+      "text": "get my 5k under 25:00 by the 4th of july, currently at 27:40",
+      "keyword": "6841e67e45bfcb47",
+      "calm": "8e5afea36c075ccd"
+    },
+    {
+      "text": "bookmark shop.example.com/kids/cleats size 3",
+      "keyword": "0c3bda1b1a0259f2",
+      "calm": "d44aa47f305f3184"
+    },
+    {
+      "text": "Costco run - eggs, coffee, TP, rotisserie chicken, paper plates",
+      "keyword": "e5f3fea11a9fae03",
+      "calm": "29fd9dbbded09e99"
+    },
+    {
+      "text": "pick up Grandpa at O'Hare 6pm",
+      "keyword": "7e302388aa6c8cdd",
+      "calm": "ba85b038888e31aa"
+    },
+    {
+      "text": "baby name ideas: Hazel, June, Iris",
+      "keyword": "e5522c24b1a513d5",
+      "calm": "9d68522ab675cd43"
+    },
+    {
+      "text": "50 minute focus block",
+      "keyword": "19a2ce0a309af030",
+      "calm": "a1d4feea1d755be0"
+    },
+    {
+      "text": "Maria from HR maria.hr@example.com",
+      "keyword": "75a7c4d13556b39c",
+      "calm": "37907917c90f6741"
+    },
+    {
+      "text": "flying to chicago for a client meeting on the 18th, back the same night",
+      "keyword": "505974ee095905d5",
+      "calm": "37f701608bf81709"
+    },
+    {
+      "text": "remind me to pick a health plan before open enrollment closes friday",
+      "keyword": "eae6d87ba3e3a7eb",
+      "calm": "8b16037ca53f2954"
+    },
+    {
+      "text": "can't wait for football season!!!",
+      "keyword": "3a8f0f2bfb75f959",
+      "calm": "914b2bcb1c1a90b6"
+    },
+    {
+      "text": "thinking we convert the garage into a home gym by summer",
+      "keyword": "ed6acb6e1fe10972",
+      "calm": "d9891bd9550a02bf"
+    },
+    {
+      "text": "pick one: Chinese, Thai, Mexican",
+      "keyword": "d799ab550b0424dc",
+      "calm": "1621b646f2f60c80"
+    },
+    {
+      "text": "lunch with Megan thursday 12:30",
+      "keyword": "0c638616a1503499",
+      "calm": "6a796701e37ac310"
+    },
+    {
+      "text": "how many tablespoons in a cup",
+      "keyword": "f49f41862ebd5be7",
+      "calm": "32f3f8b9ac672187"
+    },
+    {
+      "text": "days until thanksgiving",
+      "keyword": "92bf4644ec1dd34f",
+      "calm": "b2e7e30cdb02fa72"
+    },
+    {
+      "text": "split $120 in groceries with my roommate",
+      "keyword": "2a914882c60ab34d",
+      "calm": "93a711bef41c1e49"
+    },
+    {
+      "text": "paid €30 for the Louvre and $18 for lunch in Paris",
+      "keyword": "07d9fc7184755e72",
+      "calm": "aa44ec7a778f8903"
+    },
+    {
+      "text": "poll: best day for soccer carpool — mon, wed or thu",
+      "keyword": "13d61a6ae4c3271d",
+      "calm": "e089df3ea2ecd89d"
+    },
+    {
+      "text": "vote: team lunch at Chili's, Panera or Chipotle",
+      "keyword": "f901d7d07c87fc7f",
+      "calm": "a942de1a735350c3"
+    },
+    {
+      "text": "Kevin 555-0134",
+      "keyword": "d087918abad3076c",
+      "calm": "27117dfba935b799"
+    },
+    {
+      "text": "#1e90ff for the buttons",
+      "keyword": "e41cf96bd090b362",
+      "calm": "732db368b41e6e3f"
+    },
+    {
+      "text": "vegas in march?",
+      "keyword": "16abc9cb2a259ce3",
+      "calm": "297cad9d49da9e2f"
+    },
+    {
+      "text": "quick 5 minute stretch break",
+      "keyword": "087f33f6df4d6443",
+      "calm": "87117d5a11b97bac"
+    },
+    {
+      "text": "which weekend works for the reunion, 10/12 or 10/19?",
+      "keyword": "be56fee640b2f880",
+      "calm": "f8463a98b93fbacd"
+    },
+    {
+      "text": "how much is 6 times 17",
+      "keyword": "598c1881c2b1b738",
+      "calm": "f161dc8e7004bb4d"
+    },
+    {
+      "text": "remind me to drink water every hour",
+      "keyword": "e556567c8709fe6a",
+      "calm": "0dfcbf4dd342eb58"
+    },
+    {
+      "text": "remind me to put the trash cans out tuesday night",
+      "keyword": "a21820dd134a27f8",
+      "calm": "2f2b6434984799df"
+    },
+    {
+      "text": "dinner at Olive Garden saturday 7pm with the Hendersons",
+      "keyword": "d9675c5c8536b149",
+      "calm": "bd897aef7b2849c8"
+    },
+    {
+      "text": "super bowl sunday countdown",
+      "keyword": "b1712a5392a406d3",
+      "calm": "f91ea58c9e6ad4fd"
+    },
+    {
+      "text": "turkey trot 11/27",
+      "keyword": "b7504af01268855b",
+      "calm": "86227a753bd7c28b"
+    },
+    {
+      "text": "check the budget spreadsheet on the first of every month",
+      "keyword": "3a3ebecf9a19285f",
+      "calm": "f3269b5178b49d36"
+    },
+    {
+      "text": "disney fund $1,800 of $5,000, trip in june",
+      "keyword": "88e13a93c16d10f2",
+      "calm": "dcf74b403b803a14"
+    },
+    {
+      "text": "quick poll for the class: pizza party or ice cream social",
+      "keyword": "f8adfe2120888148",
+      "calm": "b51f629df324a94c"
+    },
+    {
+      "text": "road trip to yellowstone with the kids in august",
+      "keyword": "4cb024b68e2521ac",
+      "calm": "70c490c9b486ab24"
+    },
+    {
+      "text": "facetime with the grandkids tonight after dinner",
+      "keyword": "52e1c6dc2f04de71",
+      "calm": "d99c9d9d908fa7c5"
+    },
+    {
+      "text": "cool slate blue",
+      "keyword": "7cee6ec23a4525b4",
+      "calm": "d14a243e9de48d30"
+    },
+    {
+      "text": "10 min break",
+      "keyword": "f5bc9d60d78f9620",
+      "calm": "2097513e5a70a2d4"
+    },
+    {
+      "text": "our realtor Brian 555-0109",
+      "keyword": "417b95f624b8525b",
+      "calm": "e7adfb162cbd2b79"
+    },
+    {
+      "text": "oranges 4, avocados 3, limes, a bag of ice",
+      "keyword": "d1203d69cf685716",
+      "calm": "f5c9f05eb77f04bc"
+    },
+    {
+      "text": "saved $4,500 of $12,000 for a new car",
+      "keyword": "594ba9e52f03b87c",
+      "calm": "0100f59374ae5f07"
+    },
+    {
+      "text": "read 20 books this year, on #6",
+      "keyword": "1191ac5b737df4a4",
+      "calm": "5fd72ddebc16fbff"
+    },
+    {
+      "text": "remember to rotate the tires before the road trip",
+      "keyword": "fdce7e2c64c9a191",
+      "calm": "890d15ac262c299e"
+    },
+    {
+      "text": "$49.99 plus 8.25% sales tax",
+      "keyword": "24a4be0095d5f379",
+      "calm": "6ac6f23cae6f5aa2"
+    },
+    {
+      "text": "notes from my 1:1: promo packet due next cycle, focus on mentoring",
+      "keyword": "99126ce71bc53056",
+      "calm": "0b752ae702f4b870"
+    },
+    {
+      "text": "honestly burned out, this sprint has been brutal",
+      "keyword": "689b17fe0949f8d7",
+      "calm": "c81bced9234bd9c9"
+    },
+    {
+      "text": "10am central to mountain",
+      "keyword": "502aa7d1c5416efa",
+      "calm": "28a9a70aa2cffa49"
+    },
+    {
+      "text": "3.5% raise on 72,000",
+      "keyword": "fbaf56ed0edde6ac",
+      "calm": "30eaaa7358a5d734"
+    },
+    {
+      "text": "southwest flight to denver in november",
+      "keyword": "54dd2cb75ea28384",
+      "calm": "a35a4f76d86ee858"
+    },
+    {
+      "text": "that gray area in the contract is bugging me",
+      "keyword": "db8b8c2fec5e8d90",
+      "calm": "885c570f698faaeb"
+    },
+    {
+      "text": "what time is it in phoenix right now",
+      "keyword": "b33289e2fa45ed20",
+      "calm": "e1f9421295e493cd"
+    },
+    {
+      "text": "split $84 dinner between 4",
+      "keyword": "11c91555cfe7f39a",
+      "calm": "b892c7d7f56cf094"
+    },
+    {
+      "text": "https://example.com/recipes/chili for game day",
+      "keyword": "8297483e07e3439b",
+      "calm": "c855c1581f0c0f5a"
+    },
+    {
+      "text": "sqrt 225",
+      "keyword": "0b2df66a8d9caed7",
+      "calm": "9494f0abd70d43e0"
+    },
+    {
+      "text": "100 km bike ride this weekend, that's like 62 miles?",
+      "keyword": "7ef84a049034ae07",
+      "calm": "068944fb34acc1b7"
+    },
+    {
+      "text": "happy hour with the team friday 5pm at the brewery on Main",
+      "keyword": "0dd990a96c7c70a8",
+      "calm": "85c7fb3d94fa1431"
+    },
+    {
+      "text": "meal prep every sunday",
+      "keyword": "4f00aa68380e9dda",
+      "calm": "b046c6a1c9a7671e"
+    },
+    {
+      "text": "big red flag on that first date lol",
+      "keyword": "91f408385ee995d7",
+      "calm": "c5be73af7c6e05d3"
+    },
+    {
+      "text": "walk the dog every morning at 7",
+      "keyword": "beccff4ccb529435",
+      "calm": "16aa9454a4604876"
+    },
+    {
+      "text": "pomodoro 25, heads down on the report",
+      "keyword": "d9aaf9f3c2e6422d",
+      "calm": "28a45757679de38e"
+    },
+    {
+      "text": "www.example.org/camp-signup deadline soon",
+      "keyword": "7a305fff0b5bf649",
+      "calm": "c7e940c3e330319c"
+    },
+    {
+      "text": "what's 15% off $120",
+      "keyword": "46b0748f5912a112",
+      "calm": "a495a6264adf2347"
+    },
+    {
+      "text": "$52 gas at Costco",
+      "keyword": "8aea3563fc0f0365",
+      "calm": "0bd294dd4b2e0839"
+    },
+    {
+      "text": "if it's 9am in NYC what time is it in denver",
+      "keyword": "f7ddaeeca51ca1de",
+      "calm": "1640e3ace533176b"
+    },
+    {
+      "text": "google meet sync with Chris and Dana wed 11am PT",
+      "keyword": "bdc75d64497498f6",
+      "calm": "caeb1ed8461d822b"
+    },
+    {
+      "text": "brunch or dinner sunday?",
+      "keyword": "86c4584a736885c5",
+      "calm": "9671cb65c38b76b8"
+    },
+    {
+      "text": "bowling night $32",
+      "keyword": "a037421a8c0d575e",
+      "calm": "423197ed989f1d85"
+    },
+    {
+      "text": "roll a die",
+      "keyword": "73b7043830fb687b",
+      "calm": "18b0934951e202cc"
+    },
+    {
+      "text": "example.com/deals black friday tv",
+      "keyword": "478cbb39819015e7",
+      "calm": "634d5506903dd01d"
+    },
+    {
+      "text": "roll 3d6",
+      "keyword": "117237d1d82f733a",
+      "calm": "1e01b13c71b0c981"
+    },
+    {
+      "text": "how long until christmas",
+      "keyword": "4ae14cd015c0eca8",
+      "calm": "1a6abe2f03742184"
+    },
+    {
+      "text": "navy, almost black",
+      "keyword": "83abac1e82f5aa3d",
+      "calm": "8debc97827136b1c"
+    },
+    {
+      "text": "water the lawn every other day",
+      "keyword": "10b93ebc1550de50",
+      "calm": "fe379407ea6f0101"
+    },
+    {
+      "text": "run 3 miles 4x a week",
+      "keyword": "932a27e1961771dc",
+      "calm": "8a759682ae7d3e2e"
+    },
+    {
+      "text": "start timing the kids' math drill",
+      "keyword": "e8c0d81aebbccb15",
+      "calm": "9ecbb1fc52371784"
+    },
+    {
+      "text": "read later: https://news.example.com/401k-tips",
+      "keyword": "b05ef86790bef2ea",
+      "calm": "c8fbc41948dbe83c"
+    },
+    {
+      "text": "new cell for Uncle Joe 555-0171",
+      "keyword": "676f1fee878ee2da",
+      "calm": "3a93dee5065ecad5"
+    },
+    {
+      "text": "pay off the $8,000 credit card, $2,750 paid",
+      "keyword": "34b7d21bef9854a5",
+      "calm": "cb1d37165216dbf3"
+    },
+    {
+      "text": "a pale mint green",
+      "keyword": "0de06b6a4d07b286",
+      "calm": "ae4de6472522cc0d"
+    },
+    {
+      "text": "10,000 steps target, 6,200 so far today",
+      "keyword": "1cc549b2a16273c2",
+      "calm": "2fc1463c201dc301"
+    },
+    {
+      "text": "https://example.com/tickets game saturday 1pm",
+      "keyword": "55b5661ff07e5bda",
+      "calm": "3a70feebe9134f9e"
+    },
+    {
+      "text": "16 oz to lbs",
+      "keyword": "6abe12405bf80fe8",
+      "calm": "35ffbf7ae87032dd"
+    },
+    {
+      "text": "countdown to disney 6/12!!",
+      "keyword": "c9e1bc8a8e9d4678",
+      "calm": "35cb190482abbdf5"
+    },
+    {
+      "text": "http://example.net/listing/4417 cute house in Denver",
+      "keyword": "d627604a0a3fc7d5",
+      "calm": "190055c3609bceef"
+    },
+    {
+      "text": "days until memorial day weekend",
+      "keyword": "7432a7d8a41270b0",
+      "calm": "cd5513b553af0f0f"
+    },
+    {
+      "text": "count down to the last day of school",
+      "keyword": "d1611674e3ed3c94",
+      "calm": "f464dd81a222e5ab"
+    },
+    {
+      "text": "noon eastern = ? pacific",
+      "keyword": "bdb63326e77c728d",
+      "calm": "dc1c84e7008aa258"
+    },
+    {
+      "text": "which works for the call, 1pm or 3pm ET?",
+      "keyword": "4c715370052a1dee",
+      "calm": "ce94a9fe0021dc64"
+    },
+    {
+      "text": "spent $14 on Chipotle",
+      "keyword": "d8816de8eee8ce76",
+      "calm": "bbbe6dcf714327bd"
+    },
+    {
+      "text": "days left until my PTO starts 12/20",
+      "keyword": "08841515e1db00a0",
+      "calm": "04a36169412ef550"
+    },
+    {
+      "text": "3/4 cup to tablespoons",
+      "keyword": "78177ec4f2c7b804",
+      "calm": "1308ca5a84a900c4"
+    },
+    {
+      "text": "rake leaves, clean gutters, swap out the furnace filter",
+      "keyword": "d6aa6d5be94ba34b",
+      "calm": "a4330873b27d3d9f"
+    },
+    {
+      "text": "greyhound to philly friday to see my brother",
+      "keyword": "440792bbada16db4",
+      "calm": "a9db24b1ae1423fb"
+    },
+    {
+      "text": "what time is it in LA",
+      "keyword": "ec12b161a88275c3",
+      "calm": "73b45f862f91e6fc"
+    },
+    {
+      "text": "gotta grab milk and also pick up the dry cleaning and then drop the kids at practice and call the vet",
+      "keyword": "62aefaaf80de74cc",
+      "calm": "944080ecb1f50a42"
+    },
+    {
+      "text": "coffee Josh 10",
+      "keyword": "84ad8a5b4abe4fa8",
+      "calm": "afa7dc43e55bd26a"
+    },
+    {
+      "text": "need milk, a gallon of OJ and hot dog buns for the cookout",
+      "keyword": "07e31a53d2f60414",
+      "calm": "3346129583f4471b"
+    },
+    {
+      "text": "remind me to Venmo Tyler for the concert tickets",
+      "keyword": "5a5fa0ebe8115942",
+      "calm": "83b6e35745af7693"
+    },
+    {
+      "text": "5'10 in inches",
+      "keyword": "a7902c3e8e247cc4",
+      "calm": "27117dfba935b799"
+    },
+    {
+      "text": "split the $65 pizza order plus tip among 5",
+      "keyword": "44f85d52094c45c2",
+      "calm": "60e240313ca2e73d"
+    },
+    {
+      "text": "a pint in fluid ounces",
+      "keyword": "ce8f62c1af2303d3",
+      "calm": "c5debaf6e9ad49fe"
+    },
+    {
+      "text": "Southwest 2417 to Denver friday, aisle seat",
+      "keyword": "932819a0b3738e4d",
+      "calm": "c198c3d76b1da665"
+    },
+    {
+      "text": "copay $30 at urgent care",
+      "keyword": "e82d2b6a19a1f165",
+      "calm": "dcc950d842ff768d"
+    },
+    {
+      "text": "lose 15 lbs, down 6 so far",
+      "keyword": "3110194a294e05d7",
+      "calm": "fa56770b56bb6532"
+    },
+    {
+      "text": "remnd me to by diapers tmrw",
+      "keyword": "51373fd885d94c58",
+      "calm": "99549693ddfa2aae"
+    },
+    {
+      "text": "tacos or burgers tonight?",
+      "keyword": "bab11d83f0b1a5f2",
+      "calm": "8d8ed9d619b3c8fa"
+    },
+    {
+      "text": "family vacation to orlando in july, driving down and staying a week near the parks so the kids can do disney and universal",
+      "keyword": "ff2634e38b335874",
+      "calm": "5025399422a30cf3"
+    },
+    {
+      "text": "ran 38 of 100 miles this month",
+      "keyword": "abc6a8cbfb371104",
+      "calm": "7c0d199bb88649c0"
+    },
+    {
+      "text": "how many days till the 4th of july",
+      "keyword": "41e90214dbaafa85",
+      "calm": "9e6e0a2c41b81137"
+    },
+    {
+      "text": "mom's birthday 5/9",
+      "keyword": "b52d922dbf2431fd",
+      "calm": "489a822748882f01"
+    },
+    {
+      "text": "beach or mountains for the long weekend? everyone vote",
+      "keyword": "07687344d656be5d",
+      "calm": "e03aefd0c82100fe"
+    },
+    {
+      "text": "12 yards to feet",
+      "keyword": "4c36393e8bc585fa",
+      "calm": "6bc51bddf1e7a2e4"
+    },
+    {
+      "text": "https://docs.example.com/onboarding for the new hire",
+      "keyword": "9f17c04b04e92476",
+      "calm": "48e327bc74ec2e0b"
+    },
+    {
+      "text": "remind me at 4 to leave for carpool pickup",
+      "keyword": "b2c3775e9420597a",
+      "calm": "b8979373bafe6581"
+    },
+    {
+      "text": "🏈🍗 sunday 1pm at mikes 🎉",
+      "keyword": "d21b57f1610e95e1",
+      "calm": "1bb34daf8bbd3f9d"
+    },
+    {
+      "text": "grateful for the neighbors who helped shovel our driveway",
+      "keyword": "85ce85f88cc297c2",
+      "calm": "7ef57cbb4e72e1bf"
+    },
+    {
+      "text": "idea: a carpool app for soccer parents that syncs with the team schedule",
+      "keyword": "7f3bc362bea060e1",
+      "calm": "d22382934751c1ff"
+    },
+    {
+      "text": "call grandma every sunday afternoon",
+      "keyword": "df1786c05fa479e5",
+      "calm": "64400e815a669373"
+    },
+    {
+      "text": "Venmo Sarah $25",
+      "keyword": "8f18ead9dfc24fcd",
+      "calm": "8cb1b9170dce6066"
+    },
+    {
+      "text": "4pm denver",
+      "keyword": "1404ea73f152e0dc",
+      "calm": "c2e7f54a4543ecbb"
+    },
+    {
+      "text": "12/30 days of no takeout",
+      "keyword": "ecbe2c641e52493e",
+      "calm": "605d828fa4c29e0f"
+    },
+    {
+      "text": "10k in 55 min, pace per mile?",
+      "keyword": "f70bb43fceb29baf",
+      "calm": "2b64eee91e0cdcca"
+    },
+    {
+      "text": "phone call with Aunt Linda sunday afternoon",
+      "keyword": "20d7217e210da5b8",
+      "calm": "0a728094044191e9"
+    }
+  ]
+}

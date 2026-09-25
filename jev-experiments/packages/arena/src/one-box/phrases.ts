@@ -1,11 +1,11 @@
 /** The authored phrases (phrases.json): expected card and signals, written before any model ran. */
 import { z } from "zod";
-import { INTENT_KEYS } from "./upstream/jev/types";
+import { INTENTS } from "./questions";
 
-const intent = z.enum(INTENT_KEYS).exclude(["none"]);
+const intent = z.enum(INTENTS).exclude(["none"]);
 
 export const phrasesSchema = z.object({
-  schema: z.literal("shapeshift.phrases/1"),
+  schema: z.literal("one-box.phrases/1"),
   authoredAt: z.string(),
   authoredBy: z.string(),
   phrases: z.array(

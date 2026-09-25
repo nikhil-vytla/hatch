@@ -1,15 +1,28 @@
-import { choice, noul, score } from "../../wire";
-
 /**
- * The full Jev question schema. Jev evaluates every question in parallel against
- * the same state, so we ask every signal every time (speculative fan-out) and let
- * code decide which ones matter for the chosen intent.
+ * The 14 questions asked on every keystroke, in one table that the wire request, the answer
+ * types and the keyword classifier all derive from. The wording is Shapeshift's (MIT, see
+ * NOTICE.md), unchanged so that Jev sees exactly what upstream asks; a test pins it.
  *
- * Criteria rules: self-contained, non-overlapping, every signal has an escape option,
- * and never ask Jev to extract values, count or do date math.
+ * Criteria rules from upstream: self-contained, non-overlapping, every signal has an escape
+ * option, and never ask Jev to extract values, count or do date math. Code does that.
  */
-export const questions = {
-  // ── Which UI ────────────────────────────────────────────────
+
+const choice = <const C extends Record<string, string>>(instructions: string, criteria: C) => ({
+  type: "choice" as const,
+  instructions,
+  criteria,
+});
+
+const noul = (instructions: string) => ({ type: "noul" as const, instructions });
+
+const score = (instructions: string, criteria: [string, string, string]) => ({
+  type: "score" as const,
+  instructions,
+  criteria,
+});
+
+export const QUESTIONS = {
+  // Which card.
   intent: choice("What is the person trying to create with this text", {
     event: "Scheduling a meeting, meal, call or gathering at a time, usually with other people",
     reminder: "Asking to be reminded to do a single task themselves, e.g. 'remind me to…'",
@@ -27,7 +40,8 @@ export const questions = {
     link: "Saving a web link or URL, optionally with a note",
     countdown: "Counting the days until a future date, holiday or event",
     timezone: "Converting a time of day between time zones or cities, or asking the time somewhere",
-    random: "Asking for a random result: rolling dice, flipping a coin, a random number or letting chance pick",
+    random:
+      "Asking for a random result: rolling dice, flipping a coin, a random number or letting chance pick",
     goal: "Tracking progress toward a numeric target, such as 4 of 12 books read or money saved",
     note: "Writing a thought, idea or note that is none of the above",
     none: "Too short, unclear or unfinished to tell yet",
@@ -39,7 +53,7 @@ export const questions = {
     "Fully specified, ready to act on",
   ]),
 
-  // ── Signals that pick the UI variant ────────────────────────
+  // Signals that pick the card's variant.
   isQuestion: noul("The text is a question rather than an instruction or statement"),
   recurring: noul("The text describes something that repeats on a schedule"),
   urgency: score("How urgent or time-sensitive the text sounds", [
@@ -99,4 +113,47 @@ export const questions = {
   isShoppingList: noul("The listed items are things to buy"),
 };
 
-export const QUESTION_COUNT = Object.keys(questions).length;
+type Questions = typeof QUESTIONS;
+
+export type QuestionId = keyof Questions;
+
+type ChoiceId = {
+  [K in QuestionId]: Questions[K]["type"] extends "choice" ? K : never;
+}[QuestionId];
+
+/** The options of a choice question, e.g. Option<"eventMode"> = "in_person" | … */
+export type Option<K extends ChoiceId> = Extract<keyof Questions[K]["criteria"], string>;
+
+export type Intent = Option<"intent">;
+
+export type CardIntent = Exclude<Intent, "none">;
+
+/** A choice answer: the top option, its confidence, and the whole distribution. */
+export type Choice<T extends string> = {
+  value: T;
+  confidence: number;
+  probabilities: Partial<Record<T, number>>;
+};
+
+/**
+ * Every answer, keyed like the questions: a choice as its distribution, a yes/no as the
+ * probability of yes, a 0–2 score with its confidence.
+ */
+export type Reading = {
+  [K in QuestionId]: Questions[K]["type"] extends "choice"
+    ? Choice<Option<Extract<K, ChoiceId>>>
+    : Questions[K]["type"] extends "noul"
+      ? number
+      : { score: number; confidence: number };
+};
+
+export const optionsOf = <K extends ChoiceId>(id: K) =>
+  // SAFETY: the criteria's keys are exactly the options; Object.keys only widens them to string.
+  Object.keys(QUESTIONS[id].criteria) as Option<K>[];
+
+/** A distribution's entries, typed by its options. */
+export const entriesOf = <T extends string>(p: Partial<Record<T, number>>) =>
+  // SAFETY: a Choice is only ever keyed by its question's options (adapter.ts checks Jev's).
+  Object.entries(p) as [T, number | undefined][];
+
+export const INTENTS = optionsOf("intent");
