@@ -24,7 +24,8 @@ import {
 } from "electron";
 import type { StriveEvent } from "../shared/bridge";
 import { Connection } from "./connection";
-import { noticeFor } from "./notify";
+import { Learning } from "./learning";
+import { learnedNotice, type Notice, noticeFor } from "./notify";
 import { loadWorkspace, saveWorkspace } from "./store";
 
 /** What the renderer may ask the daemon for: a person's actions on this session. */
@@ -40,10 +41,22 @@ const ALLOWED: ReadonlySet<MethodName> = new Set<MethodName>([
   "daemon/status",
   "model/list",
   "auth/status",
+  "proposal/list",
+  "proposal/decide",
+  "proposal/rollback",
+  "learning/run",
 ]);
 
 /** Allowed requests that aren't about a session: read-only facts about the daemon. */
 const UNBOUND: ReadonlySet<MethodName> = new Set<MethodName>(["daemon/status", "model/list", "auth/status"]);
+
+/** Allowed requests about the window's project rather than its session: learning, and what it proposed. */
+const PROJECT: ReadonlySet<MethodName> = new Set<MethodName>([
+  "proposal/list",
+  "proposal/decide",
+  "proposal/rollback",
+  "learning/run",
+]);
 
 type Mode = { kind: "new" } | { kind: "continue" } | { kind: "resume"; id: string };
 
@@ -157,28 +170,36 @@ async function main() {
     if (!window.isDestroyed()) window.webContents.send("strive:event", event);
   };
 
+  // A person not looking at the window hears when the agent needs them or stops, and when the learner has proposals.
+  const notify = (notice: Notice | undefined) => {
+    if (!notice || window.isDestroyed() || window.isFocused() || !Notification.isSupported()) return;
+
+    const note = new Notification({ title: notice.title, body: notice.body });
+    note.on("click", () => {
+      window.show();
+      window.focus();
+    });
+    note.show();
+  };
+
   const watch = (c: Connection) => {
     c.onLost(() => {
       if (!window.isDestroyed() && c === current) window.webContents.send("strive:closed");
     });
-    // A person not looking at the window hears when the agent needs them or stops.
-    c.onEntry = (entry) => {
-      if (window.isDestroyed() || window.isFocused() || !Notification.isSupported()) return;
-
-      const notice = noticeFor(entry.event, sessionName(c));
-
-      if (!notice) return;
-
-      const note = new Notification({ title: notice.title, body: notice.body });
-      note.on("click", () => {
-        window.show();
-        window.focus();
-      });
-      note.show();
-    };
+    c.onEntry = (entry) => notify(noticeFor(entry.event, sessionName(c)));
   };
 
   watch(current);
+
+  const learning = new Learning(args.socket, app.getVersion(), cwd, (entry, seen) => {
+    if (!window.isDestroyed()) window.webContents.send("strive:learning-entry", entry);
+    notify(learnedNotice(seen, entry, basename(cwd)));
+  });
+
+  // Followed from the start if the project has a learning session, so a run started elsewhere is heard too.
+  learning
+    .follow()
+    .catch((e) => console.error(`strive-desktop: can't follow the learning session: ${describeError(e)}`));
 
   ipcMain.handle("strive:opened", (e) => {
     if (!fromOurPage(e)) return undefined;
@@ -220,16 +241,48 @@ async function main() {
   ipcMain.handle("strive:request", async (e, method: MethodName, params: Methods[MethodName]["params"]) => {
     if (!fromOurPage(e) || !ALLOWED.has(method)) throw new Error(`${method} isn't available to the window`);
 
-    // The window acts on the session it shows only, whatever id it sends.
-    const bound = UNBOUND.has(method) ? params : { ...params, id: current.id };
+    // The window acts on the session it shows, and its project, only, whatever id or directory it sends.
+    const bound = UNBOUND.has(method)
+      ? params
+      : PROJECT.has(method)
+        ? { ...params, cwd }
+        : { ...params, id: current.id };
 
-    return current.client.request<MethodName>(method, bound);
+    // The daemon's own words reach the page, not the client's wrapping of them.
+    const result = await current.client.request<MethodName>(method, bound).catch((err: Error) => {
+      throw new Error(describeError(err));
+    });
+
+    // A run may have just made the project's learning session: follow it from here.
+    if (method === "learning/run") await learning.follow();
+
+    return result;
   });
 
   ipcMain.handle("strive:blob", async (e, digest: Digest) => {
     if (!fromOurPage(e) || !current.readable.has(digest)) throw new Error("that output isn't this session's");
 
     return (await current.client.request("blob/get", { digest })).text;
+  });
+
+  ipcMain.handle("strive:learning", (e) => {
+    if (!fromOurPage(e)) throw new Error("not available to this frame");
+
+    return learning.read();
+  });
+
+  // A proposal's "before" by its id among this project's proposals: blob/get stays limited to the shown session's digests.
+  ipcMain.handle("strive:proposal-before", async (e, proposal: number) => {
+    if (!fromOurPage(e)) throw new Error("not available to this frame");
+
+    const { proposals } = await current.client.request("proposal/list", { cwd });
+    const found = proposals.find((p) => p.id === proposal);
+
+    if (!found) throw new Error(`there's no proposal #${proposal} for ${cwd}`);
+
+    return found.before === undefined
+      ? null
+      : (await current.client.request("blob/get", { digest: found.before })).text;
   });
 
   ipcMain.handle("workspace:load", (e) => (fromOurPage(e) ? loadWorkspace(app.getPath("userData")) : undefined));
@@ -244,7 +297,10 @@ async function main() {
     saveWorkspace(app.getPath("userData"), parsed.value);
   });
 
-  window.on("closed", () => current.close());
+  window.on("closed", () => {
+    current.close();
+    learning.close();
+  });
   await window.loadFile(join(built(), "renderer", "index.html"));
 }
 
@@ -254,6 +310,10 @@ function sessionName(c: Connection): string {
   const text = first?.type === "userMessage" ? first.text : (c.snapshot.session.cwd.split("/").at(-1) ?? "strive");
 
   return text.length > 60 ? `${text.slice(0, 57)}…` : text;
+}
+
+function basename(path: string): string {
+  return path.split("/").filter(Boolean).at(-1) ?? path;
 }
 
 /** A TCP listener's address: a string only for a pipe, null before it listens. */

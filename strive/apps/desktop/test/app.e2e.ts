@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { createSocket } from "node:dgram";
-import { mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { type AddressInfo, connect, createServer, type Socket } from "node:net";
 import { tmpdir } from "node:os";
@@ -534,10 +534,13 @@ test("the window has no Node, only the app's bridge", async () => {
     process: false,
     bridge: [
       "blob",
+      "learning",
       "loadWorkspace",
       "onClosed",
       "onEvent",
+      "onLearning",
       "opened",
+      "proposalBefore",
       "request",
       "saveWorkspace",
       "sessions",
@@ -784,4 +787,323 @@ test("a decision made in one window survives another window's save", async () =>
   host.close();
   await b.close();
   await a.app.close();
+});
+
+// --- The Learned pane (ADR-0016): the tests stand in for the learner, as
+// the project's learning session's host, and propose over RPC.
+
+/** A reply's result, once it's known to have succeeded. */
+function resultOf(r: Reply) {
+  assert.equal(r.error, undefined, JSON.stringify(r));
+
+  return JSON.parse(JSON.stringify(r.result));
+}
+
+type Learner = { host: Rpc; id: string };
+
+/**
+ * A connection registered as the project's learner. Registering shows it
+ * the project's memory as it is now: a proposal's "before".
+ */
+async function learner(cwd: string): Promise<Learner> {
+  const rpc = await Rpc.open();
+  const id = String(resultOf(await rpc.call("learning/open", { cwd })).id);
+  rpc.close();
+  const host = await Rpc.open();
+  resultOf(await host.call("host/register", { id }));
+
+  return { host, id };
+}
+
+type Proposed = { summary: string; content: string; evidence?: string; note?: string };
+
+/** Proposes a change to the project's memory, citing a work session's first entry; its id. */
+async function proposeMemory(l: Learner, cwd: string, p: Proposed): Promise<number> {
+  const proposal = {
+    artifact: { kind: "memory" },
+    content: p.content,
+    summary: p.summary,
+    rationale: `Why: ${p.summary}.`,
+    evidence: [{ session: p.evidence ?? sessionId(cwd), seqs: [1], note: p.note ?? "the session began here" }],
+    prediction: `Later sessions follow: ${p.summary}.`,
+  };
+
+  const r = await l.host.call("host/record", { id: l.id, event: { type: "proposalMade", proposal } });
+
+  return Number(resultOf(r).seq);
+}
+
+function memoryFile(cwd: string): string {
+  return join(cwd, ".strive/memory.md");
+}
+
+function writeMemory(cwd: string, text: string) {
+  mkdirSync(join(cwd, ".strive"), { recursive: true });
+  writeFileSync(memoryFile(cwd), text);
+}
+
+/** The learning session's events, by type. */
+async function learningEvents(cwd: string, type: string): Promise<{ [key: string]: Json }[]> {
+  const rpc = await Rpc.open();
+  const id = String(resultOf(await rpc.call("learning/open", { cwd })).id);
+
+  const read: { entries: { seq: number; event: { [key: string]: Json } }[] } = resultOf(
+    await rpc.call("session/read", { id }),
+  );
+
+  rpc.close();
+
+  return read.entries.flatMap((e) => (e.event.type === type ? [{ ...e.event, seq: e.seq }] : []));
+}
+
+/** Opens the Learned pane with ⌘L. */
+async function learnedPane(page: Page) {
+  await page.keyboard.press("Meta+l");
+  const pane = page.getByRole("complementary", { name: "learned" });
+  await pane.waitFor();
+
+  return pane;
+}
+
+/** Opens a proposal from the pane's list. */
+async function openProposal(page: Page, id: number) {
+  const pane = await learnedPane(page);
+  await pane.locator(`.learned-item[data-proposal="${id}"]`).click();
+  await pane.locator(`.learned-detail[data-proposal="${id}"]`).waitFor();
+
+  return pane;
+}
+
+test("the Learned pane lists proposals newest first, and shows one with its diff, reasons, evidence and checks", async () => {
+  const { page, cwd } = await openApp();
+  const rpc = await Rpc.open();
+  const other = String(resultOf(await rpc.call("session/create", { cwd })).id);
+  await rpc.call("session/prompt", { id: other, text: "tidy the changelog" });
+  rpc.close();
+  const l = await learner(cwd);
+  await proposeMemory(l, cwd, { summary: "Run the tests with bun", content: "- Run `bun test`.\n" });
+
+  const second = await proposeMemory(l, cwd, {
+    summary: "Keep the changelog sorted",
+    content: "- Sort the changelog by date.\n- Newest first.\n",
+    evidence: other,
+    note: "the user asked to tidy it",
+  });
+
+  const pane = await learnedPane(page);
+  await pane.locator(".learned-item").nth(1).waitFor();
+
+  assert.deepEqual(await pane.locator(".learned-item .summary").allTextContents(), [
+    "Keep the changelog sorted",
+    "Run the tests with bun",
+  ]);
+
+  assert.deepEqual(await pane.locator(".learned-item .badge").allTextContents(), ["ready", "ready"]);
+  assert.deepEqual(await pane.locator(".learned-item .mono").allTextContents(), ["memory", "memory"]);
+  await pane.locator(`.learned-item[data-proposal="${second}"]`).click();
+  const detail = pane.locator(`.learned-detail[data-proposal="${second}"]`);
+  await detail.getByText("New file").waitFor();
+  await detail.locator(".row.add").nth(1).waitFor();
+
+  assert.deepEqual(await detail.locator(".row.add").allTextContents(), [
+    "1+- Sort the changelog by date.",
+    "2+- Newest first.",
+  ]);
+
+  await detail.getByText("Why: Keep the changelog sorted.").waitFor();
+  await detail.getByText("Later sessions follow: Keep the changelog sorted.").waitFor();
+  await detail.getByText("the user asked to tidy it").waitFor();
+  await detail.locator("[data-gate=static] .badge", { hasText: "passed" }).waitFor();
+  await detail.locator("[data-gate=judge]", { hasText: "not run: the model judge isn't built yet" }).waitFor();
+  // The evidence's session is one of this project's: a click shows it, and the proposal stays open.
+  await detail.getByRole("button", { name: "tidy the changelog" }).click();
+  await page.locator(".msg.user", { hasText: "tidy the changelog" }).waitFor();
+  await page.locator(`.learned-detail[data-proposal="${second}"]`).getByText("(shown)").waitFor();
+  l.host.close();
+});
+
+test("Accept in the Learned pane asks first, then writes the proposal's file", async () => {
+  const { page, cwd } = await openApp();
+  const l = await learner(cwd);
+  const id = await proposeMemory(l, cwd, { summary: "Run the tests with bun", content: "- Run `bun test`.\n" });
+  const pane = await openProposal(page, id);
+  await pane.getByRole("button", { name: "Accept" }).click();
+  const confirm = pane.getByRole("group", { name: "confirm accept" });
+  await confirm.getByText("Write .strive/memory.md?").waitFor();
+  await confirm.getByRole("button", { name: "Cancel" }).click();
+  assert.equal(existsSync(memoryFile(cwd)), false, "cancelled: nothing written");
+  await pane.getByRole("button", { name: "Accept" }).click();
+  await confirm.getByRole("button", { name: "Write it" }).click();
+  await pane.locator(".learned-title .badge", { hasText: "applied" }).waitFor();
+  assert.equal(readFileSync(memoryFile(cwd), "utf8"), "- Run `bun test`.\n");
+  const decided = await learningEvents(cwd, "proposalDecided");
+  assert.deepEqual(
+    decided.map((e) => [e.proposal, e.decision, e.by]),
+    [[id, "accept", "strive-desktop"]],
+  );
+  l.host.close();
+});
+
+test("Reject in the Learned pane writes nothing and says so", async () => {
+  const { page, cwd } = await openApp();
+  const l = await learner(cwd);
+  const id = await proposeMemory(l, cwd, { summary: "Run the tests with bun", content: "- Run `bun test`.\n" });
+  const pane = await openProposal(page, id);
+  await pane.getByRole("button", { name: "Reject" }).click();
+  await pane.locator(".learned-title .badge", { hasText: "rejected" }).waitFor();
+  await pane.getByText("Rejected. Nothing was written.").waitFor();
+  assert.equal(await pane.getByRole("button", { name: "Accept" }).count(), 0, "a rejected proposal can't be accepted");
+  assert.equal(existsSync(memoryFile(cwd)), false);
+  const decided = await learningEvents(cwd, "proposalDecided");
+  assert.deepEqual(
+    decided.map((e) => [e.proposal, e.decision]),
+    [[id, "reject"]],
+  );
+  l.host.close();
+});
+
+test("Roll back in the Learned pane asks first, then puts the file back as it was", async () => {
+  const { page, cwd } = await openApp();
+  writeMemory(cwd, "- The old rule.\n");
+  const l = await learner(cwd);
+  const id = await proposeMemory(l, cwd, { summary: "Replace the rule", content: "- The new rule.\n" });
+  const pane = await openProposal(page, id);
+  // The diff is against the file as the learner read it.
+  await pane.getByText("Change, against the file as the learner read it").waitFor();
+  // The heading shows at once; the rows once the file as it was has loaded.
+  await pane.locator(".row.remove").waitFor();
+  assert.deepEqual(await pane.locator(".row.remove").allTextContents(), ["1−- The old rule."]);
+  await pane.getByRole("button", { name: "Accept" }).click();
+  await pane.getByRole("button", { name: "Write it" }).click();
+  await pane.locator(".learned-title .badge", { hasText: "applied" }).waitFor();
+  assert.equal(readFileSync(memoryFile(cwd), "utf8"), "- The new rule.\n");
+  await pane.getByRole("button", { name: "Roll back" }).click();
+  const confirm = pane.getByRole("group", { name: "confirm rollback" });
+  await confirm.getByText("Put .strive/memory.md back as it was before this proposal?").waitFor();
+  await confirm.getByRole("button", { name: "Roll back" }).click();
+  await pane.locator(".learned-title .badge", { hasText: "rolled back" }).waitFor();
+  assert.equal(readFileSync(memoryFile(cwd), "utf8"), "- The old rule.\n");
+  assert.equal((await learningEvents(cwd, "proposalRolledBack")).length, 1);
+  l.host.close();
+});
+
+test("a proposal whose file changed after the learner read it is stale: the pane says so and nothing is written", async () => {
+  const { page, cwd } = await openApp();
+  writeMemory(cwd, "- The old rule.\n");
+  const l = await learner(cwd);
+  const id = await proposeMemory(l, cwd, { summary: "Replace the rule", content: "- The new rule.\n" });
+  writeMemory(cwd, "- A rule a person wrote meanwhile.\n");
+  const pane = await openProposal(page, id);
+  await pane.getByRole("button", { name: "Accept" }).click();
+  await pane.getByRole("button", { name: "Write it" }).click();
+  await pane.locator(".learned-title .badge", { hasText: "stale" }).waitFor();
+
+  await pane
+    .getByText(".strive/memory.md changed after the learner read it, so nothing was written.", { exact: false })
+    .waitFor();
+
+  await pane.getByRole("button", { name: "Learn from recent sessions" }).waitFor();
+  assert.equal(readFileSync(memoryFile(cwd), "utf8"), "- A rule a person wrote meanwhile.\n");
+  assert.equal((await learningEvents(cwd, "proposalApplied")).length, 0);
+  l.host.close();
+});
+
+test("the window acts only on its own project's proposals, and reads their files only through them", async () => {
+  const { page, cwd } = await openApp();
+  writeMemory(cwd, "- Ours.\n");
+  const ours = await learner(cwd);
+  const mine = await proposeMemory(ours, cwd, { summary: "Ours", content: "- Ours, better.\n" });
+  // Another project, with a proposal of its own.
+  const theirs = realpathSync(mkdtempSync(join(tmpdir(), "strv-desk-other-")));
+  const rpc = await Rpc.open();
+  const theirWork = String(resultOf(await rpc.call("session/create", { cwd: theirs })).id);
+  const l = await learner(theirs);
+  await proposeMemory(l, theirs, { summary: "Theirs, first", content: "- Theirs.\n", evidence: theirWork });
+  // Ids are seqs in each project's own learning session: this one names nothing in ours.
+  const id = await proposeMemory(l, theirs, { summary: "Theirs", content: "- Theirs.\n", evidence: theirWork });
+  const ourIds = JSON.stringify(resultOf(await rpc.call("proposal/list", { cwd })));
+  assert.ok(!ourIds.includes(`"id":${id},`), "their proposal's id isn't one of ours");
+
+  // What code in the window could try: the bridge, naming the other project.
+  const tried = await page.evaluate(
+    async ([dir, proposal]) => {
+      const bridge = Object.getOwnPropertyDescriptor(window, "strive")?.value;
+
+      const outcome = (p: Promise<unknown>) =>
+        p.then(
+          (r) => ({ ok: JSON.stringify(r) }),
+          (e: Error) => ({ error: e.message }),
+        );
+
+      return {
+        decide: await outcome(bridge.request("proposal/decide", { cwd: dir, proposal, decision: "accept" })),
+        list: await outcome(bridge.request("proposal/list", { cwd: dir })),
+        before: await outcome(bridge.proposalBefore(proposal)),
+        learning: await outcome(bridge.learning()),
+      };
+    },
+    [theirs, id] as const,
+  );
+
+  assert.ok("error" in tried.decide, `the decision was refused: ${JSON.stringify(tried.decide)}`);
+  assert.ok("error" in tried.before, `their file wasn't read: ${JSON.stringify(tried.before)}`);
+  assert.ok("ok" in tried.list && !tried.list.ok.includes("Theirs"), `our list only: ${JSON.stringify(tried.list)}`);
+  assert.ok("ok" in tried.learning && !tried.learning.ok.includes(theirs), "our learning session only");
+  assert.equal(existsSync(memoryFile(theirs)), false, "nothing written in the other project");
+  const listed = resultOf(await rpc.call("proposal/list", { cwd: theirs }));
+  assert.match(JSON.stringify(listed), /"status":"ready"/, "theirs is still undecided");
+
+  // Our proposal's "before" is readable through the proposal, but not as a blob: it isn't the shown session's.
+  const reads = await page.evaluate(async (proposal) => {
+    const bridge = Object.getOwnPropertyDescriptor(window, "strive")?.value;
+    const text = await bridge.proposalBefore(proposal);
+    const { proposals } = await bridge.request("proposal/list", { cwd: "" });
+    const digest = proposals.find((p: { id: number }) => p.id === proposal)?.before;
+
+    const blob = await bridge.blob(digest).then(
+      () => "read",
+      (e: Error) => e.message,
+    );
+
+    return { text, blob };
+  }, mine);
+
+  assert.equal(reads.text, "- Ours.\n");
+  assert.match(reads.blob, /isn't this session's/);
+  rpc.close();
+  l.host.close();
+  ours.host.close();
+});
+
+test("Learn from recent sessions starts a run that the pane follows until its proposals arrive", async () => {
+  const { page, cwd } = await openApp();
+  const pane = await learnedPane(page);
+  await pane.getByText("The learner reads this project's recent sessions").waitFor();
+  await pane.getByRole("button", { name: "Learn from recent sessions" }).click();
+  const learning = pane.getByRole("status").filter({ hasText: "Learning…" });
+  await learning.waitFor();
+  const asked = await learningEvents(cwd, "learnRequested");
+  assert.equal(asked.length, 1, "the run was requested");
+  // The learner takes the request, reads, proposes, and ends its turn.
+  const l = await learner(cwd);
+  const took = { type: "turnStarted", turn: 1, throughSeq: Number(asked[0]?.seq) };
+  resultOf(await l.host.call("host/record", { id: l.id, event: took }));
+
+  const reading = {
+    type: "assistantMessage",
+    turn: 1,
+    text: "",
+    toolCalls: [{ id: "c1", name: "read_session" }],
+    message: {},
+  };
+
+  resultOf(await l.host.call("host/record", { id: l.id, event: reading }));
+  await learning.getByText("Reading a session").waitFor();
+  const id = await proposeMemory(l, cwd, { summary: "Run the tests with bun", content: "- Run `bun test`.\n" });
+
+  const ended = { type: "turnEnded", turn: 1, reason: { kind: "done" } };
+  resultOf(await l.host.call("host/record", { id: l.id, event: ended }));
+  await learning.waitFor({ state: "detached" });
+  await pane.locator(`.learned-item[data-proposal="${id}"]`, { hasText: "Run the tests with bun" }).waitFor();
+  l.host.close();
 });

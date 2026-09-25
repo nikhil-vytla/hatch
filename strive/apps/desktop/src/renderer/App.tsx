@@ -3,7 +3,15 @@
 // dragging, which records an edit in the workspace history.
 import { closestCorners, DndContext, type DragEndEvent, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
-import type { ApprovalMode, Decision, Digest, ModelListResult, SessionInfo } from "@strive/protocol";
+import {
+  type ApprovalMode,
+  type Decision,
+  type Digest,
+  type ModelListResult,
+  type ProposalDecision,
+  type ProposalState,
+  type SessionInfo,
+} from "@strive/protocol";
 import { formatUsd as exactUsd, MODE_NAMES } from "@strive/view";
 import {
   DEFAULT_WORKSPACE,
@@ -27,6 +35,8 @@ import { useStickToBottom } from "use-stick-to-bottom";
 import type { Bridge, Opened } from "../shared/bridge";
 import { type Item, label, summarize, type Tool } from "./conversation";
 import { ChangesPane } from "./ChangesPane";
+import { LearnedPane } from "./LearnedPane";
+import { errorText, Journal, latestRun } from "./learning";
 import { Palette } from "./Palette";
 import { Diff } from "./DiffView";
 import { Icon, type IconName } from "./icons";
@@ -39,8 +49,28 @@ type Props = { bridge: Bridge; opened: Opened; onSwitch: (id?: string) => Promis
 /** Whether the sessions sidebar shows, kept across launches. */
 const SIDEBAR_KEY = "strive.sidebar";
 
-/** Whether the changes pane shows, kept across launches. */
-const CHANGES_KEY = "strive.changes";
+/** Which pane shows beside the conversation, if any, kept across launches. */
+const PANE_KEY = "strive.pane";
+
+type Pane = "changes" | "learned";
+
+function savedPane(): Pane | undefined {
+  const saved = localStorage.getItem(PANE_KEY);
+
+  return saved === "changes" || saved === "learned" ? saved : undefined;
+}
+
+/** The proposal the Learned pane shows, kept while the window switches sessions. */
+const SELECTED_KEY = "strive.learned.selected";
+
+/** Entries in the learning session after which the proposals may read differently. */
+const PROPOSAL_EVENTS = new Set([
+  "proposalMade",
+  "gateFinished",
+  "proposalDecided",
+  "proposalApplied",
+  "proposalRolledBack",
+]);
 
 export function App({ bridge, opened, onSwitch }: Props) {
   const [model] = useState(() => new SessionModel(opened.session.id, opened.home));
@@ -72,7 +102,7 @@ export function App({ bridge, opened, onSwitch }: Props) {
       .finally(() => setLoaded(true));
   }, [bridge, model, opened]);
 
-  const act = (p: Promise<unknown>) => p.catch((e: Error) => setError(e.message));
+  const act = (p: Promise<unknown>) => p.catch((e: Error) => setError(errorText(e)));
   const id = opened.session.id;
 
   const edit = (next: History) => {
@@ -135,15 +165,94 @@ export function App({ bridge, opened, onSwitch }: Props) {
     act(onSwitch(to));
   };
 
-  const [changes, setChanges] = useState(() => localStorage.getItem(CHANGES_KEY) === "shown");
+  const [pane, setPane] = useState<Pane | undefined>(savedPane);
   const [palette, setPalette] = useState(false);
+  const changes = pane === "changes";
+  const learned = pane === "learned";
 
-  const toggleChanges = () =>
-    setChanges((open) => {
-      localStorage.setItem(CHANGES_KEY, open ? "hidden" : "shown");
+  const toggle = (which: Pane) =>
+    setPane((open) => {
+      const next = open === which ? undefined : which;
+      localStorage.setItem(PANE_KEY, next ?? "");
 
-      return !open;
+      return next;
     });
+
+  const toggleChanges = () => toggle("changes");
+  const toggleLearned = () => toggle("learned");
+
+  // The project's learning: its proposals, and its journal for the state of a run.
+  const [proposals, setProposals] = useState<ProposalState[]>();
+  const [journal] = useState(() => new Journal());
+  const [, journalChanged] = useReducer((n: number) => n + 1, 0);
+  const [projectSessions, setProjectSessions] = useState<SessionInfo[]>([]);
+
+  const [selected, setSelected] = useState<number | undefined>(() => {
+    const saved = Number(sessionStorage.getItem(SELECTED_KEY));
+
+    return Number.isInteger(saved) && saved > 0 ? saved : undefined;
+  });
+
+  const select = (proposal?: number) => {
+    sessionStorage.setItem(SELECTED_KEY, proposal === undefined ? "" : String(proposal));
+    setSelected(proposal);
+  };
+
+  const cwd = opened.session.cwd;
+
+  const loadProposals = useCallback(
+    () => bridge.request("proposal/list", { cwd }).then((r) => setProposals(r.proposals)),
+    [bridge, cwd],
+  );
+
+  const readLearning = useCallback(
+    () =>
+      bridge.learning().then((r) => {
+        if (r) journal.add(r.entries);
+        journalChanged();
+      }),
+    [bridge, journal],
+  );
+
+  useEffect(() => {
+    bridge.onLearning((entry) => {
+      journal.add([entry]);
+      journalChanged();
+
+      if (PROPOSAL_EVENTS.has(entry.event.type)) void loadProposals().catch(() => undefined);
+    });
+    void loadProposals().catch((e: Error) => setError(`Couldn't list what the learner proposed: ${errorText(e)}`));
+    void readLearning().catch(() => undefined);
+  }, [bridge, journal, loadProposals, readLearning]);
+
+  // Opened, the pane looks again: a learning session made elsewhere (`strive learn`) is found and followed from then on.
+  useEffect(() => {
+    if (!learned) return;
+
+    bridge.sessions().then(setProjectSessions, () => undefined);
+    void loadProposals().catch((e: Error) => setError(`Couldn't list what the learner proposed: ${errorText(e)}`));
+    void readLearning().catch(() => undefined);
+  }, [learned, bridge, loadProposals, readLearning]);
+
+  const run = latestRun(journal.entries);
+
+  const learning = {
+    before: useCallback((proposal: number) => bridge.proposalBefore(proposal), [bridge]),
+    decide: async (proposal: number, decision: ProposalDecision) => {
+      await bridge.request("proposal/decide", { cwd, proposal, decision });
+      await loadProposals();
+    },
+    rollback: async (proposal: number) => {
+      await bridge.request("proposal/rollback", { cwd, proposal });
+      await loadProposals();
+    },
+    learn: async () => {
+      await bridge.request("learning/run", { cwd });
+      await readLearning();
+    },
+  };
+
+  const ready = proposals?.filter((p) => p.status === "ready").length ?? 0;
 
   useEffect(() => {
     const keys = (e: KeyboardEvent) => {
@@ -158,6 +267,9 @@ export function App({ bridge, opened, onSwitch }: Props) {
       } else if (e.key === "d") {
         e.preventDefault();
         toggleChanges();
+      } else if (e.key === "l") {
+        e.preventDefault();
+        toggleLearned();
       } else if (e.key === "k") {
         e.preventDefault();
         setPalette((open) => !open);
@@ -234,6 +346,10 @@ export function App({ bridge, opened, onSwitch }: Props) {
           onToggle={toggleSidebar}
           changes={changes}
           onChanges={toggleChanges}
+          learned={learned}
+          onLearned={toggleLearned}
+          ready={ready}
+          learning={run?.running === true}
           onPalette={() => setPalette(true)}
         />
         {closed && (
@@ -254,6 +370,19 @@ export function App({ bridge, opened, onSwitch }: Props) {
             { id: "new", label: "New session", keys: "⌘N", run: () => switchTo() },
             { id: "sidebar", label: sidebar ? "Hide sessions" : "Show sessions", keys: "⌘B", run: toggleSidebar },
             { id: "changes", label: changes ? "Hide changes" : "Show changes", keys: "⌘D", run: toggleChanges },
+            { id: "learned", label: learned ? "Hide learned" : "Show learned", keys: "⌘L", run: toggleLearned },
+            ...(run?.running
+              ? []
+              : [
+                  {
+                    id: "learn",
+                    label: "Learn from recent sessions",
+                    run: () => {
+                      if (!learned) toggleLearned();
+                      act(learning.learn());
+                    },
+                  },
+                ]),
             ...(model.working
               ? [{ id: "interrupt", label: "Interrupt the agent", keys: "Esc", run: session.interrupt }]
               : []),
@@ -266,7 +395,7 @@ export function App({ bridge, opened, onSwitch }: Props) {
           currentSession={opened.session.id}
           onSwitch={(to) => switchTo(to)}
         />
-        <div className={`work ${changes ? "with-changes" : ""}`}>
+        <div className={`work ${pane ? "with-changes" : ""}`}>
           <Columns
             workspace={workspace}
             onMove={(panel, column, before) => change(`move ${panel}`, [{ op: "move", panel, column, before }])}
@@ -281,6 +410,22 @@ export function App({ bridge, opened, onSwitch }: Props) {
               version={model.filesVersion}
               load={loadChanges}
               onClose={toggleChanges}
+            />
+          )}
+          {learned && (
+            <LearnedPane
+              proposals={proposals}
+              run={run}
+              sessions={projectSessions}
+              currentSession={id}
+              selected={selected}
+              onSelect={select}
+              before={learning.before}
+              decide={learning.decide}
+              rollback={learning.rollback}
+              learn={learning.learn}
+              onSwitch={(to) => switchTo(to)}
+              onClose={toggleLearned}
             />
           )}
         </div>
@@ -440,10 +585,19 @@ type TitlebarProps = {
   onToggle: () => void;
   changes: boolean;
   onChanges: () => void;
+  learned: boolean;
+  onLearned: () => void;
+  /** Proposals waiting for a person's decision. */
+  ready: number;
+  /** Whether a learning run is going on. */
+  learning: boolean;
   onPalette: () => void;
 };
 
-function Titlebar({ model, opened, sidebar, onToggle, changes, onChanges, onPalette }: TitlebarProps) {
+function Titlebar(props: TitlebarProps) {
+  const { model, opened, sidebar, onToggle, changes, onChanges, learned, onLearned, ready, learning, onPalette } =
+    props;
+
   const first = model.conversation.items.find((i) => i.kind === "user");
   const title = first?.kind === "user" ? first.text : "New session";
 
@@ -481,6 +635,19 @@ function Titlebar({ model, opened, sidebar, onToggle, changes, onChanges, onPale
         aria-pressed={changes}
       >
         <Icon name="diff" />
+      </button>
+      <button
+        type="button"
+        className={`icon-button learned-button ${learned ? "on" : ""}`}
+        onClick={onLearned}
+        title={
+          learning ? "Learned (⌘L): learning now" : ready > 0 ? `Learned (⌘L): ${ready} to review` : "Learned (⌘L)"
+        }
+        aria-label="learned"
+        aria-pressed={learned}
+      >
+        <Icon name="bulb" />
+        {(learning || ready > 0) && <span className={`count-dot ${learning ? "working" : ""}`} />}
       </button>
     </header>
   );
@@ -1076,7 +1243,7 @@ function Empty({ opened, model, session }: EmptyProps) {
         </div>
       </dl>
       <p className="keys">
-        <kbd>⌘K</kbd> commands <kbd>⌘D</kbd> changes <kbd>⌘B</kbd> sessions <kbd>⇧↵</kbd> new line
+        <kbd>⌘K</kbd> commands <kbd>⌘D</kbd> changes <kbd>⌘L</kbd> learned <kbd>⌘B</kbd> sessions <kbd>⇧↵</kbd> new line
       </p>
     </div>
   );

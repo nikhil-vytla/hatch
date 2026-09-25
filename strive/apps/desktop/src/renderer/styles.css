@@ -372,6 +372,74 @@ button.chip { cursor: pointer; max-width: 100%; }
 .status.deleted { color: var(--bad); }
 .file pre.diff { border: 0; border-radius: 0; max-height: none; background: transparent; }
 
+/* The Learned pane: what the learner proposed, for a person to decide. */
+.learned-button { position: relative; }
+.count-dot { position: absolute; top: 5px; right: 5px; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 2px var(--bg); }
+.count-dot.working { animation: pulse 1.6s infinite; }
+.pane-title { margin: 0 0 0 4px; font-size: 13px; font-weight: 550; }
+.changes-head .back { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px 3px 4px; font-size: 13px; }
+.icon-chevron.left { transform: rotate(180deg); width: 14px; height: 14px; }
+button.learn { display: inline-flex; align-items: center; gap: 6px; }
+button.learn .icon { width: 14px; height: 14px; color: var(--accent-text); }
+.learn-note { margin: 8px 0 0; }
+.learned-bar { display: flex; flex-direction: column; align-items: flex-start; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+.learning-now { display: flex; align-items: center; gap: 9px; padding: 10px 14px; border-bottom: 1px solid var(--line); background: linear-gradient(90deg, var(--accent-soft), transparent); font-size: 13px; animation: fade-in 200ms ease-out; }
+.learning-now > span:nth-child(2) { font-weight: 500; }
+.learned-empty { max-width: 380px; margin: 12vh auto 0; padding: 0 20px; text-align: center; color: var(--muted); line-height: 1.6; }
+.learned-empty .mark { display: inline-grid; place-items: center; width: 36px; height: 36px; margin-bottom: 14px; border-radius: var(--r-card); background: var(--accent-soft); color: var(--accent-text); box-shadow: inset 0 0 0 1px var(--accent-line); }
+.learned-empty .mark .icon { width: 18px; height: 18px; }
+.learned-empty p { margin: 0 0 18px; font-size: 13px; }
+.learned-list { list-style: none; margin: 0; padding: 6px; }
+.learned-item { display: flex; flex-direction: column; align-items: stretch; gap: 5px; width: 100%; padding: 9px 10px; border: 0; border-radius: var(--r-item); background: transparent; text-align: left; font-weight: 400; }
+.learned-item:hover { background: var(--hover); border: 0; }
+.learned-item .summary { color: var(--text); font-weight: 500; line-height: 1.4; }
+.learned-item .meta { display: flex; align-items: center; gap: 8px; color: var(--faint); font-size: 12px; }
+.learned-item .mono { font-size: 11.5px; }
+.learned-item .when { font-variant-numeric: tabular-nums; }
+.badge.status-ready, .badge.status-checking { background: var(--accent-soft); color: var(--accent-text); }
+.badge.status-failed, .badge.verdict-fail { background: var(--bad-soft); color: var(--bad); }
+.badge.status-stale { background: var(--warn-soft); color: var(--warn); }
+.badge.status-rejected, .badge.status-rolledBack, .badge.verdict-skipped { background: var(--surface-2); color: var(--faint); }
+.learned-detail { padding-bottom: 28px; }
+.learned-head { padding: 14px 16px 12px; }
+.learned-title { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.learned-head h3 { margin: 0 0 4px; font-size: 15px; font-weight: 600; letter-spacing: -0.01em; line-height: 1.35; }
+.learned-head p { margin: 0; }
+.status-note { margin-top: 10px !important; font-size: 13px; color: var(--muted); }
+.status-note.stale { padding: 8px 10px; border-radius: var(--r-item); background: var(--warn-soft); border: 1px solid rgb(250 204 21 / 0.2); color: var(--text); }
+.status-note.stale + button.learn { margin-top: 8px; }
+.learned-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; position: sticky; top: 0; z-index: 2; padding: 8px 16px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); background: var(--shell); }
+.learned-actions button { display: inline-flex; align-items: center; gap: 6px; }
+.learned-actions button .icon { width: 14px; height: 14px; }
+.learned-actions.confirm { justify-content: flex-start; background: linear-gradient(0deg, var(--accent-soft), var(--accent-soft)), var(--shell); animation: fade-in var(--fast) ease-out; }
+.learned-actions.confirm span { flex: 1; font-size: 13px; color: var(--text); }
+.learned-actions.confirm button { flex: none; }
+.learned-section { padding: 14px 16px 0; }
+.learned-section h4 { margin: 0 0 7px; font-size: 11.5px; font-weight: 500; color: var(--faint); letter-spacing: 0.02em; }
+.learned-section .prose { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--text); line-height: 1.55; }
+.learned-diff { border: 1px solid var(--line); border-radius: var(--r-panel); overflow: hidden; background: var(--code-bg); }
+.learned-diff pre.diff { margin: 0; border: 0; border-radius: 0; max-height: none; }
+/* Memory and skills are prose: long lines wrap rather than scroll. */
+.learned-diff .diff .row { white-space: pre-wrap; overflow-wrap: anywhere; padding-left: 28px; text-indent: -16px; }
+.learned-diff .diff .row .num { display: none; }
+/* An inline block takes the row's indent on its own first line too. */
+.learned-diff .diff .row .sign { text-indent: 0; }
+.learned-diff .diff .row.gap { text-indent: 0; padding-left: 12px; }
+.learned-section .md { color: var(--text); }
+.learned-section .md > :first-child { margin-top: 0; }
+.learned-section .md > :last-child { margin-bottom: 0; }
+.evidence, .checks { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.evidence li { padding-left: 10px; border-left: 2px solid var(--line-2); }
+.evidence-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 2px; }
+.evidence .prose { color: var(--muted); }
+button.link { padding: 0; border: 0; background: transparent; color: var(--accent-text); font-weight: 500; text-align: left; }
+button.link:hover { background: transparent; text-decoration: underline; text-underline-offset: 2px; }
+.session-name { font-weight: 500; }
+.checks li { display: grid; grid-template-columns: 56px 64px 1fr; align-items: baseline; gap: 4px 10px; font-size: 13px; }
+.checks .gate { color: var(--muted); }
+.checks .badge { justify-self: start; }
+.checks .detail { grid-column: 3; color: var(--muted); white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12.5px; }
+
 /* The command palette (⌘K). */
 .palette-overlay { position: fixed; inset: 0; background: rgb(0 0 0 / 0.5); z-index: 40; animation: fade-in var(--fast) ease-out; }
 .palette { position: fixed; top: 14vh; left: 50%; transform: translateX(-50%); width: min(620px, 90vw); z-index: 41; border-radius: var(--r-dialog); background: rgb(22 22 24 / 0.94); backdrop-filter: blur(16px); border: 1px solid var(--line-2); box-shadow: 0 24px 70px rgb(0 0 0 / 0.6); overflow: hidden; animation: dialog-in 180ms var(--ease-out); }

@@ -381,6 +381,21 @@ prediction and checks) and accepts, rejects or rolls it back.
   it. They reach neither the app nor the network.
 - **Several windows:** they share one layout file. Decided proposals merge
   on save; the layout itself is the last saver's.
+- **The Learned pane** (⌘L) is `strive review` in the window: the
+  project's proposals, each with its whole-file diff, reasons, evidence and
+  checks, and Accept, Reject or Roll back.
+  - `proposal/list`, `proposal/decide`, `proposal/rollback` and
+    `learning/run` get the window's project directory from the main
+    process, whatever the page sends.
+  - A proposal's "before" comes through `proposalBefore(id)`, looked up
+    among the project's proposals; `blob/get` stays limited to digests the
+    shown session names.
+  - The main process follows the project's learning session on a
+    connection of its own, as an observer, from startup if the session
+    exists and from the first run if not. Its entries reach the page
+    (`onLearning`), which shows a run's progress; `learning()` reads the
+    journal whole (`session/read`). A run that ends with proposals
+    notifies a person who isn't looking.
 
 ## Effects
 

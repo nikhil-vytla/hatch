@@ -1,3 +1,4 @@
+import type { Entry } from "@strive/protocol";
 import { useState } from "react";
 import { createRoot } from "react-dom/client";
 import type { Bridge, Opened, StriveEvent } from "../shared/bridge";
@@ -21,12 +22,21 @@ let listener: ((event: StriveEvent) => void) | undefined;
 
 window.strive.onEvent((event) => (listener ? listener(event) : queued.push(event)));
 
+// The learning session's entries go to the app shown now. One that arrives
+// mid-switch is missed; the next app reads the journal whole when it mounts.
+let learningListener: ((entry: Entry) => void) | undefined;
+
+window.strive.onLearning((entry) => learningListener?.(entry));
+
 const events: Bridge = {
   ...window.strive,
   onEvent: (l) => {
     listener = l;
 
     for (const event of queued.splice(0)) l(event);
+  },
+  onLearning: (l) => {
+    learningListener = l;
   },
 };
 

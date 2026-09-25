@@ -956,3 +956,71 @@ fails them the same way (12 of 18). The gate ran with
 - Held-out selection by relevance, not recency.
 - The learner's live 5 s wait covers only the static gate. Its tool
   result doesn't mention the judge.
+
+## 2026-09-23: M8b, the Learned pane
+
+`strive review` in the desktop window, per ADR-0016.
+- **Bridge:** `proposal/list`, `proposal/decide`, `proposal/rollback` and
+  `learning/run` go through `strive:request`, and the main process sets
+  `cwd` to the window's project. Two calls are new:
+  - `learning()`: the learning session's journal (`session/read`), or
+    null if the project has none. It never creates one; only a run does.
+  - `proposalBefore(id)`: the "before" text, found among the project's
+    proposals. `blob/get` still serves only the shown session's digests.
+  - Request errors reach the page as the daemon's words (`describeError`
+    in main; the renderer strips Electron's "Error invoking remote
+    method" prefix).
+- **Following a run:** `main/learning.ts` holds a connection of its own,
+  attached as an observer, so switching sessions doesn't drop it and the
+  learner never waits on it. It starts at launch if the project has a
+  learning session, else after the first `learning/run` or the first time
+  the pane opens after one exists. Its entries go to the page
+  (`onLearning`) and feed the notice.
+- **Run state** (`renderer/learning.ts`): a request is running until the
+  turn that took it (`turnStarted.throughSeq`) ends. The step shown is the
+  learner's last tool. A failed or timed-out turn says why.
+- **The pane:** list newest first (status, summary, artifact, age), and a
+  detail with the whole-file diff, why and prediction (markdown), evidence
+  (a link to switch to a session of this project, "(shown)" for the
+  current one, the bare id otherwise), checks, and Accept (confirm) /
+  Reject / Roll back (confirm). A stale proposal says plainly that nothing
+  was written, and offers a new run. The chosen proposal is kept in
+  `sessionStorage`, so following an evidence link keeps it open.
+  - The changes and Learned panes share the right side: one at a time,
+    saved as `strive.pane` (the old `strive.changes` key is dropped).
+  - The titlebar button has a dot while a run goes or proposals are ready.
+- **Tests:** seven e2e tests in `app.e2e.ts` (list and detail, accept,
+  reject, rollback, stale, project binding, a run followed to its
+  proposal), with the tests as the learner's host over RPC. Unit tests:
+  `learnedNotice` and `latestRun`. The binding test was checked by
+  letting the page's `cwd` win: it failed.
+  - A first version of the binding test passed for the wrong reason:
+    proposal ids are seqs in each project's own learning session, so the
+    other project's id named one of ours, and "decide" accepted ours. The
+    test now asserts the id is not one of ours.
+- **Look:** screenshots from a harness in /tmp/m8b-shot (not committed),
+  running the real host and learner against a scripted model. Fixed from
+  the first pass: the diff's `+` was pulled out of view by the wrapping
+  indent (an inline block takes the row's `text-indent`), and rationale
+  backticks showed raw.
+- **Environment, and the gate:** checkpoint-heavy tests (the `checkpoints`
+  cargo suite, TUI prompts and `/rewind`) hit their 5 s and 2 s read limits
+  while another agent looped strive suites on the machine
+  (`/tmp/flake-target`) and syspolicyd, Santa and Kandji checked every exec.
+  One two-prompt checkpoint test took 4 to 8 s on its own. No Rust or TUI
+  code changed here. Every step passed on its own, but `check.sh` never
+  exited 0 in one run: `cargo test --no-fail-fast` passed in full once, and
+  the TS steps and all 35 desktop e2e tests passed, with the TUI tests
+  timing out as above. Rerun the gate on a quiet machine.
+  - A real race the gate did catch, in two of these tests: the diff's
+    heading shows before the "before" text loads, so reading rows at once
+    could find none. They wait for the rows now.
+- **Deferred:**
+  - Notifications aren't e2e-tested: a test window is focused, and
+    Electron's `Notification` isn't observable from Playwright. The notice
+    text is unit-tested.
+  - No real-model run: the harness drives the real learner with a
+    scripted model.
+  - Clicking the notice focuses the window but doesn't open the pane.
+  - A learning session made by `strive learn` while the window is open
+    is found when the pane next opens, not before.
