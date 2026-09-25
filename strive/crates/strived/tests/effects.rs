@@ -645,4 +645,10 @@ fn a_temp_directory_with_a_quote_is_left_out_of_the_sandbox() {
     let text = w.text(json!({"kind": "bash", "command": cmd}));
     assert!(text.ends_with("status=1\ninside\n") && text.contains("Operation not permitted"), "{text}");
     assert!(!odd.join("f").exists());
+    // And temp files still work: `mktemp` (the user's temp directory, what
+    // macOS's tools use whatever TMPDIR says) and $TMPDIR, which no longer
+    // names the directory left out.
+    let cmd = r#"f=$(mktemp) && echo ok > "$f" && cat "$f"; g="$TMPDIR/strv-$$" && echo ok2 > "$g" && cat "$g"; rm -f "$f" "$g"; case "$TMPDIR" in *'"'*) echo odd;; esac"#;
+    let text = w.text(json!({"kind": "bash", "command": cmd}));
+    assert_eq!(text, "ok\nok2\n", "{text}");
 }

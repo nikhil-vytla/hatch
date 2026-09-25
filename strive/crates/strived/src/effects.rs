@@ -398,6 +398,18 @@ fn edit(p: &Path, shown: &str, old: &str, new: &str) -> Result {
     }
 }
 
+/// The user's own temp directory (`confstr(_CS_DARWIN_USER_TEMP_DIR)`),
+/// asked of `getconf` once, since the crate forbids `unsafe`.
+fn user_temp_dir() -> Option<PathBuf> {
+    static DIR: std::sync::OnceLock<Option<PathBuf>> = std::sync::OnceLock::new();
+    DIR.get_or_init(|| {
+        let out = Command::new("/usr/bin/getconf").arg("DARWIN_USER_TEMP_DIR").output().ok()?;
+        let text = String::from_utf8(out.stdout).ok()?;
+        PathBuf::from(text.trim()).canonicalize().ok()
+    })
+    .clone()
+}
+
 /// Whether commands can run sandboxed here.
 fn sandbox_available() -> bool {
     if cfg!(target_os = "macos") { Path::new("/usr/bin/sandbox-exec").exists() } else { which("bwrap").is_some() }
@@ -426,13 +438,17 @@ fn sandboxed_command(scope: &Scope, command: &str) -> io::Result<Command> {
                 )));
             }
         }
-        // The daemon's TMPDIR is the person's to set, and commands don't
-        // need it: one the profile can't hold is left out, not refused.
-        let tmp = std::env::temp_dir()
-            .canonicalize()
-            .ok()
-            .filter(|t| !unsafe_in_profile(t))
-            .unwrap_or_else(|| PathBuf::from("/private/tmp"));
+        // Commands may write the user's own temp directory, which macOS's
+        // tools use whatever TMPDIR says (`mktemp` does), and the daemon's
+        // TMPDIR. That one is the person's to set: if the profile can't hold
+        // it, it's left out, not refused, and commands are pointed elsewhere.
+        let user_tmp = user_temp_dir().filter(|t| !unsafe_in_profile(t));
+        let daemon_tmp = std::env::temp_dir().canonicalize().ok().filter(|t| !unsafe_in_profile(t));
+        let tmp = daemon_tmp.clone().or_else(|| user_tmp.clone()).unwrap_or_else(|| PathBuf::from("/private/tmp"));
+        let mut temps = String::new();
+        for t in daemon_tmp.iter().chain(&user_tmp) {
+            let _ = write!(temps, " (subpath \"{}\")", t.display());
+        }
         let mut linked = String::new();
         if let Some(t) = memory_target {
             let _ = write!(linked, " (literal \"{}\")", t.display());
@@ -452,8 +468,7 @@ fn sandboxed_command(scope: &Scope, command: &str) -> io::Result<Command> {
 (deny file-write*)
 (allow file-write*
   (subpath "{ws}")
-  (subpath "/private/tmp")
-  (subpath "{tmp}")
+  (subpath "/private/tmp"){temps}
   (literal "/dev/null") (literal "/dev/zero") (literal "/dev/tty")
   (regex #"^/dev/fd/") (regex #"^/dev/ttys"))
 (deny file-write*
@@ -462,10 +477,12 @@ fn sandboxed_command(scope: &Scope, command: &str) -> io::Result<Command> {
   (subpath "{ws}/{skills}"){linked})
 (deny file-read* file-write* (subpath "{home}"))
 (allow file-read* (subpath "{home}/skills"))"#,
-            tmp = tmp.display(),
         );
         let mut c = Command::new("/usr/bin/sandbox-exec");
         c.args(["-p", &profile, "/bin/bash", "-c", command]);
+        // The temp directory the profile allows, so tools that make temp
+        // files (mktemp) don't reach for one it denies.
+        c.env("TMPDIR", &tmp);
         return Ok(c);
     }
     let bwrap = which("bwrap").ok_or_else(|| io::Error::other("bwrap is gone"))?;
@@ -486,6 +503,8 @@ fn sandboxed_command(scope: &Scope, command: &str) -> io::Result<Command> {
     give_seccomp_filter(&mut c)?;
     // Its own PID namespace: every process the command starts dies with it.
     c.args(["--unshare-net", "--unshare-pid", "--die-with-parent", "--", "/bin/bash", "-c", command]);
+    // The host's TMPDIR isn't in the sandbox's view; its private /tmp is.
+    c.env("TMPDIR", "/tmp");
     Ok(c)
 }
 

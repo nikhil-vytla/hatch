@@ -1283,6 +1283,15 @@ put the daemon's TMPDIR in unchecked. With `TMPDIR=.../a"b`, sandbox-exec
 parsed the rest of the path as profile code ("unbound variable: b\""), so a
 crafted TMPDIR could add rules. It's the person's variable, not the
 agent's, so this was a robustness hole more than an escape. A TMPDIR the
-profile can't hold is now left out (commands don't need it; `/private/tmp`
-stays). `a_temp_directory_with_a_quote_is_left_out_of_the_sandbox` failed
-before.
+profile can't hold is now left out, not refused.
+`a_temp_directory_with_a_quote_is_left_out_of_the_sandbox` failed before.
+
+A stop-time review then found that leaving it out left commands pointed at
+a directory they couldn't write. Looking closer: macOS's `mktemp` ignores
+TMPDIR and always uses the user's temp directory
+(`confstr(_CS_DARWIN_USER_TEMP_DIR)`, under `/var/folders`), which the
+profile allowed only because it usually *is* the daemon's TMPDIR. The
+profile now allows that directory (asked of `getconf` once; the crate
+forbids `unsafe`) and the daemon's TMPDIR when it's safe, and sets the
+command's TMPDIR to one of them. On Linux, commands get `TMPDIR=/tmp`, the
+sandbox's private one.
