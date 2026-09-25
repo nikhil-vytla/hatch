@@ -898,8 +898,33 @@ order the sessions started, numbered, with a test.
   client gone before the headers are sent is noticed only at the next
   write, and the fake provider wrote nothing for 20s. It now pings, as
   real providers do.
-- The TUI's `/rewind` test is reported to fail about 1 in 5 runs. It's
-  still to be looked into.
+- The TUI's `/rewind` test is reported to fail about 1 in 5 runs. The
+  race was in the test, twice over. The TUI and the daemon behaved
+  correctly throughout.
+  - **Too short a deadline.** A rewind runs about 16 git processes, one
+    after another. Each takes ~20ms on an idle machine, so the whole
+    rewind takes ~0.4s. Beside two looping `cargo test -p strived --test
+    effects` runs, the rewind took 0.4 to 11s, and one git call alone took
+    ~0.5s. `waitFor` gives up after 2s. At failure the screen shows no
+    error, only the first rewind's line. The second reply came later.
+    Failures: 0/30 alone, 16/30 under that load, and 28/30 under two
+    loops.
+  - **A shared directory.** Every run of `app.test.ts` used
+    `/tmp/some-repo` and deleted it in `beforeEach`. So did other
+    checkouts' `check.sh` runs. One such run deleted the directory under
+    a rewind (`git commit failed: Unable to read current working
+    directory`). Two copies of the test run at once failed in 2 of 8
+    rounds. In one, the session started in a missing directory, so no
+    checkpoint was taken and the screen showed "No checkpoints yet".
+  - **Fix.** Each test gets its own `mkdtemp` directory. Lines that wait
+    on git use a 20s `waitFor` (`GIT_MS`) instead of the 2s default. The
+    test still waits for the line the TUI shows. No sleep or retry was
+    added.
+  - **After the fix.** 30/30 alone, and 10/10 rounds of two copies at
+    once. Under load, 33/34: the failure was `strive status` being
+    SIGKILLed while the daemon started, not a rewind. A start loop
+    reproduced it 1 time in 150 under the same load, with no daemon log.
+    The sender is still unknown.
 
 ## 2026-09-24: M9, the judge gate
 

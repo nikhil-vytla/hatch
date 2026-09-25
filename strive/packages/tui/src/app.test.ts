@@ -1,5 +1,5 @@
-import { afterEach, beforeEach, expect, test } from "bun:test";
-import { mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { afterEach, beforeEach, expect, setDefaultTimeout, test } from "bun:test";
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { TuiMainScreen } from "@earendil-works/pi-tui";
 import {
@@ -12,7 +12,23 @@ import {
 import { startDaemon, type TestDaemon, VirtualTerminal } from "@strive/testkit";
 import { App, parseSessionMode, type SessionMode } from "./app";
 
-const CWD = "/tmp/some-repo";
+/**
+ * The session's working directory, fresh for each test. Never a fixed path:
+ * test runs in other checkouts share /tmp, and one deleting another's
+ * directory mid-test loses its checkpoints.
+ */
+let CWD: string;
+
+/**
+ * How long to wait for a line the daemon shows only after running git: a
+ * prompt is journaled after its checkpoint (about 8 git processes), and a
+ * rewind runs about 16 in sequence. A rewind takes 0.4s on an idle machine
+ * and took 11s beside two `cargo test` runs, far past `waitFor`'s default.
+ */
+const GIT_MS = 20_000;
+
+// Room for a test's several GIT_MS waits, so a timeout shows the screen.
+setDefaultTimeout(60_000);
 
 /** Where sessions say they are: the daemon keeps a directory's real path. */
 const real = () => realpathSync(CWD);
@@ -40,13 +56,13 @@ async function openUi(mode: SessionMode = "new"): Promise<Ui> {
 beforeEach(() => {
   daemon = startDaemon();
   uis = [];
-  rmSync(CWD, { recursive: true, force: true });
-  mkdirSync(CWD, { recursive: true });
+  CWD = mkdtempSync("/tmp/strv-tui-app-");
 });
 
 afterEach(() => {
   for (const ui of uis) ui.stop();
   daemon.dispose();
+  rmSync(CWD, { recursive: true, force: true });
 });
 
 const enter = async (ui: Ui, text: string) => {
@@ -75,7 +91,7 @@ test("a new session is created in the working directory and named in the header"
 test("a prompt is shown from the journal and is in `strive log`", async () => {
   const ui = await openUi();
   await enter(ui, "fix the flaky test");
-  await ui.term.waitFor("› fix the flaky test");
+  await ui.term.waitFor("› fix the flaky test", GIT_MS);
   const log = daemon.strive("log", sessions()[0]!.id);
   expect(log.stdout).toMatch(/\n#\d+ \d\d:\d\d:\d\d {2}you: fix the flaky test\n/);
 });
@@ -102,15 +118,15 @@ test("two clients on one session see each other's prompts", async () => {
   const id = sessions()[0]!.id;
   const b = await openUi({ resume: id });
   await enter(a, "hello from a");
-  await b.term.waitFor("› hello from a");
+  await b.term.waitFor("› hello from a", GIT_MS);
   await enter(b, "hello from b");
-  await a.term.waitFor("› hello from b");
+  await a.term.waitFor("› hello from b", GIT_MS);
 });
 
 test("resuming a tampered session explains why and saves nothing", async () => {
   const first = await openUi();
   await enter(first, "original");
-  await first.term.waitFor("› original");
+  await first.term.waitFor("› original", GIT_MS);
   first.app.quit(0);
   const id = sessions()[0]!.id;
   // SAFETY: as for `sessions`.
@@ -274,10 +290,10 @@ test("/rewind lists checkpoints and puts the files back", async () => {
   const file = join(CWD, "notes.txt");
   writeFileSync(file, "v1");
   await enter(ui, "first");
-  await ui.term.waitFor("› first");
+  await ui.term.waitFor("› first", GIT_MS);
   writeFileSync(file, "v2");
   await enter(ui, "second");
-  await ui.term.waitFor("› second");
+  await ui.term.waitFor("› second", GIT_MS);
   writeFileSync(file, "v3");
 
   await enter(ui, "/rewind");
@@ -285,11 +301,11 @@ test("/rewind lists checkpoints and puts the files back", async () => {
   await ui.term.waitFor("2  before “second”");
 
   await enter(ui, "/rewind 1");
-  await ui.term.waitFor("Rewound to checkpoint 1. Undo with /rewind 3.");
+  await ui.term.waitFor("Rewound to checkpoint 1. Undo with /rewind 3.", GIT_MS);
   expect(readFileSync(file, "utf8")).toBe("v1");
 
   await enter(ui, "/rewind 3");
-  await ui.term.waitFor("Rewound to checkpoint 3.");
+  await ui.term.waitFor("Rewound to checkpoint 3.", GIT_MS);
   expect(readFileSync(file, "utf8")).toBe("v3");
 });
 
@@ -299,9 +315,9 @@ test("/rewind says which nested repositories it left alone", async () => {
   writeFileSync(join(CWD, "vendor/lib/x.txt"), "v1");
   expect(Bun.spawnSync(["git", "init", "-q"], { cwd: join(CWD, "vendor/lib") }).exitCode).toBe(0);
   await enter(ui, "first");
-  await ui.term.waitFor("› first");
+  await ui.term.waitFor("› first", GIT_MS);
   await enter(ui, "/rewind 1");
-  await ui.term.waitFor("Left as they were (checkpoints don't hold nested repositories): vendor/lib");
+  await ui.term.waitFor("Left as they were (checkpoints don't hold nested repositories): vendor/lib", GIT_MS);
 });
 
 test("/rewind to a checkpoint that doesn't exist says so", async () => {
@@ -331,7 +347,7 @@ test("an MCP server that didn't start is shown", async () => {
 test("terminal control sequences in a reply are shown as text, not run", async () => {
   const ui = await openUi();
   await enter(ui, "first prompt");
-  await ui.term.waitFor("› first prompt");
+  await ui.term.waitFor("› first prompt", GIT_MS);
   const { client } = await StriveClient.connect(daemon.socket, { name: "agent", version: "0" });
   const id = sessions()[0]!.id;
   await client.request("host/register", { id });
