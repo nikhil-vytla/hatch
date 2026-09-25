@@ -1049,3 +1049,48 @@ fails them the same way (12 of 18). The gate ran with
   - Clicking the notice focuses the window but doesn't open the pane.
   - A learning session made by `strive learn` while the window is open
     is found when the pane next opens, not before.
+
+## 2026-09-24: merging M8b, M9 and the TUI flake fix; three causes of failures under load
+
+M9 (judge), M8b (Learned pane) and the TUI rewind fix merged into
+strive-rebuild. The first full check on the merged tree failed in
+`a_client_that_leaves_before_the_response_starts_closes_the_call`, which
+passed 20/20 alone. Looping it beside `cargo test -p strived` failed it
+1 in 24, and every load run also failed two checkpoint rewind tests. Three
+separate causes:
+
+- **A call the gateway started but nobody closed (product bug).** The
+  session writer journals `modelCallStarted` (reserving the money) and then
+  replies. A client that left in that window dropped the handler while it
+  awaited the reply, so no `Finish` was ever built: the call stayed open and
+  its reservation held. The start now runs in a spawned task that always
+  hands its result to a `Finish`, whose drop closes the call ("the client
+  disconnected before the response began"). No deterministic test: the
+  window is inside the writer; the evidence is the loop, 1/24 before and
+  0/120 after under the same load.
+- **Stale-daemon replacement on every cargo run (product bug).** `build_id`
+  was version + inode + size + mtime of the executable. Cargo copies
+  `target/debug/strive` into place on every invocation, rebuilt or not (1
+  link, a new inode, the same bytes and mtime). So any cargo run beside the
+  tests made each live test daemon look stale, and the next `strive status`
+  shut it down mid-test: broken pipes and "the daemon is stopping" in the
+  rewind tests. For a person, reinstalling the same build would have shut
+  down a daemon under running sessions. The inode is out of the build id;
+  `a_fresh_copy_of_the_same_build_keeps_the_daemon` failed before. The
+  stale-daemon tests now make "another build" by changing the copy's mtime,
+  which is what a rebuild does.
+- **The fake MCP server's pid file (test race).** `fs::write` creates and
+  then writes, so a test could read an empty pid. It's renamed into place.
+
+Also: `Env::status` says how `strive status` ended. That showed the
+remaining load failure is `strive status` killed by SIGKILL, only while
+another cargo run re-copies the binary it executes; no log names the
+sender. Not seen in a single `check.sh`.
+
+**Merge fallout.** M8b's pane test expected the judge's pre-M9 "isn't built
+yet". The e2e daemon is shared, and one test stores a stand-in Anthropic
+key, so the judge's detail depends on test order, and with no upstream
+override its call went to the real api.anthropic.com with a fake key. The
+e2e daemon's upstreams now point at a dead port, as the Rust tests' do, and
+the pane test checks that the pane shows the judge detail the daemon
+recorded.

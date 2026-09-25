@@ -55,7 +55,7 @@ impl Env {
     }
     pub fn status(&self) -> Value {
         let out = self.strive(&["status", "--json"]);
-        assert!(out.status.success(), "status failed: {}", String::from_utf8_lossy(&out.stderr));
+        assert!(out.status.success(), "status failed ({}): {}", out.status, String::from_utf8_lossy(&out.stderr));
         serde_json::from_slice(&out.stdout).unwrap()
     }
     pub fn socket(&self) -> PathBuf {

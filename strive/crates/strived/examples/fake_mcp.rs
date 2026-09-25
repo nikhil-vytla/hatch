@@ -20,7 +20,10 @@ use serde_json::{Value, json};
 
 fn main() {
     if let Ok(p) = std::env::var("FAKE_MCP_PID") {
-        std::fs::write(p, std::process::id().to_string()).unwrap();
+        // Renamed into place, so a test that sees the file sees the pid.
+        let tmp = format!("{p}.tmp");
+        std::fs::write(&tmp, std::process::id().to_string()).unwrap();
+        std::fs::rename(&tmp, &p).unwrap();
     }
     if std::env::var("FAKE_MCP_BROKEN").is_ok() {
         eprintln!("refusing to start");

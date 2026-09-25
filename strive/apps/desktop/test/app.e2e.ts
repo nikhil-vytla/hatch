@@ -21,11 +21,15 @@ const electronPath: string = createRequire(import.meta.url)("electron");
 
 let home: string;
 
-/** strive's environment here: no provider keys, so the daemon these tests start never holds a real one. */
+/**
+ * strive's environment here: no provider keys, so the daemon these tests start
+ * never holds a real one, and upstreams at a dead port, so a call made with the
+ * stand-in key a test sets (the judge's, say) never leaves the machine.
+ */
 function keyless(): NodeJS.ProcessEnv {
   const { ANTHROPIC_API_KEY: _a, OPENAI_API_KEY: _o, ...rest } = process.env;
 
-  return rest;
+  return { ...rest, STRIVE_UPSTREAM_ANTHROPIC: "http://127.0.0.1:9", STRIVE_UPSTREAM_OPENAI: "http://127.0.0.1:9" };
 }
 
 function strive(...args: string[]): string {
@@ -305,7 +309,7 @@ test("a new session with no key for its model says how to add one, and sees one 
   const setup = page.getByRole("status").filter({ hasText: "Add an Anthropic API key to start." });
   await setup.getByText("strive auth anthropic").waitFor();
   const rpc = await Rpc.open();
-  // A stand-in: nothing here calls a provider (the tests' hosts are off).
+  // A stand-in: the tests' hosts are off, and upstreams point at a dead port.
   const set = await rpc.call("auth/set", { provider: "anthropic", apiKey: "sk-ant-e2e-not-a-key" });
   assert.equal(set.error, undefined, JSON.stringify(set));
   await setup.getByRole("button", { name: "Check again" }).click();
@@ -914,7 +918,18 @@ test("the Learned pane lists proposals newest first, and shows one with its diff
   await detail.getByText("Later sessions follow: Keep the changelog sorted.").waitFor();
   await detail.getByText("the user asked to tidy it").waitFor();
   await detail.locator("[data-gate=static] .badge", { hasText: "passed" }).waitFor();
-  await detail.locator("[data-gate=judge]", { hasText: "not run: the model judge isn't built yet" }).waitFor();
+  // What the judge said depends on whether an earlier test stored a key in
+  // this shared daemon; the pane shows whatever the daemon recorded.
+  const lister = await Rpc.open();
+  const listed = resultOf(await lister.call("proposal/list", { cwd }));
+  lister.close();
+
+  const judged = listed.proposals
+    .find((p: { id: number }) => p.id === second)
+    ?.gates.find((g: { gate: string }) => g.gate === "judge");
+
+  assert.ok(judged?.detail, JSON.stringify(listed));
+  await detail.locator("[data-gate=judge] .detail", { hasText: judged.detail }).waitFor();
   // The evidence's session is one of this project's: a click shows it, and the proposal stays open.
   await detail.getByRole("button", { name: "tidy the changelog" }).click();
   await page.locator(".msg.user", { hasText: "tidy the changelog" }).waitFor();
