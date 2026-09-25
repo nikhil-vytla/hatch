@@ -85,7 +85,7 @@ asks otherwise, the user wins.";
 /// what a person reviewed is given, not files it points to.
 fn memory(workspace: &Path, strive_home: &Path) -> Option<InstructionFile> {
     let path = workspace.join(strive_learning::MEMORY_PATH);
-    let real = path.canonicalize().ok()?;
+    let real = really_at(workspace, Path::new(strive_learning::MEMORY_PATH))?;
     if !allowed(&real, strive_home) {
         return None;
     }
@@ -128,6 +128,17 @@ pub fn learned(workspace: &Path, strive_home: &Path) -> Vec<(Artifact, String)> 
         out.push((artifact, text));
     }
     out
+}
+
+/// A learned file's real path, only if it is really at `relative` in the
+/// workspace, reached without a symlink. Learned files change only through
+/// review, and the approval gate and the sandbox guard these real paths; a
+/// symlink to a file elsewhere would let a plain edit there change what
+/// every session is told.
+fn really_at(workspace: &Path, relative: &Path) -> Option<PathBuf> {
+    let path = workspace.canonicalize().ok()?.join(relative);
+    let real = path.canonicalize().ok()?;
+    (real == path).then_some(real)
 }
 
 /// A regular file's whole text, if it's UTF-8 and at most `limit` bytes.
@@ -211,13 +222,20 @@ fn expand(path: &Path, strive_home: &Path, stack: &mut Vec<PathBuf>) -> Option<S
 
 fn skills(workspace: &Path, strive_home: &Path) -> Vec<SkillInfo> {
     let mut found: Vec<SkillInfo> = Vec::new();
-    for root in [workspace.join(".strive/skills"), workspace.join(".claude/skills"), strive_home.join("skills")] {
+    let learned = workspace.join(strive_learning::SKILLS_DIR);
+    for root in [learned.clone(), workspace.join(".claude/skills"), strive_home.join("skills")] {
         let Ok(entries) = fs::read_dir(&root) else { continue };
         let mut dirs: Vec<PathBuf> = entries.filter_map(Result::ok).map(|e| e.path()).filter(|p| p.is_dir()).collect();
         dirs.sort();
         for dir in dirs {
             let file = dir.join("SKILL.md");
-            let readable = file.canonicalize().ok().filter(|real| allowed(real, strive_home));
+            let real = if root == learned {
+                let Some(name) = dir.file_name() else { continue };
+                really_at(workspace, &Path::new(strive_learning::SKILLS_DIR).join(name).join("SKILL.md"))
+            } else {
+                file.canonicalize().ok()
+            };
+            let readable = real.filter(|real| allowed(real, strive_home));
             let Some((name, description)) =
                 readable.and_then(|r| read_regular(&r)).as_deref().and_then(strive_learning::frontmatter)
             else {

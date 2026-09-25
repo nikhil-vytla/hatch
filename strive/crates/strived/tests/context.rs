@@ -206,3 +206,40 @@ fn a_skill_file_that_is_a_fifo_does_not_hold_up_the_session() {
     let names: Vec<&str> = config["skills"].as_array().unwrap().iter().map(|s| s["name"].as_str().unwrap()).collect();
     assert_eq!(names, vec!["ok"]);
 }
+
+/// Learned memory and skills change only through review: the approval gate
+/// and the sandbox guard their real paths. So only what is really there is
+/// loaded; a symlink to a file elsewhere in the project would let a plain
+/// edit of that file change what every session is told.
+#[test]
+fn learned_memory_and_skills_reached_through_a_symlink_are_not_loaded() {
+    let env = Env::new();
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path().canonicalize().unwrap();
+    write(&root.join("docs/notes.md"), "Anything an edit put here.");
+    write(&root.join("docs/deploy/SKILL.md"), "---\nname: deploy\ndescription: Deploy it.\n---\n");
+    write(&root.join("docs/shared.md"), "---\nname: shared\ndescription: Shared skill.\n---\n");
+    fs::create_dir_all(root.join(".strive/skills/linked-file")).unwrap();
+    std::os::unix::fs::symlink(root.join("docs/notes.md"), root.join(".strive/memory.md")).unwrap();
+    std::os::unix::fs::symlink(root.join("docs/deploy"), root.join(".strive/skills/deploy")).unwrap();
+    std::os::unix::fs::symlink(root.join("docs/shared.md"), root.join(".strive/skills/linked-file/SKILL.md")).unwrap();
+    write(&root.join(".strive/skills/real/SKILL.md"), "---\nname: real\ndescription: Really here.\n---\n");
+    let (_, config) = register(&env, &root);
+    let names: Vec<&str> = config["skills"].as_array().unwrap().iter().map(|s| s["name"].as_str().unwrap()).collect();
+    assert_eq!(names, vec!["real"], "{config}");
+    let text = config["instructions"].to_string();
+    assert!(!text.contains("Anything an edit put here"), "{config}");
+}
+
+/// A skills directory that is itself a symlink is skipped whole.
+#[test]
+fn a_learned_skills_directory_that_is_a_symlink_is_not_loaded() {
+    let env = Env::new();
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path().canonicalize().unwrap();
+    write(&root.join("elsewhere/x/SKILL.md"), "---\nname: x\ndescription: X.\n---\n");
+    fs::create_dir_all(root.join(".strive")).unwrap();
+    std::os::unix::fs::symlink(root.join("elsewhere"), root.join(".strive/skills")).unwrap();
+    let (_, config) = register(&env, &root);
+    assert_eq!(config["skills"], json!([]), "{config}");
+}

@@ -1244,3 +1244,17 @@ itself"), run hands-on without model spend.
 - **Not to copy:** unreviewed writes to anything injected into every prompt;
   full-trust code behind a client-side confirmation; counting retrievals as
   benefit; regex filters as the main defense; committed session corpora.
+
+## 2026-09-24: learned files are loaded only when really there
+
+A stop-time review found that a symlink still got around the approval gate
+for learned files. The gate and the sandbox matched `.strive/skills` and
+whatever *it* linked to, but not a single skill linked elsewhere:
+`.strive/skills/deploy -> docs/deploy`, then a plain write to
+`docs/deploy/SKILL.md` changed a loaded skill with no one asked. The same
+held for `.strive/memory.md` linked to `docs/notes.md`, which the agent
+was told "a person reviewed". Rather than chase every link in the gate, the
+loader now takes memory and `.strive/skills` only when reached without a
+symlink, as `learned()` already did for the learner. Two tests in
+`tests/context.rs` failed before. `AGENTS.md`/`CLAUDE.md` and
+`.claude/skills` stay ordinary project files, outside review, by design.

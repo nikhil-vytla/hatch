@@ -352,6 +352,13 @@ project's directory against rewinds.
 
 **Learned files outside review.** The daemon's own write on accept and
 rollback is not an agent effect, so the checks below don't apply to it.
+- **Loading:** memory and `.strive/skills` are loaded only when really
+  there, reached without a symlink, as the learner already reads them. The
+  checks below guard real paths; a skill linked to `docs/x` would otherwise
+  change with any edit of `docs/x`.
+- **Out of scope:** `AGENTS.md`/`CLAUDE.md` and `.claude/skills` are the
+  project's own files. The agent edits them as it edits any file, visible in
+  diffs and checkpoints; only what strive learns is review-gated.
 - **Agent writes:** a work session's `write` or `edit` that reaches
   `.strive/memory.md` or anything under `.strive/skills` asks a person in
   every approval mode, `fullAuto` included, and "allow for the session"
