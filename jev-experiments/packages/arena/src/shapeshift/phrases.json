@@ -1,0 +1,2113 @@
+{
+  "schema": "shapeshift.phrases/1",
+  "authoredAt": "2026-09-24T00:00:00Z",
+  "authoredBy": "Claude (subagent), blind to classifier rules; to be reviewed by Nikhil",
+  "phrases": [
+    {
+      "id": "p001",
+      "text": "lunch with priya thursday 1pm",
+      "intent": "event",
+      "acceptable": [],
+      "signals": {
+        "eventMode": "in_person"
+      },
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p002",
+      "text": "zoom call with the design team tomorrow at 10",
+      "intent": "event",
+      "acceptable": [],
+      "signals": {
+        "eventMode": "video_call"
+      },
+      "kind": "plain",
+      "split": "heldout"
+    },
+    {
+      "id": "p003",
+      "text": "Dinner at Marco's place on Saturday, 7:30pm",
+      "intent": "event",
+      "acceptable": [],
+      "signals": {
+        "eventMode": "in_person"
+      },
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p004",
+      "text": "phone call with mum sunday evening",
+      "intent": "event",
+      "acceptable": [],
+      "signals": {
+        "eventMode": "phone_call"
+      },
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p005",
+      "text": "standup moved to 9:15, same google meet link",
+      "intent": "event",
+      "acceptable": [],
+      "signals": {
+        "eventMode": "video_call"
+      },
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p006",
+      "text": "hey so we should finally do that dinner we keep talking about, next saturday around 7 at the new thai place on 5th, i'll book it if you're in",
+      "intent": "event",
+      "acceptable": [],
+      "signals": {
+        "eventMode": "in_person"
+      },
+      "kind": "plain",
+      "split": "heldout"
+    },
+    {
+      "id": "p007",
+      "text": "catch up with Leo over coffee at Blue Bottle wed 4pm",
+      "intent": "event",
+      "acceptable": [],
+      "signals": {
+        "eventMode": "in_person"
+      },
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p008",
+      "text": "facetime grandma saturday morning",
+      "intent": "event",
+      "acceptable": [],
+      "signals": {
+        "eventMode": "video_call"
+      },
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p009",
+      "text": "remind me to call the dentist tomorrow",
+      "intent": "reminder",
+      "acceptable": [],
+      "signals": {
+        "recurring": false
+      },
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p010",
+      "text": "remind me to take the chicken out of the freezer at 5",
+      "intent": "reminder",
+      "acceptable": [],
+      "signals": {
+        "recurring": false
+      },
+      "kind": "plain",
+      "split": "heldout"
+    },
+    {
+      "id": "p011",
+      "text": "don't let me forget to pay the electricity bill by friday",
+      "intent": "reminder",
+      "acceptable": [],
+      "signals": {
+        "recurring": false
+      },
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p012",
+      "text": "remind me to water the plants when I get home",
+      "intent": "reminder",
+      "acceptable": [],
+      "signals": {
+        "recurring": false
+      },
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p013",
+      "text": "Remind me to email Ana the signed contract before noon today",
+      "intent": "reminder",
+      "acceptable": [],
+      "signals": {
+        "recurring": false,
+        "urgency": 1
+      },
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p014",
+      "text": "remind me in 20 min to move the laundry to the dryer",
+      "intent": "reminder",
+      "acceptable": [],
+      "signals": {
+        "recurring": false
+      },
+      "kind": "plain",
+      "split": "heldout"
+    },
+    {
+      "id": "p015",
+      "text": "ping me tonight to renew my passport, it expires next week",
+      "intent": "reminder",
+      "acceptable": [],
+      "signals": {
+        "recurring": false
+      },
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p016",
+      "text": "REMIND ME TO SUBMIT THE VISA FORM RIGHT NOW, DEADLINE IS IN AN HOUR",
+      "intent": "reminder",
+      "acceptable": [],
+      "signals": {
+        "recurring": false,
+        "urgency": 2,
+        "tone": "stressed"
+      },
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p017",
+      "text": "milk, eggs, bread, coffee filters",
+      "intent": "todo",
+      "acceptable": [],
+      "signals": {
+        "isShoppingList": true
+      },
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p018",
+      "text": "buy: bananas, oat milk, rice, dish soap, batteries",
+      "intent": "todo",
+      "acceptable": [],
+      "signals": {
+        "isShoppingList": true
+      },
+      "kind": "plain",
+      "split": "heldout"
+    },
+    {
+      "id": "p019",
+      "text": "clean bathroom, fold laundry, vacuum, take out recycling",
+      "intent": "todo",
+      "acceptable": [],
+      "signals": {
+        "isShoppingList": false
+      },
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p020",
+      "text": "todo: reply to Sam, book dentist, fix bike light",
+      "intent": "todo",
+      "acceptable": [],
+      "signals": {
+        "isShoppingList": false
+      },
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p021",
+      "text": "groceries - tomatoes onions garlic coriander paneer",
+      "intent": "todo",
+      "acceptable": [],
+      "signals": {
+        "isShoppingList": true
+      },
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p022",
+      "text": "before we leave: pack chargers, print tickets, water plants, lock windows",
+      "intent": "todo",
+      "acceptable": [],
+      "signals": {
+        "isShoppingList": false
+      },
+      "kind": "plain",
+      "split": "heldout"
+    },
+    {
+      "id": "p023",
+      "text": "need to get sunscreen, flip flops and a beach towel",
+      "intent": "todo",
+      "acceptable": [],
+      "signals": {
+        "isShoppingList": true
+      },
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p024",
+      "text": "things for the weekend: mow lawn, call plumber, pick up dry cleaning, wash car",
+      "intent": "todo",
+      "acceptable": [],
+      "signals": {
+        "isShoppingList": false
+      },
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p025",
+      "text": "timer 10 minutes",
+      "intent": "timer",
+      "acceptable": [],
+      "signals": {
+        "timerKind": "countdown"
+      },
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p026",
+      "text": "25 min focus session",
+      "intent": "timer",
+      "acceptable": [],
+      "signals": {
+        "timerKind": "focus"
+      },
+      "kind": "plain",
+      "split": "heldout"
+    },
+    {
+      "id": "p027",
+      "text": "start a stopwatch",
+      "intent": "timer",
+      "acceptable": [],
+      "signals": {
+        "timerKind": "stopwatch"
+      },
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p028",
+      "text": "5 minute break",
+      "intent": "timer",
+      "acceptable": [],
+      "signals": {
+        "timerKind": "break"
+      },
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p029",
+      "text": "set a timer for 12 minutes for the pasta",
+      "intent": "timer",
+      "acceptable": [],
+      "signals": {
+        "timerKind": "countdown"
+      },
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p030",
+      "text": "deep work block, 90 minutes, no distractions",
+      "intent": "timer",
+      "acceptable": [],
+      "signals": {
+        "timerKind": "focus"
+      },
+      "kind": "plain",
+      "split": "heldout"
+    },
+    {
+      "id": "p031",
+      "text": "time my run",
+      "intent": "timer",
+      "acceptable": [],
+      "signals": {
+        "timerKind": "stopwatch"
+      },
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p032",
+      "text": "15 min rest between sets",
+      "intent": "timer",
+      "acceptable": [],
+      "signals": {
+        "timerKind": "break"
+      },
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p033",
+      "text": "meditate every morning",
+      "intent": "habit",
+      "acceptable": [],
+      "signals": {
+        "recurring": true
+      },
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p034",
+      "text": "drink 8 glasses of water daily",
+      "intent": "habit",
+      "acceptable": [],
+      "signals": {
+        "recurring": true
+      },
+      "kind": "plain",
+      "split": "heldout"
+    },
+    {
+      "id": "p035",
+      "text": "go to the gym mon wed fri",
+      "intent": "habit",
+      "acceptable": [],
+      "signals": {
+        "recurring": true
+      },
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p036",
+      "text": "read for 20 minutes before bed every night",
+      "intent": "habit",
+      "acceptable": [],
+      "signals": {
+        "recurring": true
+      },
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p037",
+      "text": "practice guitar every day",
+      "intent": "habit",
+      "acceptable": [],
+      "signals": {
+        "recurring": true
+      },
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p038",
+      "text": "call dad every sunday",
+      "intent": "habit",
+      "acceptable": [],
+      "signals": {
+        "recurring": true
+      },
+      "kind": "plain",
+      "split": "heldout"
+    },
+    {
+      "id": "p039",
+      "text": "floss nightly",
+      "intent": "habit",
+      "acceptable": [],
+      "signals": {
+        "recurring": true
+      },
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p040",
+      "text": "Weekly review every Friday afternoon",
+      "intent": "habit",
+      "acceptable": [],
+      "signals": {
+        "recurring": true
+      },
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p041",
+      "text": "#ff6b35 for the header",
+      "intent": "color",
+      "acceptable": [],
+      "signals": {},
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p042",
+      "text": "rgb(30, 60, 120)",
+      "intent": "color",
+      "acceptable": [],
+      "signals": {},
+      "kind": "plain",
+      "split": "heldout"
+    },
+    {
+      "id": "p043",
+      "text": "a soft pastel pink",
+      "intent": "color",
+      "acceptable": [],
+      "signals": {
+        "colorMood": "pastel"
+      },
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p044",
+      "text": "deep forest green",
+      "intent": "color",
+      "acceptable": [],
+      "signals": {
+        "colorMood": "dark"
+      },
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p045",
+      "text": "warm terracotta orange",
+      "intent": "color",
+      "acceptable": [],
+      "signals": {
+        "colorMood": "warm"
+      },
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p046",
+      "text": "light grey, almost off-white",
+      "intent": "color",
+      "acceptable": [],
+      "signals": {
+        "colorMood": "neutral"
+      },
+      "kind": "plain",
+      "split": "heldout"
+    },
+    {
+      "id": "p047",
+      "text": "neon lime green",
+      "intent": "color",
+      "acceptable": [],
+      "signals": {
+        "colorMood": "vivid"
+      },
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p048",
+      "text": "calm ocean blue",
+      "intent": "color",
+      "acceptable": [],
+      "signals": {
+        "colorMood": "cool"
+      },
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p049",
+      "text": "split 90 between 3",
+      "intent": "split",
+      "acceptable": [],
+      "signals": {},
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p050",
+      "text": "split $240 dinner bill four ways",
+      "intent": "split",
+      "acceptable": [],
+      "signals": {
+        "expenseCategory": "food"
+      },
+      "kind": "plain",
+      "split": "heldout"
+    },
+    {
+      "id": "p051",
+      "text": "divide ₹3600 rent between me, Arjun and Kabir",
+      "intent": "split",
+      "acceptable": [],
+      "signals": {
+        "expenseCategory": "bills"
+      },
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p052",
+      "text": "uber was 42, split with maya",
+      "intent": "split",
+      "acceptable": [],
+      "signals": {
+        "expenseCategory": "transport"
+      },
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p053",
+      "text": "split the €75 groceries between 5 flatmates",
+      "intent": "split",
+      "acceptable": [],
+      "signals": {
+        "expenseCategory": "food"
+      },
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p054",
+      "text": "we owe 1,250 for the cabin, split evenly among 6",
+      "intent": "split",
+      "acceptable": [],
+      "signals": {},
+      "kind": "plain",
+      "split": "heldout"
+    },
+    {
+      "id": "p055",
+      "text": "£60 pizza split 4 ways incl tip",
+      "intent": "split",
+      "acceptable": [],
+      "signals": {
+        "expenseCategory": "food"
+      },
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p056",
+      "text": "split 18.50 between jo and me",
+      "intent": "split",
+      "acceptable": [],
+      "signals": {},
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p057",
+      "text": "spent 12 on lunch",
+      "intent": "expense",
+      "acceptable": [],
+      "signals": {
+        "expenseCategory": "food"
+      },
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p058",
+      "text": "$45 gas",
+      "intent": "expense",
+      "acceptable": [],
+      "signals": {
+        "expenseCategory": "transport"
+      },
+      "kind": "plain",
+      "split": "heldout"
+    },
+    {
+      "id": "p059",
+      "text": "netflix 15.49",
+      "intent": "expense",
+      "acceptable": [],
+      "signals": {
+        "expenseCategory": "bills"
+      },
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p060",
+      "text": "paid ₹850 for groceries at the market",
+      "intent": "expense",
+      "acceptable": [],
+      "signals": {
+        "expenseCategory": "food"
+      },
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p061",
+      "text": "bought a new phone case, 25 dollars",
+      "intent": "expense",
+      "acceptable": [],
+      "signals": {
+        "expenseCategory": "shopping"
+      },
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p062",
+      "text": "movie tickets 28",
+      "intent": "expense",
+      "acceptable": [],
+      "signals": {
+        "expenseCategory": "entertainment"
+      },
+      "kind": "plain",
+      "split": "heldout"
+    },
+    {
+      "id": "p063",
+      "text": "pharmacy £9.20 for cold meds",
+      "intent": "expense",
+      "acceptable": [],
+      "signals": {
+        "expenseCategory": "health"
+      },
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p064",
+      "text": "cab to airport 60 bucks",
+      "intent": "expense",
+      "acceptable": [],
+      "signals": {
+        "expenseCategory": "transport"
+      },
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p065",
+      "text": "5 miles to km",
+      "intent": "convert",
+      "acceptable": [],
+      "signals": {},
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p066",
+      "text": "350 f in c",
+      "intent": "convert",
+      "acceptable": [],
+      "signals": {},
+      "kind": "plain",
+      "split": "heldout"
+    },
+    {
+      "id": "p067",
+      "text": "how many cups is 500 ml",
+      "intent": "convert",
+      "acceptable": [],
+      "signals": {
+        "isQuestion": true
+      },
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p068",
+      "text": "12 oz to grams",
+      "intent": "convert",
+      "acceptable": [],
+      "signals": {},
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p069",
+      "text": "6 feet 2 in cm",
+      "intent": "convert",
+      "acceptable": [],
+      "signals": {},
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p070",
+      "text": "convert 2.5 kg to pounds",
+      "intent": "convert",
+      "acceptable": [],
+      "signals": {},
+      "kind": "plain",
+      "split": "heldout"
+    },
+    {
+      "id": "p071",
+      "text": "100 km/h in mph",
+      "intent": "convert",
+      "acceptable": [],
+      "signals": {},
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p072",
+      "text": "3 tablespoons in teaspoons",
+      "intent": "convert",
+      "acceptable": [],
+      "signals": {},
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p073",
+      "text": "15% of 80",
+      "intent": "calc",
+      "acceptable": [],
+      "signals": {},
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p074",
+      "text": "234 * 17",
+      "intent": "calc",
+      "acceptable": [],
+      "signals": {},
+      "kind": "plain",
+      "split": "heldout"
+    },
+    {
+      "id": "p075",
+      "text": "what's an 18% tip on 64",
+      "intent": "calc",
+      "acceptable": [],
+      "signals": {
+        "isQuestion": true
+      },
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p076",
+      "text": "(120 + 45) / 3",
+      "intent": "calc",
+      "acceptable": [],
+      "signals": {},
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p077",
+      "text": "sqrt 144",
+      "intent": "calc",
+      "acceptable": [],
+      "signals": {},
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p078",
+      "text": "20% off 149.99",
+      "intent": "calc",
+      "acceptable": [],
+      "signals": {},
+      "kind": "plain",
+      "split": "heldout"
+    },
+    {
+      "id": "p079",
+      "text": "1200 minus 15 percent",
+      "intent": "calc",
+      "acceptable": [],
+      "signals": {},
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p080",
+      "text": "how much is 7 times 8",
+      "intent": "calc",
+      "acceptable": [],
+      "signals": {
+        "isQuestion": true
+      },
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p081",
+      "text": "flight to tokyo in march",
+      "intent": "travel",
+      "acceptable": [],
+      "signals": {
+        "transport": "flight"
+      },
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p082",
+      "text": "train to paris next weekend for a mini holiday",
+      "intent": "travel",
+      "acceptable": [],
+      "signals": {
+        "transport": "train",
+        "tripType": "leisure"
+      },
+      "kind": "plain",
+      "split": "heldout"
+    },
+    {
+      "id": "p083",
+      "text": "business trip to chicago oct 12-15, fly out monday",
+      "intent": "travel",
+      "acceptable": [],
+      "signals": {
+        "transport": "flight",
+        "tripType": "work"
+      },
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p084",
+      "text": "road trip to big sur with the girls in june",
+      "intent": "travel",
+      "acceptable": [],
+      "signals": {
+        "transport": "car",
+        "tripType": "leisure"
+      },
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p085",
+      "text": "book a hotel in lisbon for 3 nights",
+      "intent": "travel",
+      "acceptable": [],
+      "signals": {
+        "transport": "unspecified"
+      },
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p086",
+      "text": "bus to boston friday to visit my sister",
+      "intent": "travel",
+      "acceptable": [],
+      "signals": {
+        "transport": "bus",
+        "tripType": "leisure"
+      },
+      "kind": "plain",
+      "split": "heldout"
+    },
+    {
+      "id": "p087",
+      "text": "client visit in Bangalore the week of the 14th, need a flight there and a hotel near the office for four nights, company is paying",
+      "intent": "travel",
+      "acceptable": [],
+      "signals": {
+        "transport": "flight",
+        "tripType": "work"
+      },
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p088",
+      "text": "weekend in the lake district, driving up saturday",
+      "intent": "travel",
+      "acceptable": [],
+      "signals": {
+        "transport": "car",
+        "tripType": "leisure"
+      },
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p089",
+      "text": "pizza or thai tonight? vote",
+      "intent": "poll",
+      "acceptable": [],
+      "signals": {
+        "hasExplicitOptions": true,
+        "isQuestion": true
+      },
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p090",
+      "text": "team vote: offsite in denver, austin or nashville",
+      "intent": "poll",
+      "acceptable": [],
+      "signals": {
+        "hasExplicitOptions": true
+      },
+      "kind": "plain",
+      "split": "heldout"
+    },
+    {
+      "id": "p091",
+      "text": "which movie friday: dune, barbie, or oppenheimer?",
+      "intent": "poll",
+      "acceptable": [],
+      "signals": {
+        "hasExplicitOptions": true,
+        "isQuestion": true
+      },
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p092",
+      "text": "poll: best day for book club — tue, wed, thu",
+      "intent": "poll",
+      "acceptable": [],
+      "signals": {
+        "hasExplicitOptions": true
+      },
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p093",
+      "text": "should we get a dog or a cat? everyone vote!",
+      "intent": "poll",
+      "acceptable": [],
+      "signals": {
+        "hasExplicitOptions": true,
+        "isQuestion": true
+      },
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p094",
+      "text": "Where should we go for brunch? Tartine, Plow or Zazie",
+      "intent": "poll",
+      "acceptable": [],
+      "signals": {
+        "hasExplicitOptions": true,
+        "isQuestion": true
+      },
+      "kind": "plain",
+      "split": "heldout"
+    },
+    {
+      "id": "p095",
+      "text": "vote on the logo: A or B",
+      "intent": "poll",
+      "acceptable": [],
+      "signals": {
+        "hasExplicitOptions": true
+      },
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p096",
+      "text": "quick poll for the team: tabs or spaces",
+      "intent": "poll",
+      "acceptable": [],
+      "signals": {
+        "hasExplicitOptions": true
+      },
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p097",
+      "text": "Sam 555-0142",
+      "intent": "contact",
+      "acceptable": [],
+      "signals": {},
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p098",
+      "text": "Priya priya.sharma@example.com",
+      "intent": "contact",
+      "acceptable": [],
+      "signals": {},
+      "kind": "plain",
+      "split": "heldout"
+    },
+    {
+      "id": "p099",
+      "text": "save contact: Diego Ramirez, 555-0198, diego@example.com",
+      "intent": "contact",
+      "acceptable": [],
+      "signals": {},
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p100",
+      "text": "plumber Mike (555) 555-0117",
+      "intent": "contact",
+      "acceptable": [],
+      "signals": {},
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p101",
+      "text": "new number for Aunt Rosa: 555-0163",
+      "intent": "contact",
+      "acceptable": [],
+      "signals": {},
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p102",
+      "text": "Hana from the conference hana.k@example.com",
+      "intent": "contact",
+      "acceptable": [],
+      "signals": {},
+      "kind": "plain",
+      "split": "heldout"
+    },
+    {
+      "id": "p103",
+      "text": "Dr. Patel dentist 555-0100",
+      "intent": "contact",
+      "acceptable": [],
+      "signals": {},
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p104",
+      "text": "Tom's work email tom@example.com",
+      "intent": "contact",
+      "acceptable": [],
+      "signals": {},
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p105",
+      "text": "https://example.com/recipes/lasagna for sunday",
+      "intent": "link",
+      "acceptable": [],
+      "signals": {},
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p106",
+      "text": "read later: https://blog.example.com/rust-async",
+      "intent": "link",
+      "acceptable": [],
+      "signals": {},
+      "kind": "plain",
+      "split": "heldout"
+    },
+    {
+      "id": "p107",
+      "text": "www.example.org/menu save this",
+      "intent": "link",
+      "acceptable": [],
+      "signals": {},
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p108",
+      "text": "check this out example.com/deals great sale on tents",
+      "intent": "link",
+      "acceptable": [],
+      "signals": {},
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p109",
+      "text": "https://video.example.com/watch?v=abc123XYZ sourdough tutorial",
+      "intent": "link",
+      "acceptable": [],
+      "signals": {},
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p110",
+      "text": "save https://docs.example.com/api/v2 for the integration",
+      "intent": "link",
+      "acceptable": [],
+      "signals": {},
+      "kind": "plain",
+      "split": "heldout"
+    },
+    {
+      "id": "p111",
+      "text": "http://example.net/article?id=4471 good piece on sleep",
+      "intent": "link",
+      "acceptable": [],
+      "signals": {},
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p112",
+      "text": "github.com/example/dotfiles - steal the zsh config",
+      "intent": "link",
+      "acceptable": [],
+      "signals": {},
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p113",
+      "text": "days until christmas",
+      "intent": "countdown",
+      "acceptable": [],
+      "signals": {},
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p114",
+      "text": "how many days till my birthday on nov 3",
+      "intent": "countdown",
+      "acceptable": [],
+      "signals": {
+        "isQuestion": true
+      },
+      "kind": "plain",
+      "split": "heldout"
+    },
+    {
+      "id": "p115",
+      "text": "countdown to our wedding june 14!!",
+      "intent": "countdown",
+      "acceptable": [],
+      "signals": {
+        "tone": "excited"
+      },
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p116",
+      "text": "days until summer vacation",
+      "intent": "countdown",
+      "acceptable": [],
+      "signals": {},
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p117",
+      "text": "how long until new year's",
+      "intent": "countdown",
+      "acceptable": [],
+      "signals": {
+        "isQuestion": true
+      },
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p118",
+      "text": "count down to the marathon on april 20",
+      "intent": "countdown",
+      "acceptable": [],
+      "signals": {},
+      "kind": "plain",
+      "split": "heldout"
+    },
+    {
+      "id": "p119",
+      "text": "days left until the product launch dec 1",
+      "intent": "countdown",
+      "acceptable": [],
+      "signals": {},
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p120",
+      "text": "diwali countdown",
+      "intent": "countdown",
+      "acceptable": [],
+      "signals": {},
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p121",
+      "text": "what time is it in tokyo",
+      "intent": "timezone",
+      "acceptable": [],
+      "signals": {
+        "isQuestion": true
+      },
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p122",
+      "text": "3pm EST in london time",
+      "intent": "timezone",
+      "acceptable": [],
+      "signals": {},
+      "kind": "plain",
+      "split": "heldout"
+    },
+    {
+      "id": "p123",
+      "text": "9am pacific to IST",
+      "intent": "timezone",
+      "acceptable": [],
+      "signals": {},
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p124",
+      "text": "time in sydney right now",
+      "intent": "timezone",
+      "acceptable": [],
+      "signals": {},
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p125",
+      "text": "if it's 6pm in berlin what time is it in new york",
+      "intent": "timezone",
+      "acceptable": [],
+      "signals": {
+        "isQuestion": true
+      },
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p126",
+      "text": "convert 14:00 CET to singapore time",
+      "intent": "timezone",
+      "acceptable": [],
+      "signals": {},
+      "kind": "plain",
+      "split": "heldout"
+    },
+    {
+      "id": "p127",
+      "text": "noon in NYC = ? in LA",
+      "intent": "timezone",
+      "acceptable": [],
+      "signals": {},
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p128",
+      "text": "what's the time difference between dubai and toronto",
+      "intent": "timezone",
+      "acceptable": [],
+      "signals": {
+        "isQuestion": true
+      },
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p129",
+      "text": "flip a coin",
+      "intent": "random",
+      "acceptable": [],
+      "signals": {},
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p130",
+      "text": "roll a d20",
+      "intent": "random",
+      "acceptable": [],
+      "signals": {},
+      "kind": "plain",
+      "split": "heldout"
+    },
+    {
+      "id": "p131",
+      "text": "random number 1-100",
+      "intent": "random",
+      "acceptable": [],
+      "signals": {},
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p132",
+      "text": "pick a random name: ana, ben, cleo, dev",
+      "intent": "random",
+      "acceptable": [],
+      "signals": {
+        "hasExplicitOptions": true
+      },
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p133",
+      "text": "roll 2 dice",
+      "intent": "random",
+      "acceptable": [],
+      "signals": {},
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p134",
+      "text": "let fate decide who does the dishes tonight",
+      "intent": "random",
+      "acceptable": [],
+      "signals": {},
+      "kind": "plain",
+      "split": "heldout"
+    },
+    {
+      "id": "p135",
+      "text": "give me a random letter",
+      "intent": "random",
+      "acceptable": [],
+      "signals": {},
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p136",
+      "text": "read 24 books this year, 5 done",
+      "intent": "goal",
+      "acceptable": [],
+      "signals": {},
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p137",
+      "text": "saved $3,200 of $10,000 for the house deposit",
+      "intent": "goal",
+      "acceptable": [],
+      "signals": {},
+      "kind": "plain",
+      "split": "heldout"
+    },
+    {
+      "id": "p138",
+      "text": "ran 42 of 100 miles this month",
+      "intent": "goal",
+      "acceptable": [],
+      "signals": {},
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p139",
+      "text": "lose 10 lbs, down 3 so far",
+      "intent": "goal",
+      "acceptable": [],
+      "signals": {},
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p140",
+      "text": "7/30 days of yoga completed",
+      "intent": "goal",
+      "acceptable": [],
+      "signals": {},
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p141",
+      "text": "emergency fund ₹50,000 target, at ₹18,000 now",
+      "intent": "goal",
+      "acceptable": [],
+      "signals": {},
+      "kind": "plain",
+      "split": "heldout"
+    },
+    {
+      "id": "p142",
+      "text": "write 50,000 words for nanowrimo, at 12k",
+      "intent": "goal",
+      "acceptable": [],
+      "signals": {},
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p143",
+      "text": "pushup challenge 350 of 1000",
+      "intent": "goal",
+      "acceptable": [],
+      "signals": {},
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p144",
+      "text": "idea: an app that tells you which houseplants are safe for cats",
+      "intent": "note",
+      "acceptable": [],
+      "signals": {},
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p145",
+      "text": "the best conversations always seem to happen on long walks",
+      "intent": "note",
+      "acceptable": [],
+      "signals": {
+        "tone": "reflective"
+      },
+      "kind": "plain",
+      "split": "heldout"
+    },
+    {
+      "id": "p146",
+      "text": "so grateful for how the team rallied today",
+      "intent": "note",
+      "acceptable": [],
+      "signals": {
+        "tone": "positive"
+      },
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p147",
+      "text": "notes: Q3 budget approved, hiring freeze lifted, Jo leads onboarding",
+      "intent": "note",
+      "acceptable": [],
+      "signals": {},
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p148",
+      "text": "can't believe how stressful this week has been, nothing is going right",
+      "intent": "note",
+      "acceptable": [],
+      "signals": {
+        "tone": "stressed"
+      },
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p149",
+      "text": "book rec from Jo: The Overstory",
+      "intent": "note",
+      "acceptable": [],
+      "signals": {},
+      "kind": "plain",
+      "split": "heldout"
+    },
+    {
+      "id": "p150",
+      "text": "SO excited for the concert!!!",
+      "intent": "note",
+      "acceptable": [],
+      "signals": {
+        "tone": "excited"
+      },
+      "kind": "plain",
+      "split": "dev"
+    },
+    {
+      "id": "p151",
+      "text": "lunch or dinner friday?",
+      "intent": "event",
+      "acceptable": ["poll"],
+      "signals": {
+        "hasExplicitOptions": true,
+        "isQuestion": true
+      },
+      "kind": "ambiguous",
+      "split": "dev",
+      "note": "a plan with two options could be an event or a poll"
+    },
+    {
+      "id": "p152",
+      "text": "coffee sam 3",
+      "intent": "event",
+      "acceptable": ["reminder"],
+      "signals": {},
+      "kind": "ambiguous",
+      "split": "heldout",
+      "note": "terse; could be a meeting or a nudge to self"
+    },
+    {
+      "id": "p153",
+      "text": "split 1200 dinner",
+      "intent": "split",
+      "acceptable": ["expense"],
+      "signals": {
+        "expenseCategory": "food"
+      },
+      "kind": "ambiguous",
+      "split": "dev",
+      "note": "no head count; could just be logging the dinner"
+    },
+    {
+      "id": "p154",
+      "text": "what time works for the call, 2pm or 4pm?",
+      "intent": "poll",
+      "acceptable": ["event"],
+      "signals": {
+        "hasExplicitOptions": true,
+        "isQuestion": true
+      },
+      "kind": "ambiguous",
+      "split": "dev",
+      "note": "choosing between times vs scheduling the call"
+    },
+    {
+      "id": "p155",
+      "text": "gym 6am",
+      "intent": "habit",
+      "acceptable": ["reminder", "event"],
+      "signals": {},
+      "kind": "ambiguous",
+      "split": "dev",
+      "note": "no day or repetition stated"
+    },
+    {
+      "id": "p156",
+      "text": "call mom",
+      "intent": "reminder",
+      "acceptable": ["todo", "event"],
+      "signals": {},
+      "kind": "ambiguous",
+      "split": "heldout",
+      "note": "bare task, no time"
+    },
+    {
+      "id": "p157",
+      "text": "dentist tuesday 3pm",
+      "intent": "event",
+      "acceptable": ["reminder"],
+      "signals": {
+        "eventMode": "in_person"
+      },
+      "kind": "ambiguous",
+      "split": "dev",
+      "note": "appointment vs reminder to self"
+    },
+    {
+      "id": "p158",
+      "text": "water plants every 3 days",
+      "intent": "habit",
+      "acceptable": ["reminder"],
+      "signals": {
+        "recurring": true
+      },
+      "kind": "ambiguous",
+      "split": "dev",
+      "note": "repeating task could be a recurring reminder"
+    },
+    {
+      "id": "p159",
+      "text": "remind me to stretch every hour",
+      "intent": "habit",
+      "acceptable": ["reminder"],
+      "signals": {
+        "recurring": true
+      },
+      "kind": "ambiguous",
+      "split": "dev",
+      "note": "'remind me' phrasing but repeats"
+    },
+    {
+      "id": "p160",
+      "text": "paid 60 for dinner, sam owes me half",
+      "intent": "split",
+      "acceptable": ["expense"],
+      "signals": {
+        "expenseCategory": "food"
+      },
+      "kind": "ambiguous",
+      "split": "heldout",
+      "note": "records spend and a split"
+    },
+    {
+      "id": "p161",
+      "text": "50 usd in inr",
+      "intent": "convert",
+      "acceptable": ["calc"],
+      "signals": {},
+      "kind": "ambiguous",
+      "split": "dev",
+      "note": "currency is not strictly a unit of measurement"
+    },
+    {
+      "id": "p162",
+      "text": "tokyo in april?",
+      "intent": "travel",
+      "acceptable": ["countdown", "note"],
+      "signals": {
+        "isQuestion": true
+      },
+      "kind": "ambiguous",
+      "split": "dev",
+      "note": "destination and month only"
+    },
+    {
+      "id": "p163",
+      "text": "3pm tokyo",
+      "intent": "timezone",
+      "acceptable": ["event"],
+      "signals": {},
+      "kind": "ambiguous",
+      "split": "dev",
+      "note": "time in a city vs an event at 3pm"
+    },
+    {
+      "id": "p164",
+      "text": "marathon oct 5",
+      "intent": "countdown",
+      "acceptable": ["event", "goal"],
+      "signals": {},
+      "kind": "ambiguous",
+      "split": "heldout",
+      "note": "future date, could be the event itself"
+    },
+    {
+      "id": "p165",
+      "text": "save for new laptop $1500",
+      "intent": "goal",
+      "acceptable": ["expense", "note"],
+      "signals": {},
+      "kind": "ambiguous",
+      "split": "dev",
+      "note": "target amount without progress"
+    },
+    {
+      "id": "p166",
+      "text": "run 5k 3x a week",
+      "intent": "habit",
+      "acceptable": ["goal"],
+      "signals": {
+        "recurring": true
+      },
+      "kind": "ambiguous",
+      "split": "dev",
+      "note": "repeated routine with a numeric target"
+    },
+    {
+      "id": "p167",
+      "text": "blue or green for the kitchen?",
+      "intent": "poll",
+      "acceptable": ["color"],
+      "signals": {
+        "hasExplicitOptions": true,
+        "isQuestion": true
+      },
+      "kind": "ambiguous",
+      "split": "dev",
+      "note": "options are colors"
+    },
+    {
+      "id": "p168",
+      "text": "sam's birthday march 3",
+      "intent": "countdown",
+      "acceptable": ["event", "reminder"],
+      "signals": {},
+      "kind": "ambiguous",
+      "split": "heldout",
+      "note": "a date, no action stated"
+    },
+    {
+      "id": "p169",
+      "text": "meet anna at the airport 6pm",
+      "intent": "event",
+      "acceptable": ["travel", "reminder"],
+      "signals": {
+        "eventMode": "in_person"
+      },
+      "kind": "ambiguous",
+      "split": "dev",
+      "note": "airport suggests travel but it's a meetup"
+    },
+    {
+      "id": "p170",
+      "text": "pick one: tacos, ramen, burgers",
+      "intent": "random",
+      "acceptable": ["poll"],
+      "signals": {
+        "hasExplicitOptions": true
+      },
+      "kind": "ambiguous",
+      "split": "dev",
+      "note": "no group mentioned; chance pick vs vote"
+    },
+    {
+      "id": "p171",
+      "text": "5km in 28 min, pace?",
+      "intent": "calc",
+      "acceptable": ["convert"],
+      "signals": {
+        "isQuestion": true
+      },
+      "kind": "ambiguous",
+      "split": "dev",
+      "note": "pace is division but also unit-flavoured"
+    },
+    {
+      "id": "p172",
+      "text": "flight lands 9pm london, what's that in delhi",
+      "intent": "timezone",
+      "acceptable": ["travel"],
+      "signals": {
+        "isQuestion": true,
+        "transport": "flight"
+      },
+      "kind": "ambiguous",
+      "split": "heldout",
+      "note": "flight context around a timezone question"
+    },
+    {
+      "id": "p173",
+      "text": "12 books this year",
+      "intent": "goal",
+      "acceptable": ["habit"],
+      "signals": {},
+      "kind": "ambiguous",
+      "split": "dev",
+      "note": "numeric target without progress"
+    },
+    {
+      "id": "p174",
+      "text": "rent due on the 1st",
+      "intent": "reminder",
+      "acceptable": ["countdown", "expense"],
+      "signals": {},
+      "kind": "ambiguous",
+      "split": "dev",
+      "note": "a due date, no explicit ask"
+    },
+    {
+      "id": "p175",
+      "text": "nina 555-0177 re: couch pickup sat",
+      "intent": "contact",
+      "acceptable": ["event", "note"],
+      "signals": {},
+      "kind": "ambiguous",
+      "split": "dev",
+      "note": "contact plus a plan"
+    },
+    {
+      "id": "p176",
+      "text": "https://example.com/tickets concert friday 8pm",
+      "intent": "link",
+      "acceptable": ["event"],
+      "signals": {},
+      "kind": "ambiguous",
+      "split": "heldout",
+      "note": "URL with an event attached"
+    },
+    {
+      "id": "p177",
+      "text": "yoga class tues 7pm",
+      "intent": "event",
+      "acceptable": ["habit"],
+      "signals": {
+        "eventMode": "in_person"
+      },
+      "kind": "ambiguous",
+      "split": "dev",
+      "note": "might be weekly"
+    },
+    {
+      "id": "p178",
+      "text": "pizza night w/ roommates, $48 total",
+      "intent": "split",
+      "acceptable": ["expense", "event"],
+      "signals": {
+        "expenseCategory": "food"
+      },
+      "kind": "ambiguous",
+      "split": "dev",
+      "note": "implies dividing, but never says so"
+    },
+    {
+      "id": "p179",
+      "text": "vacation fund 2k of 5k, bali in dec",
+      "intent": "goal",
+      "acceptable": ["travel"],
+      "signals": {},
+      "kind": "ambiguous",
+      "split": "dev",
+      "note": "savings progress for a trip"
+    },
+    {
+      "id": "p180",
+      "text": "brainstorm podcast names: echo, driftwood, low tide",
+      "intent": "note",
+      "acceptable": ["poll"],
+      "signals": {},
+      "kind": "ambiguous",
+      "split": "dev",
+      "note": "a list of candidates, not a question to a group"
+    },
+    {
+      "id": "p181",
+      "text": "remind me why I love this song",
+      "intent": "note",
+      "acceptable": [],
+      "signals": {},
+      "kind": "adversarial",
+      "split": "dev",
+      "note": "'remind me' but it's a thought, not a task"
+    },
+    {
+      "id": "p182",
+      "text": "the red flag at work today was my manager ignoring the deadline again",
+      "intent": "note",
+      "acceptable": [],
+      "signals": {
+        "tone": "stressed"
+      },
+      "kind": "adversarial",
+      "split": "dev",
+      "note": "'red' is an idiom, not a color"
+    },
+    {
+      "id": "p183",
+      "text": "paid €40 + $25 for the museum and lunch in rome",
+      "intent": "expense",
+      "acceptable": [],
+      "signals": {},
+      "kind": "adversarial",
+      "split": "heldout",
+      "note": "mixed currencies; travel words"
+    },
+    {
+      "id": "p184",
+      "text": "spent ₹1,200 on a kurta and £15 on socks online",
+      "intent": "expense",
+      "acceptable": [],
+      "signals": {
+        "expenseCategory": "shopping"
+      },
+      "kind": "adversarial",
+      "split": "dev",
+      "note": "mixed INR and GBP"
+    },
+    {
+      "id": "p185",
+      "text": "ok so notes from the call with the landlord: he says the boiler gets serviced next month, deposit comes back within 10 days after we leave, and we can paint the spare room if it's white after",
+      "intent": "note",
+      "acceptable": [],
+      "signals": {},
+      "kind": "adversarial",
+      "split": "dev",
+      "note": "long paste with call, month, days and color words"
+    },
+    {
+      "id": "p186",
+      "text": "remnd me to by bred tmrw",
+      "intent": "reminder",
+      "acceptable": [],
+      "signals": {
+        "recurring": false
+      },
+      "kind": "adversarial",
+      "split": "dev",
+      "note": "heavy typos"
+    },
+    {
+      "id": "p187",
+      "text": "🍕🍕 friday 8pm w/ the crew 🎉",
+      "intent": "event",
+      "acceptable": [],
+      "signals": {
+        "tone": "excited"
+      },
+      "kind": "adversarial",
+      "split": "heldout",
+      "note": "mostly emoji"
+    },
+    {
+      "id": "p188",
+      "text": "need to grab milk and also pick up the kids and then drop off the parcel and call the bank",
+      "intent": "todo",
+      "acceptable": [],
+      "signals": {
+        "isShoppingList": false
+      },
+      "kind": "adversarial",
+      "split": "dev",
+      "note": "lowercase run-on, only one item is a purchase"
+    },
+    {
+      "id": "p189",
+      "text": "colour for the nursery walls, a pale sage",
+      "intent": "color",
+      "acceptable": [],
+      "signals": {
+        "colorMood": "pastel"
+      },
+      "kind": "adversarial",
+      "split": "dev",
+      "note": "British spelling, color described in words"
+    },
+    {
+      "id": "p190",
+      "text": "chapter 3:16 had the best line in the whole book",
+      "intent": "note",
+      "acceptable": [],
+      "signals": {},
+      "kind": "adversarial",
+      "split": "dev",
+      "note": "3:16 looks like a time"
+    },
+    {
+      "id": "p191",
+      "text": "BA 1130 to heathrow thursday, window seat",
+      "intent": "travel",
+      "acceptable": [],
+      "signals": {
+        "transport": "flight"
+      },
+      "kind": "adversarial",
+      "split": "heldout",
+      "note": "flight number looks like a time"
+    },
+    {
+      "id": "p192",
+      "text": "oranges 3, apples 6, bananas, a lemon",
+      "intent": "todo",
+      "acceptable": [],
+      "signals": {
+        "isShoppingList": true
+      },
+      "kind": "adversarial",
+      "split": "dev",
+      "note": "color word and bare counts"
+    },
+    {
+      "id": "p193",
+      "text": "my timer for patience is running out with this landlord",
+      "intent": "note",
+      "acceptable": [],
+      "signals": {
+        "tone": "stressed"
+      },
+      "kind": "adversarial",
+      "split": "dev",
+      "note": "'timer' used figuratively"
+    },
+    {
+      "id": "p194",
+      "text": "Split pea soup: 2 cups peas, 1 onion, 6 cups stock, simmer an hour",
+      "intent": "note",
+      "acceptable": [],
+      "signals": {},
+      "kind": "adversarial",
+      "split": "dev",
+      "note": "'split' and units in a recipe"
+    },
+    {
+      "id": "p195",
+      "text": "thinking we could convert the spare room into an office by spring",
+      "intent": "note",
+      "acceptable": [],
+      "signals": {
+        "isQuestion": false
+      },
+      "kind": "adversarial",
+      "split": "heldout",
+      "note": "'convert' but not units"
+    },
+    {
+      "id": "p196",
+      "text": "the 5 by 5 rule: if it won't matter in 5 years don't spend more than 5 minutes on it",
+      "intent": "note",
+      "acceptable": [],
+      "signals": {
+        "tone": "reflective"
+      },
+      "kind": "adversarial",
+      "split": "dev",
+      "note": "numbers and minutes but a thought"
+    },
+    {
+      "id": "p197",
+      "text": "remember to flip the mattress this weekend",
+      "intent": "reminder",
+      "acceptable": [],
+      "signals": {},
+      "kind": "adversarial",
+      "split": "dev",
+      "note": "'flip' bait for coin flip"
+    },
+    {
+      "id": "p198",
+      "text": "₹500 recharge done for mum's phone",
+      "intent": "expense",
+      "acceptable": [],
+      "signals": {
+        "expenseCategory": "bills"
+      },
+      "kind": "adversarial",
+      "split": "dev",
+      "note": "'phone' bait for contact; recharge is a bill"
+    },
+    {
+      "id": "p199",
+      "text": "lunch was 4 of us at 1800 rupees, how much each?",
+      "intent": "split",
+      "acceptable": [],
+      "signals": {
+        "isQuestion": true,
+        "expenseCategory": "food"
+      },
+      "kind": "adversarial",
+      "split": "heldout",
+      "note": "1800 looks like a time"
+    },
+    {
+      "id": "p200",
+      "text": "rgb lights for the gaming setup, 49.99",
+      "intent": "expense",
+      "acceptable": [],
+      "signals": {
+        "expenseCategory": "shopping"
+      },
+      "kind": "adversarial",
+      "split": "dev",
+      "note": "'rgb' bait for color"
+    }
+  ]
+}

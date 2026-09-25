@@ -23,7 +23,9 @@
     "@tanstack/react-table": "^8.21.3",
     "@tonejs/midi": "^2.0.28",
     "@xyflow/react": "^12.10.0",
+    "chrono-node": "2.10.1",
     "cmdk": "1.1.1",
+    "convert-units": "2.3.4",
     "d3-scale": "4.0.2",
     "lucide-react": "^0.577.0",
     "motion": "^12.35.0",
@@ -38,6 +40,7 @@
   "devDependencies": {
     "@oxlint/plugins": "1.85.0",
     "@tailwindcss/vite": "^4.2.1",
+    "@types/convert-units": "2.3.12",
     "@types/d3-scale": "4.0.9",
     "@types/node": "^26.6.2",
     "@types/react": "^19.2.14",
