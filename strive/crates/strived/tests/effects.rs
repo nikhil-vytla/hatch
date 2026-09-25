@@ -626,3 +626,23 @@ fn a_session_directory_swapped_for_a_symlink_is_not_followed() {
     assert!(r["error"]["message"].as_str().unwrap_or_default().contains("now leads to"), "{r}");
     assert!(!elsewhere.path().join("x.txt").exists(), "nothing was written through the link");
 }
+
+/// The daemon's TMPDIR goes into the macOS profile's string literals like
+/// the workspace does. One with a quote would end a literal early, so it is
+/// left out of the profile: commands still run, and can't write there.
+#[test]
+fn a_temp_directory_with_a_quote_is_left_out_of_the_sandbox() {
+    if !cfg!(target_os = "macos") || !sandboxed() {
+        eprintln!("the macOS profile only");
+        return;
+    }
+    // Outside every directory the sandbox otherwise lets commands write.
+    let base = tempfile::Builder::new().prefix("strv-tmp").tempdir_in(std::env::var("HOME").unwrap()).unwrap();
+    let odd = base.path().canonicalize().unwrap().join("a\"b");
+    std::fs::create_dir(&odd).unwrap();
+    let mut w = Ws::with_vars(&[("TMPDIR", odd.to_str().unwrap())]);
+    let cmd = format!("echo x > '{}/f'; echo status=$?; echo inside > in.txt && cat in.txt", odd.display());
+    let text = w.text(json!({"kind": "bash", "command": cmd}));
+    assert!(text.ends_with("status=1\ninside\n") && text.contains("Operation not permitted"), "{text}");
+    assert!(!odd.join("f").exists());
+}

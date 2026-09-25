@@ -416,17 +416,23 @@ fn sandboxed_command(scope: &Scope, command: &str) -> io::Result<Command> {
         // The paths go into the profile's string literals: one that would
         // need escaping could end a literal and add rules of its own. The
         // learned paths add only fixed ASCII to the workspace's.
+        let unsafe_in_profile = |p: &Path| p.to_string_lossy().chars().any(|c| c == '"' || c == '\\' || c.is_control());
         let targets = memory_target.iter().chain(&skills_target);
         for p in [&scope.workspace, &scope.strive_home].into_iter().chain(targets) {
-            let text = p.to_string_lossy();
-            if text.chars().any(|c| c == '"' || c == '\\' || c.is_control()) {
+            if unsafe_in_profile(p) {
                 return Err(io::Error::other(format!(
                     "{} has a quote, backslash or control character in its path, which the macOS sandbox profile can't hold safely",
                     p.display()
                 )));
             }
         }
-        let tmp = std::env::temp_dir().canonicalize().unwrap_or_else(|_| PathBuf::from("/private/tmp"));
+        // The daemon's TMPDIR is the person's to set, and commands don't
+        // need it: one the profile can't hold is left out, not refused.
+        let tmp = std::env::temp_dir()
+            .canonicalize()
+            .ok()
+            .filter(|t| !unsafe_in_profile(t))
+            .unwrap_or_else(|| PathBuf::from("/private/tmp"));
         let mut linked = String::new();
         if let Some(t) = memory_target {
             let _ = write!(linked, " (literal \"{}\")", t.display());

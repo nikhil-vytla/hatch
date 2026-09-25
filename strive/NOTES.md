@@ -1274,3 +1274,15 @@ safeguard phrases as plain substrings, so one zero-width space inside
 Three tests in `crates/learning/tests/checks.rs` failed first. Homoglyphs
 from other scripts (Cyrillic `і`) are not folded; that needs a confusables
 table and the judge sees the text too.
+
+## 2026-09-24: the daemon's TMPDIR could write the sandbox profile
+
+The macOS profile checks the workspace, strive's home and the learned
+paths' symlink targets for characters that would end a string literal, but
+put the daemon's TMPDIR in unchecked. With `TMPDIR=.../a"b`, sandbox-exec
+parsed the rest of the path as profile code ("unbound variable: b\""), so a
+crafted TMPDIR could add rules. It's the person's variable, not the
+agent's, so this was a robustness hole more than an escape. A TMPDIR the
+profile can't hold is now left out (commands don't need it; `/private/tmp`
+stays). `a_temp_directory_with_a_quote_is_left_out_of_the_sandbox` failed
+before.
