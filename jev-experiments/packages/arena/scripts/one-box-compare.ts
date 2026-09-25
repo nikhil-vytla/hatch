@@ -6,7 +6,8 @@
  * recorded Jev never does, so prefixes not yet recorded are treated as still in flight. Under
  * "latest" every prefix must be recorded.
  */
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
+import { gunzipSync } from "node:zlib";
 import { answersSchema, toReading } from "../src/one-box/adapter";
 import { keyword } from "../src/one-box/keyword";
 import { phrasesSchema, type Phrase } from "../src/one-box/phrases";
@@ -28,10 +29,16 @@ const doc = phrasesSchema.parse(
 const recorded = new Map<string, Answered>();
 let dropped = 0;
 
-for (const line of readFileSync(
-  new URL("../recordings/one-box.jsonl", import.meta.url),
-  "utf8",
-).split("\n")) {
+/** The raw log while recording; the committed gzipped copy otherwise. */
+const raw = new URL("../recordings/one-box.jsonl", import.meta.url);
+
+const log = existsSync(raw)
+  ? readFileSync(raw, "utf8")
+  : gunzipSync(readFileSync(new URL("../recordings/one-box.jsonl.gz", import.meta.url))).toString(
+      "utf8",
+    );
+
+for (const line of log.split("\n")) {
   if (!line.trim()) continue;
   const row: { status?: string; key?: string; latencyMs?: number; answers?: unknown } =
     JSON.parse(line);
