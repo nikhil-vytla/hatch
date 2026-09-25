@@ -88,16 +88,32 @@ test("semantic failures preserve independently observed cost and identity withou
   }
 });
 
-test("Score rejection retains the raw distribution and disagreement", async () => {
+test("a Score that disagrees with its distribution drops only that answer", async () => {
   const body = reply(); body.answers.severity.score = 0;
-  const error = await rejected(evaluate(payload, { apiKey: "fixture-only", fetcher: fetchReply(body) }));
-  expect(error.code).toBe("native_score_mismatch");
-  expect(error.accounting.costUsd).toBe(0.001);
-  const check = error.accounting.attempts[0].scoreChecks?.[0];
+  const result = await evaluate(payload, { apiKey: "fixture-only", fetcher: fetchReply(body) });
+  expect(result.answers.severity).toBeUndefined();
+  expect(result.answers.category.value).toBe("a");
+  expect(result.answers.ready.value).toBe(0.75);
+  expect(result.rejected).toEqual([
+    { question_id: "severity", code: "native_score_mismatch", message: expect.any(String) },
+  ]);
+  expect(result.accounting.costUsd).toBe(0.001);
+  const check = result.accounting.attempts[0].scoreChecks?.[0];
   expect(check?.questionId).toBe("severity");
   expect(check?.result.probabilities).toEqual([0.2, 0.3, 0.5]);
   expect(check?.result.normalizedExpectation).toBeCloseTo(1.3);
   expect(check?.result.accepted).toBe(false);
+  expect(accountingIssue(result.accounting)).toBeNull();
+});
+
+test("when every answer is a rejected Score, the request fails and keeps the disagreement", async () => {
+  const only: Payload = { state: payload.state, questions: { severity: payload.questions.severity } };
+  const body = reply(); body.answers.severity.score = 0;
+  const { category: _c, ready: _r, ...answers } = body.answers;
+  const error = await rejected(evaluate(only, { apiKey: "fixture-only", fetcher: fetchReply({ ...body, answers }) }));
+  expect(error.code).toBe("native_score_mismatch");
+  expect(error.accounting.costUsd).toBe(0.001);
+  expect(error.accounting.attempts[0].scoreChecks?.[0]?.result.accepted).toBe(false);
   expect(accountingIssue(error.accounting)).toBeNull();
 });
 
