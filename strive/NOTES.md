@@ -1094,3 +1094,99 @@ override its call went to the real api.anthropic.com with a fake key. The
 e2e daemon's upstreams now point at a dead port, as the Rust tests' do, and
 the pane test checks that the pane shows the judge detail the daemon
 recorded.
+
+## 2026-09-24: learned files can't be changed around review
+
+**The gap.** ADR-0016 says memory and skills change only through reviewed
+proposals, but `effects::resolve` protected only `~/.strive`. A work
+session's `write`/`edit` could rewrite `.strive/memory.md` (free in
+autoEdit and fullAuto), and so could any sandboxed command, since the
+sandbox allowed writes anywhere in the workspace. The proposal, the checks
+and the person were all skipped, and every later session would be told
+the result as "reviewed memory".
+
+**Write and edit: always ask.** `Access::Learned(real, rel)` joins
+`Allowed`/`Ask`/`Denied`, and `gate()` maps it to `Gate::Ask` whatever the
+mode. That fit the design cleanly: `run_effect` asks for any `Gate::Ask`
+and never looks at the mode itself, and "allow for the session" only
+switches the mode to fullAuto, so it can't pre-approve the next learned
+file. "Unsandboxed command" already worked this way. So I ask rather than
+refuse: a person at the keyboard can still let the agent fix a typo in
+memory, and the request says what that means. Matching:
+- on the real path (symlinks followed, `..` after them, as `resolve`
+  already did), relative to the workspace, lowercased. Lowercasing is right
+  on APFS's default case-insensitive volumes. On a case-sensitive one it
+  asks about `.strive/MEMORY.md`, which is harmless.
+- also where the project's own `.strive/memory.md` or `.strive/skills`
+  leads through a symlink, since `context::memory` follows it. That needed
+  `leads_to`, which follows dangling links too: `real_path` gives up on
+  them, and my first test (memory linking to a not-yet-existing
+  `docs/notes.md`) wrote the file in fullAuto.
+- Unattended, the refusal said "use full-auto approvals", which is wrong
+  when full-auto wouldn't help. It now re-runs the gate in fullAuto and
+  suggests full-auto only if that would have allowed the effect. This also
+  fixes the same wrong advice for writes outside the workspace.
+
+**Bash: Seatbelt.** I probed `sandbox-exec` by hand before writing the rule:
+- It matches the path a write reaches, after symlinks, so `ln -s
+  .strive/memory.md m; echo > m` is denied, and so is making a hard link to
+  the file.
+- On a case-insensitive volume it matches case-insensitively, even for a
+  file that doesn't exist yet (`.STRIVE/MEMORY.md`, `mkdir .STRIVE`).
+- The rule denies `literal .strive`, `literal .strive/memory.md` and
+  `subpath .strive/skills`, plus wherever `leads_to` says those go. Without
+  the `.strive` literal, a command could move a prepared directory into
+  place (`mv x .strive`). Denying it also stops creating `.strive`, which
+  is fine: only learned files live there. Other files in `.strive` stay
+  writable.
+- Escaping: the added literals are the workspace plus fixed ASCII, which
+  the existing quote/backslash/control check already covers. Symlink
+  targets are checked the same way. `tmp` (from `TMPDIR`) is still not
+  checked. That predates this change, and I left it.
+- A symlinked skills directory pointing at `/` or at the workspace would
+  deny writes there too. That fails closed, and I left it.
+
+**Bash: Linux, untested here.** bubblewrap gets `--ro-bind-try` on the
+memory file and skills directory (their `leads_to` targets). A bind can't
+cover a missing path without creating it on the host, so a command can
+still create memory where there is none, and can move `.strive` aside.
+Tests that depend on that are macOS-only.
+
+**`sandbox: off`:** commands are unconfined, so none of the bash
+protection applies. That's documented in ARCHITECTURE. Write and edit
+still ask.
+
+**Changed outside review.** `proposal/list` gains `changedOutsideReview`:
+the paths of learned files that aren't what an accepted proposal last left
+there. It walks the learning journal: `proposalApplied` sets `after`, and
+`proposalRolledBack` sets that proposal's `before`. Then it compares each
+learned file on disk (memory, every valid skill directory, anything a
+proposal wrote) by digest. A file with no applied proposal counts once it
+exists, and so does something that isn't a regular file. `cas::digest`
+hashes without storing, so listing doesn't fill the store with hand edits.
+`strive review` prints one line per file. Not done: the desktop Learned
+pane doesn't show it yet, and `strive review <id>` doesn't mention it.
+
+Tests (real daemon): approvals.rs `full_auto_still_asks_before_writing_
+reviewed_memory`, `allowing_for_the_session_doesnt_cover_learned_files`,
+`unattended_full_auto_refuses_a_learned_file`, `a_learned_file_asks_by_any_
+path_that_reaches_it` (symlink, `..`, absolute, case),
+`a_file_the_learned_paths_link_to_asks_too`, `full_auto_writes_other_files_
+without_asking`; effects.rs `the_sandbox_lets_commands_read_learned_files_
+but_not_change_them`, `the_sandbox_protects_the_file_learned_memory_links_
+to`, `the_sandbox_keeps_commands_from_creating_learned_files` (macOS);
+learning.rs `a_work_session_cant_write_memory_but_an_accepted_proposal_
+does`, `learned_files_changed_outside_review_are_listed`. All but
+`full_auto_writes_other_files_without_asking` (a guard) and the
+accepted-proposal half failed before the change.
+
+**A flake seen, not fixed.** The first `check.sh` run failed once in
+`packages/host/src/learner.test.ts`: "a learner resumes after a restart"
+failed in 5 ms with `host/record: connection closed`. The second run
+passed, and so did 8 runs of the file alone. That test runs only against
+`FakeDaemon`, so the Rust changes here can't reach it. 5 ms is too short
+for it to have scripted a turn. My guess is a rejection left over from the
+previous test, whose `afterEach` `stop()` closes the connection while its
+host still has a `host/record` pending, and bun blames it on the test
+running at the time. I haven't confirmed it. Next step: await the host's
+exit in `stop()`.

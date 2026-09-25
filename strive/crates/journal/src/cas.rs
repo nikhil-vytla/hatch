@@ -15,6 +15,11 @@ pub use strive_proto::Digest;
 
 static TEMP_SEQ: AtomicU64 = AtomicU64::new(0);
 
+/// The name `bytes` would have in the store, without storing them.
+pub fn digest(bytes: &[u8]) -> Digest {
+    Digest::from_bytes(Sha256::digest(bytes).into())
+}
+
 #[derive(Debug, Clone)]
 pub struct Cas {
     root: PathBuf,
@@ -35,7 +40,7 @@ impl Cas {
     }
 
     pub fn put(&self, bytes: &[u8]) -> io::Result<Digest> {
-        let d = Digest::from_bytes(Sha256::digest(bytes).into());
+        let d = digest(bytes);
         let (dir, path) = self.location(&d);
         if path.exists() {
             return Ok(d);

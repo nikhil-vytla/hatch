@@ -20,6 +20,8 @@ use strive_proto::{Artifact, Gate, ProposalStatus};
 
 /// Where memory lives, relative to the project.
 pub const MEMORY_PATH: &str = ".strive/memory.md";
+/// Where skills live, relative to the project: `<name>/SKILL.md` each.
+pub const SKILLS_DIR: &str = ".strive/skills";
 /// The most a memory file may hold, in bytes.
 pub const MEMORY_LIMIT: usize = 16 * 1024;
 /// The most a skill's SKILL.md may hold, in bytes.
@@ -42,7 +44,7 @@ pub fn valid_skill_name(name: &str) -> bool {
 pub fn relative_path(artifact: &Artifact) -> Result<String, String> {
     match artifact {
         Artifact::Memory => Ok(MEMORY_PATH.into()),
-        Artifact::Skill { name } if valid_skill_name(name) => Ok(format!(".strive/skills/{name}/SKILL.md")),
+        Artifact::Skill { name } if valid_skill_name(name) => Ok(format!("{SKILLS_DIR}/{name}/SKILL.md")),
         Artifact::Skill { name } => {
             Err(format!("the skill name {name:?} isn't 1 to {SKILL_NAME_LIMIT} of a-z, 0-9 and -"))
         }

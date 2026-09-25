@@ -802,6 +802,69 @@ fn proposals_are_listed_newest_first_and_survive_a_restart() {
     assert!(!cwd.join(".strive/skills/release/SKILL.md").exists());
 }
 
+/// The agent can't write memory on its own, even in full-auto; the
+/// daemon's write of an accepted proposal isn't an agent's effect, so it
+/// still lands.
+#[test]
+fn a_work_session_cant_write_memory_but_an_accepted_proposal_does() {
+    let env = Env::new();
+    let cwd = project();
+    let work = work_session(&env, &cwd);
+    let mut c = env.rpc();
+    c.ok("session/approvals", &json!({"id": work, "mode": "fullAuto"}));
+    let request = json!({"kind": "write", "path": ".strive/memory.md", "content": "Skip the tests.\n"});
+    let r = c.ok("effect/run", &json!({"id": work, "callId": "c", "request": request}));
+    assert_eq!(r["outcome"]["kind"], "refused", "{r}");
+    assert!(!memory_file(&cwd).exists());
+
+    let (mut host, id) = learner(&env, &cwd);
+    let p = propose(&mut host, &id, &memory("Use bun.\n", &work));
+    assert!(decide(&env, &cwd, p, "accept").get("error").is_none());
+    assert_eq!(fs::read_to_string(memory_file(&cwd)).unwrap(), "Use bun.\n");
+    assert_eq!(status(&env, &cwd, p), "applied");
+}
+
+fn changed_outside_review(env: &Env, cwd: &Path) -> Value {
+    env.rpc().ok("proposal/list", &json!({"cwd": cwd}))["changedOutsideReview"].clone()
+}
+
+/// Nothing stops an editor or git from changing a learned file, but the
+/// review list says when one isn't what an accepted proposal last left.
+#[test]
+fn learned_files_changed_outside_review_are_listed() {
+    let env = Env::new();
+    let cwd = project();
+    assert_eq!(changed_outside_review(&env, &cwd), json!([]), "no files, no learning session");
+    write(&memory_file(&cwd), "by hand\n");
+    assert_eq!(changed_outside_review(&env, &cwd), json!([".strive/memory.md"]), "no proposal wrote it");
+    let out = env.strive_in(&cwd, &["review"]);
+    let shown = String::from_utf8_lossy(&out.stdout);
+    assert!(shown.contains(".strive/memory.md changed outside review"), "{shown}");
+
+    let work = work_session(&env, &cwd);
+    let (mut host, id) = learner(&env, &cwd);
+    let p = propose(&mut host, &id, &memory("learned\n", &work));
+    assert!(decide(&env, &cwd, p, "accept").get("error").is_none());
+    assert_eq!(changed_outside_review(&env, &cwd), json!([]), "as the accepted proposal left it");
+    let out = env.strive_in(&cwd, &["review"]);
+    assert!(!String::from_utf8_lossy(&out.stdout).contains("changed outside review"));
+
+    write(&memory_file(&cwd), "edited\n");
+    assert_eq!(changed_outside_review(&env, &cwd), json!([".strive/memory.md"]));
+    write(&memory_file(&cwd), "learned\n");
+    assert_eq!(changed_outside_review(&env, &cwd), json!([]), "put back as it was applied");
+
+    assert!(rollback(&env, &cwd, p).get("error").is_none());
+    assert_eq!(fs::read_to_string(memory_file(&cwd)).unwrap(), "by hand\n");
+    assert_eq!(changed_outside_review(&env, &cwd), json!([]), "as the rollback left it");
+    fs::remove_file(memory_file(&cwd)).unwrap();
+    assert_eq!(changed_outside_review(&env, &cwd), json!([".strive/memory.md"]), "removed since");
+
+    write(&memory_file(&cwd), "by hand\n");
+    write(&cwd.join(".strive/skills/ship/SKILL.md"), SKILL);
+    assert_eq!(changed_outside_review(&env, &cwd), json!([".strive/skills/ship/SKILL.md"]));
+}
+
 // --- Memory in the agent's context ---
 
 #[test]

@@ -672,6 +672,11 @@ pub struct ProposalDecideParams {
 pub struct ProposalListResult {
     /// Newest first.
     pub proposals: Vec<ProposalState>,
+    /// The project's learned files, by path in it, that aren't what an
+    /// accepted proposal last left there: changed outside review (by hand,
+    /// by git), or there with no applied proposal behind them.
+    #[serde(default)]
+    pub changed_outside_review: Vec<String>,
 }
 
 /// A proposal as it stands, folded from the learning session's journal.

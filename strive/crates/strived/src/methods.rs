@@ -727,8 +727,19 @@ async fn run_effect(
             crate::effects::Gate::Deny(why) => Some(why),
             crate::effects::Gate::Ask(what) => {
                 match state.sessions.ask(&sid, effect, what.clone(), cancelled).await.map_err(session_error)? {
+                    // Suggest full-auto only where it would have let this run.
+                    Answer::NoOne
+                        if matches!(
+                            crate::effects::gate(&scope, &request, strive_proto::ApprovalMode::FullAuto).0,
+                            crate::effects::Gate::Allow
+                        ) =>
+                    {
+                        Some(format!(
+                            "{what} needs approval, but no client is attached to give it; use full-auto approvals for unattended runs"
+                        ))
+                    }
                     Answer::NoOne => Some(format!(
-                        "{what} needs approval, but no client is attached to give it; use full-auto approvals for unattended runs"
+                        "{what} needs a person's approval even in full-auto, and no client is attached to give it"
                     )),
                     Answer::Cancelled => Some(format!("interrupted: {what}")),
                     Answer::Decided(Decision::Deny) => Some(format!("declined: {what}")),

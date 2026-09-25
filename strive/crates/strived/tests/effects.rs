@@ -125,9 +125,7 @@ fn writes_outside_the_workspace_are_refused() {
     assert_eq!(kind, "refused");
     assert!(text.starts_with("write outside the workspace: "), "{text}");
     assert!(
-        text.ends_with(
-            "needs approval, but no client is attached to give it; use full-auto approvals for unattended runs"
-        ),
+        text.ends_with("needs a person's approval even in full-auto, and no client is attached to give it"),
         "{text}"
     );
     assert!(!target.exists());
@@ -291,6 +289,70 @@ fn the_sandbox_blocks_writes_outside_the_workspace_and_reading_strive_state() {
 
     let text = w.text(json!({"kind": "bash", "command": "echo inside > in.txt && cat in.txt"}));
     assert_eq!(text, "inside\n");
+}
+
+/// Learned files change only through review (ADR-0016): a command can read
+/// them but not change, replace or add to them.
+#[test]
+fn the_sandbox_lets_commands_read_learned_files_but_not_change_them() {
+    if !sandboxed() {
+        eprintln!("no usable sandbox on this machine; covered by the refusal test");
+        return;
+    }
+    let mut w = Ws::new();
+    fs::create_dir_all(w.path(".strive/skills/ship")).unwrap();
+    fs::write(w.path(".strive/memory.md"), "reviewed\n").unwrap();
+    fs::write(w.path(".strive/skills/ship/SKILL.md"), "skill\n").unwrap();
+    let mut refused = vec![
+        "echo x > .strive/memory.md",
+        "echo x >> .strive/skills/ship/SKILL.md",
+        "rm .strive/memory.md",
+        "mkdir .strive/skills/new",
+    ];
+    // Seatbelt matches paths, so it also covers the directory holding them
+    // and other spellings; bubblewrap makes the files that exist read-only.
+    if cfg!(target_os = "macos") {
+        refused.extend(["mv .strive moved", "echo x > .STRIVE/Memory.md", "ln -s .strive/memory.md m && echo x > m"]);
+    }
+    for command in refused {
+        let text = w.text(json!({"kind": "bash", "command": format!("{command}; echo status=$?")}));
+        assert!(!text.ends_with("status=0\n"), "{command}: {text}");
+    }
+    assert_eq!(w.text(json!({"kind": "bash", "command": "cat .strive/memory.md"})), "reviewed\n");
+    assert_eq!(fs::read_to_string(w.path(".strive/memory.md")).unwrap(), "reviewed\n");
+    assert_eq!(fs::read_to_string(w.path(".strive/skills/ship/SKILL.md")).unwrap(), "skill\n");
+    assert!(!w.path(".strive/skills/new").exists() && !w.path("moved").exists());
+    let text = w.text(json!({"kind": "bash", "command": "echo a > .strive/notes.md && echo b > memory.md && echo ok"}));
+    assert_eq!(text, "ok\n", "other files, even in .strive, stay writable");
+}
+
+/// Sessions are given what the memory file leads to, so a command can't
+/// change that file by its own name either.
+#[test]
+fn the_sandbox_protects_the_file_learned_memory_links_to() {
+    if !sandboxed() {
+        eprintln!("no usable sandbox on this machine; covered by the refusal test");
+        return;
+    }
+    let mut w = Ws::new();
+    fs::create_dir_all(w.path(".strive")).unwrap();
+    fs::create_dir_all(w.path("docs")).unwrap();
+    fs::write(w.path("docs/notes.md"), "reviewed\n").unwrap();
+    std::os::unix::fs::symlink("../docs/notes.md", w.path(".strive/memory.md")).unwrap();
+    let text = w.text(json!({"kind": "bash", "command": "echo x > docs/notes.md; echo status=$?"}));
+    assert!(!text.ends_with("status=0\n"), "{text}");
+    assert_eq!(fs::read_to_string(w.path("docs/notes.md")).unwrap(), "reviewed\n");
+}
+
+/// A project that has no `.strive` yet can't get one from a command: the
+/// memory it would hold is loaded into every session.
+#[cfg(target_os = "macos")]
+#[test]
+fn the_sandbox_keeps_commands_from_creating_learned_files() {
+    let mut w = Ws::new();
+    let text = w.text(json!({"kind": "bash", "command": "mkdir -p .strive/skills; echo status=$?"}));
+    assert!(text.ends_with("status=1\n"), "{text}");
+    assert!(!w.path(".strive").exists());
 }
 
 /// Unix sockets outside the workspace (a Docker daemon, the user's D-Bus)

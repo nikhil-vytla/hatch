@@ -349,6 +349,29 @@ project's directory against rewinds.
 - The file is written before its record. A crash between leaves the file
   changed and the proposal `ready`; accepting it again finds the file
   isn't `before` and marks it stale, so nothing is written twice.
+
+**Learned files outside review.** The daemon's own write on accept and
+rollback is not an agent effect, so the checks below don't apply to it.
+- **Agent writes:** a work session's `write` or `edit` that reaches
+  `.strive/memory.md` or anything under `.strive/skills` asks a person in
+  every approval mode, `fullAuto` included, and "allow for the session"
+  doesn't cover the next one. The path is matched after symlinks and `..`
+  are resolved, and without regard to case. A file that the project's memory
+  path or skills directory leads to through a symlink is matched too. The
+  request says the change reaches every future session and names `strive
+  learn` and `strive review`. Unattended, it's refused.
+- **Commands:** the macOS sandbox denies writes to `.strive` itself (so it
+  can't be moved aside or created), `.strive/memory.md`, `.strive/skills`,
+  and wherever a symlink takes those. Other files in `.strive` stay
+  writable, and reads are allowed. On Linux, bubblewrap binds the memory
+  file and skills directory read-only where they exist, so a command can
+  still create a missing one there. With `"sandbox": "off"` none of this
+  applies to commands.
+- **Anything else** (an editor, git) can still change them. `proposal/list`
+  returns `changedOutsideReview`: learned files that aren't what an
+  accepted proposal last left there. After an apply that's its content,
+  after a rollback what it replaced, and with no applied proposal, any
+  file that exists counts. `strive review` prints a line for each.
 - A command a work session runs can change the file between the compare
   and the write. Writes and edits the agent asks for can't: they wait for
   the file.
@@ -429,7 +452,8 @@ server, so they are coordinated by the session's directory alone.
 
 **The sandbox.**
 - **macOS (Seatbelt):**
-  - Commands may write only in the workspace and temp directories.
+  - Commands may write only in the workspace and temp directories, and not
+    to the project's learned files (see "Learned files outside review").
   - strive's home is hidden.
   - There is no network, and that includes Unix sockets.
   - Without PID namespaces, a background job that leaves the command's
@@ -438,6 +462,7 @@ server, so they are coordinated by the session's directory alone.
 - **Linux (bubblewrap):**
   - Commands get their own PID namespace, so every process dies with the
     command.
+  - The learned files that exist are bound read-only.
   - `/tmp` and `/run` are private, which keeps the user's D-Bus, systemd,
     X11 and Docker sockets out of reach.
   - There is no network.
@@ -460,8 +485,10 @@ server, so they are coordinated by the session's directory alone.
 - `autoEdit` (the default): changes in the workspace are free; commands ask.
 - `fullAuto`: everything inside the workspace and sandbox is free.
 
-In every mode, writes outside the workspace and commands without a sandbox
-ask, and strive's own state is refused. An approval request is a journal
+In every mode, writes outside the workspace, writes to the project's
+learned files (`.strive/memory.md`, `.strive/skills`) and commands without
+a sandbox ask, and strive's own state is refused. With no one attached,
+the refusal suggests full-auto only when full-auto would have allowed it. An approval request is a journal
 entry, so every attached client sees it and the first answer wins. With no
 one attached, the request is refused at once.
 

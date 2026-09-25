@@ -6,7 +6,7 @@
 //! its reach, and a file is written only by the daemon, only when a person
 //! accepts, and only over the file as it was when the learner proposed.
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex as StdMutex};
@@ -62,14 +62,16 @@ pub async fn route(state: &Arc<State>, conn: &Arc<Conn>, method: &str, params: V
         ProposalList::NAME => {
             let ProjectRef { cwd } = parse::<ProposalList>(params)?;
             let cwd = project(&cwd)?;
-            let mut proposals = Vec::new();
+            let (mut proposals, mut entries) = (Vec::new(), Vec::new());
             if let Some(sid) = find(state, &cwd)? {
                 let lock = state.learning.project(&sid);
                 let _held = lock.lock().await;
                 proposals = settled(state, &sid, &cwd).await?.into_iter().map(|f| f.state).collect();
                 proposals.reverse();
+                entries = journal(state, &sid)?;
             }
-            reply::<ProposalList>(ProposalListResult { proposals })
+            let changed_outside_review = outside_review(state, &cwd, &entries).await?;
+            reply::<ProposalList>(ProposalListResult { proposals, changed_outside_review })
         }
         ProposalDecide::NAME => {
             require_person(conn)?;
@@ -235,6 +237,61 @@ fn shown(entries: &[Entry], rel: &str) -> Option<Digest> {
         _ => None,
     })?;
     learned.iter().find(|f| f.path == rel).map(|f| f.digest)
+}
+
+/// The project's learned files that aren't what an accepted proposal last
+/// left there: its content once applied, what it replaced once rolled back.
+/// A file no applied proposal wrote counts once it exists. Nothing stops an
+/// editor or git from changing these files; this is how review sees it.
+async fn outside_review(state: &State, cwd: &str, entries: &[Entry]) -> Result<Vec<String>, RpcError> {
+    let mut paths: HashMap<u64, String> = HashMap::new();
+    let mut replaced: HashMap<u64, Option<Digest>> = HashMap::new();
+    let mut left: BTreeMap<String, Option<Digest>> = BTreeMap::new();
+    for e in entries {
+        match &e.event {
+            Event::ProposalMade { proposal, .. } => {
+                if let Ok(rel) = strive_learning::relative_path(&proposal.artifact) {
+                    paths.insert(e.seq, rel);
+                }
+            }
+            Event::ProposalApplied { proposal, before, after } => {
+                if let Some(rel) = paths.get(proposal) {
+                    left.insert(rel.clone(), Some(*after));
+                    replaced.insert(*proposal, *before);
+                }
+            }
+            Event::ProposalRolledBack { proposal, .. } => {
+                if let (Some(rel), Some(before)) = (paths.get(proposal), replaced.get(proposal)) {
+                    left.insert(rel.clone(), *before);
+                }
+            }
+            _ => {}
+        }
+    }
+    let mut files: BTreeSet<String> = left.keys().cloned().collect();
+    files.insert(strive_learning::MEMORY_PATH.into());
+    if let Ok(dir) = std::fs::read_dir(Path::new(cwd).join(strive_learning::SKILLS_DIR)) {
+        let names = dir.filter_map(Result::ok).filter_map(|e| e.file_name().to_str().map(str::to_string));
+        files.extend(
+            names
+                .filter(|n| strive_learning::valid_skill_name(n))
+                .map(|n| format!("{}/{n}/SKILL.md", strive_learning::SKILLS_DIR)),
+        );
+    }
+    let mut changed = Vec::new();
+    for rel in files {
+        // Something there that isn't a plain file (a symlink, say) is a change too.
+        let now = file_now(state, cwd, &rel).await?.map(|b| b.map(|b| strive_journal::cas::digest(&b)));
+        let differs = match (left.get(&rel), now) {
+            (_, Err(_)) => true,
+            (Some(expected), Ok(now)) => *expected != now,
+            (None, Ok(now)) => now.is_some(),
+        };
+        if differs {
+            changed.push(rel);
+        }
+    }
+    Ok(changed)
 }
 
 /// The static gate: the proposal's own text, where its file resolves (and

@@ -5,4 +5,10 @@ export type ProposalListResult = {
 /**
  * Newest first.
  */
-proposals: Array<ProposalState>, };
+proposals: Array<ProposalState>, 
+/**
+ * The project's learned files, by path in it, that aren't what an
+ * accepted proposal last left there: changed outside review (by hand,
+ * by git), or there with no applied proposal behind them.
+ */
+changedOutsideReview: Array<string>, };

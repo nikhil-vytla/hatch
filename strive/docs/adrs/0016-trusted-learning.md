@@ -161,3 +161,8 @@ A proposal is `ready` when every check that ran passed or was skipped, and
   session's budget and shows up in `strive log`.
 - **Memory is a project file:** `.strive/memory.md` can be committed and
   shared, or ignored. strive neither commits it nor adds it to `.gitignore`.
+- **A work session can't skip review:** its `write` and `edit` of memory or
+  a skill ask a person in every approval mode, and the macOS sandbox denies
+  commands writes there (Linux: where the files exist; `sandbox: off`: not
+  at all). An editor or git still can, and `strive review` lists such a file
+  as changed outside review.

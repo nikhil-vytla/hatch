@@ -81,13 +81,17 @@ fn line(p: &ProposalState) -> String {
 
 pub async fn review(c: &mut Client, id: Option<u64>, action: Option<Action>) -> Result<ExitCode> {
     let cwd = cwd()?;
-    let proposals = c.request::<ProposalList>(ProjectRef { cwd: cwd.clone() }).await?.proposals;
+    let listed = c.request::<ProposalList>(ProjectRef { cwd: cwd.clone() }).await?;
+    let proposals = listed.proposals;
     let Some(id) = id else {
         if proposals.is_empty() {
             println!("no proposals for {cwd}; `strive learn` asks the learner to study this project's sessions");
         }
         for p in &proposals {
             println!("{}", line(p));
+        }
+        for rel in &listed.changed_outside_review {
+            println!("{rel} changed outside review: it isn't what an accepted proposal last left there");
         }
         return Ok(ExitCode::SUCCESS);
     };
