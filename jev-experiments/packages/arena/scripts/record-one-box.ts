@@ -1,7 +1,7 @@
 /**
- * Records Jev answering Shapeshift's 14 questions for every prefix a typist produces.
+ * One box (after anishfn/shapeshift): records Jev answering its 14 questions for every prefix a typist produces.
  *
- * Protocol (fixed before running): phrases from src/shapeshift/phrases.json, both splits
+ * Protocol (fixed before running): phrases from src/one-box/phrases.json, both splits
  * (thresholds are tuned on dev only; held-out answers are not looked at until then). Each
  * distinct normalized prefix of two or more characters is asked once, as `{ text }` with
  * upstream's questions, exactly as upstream's client sends it. Prefixes are asked in a seeded
@@ -15,7 +15,7 @@
  * The log is append-only. Rerunning resumes: prefixes already recorded are skipped, never
  * re-asked or overwritten.
  *
- *   bun jev-experiments/packages/arena/scripts/record-shapeshift.ts [words|all]
+ *   bun jev-experiments/packages/arena/scripts/record-one-box.ts [words|all]
  *
  * `words` asks only prefixes that end a word (about 1,300 requests); `all` asks every prefix
  * (about 5,500). Upstream's cancel-on-keystroke policy only ever lands word-end prefixes and
@@ -24,9 +24,9 @@
 import "../../../experience-prototypes/scripts/credentials";
 import { appendFileSync, existsSync, readFileSync } from "node:fs";
 import { evaluate, GatewayError } from "../../../experience-prototypes/server/gateway";
-import { phrasesSchema } from "../src/shapeshift/phrases";
-import { normalizeKey } from "../src/shapeshift/replay";
-import { questions } from "../src/shapeshift/upstream/jev/questions";
+import { phrasesSchema } from "../src/one-box/phrases";
+import { normalizeKey } from "../src/one-box/replay";
+import { QUESTIONS } from "../src/one-box/questions";
 
 const key = process.env.AI_GATEWAY_API_KEY;
 
@@ -36,10 +36,10 @@ const scope = process.argv[2] ?? "all";
 
 if (scope !== "words" && scope !== "all") throw Error("Scope is words or all.");
 
-const out = new URL("../recordings/shapeshift.jsonl", import.meta.url);
+const out = new URL("../recordings/one-box.jsonl", import.meta.url);
 
 const doc = phrasesSchema.parse(
-  JSON.parse(readFileSync(new URL("../src/shapeshift/phrases.json", import.meta.url), "utf8")),
+  JSON.parse(readFileSync(new URL("../src/one-box/phrases.json", import.meta.url), "utf8")),
 );
 
 /** Every prefix key and the phrases that produce it. */
@@ -109,7 +109,7 @@ for (const k of todo) {
 
     try {
       const r = await evaluate(
-        { state: { text: k }, questions },
+        { state: { text: k }, questions: QUESTIONS },
         { apiKey: key, maxAttempts: 1, deadlineMs: 20_000 },
       );
 

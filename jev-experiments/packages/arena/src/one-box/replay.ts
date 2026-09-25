@@ -1,17 +1,11 @@
 /**
- * Replays one phrase as timed keystrokes through a classifier and upstream's calm-UI rules,
+ * Replays one phrase as timed keystrokes through a classifier and the calm rules (calm.ts),
  * and measures what the visitor would have seen. Answers come from a lookup (recorded, or a
  * local classifier), so a recording made once can be replayed under any request policy.
  */
-import {
-  activeIntent,
-  decide,
-  initialMemory,
-  type DecideMemory,
-  type UiState,
-} from "./upstream/decide";
-import type { IntentResult } from "./upstream/jev/types";
-import { noneResult } from "./upstream/jev/types";
+import { calm, cardOf, START, type Calm, type Shown } from "./calm";
+import { keyword } from "./keyword";
+import type { Reading } from "./questions";
 
 /** Frozen before any recording: a steady typist who pauses briefly between words. */
 export const TYPING = { msPerKey: 160, wordPauseMs: 240, debounceMs: 120, settleMs: 4000 } as const;
@@ -22,7 +16,7 @@ export const TYPING = { msPerKey: 160, wordPauseMs: 240, debounceMs: 120, settle
  */
 export type Policy = "cancel" | "latest";
 
-export type Answered = { result: IntentResult; latencyMs: number };
+export type Answered = { reading: Reading; latencyMs: number };
 
 /** undefined: the request failed or was not recorded; the UI keeps what it has. */
 export type AnswerFor = (key: string) => Answered | undefined;
@@ -44,7 +38,7 @@ export function keystrokes(phrase: string): Keystroke[] {
   return out;
 }
 
-export type Frame = { at: number; ui: UiState; text: string };
+export type Frame = { at: number; shown: Shown; text: string };
 
 export type Replay = {
   frames: Frame[];
@@ -54,24 +48,27 @@ export type Replay = {
   lastKeyAt: number;
 };
 
-const shown = (ui: UiState) =>
-  ui.kind === "choose" ? `choose:${ui.options.join("|")}` : `${ui.kind}:${activeIntent(ui) ?? ""}`;
+const label = (s: Shown) =>
+  s.kind === "choose" ? `choose:${s.options.join("|")}` : `${s.kind}:${cardOf(s) ?? ""}`;
+
+/** What upstream's box holds for text under two characters: nothing to ask about. */
+const BLANK = keyword("");
 
 export function replay(phrase: string, answerFor: AnswerFor, policy: Policy): Replay {
   const keys = keystrokes(phrase);
   const lastKeyAt = keys.at(-1)?.at ?? 0;
-  const frames: Frame[] = [{ at: 0, ui: initialMemory.ui, text: "" }];
-  let mem: DecideMemory = initialMemory;
+  const frames: Frame[] = [{ at: 0, shown: START.shown, text: "" }];
+  let state: Calm = START;
 
   let requests = 0,
     landed = 0,
     failed = 0;
 
-  const apply = (at: number, result: IntentResult, text: string) => {
-    mem = decide(mem, result, text);
+  const apply = (at: number, reading: Reading, text: string) => {
+    state = calm(state, reading, text);
 
-    if (shown(mem.ui) !== shown(frames[frames.length - 1].ui))
-      frames.push({ at, ui: mem.ui, text });
+    if (label(state.shown) !== label(frames[frames.length - 1].shown))
+      frames.push({ at, shown: state.shown, text });
   };
 
   /** Asks for `text` at `at`; returns when the answer lands (or undefined if it failed). */
@@ -85,7 +82,7 @@ export function replay(phrase: string, answerFor: AnswerFor, policy: Policy): Re
       return undefined;
     }
 
-    return { arrives: at + answer.latencyMs, result: answer.result, text };
+    return { arrives: at + answer.latencyMs, reading: answer.reading, text };
   };
 
   // What each keystroke wants: a reset below two characters, or a request once the debounce passes.
@@ -102,7 +99,7 @@ export function replay(phrase: string, answerFor: AnswerFor, policy: Policy): Re
   if (policy === "cancel") {
     for (const w of wants) {
       if (w.reset) {
-        apply(w.at, noneResult(), w.text);
+        apply(w.at, BLANK, w.text);
         continue;
       }
 
@@ -111,7 +108,7 @@ export function replay(phrase: string, answerFor: AnswerFor, policy: Policy): Re
       // The next keystroke aborts a request still in flight.
       if (flight && flight.arrives < w.next) {
         landed++;
-        apply(flight.arrives, flight.result, w.text);
+        apply(flight.arrives, flight.reading, w.text);
       }
     }
   } else {
@@ -134,7 +131,7 @@ export function replay(phrase: string, answerFor: AnswerFor, policy: Policy): Re
         inFlight = null;
         landed++;
 
-        if (!flight.stale) apply(flight.arrives, flight.result, flight.text);
+        if (!flight.stale) apply(flight.arrives, flight.reading, flight.text);
 
         if (queued !== null && normalizeKey(queued) !== normalizeKey(flight.text))
           inFlight = send(flight.arrives, queued);
@@ -148,7 +145,7 @@ export function replay(phrase: string, answerFor: AnswerFor, policy: Policy): Re
       if (w.reset) {
         if (flight) flight.stale = true;
         queued = null;
-        apply(w.at, noneResult(), w.text);
+        apply(w.at, BLANK, w.text);
       } else if (flight) queued = w.text;
       else inFlight = send(w.at, w.text);
     }
@@ -174,17 +171,19 @@ export type Outcome = {
 export function outcome(r: Replay, expected: Expected): Outcome {
   const ok = new Set([expected.intent, ...(expected.acceptable ?? [])]);
   const settled = r.frames.filter((f) => f.at <= r.lastKeyAt + TYPING.settleMs);
-  const last = settled[settled.length - 1].ui;
-  const right = (ui: UiState) => ui.kind === "committed" && ok.has(ui.intent);
+  const last = settled[settled.length - 1].shown;
+  const right = (s: Shown) => s.kind === "committed" && ok.has(s.intent);
 
   let timeToRight: number | undefined;
 
-  for (let i = settled.length - 1; i >= 0 && right(settled[i].ui); i--) timeToRight = settled[i].at;
+  for (let i = settled.length - 1; i >= 0 && right(settled[i].shown); i--)
+    timeToRight = settled[i].at;
 
   return {
-    finalRight: ok.has(activeIntent(last) ?? ""),
+    finalRight: ok.has(cardOf(last) ?? ""),
     committedAtEnd: last.kind === "committed",
-    wrongCommits: settled.filter((f) => f.ui.kind === "committed" && !ok.has(f.ui.intent)).length,
+    wrongCommits: settled.filter((f) => f.shown.kind === "committed" && !ok.has(f.shown.intent))
+      .length,
     changes: settled.length - 1,
     timeToRight,
     requests: r.requests,
