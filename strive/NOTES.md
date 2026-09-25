@@ -1190,3 +1190,57 @@ previous test, whose `afterEach` `stop()` closes the connection while its
 host still has a `host/record` pending, and bun blames it on the test
 running at the time. I haven't confirmed it. Next step: await the host's
 exit in `stop()`.
+
+## 2026-09-24: an unhandled rejection when the daemon goes mid-turn
+
+"a learner resumes after a restart" failed 2 in 30 runs of
+`learner.test.ts`, in ~5 ms, with `host/record: connection closed`. The
+error belonged to the test before it: `Host` started turns with
+`void this.drain()`, so once the connection closed under a running turn,
+the record it was making rejected and nothing handled it; bun blames the
+test running at that moment. The background drain now catches, stays quiet
+once the connection has closed, and logs anything else.
+`losing the daemon mid-turn leaves no unhandled rejection` (resume.test.ts)
+failed before. After: 0/30.
+
+## 2026-09-24: what bb (get-bb/bb) suggests for strive's learning loop
+
+Two studies of bb (github.com/get-bb/bb, MIT, "the agent IDE that builds
+itself"), run hands-on without model spend.
+
+- **How bb improves itself.** In its repo, agents reproduce issues and open
+  fix PRs with a failing-first regression test, and maintainers merge
+  (100% agent-authored lately, no auto-merge). Its gates: a private corpus
+  of 307 real threads replayed into snapshots, where any diff must name the
+  PR that caused it; ratchets whose baselines may only shrink; and
+  verification recipes that fail when the source drifts from them. At
+  runtime, "builds itself" means agents write full-trust plugins into your
+  install. Memory, skills and global instructions are written unreviewed,
+  and nothing measures whether a learned thing helped.
+- **Found in strive, fixed.** Work sessions could write `.strive/memory.md`
+  and skills directly, around proposals (e706b1a).
+- **To adopt, in order:**
+  1. M10 replay shaped like bb's corpus: tasks mined from journals with
+     checkable outcomes (a command that went red to green, a final test exit
+     0), run 3 times with and without the change, recording whether the
+     skill loaded. The corpus stays local, with a redaction sweep that fails
+     loudly.
+  2. Predictions a machine can check (M11): a small predicate beside the
+     prose, evaluated by the daemon on each new work journal, tallied, and
+     suggesting (never doing) a scoped rollback.
+  3. Cheap triggers before paid ones: a deterministic pre-filter for
+     corrections, interrupts, declined approvals and failed-then-fixed
+     commands, with a daily cap.
+  4. Staleness: fingerprint the commands and paths a bullet names, and flag
+     it when they change or the command later fails.
+  5. Review UX: cited entries inline, the judge's reasons by criterion,
+     amend-then-accept (re-running the checks), and blame per bullet.
+  6. A learned verification check as an artifact (path glob → a command to
+     run after the turn). Plugins, hooks and harness code come last, never
+     loaded live.
+  7. Changes to strive's own repo: the learner files a draft issue with
+     evidence, and an ordinary session writes the failing test and fix
+     behind CI and replay; a person merges.
+- **Not to copy:** unreviewed writes to anything injected into every prompt;
+  full-trust code behind a client-side confirmation; counting retrievals as
+  benefit; regex filters as the main defense; committed session corpora.

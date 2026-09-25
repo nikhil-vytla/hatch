@@ -330,6 +330,8 @@ export class Host {
   private readonly models: ReturnType<typeof createStriveModels>;
   private readonly mode: AgentMode;
   private readonly prompts = new PromptReader();
+  /** The daemon's connection closed: nothing more can be recorded. */
+  private lost = false;
 
   constructor(
     private readonly client: StriveClient,
@@ -338,6 +340,22 @@ export class Host {
   ) {
     this.models = createStriveModels(model(config));
     this.mode = modeFor(client, sessionId, config);
+    client.onClose(() => {
+      this.lost = true;
+    });
+  }
+
+  /**
+   * Runs waiting prompts in the background. A turn ends its own failures by
+   * recording them; what escapes is a record that couldn't be made, which
+   * once the daemon has gone is expected and needs no word.
+   */
+  private async kick() {
+    try {
+      await this.drain();
+    } catch (e) {
+      if (!this.lost) console.error(`a turn stopped: ${describeError(e)}`);
+    }
   }
 
   /** Resumes from the journal and handles prompts as they arrive. */
@@ -410,7 +428,7 @@ export class Host {
     this.early = undefined;
 
     for (const entry of early) this.onEntry(entry);
-    void this.drain();
+    void this.kick();
   }
 
   onEntry(entry: Entry) {
@@ -427,7 +445,7 @@ export class Host {
 
     if (text !== undefined) {
       this.queued.push({ text, seq: entry.seq });
-      void this.drain();
+      void this.kick();
     }
   }
 

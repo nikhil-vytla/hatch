@@ -215,3 +215,51 @@ test("a compaction covers what the conversation holds, not the latest entry the 
 
   expect(recorded.find((e) => e.type === "compacted")).toMatchObject({ uptoSeq: 4, summary: "the summary" });
 });
+
+// The daemon can go away mid-turn (it stopped, or restarted). What the host
+// was about to record then fails; that must end the turn quietly, not leave a
+// rejection no one handles.
+test("losing the daemon mid-turn leaves no unhandled rejection", async () => {
+  const model = new FakeAnthropic([{ text: "answered" }]).start();
+  const unhandled: string[] = [];
+  const onUnhandled = (e: Error) => unhandled.push(e.message);
+  process.on("unhandledRejection", onUnhandled);
+  let client: StriveClient | undefined;
+  let seq = 2;
+
+  const entries: Entry[] = [
+    { seq: 1, tsMs: 0, event: { type: "sessionStarted", format: 1, cwd: "/tmp/r", striveVersion: "x" } },
+    { seq: 2, tsMs: 0, event: { type: "userMessage", text: "A" } },
+  ];
+
+  const daemon = new FakeDaemon({
+    "host/register": () => ({ result: config(model.url) }),
+    "session/attach": () => ({ result: { session: { id: ID, cwd: "/tmp/r", createdAtMs: 0 }, entries } }),
+    "host/record": (p) => {
+      // The connection drops once the turn has started: the reply is lost too.
+      if (p.event.type === "turnStarted") setTimeout(() => client?.close(), 0);
+
+      return { result: { seq: ++seq } };
+    },
+    "host/stream": () => ({ result: {} }),
+  });
+
+  await daemon.listen();
+  stop = () => {
+    process.off("unhandledRejection", onUnhandled);
+    client?.close();
+    daemon.close();
+    model.stop();
+  };
+
+  ({ client } = await runHost(daemon.socket, ID));
+  const deadline = Date.now() + 5_000;
+
+  while (model.requests.length === 0 && Date.now() < deadline) await Bun.sleep(20);
+  // An absence can only be checked over a window: the turn's failed record
+  // rejects within a few ms of the model's reply.
+  await Bun.sleep(300);
+
+  expect(model.requests.length).toBeGreaterThan(0);
+  expect(unhandled).toEqual([]);
+});
