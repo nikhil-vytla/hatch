@@ -19,11 +19,21 @@ struct Ws {
     c: Rpc,
 }
 
+/// A connection that waits up to 30s for each reply. A checkpoint or rewind
+/// runs a dozen or more git processes one after another; on a loaded
+/// machine that took longer than the 5s default, and the test failed for
+/// the load, not the code.
+fn slow_rpc(env: &Env) -> Rpc {
+    let mut c = env.rpc();
+    c.wait_up_to(std::time::Duration::from_secs(30));
+    c
+}
+
 impl Ws {
     fn with_vars(vars: &[(&str, &str)]) -> Self {
         let env = Env::with_vars(vars);
         let dir = tempfile::Builder::new().prefix("strv-cp").tempdir_in("/tmp").unwrap();
-        let mut c = env.rpc();
+        let mut c = slow_rpc(&env);
         let id = c.ok("session/create", &json!({"cwd": dir.path().canonicalize().unwrap()}))["id"]
             .as_str()
             .unwrap()
@@ -229,7 +239,7 @@ fn rewinding_while_an_effect_runs_is_refused() {
     w.write("a.txt", "a1");
     w.prompt("first");
     w.c.ok("session/approvals", &json!({"id": w.id, "mode": "fullAuto"}));
-    let mut agent = w.env.rpc();
+    let mut agent = slow_rpc(&w.env);
     let params =
         json!({"id": w.id, "callId": "call_1", "request": {"kind": "bash", "command": "sleep 2; echo a3 > a.txt"}});
     let running = std::thread::spawn(move || agent.ok("effect/run", &params));
@@ -349,14 +359,14 @@ fn rewinding_while_another_session_in_the_same_directory_is_changing_files_is_re
     let mut w = Ws::new();
     w.write("a.txt", "a1");
     w.prompt("first");
-    let mut other = w.env.rpc();
+    let mut other = slow_rpc(&w.env);
     let cwd = w.dir.path().canonicalize().unwrap();
     let id = other.ok("session/create", &json!({"cwd": cwd}))["id"].as_str().unwrap().to_string();
     other.ok("session/approvals", &json!({"id": id, "mode": "fullAuto"}));
     let params =
         json!({"id": id, "callId": "call_1", "request": {"kind": "bash", "command": "sleep 2; echo b > b.txt"}});
     let running = std::thread::spawn(move || other.ok("effect/run", &params));
-    let mut watcher = w.env.rpc();
+    let mut watcher = slow_rpc(&w.env);
     common::wait_for("the other session's command to start", std::time::Duration::from_secs(5), || {
         let r = watcher.ok("session/read", &json!({"id": id}));
         r["entries"].as_array().unwrap().iter().any(|e| e["event"]["type"] == "effectStarted")

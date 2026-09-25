@@ -1353,3 +1353,13 @@ Deferred:
 - Held-out session ids in the judge's head line aren't turned into
   session titles.
 - No amend-then-accept or per-bullet blame (bb item 5's other half).
+
+## 2026-09-25: the checkpoint tests wait for git as long as a loaded machine needs
+
+Checkpoint tests failed with 5 s read timeouts three times now, each time
+with other agents' builds running (load average ~7). The machine's `git`
+is a wrapper at 40–60 ms a call against 20 ms for Homebrew's, not seconds.
+A rewind runs a dozen or more git processes in turn, so under load its reply
+outlasts the default 5 s read. As with the TUI's rewind test, the fix is
+the test's deadline: checkpoint tests' connections wait up to 30 s for a
+reply. Nothing sleeps; the test still waits on the reply it acts on.
