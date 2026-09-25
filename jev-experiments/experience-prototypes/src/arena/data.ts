@@ -135,6 +135,34 @@ export function formatNumber(metric: Pick<MetricDef, "unit">, value?: number, me
   }
 }
 
+/**
+ * Formats a row of axis ticks with one unit and the fewest decimals that keep every tick
+ * distinct: "0%, 20%, 40%" rather than "0.0%, 20.0%", and seconds throughout once the
+ * axis passes one second rather than "500 ms, 1.00 s".
+ */
+export function tickFormat(metric: Pick<MetricDef, "unit">, ticks: number[]) {
+  const max = Math.max(0, ...ticks.map(Math.abs));
+
+  const [scale, suffix] =
+    metric.unit === "%"
+      ? [100, "%"]
+      : metric.unit === "ms"
+        ? max >= 1000
+          ? [0.001, " s"]
+          : [1, " ms"]
+        : metric.unit === "s"
+          ? [1, " s"]
+          : [1, ""];
+
+  const scaled = ticks.map((t) => t * scale);
+
+  const digits = [0, 1, 2, 3, 4].find((d) =>
+    scaled.every((v) => Math.abs(Number(v.toFixed(d)) - v) < 1e-9),
+  );
+
+  return (t: number) => `${(t * scale).toFixed(digits ?? 4)}${suffix}`;
+}
+
 /** Formats an estimate; per-seed estimates are means. */
 export const formatValue = (metric: Pick<MetricDef, "unit">, estimate?: Estimate) =>
   formatNumber(metric, estimate?.value, Boolean(estimate?.perItem));
