@@ -27,12 +27,14 @@ export type Keystroke = { at: number; text: string };
 export const normalizeKey = (text: string) => text.toLowerCase().replace(/\s+/g, " ").trim();
 
 export function keystrokes(phrase: string): Keystroke[] {
+  // Whole characters: an emoji is one keystroke, never half of one.
+  const chars = Array.from(phrase);
   const out: Keystroke[] = [];
   let at = 0;
 
-  for (let i = 1; i <= phrase.length; i++) {
-    if (i > 1) at += TYPING.msPerKey + (phrase[i - 2] === " " ? TYPING.wordPauseMs : 0);
-    out.push({ at, text: phrase.slice(0, i) });
+  for (let i = 1; i <= chars.length; i++) {
+    if (i > 1) at += TYPING.msPerKey + (chars[i - 2] === " " ? TYPING.wordPauseMs : 0);
+    out.push({ at, text: chars.slice(0, i).join("") });
   }
 
   return out;
