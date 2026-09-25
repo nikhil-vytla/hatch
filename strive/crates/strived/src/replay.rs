@@ -1,0 +1,527 @@
+//! The replay gate in the daemon (ADR-0018): past tasks of the project,
+//! mined from its work journals, run again by the agent with and without a
+//! proposal, each in a scratch copy of the files as they were.
+//!
+//! Every run is a session of its own (`kind: replay`): the real host, the
+//! gateway and the sandbox, full-auto approvals with no one attached, and a
+//! budget carved from a hold on the learning session's. Its commands may
+//! write only in its scratch area, which lies outside the project; its
+//! agent's writes elsewhere ask, and are refused. The task's check command
+//! runs afterwards as an effect of that session, sandboxed and journaled.
+
+use std::collections::{HashMap, HashSet};
+use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex as StdMutex};
+use std::time::Duration;
+
+use strive_budget::{Ledger, Limits, Refusal, format_usd};
+use strive_learning::replay::{Task, TaskTally};
+use strive_proto::{
+    ApprovalMode, Digest, EffectOutcome, EffectRecord, EffectRequest, Entry, Event, Proposal, ReplayRun, SessionKind,
+    TurnEnd, Verdict,
+};
+
+use crate::server::State;
+use crate::sessions::{Push, ReplayDone, SessionId};
+
+/// How long a run's host has to start its turn.
+const START_LIMIT: Duration = Duration::from_secs(60);
+/// How long past the turn's own time limit a run is waited for.
+const TURN_GRACE: Duration = Duration::from_secs(60);
+/// The check command's time limit.
+const CHECK_TIMEOUT_MS: u64 = 300_000;
+/// The call id a run's check is journaled under.
+const CHECK_CALL: &str = "replay-check";
+
+/// What the replay gate does with a proposal.
+pub enum Plan {
+    /// Journal it as skipped, for this reason.
+    Now(String),
+    /// Run these tasks.
+    Run(Replay),
+}
+
+#[derive(Clone)]
+pub struct Replay {
+    model: String,
+    cap: u64,
+    runs: u32,
+    tasks: Vec<Task>,
+    /// The learned files as the learner was shown them, in every run.
+    learned: Vec<(String, Digest)>,
+    /// The proposal's file and content, in the runs with the change.
+    path: String,
+    content: String,
+}
+
+/// Replays running, by learning session and proposal, and the sessions
+/// their runs use, with whether the gateway refused one of their calls
+/// for want of budget.
+#[derive(Default)]
+pub struct Running {
+    proposals: StdMutex<HashSet<(SessionId, u64)>>,
+    runs: StdMutex<HashMap<SessionId, bool>>,
+}
+
+impl Running {
+    pub fn has(&self, sid: &SessionId, id: u64) -> bool {
+        crate::sync::lock(&self.proposals).contains(&(sid.clone(), id))
+    }
+
+    /// Replays running now: they keep the daemon from idling out.
+    pub fn count(&self) -> u32 {
+        u32::try_from(crate::sync::lock(&self.proposals).len()).unwrap_or(u32::MAX)
+    }
+
+    /// The gateway refused a call of `session` for its budget.
+    pub fn note_refused(&self, session: &SessionId) {
+        if let Some(refused) = crate::sync::lock(&self.runs).get_mut(session) {
+            *refused = true;
+        }
+    }
+}
+
+/// Removes a replay from `Running` however it ends.
+struct Mark {
+    state: Arc<State>,
+    key: (SessionId, u64),
+}
+
+impl Drop for Mark {
+    fn drop(&mut self) {
+        crate::sync::lock(&self.state.learning.replaying.proposals).remove(&self.key);
+    }
+}
+
+fn skipped(why: impl Into<String>) -> Plan {
+    Plan::Now(format!("not run: {}", why.into()))
+}
+
+/// The replayed agent's model: `replay.model`, else the cheaper of the
+/// agent's and the judge's, by output price.
+fn model(state: &State) -> String {
+    if let Some(m) = &state.settings.replay.model {
+        return m.clone();
+    }
+    let price = |m: &str| state.models.get(m).map_or(u64::MAX, |p| p.price.output.saturating_add(p.price.input));
+    let agent = state.settings.model.clone();
+    match &state.settings.judge_model {
+        Some(judge) if price(judge) < price(&agent) => judge.clone(),
+        _ => agent,
+    }
+}
+
+/// Where a replay session's commands may write besides its workspace: the
+/// scratch area's `tmp`, beside the `work` directory it runs in.
+pub fn temp_of(cwd: &str) -> Option<PathBuf> {
+    Path::new(cwd).parent().map(|scratch| scratch.join("tmp"))
+}
+
+/// Decides whether the proposal can be replayed, and if so which tasks.
+/// `learning` is the learning session's journal; `made_at_ms` is when the
+/// proposal was made, so a later session isn't mined for it.
+pub fn plan(state: &State, cwd: &str, proposal: &Proposal, made_at_ms: u64, learning: &[Entry]) -> Plan {
+    let settings = &state.settings.replay;
+    let cap = settings.budget_micros();
+    if cap == 0 {
+        return skipped("replay is off (\"replay\": {\"budgetUsd\": 0} in ~/.strive/settings.json)");
+    }
+    if state.settings.sandbox == crate::settings::SandboxSetting::Off || !crate::effects::sandbox_available() {
+        return skipped(
+            "replayed commands run only in the OS sandbox, and there's none here (or \"sandbox\" is \"off\")",
+        );
+    }
+    if !crate::hosts::Hosts::available() {
+        return skipped(
+            "no agent host can be started to replay tasks (STRIVE_HOST is \"none\", or strive-tui is missing)",
+        );
+    }
+    let model = model(state);
+    if state.models.get(&model).is_none() {
+        return skipped(format!(
+            "no price is known for the replay's model {model}; set \"replay\": {{\"model\": ...}} or add it under \"models\" in ~/.strive/settings.json"
+        ));
+    }
+    let provider = crate::methods::provider_of(&model);
+    if state.credentials.get(provider).is_none() {
+        return skipped(format!(
+            "there's no {provider} API key for the replayed agent; `strive auth {provider}` sets one"
+        ));
+    }
+    let Ok(path) = strive_learning::relative_path(&proposal.artifact) else {
+        return skipped("the proposal's file has no path in the project");
+    };
+    let cited: Vec<&str> = proposal.evidence.iter().map(|e| e.session.as_str()).collect();
+    let tasks = tasks(state, cwd, &cited, made_at_ms, settings.tasks);
+    if tasks.is_empty() {
+        return skipped(
+            "no past task could be replayed: no session of this project that the proposal doesn't cite ran a \
+             command that failed and later passed",
+        );
+    }
+    let learned = crate::judge::shown_files(learning);
+    Plan::Run(Replay { model, cap, runs: settings.runs, tasks, learned, path, content: proposal.content.clone() })
+}
+
+/// Up to `limit` tasks from the project's newest work sessions the proposal
+/// doesn't cite, begun before it, whose journals verify and whose
+/// checkpoints are there to start from.
+fn tasks(state: &State, cwd: &str, cited: &[&str], made_at_ms: u64, limit: usize) -> Vec<Task> {
+    let Ok((sessions, _)) = state.sessions.list(Some(cwd), SessionKind::Work) else { return Vec::new() };
+    let mut out = Vec::new();
+    for s in sessions.into_iter().filter(|s| !cited.contains(&s.id.as_str()) && s.created_at_ms <= made_at_ms) {
+        let Some(sid) = SessionId::parse(&s.id) else { continue };
+        let Some(entries) = crate::judge::verified(state, cwd, &s.id) else { continue };
+        if !state.sessions.checkpoint_dir(&sid).join("HEAD").exists() {
+            continue;
+        }
+        out.extend(strive_learning::replay::mine(&s.id, &entries));
+        if out.len() >= limit {
+            break;
+        }
+    }
+    out.truncate(limit);
+    out
+}
+
+/// Starts the replay of proposal `id` in the background. Call with the
+/// project's lock held, so no other look starts one too.
+pub fn start(state: &Arc<State>, sid: &SessionId, id: u64, replay: Replay) {
+    let key = (sid.clone(), id);
+    if !crate::sync::lock(&state.learning.replaying.proposals).insert(key.clone()) {
+        return;
+    }
+    let mark = Mark { state: state.clone(), key };
+    let (state, sid) = (state.clone(), sid.clone());
+    tokio::spawn(async move {
+        match state.sessions.hold(&sid, id, replay.cap).await {
+            Ok(Ok(_)) => {
+                let (verdict, detail, done) = run(&state, &sid, id, replay).await;
+                if let Err(e) = crate::learning::replayed(&state, &sid, id, verdict, detail, Some(done)).await {
+                    crate::log!("could not journal the replay of proposal #{id}: {e:?}");
+                }
+            }
+            Ok(Err(refusal)) => {
+                let detail = format!("not run: {}", unaffordable(&refusal, replay.cap));
+                if let Err(e) = crate::learning::replayed(&state, &sid, id, Verdict::Skipped, detail, None).await {
+                    crate::log!("could not journal the replay of proposal #{id}: {e:?}");
+                }
+            }
+            Err(e) => crate::log!("could not hold the budget for the replay of proposal #{id}: {e:?}"),
+        }
+        drop(mark);
+    });
+}
+
+fn unaffordable(r: &Refusal, cap: u64) -> String {
+    match *r {
+        Refusal::Usd { limit, committed, .. } => format!(
+            "the replay may spend up to {} (\"replay\": {{\"budgetUsd\"}} in ~/.strive/settings.json), but only {} of the learning session's {} budget is left",
+            format_usd(cap),
+            format_usd(limit.saturating_sub(committed)),
+            format_usd(limit)
+        ),
+        Refusal::Tokens { limit, committed, .. } => {
+            format!("the learning session has used {committed} of its {limit} tokens")
+        }
+    }
+}
+
+/// One run: how its check went, what it cost, and whether the gateway
+/// refused one of its calls for want of budget.
+struct Ran {
+    session: String,
+    /// Whether the check passed, or why the run couldn't go on.
+    passed: Result<bool, String>,
+    cost: u64,
+    tokens: u64,
+    out_of_budget: bool,
+}
+
+/// Every run, interleaved (without, with, without, ...) so a cap that runs
+/// out doesn't fall on one side. Returns the verdict, its detail, and what
+/// `ReplayFinished` records.
+async fn run(state: &Arc<State>, learning: &SessionId, id: u64, r: Replay) -> (Verdict, String, ReplayDone) {
+    let mut done = ReplayDone { proposal: id, cost_usd_micros: 0, tokens: 0, runs: Vec::new() };
+    let mut tallies = Vec::new();
+    let mut stopped: Option<String> = None;
+    'tasks: for task in &r.tasks {
+        let mut tally = TaskTally {
+            session: task.session.clone(),
+            prompt_seq: task.prompt_seq,
+            check: task.check.clone(),
+            ..TaskTally::default()
+        };
+        for _ in 0..r.runs {
+            for with_change in [false, true] {
+                let left = r.cap.saturating_sub(done.cost_usd_micros);
+                let ran = match once(state, &r, task, with_change, left).await {
+                    Ok(ran) => ran,
+                    Err(why) => {
+                        stopped = Some(format!("a run couldn't be set up ({why})"));
+                        break 'tasks;
+                    }
+                };
+                done.cost_usd_micros = done.cost_usd_micros.saturating_add(ran.cost);
+                done.tokens = done.tokens.saturating_add(ran.tokens);
+                let passed = match ran.passed {
+                    Ok(passed) => passed,
+                    Err(why) => {
+                        stopped = Some(format!("a run couldn't finish ({why}; replay session {})", ran.session));
+                        break 'tasks;
+                    }
+                };
+                done.runs.push(ReplayRun {
+                    session: ran.session,
+                    task_session: task.session.clone(),
+                    task_seq: task.prompt_seq,
+                    with_change,
+                    passed,
+                });
+                let (passed_count, runs) = if with_change {
+                    (&mut tally.with_passed, &mut tally.with_runs)
+                } else {
+                    (&mut tally.without_passed, &mut tally.without_runs)
+                };
+                *runs += 1;
+                *passed_count += u32::from(passed);
+                if ran.out_of_budget {
+                    stopped = Some(format!(
+                        "the replay's cap of {} ran out after {} runs; raise \"replay\": {{\"budgetUsd\"}} in ~/.strive/settings.json",
+                        format_usd(r.cap),
+                        done.runs.len()
+                    ));
+                    break 'tasks;
+                }
+            }
+        }
+        tallies.push(tally);
+    }
+    crate::log!("replay of proposal #{id} in learning session {} done", learning.as_str());
+    let cost = format!("{} of its {} cap", format_usd(done.cost_usd_micros), format_usd(r.cap));
+    if let Some(why) = stopped {
+        return (Verdict::Skipped, format!("not run to the end: {why}\n{}, {cost}", r.model), done);
+    }
+    let (verdict, detail) = strive_learning::replay::verdict(&tallies, &r.model, &cost);
+    (verdict, detail, done)
+}
+
+/// A scratch area outside the project: `work` is the copy the agent runs
+/// in, `tmp` where its commands may also write. Removed when dropped.
+struct Scratch {
+    _dir: tempfile::TempDir,
+    root: PathBuf,
+    work: PathBuf,
+}
+
+fn scratch(project: &Path) -> std::io::Result<Scratch> {
+    let dir = tempfile::Builder::new().prefix("strive-replay-").tempdir_in(std::env::temp_dir())?;
+    let root = dir.path().canonicalize()?;
+    if root.starts_with(project) || project.starts_with(&root) {
+        return Err(std::io::Error::other(format!(
+            "the temp directory {} overlaps the project {}",
+            root.display(),
+            project.display()
+        )));
+    }
+    let work = root.join("work");
+    std::fs::create_dir(&work)?;
+    std::fs::create_dir(root.join("tmp"))?;
+    Ok(Scratch { _dir: dir, root, work })
+}
+
+/// Writes `bytes` at `rel` under `root`, making its directories.
+fn put(root: &Path, rel: &str, bytes: &[u8]) -> std::io::Result<()> {
+    let path = root.join(rel);
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    std::fs::write(path, bytes)
+}
+
+/// The task's files as they were before its prompt, with the learned files
+/// as the learner was shown them in place of the checkpoint's, and the
+/// proposal's file when `with_change`.
+fn materialize(state: &State, r: &Replay, task: &Task, with_change: bool, s: &Scratch) -> std::io::Result<()> {
+    let sid = SessionId::parse(&task.session).ok_or_else(|| std::io::Error::other("the task's session id"))?;
+    let shadow = crate::checkpoints::Shadow::new(&state.sessions.checkpoint_dir(&sid), &s.work)
+        .ok_or_else(|| std::io::Error::other("checkpoints need git, which isn't available"))?;
+    let index = s.root.join("index");
+    shadow.export(&task.commit, &index)?;
+    std::fs::remove_file(&index)?;
+    let memory = s.work.join(strive_learning::MEMORY_PATH);
+    if memory.symlink_metadata().is_ok() {
+        std::fs::remove_file(&memory)?;
+    }
+    let skills = s.work.join(strive_learning::SKILLS_DIR);
+    if skills.symlink_metadata().is_ok() {
+        std::fs::remove_dir_all(&skills)?;
+    }
+    for (rel, digest) in &r.learned {
+        put(&s.work, rel, &state.cas.get(digest)?)?;
+    }
+    if with_change {
+        put(&s.work, &r.path, r.content.as_bytes())?;
+    }
+    Ok(())
+}
+
+async fn once(state: &Arc<State>, r: &Replay, task: &Task, with_change: bool, left: u64) -> Result<Ran, String> {
+    let project = state
+        .sessions
+        .peek(&SessionId::parse(&task.session).ok_or("the task's session id isn't valid")?)
+        .map(|i| PathBuf::from(i.cwd))
+        .ok_or("the task's session is gone")?;
+    let s = scratch(&project).map_err(|e| format!("making a scratch copy: {e}"))?;
+    let (st, rr, t) = (state.clone(), r.clone(), task.clone());
+    let s = tokio::task::spawn_blocking(move || materialize(&st, &rr, &t, with_change, &s).map(|()| s))
+        .await
+        .map_err(|e| e.to_string())?
+        .map_err(|e| format!("copying checkpoint {} of session {}: {e}", task.commit, task.session))?;
+    let cwd = s.work.display().to_string();
+    let limits = Limits { usd_micros: Some(left), tokens: None };
+    let info = state
+        .sessions
+        .create(cwd, limits, ApprovalMode::FullAuto, Some(SessionKind::Replay))
+        .await
+        .map_err(|e| format!("creating a replay session: {e:?}"))?;
+    let sid = SessionId::parse(&info.id).ok_or("the replay session's id isn't valid")?;
+    crate::sync::lock(&state.learning.replaying.runs).insert(sid.clone(), false);
+    let result = drive(state, &sid, r, task, &project, &s).await;
+    let refused = crate::sync::lock(&state.learning.replaying.runs).remove(&sid).unwrap_or(false);
+    state.hosts.stop(&sid);
+    let (cost, tokens) = spent(state, &sid, left);
+    state.sessions.close(&sid).await;
+    drop(s);
+    Ok(Ran { session: info.id, passed: result, cost, tokens, out_of_budget: refused })
+}
+
+/// The run's session from its prompt to its check: whether the check passed.
+/// `text` with the project's directory, under each name it may go by
+/// (`/private/tmp/p` is also `/tmp/p` on macOS), made the scratch copy's.
+fn relocated(text: &str, project: &Path, work: &Path) -> String {
+    let (from, to) = (project.display().to_string(), work.display().to_string());
+    let text = strive_learning::replay::relocate(text, &from, &to);
+    match from.strip_prefix("/private") {
+        Some(alias) if alias.starts_with('/') => strive_learning::replay::relocate(&text, alias, &to),
+        _ => text,
+    }
+}
+
+async fn drive(
+    state: &Arc<State>,
+    sid: &SessionId,
+    r: &Replay,
+    task: &Task,
+    project: &Path,
+    s: &Scratch,
+) -> Result<bool, String> {
+    let set = state.sessions.set_model(sid, r.model.clone()).await.map_err(|e| format!("{e:?}"))?;
+    set.map_err(|why| format!("choosing the model: {why}"))?;
+    // Attached (not as a person) before the prompt, so its turn can't end unseen.
+    let (_, _, mut stream) = state.sessions.attach(sid, 0, false).await.map_err(|e| format!("{e:?}"))?;
+    let prompt = relocated(&task.prompt, project, &s.work);
+    state.sessions.prompt(sid, prompt, None).await.map_err(|e| format!("{e:?}"))?;
+    let log = state.sessions.session_dir(sid).join("host.log");
+    state.hosts.ensure(sid, &state.home.socket(), &log);
+    let started = tokio::time::Instant::now();
+    let turn_limit = Duration::from_secs(state.settings.turn_seconds) + TURN_GRACE;
+    let mut turn: Option<(u64, tokio::time::Instant)> = None;
+    loop {
+        let deadline = turn.map_or(started + START_LIMIT, |(_, at)| at + turn_limit);
+        let push = match tokio::time::timeout_at(deadline, stream.recv()).await {
+            Ok(Some(push)) => push,
+            Ok(None) => return Err("the replay session's journal stopped".into()),
+            Err(_) if turn.is_none() => {
+                return Err(format!(
+                    "the agent host didn't start within {}s; see {}",
+                    START_LIMIT.as_secs(),
+                    log.display()
+                ));
+            }
+            Err(_) => {
+                // Over its time: the check still runs on what it left.
+                let _ = state.sessions.push(sid, Push::Interrupt).await; // the host may be gone
+                break;
+            }
+        };
+        let Push::Entry(e) = push else { continue };
+        match e.event {
+            Event::TurnStarted { turn: n, .. } if turn.is_none() => turn = Some((n, tokio::time::Instant::now())),
+            Event::TurnEnded { turn: n, reason } if turn.is_some_and(|(t, _)| t == n) => {
+                if let TurnEnd::Failed { error } = &reason {
+                    crate::log!("replay session {}: the turn failed: {error}", sid.as_str());
+                }
+                break;
+            }
+            _ => {}
+        }
+    }
+    state.hosts.stop(sid);
+    check(state, sid, &relocated(&task.check, project, &s.work), s).await
+}
+
+/// Runs the task's check in the run's workspace, sandboxed, as an effect of
+/// its session: whether it exited 0.
+async fn check(state: &Arc<State>, sid: &SessionId, command: &str, s: &Scratch) -> Result<bool, String> {
+    let scope = crate::effects::Scope {
+        workspace: s.work.clone(),
+        strive_home: state.home.root.canonicalize().map_err(|e| e.to_string())?,
+        unconfined: false,
+        temp: Some(s.root.join("tmp")),
+    };
+    let request = EffectRequest::Bash { command: command.to_string(), timeout_ms: Some(CHECK_TIMEOUT_MS) };
+    let record = EffectRecord::Bash { command: command.to_string(), timeout_ms: CHECK_TIMEOUT_MS };
+    let Some(_running) = state.sessions.begin_effect() else { return Err("the daemon is stopping".into()) };
+    let effect = state.sessions.start_effect(sid, CHECK_CALL.into(), record).await.map_err(|e| format!("{e:?}"))?;
+    let started = std::time::Instant::now();
+    let (gate, target) = crate::effects::gate(&scope, &request, ApprovalMode::FullAuto);
+    let result = match gate {
+        crate::effects::Gate::Allow => {
+            let files = state.sessions.workspaces.effect(vec![s.work.clone()]).await;
+            let cancelled = std::sync::atomic::AtomicBool::new(false);
+            tokio::task::spawn_blocking(move || {
+                let _held = files;
+                crate::effects::perform(&scope, &request, &target, &cancelled)
+            })
+            .await
+            .map_err(|e| e.to_string())?
+        }
+        crate::effects::Gate::Ask(what) => crate::effects::Result::Refused(format!("{what} would need approval")),
+        crate::effects::Gate::Deny(why) => crate::effects::Result::Refused(why),
+    };
+    let (outcome, passed) = match result {
+        crate::effects::Result::Done { text, exit_code, truncated } => {
+            let output = state.cas.put(text.as_bytes()).map_err(|e| e.to_string())?;
+            (EffectOutcome::Done { output, exit_code, truncated }, exit_code == Some(0))
+        }
+        crate::effects::Result::Refused(reason) => (EffectOutcome::Refused { reason }, false),
+    };
+    let ms = u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX);
+    state.sessions.finish_effect(sid, effect, outcome, ms).await.map_err(|e| format!("{e:?}"))?;
+    Ok(passed)
+}
+
+/// What the run's session spent, from its journal: calls left open are
+/// charged their reservation, and a journal that can't be read its whole
+/// budget, `left`.
+fn spent(state: &State, sid: &SessionId, left: u64) -> (u64, u64) {
+    match state.sessions.read(sid) {
+        Ok((_, report)) => {
+            let events: Vec<Event> = report.entries.into_iter().map(|e| e.event).collect();
+            let l = Ledger::replay(&events);
+            (l.spent_usd(), l.spent_tokens())
+        }
+        Err(e) => {
+            crate::log!("could not read replay session {} to charge it: {e:?}", sid.as_str());
+            (left, 0)
+        }
+    }
+}
+
+/// Whether the journal already has proposal `id`'s replay verdict.
+pub fn has_verdict(entries: &[Entry], id: u64) -> bool {
+    entries.iter().any(
+        |e| matches!(&e.event, Event::GateFinished { proposal, gate: strive_proto::Gate::Replay, .. } if *proposal == id),
+    )
+}

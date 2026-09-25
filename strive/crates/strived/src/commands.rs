@@ -128,6 +128,12 @@ pub fn describe(e: &Entry) -> String {
         Event::ProposalApplied { proposal, before: None, .. } => format!("proposal #{proposal} applied: file created"),
         Event::ProposalApplied { proposal, .. } => format!("proposal #{proposal} applied: file replaced"),
         Event::ProposalRolledBack { proposal, by } => format!("proposal #{proposal} rolled back by {by}"),
+        Event::ReplayStarted { proposal, reserved_usd_micros } => {
+            format!("proposal #{proposal}: replaying past tasks, holding up to {}", format_usd(*reserved_usd_micros))
+        }
+        Event::ReplayFinished { proposal, cost_usd_micros, runs, .. } => {
+            format!("proposal #{proposal}: {} replay runs done · {}", runs.len(), format_usd(*cost_usd_micros))
+        }
         Event::ModelSet { model } => format!("model: {model}"),
         Event::Compacted { upto_seq, summary } => {
             format!("conversation up to #{upto_seq} summarized ({} characters)", summary.len())
@@ -205,9 +211,12 @@ pub async fn log(c: &mut Client, id: Option<String>, json: bool) -> Result<ExitC
 pub async fn verify(c: &mut Client, id: Option<String>, all: bool) -> Result<ExitCode> {
     let ids = if all {
         let (mut sessions, unreadable) = listing(c, true).await?;
-        // Learning journals record who accepted what: they're checked too.
-        let learning = SessionListParams { cwd: None, kind: Some(strive_proto::SessionKind::Learning) };
-        sessions.extend(c.request::<SessionList>(learning).await?.sessions);
+        // Learning journals record who accepted what, and replays what the
+        // replay gate saw: they're checked too.
+        for kind in [strive_proto::SessionKind::Learning, strive_proto::SessionKind::Replay] {
+            let params = SessionListParams { cwd: None, kind: Some(kind) };
+            sessions.extend(c.request::<SessionList>(params).await?.sessions);
+        }
         all_ids(&sessions, &unreadable)
     } else {
         vec![resolve(c, id).await?]

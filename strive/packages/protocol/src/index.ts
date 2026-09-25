@@ -136,6 +136,8 @@ export type * from "./generated/ProposalStatus";
 
 export type * from "./generated/SessionKind";
 
+export type * from "./generated/ReplayRun";
+
 export type * from "./generated/Verdict";
 
 export type * from "./generated/SessionChangesParams";

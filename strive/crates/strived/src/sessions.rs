@@ -214,6 +214,20 @@ enum Cmd {
         event: Event,
         reply: oneshot::Sender<std::result::Result<io::Result<Vec<Entry>>, String>>,
     },
+    /// Holds budget for a proposal's replay and journals `ReplayStarted`,
+    /// or refuses if it doesn't fit.
+    Hold {
+        proposal: u64,
+        usd_micros: u64,
+        reply: oneshot::Sender<std::result::Result<io::Result<Vec<Entry>>, Refusal>>,
+    },
+    /// Journals `ReplayFinished`, releasing its hold and charging its cost,
+    /// followed by `then` in the same commit.
+    Release {
+        finished: ReplayDone,
+        then: Vec<Event>,
+        reply: oneshot::Sender<io::Result<Vec<Entry>>>,
+    },
     /// How many people are attached (clients that aren't agent hosts).
     People {
         reply: oneshot::Sender<usize>,
@@ -221,6 +235,14 @@ enum Cmd {
     /// Finish the batch this arrives in, then exit. Shutdown can't wait for
     /// every sender to drop: a request waiting on a person holds one.
     Stop,
+}
+
+/// What a replay cost, and its runs, for `ReplayFinished`.
+pub struct ReplayDone {
+    pub proposal: u64,
+    pub cost_usd_micros: u64,
+    pub tokens: u64,
+    pub runs: Vec<strive_proto::ReplayRun>,
 }
 
 /// History for a new subscriber, and its stream of later entries.
@@ -661,6 +683,31 @@ impl Sessions {
         Ok(rx.await.map_err(|_| writer_gone())??)
     }
 
+    /// Holds `usd_micros` of the session's budget for proposal `proposal`'s
+    /// replay, journaled as `ReplayStarted`; the refusal if it doesn't fit.
+    pub async fn hold(
+        &self,
+        id: &SessionId,
+        proposal: u64,
+        usd_micros: u64,
+    ) -> Result<std::result::Result<Vec<Entry>, Refusal>> {
+        let (_, tx) = self.writer(id).await?;
+        let (reply, rx) = oneshot::channel();
+        tx.send(Cmd::Hold { proposal, usd_micros, reply }).map_err(|_| writer_gone())?;
+        match rx.await.map_err(|_| writer_gone())? {
+            Ok(written) => Ok(Ok(written?)),
+            Err(refusal) => Ok(Err(refusal)),
+        }
+    }
+
+    /// Journals a replay's end (releasing its hold) and `then`, together.
+    pub async fn release(&self, id: &SessionId, finished: ReplayDone, then: Vec<Event>) -> Result<Vec<Entry>> {
+        let (_, tx) = self.writer(id).await?;
+        let (reply, rx) = oneshot::channel();
+        tx.send(Cmd::Release { finished, then, reply }).map_err(|_| writer_gone())?;
+        Ok(rx.await.map_err(|_| writer_gone())??)
+    }
+
     /// A session's info from its journal's first lines, unverified; `None`
     /// if there's no such session or its start can't be read.
     pub fn peek(&self, id: &SessionId) -> Option<SessionInfo> {
@@ -763,6 +810,15 @@ impl Sessions {
         let (tx, thread) = spawn_writer(journal, entries, self.verifier(id));
         live.insert(id.clone(), Live { info: info.clone(), tx: tx.clone(), thread });
         Ok((info, tx))
+    }
+
+    /// Stops the session's writer after what is queued, for a session done
+    /// with (a replay's run). Anything that writes to it later reopens it.
+    pub async fn close(&self, id: &SessionId) {
+        let Some(l) = self.live.lock().await.remove(id) else { return };
+        let _ = l.tx.send(Cmd::Stop); // fails only if the writer already stopped
+        drop(l.tx);
+        let _ = tokio::task::spawn_blocking(move || l.thread.join()).await;
     }
 
     /// Stops every writer after it finishes what is queued. The daemon calls
@@ -1059,6 +1115,21 @@ impl Writer {
                     return Staged::Handled;
                 }
                 (vec![event], Box::new(move |r, _| drop(reply.send(Ok(r)))))
+            }
+            Cmd::Hold { proposal, usd_micros, reply } => {
+                if let Err(refusal) = self.ledger.hold(proposal, usd_micros) {
+                    let _ = reply.send(Err(refusal));
+                    return Staged::Handled;
+                }
+                let e = Event::ReplayStarted { proposal, reserved_usd_micros: usd_micros };
+                (vec![e], Box::new(move |r, _| drop(reply.send(Ok(r)))))
+            }
+            Cmd::Release { finished, then, reply } => {
+                let ReplayDone { proposal, cost_usd_micros, tokens, runs } = finished;
+                self.ledger.release(proposal, cost_usd_micros, tokens);
+                let mut events = vec![Event::ReplayFinished { proposal, cost_usd_micros, tokens, runs }];
+                events.extend(then);
+                (events, Box::new(move |r, _| drop(reply.send(r))))
             }
             Cmd::People { reply } => {
                 let _ = reply.send(self.subscribers.iter().filter(|(s, person)| *person && !s.is_closed()).count());

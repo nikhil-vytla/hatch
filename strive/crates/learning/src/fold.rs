@@ -98,6 +98,8 @@ pub fn fold(entries: &[Entry]) -> Vec<Folded> {
             | Event::LearnRequested { .. }
             | Event::LayoutProposed { .. }
             | Event::Compacted { .. }
+            | Event::ReplayStarted { .. }
+            | Event::ReplayFinished { .. }
             | Event::ModelSet { .. } => {}
         }
     }

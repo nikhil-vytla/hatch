@@ -173,7 +173,7 @@ pub async fn run(cfg: Config) -> Result<Started> {
                 }
                 // Hosts don't count: they exist to serve clients, and exit with the daemon.
                 let people = state.clients.load(Ordering::SeqCst).saturating_sub(state.hosts.count());
-                let busy = people + state.gateway_calls.load(Ordering::SeqCst) > 0;
+                let busy = people + state.gateway_calls.load(Ordering::SeqCst) + state.learning.replaying.count() > 0;
                 if !busy && state.idle_since.lock().await.elapsed() >= state.idle_exit {
                     log!("idle for {}s with no clients, exiting", state.idle_exit.as_secs());
                     break;

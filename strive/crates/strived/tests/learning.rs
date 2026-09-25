@@ -394,7 +394,7 @@ fn a_proposal_that_passes_is_ready_with_the_later_gates_skipped() {
     let details: Vec<&str> =
         p["gates"].as_array().unwrap()[1..].iter().map(|g| g["detail"].as_str().unwrap()).collect();
     assert!(details[0].contains("no Anthropic API key"), "{details:?}");
-    assert!(details[1].contains("isn't built yet"), "{details:?}");
+    assert!(details[1].contains("no agent host can be started"), "{details:?}");
     let made = &events(&env, &id, "proposalMade")[0];
     assert_eq!(made["proposal"], memory("Use bun.\n", &work));
 

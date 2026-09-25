@@ -1363,3 +1363,80 @@ A rewind runs a dozen or more git processes in turn, so under load its reply
 outlasts the default 5 s read. As with the TUI's rewind test, the fix is
 the test's deadline: checkpoint tests' connections wait up to 30 s for a
 reply. Nothing sleeps; the test still waits on the reply it acts on.
+## 2026-09-24: M10, the replay gate
+
+Design in [ADR-0018](docs/adrs/0018-replay-gate.md). The first slice of
+bb's suggestion 1: mining, running, the verdict. No reuse across
+proposals yet.
+- **Tasks** (`strive_learning::replay::mine`, 15 unit tests): a turn's
+  command that failed, which the same session later ran with exit 0. The
+  task is the turn's prompts, the checkpoint journaled with the first, and
+  the command. Mined from the newest uncited work sessions, begun before
+  the proposal, with a checkpoint repo; at most 3.
+- **Runs are daemon-driven sessions** (`kind: replay`), not `strive run`
+  processes: a scratch copy (`$TMPDIR/strive-replay-*/work`) exported from
+  the task session's shadow repo, the learned files as the learner saw
+  them on both sides, the proposal's file on one. Full-auto approvals and
+  no person attached, so anything that asks is refused. The daemon sends
+  the prompt, starts the real host, waits for `turnEnded`, kills the host's
+  process group, then runs the check as a journaled effect
+  (`replay-check`). The writer is closed after each run.
+- **The sandbox had a hole for this:** it allows writes to `/private/tmp`
+  and `$TMPDIR`, so a project under `/tmp` (every test project) was
+  writable by any command. `Scope.temp` gives a replay's commands their
+  scratch `tmp` instead (also their `TMPDIR`). The escape test failed with
+  the old scope (`escaped-bash.txt` appeared in the project).
+- **Money:** `ReplayStarted` holds `replay.budgetUsd` ($1) in the learning
+  session's ledger (`Ledger::hold`), or the gate skips with the numbers.
+  Each run's session budget is the cap minus what earlier runs spent, one
+  run at a time, interleaved without/with. `ReplayFinished` charges what
+  the runs' journals say they cost and names every run; it releases the
+  hold in the same commit as the verdict. The gateway notes a budget
+  refusal for a replay session, which stops the replay (skipped: "the cap
+  ran out after N runs").
+- **Verdict:** pass (with ≥ without, by rate), fail, or inconclusive
+  (skipped) when every run failed on both sides. Runs after the judge's
+  verdict if that isn't a fail; a skip doesn't block acceptance.
+- **Model:** `replay.model`, else the cheaper of `model` and `judgeModel`.
+
+**Found by the real run: agents name the project in commands.** Haiku ran
+`cd /private/tmp/strv-smoke-proj && sh check.sh`. Replayed as written,
+that check runs in the real project, which by then passes, so both sides
+pass whatever the agent did. The project's path in the prompt and check is
+now relocated to the scratch copy (`relocate`, whole paths only, plus the
+`/tmp` alias of `/private/tmp`). The e2e task uses such a command; with
+relocation disabled, the pass test reads "without 3/3" instead of 0/3.
+
+**Real run (Haiku 4.5, $0.055 in all, the replay $0.025).** A project whose
+`check.sh` passes once `config.txt` says `mode=fast`; two `strive run`
+sessions fixed it (one cited), one said hello.
+- With the judge on Haiku, it failed the proposal on "generalizes": the
+  held-out session fixed the check from its error message alone, so the
+  memory is redundant. Replay was skipped ("the judge failed it"), as
+  designed.
+- With the judge skipped (`judgeModel` set to an OpenAI model with no key)
+  and `replay.model` Haiku, 1 run a side: "with the change 1/1 passed,
+  without 1/1; 1 task", $0.0252 of the $0.20 cap, 13 s. The with-change
+  agent still ran the check before writing `config.txt`, so the proposal's
+  prediction didn't hold there; replay measured the outcome, not the path.
+
+**Tests** (`packages/host/src/replay.e2e.test.ts`, real daemon, host,
+gateway and sandbox; `FakeAnthropic` takes a function so replies can
+depend on the request): a pass (3/3 vs 0/3, the gate order, the runs'
+sessions hidden from lists, the review output), a fail, nothing minable,
+a judge fail skipping replay, a cap the learning budget can't hold, a cap
+that runs out at the first call, and a replayed agent that can't write the
+project. The desktop e2e checks the Learned pane shows the replay's
+detail. 4/4 alone and 2/2 with two copies at once.
+
+**Deferred:**
+- Reusing "without" runs across proposals, keyed by task plus the digests
+  of memory and skills (bb's replay-by-hash).
+- Recording whether a skill was read in a run.
+- Other task shapes (a session's last test run passing).
+- Parallel runs; `strive learn` waits 5 min for checks, which a real
+  18-run replay can exceed.
+- Reads aren't confined: a replayed agent can read the real project.
+- The copy has no `.git` and no ignored files (`node_modules`), so checks
+  that need them fail on both sides (inconclusive).
+- A daemon stopped mid-replay leaves its scratch directory behind.

@@ -305,6 +305,9 @@ pub struct Ledger {
     spent_usd: u64,
     spent_tokens: u64,
     open: HashMap<u64, Reservation>,
+    /// Replay gates running for proposals, by proposal: each holds money
+    /// until its runs are over. One cut off by a crash is never released.
+    holds: Vec<(u64, u64)>,
 }
 
 impl Ledger {
@@ -328,9 +331,10 @@ impl Ledger {
         self.spent_tokens
     }
 
-    /// Spent plus held by calls in flight.
+    /// Spent plus held by calls in flight and by replays.
     pub fn committed_usd(&self) -> u64 {
-        self.open.values().fold(self.spent_usd, |a, r| a.saturating_add(r.usd_micros))
+        let held = self.holds.iter().fold(self.spent_usd, |a, (_, usd)| a.saturating_add(*usd));
+        self.open.values().fold(held, |a, r| a.saturating_add(r.usd_micros))
     }
 
     fn committed_tokens(&self) -> u64 {
@@ -363,6 +367,24 @@ impl Ledger {
         self.check(r)?;
         self.open.insert(call, r);
         Ok(())
+    }
+
+    /// Holds `usd_micros` for proposal `proposal`'s replay, if it fits.
+    pub fn hold(&mut self, proposal: u64, usd_micros: u64) -> Result<(), Refusal> {
+        self.check(Reservation { usd_micros, tokens: 0 })?;
+        self.holds.push((proposal, usd_micros));
+        Ok(())
+    }
+
+    /// Releases the proposal's latest replay hold and charges what the
+    /// replay cost. An earlier hold for the same proposal (a run a crash cut
+    /// off) stays held.
+    pub fn release(&mut self, proposal: u64, usd_micros: u64, tokens: u64) {
+        if let Some(i) = self.holds.iter().rposition(|(p, _)| *p == proposal) {
+            self.holds.remove(i);
+        }
+        self.spent_usd = self.spent_usd.saturating_add(usd_micros);
+        self.spent_tokens = self.spent_tokens.saturating_add(tokens);
     }
 
     /// Releases the call's reservation and charges what it actually cost.
@@ -415,6 +437,12 @@ impl Ledger {
                 | Event::ProposalApplied { .. }
                 | Event::ProposalRolledBack { .. }
                 | Event::ModelSet { .. } => {}
+                Event::ReplayStarted { proposal, reserved_usd_micros } => {
+                    l.holds.push((*proposal, *reserved_usd_micros));
+                }
+                Event::ReplayFinished { proposal, cost_usd_micros, tokens, .. } => {
+                    l.release(*proposal, *cost_usd_micros, *tokens);
+                }
             }
         }
         for r in abandoned.values() {

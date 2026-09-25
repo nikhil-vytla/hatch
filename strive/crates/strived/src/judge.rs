@@ -146,7 +146,7 @@ pub fn plan(
 }
 
 /// The memory and skill files the learner was last shown, by path.
-fn shown_files(learning: &[Entry]) -> Vec<(String, Digest)> {
+pub fn shown_files(learning: &[Entry]) -> Vec<(String, Digest)> {
     learning
         .iter()
         .rev()
@@ -161,7 +161,7 @@ fn shown_files(learning: &[Entry]) -> Vec<(String, Digest)> {
 }
 
 /// A work session of the project whose journal verifies: its entries.
-fn verified(state: &State, cwd: &str, id: &str) -> Option<Vec<Entry>> {
+pub fn verified(state: &State, cwd: &str, id: &str) -> Option<Vec<Entry>> {
     let sid = SessionId::parse(id)?;
     let (info, report) = state.sessions.read(&sid).ok()?;
     let work = info.kind.unwrap_or_default() == SessionKind::Work && info.cwd == cwd;

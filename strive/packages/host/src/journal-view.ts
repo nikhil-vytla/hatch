@@ -170,12 +170,15 @@ async function block(entry: Entry, effects: Map<number, Effect>, ran: Set<string
       return `${at} proposal #${e.proposal} applied`;
     case "proposalRolledBack":
       return `${at} proposal #${e.proposal} rolled back by ${e.by}`;
+    case "replayFinished":
+      return `${at} proposal #${e.proposal} replayed in ${e.runs.length} runs`;
     case "modelSet":
       return `${at} the session's model set to ${e.model}`;
     case "sessionStarted":
     case "budgetSet":
     case "modelCallStarted":
     case "checkpointed":
+    case "replayStarted":
       return "";
     default:
       return e satisfies never;

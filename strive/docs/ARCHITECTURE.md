@@ -22,7 +22,7 @@ calls go through the daemon's gateway. Why: [ADR-0015](adrs/0015-rebuild-daemon-
 | `crates/journal` | Authenticated session journals: format, verification, crash recovery |
 | `crates/budget` | Prices, costs, reservations and the ledger rebuilt from journal events |
 | `crates/gateway` | Provider wire formats: which API, what a request asks for, usage from bodies and streams |
-| `crates/learning` | Trusted learning's pure parts: where proposals write, the static gate's text checks, proposal status |
+| `crates/learning` | Trusted learning's pure parts: where proposals write, the static gate's text checks, proposal status, the judge's rubric, the replay gate's task mining and verdict |
 | `crates/strived` | The `strive` binary: CLI, launcher, daemon, sessions |
 | `packages/protocol` | Generated TS types + the typed socket client |
 | `packages/tui` | The terminal client; its binary also runs the agent host |
@@ -237,9 +237,10 @@ daemon checks; a person decides; the daemon writes.
 **The learning session.** Each project directory has one, found or created
 by `learning/open`. Its `sessionStarted` says `kind: learning`.
 - Lists people pick from leave it out: `session/list` returns work
-  sessions unless asked for `kind: learning`, so `strive sessions`,
-  continue and the desktop's sidebar never offer it. `strive verify --all`
-  asks for both, since the learning journal records who accepted what.
+  sessions unless asked for `kind: learning` (or `replay`), so `strive
+  sessions`, continue and the desktop's sidebar never offer it. `strive
+  verify --all` asks for all three, since the learning journal records who
+  accepted what and replays what the replay gate saw.
 - `learning/run` (people only) journals `learnRequested`, naming work
   sessions of the project or none, and starts the session's host. Prompts
   to a learning session are refused.
@@ -317,8 +318,44 @@ it is admitted, held, journaled and charged like any call of that session.
   again.
 - The model is `judgeModel` in settings, else `model`.
 
-The replay gate (M10) is journaled as skipped, saying it isn't built yet,
-or that the static check failed.
+**The replay gate** ([ADR-0018](adrs/0018-replay-gate.md)): past tasks of
+the project, run again by the agent with and without the proposal.
+- **Tasks** (`strive_learning::replay::mine`): a turn that ran a command
+  that failed, which the same session later ran with exit 0. The task is
+  the turn's prompts, the checkpoint before them, and the command as its
+  check. Mined from the project's newest work sessions the proposal doesn't
+  cite, begun before it; at most `replay.tasks` (3).
+- **A run** is a session of `kind: replay` the daemon creates in a scratch
+  directory outside the project (`$TMPDIR/strive-replay-*/work`):
+  - the checkpoint's tree, exported from the task session's shadow
+    repository; the learned files as the learner was shown them in place of
+    the checkpoint's; and, on the side with the change, the proposal's file;
+  - full-auto approvals with no person attached, so whatever would ask is
+    refused; no MCP servers; the model `replay.model`, else the cheaper of
+    `model` and `judgeModel`;
+  - its commands may write only under the scratch directory (`work` and
+    its `tmp`, their `TMPDIR`), not the system temp directories;
+  - the project's directory in the prompt and the check becomes the
+    scratch copy's, so `cd /the/project && make` runs in the copy;
+  - the daemon sends the task's prompt, starts the real host, waits for the
+    turn to end, stops the host, and runs the check as an effect of the
+    session (`replay-check`). Passed is exit 0. The scratch directory is
+    removed; the session's journal stays, left out of `session/list` unless
+    asked for `kind: replay`.
+- **Runs:** for each task, `replay.runs` (3) times without and with,
+  interleaved, one at a time.
+- **Money:** `ReplayStarted` holds `replay.budgetUsd` ($1 by default) in
+  the learning session's ledger, or the gate is skipped. Each run's budget
+  is what the cap has left. `ReplayFinished` names every run and charges
+  their actual cost in place of the hold, in the same commit as the
+  verdict. A hold a crash cut off stays charged in full. A call refused
+  for the cap stops the replay.
+- **Verdict:** pass when runs with the change passed at least as often as
+  without; fail when less often; skipped when every run failed on both
+  sides, and with the reason when it couldn't run (static or judge failed,
+  replay off, no sandbox, no host, no key, nothing to mine, no budget).
+- **When:** once the judge has a verdict that isn't a fail, in the
+  background, like the judge; run again after a crash.
 
 **Status**, folded from the learning journal:
 
@@ -468,6 +505,8 @@ server, so they are coordinated by the session's directory alone.
 - **macOS (Seatbelt):**
   - Commands may write only in the workspace and temp directories, and not
     to the project's learned files (see "Learned files outside review").
+    A replay's commands get their scratch directory in place of the temp
+    directories.
   - strive's home is hidden.
   - There is no network, and that includes Unix sockets.
   - Without PID namespaces, a background job that leaves the command's

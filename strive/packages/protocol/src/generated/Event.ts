@@ -10,6 +10,7 @@ import type { Gate } from "./Gate";
 import type { McpStatus } from "./McpStatus";
 import type { Proposal } from "./Proposal";
 import type { ProposalDecision } from "./ProposalDecision";
+import type { ReplayRun } from "./ReplayRun";
 import type { SessionKind } from "./SessionKind";
 import type { ToolCall } from "./ToolCall";
 import type { TurnEnd } from "./TurnEnd";
@@ -104,7 +105,7 @@ before?: Digest, } | { "type": "gateFinished", proposal: number, gate: Gate, ver
 /**
  * What it found, for a person reviewing the proposal.
  */
-detail: string, } | { "type": "proposalDecided", proposal: number, decision: ProposalDecision, 
+detail: string, } | { "type": "replayStarted", proposal: number, reservedUsdMicros: number, } | { "type": "replayFinished", proposal: number, costUsdMicros: number, tokens: number, runs: Array<ReplayRun>, } | { "type": "proposalDecided", proposal: number, decision: ProposalDecision, 
 /**
  * The client that decided.
  */

@@ -34,6 +34,8 @@ pub struct Locks {
     projects: StdMutex<HashMap<SessionId, Arc<tokio::sync::Mutex<()>>>>,
     /// Proposals the judge is working on.
     pub judging: crate::judge::Running,
+    /// Proposals being replayed, and their runs' sessions.
+    pub replaying: crate::replay::Running,
 }
 
 impl Locks {
@@ -42,8 +44,8 @@ impl Locks {
     }
 }
 
-const REPLAY_SKIPPED: &str = "not run: replaying past tasks isn't built yet";
 const AFTER_FAILURE: &str = "not run: the static check failed";
+const AFTER_JUDGE: &str = "not run: the judge failed it";
 /// The most of a file as it is now that is read to keep or compare.
 const READ_LIMIT: u64 = 1024 * 1024;
 
@@ -133,6 +135,7 @@ fn work_session(state: &State, cwd: &str, id: &str) -> Result<SessionId, String>
     let info = state.sessions.peek(&sid).ok_or_else(|| format!("there's no session {id}"))?;
     match info.kind.unwrap_or_default() {
         SessionKind::Learning => Err(format!("{id} is the learning session of {}, not a work session", info.cwd)),
+        SessionKind::Replay => Err(format!("{id} is a run of the replay gate, not a work session")),
         SessionKind::Work if info.cwd != cwd => Err(format!("session {id} worked in {}, not in {cwd}", info.cwd)),
         SessionKind::Work => Ok(sid),
     }
@@ -174,20 +177,30 @@ pub async fn propose(
         Err(_) => None,
     };
     let (verdict, detail) = strive_learning::verdict(&findings);
-    let judge = judge_plan(state, cwd, verdict, &proposal, before, crate::server::epoch_ms(), &entries);
+    let now = crate::server::epoch_ms();
+    let judge = judge_plan(state, cwd, verdict, &proposal, before, now, &entries);
     let mut gates = vec![(Gate::Static, verdict, detail)];
-    let call = match judge {
+    let (mut call, mut replay) = (None, None);
+    match judge {
         crate::judge::Plan::Now(v, why) => {
             gates.push((Gate::Judge, v, why));
-            None
+            match replay_plan(state, cwd, verdict, v, &proposal, now, &entries) {
+                crate::replay::Plan::Now(why) => gates.push((Gate::Replay, Verdict::Skipped, why)),
+                crate::replay::Plan::Run(r) => replay = Some(r),
+            }
         }
-        crate::judge::Plan::Call(call) => Some(call),
-    };
-    gates.push((Gate::Replay, Verdict::Skipped, replay_skipped(verdict)));
+        // The replay waits for the judge's verdict.
+        crate::judge::Plan::Call(c) => call = Some(c),
+    }
     let made = Event::ProposalMade { call_id, proposal, before };
     let written = state.sessions.propose(sid, made, gates).await.map_err(session_error)?;
-    if let (Some(call), Some(made)) = (call, written.first()) {
-        crate::judge::start(state, sid, made.seq, call);
+    if let Some(made) = written.first() {
+        if let Some(call) = call {
+            crate::judge::start(state, sid, made.seq, call);
+        }
+        if let Some(r) = replay {
+            crate::replay::start(state, sid, made.seq, r);
+        }
     }
     Ok(written)
 }
@@ -209,23 +222,109 @@ fn judge_plan(
     }
 }
 
-fn replay_skipped(static_verdict: Verdict) -> String {
-    match static_verdict {
-        Verdict::Fail => AFTER_FAILURE.into(),
-        Verdict::Pass | Verdict::Skipped => REPLAY_SKIPPED.into(),
+/// The replay's plan, given the earlier gates' verdicts: it runs only when
+/// neither failed (ADR-0018).
+fn replay_plan(
+    state: &State,
+    cwd: &str,
+    static_verdict: Verdict,
+    judge_verdict: Verdict,
+    proposal: &Proposal,
+    made_at_ms: u64,
+    learning: &[Entry],
+) -> crate::replay::Plan {
+    match (static_verdict, judge_verdict) {
+        (Verdict::Fail, _) => crate::replay::Plan::Now(AFTER_FAILURE.into()),
+        (_, Verdict::Fail) => crate::replay::Plan::Now(AFTER_JUDGE.into()),
+        (Verdict::Pass | Verdict::Skipped, Verdict::Pass | Verdict::Skipped) => {
+            crate::replay::plan(state, cwd, proposal, made_at_ms, learning)
+        }
     }
 }
 
-/// Journals the judge's verdict on proposal `id`, unless it has one.
-pub async fn judged(state: &State, sid: &SessionId, id: u64, verdict: Verdict, detail: String) -> Result<(), RpcError> {
+/// Journals the judge's verdict on proposal `id`, unless it has one, and
+/// with it the replay's skip, or starts the replay.
+pub async fn judged(
+    state: &Arc<State>,
+    sid: &SessionId,
+    id: u64,
+    verdict: Verdict,
+    detail: String,
+) -> Result<(), RpcError> {
     let lock = state.learning.project(sid);
     let _held = lock.lock().await;
-    if crate::judge::has_verdict(&journal(state, sid)?, id) {
+    let entries = journal(state, sid)?;
+    if crate::judge::has_verdict(&entries, id) {
         return Ok(());
     }
-    let event = Event::GateFinished { proposal: id, gate: Gate::Judge, verdict, detail };
-    state.sessions.append(sid, vec![event]).await.map_err(session_error)?;
+    let mut events = vec![Event::GateFinished { proposal: id, gate: Gate::Judge, verdict, detail }];
+    let mut replay = None;
+    let made = strive_learning::fold(&entries).into_iter().find(|f| f.state.id == id);
+    if let Some(f) = made
+        && !crate::replay::has_verdict(&entries, id)
+        && !state.learning.replaying.has(sid, id)
+    {
+        let static_verdict = f.state.gates.iter().find(|g| g.gate == Gate::Static).map_or(Verdict::Pass, |g| g.verdict);
+        let p = &f.state;
+        match replay_plan(
+            state,
+            cwd_of(state, sid)?.as_str(),
+            static_verdict,
+            verdict,
+            &p.proposal,
+            p.made_at_ms,
+            &entries,
+        ) {
+            crate::replay::Plan::Now(why) => {
+                events.push(Event::GateFinished {
+                    proposal: id,
+                    gate: Gate::Replay,
+                    verdict: Verdict::Skipped,
+                    detail: why,
+                });
+            }
+            crate::replay::Plan::Run(r) => replay = Some(r),
+        }
+    }
+    state.sessions.append(sid, events).await.map_err(session_error)?;
+    if let Some(r) = replay {
+        crate::replay::start(state, sid, id, r);
+    }
     Ok(())
+}
+
+/// Journals the replay's end and its verdict on proposal `id` (unless it
+/// has one). The end, which releases the replay's hold on the budget, is
+/// journaled either way.
+pub async fn replayed(
+    state: &State,
+    sid: &SessionId,
+    id: u64,
+    verdict: Verdict,
+    detail: String,
+    done: Option<crate::sessions::ReplayDone>,
+) -> Result<(), RpcError> {
+    let lock = state.learning.project(sid);
+    let _held = lock.lock().await;
+    let mut then = Vec::new();
+    if !crate::replay::has_verdict(&journal(state, sid)?, id) {
+        then.push(Event::GateFinished { proposal: id, gate: Gate::Replay, verdict, detail });
+    }
+    match done {
+        Some(done) => {
+            state.sessions.release(sid, done, then).await.map_err(session_error)?;
+        }
+        None if !then.is_empty() => {
+            state.sessions.append(sid, then).await.map_err(session_error)?;
+        }
+        None => {}
+    }
+    Ok(())
+}
+
+/// The project a learning session is for.
+fn cwd_of(state: &State, sid: &SessionId) -> Result<String, RpcError> {
+    state.sessions.peek(sid).map(|i| i.cwd).ok_or_else(|| session_error(SessionError::NotFound))
 }
 
 /// The file at `rel` as the learner was last shown it; none if it wasn't
@@ -433,6 +532,7 @@ async fn settled(state: &Arc<State>, sid: &SessionId, cwd: &str) -> Result<Vec<F
     let folded = strive_learning::fold(&entries);
     let mut events = Vec::new();
     let mut calls = Vec::new();
+    let mut replays = Vec::new();
     for f in folded.iter().filter(|f| f.state.status == ProposalStatus::Checking) {
         let id = f.state.id;
         let had = |gate: Gate| f.state.gates.iter().find(|g| g.gate == gate).map(|g| g.verdict);
@@ -443,27 +543,55 @@ async fn settled(state: &Arc<State>, sid: &SessionId, cwd: &str) -> Result<Vec<F
             events.push(Event::GateFinished { proposal: id, gate: Gate::Static, verdict: v, detail });
             v
         };
-        if had(Gate::Judge).is_none() && !state.learning.judging.has(sid, id) {
-            let p = &f.state;
-            match judge_plan(state, cwd, static_verdict, &p.proposal, p.before, p.made_at_ms, &entries) {
+        let p = &f.state;
+        let judge_verdict = match had(Gate::Judge) {
+            Some(v) => Some(v),
+            None if state.learning.judging.has(sid, id) => None,
+            None => match judge_plan(state, cwd, static_verdict, &p.proposal, p.before, p.made_at_ms, &entries) {
                 crate::judge::Plan::Now(verdict, detail) => {
                     events.push(Event::GateFinished { proposal: id, gate: Gate::Judge, verdict, detail });
+                    Some(verdict)
                 }
-                crate::judge::Plan::Call(call) => calls.push((id, call)),
+                crate::judge::Plan::Call(call) => {
+                    calls.push((id, call));
+                    None
+                }
+            },
+        };
+        // The replay runs once the judge has its verdict.
+        if let Some(judge_verdict) = judge_verdict
+            && had(Gate::Replay).is_none()
+            && !state.learning.replaying.has(sid, id)
+        {
+            match replay_plan(state, cwd, static_verdict, judge_verdict, &p.proposal, p.made_at_ms, &entries) {
+                crate::replay::Plan::Now(detail) => {
+                    events.push(Event::GateFinished {
+                        proposal: id,
+                        gate: Gate::Replay,
+                        verdict: Verdict::Skipped,
+                        detail,
+                    });
+                }
+                crate::replay::Plan::Run(r) => replays.push((id, r)),
             }
-        }
-        if had(Gate::Replay).is_none() {
-            let detail = replay_skipped(static_verdict);
-            events.push(Event::GateFinished { proposal: id, gate: Gate::Replay, verdict: Verdict::Skipped, detail });
         }
     }
     for (id, call) in calls {
         crate::judge::start(state, sid, id, call);
     }
-    if events.is_empty() {
+    // Journaled first: a replay that finishes fast must find its judge verdict there.
+    let appended = if events.is_empty() {
+        false
+    } else {
+        state.sessions.append(sid, events).await.map_err(session_error)?;
+        true
+    };
+    for (id, r) in replays {
+        crate::replay::start(state, sid, id, r);
+    }
+    if !appended {
         return Ok(folded);
     }
-    state.sessions.append(sid, events).await.map_err(session_error)?;
     Ok(strive_learning::fold(&journal(state, sid)?))
 }
 

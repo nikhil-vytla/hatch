@@ -96,8 +96,10 @@ The daemon journals a `GateFinished` for each check it runs.
    is shown as such.
    [ADR-0017](0017-judge-gate.md) records how it is built.
 3. **`replay`** (M10): tasks mined from past sessions with checkable
-   outcomes are run again with `strive run`, with and without the change.
-   Three runs each, and the difference is reported.
+   outcomes are run again, with and without the change. Three runs each,
+   and the difference is reported. The daemon drives the runs as sessions
+   of their own, in scratch copies, under a hold on the learning session's
+   budget. [ADR-0018](0018-replay-gate.md) records how it is built.
 
 A proposal is `ready` when every check that ran passed or was skipped, and
 `failed` when one failed. Only a `ready` one can be accepted.
@@ -143,7 +145,10 @@ A proposal is `ready` when every check that ran passed or was skipped, and
   - tests against the real daemon with a scripted model.
 - **M8b Desktop:** the Learned pane.
 - **M9 Judge gate.**
-- **M10 Replay gate:** mining tasks with checkable outcomes.
+- **M10 Replay gate:** mining tasks with checkable outcomes (a command
+  that went red to green), running them in scratch copies with and without
+  the change, the verdict ([ADR-0018](0018-replay-gate.md)). Reusing the
+  "without" runs across proposals is deferred.
 - **M11 Predictions checked, and drift:**
   - predictions checked against later sessions;
   - a watch for quality that peaks and then declines;

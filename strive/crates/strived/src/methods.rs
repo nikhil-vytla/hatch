@@ -367,6 +367,8 @@ fn host_may_record(event: &Event, kind: SessionKind) -> bool {
         | Event::ProposalDecided { .. }
         | Event::ProposalApplied { .. }
         | Event::ProposalRolledBack { .. }
+        | Event::ReplayStarted { .. }
+        | Event::ReplayFinished { .. }
         | Event::ModelSet { .. } => false,
     }
 }
@@ -420,9 +422,10 @@ async fn host_config(state: &Arc<State>, sid: &SessionId) -> Reply {
         })
         .transpose()
         .map_err(|e| internal(&e))?;
-    // The learner has no effect tools, and an MCP tool is one.
+    // The learner has no effect tools, and an MCP tool is one. A replay's
+    // servers would run unsandboxed, outside its scratch copy (ADR-0018).
     let mcp = match info.kind.unwrap_or_default() {
-        SessionKind::Learning => crate::mcp::Summary { status: Vec::new(), tools: Vec::new() },
+        SessionKind::Learning | SessionKind::Replay => crate::mcp::Summary { status: Vec::new(), tools: Vec::new() },
         SessionKind::Work => {
             state
                 .mcp
@@ -506,6 +509,7 @@ async fn route_host(state: &Arc<State>, conn: &Arc<Conn>, method: &str, params: 
                         SessionKind::Learning => {
                             "a learning session's host records only turns, assistant messages, summaries and proposals"
                         }
+                        SessionKind::Replay => "a replay's host records only turns, assistant messages and summaries",
                     },
                 ));
             }
@@ -543,11 +547,20 @@ async fn prompt(state: &Arc<State>, params: Value) -> Reply {
     let SessionPromptParams { id, text } = parse::<SessionPrompt>(params)?;
     let sid = session_id(&id)?;
     let info = state.sessions.info(&sid).await.map_err(session_error)?;
-    if info.kind == Some(SessionKind::Learning) {
-        return Err(RpcError::new(
-            RpcError::INVALID_REQUEST,
-            "this is a project's learning session; ask it to study sessions with `strive learn` (learning/run)",
-        ));
+    match info.kind.unwrap_or_default() {
+        SessionKind::Work => {}
+        SessionKind::Learning => {
+            return Err(RpcError::new(
+                RpcError::INVALID_REQUEST,
+                "this is a project's learning session; ask it to study sessions with `strive learn` (learning/run)",
+            ));
+        }
+        SessionKind::Replay => {
+            return Err(RpcError::new(
+                RpcError::INVALID_REQUEST,
+                "this is one run of the replay gate, kept for the record; start a session of your own with `strive`",
+            ));
+        }
     }
     let commit = checkpoint(state, &sid, &info.cwd, &format!("before: {text}")).await;
     let entries = state.sessions.prompt(&sid, text, commit).await.map_err(session_error)?;
@@ -654,6 +667,10 @@ async fn route_effect(state: &Arc<State>, method: &str, params: Value) -> Reply 
                 workspace: workspace_of(&info.cwd)?,
                 strive_home: state.home.root.canonicalize().map_err(|e| internal(&e))?,
                 unconfined: state.settings.sandbox == crate::settings::SandboxSetting::Off,
+                temp: match info.kind.unwrap_or_default() {
+                    SessionKind::Replay => crate::replay::temp_of(&info.cwd),
+                    SessionKind::Work | SessionKind::Learning => None,
+                },
             };
             let record = crate::effects::record(&state.cas, &request).map_err(|e| internal(&e))?;
             let Some(_running) = state.sessions.begin_effect() else {

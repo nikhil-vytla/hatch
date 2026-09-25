@@ -31,6 +31,9 @@ pub struct Settings {
     /// must be an Anthropic model.
     #[serde(default)]
     pub judge_model: Option<String>,
+    /// The replay gate (ADR-0018): what it may spend and how much it runs.
+    #[serde(default)]
+    pub replay: ReplaySetting,
     /// The longest a turn may run before it is stopped.
     #[serde(default = "default_turn_seconds")]
     pub turn_seconds: u64,
@@ -52,6 +55,59 @@ pub struct Settings {
     /// as Claude Code's `mcpServers`.
     #[serde(default)]
     pub mcp_servers: BTreeMap<String, McpServerSetting>,
+}
+
+/// The replay gate's limits. Each proposal it replays holds `budgetUsd` of
+/// the learning session's budget while its runs go on.
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ReplaySetting {
+    /// Dollars one proposal's replay may spend, all runs together. 0 turns
+    /// replay off.
+    #[serde(default = "default_replay_usd")]
+    pub budget_usd: f64,
+    /// The model the replayed agent runs on; the cheaper of `model` and
+    /// `judgeModel` when unset.
+    #[serde(default)]
+    pub model: Option<String>,
+    /// The most tasks one replay runs.
+    #[serde(default = "default_replay_tasks")]
+    pub tasks: usize,
+    /// Runs of each task on each side, with the change and without.
+    #[serde(default = "default_replay_runs")]
+    pub runs: u32,
+}
+
+fn default_replay_usd() -> f64 {
+    1.0
+}
+
+fn default_replay_tasks() -> usize {
+    strive_learning::replay::TASKS
+}
+
+fn default_replay_runs() -> u32 {
+    3
+}
+
+impl Default for ReplaySetting {
+    fn default() -> Self {
+        Self {
+            budget_usd: default_replay_usd(),
+            model: None,
+            tasks: default_replay_tasks(),
+            runs: default_replay_runs(),
+        }
+    }
+}
+
+impl ReplaySetting {
+    /// The cap on one proposal's replay, in micro-dollars.
+    pub fn budget_micros(&self) -> u64 {
+        #[expect(clippy::cast_possible_truncation, clippy::cast_sign_loss, reason = "validated non-negative on load")]
+        let m = (self.budget_usd * 1_000_000.0).round() as u64;
+        m
+    }
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize)]
@@ -158,6 +214,12 @@ impl Settings {
         };
         if s.budget.usd.is_some_and(|d| !d.is_finite() || d < 0.0) {
             anyhow::bail!("{}: budget.usd must be a non-negative number of dollars", path.display());
+        }
+        if !s.replay.budget_usd.is_finite() || s.replay.budget_usd < 0.0 {
+            anyhow::bail!("{}: replay.budgetUsd must be a non-negative number of dollars", path.display());
+        }
+        if s.replay.runs == 0 || s.replay.runs > 10 || s.replay.tasks > 10 {
+            anyhow::bail!("{}: replay.runs is 1 to 10 and replay.tasks 0 to 10", path.display());
         }
         for (name, server) in &s.mcp_servers {
             if server.transport.as_deref().is_some_and(|t| t != "stdio") {

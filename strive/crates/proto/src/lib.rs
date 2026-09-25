@@ -553,6 +553,9 @@ pub enum SessionKind {
     /// The project's learner: it studies work sessions and proposes changes
     /// to the agent's memory and skills, which people review.
     Learning,
+    /// One run of the replay gate (ADR-0018): a past task, run again by the
+    /// daemon in a scratch copy of the project, with or without a proposal.
+    Replay,
 }
 
 /// A project: the directory its sessions work in.
@@ -1018,6 +1021,21 @@ pub enum Event {
         /// What it found, for a person reviewing the proposal.
         detail: String,
     },
+    /// The replay gate began on a proposal (ADR-0018), holding up to
+    /// `reserved_usd_micros` of this learning session's budget until
+    /// `ReplayFinished`. A hold that never finishes stays charged in full.
+    ReplayStarted {
+        proposal: u64,
+        reserved_usd_micros: u64,
+    },
+    /// The replay gate's runs are over: what they cost is charged in place of
+    /// the hold, and each run's session is named for audit.
+    ReplayFinished {
+        proposal: u64,
+        cost_usd_micros: u64,
+        tokens: u64,
+        runs: Vec<ReplayRun>,
+    },
     /// A person accepted or rejected a proposal.
     ProposalDecided {
         proposal: u64,
@@ -1062,6 +1080,22 @@ pub enum Event {
     ModelSet {
         model: String,
     },
+}
+
+/// One run of a replayed task.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct ReplayRun {
+    /// The replay session that ran it.
+    pub session: String,
+    /// The work session the task was mined from, and its prompt's seq.
+    pub task_session: String,
+    pub task_seq: u64,
+    /// Whether the proposal's file was in place.
+    pub with_change: bool,
+    /// Whether the task's check command exited 0 afterwards.
+    pub passed: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]

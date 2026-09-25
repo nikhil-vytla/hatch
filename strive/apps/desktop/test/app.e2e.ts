@@ -935,6 +935,14 @@ test("the Learned pane lists proposals newest first, and shows one with its diff
 
   assert.ok(judged?.detail, JSON.stringify(listed));
   await detail.locator("[data-gate=judge] .detail", { hasText: judged.detail }).waitFor();
+
+  // So is the replay gate's (skipped here: this daemon starts no agent host).
+  const replayed = listed.proposals
+    .find((p: { id: number }) => p.id === second)
+    ?.gates.find((g: { gate: string }) => g.gate === "replay");
+
+  assert.ok(replayed?.detail, JSON.stringify(listed));
+  await detail.locator("[data-gate=replay] .detail", { hasText: replayed.detail.split("\n")[0] }).waitFor();
   // The evidence's session is one of this project's: a click shows it, and the proposal stays open.
   await detail.getByRole("button", { name: "tidy the changelog" }).click();
   await page.locator(".msg.user", { hasText: "tidy the changelog" }).waitFor();

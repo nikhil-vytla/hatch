@@ -21,6 +21,8 @@ const START_GRACE: Duration = Duration::from_secs(20);
 struct Slot {
     registered: bool,
     starting: Option<Instant>,
+    /// The process group of the host this daemon last started.
+    group: Option<i32>,
 }
 
 #[derive(Default)]
@@ -78,13 +80,35 @@ impl Hosts {
             .stderr(err)
             .process_group(0);
         match cmd.spawn() {
-            Ok(_) => crate::log!("started an agent host for session {}", id.as_str()),
+            Ok(child) => {
+                crate::log!("started an agent host for session {}", id.as_str());
+                if let Some(slot) = crate::sync::lock(&self.slots).get_mut(id) {
+                    slot.group = i32::try_from(child.id()).ok();
+                }
+            }
             Err(e) => {
                 crate::log!("could not start an agent host: {e}");
                 if let Some(slot) = crate::sync::lock(&self.slots).get_mut(id) {
                     slot.starting = None;
                 }
             }
+        }
+    }
+}
+
+impl Hosts {
+    /// Whether a host can be started at all.
+    pub fn available() -> bool {
+        command().is_some()
+    }
+
+    /// Stops the host this daemon started for the session, if any: the
+    /// replay gate's hosts are done once their one turn is.
+    pub fn stop(&self, id: &SessionId) {
+        let group = crate::sync::lock(&self.slots).get_mut(id).and_then(|s| s.group.take());
+        if let Some(pgid) = group {
+            // Already gone is fine: it exits when its connection closes.
+            let _ = nix::sys::signal::killpg(nix::unistd::Pid::from_raw(pgid), nix::sys::signal::Signal::SIGTERM);
         }
     }
 }

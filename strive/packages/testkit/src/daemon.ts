@@ -1,5 +1,6 @@
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
+import type { Json } from "./fake-anthropic";
 
 export const STRIVE_EXE = resolve(import.meta.dir, "../../../target/debug/strive");
 
@@ -12,8 +13,14 @@ export type TestDaemon = {
   dispose(): void;
 };
 
-export function startDaemon(extra: Record<string, string> = {}): TestDaemon {
+/** A daemon's settings.json. */
+export type DaemonSettings = { [key: string]: Json };
+
+/** Starts a daemon in a scratch home, with `settings` as its settings.json. */
+export function startDaemon(extra: Record<string, string> = {}, settings?: DaemonSettings): TestDaemon {
   const home = mkdtempSync("/tmp/strv-ts-");
+
+  if (settings) writeFileSync(join(home, "settings.json"), JSON.stringify(settings));
 
   // Real keys and upstreams must never reach a test daemon.
   const env = {

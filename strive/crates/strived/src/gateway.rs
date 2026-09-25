@@ -172,8 +172,12 @@ async fn admit(
         bad(StatusCode::UNAUTHORIZED, "authentication_error", &why)
     })?;
     let reservation = Reservation::for_call(&model, sent.len() as u64, info.max_output, info.choices, info.input_rate);
+    let refused_session = session.clone();
     let refused = |e| match e {
-        CallError::Refused(r) => bad(StatusCode::PAYMENT_REQUIRED, "budget_exceeded", &r.to_string()),
+        CallError::Refused(r) => {
+            state.learning.replaying.note_refused(&refused_session);
+            bad(StatusCode::PAYMENT_REQUIRED, "budget_exceeded", &r.to_string())
+        }
         CallError::Session(e) => session_failed(e),
     };
     // Checked before storing, so refused requests can't fill the store.

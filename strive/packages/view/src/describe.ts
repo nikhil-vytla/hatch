@@ -203,6 +203,10 @@ export function describe(entry: Entry, options: DescribeOptions = {}): Line[] {
       return note("accent", `#${e.proposal} applied`);
     case "proposalRolledBack":
       return note("muted", `#${e.proposal} rolled back by ${e.by}`);
+    case "replayStarted":
+      return note("faint", `#${e.proposal} replaying past tasks, holding up to ${formatUsd(e.reservedUsdMicros)}`);
+    case "replayFinished":
+      return note("faint", `#${e.proposal} replayed in ${e.runs.length} runs · ${formatUsd(e.costUsdMicros)}`);
     default:
       return e satisfies never;
   }

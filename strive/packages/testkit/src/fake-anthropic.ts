@@ -1,6 +1,7 @@
 // A scripted Anthropic Messages API for tests: the network boundary where a
-// stand-in is the point. Each request takes the next scripted reply and is
-// recorded, so tests can check exactly what the model was sent.
+// stand-in is the point. Each request takes the next scripted reply (or the
+// reply a function picks for it) and is recorded, so tests can check exactly
+// what the model was sent.
 
 export type Json = string | number | boolean | null | Json[] | { [key: string]: Json };
 
@@ -16,13 +17,21 @@ export type ScriptedReply = {
   outputTokens?: number;
 };
 
+/** What a scripted function sees of a request: the parts tests branch on. */
+export type ModelRequest = {
+  system?: Json;
+  messages: { role: string; content: Json }[];
+  tool_choice?: { type: string; name?: string };
+};
+
 const sse = (event: string, data: Json) => `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
 
 export class FakeAnthropic {
   readonly requests: any[] = [];
   private server?: ReturnType<typeof Bun.serve>;
 
-  constructor(private readonly script: ScriptedReply[]) {}
+  /** A list is answered in order; a function answers each request by what it holds. */
+  constructor(private readonly script: ScriptedReply[] | ((request: ModelRequest) => ScriptedReply)) {}
 
   get url(): string {
     return `http://127.0.0.1:${this.server!.port}`;
@@ -35,7 +44,10 @@ export class FakeAnthropic {
       fetch: async (req) => {
         const body: any = await req.json();
         this.requests.push(body);
-        const reply = this.script.shift() ?? { text: "(the script has no more replies)" };
+
+        const reply = Array.isArray(this.script)
+          ? (this.script.shift() ?? { text: "(the script has no more replies)" })
+          : this.script(body);
 
         if (reply.delayMs) await Bun.sleep(reply.delayMs);
 

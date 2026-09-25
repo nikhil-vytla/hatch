@@ -285,3 +285,33 @@ fn a_call_is_open_from_reservation_until_settlement() {
     l.settle(1, 5, 5);
     assert!(!l.is_open(1));
 }
+
+#[test]
+fn a_replay_hold_counts_against_calls_until_it_is_released_at_its_cost() {
+    let mut l = Ledger::new(Limits { usd_micros: Some(10_000), tokens: None });
+    l.hold(7, 8000).unwrap();
+    assert_eq!(
+        l.reserve(1, Reservation { usd_micros: 3000, tokens: 1 }),
+        Err(Refusal::Usd { limit: 10_000, committed: 8000, wanted: 3000 })
+    );
+    assert_eq!(l.hold(8, 3000), Err(Refusal::Usd { limit: 10_000, committed: 8000, wanted: 3000 }));
+    l.release(7, 1500, 400);
+    assert_eq!((l.spent_usd(), l.committed_usd(), l.spent_tokens()), (1500, 1500, 400));
+    l.reserve(1, Reservation { usd_micros: 3000, tokens: 1 }).unwrap();
+}
+
+/// A replay cut off by a crash is run again with a hold of its own; the
+/// first hold, whose runs' cost is unknown, stays charged in full.
+#[test]
+fn a_replay_hold_a_crash_left_open_stays_committed_when_the_rerun_finishes() {
+    let events = vec![
+        Event::BudgetSet { usd_micros: Some(100_000), tokens: None },
+        Event::ReplayStarted { proposal: 5, reserved_usd_micros: 20_000 },
+        Event::ReplayStarted { proposal: 5, reserved_usd_micros: 20_000 },
+        Event::ReplayFinished { proposal: 5, cost_usd_micros: 3000, tokens: 700, runs: Vec::new() },
+    ];
+    let l = Ledger::replay(&events);
+    assert_eq!((l.spent_usd(), l.spent_tokens(), l.committed_usd()), (3000, 700, 23_000));
+    let open = Ledger::replay(&events[..3]);
+    assert_eq!((open.spent_usd(), open.committed_usd()), (0, 40_000));
+}
