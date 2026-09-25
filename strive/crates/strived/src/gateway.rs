@@ -181,7 +181,19 @@ async fn admit(
     let request =
         state.cas.put(&sent).map_err(|e| bad(StatusCode::INTERNAL_SERVER_ERROR, "api_error", &e.to_string()))?;
     let start = CallStart { provider: provider.to_string(), model: info.model.clone(), request, reservation };
-    let call = state.sessions.start_call(&session, start).await.map_err(refused)?;
+    // Journaling the start reserves money, so whatever journals it must also
+    // own closing it. A client that leaves drops this handler, and could do so
+    // after the writer journaled the start but before its reply arrived; in
+    // a task of its own, the start always ends up in a `Finish`, whose drop
+    // closes the call.
+    let owner = state.clone();
+    let finish = tokio::spawn(async move {
+        let call = owner.sessions.start_call(&session, start).await?;
+        Ok(Finish::new(owner, session, call, reservation))
+    })
+    .await
+    .map_err(|e| bad(StatusCode::INTERNAL_SERVER_ERROR, "api_error", &e.to_string()))?
+    .map_err(refused)?;
     Ok(Admitted {
         api,
         provider: provider.to_string(),
@@ -190,7 +202,7 @@ async fn admit(
         sent,
         key,
         price: model.price,
-        finish: Finish::new(state.clone(), session, call, reservation),
+        finish,
     })
 }
 
@@ -214,7 +226,9 @@ async fn forward(state: Arc<State>, a: Admitted, headers: &HeaderMap) -> Respons
     let (head_tx, head_rx) = oneshot::channel::<Head>();
     let (tx, rx) = mpsc::channel::<Result<Bytes, std::io::Error>>(32);
     let idle = Duration::from_secs(state.settings.gateway.stream_idle_secs);
-    let pump = Pump { api, stream: a.stream, provider: a.provider, price: a.price, finish: a.finish, idle };
+    let mut finish = a.finish;
+    finish.if_dropped = "the gateway dropped the call unexpectedly";
+    let pump = Pump { api, stream: a.stream, provider: a.provider, price: a.price, finish, idle };
     tokio::spawn(pump.run(req, head_tx, tx));
     match head_rx.await {
         Ok(Ok((status, upstream_headers))) => {
@@ -373,12 +387,22 @@ struct Finish {
     reservation: Reservation,
     started: Instant,
     finished: bool,
+    /// Why the call ended, if this is dropped before `done`.
+    if_dropped: &'static str,
 }
 
 impl Finish {
     fn new(state: Arc<State>, session: SessionId, call: u64, reservation: Reservation) -> Self {
         state.gateway_calls.fetch_add(1, Ordering::SeqCst);
-        Self { state, session, call, reservation, started: Instant::now(), finished: false }
+        Self {
+            state,
+            session,
+            call,
+            reservation,
+            started: Instant::now(),
+            finished: false,
+            if_dropped: "the client disconnected before the response began",
+        }
     }
 
     /// Journals how the call ended; false if that couldn't be recorded.
@@ -404,7 +428,7 @@ impl Drop for Finish {
         let state = self.state.clone();
         if !self.finished {
             let (session, call, r) = (self.session.clone(), self.call, self.reservation);
-            let reason = "the gateway dropped the call unexpectedly".to_string();
+            let reason = self.if_dropped.to_string();
             tokio::spawn(async move {
                 let _ = state.sessions.finish_call(&session, call, broken(&r, reason), None, 0).await;
             });
