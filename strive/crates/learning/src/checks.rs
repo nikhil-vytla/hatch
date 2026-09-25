@@ -17,6 +17,8 @@ pub enum Rule {
     /// A skill's frontmatter; a one-line summary; a rationale and a prediction.
     Form,
     Secret,
+    /// Characters a person can't see in review: invisible or direction-changing.
+    Hidden,
     /// Instructions that would weaken strive's safeguards.
     Weakening,
     /// The evidence must name real work sessions of the project.
@@ -30,6 +32,7 @@ impl Rule {
             Rule::Size => "size",
             Rule::Form => "form",
             Rule::Secret => "secrets",
+            Rule::Hidden => "hidden text",
             Rule::Weakening => "safeguards",
             Rule::Evidence => "evidence",
         }
@@ -72,6 +75,21 @@ pub fn check(p: &Proposal, known: &[String]) -> Vec<Finding> {
             found.push(Finding::new(Rule::Secret, format!("the {what} holds what looks like {kind}")));
         }
     }
+    let notes = p.evidence.iter().map(|e| e.note.as_str()).collect::<Vec<_>>().join("\n");
+    for (what, text) in [
+        ("content", p.content.as_str()),
+        ("summary", &p.summary),
+        ("rationale", &p.rationale),
+        ("prediction", &p.prediction),
+        ("evidence notes", &notes),
+    ] {
+        if let Some(c) = text.chars().find(|c| hidden(*c)) {
+            found.push(Finding::new(
+                Rule::Hidden,
+                format!("the {what} holds U+{:04X}, a character a reviewer can't see", u32::from(c)),
+            ));
+        }
+    }
     found.extend(weakening(&p.content).into_iter().map(|d| Finding::new(Rule::Weakening, d)));
     if p.evidence.is_empty() {
         found.push(Finding::new(Rule::Evidence, "it names no sessions as evidence"));
@@ -79,10 +97,45 @@ pub fn check(p: &Proposal, known: &[String]) -> Vec<Finding> {
     found
 }
 
+/// Invisible or direction-changing: zero-width and joiner characters, bidi
+/// controls and isolates, word joiners and invisible operators, the BOM, the
+/// soft hyphen, fillers, and tag characters (which can spell out hidden
+/// ASCII). Variation selectors stay allowed: emoji use them.
+fn hidden(c: char) -> bool {
+    matches!(
+        u32::from(c),
+        0x00AD
+            | 0x034F
+            | 0x061C
+            | 0x115F
+            | 0x1160
+            | 0x180E
+            | 0x200B..=0x200F
+            | 0x202A..=0x202E
+            | 0x2060..=0x2064
+            | 0x2066..=0x206F
+            | 0x3164
+            | 0xFEFF
+            | 0xFFA0
+            | 0xFFF9..=0xFFFB
+            | 0x1D173..=0x1D17A
+            | 0xE0000..=0xE007F
+    )
+}
+
+/// Fullwidth ASCII (`ｉｇｎｏｒｅ`) read as ASCII, so a phrase can't hide in it.
+fn fold_fullwidth(c: char) -> char {
+    match u32::from(c) {
+        0x3000 => ' ',
+        n @ 0xFF01..=0xFF5E => char::from_u32(n - 0xFEE0).unwrap_or(c),
+        _ => c,
+    }
+}
+
 /// The gate's verdict and the detail a person reads.
 pub fn verdict(findings: &[Finding]) -> (Verdict, String) {
     if findings.is_empty() {
-        return (Verdict::Pass, "path, size, form, secrets, safeguards and evidence are fine".into());
+        return (Verdict::Pass, "path, size, form, secrets, hidden text, safeguards and evidence are fine".into());
     }
     let lines: Vec<String> = findings.iter().map(|f| format!("{}: {}", f.rule.name(), f.detail)).collect();
     (Verdict::Fail, lines.join("; "))
@@ -269,6 +322,22 @@ const WEAKENING: &[(&str, &[&str])] = &[
             "hide it from the user",
         ],
     ),
+    (
+        "poses as a system or model turn",
+        &[
+            "<system>",
+            "</system>",
+            "<system ",
+            "<|system|>",
+            "<|im_start|>",
+            "<|im_end|>",
+            "<assistant>",
+            "</assistant>",
+            "<|assistant|>",
+            "<|user|>",
+            "[system]",
+        ],
+    ),
 ];
 
 /// Programs that run a script piped to them.
@@ -276,7 +345,8 @@ const SHELLS: &[&str] = &["sh", "bash", "zsh", "dash", "ksh", "fish", "python", 
 
 /// What in `text` would weaken strive, one line per kind found.
 fn weakening(text: &str) -> Vec<String> {
-    let normal = text.replace(['\u{2019}', '\u{2018}'], "'").to_lowercase();
+    let normal =
+        text.replace(['\u{2019}', '\u{2018}'], "'").chars().map(fold_fullwidth).collect::<String>().to_lowercase();
     let flat = normal.split_whitespace().collect::<Vec<_>>().join(" ");
     let mut out: Vec<String> = WEAKENING
         .iter()

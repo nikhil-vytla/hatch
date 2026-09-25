@@ -1258,3 +1258,19 @@ loader now takes memory and `.strive/skills` only when reached without a
 symlink, as `learned()` already did for the learner. Two tests in
 `tests/context.rs` failed before. `AGENTS.md`/`CLAUDE.md` and
 `.claude/skills` stay ordinary project files, outside review, by design.
+
+## 2026-09-24: the static gate reads what a reviewer can't see
+
+From the bb study (its `unsafeMemoryReason`): the static gate matched
+safeguard phrases as plain substrings, so one zero-width space inside
+"ignore the user" got past it, and a person reviewing would see nothing.
+- A new rule, `hidden text`, refuses invisible and direction-changing
+  characters (zero-width, bidi controls and isolates, word joiners, the BOM,
+  soft hyphen, fillers, tag characters) in the content, summary, rationale,
+  prediction and evidence notes. Emoji variation selectors stay allowed.
+- Fullwidth ASCII is folded before phrase matching.
+- Role tags (`<system>`, `<|im_start|>`, `[system]`, ...) join the
+  safeguard phrases. `<system` alone isn't one: `<SystemProvider>` is code.
+Three tests in `crates/learning/tests/checks.rs` failed first. Homoglyphs
+from other scripts (Cyrillic `і`) are not folded; that needs a confusables
+table and the judge sees the text too.

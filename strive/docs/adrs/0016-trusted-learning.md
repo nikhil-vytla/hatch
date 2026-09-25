@@ -83,9 +83,11 @@ The daemon journals a `GateFinished` for each check it runs.
      describing when to use it.
    - **Secrets:** API-key and private-key patterns, and anything from
      strive's credentials.
+   - **Hidden text:** invisible or direction-changing characters (zero-width,
+     bidi controls, tag characters) anywhere a person reads the proposal.
    - **Weakening strive:** instructions to bypass approvals or the sandbox,
      to change strive's own state or settings, or to ignore the user;
-     pipe-to-shell installs.
+     pipe-to-shell installs; role tags posing as a system or model turn. Fullwidth letters are read as ASCII.
    - **Evidence:** it must name sessions that exist in this project.
 2. **`judge`** (M9): a model the learner doesn't control scores the
    proposal against work sessions the learner wasn't shown. It runs in the
