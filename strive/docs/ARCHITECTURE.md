@@ -292,8 +292,11 @@ machine). Every finding is listed in the gate's detail:
   skills themselves), or tell the agent to ignore the user; piping a
   download to a shell. The lists are broad on purpose: a false alarm
   costs a look.
-- **Evidence:** at least one session. Each is a work session of this
-  project whose journal verifies, and each cited seq is one of its entries.
+- **Evidence:** one to five sessions (`CITED_SESSIONS`), each citing at
+  least one entry. Each is a work session of this project whose journal
+  verifies, and each cited seq is one of its entries. The cap matters
+  because cited sessions are left out of the judge's held-out sessions and
+  the replay's tasks.
 
 **The judge gate** ([ADR-0017](adrs/0017-judge-gate.md)): the daemon's
 own model call, through its gateway with the learning session's token, so

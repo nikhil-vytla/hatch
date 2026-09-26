@@ -44,7 +44,9 @@ A task is mined from a work journal by a pure function
 - **Which sessions:** the project's work sessions the proposal doesn't
   cite, begun before it, whose journals verify and whose checkpoints exist,
   newest first, as the judge holds sessions out. At most `replay.tasks`
-  (3).
+  (3). Citing is how a learner could steer this, so the static gate caps a
+  proposal at five cited sessions, each with entries it names
+  ([ADR-0016](0016-trusted-learning.md)).
 
 Other checkable outcomes (a session whose last test run passed, say) wait
 until this one has shown what it's worth.

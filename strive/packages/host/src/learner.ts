@@ -70,7 +70,7 @@ What cost a session time and will come up again:
 - Memory is one file, so put all of a run's memory changes in one memory proposal.
 - summary: one line saying what changes, for a list.
 - rationale: what went wrong, how often, and why this text prevents it.
-- evidence: every session and the entry seqs you rely on, each with a note on what those entries show ("#12 \`bun test\` fails: no display; #15 the user says to run packages/host only"). Cite only this project's sessions, and only entries you read.
+- evidence: the sessions and entry seqs you rely on, each with a note on what those entries show ("#12 \`bun test\` fails: no display; #15 the user says to run packages/host only"). Cite only this project's sessions, and only entries you read. Every cited session needs at least one entry, and at most 5 sessions may be cited: pick those that show the lesson best.
 - prediction: a falsifiable claim about later sessions that someone could check, naming what would be observed: "Sessions that run the host tests won't first fail with 'no display'." Not "the agent will be more efficient".
 - watch: the prediction as a check the daemon runs on every later session once the change is accepted. Give one whenever the prediction is about commands, their output or exit, or what the user says; leave it out otherwise. A session is its steps in order: each prompt, and each command that ran. A step pattern matches by substrings, ignoring case: \`prompt\` alone, or any of \`command\`, \`output\` and \`exit\` ("zero" or "nonZero"), which must all hold for the same command. \`when\` limits the check to sessions with a matching step. \`expect\` is one of:
   - never: no step matches. {"when": {"command": "bun test"}, "expect": {"kind": "never", "step": {"command": "bun test", "output": "no display"}}}
@@ -192,9 +192,10 @@ export const ProposalParams = Type.Object({
   evidence: Type.Array(
     Type.Object({
       session: Type.String({ description: "A work session of this project" }),
-      seqs: Type.Array(Type.Integer(), { description: "The entries in it, by seq" }),
+      seqs: Type.Array(Type.Integer(), { minItems: 1, description: "The entries in it, by seq: at least one" }),
       note: Type.String({ description: "What those entries show" }),
     }),
+    { description: "At most 5 sessions, each with the entries that show the lesson" },
   ),
   prediction: Type.String({ description: "A falsifiable claim about later sessions, checked later" }),
   watch: Type.Optional(watchSchema()),

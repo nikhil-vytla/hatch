@@ -99,13 +99,41 @@ pub fn check(p: &Proposal, known: &[String]) -> Vec<Finding> {
         }
     }
     found.extend(weakening(&p.content).into_iter().map(|d| Finding::new(Rule::Weakening, d)));
-    if p.evidence.is_empty() {
-        found.push(Finding::new(Rule::Evidence, "it names no sessions as evidence"));
-    }
+    found.extend(citations(p).into_iter().map(|d| Finding::new(Rule::Evidence, d)));
     if let Some(w) = &p.watch {
         found.extend(crate::watch::problems(w).into_iter().map(|d| Finding::new(Rule::Watch, d)));
     }
     found
+}
+
+/// The most sessions a proposal may cite. Cited sessions are kept out of
+/// the judge's held-out sessions and the replay's tasks, so a learner that
+/// cited every session could choose what its checks see.
+pub const CITED_SESSIONS: usize = 5;
+
+/// What's wrong with the evidence as cited: none, a session with no entries
+/// (a citation must point at what it rests on), or too many sessions.
+fn citations(p: &Proposal) -> Vec<String> {
+    let mut out = Vec::new();
+    if p.evidence.is_empty() {
+        out.push("it names no sessions as evidence".to_string());
+    }
+    let mut sessions: Vec<&str> = Vec::new();
+    for e in &p.evidence {
+        if e.seqs.is_empty() {
+            out.push(format!("session {} names no entries; cite the entries that show the lesson", e.session));
+        }
+        if !sessions.contains(&e.session.as_str()) {
+            sessions.push(&e.session);
+        }
+    }
+    if sessions.len() > CITED_SESSIONS {
+        out.push(format!(
+            "it cites {} sessions; at most {CITED_SESSIONS}, the ones that show the lesson best",
+            sessions.len()
+        ));
+    }
+    out
 }
 
 /// Control characters, and invisible or direction-changing ones: zero-width and joiner characters, bidi

@@ -88,7 +88,11 @@ The daemon journals a `GateFinished` for each check it runs.
    - **Weakening strive:** instructions to bypass approvals or the sandbox,
      to change strive's own state or settings, or to ignore the user;
      pipe-to-shell installs; role tags posing as a system or model turn. Fullwidth letters are read as ASCII.
-   - **Evidence:** it must name sessions that exist in this project.
+   - **Evidence:** it must name sessions that exist in this project, each
+     with at least one of its entries, and at most five sessions
+     (`CITED_SESSIONS`). The judge holds out and the replay mines only
+     sessions the proposal doesn't cite, so a learner that cited every
+     other session, with no entries, would choose what its checks see.
 2. **`judge`** (M9): a model the learner doesn't control scores the
    proposal against work sessions the learner wasn't shown. It runs in the
    daemon's own call, under the learning session's budget, with a fixed

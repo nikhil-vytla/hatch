@@ -543,6 +543,7 @@ fn the_static_gate_wants_evidence_from_this_projects_work_sessions() {
         (cite(&id, json!([1])), "learning session"),
         (cite(&work, json!([99])), "has no entry 99"),
         (cite(&work, json!([0])), "has no entry 0"),
+        (cite(&work, json!([])), "names no entries"),
     ] {
         let made = propose(&mut host, &id, &p);
         assert_fails(&env, &cwd, made, "evidence", why);
@@ -550,6 +551,13 @@ fn the_static_gate_wants_evidence_from_this_projects_work_sessions() {
     let last = env.rpc().ok("session/read", &json!({"id": work}))["entries"].as_array().unwrap().len() as u64;
     let fine = propose(&mut host, &id, &cite(&work, json!([1, last])));
     assert_eq!(status(&env, &cwd, fine), "ready", "its last entry is real");
+
+    // Each cited session is kept from the judge's held-out sessions and the
+    // replay's tasks, so a proposal can't cite its way past them.
+    let mut many = memory("m", &work);
+    many["evidence"] = (0..6).map(|_| json!({"session": work_session(&env, &cwd), "seqs": [1], "note": "n"})).collect();
+    let many = propose(&mut host, &id, &many);
+    assert_fails(&env, &cwd, many, "evidence", "it cites 6 sessions; at most 5");
 }
 
 #[test]

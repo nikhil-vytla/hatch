@@ -87,6 +87,34 @@ fn a_proposal_says_what_why_and_what_should_happen() {
     assert_eq!(rules(&p), vec![Rule::Evidence]);
 }
 
+fn citing(sessions: &[(&str, &[u64])]) -> Proposal {
+    let evidence = sessions
+        .iter()
+        .map(|(s, seqs)| Evidence { session: (*s).into(), seqs: seqs.to_vec(), note: "n".into() })
+        .collect();
+    Proposal { evidence, ..memory("m") }
+}
+
+#[test]
+fn evidence_names_entries_and_only_a_few_sessions() {
+    // Citing a session keeps it out of the judge's held-out sessions and the
+    // replay's tasks, so a citation must point at something.
+    let found = check(&citing(&[("A", &[3]), ("B", &[])]), &[]);
+    assert_eq!(found.iter().map(|f| f.rule).collect::<Vec<_>>(), vec![Rule::Evidence]);
+    assert!(found[0].detail.contains("session B names no entries"), "{found:?}");
+
+    let five: Vec<(String, &[u64])> = (0..5).map(|i| (format!("S{i}"), &[1u64][..])).collect();
+    let five: Vec<(&str, &[u64])> = five.iter().map(|(s, q)| (s.as_str(), *q)).collect();
+    assert_eq!(rules(&citing(&five)), vec![]);
+    let mut six = five.clone();
+    six.push(("S0", &[2])); // the same session again doesn't count twice
+    assert_eq!(rules(&citing(&six)), vec![]);
+    six.push(("S5", &[1]));
+    let found = check(&citing(&six), &[]);
+    assert_eq!(found.iter().map(|f| f.rule).collect::<Vec<_>>(), vec![Rule::Evidence]);
+    assert!(found[0].detail.contains("it cites 6 sessions; at most 5"), "{found:?}");
+}
+
 #[test]
 fn secrets_are_refused_without_being_repeated() {
     let key = "sk-ant-api03-abcdefghij0123456789";
