@@ -17,14 +17,18 @@ import { appendFileSync, existsSync, readFileSync } from "node:fs";
 import { evaluate, GatewayError } from "../../../experience-prototypes/server/gateway";
 import { bankSchema, rng, shuffled } from "../src/checkable/items";
 
+/** Optional: another bank in src/checkable/ and its log name, e.g. judgement-bank.json judgement. */
+const BANK = process.argv[2] ?? "bank.json";
+const LOG = process.argv[3] ?? "checkable";
+
 const key = process.env.AI_GATEWAY_API_KEY;
 
 if (!key) throw Error("Set AI_GATEWAY_API_KEY to record.");
 
-const out = new URL("../recordings/checkable.jsonl", import.meta.url);
+const out = new URL(`../recordings/${LOG}.jsonl`, import.meta.url);
 
 const bank = bankSchema.parse(
-  JSON.parse(readFileSync(new URL("../src/checkable/bank.json", import.meta.url), "utf8")),
+  JSON.parse(readFileSync(new URL(`../src/checkable/${BANK}`, import.meta.url), "utf8")),
 );
 
 const done = new Set<string>();
