@@ -62,7 +62,8 @@ async function launch(args: string[], at = home): Promise<ElectronApplication> {
   const app = await electron.launch({
     executablePath: electronPath,
     args: [APP, ...args],
-    env: { ...keyless(), STRIVE_SOCKET: join(at, "run/strived.sock") },
+    // Behind the person's windows, without taking focus (see main.ts).
+    env: { ...keyless(), STRIVE_SOCKET: join(at, "run/strived.sock"), STRIVE_DESKTOP_BACKGROUND: "1" },
   });
 
   launched.add(app);

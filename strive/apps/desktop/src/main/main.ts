@@ -122,6 +122,12 @@ async function main() {
   const cwd = current.snapshot.session.cwd;
 
   await app.whenReady();
+  // Tests and screenshot runs drive the window over CDP, which needs no OS
+  // focus: in the background it opens behind what the person is doing, with
+  // no Dock icon or menu bar, and never takes the keyboard.
+  const background = process.env.STRIVE_DESKTOP_BACKGROUND === "1";
+
+  if (background && process.platform === "darwin") app.setActivationPolicy("accessory");
   serveWidgets();
   // Nothing loads from the network: the renderer is local files, and agent
   // widgets are sandboxed documents with their own policy.
@@ -146,14 +152,19 @@ async function main() {
     minHeight: 480,
     title: `strive · ${cwd}`,
     backgroundColor: "#0b0b0c",
+    show: !background,
     ...(process.platform === "darwin" && { titleBarStyle: "hiddenInset", trafficLightPosition: { x: 16, y: 17 } }),
     webPreferences: {
       preload: join(built(), "preload.cjs"),
       contextIsolation: true,
       sandbox: true,
       nodeIntegration: false,
+      // Behind other windows a page is otherwise throttled, and runs slow.
+      backgroundThrottling: !background,
     },
   });
+
+  if (background) window.showInactive();
 
   const page = pathToFileURL(join(built(), "renderer", "index.html")).href;
 
@@ -173,7 +184,9 @@ async function main() {
 
   // A person not looking at the window hears when the agent needs them or stops, and when the learner has proposals.
   const notify = (notice: Notice | undefined) => {
-    if (!notice || window.isDestroyed() || window.isFocused() || !Notification.isSupported()) return;
+    // In the background the window is never focused: no notices then, or
+    // every test would post them to the person's screen.
+    if (!notice || background || window.isDestroyed() || window.isFocused() || !Notification.isSupported()) return;
 
     const note = new Notification({ title: notice.title, body: notice.body });
     note.on("click", () => {
