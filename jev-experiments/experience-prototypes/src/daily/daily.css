@@ -306,3 +306,20 @@
   font: 13px/1.5 var(--mono);
   margin: 0;
 }
+.dy-card ol {
+  margin: 0;
+  padding-left: 20px;
+}
+.dy-facts {
+  border-collapse: collapse;
+  font-size: 15px;
+}
+.dy-facts th {
+  text-align: left;
+  font-weight: 400;
+  color: var(--muted);
+  padding: 2px 16px 2px 0;
+}
+.dy-facts td {
+  padding: 2px 0;
+}
