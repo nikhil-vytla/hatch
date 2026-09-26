@@ -27,10 +27,13 @@ import { PALETTE } from "./palette";
 import type { Card, CardContestant, Estimate, MetricDef, RunSet } from "./schema";
 
 /**
- * Phrases scored on this card. The held-out split is scored once, at the end; adding it is
- * this one line.
+ * Phrases scored on this card. The held-out split was scored once, after every contestant was
+ * recorded and with nothing tuned; the card pools both and offers each as a slice.
  */
-export const ONE_BOX_SPLITS: Phrase["split"][] = ["dev"];
+export const ONE_BOX_SPLITS: Phrase["split"][] = ["dev", "heldout"];
+
+/** Slice names for the two splits, shown in the "Phrases" select beside the phrase kinds. */
+const SPLIT_SLICE = { dev: "development", heldout: "held-out" } as const;
 
 const POLICIES: { id: Policy; label: string; short: string }[] = [
   { id: "latest", label: "keep the latest answer", short: "keep latest" },
@@ -379,6 +382,12 @@ export function oneBoxCard(
       (slices.workflow[kind] ??= {})[id] = estimates(idx);
     }
 
+    for (const sp of ["heldout", "dev"] as const) {
+      const idx = all.filter((i) => rows[i].p.split === sp);
+
+      (slices.workflow[SPLIT_SLICE[sp]] ??= {})[id] = estimates(idx);
+    }
+
     // What the box showed, compactly: [ms, state, characters typed].
     frames[id] = `onebox/frames.${id}.json`;
     writeFileSync(
@@ -433,6 +442,7 @@ export function oneBoxCard(
         id: p.id,
         text: p.text,
         kind: p.kind,
+        split: SPLIT_SLICE[p.split],
         intent: p.intent,
         acceptable: p.acceptable ?? [],
       })),
@@ -451,6 +461,7 @@ export function oneBoxCard(
           key: "intent",
           type: p.kind,
           wf: p.kind,
+          split: SPLIT_SLICE[p.split],
           keys: cardKeys,
           target: cardKeys.map((k) => (ok.has(k) ? 1 / ok.size : 0)),
         };
@@ -464,6 +475,7 @@ export function oneBoxCard(
       cases: phrases.map((p) => ({
         id: p.id,
         workflow: p.kind,
+        split: SPLIT_SLICE[p.split],
         state: { text: p.text },
         questions: [
           {
@@ -492,7 +504,7 @@ export function oneBoxCard(
     results,
     slices,
     facetLabels: { workflow: "Phrases" },
-    provenance: `Agreement with authored expectations · ${phrases.length} phrases, ${split} split (held-out phrases not yet scored) · written by a model that never saw any contestant's rules, then reviewed · typed at ${TYPING.msPerKey} ms a key with a ${TYPING.wordPauseMs} ms pause after each word and upstream's ${TYPING.debounceMs} ms debounce · recorded contestants (${models}) answered every distinct prefix once; replays reuse those answers under each request policy · calm-UI thresholds and keyword rules are Shapeshift's (anishfn/shapeshift, MIT), untuned · 95% case-bootstrap intervals`,
+    provenance: `Agreement with authored expectations · ${phrases.length} phrases (150 development, 50 held-out; the held-out ones scored once, after every contestant was recorded, with nothing tuned) · written by a model that never saw any contestant's rules, then reviewed · typed at ${TYPING.msPerKey} ms a key with a ${TYPING.wordPauseMs} ms pause after each word and upstream's ${TYPING.debounceMs} ms debounce · recorded contestants (${models}) answered every distinct prefix once; replays reuse those answers under each request policy · calm-UI thresholds and keyword rules are Shapeshift's (anishfn/shapeshift, MIT), untuned · 95% case-bootstrap intervals`,
     chunks: {
       phrases: "onebox/phrases.json",
       frames,

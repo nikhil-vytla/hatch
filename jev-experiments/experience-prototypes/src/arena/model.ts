@@ -117,6 +117,16 @@ export function useCardModel(card: Card, view: View, hasKey: boolean) {
 
           if (!best || !worst || order.length < 2 || best.value === worst.value) return [];
 
+          // A measure only some phrases reach (e.g. time until right for good) is not comparable
+          // across contestants that reach different phrases, so it never crowns a winner.
+          const partial = order.some((id) => {
+            const c = estimate(id, m)?.coverage;
+
+            return c !== undefined && c.covered < c.of;
+          });
+
+          if (partial) return [];
+
           return [
             {
               metric: m,

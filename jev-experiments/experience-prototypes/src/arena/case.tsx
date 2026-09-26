@@ -99,7 +99,7 @@ export function CaseView({ model: m }: { model: CardModel }) {
   if (!data) return <p className="muted">Loading cases…</p>;
 
   const list = data.cases.cases.flatMap((c, ci) =>
-    !m.view.wf || c.workflow === m.view.wf ? [{ c, ci }] : [],
+    !m.view.wf || c.workflow === m.view.wf || c.split === m.view.wf ? [{ c, ci }] : [],
   );
 
   if (!list.length) return <p className="muted">No cases in this slice.</p>;
