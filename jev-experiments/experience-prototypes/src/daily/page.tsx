@@ -82,7 +82,30 @@ function Card({ state }: { state: Record<string, unknown> }) {
       {Object.entries(state).map(([k, v]) => (
         <div key={k}>
           <dt>{k.replaceAll("_", " ")}</dt>
-          <dd>{typeof v === "string" ? v : <pre>{JSON.stringify(v, null, 2)}</pre>}</dd>
+          <dd>
+            {typeof v === "string" ? (
+              v
+            ) : Array.isArray(v) ? (
+              <ol>
+                {v.map((line, i) => (
+                  <li key={i}>{String(line)}</li>
+                ))}
+              </ol>
+            ) : v && typeof v === "object" ? (
+              <table className="dy-facts">
+                <tbody>
+                  {Object.entries(v).map(([fk, fv]) => (
+                    <tr key={fk}>
+                      <th scope="row">{fk.replaceAll("_", " ")}</th>
+                      <td>{String(fv)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              String(v)
+            )}
+          </dd>
         </div>
       ))}
     </dl>
@@ -250,12 +273,16 @@ export function DailyPage() {
 
   useEffect(() => {
     document.title = "Jev Daily · Jev experiments";
-    heading.current?.focus({ preventScroll: true });
     fetch("/daily/daily.json")
       .then((r) => r.json())
       .then((json) => setData(dailySchema.parse(json)))
       .catch(() => setError("Today's puzzles could not be loaded."));
   }, []);
+
+  // The heading exists once the data has loaded; focus it then, as the arena does.
+  useEffect(() => {
+    if (data) heading.current?.focus({ preventScroll: true });
+  }, [data]);
 
   const items = useMemo(() => {
     if (!data) return [];
