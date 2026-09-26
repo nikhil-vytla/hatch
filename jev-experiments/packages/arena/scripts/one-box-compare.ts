@@ -1,6 +1,8 @@
 /**
- * Every recorded contestant next to the keyword classifier on the development phrases, never
- * the held-out ones. Usage: bun packages/arena/scripts/one-box-compare.ts [cancel|latest]
+ * Every recorded contestant next to the keyword classifier on the development phrases.
+ * Usage: bun packages/arena/scripts/one-box-compare.ts [cancel|latest] [heldout]
+ * `heldout` scores the 50 held-out phrases instead; it was run once, after every contestant
+ * was recorded and with nothing tuned (see recordings/README.md).
  *
  * Under "cancel" a mid-word request only lands if it answers before the next keystroke (40 ms);
  * recorded Jev never does, so prefixes not yet recorded are treated as still in flight. Under
@@ -87,7 +89,10 @@ const fromRecording =
 
 const kw: AnswerFor = (key) => ({ reading: keyword(key), latencyMs: 1 });
 
-const dev = doc.phrases.filter((p) => p.split === "dev");
+const split = process.argv[3] === "heldout" ? "heldout" : "dev";
+const dev = doc.phrases.filter((p) => p.split === split);
+
+console.log(`${split} split: ${dev.length} phrases`);
 
 const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / (xs.length || 1);
 

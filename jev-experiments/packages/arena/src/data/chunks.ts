@@ -11,6 +11,8 @@ export const targetsSchema = z.object({
       key: z.string(),
       type: z.string(),
       wf: z.string(),
+      /** A second slice a row belongs to, e.g. One box's "held-out" split. */
+      split: z.string().optional(),
       keys: z.array(z.string()),
       target: z.array(z.number()),
     }),
@@ -49,6 +51,7 @@ export const casesSchema = z.object({
     z.object({
       id: z.string(),
       workflow: z.string(),
+      split: z.string().optional(),
       state: jsonValue,
       questions: z.array(
         z.object({
@@ -128,6 +131,7 @@ export const oneBoxPhrasesSchema = z.object({
       id: z.string(),
       text: z.string(),
       kind: z.enum(["plain", "ambiguous", "adversarial"]),
+      split: z.enum(["development", "held-out"]),
       intent: z.string(),
       acceptable: z.array(z.string()),
     }),
