@@ -26,6 +26,20 @@ export type Keystroke = { at: number; text: string };
 /** Upstream's cache key (src/lib/lru.ts): answers are shared by texts that normalize alike. */
 export const normalizeKey = (text: string) => text.toLowerCase().replace(/\s+/g, " ").trim();
 
+/** Every key a typist produces for a phrase: whole characters, two or more after normalizing. */
+export function prefixKeys(text: string) {
+  const chars = Array.from(text);
+  const keys = new Set<string>();
+
+  for (let i = 1; i <= chars.length; i++) {
+    const k = normalizeKey(chars.slice(0, i).join(""));
+
+    if (k.length >= 2) keys.add(k);
+  }
+
+  return keys;
+}
+
 export function keystrokes(phrase: string): Keystroke[] {
   // Whole characters: an emoji is one keystroke, never half of one.
   const chars = Array.from(phrase);
