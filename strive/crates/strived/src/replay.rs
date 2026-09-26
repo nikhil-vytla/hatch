@@ -152,12 +152,19 @@ pub fn plan(state: &State, cwd: &str, proposal: &Proposal, made_at_ms: u64, lear
         return skipped("the proposal's file has no path in the project");
     };
     let cited: Vec<&str> = proposal.evidence.iter().map(|e| e.session.as_str()).collect();
-    let tasks = tasks(state, cwd, &cited, made_at_ms, settings.tasks);
+    let (tasks, passed_over) = tasks(state, cwd, &cited, made_at_ms, settings.tasks);
     if tasks.is_empty() {
-        return skipped(
+        let over = match passed_over.first() {
+            Some((check, path)) => format!(
+                ", other than checks that name a path outside the project and so pass or fail by more than the \
+                 change (`{check}` names {path}, outside the project)"
+            ),
+            None => String::new(),
+        };
+        return skipped(format!(
             "no past task could be replayed: no session of this project that the proposal doesn't cite ran a \
-             command that failed and later passed",
-        );
+             command that failed and later passed{over}"
+        ));
     }
     let learned = crate::judge::shown_files(learning);
     Plan::Run(Replay { model, cap, runs: settings.runs, tasks, learned, path, content: proposal.content.clone() })
@@ -165,23 +172,41 @@ pub fn plan(state: &State, cwd: &str, proposal: &Proposal, made_at_ms: u64, lear
 
 /// Up to `limit` tasks from the project's newest work sessions the proposal
 /// doesn't cite, begun before it, whose journals verify and whose
-/// checkpoints are there to start from.
-fn tasks(state: &State, cwd: &str, cited: &[&str], made_at_ms: u64, limit: usize) -> Vec<Task> {
-    let Ok((sessions, _)) = state.sessions.list(Some(cwd), SessionKind::Work) else { return Vec::new() };
-    let mut out = Vec::new();
+/// checkpoints are there to start from; and the checks passed over for
+/// naming a path outside the project, with the path.
+fn tasks(
+    state: &State,
+    cwd: &str,
+    cited: &[&str],
+    made_at_ms: u64,
+    limit: usize,
+) -> (Vec<Task>, Vec<(String, String)>) {
+    let (mut out, mut passed_over) = (Vec::new(), Vec::new());
+    let Ok((sessions, _)) = state.sessions.list(Some(cwd), SessionKind::Work) else { return (out, passed_over) };
+    let names: Vec<&str> = std::iter::once(cwd).chain(alias(cwd)).collect();
     for s in sessions.into_iter().filter(|s| !cited.contains(&s.id.as_str()) && s.created_at_ms <= made_at_ms) {
         let Some(sid) = SessionId::parse(&s.id) else { continue };
         let Some(entries) = crate::judge::verified(state, cwd, &s.id) else { continue };
         if !state.sessions.checkpoint_dir(&sid).join("HEAD").exists() {
             continue;
         }
-        out.extend(strive_learning::replay::mine(&s.id, &entries));
+        for task in strive_learning::replay::mine(&s.id, &entries) {
+            match strive_learning::replay::outside_path(&task.check, &names) {
+                Some(path) => passed_over.push((task.check, path)),
+                None => out.push(task),
+            }
+        }
         if out.len() >= limit {
             break;
         }
     }
     out.truncate(limit);
-    out
+    (out, passed_over)
+}
+
+/// The other name a directory goes by: `/tmp/p` for `/private/tmp/p` on macOS.
+fn alias(dir: &str) -> Option<&str> {
+    dir.strip_prefix("/private").filter(|a| a.starts_with('/'))
 }
 
 /// Starts the replay of proposal `id` in the background. Call with the
@@ -456,9 +481,9 @@ async fn once(state: &Arc<State>, r: &Replay, task: &Task, with_change: bool, le
 fn relocated(text: &str, project: &Path, work: &Path) -> String {
     let (from, to) = (project.display().to_string(), work.display().to_string());
     let text = strive_learning::replay::relocate(text, &from, &to);
-    match from.strip_prefix("/private") {
-        Some(alias) if alias.starts_with('/') => strive_learning::replay::relocate(&text, alias, &to),
-        _ => text,
+    match alias(&from) {
+        Some(alias) => strive_learning::replay::relocate(&text, alias, &to),
+        None => text,
     }
 }
 

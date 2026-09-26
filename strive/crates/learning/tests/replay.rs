@@ -1,6 +1,6 @@
 //! The replay gate's tasks, mined from work journals, and its verdict.
 
-use strive_learning::replay::{Task, TaskTally, mine, relocate, verdict};
+use strive_learning::replay::{Task, TaskTally, mine, outside_path, relocate, verdict};
 use strive_proto::{Digest, EffectOutcome, EffectRecord, Entry, Event, TurnEnd, Verdict};
 
 /// Builds a work journal event by event, numbering entries from 1.
@@ -205,6 +205,36 @@ fn a_sibling_whose_name_starts_with_the_projects_is_left_alone() {
     assert_eq!(relocate("cd /p/app2 && make", "/p/app", to), "cd /p/app2 && make");
     assert_eq!(relocate("ls /p/app.bak /p/app-old /p/app_x", "/p/app", to), "ls /p/app.bak /p/app-old /p/app_x");
     assert_eq!(relocate("sh check.sh", "/p/app", to), "sh check.sh");
+}
+
+#[test]
+fn a_check_naming_a_path_outside_the_project_is_found() {
+    let projects = ["/private/tmp/p", "/tmp/p"];
+    for (check, outside) in [
+        ("test -f /tmp/.ok", "/tmp/.ok"),
+        ("cd /tmp/p && sh check.sh && cat /etc/hosts", "/etc/hosts"),
+        ("[ -e ~/.cache/done ]", "~/.cache/done"),
+        ("test -f \"$HOME/x\"", "$HOME/x"),
+        ("sh check.sh>/tmp/log", "/tmp/log"),
+        ("cd /tmp/p2 && make", "/tmp/p2"),
+    ] {
+        assert_eq!(outside_path(check, &projects).as_deref(), Some(outside), "{check}");
+    }
+}
+
+#[test]
+fn a_check_inside_the_project_or_using_system_tools_is_fine() {
+    let projects = ["/private/tmp/p", "/tmp/p"];
+    for check in [
+        "sh check.sh",
+        "cd /tmp/p && bun test src",
+        "cd '/private/tmp/p/app'; make 2>/dev/null",
+        "/bin/sh check.sh",
+        "/usr/bin/env bash run.sh",
+        "cargo test -p a/b",
+    ] {
+        assert_eq!(outside_path(check, &projects), None, "{check}");
+    }
 }
 
 fn tally(with: (u32, u32), without: (u32, u32)) -> TaskTally {

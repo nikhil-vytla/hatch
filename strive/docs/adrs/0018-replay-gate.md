@@ -34,6 +34,13 @@ A task is mined from a work journal by a pure function
 - **One per turn:** its first such command. Commands over 300 characters
   are passed over. A command killed by its time limit has no exit and isn't
   a failure.
+- **Checks inside the copy only:** a check that names a path outside the
+  project once the project's own directory is relocated (`test -f
+  /tmp/.ok`, `~/...`, `$HOME/...`) is passed over
+  (`strive_learning::replay::outside_path`). It passes or fails by state
+  outside the scratch copy, which the change can't affect and anything
+  else can. The system's tools (`/bin/`, `/usr/bin/`, ...) and `/dev/null`
+  are allowed.
 - **Which sessions:** the project's work sessions the proposal doesn't
   cite, begun before it, whose journals verify and whose checkpoints exist,
   newest first, as the judge holds sessions out. At most `replay.tasks`

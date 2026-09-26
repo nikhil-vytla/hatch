@@ -169,6 +169,38 @@ pub fn relocate(text: &str, from: &str, to: &str) -> String {
     out
 }
 
+/// System paths a check may name: tools and `/dev/null`, the same on both
+/// sides and nothing a task leaves behind.
+const SYSTEM_PATHS: [&str; 9] = [
+    "/bin/",
+    "/sbin/",
+    "/usr/bin/",
+    "/usr/sbin/",
+    "/usr/local/bin/",
+    "/opt/homebrew/bin/",
+    "/dev/null",
+    "/dev/stdout",
+    "/dev/stderr",
+];
+
+/// The first path outside the project that `check` names, once each of
+/// `projects` (the project's directory under each name it goes by) is
+/// taken out as `relocate` would: an absolute path, or one from `~` or
+/// `$HOME`, other than the system's tools and `/dev/null`. A check like
+/// `test -f /tmp/.ok` passes or fails by state outside the scratch copy,
+/// which the change can't affect and anything else can, so it measures
+/// nothing about the change.
+pub fn outside_path(check: &str, projects: &[&str]) -> Option<String> {
+    let text = projects.iter().fold(check.to_string(), |text, p| relocate(&text, p, "."));
+    let separator = |c: char| c.is_whitespace() || ";&|()<>='\"`".contains(c);
+    text.split(separator).find_map(|word| {
+        let word = word.trim_start_matches(['{', '[']).trim_end_matches(['}', ']']);
+        let outside = ["/", "~", "$HOME", "${HOME}"].iter().any(|p| word.starts_with(p));
+        let system = SYSTEM_PATHS.iter().any(|s| word.starts_with(s) && (s.ends_with('/') || word == *s));
+        (outside && !system).then(|| word.to_string())
+    })
+}
+
 /// How one task's runs went, on each side.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct TaskTally {

@@ -107,6 +107,8 @@ type Setup = {
   judgePasses?: boolean;
   /** Whether a work session ran the check red to green. */
   minable?: boolean;
+  /** The task's check command, given the project's directory. */
+  check?: (project: string) => string;
   /** The task's checkpoint has `.strive` as a symlink to this directory; the project doesn't, by the time of the proposal. */
   linkedStrive?: string;
 };
@@ -148,7 +150,7 @@ async function world(s: Setup): Promise<World> {
   if (s.minable ?? true) {
     // As agents often do, the check names the project: replayed, it must
     // run in the scratch copy, where fixed.txt may be missing, not here.
-    const check = `cd ${project} && sh check.sh`;
+    const check = s.check?.(project) ?? `cd ${project} && sh check.sh`;
 
     work.push(
       { toolCalls: [{ id: "b1", name: "bash", input: { command: check } }] },
@@ -302,6 +304,16 @@ test("with no task a machine can check, replay is skipped and says why", async (
   expect(gate(p, "replay")?.verdict).toBe("skipped");
   expect(gate(p, "replay")?.detail).toContain("no past task could be replayed");
   expect(p.status).toBe("ready");
+  expect((await events(w)).some((e) => e.event.type === "replayStarted")).toBe(false);
+});
+
+test("a task whose check names a path outside the project isn't mined", async () => {
+  const w = await world({ check: (project) => `cd ${project} && sh check.sh && test -d /tmp` });
+  const p = await settledProposal(w);
+
+  expect(gate(p, "replay")?.verdict).toBe("skipped");
+  expect(gate(p, "replay")?.detail).toContain("no past task could be replayed");
+  expect(gate(p, "replay")?.detail).toContain("names /tmp, outside the project");
   expect((await events(w)).some((e) => e.event.type === "replayStarted")).toBe(false);
 });
 

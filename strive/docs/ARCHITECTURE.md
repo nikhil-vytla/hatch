@@ -325,7 +325,10 @@ the project, run again by the agent with and without the proposal.
   that failed, which the same session later ran with exit 0. The task is
   the turn's prompts, the checkpoint before them, and the command as its
   check. Mined from the project's newest work sessions the proposal doesn't
-  cite, begun before it; at most `replay.tasks` (3).
+  cite, begun before it; at most `replay.tasks` (3). A check that names a
+  path outside the project (`test -f /tmp/.ok`), once the project's own
+  directory is relocated, is passed over: it depends on state outside the
+  copy (`strive_learning::replay::outside_path`).
 - **A run** is a session of `kind: replay` the daemon creates in a scratch
   directory outside the project (`$TMPDIR/strive-replay-*/work`):
   - the checkpoint's tree, exported from the task session's shadow
