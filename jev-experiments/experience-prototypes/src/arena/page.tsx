@@ -9,6 +9,7 @@ import { defaults, formatValue, loadIndex, readView, viewHash, type View } from 
 import { caption, colorVars, compareBy, LENS_LABEL, useCardModel, type CardModel } from "./model";
 import { Picker } from "./picker";
 import { Table } from "./table";
+import { TryBox } from "./try-box";
 import { TypingWatch } from "./typing";
 import { Watch } from "./watch";
 import "./arena.css";
@@ -174,6 +175,8 @@ function LensBody({ model: m }: { model: CardModel }) {
       return <CaseView model={m} />;
     case "board":
       return <Watch model={m} />;
+    case "try":
+      return <TryBox model={m} />;
     case "typing":
       return <TypingWatch model={m} />;
   }

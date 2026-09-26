@@ -2,28 +2,7 @@
  * One box, watched: a phrase typed at the recorded pace, one box per contestant showing what
  * it showed at each moment, and a strip of every state over the phrase.
  */
-import {
-  ArrowLeftRight,
-  Bell,
-  Calculator,
-  Calendar,
-  Contact,
-  Dices,
-  Globe,
-  Hourglass,
-  Link,
-  ListTodo,
-  Palette,
-  Plane,
-  Receipt,
-  Repeat,
-  StickyNote,
-  Target,
-  Timer,
-  Users,
-  Vote,
-} from "lucide-react";
-import { useEffect, useEffectEvent, useMemo, useState, type ReactElement } from "react";
+import { useEffect, useEffectEvent, useMemo, useState } from "react";
 import {
   oneBoxFramesSchema,
   oneBoxPhrasesSchema,
@@ -32,51 +11,12 @@ import {
 } from "../../../packages/arena/src/data/chunks";
 import { loadChunk } from "./data";
 import { colorVars, type CardModel } from "./model";
-
-const ICON = { "aria-hidden": true, size: 18, strokeWidth: 1.75 } as const;
-
-/** One icon per card, created once. */
-const ICONS = new Map<string, ReactElement>([
-  ["event", <Calendar key="event" {...ICON} />],
-  ["reminder", <Bell key="reminder" {...ICON} />],
-  ["todo", <ListTodo key="todo" {...ICON} />],
-  ["timer", <Timer key="timer" {...ICON} />],
-  ["habit", <Repeat key="habit" {...ICON} />],
-  ["color", <Palette key="color" {...ICON} />],
-  ["split", <Users key="split" {...ICON} />],
-  ["expense", <Receipt key="expense" {...ICON} />],
-  ["convert", <ArrowLeftRight key="convert" {...ICON} />],
-  ["calc", <Calculator key="calc" {...ICON} />],
-  ["travel", <Plane key="travel" {...ICON} />],
-  ["poll", <Vote key="poll" {...ICON} />],
-  ["contact", <Contact key="contact" {...ICON} />],
-  ["link", <Link key="link" {...ICON} />],
-  ["countdown", <Hourglass key="countdown" {...ICON} />],
-  ["timezone", <Globe key="timezone" {...ICON} />],
-  ["random", <Dices key="random" {...ICON} />],
-  ["goal", <Target key="goal" {...ICON} />],
-  ["note", <StickyNote key="note" {...ICON} />],
-]);
+import { parse, Shown, words } from "./one-box-ui";
 
 /** Time after the last keystroke that the replay keeps running, so late answers land. */
 const TAIL_MS = 1500;
 
 type Phrase = OneBoxPhrases["phrases"][number];
-
-type State =
-  | { kind: "input" }
-  | { kind: "ghost" | "committed"; card: string }
-  | { kind: "choose"; cards: string[] };
-
-function parse(state: string): State {
-  const [kind, rest = ""] = state.split(":");
-
-  if (kind === "choose") return { kind, cards: rest.split("|") };
-
-  if ((kind === "ghost" || kind === "committed") && rest) return { kind, card: rest };
-
-  return { kind: "input" };
-}
 
 /** Keystroke times for a phrase, from the recorded typing model. */
 function keyTimes(text: string, typing: OneBoxPhrases["typing"]) {
@@ -90,51 +30,6 @@ function keyTimes(text: string, typing: OneBoxPhrases["typing"]) {
   });
 
   return times;
-}
-
-const words = (card: string) => card.replaceAll("_", " ");
-
-function CardFace({
-  card,
-  kind,
-  wrong,
-}: {
-  card: string;
-  kind: "ghost" | "committed";
-  wrong: boolean;
-}) {
-  return (
-    <div className="ob-card" data-kind={kind} data-wrong={wrong}>
-      {ICONS.get(card) ?? <StickyNote {...ICON} />}
-      <span className="ob-card-name">{words(card)}</span>
-      <span className="ob-card-note">
-        {kind === "ghost" ? "preview" : wrong ? "wrong card" : "card"}
-      </span>
-    </div>
-  );
-}
-
-function Shown({ state, ok }: { state: State; ok: Set<string> }) {
-  if (state.kind === "input") return <p className="ob-waiting">waiting</p>;
-
-  if (state.kind === "choose")
-    return (
-      <div className="ob-chips">
-        {state.cards.map((c) => (
-          <span key={c} className="ob-chip">
-            {words(c)}
-          </span>
-        ))}
-      </div>
-    );
-
-  return (
-    <CardFace
-      card={state.card}
-      kind={state.kind}
-      wrong={state.kind === "committed" && !ok.has(state.card)}
-    />
-  );
 }
 
 export function TypingWatch({ model: m }: { model: CardModel }) {
