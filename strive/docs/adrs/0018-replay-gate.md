@@ -123,8 +123,9 @@ Counted over every run of every task:
 
 | Situation | Replay verdict |
 | --- | --- |
-| With the change, runs passed at least as often as without | pass |
+| With the change, runs passed more often than without | pass |
 | With the change, they passed less often | fail |
+| As often on both sides (3/3 and 3/3, say) | skipped: inconclusive, the change made no difference |
 | Every run failed on both sides | skipped: inconclusive |
 | The static check or the judge failed | skipped, saying which |
 | Replay is off (`budgetUsd` 0), no sandbox, no host, no key, no price | skipped, saying which |
@@ -135,6 +136,12 @@ Counted over every run of every task:
 
 The detail's first line reads "with the change 3/3 passed, without 1/3;
 1 task", then the model and cost, then one line per task.
+
+A tie is not a pass. An earlier rule passed "at least as often", so a
+change that did nothing, or a check that passes whatever the agent does,
+passed replay, and under `gated` ([ADR-0020](0020-learning-triggers.md))
+went in with no person reading it. A skip leaves it to a person, who can
+still accept it.
 
 ### When it runs, and what a skip means
 

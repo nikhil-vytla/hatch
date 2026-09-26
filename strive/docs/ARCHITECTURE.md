@@ -353,9 +353,9 @@ the project, run again by the agent with and without the proposal.
   their actual cost in place of the hold, in the same commit as the
   verdict. A hold a crash cut off stays charged in full. A call refused
   for the cap stops the replay.
-- **Verdict:** pass when runs with the change passed at least as often as
-  without; fail when less often; skipped when every run failed on both
-  sides, and with the reason when it couldn't run (static or judge failed,
+- **Verdict:** pass when runs with the change passed more often than
+  without; fail when less often; skipped (inconclusive) when as often,
+  every run failing on both sides included, and with the reason when it couldn't run (static or judge failed,
   replay off, no sandbox, no host, no key, nothing to mine, no budget).
 - **When:** once the judge has a verdict that isn't a fail, in the
   background, like the judge; run again after a crash.

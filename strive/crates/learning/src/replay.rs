@@ -183,10 +183,12 @@ pub struct TaskTally {
 }
 
 /// The replay gate's verdict and the detail a reviewer reads.
-/// - pass: with the change, runs passed at least as often as without it;
+/// - pass: with the change, runs passed more often than without it;
 /// - fail: they passed less often;
-/// - skipped (inconclusive): every run failed on both sides, so the replay
-///   can't tell whether the change helps.
+/// - skipped (inconclusive): they passed as often, so the replay shows
+///   nothing the change did. A tie isn't a pass: `gated` accepts only on
+///   passes, and a change that makes no difference (or a check that passes
+///   whatever the agent does) would otherwise go in unread.
 pub fn verdict(tasks: &[TaskTally], model: &str, cost: &str) -> (Verdict, String) {
     let sum = |f: fn(&TaskTally) -> u32| tasks.iter().map(f).sum::<u32>();
     let (wp, wr) = (sum(|t| t.with_passed), sum(|t| t.with_runs));
@@ -196,14 +198,17 @@ pub fn verdict(tasks: &[TaskTally], model: &str, cost: &str) -> (Verdict, String
         tasks.len(),
         if tasks.len() == 1 { "" } else { "s" }
     );
-    // Rates compared without division: wp/wr < op/or.
-    let worse = u64::from(wp) * u64::from(or) < u64::from(op) * u64::from(wr);
+    // Rates compared without division: wp/wr against op/or.
     let (verdict, head) = if wp == 0 && op == 0 {
         (Verdict::Skipped, format!("inconclusive: every run failed, {counts}, so replay can't tell whether it helps"))
-    } else if worse {
-        (Verdict::Fail, format!("failed: {counts}"))
     } else {
-        (Verdict::Pass, counts)
+        match (u64::from(wp) * u64::from(or)).cmp(&(u64::from(op) * u64::from(wr))) {
+            std::cmp::Ordering::Less => (Verdict::Fail, format!("failed: {counts}")),
+            std::cmp::Ordering::Equal => {
+                (Verdict::Skipped, format!("inconclusive: the change made no difference, {counts}"))
+            }
+            std::cmp::Ordering::Greater => (Verdict::Pass, counts),
+        }
     };
     let mut lines = vec![head, format!("{model}, {cost}")];
     for t in tasks {

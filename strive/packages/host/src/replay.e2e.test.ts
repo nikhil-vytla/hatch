@@ -436,6 +436,20 @@ test("under gated, a proposal whose static, judge and replay checks all passed i
   expect(after?.status).toBe("rolledBack");
 });
 
+test("under gated, a change that made no difference in replay is inconclusive and left for a person", async () => {
+  // The agent fixes the task with or without the memory.
+  const w = await world({ settings: { ...GATED, replay: { runs: 1 } }, replay: () => FIX });
+  const p = await settledProposal(w);
+
+  expect(gate(p, "replay")?.verdict).toBe("skipped");
+  expect(gate(p, "replay")?.detail.split("\n")[0]).toBe(
+    "inconclusive: the change made no difference, with the change 1/1 passed, without 1/1; 1 task",
+  );
+  expect(p.status).toBe("ready");
+  expect(await decisions(w)).toEqual([]);
+  expect(existsSync(join(w.project, ".strive/memory.md"))).toBe(false);
+});
+
 test("under gated, a proposal the judge skipped is left for a person, even when replay passed", async () => {
   // The judge runs only on Anthropic models, so it's skipped; replay runs on Haiku.
   const w = await world({

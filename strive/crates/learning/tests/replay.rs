@@ -220,14 +220,22 @@ fn tally(with: (u32, u32), without: (u32, u32)) -> TaskTally {
 }
 
 #[test]
-fn passing_at_least_as_often_with_the_change_passes() {
+fn passing_more_often_with_the_change_passes() {
     let (v, detail) = verdict(&[tally((3, 3), (1, 3)), tally((1, 3), (1, 3))], "claude-haiku-4-5", "$0.0100");
     assert_eq!(v, Verdict::Pass);
     let lines: Vec<&str> = detail.lines().collect();
     assert_eq!(lines[0], "with the change 4/6 passed, without 2/6; 2 tasks");
     assert_eq!(lines[1], "claude-haiku-4-5, $0.0100");
     assert_eq!(lines[2], "session S #4 `make`: with 3/3, without 1/3");
-    assert_eq!(verdict(&[tally((2, 3), (2, 3))], "m", "c").0, Verdict::Pass, "a tie passes");
+}
+
+#[test]
+fn a_tie_is_inconclusive_not_a_pass() {
+    for (with, without) in [((3, 3), (3, 3)), ((2, 3), (2, 3)), ((2, 4), (1, 2))] {
+        let (v, detail) = verdict(&[tally(with, without)], "m", "c");
+        assert_eq!(v, Verdict::Skipped, "{with:?} against {without:?}");
+        assert!(detail.starts_with("inconclusive: the change made no difference, with the change"), "{detail}");
+    }
 }
 
 #[test]
