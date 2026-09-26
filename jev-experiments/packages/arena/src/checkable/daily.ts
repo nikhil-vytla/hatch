@@ -5,11 +5,16 @@
  * picks the day's five with dailySet(). Jev's answers were recorded before any day's play.
  */
 import { z } from "zod";
-import { bankSchema, rng, truthSchema, wireQuestionSchema, type Bank } from "./items";
+import { bankSchema, rng, shuffled, truthSchema, wireQuestionSchema, type Bank } from "./items";
+
+/** Puzzle kinds the Daily can show. */
+export const dailyKindSchema = z.enum(["tetris", "grid", "phrase", "order", "route"]);
+
+export type DailyKind = z.infer<typeof dailyKindSchema>;
 
 export const dailyItemSchema = z.object({
   id: z.string(),
-  kind: z.enum(["tetris", "grid"]),
+  kind: dailyKindSchema,
   difficulty: z.number(),
   state: z.record(z.string(), z.unknown()),
   questionId: z.string(),
@@ -26,7 +31,7 @@ export const dailySchema = z.object({
   /** How Jev did on every question of every item where it said 90% or more. */
   sure: z.object({ n: z.number(), right: z.number() }),
   bank: bankSchema.pick({ schema: true, generatedWith: true }).extend({
-    ids: z.array(z.object({ id: z.string(), kind: z.enum(["tetris", "grid"]) })),
+    ids: z.array(z.object({ id: z.string(), kind: dailyKindSchema })),
   }),
   items: z.array(dailyItemSchema),
 });
@@ -58,3 +63,40 @@ export function questionFor(item: Bank["items"][number]) {
 export const CLAMP = 0.01;
 
 export const score = (p: number) => Math.log(Math.min(1 - CLAMP, Math.max(CLAMP, p)));
+
+/**
+ * The day's mix. Jev is built for judgement from text, so the Daily is too: phrases, orders
+ * and routing, plus one Tetris question about a local pattern. Puzzles that need counting or
+ * route-finding (Tetris heights, maze distances) stay in the arena, where Jev does poorly and
+ * says so.
+ */
+export const MIX: [DailyKind, number][] = [
+  ["phrase", 2],
+  ["order", 1],
+  ["route", 1],
+  ["tetris", 1],
+];
+
+const DAY_MS = 86_400_000;
+
+const EPOCH = Date.UTC(2026, 8, 26);
+
+/** The ids for a date (YYYY-MM-DD, UTC), walking a fixed shuffle of each kind so none repeats until used up. */
+export function pickDaily(ids: { id: string; kind: DailyKind }[], date: string) {
+  const day = Math.floor((Date.parse(`${date}T00:00:00Z`) - EPOCH) / DAY_MS);
+
+  if (!Number.isFinite(day)) throw new Error(`Not a date: ${date}`);
+
+  return MIX.flatMap(([kind, per], k) => {
+    const order = shuffled(
+      ids.flatMap((i) => (i.kind === kind ? [i.id] : [])),
+      rng(20260926 + k),
+    );
+
+    if (!order.length) return [];
+    const n = order.length;
+    const start = (((day * per) % n) + n) % n;
+
+    return Array.from({ length: Math.min(per, n) }, (_, i) => order[(start + i) % n]);
+  });
+}
