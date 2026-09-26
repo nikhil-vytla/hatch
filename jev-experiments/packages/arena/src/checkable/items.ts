@@ -24,7 +24,7 @@ export type Truth = z.infer<typeof truthSchema>;
 
 export const itemSchema = z.object({
   id: z.string(),
-  kind: z.enum(["tetris", "grid"]),
+  kind: z.enum(["tetris", "grid", "order", "route"]),
   seed: z.number(),
   /** 0 easy … 2 hard, from how close the competing answers are. */
   difficulty: z.number(),

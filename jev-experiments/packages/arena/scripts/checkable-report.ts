@@ -11,15 +11,19 @@ import { gunzipSync } from "node:zlib";
 import { z } from "zod";
 import { bankSchema, type Item } from "../src/checkable/items";
 
+/** Optional: another bank in src/checkable/ and its log name, e.g. judgement-bank.json judgement. */
+const BANK = process.argv[2] ?? "bank.json";
+const LOG = process.argv[3] ?? "checkable";
+
 const bank = bankSchema.parse(
-  JSON.parse(readFileSync(new URL("../src/checkable/bank.json", import.meta.url), "utf8")),
+  JSON.parse(readFileSync(new URL(`../src/checkable/${BANK}`, import.meta.url), "utf8")),
 );
 
-const raw = new URL("../recordings/checkable.jsonl", import.meta.url);
+const raw = new URL(`../recordings/${LOG}.jsonl`, import.meta.url);
 
 const log = existsSync(raw)
   ? readFileSync(raw, "utf8")
-  : gunzipSync(readFileSync(new URL("../recordings/checkable.jsonl.gz", import.meta.url))).toString(
+  : gunzipSync(readFileSync(new URL(`../recordings/${LOG}.jsonl.gz`, import.meta.url))).toString(
       "utf8",
     );
 
@@ -152,7 +156,7 @@ for (const [g, ss] of [...groups].sort(([a], [b]) => a.localeCompare(b))) {
 
 console.log("\ncalibration (stated confidence of the top answer → how often it is right)");
 
-for (const kind of ["all", "tetris", "grid"]) {
+for (const kind of ["all", ...new Set(bank.items.map((i) => i.kind))]) {
   const ss = kind === "all" ? scored : scored.filter((s) => s.kind === kind);
   const cells = [];
 

@@ -52,6 +52,49 @@ bank parses, every answer is one of its question's options, and the daily set is
 `dailySet(bank, "YYYY-MM-DD")` gives five items (three Tetris, two grid) walking a fixed
 shuffle, so none repeats until the bank is used up.
 
+## Judgement puzzles: orders and routing
+
+Tetris and grid questions turned out to test counting and route-finding, which Jev does
+poorly and people do at a glance. These two kinds test reading and judging instead: the text
+is written from hidden facts, both a person and Jev read the same words, and code applies the
+facts to decide the answer.
+
+### Order (`order.ts`)
+
+A customer states one to three requests in their own words ("I'm off caffeine this month",
+"keep it under five bucks", "no cow's milk, oat or almond is totally fine though", typos
+included), and the barista proposes a drink shown as a card (drink, milk, syrup, caffeine in
+mg, sweetness, price, hot or iced). The requests are hidden structured facts: no dairy, no
+caffeine or 50 mg or less, a price limit, hot or iced, no sugar or not too sweet, no tree nuts
+(almond milk and hazelnut syrup count). A quarter of customers also state a request and take
+it back ("I'd normally skip caffeine, but today I really need it"); a retracted request no
+longer applies but still appears among the options. At most one request is broken.
+
+- `meets_all` (yes/no): the drink meets everything the customer still wants.
+- `breaks` (choice): which request it breaks, each request mentioned (retracted ones too) or
+  "none".
+- `meets_one` (yes/no): the drink satisfies one named request.
+
+### Route (`route.ts`)
+
+A team's policy of three to five numbered rules from a pool, then "everything else goes to
+Support"; rules are checked in order and the first that applies wins. Messages sent to
+Security or On-call need a person today. The customer message is written from hidden facts:
+the topic (refund, security, outage, shipping, login, feature idea, billing question), an
+amount if any, and whether the customer is upset. Two rules can apply to one message (a
+hacked account with an unrecognized charge is both a security report and a question about a
+charge), so the order decides; "over $100" excludes exactly $100; a calm outage report falls
+through an "upset and down" rule. Topics are weighted towards these cases.
+
+- `team` (choice): which team gets the message, among the teams the policy names.
+- `today` (yes/no): the message needs a person today (Security or On-call).
+
+`judgement-bank.json`: 75 orders (38 meet everything, 37 break one request; 31 harder: a
+retraction or three requests) and 75 routes (30 hard) from seeds 1 upward
+(`scripts/generate-judgement.ts`). Recorded the same way as the Tetris and grid bank:
+`bun packages/arena/scripts/record-checkable.ts judgement-bank.json judgement`, reported with
+`bun packages/arena/scripts/checkable-report.ts judgement-bank.json judgement`.
+
 ## Recording (`scripts/record-checkable.ts`)
 
 One call per item with all its questions batched, items in a seeded shuffled order, one
@@ -105,3 +148,27 @@ What it shows:
 For Jev Daily this is useful rather than embarrassing: a careful person can beat Jev on these
 items, and its confidence says where. The weak question types (lowest stack, distance) are
 where a human should win; the strong ones (fills a row, clears the most) are where Jev should.
+
+## Judgement results (recorded 26 Sep 2026)
+
+150 items, 414 attempts (63.8% busy and retried), latency median 270 ms, 90th percentile
+437 ms, no answers dropped. Against the answers code computes:
+
+| Question | n | Jev right | Most common answer | Jev log score | Uniform |
+|---|---|---|---|---|---|
+| Order · breaks which request | 75 | 90.7% | 50.7% | −0.205 | −1.090 |
+| Order · meets everything | 75 | 89.3% | 50.7% | −0.273 | −0.693 |
+| Order · meets one named request | 75 | 98.7% | 70.7% | −0.085 | −0.693 |
+| Route · which team | 75 | 86.7% | 32.0% | −0.381 | −1.491 |
+| Route · needs a person today | 75 | 82.7% | 74.7% | −0.412 | −0.693 |
+
+Easy and hard items differ: "which request does it break" is 97.7% right on easy orders and
+80.6% on hard ones (a retraction or three requests); "which team" is 97.8% on easy routes and
+70.0% on hard ones (rule order, an amount at the threshold, a calm outage).
+
+Calibration error across all 375 answers is 0.010: stated 50–60% was right 52.9% of the time,
+60–70% → 65.0%, 70–80% → 73.3%, 80–90% → 82.9%, 90–100% → 95.8% (192 answers). Orders are
+slightly underconfident (90–100% → 99.2%); routes slightly overconfident (90–100% → 89.1%).
+
+Reading and judging is where Jev is strong, unlike the Tetris and grid questions above, and
+its confidence is honest about the hard cases, which is what a game against it needs.
