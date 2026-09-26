@@ -169,11 +169,11 @@ async function block(entry: Entry, effects: Map<number, Effect>, ran: Set<string
     case "proposalDecided":
       if (e.automatic === "gate") return `${at} proposal #${e.proposal} accepted automatically: every check passed`;
 
-      return `${at} proposal #${e.proposal} ${e.decision === "accept" ? "accepted" : "rejected"} by ${e.by}`;
+      return `${at} proposal #${e.proposal} ${e.decision === "accept" ? "accepted" : "rejected"} by ${e.by} (a client)`;
     case "proposalApplied":
       return `${at} proposal #${e.proposal} applied`;
     case "proposalRolledBack":
-      return `${at} proposal #${e.proposal} rolled back by ${e.by}`;
+      return `${at} proposal #${e.proposal} rolled back by ${e.by} (a client)`;
     case "replayFinished":
       return `${at} proposal #${e.proposal} replayed in ${e.runs.length} runs`;
     case "predictionChecked":

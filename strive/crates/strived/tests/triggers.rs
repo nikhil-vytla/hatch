@@ -420,4 +420,7 @@ fn gated_leaves_a_proposal_with_a_skipped_check_to_a_person_and_a_client_named_g
     assert_eq!((p["status"].as_str(), p.get("automatic")), (Some("applied"), None), "{p}");
     let shown = review(&env, &cwd, &["review", &id.to_string()]);
     assert!(!shown.contains("accepted automatically"), "{shown}");
+    // The log names the client as a client, so it can't read as the gate's own accept.
+    let logged = review(&env, &cwd, &["log", &learning_id]);
+    assert!(logged.contains(&format!("proposal #{id} accepted by gate (a client)")), "{logged}");
 }

@@ -134,8 +134,11 @@ pub fn describe(e: &Entry) -> String {
         } => {
             format!("proposal #{proposal} accepted automatically: every check passed")
         }
+        // A person's decision names their client as a client: a client may
+        // call itself anything, `gate` included, and only `automatic` marks
+        // the gate's own accept.
         Event::ProposalDecided { proposal, decision, by, .. } => format!(
-            "proposal #{proposal} {} by {by}",
+            "proposal #{proposal} {} by {by} (a client)",
             match decision {
                 ProposalDecision::Accept => "accepted",
                 ProposalDecision::Reject => "rejected",
@@ -143,7 +146,7 @@ pub fn describe(e: &Entry) -> String {
         ),
         Event::ProposalApplied { proposal, before: None, .. } => format!("proposal #{proposal} applied: file created"),
         Event::ProposalApplied { proposal, .. } => format!("proposal #{proposal} applied: file replaced"),
-        Event::ProposalRolledBack { proposal, by } => format!("proposal #{proposal} rolled back by {by}"),
+        Event::ProposalRolledBack { proposal, by } => format!("proposal #{proposal} rolled back by {by} (a client)"),
         Event::PredictionChecked { proposal, session, outcome, detail, .. } => format!(
             "proposal #{proposal}: its prediction {} in session {session}: {detail}",
             crate::review::outcome_name(*outcome)

@@ -237,11 +237,11 @@ export function describe(entry: Entry, options: DescribeOptions = {}): Line[] {
     case "proposalDecided":
       if (e.automatic === "gate") return note("accent", `#${e.proposal} accepted automatically: every check passed`);
 
-      return note("muted", `#${e.proposal} ${e.decision === "accept" ? "accepted" : "rejected"} by ${e.by}`);
+      return note("muted", `#${e.proposal} ${e.decision === "accept" ? "accepted" : "rejected"} by ${e.by} (a client)`);
     case "proposalApplied":
       return note("accent", `#${e.proposal} applied`);
     case "proposalRolledBack":
-      return note("muted", `#${e.proposal} rolled back by ${e.by}`);
+      return note("muted", `#${e.proposal} rolled back by ${e.by} (a client)`);
     case "replayStarted":
       return note("faint", `#${e.proposal} replaying past tasks, holding up to ${formatUsd(e.reservedUsdMicros)}`);
     case "replayFinished":

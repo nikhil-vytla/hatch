@@ -107,7 +107,9 @@ test("automatic learning says what triggered a run, why one was skipped, and whe
     "#7 accepted automatically: every check passed",
   );
   // Only the daemon's field makes it automatic, not a client's name.
-  expect(text({ type: "proposalDecided", proposal: 7, decision: "accept", by: "gate" })).toBe("#7 accepted by gate");
+  expect(text({ type: "proposalDecided", proposal: 7, decision: "accept", by: "gate" })).toBe(
+    "#7 accepted by gate (a client)",
+  );
 });
 
 test("budgets read as dollars, tokens, both, or unlimited", () => {

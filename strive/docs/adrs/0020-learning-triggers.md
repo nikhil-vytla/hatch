@@ -213,7 +213,10 @@ A proposal is attributed to the run whose request came last before it
   skipped run and its reason.
 - **`strive log`** describes the entries: "automatic learning run, after a
   session went idle: …", "automatic learning run skipped (…): …",
-  "proposal #N accepted automatically: every check passed".
+  "proposal #N accepted automatically: every check passed". A person's
+  decision names their client as a client, "accepted by gate (a client)",
+  so a client that calls itself `gate` can't read as the gate's own accept;
+  only `automatic` makes the automatic line.
 - **The desktop's Learned pane** shows an "Automatic" badge and the signs
   on a proposal from an automatic run, "Accepted automatically: every check
   passed" on one the gate accepted (with Roll back as for any applied
