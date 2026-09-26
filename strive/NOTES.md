@@ -1499,3 +1499,15 @@ Deferred:
 - A quality-peaks-then-declines watch (ADR-0016's second M11 bullet).
 - Watches on file effects and on the order of two steps.
 - Staleness in the desktop pane, for skills, and for commands that later fail.
+
+## 2026-09-26: the first line of highlighted code could stay one colour
+
+`highlight.test.ts` failed under load: "const" and "42" came back the same
+colour. Shiki gives each line 500 ms (`tokenizeTimeLimit`) and leaves the
+rest of a line that runs over as one default-coloured token. The first line
+a grammar tokenizes pays for compiling its regexes: ~700 ms for TypeScript
+on an idle machine, measured, and the JavaScript engine does this on the
+page's thread. So a cut first line was likely even outside tests, and the
+cache kept it plain. The limit is now 5 s per line; lines after the first
+take about a millisecond. Under 12 busy loops the test failed 7/10 before
+and 0/10 after.

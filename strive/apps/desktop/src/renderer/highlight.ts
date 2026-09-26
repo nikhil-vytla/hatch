@@ -107,6 +107,15 @@ const CACHE_SIZE = 200;
 /** Code past this many characters is shown plain: highlighting it would stall the window. */
 const MAX_CODE = 200_000;
 
+/**
+ * How long one line may take to tokenize before the rest of it is left
+ * plain. Shiki's default, 500 ms, is shorter than the first line of a
+ * grammar takes: its regexes compile then (~700 ms for TypeScript here,
+ * more on a loaded machine). A cut line came back in one colour and was
+ * cached so. Lines after the first take about a millisecond.
+ */
+const LINE_MS = 5_000;
+
 function core(): Promise<HighlighterCore> {
   highlighter ??= createHighlighterCore({ themes: [THEME], langs: [], engine: createJavaScriptRegexEngine() });
 
@@ -133,7 +142,12 @@ export async function tokens(code: string, language: string): Promise<ThemedToke
   }
 
   await loading;
-  const lines = h.codeToTokens(code, { lang: grammar, theme: THEME.name ?? "strive-dark" }).tokens;
+
+  const lines = h.codeToTokens(code, {
+    lang: grammar,
+    theme: THEME.name ?? "strive-dark",
+    tokenizeTimeLimit: LINE_MS,
+  }).tokens;
 
   if (cache.size >= CACHE_SIZE) cache.delete(cache.keys().next().value ?? "");
   cache.set(key, lines);
