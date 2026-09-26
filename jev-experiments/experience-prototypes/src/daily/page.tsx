@@ -8,16 +8,24 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   CLAMP,
   dailySchema,
+  pickDaily,
   optionKeys,
   score,
   truthKey,
   type Daily,
   type DailyItem,
 } from "../../../packages/arena/src/checkable/daily";
-import { dailySet } from "../../../packages/arena/src/checkable/items";
 import "./daily.css";
 
 const CHIPS = 10;
+
+const KIND_LABEL: Record<DailyItem["kind"], string> = {
+  tetris: "Tetris",
+  grid: "Maze",
+  phrase: "What will this become?",
+  order: "Café order",
+  route: "Who gets this?",
+};
 
 type Played = { mine: Record<string, number>; you: number; jev: number };
 
@@ -26,7 +34,7 @@ const today = () => new Date().toISOString().slice(0, 10);
 const label = (key: string, item: DailyItem) => {
   const q = item.question;
 
-  if (q.type === "noul") return key === "true" ? "Yes" : "No";
+  if (q.type === "noul") return key === "true" ? "True" : "False";
 
   if (q.type === "choice") return q.criteria[key] ?? key;
 
@@ -67,10 +75,28 @@ function Grid({ rows }: { rows: string[] }) {
   );
 }
 
+/** A judgement puzzle's state: every field as a labelled block of text, in the order given. */
+function Card({ state }: { state: Record<string, unknown> }) {
+  return (
+    <dl className="dy-card">
+      {Object.entries(state).map(([k, v]) => (
+        <div key={k}>
+          <dt>{k.replaceAll("_", " ")}</dt>
+          <dd>{typeof v === "string" ? v : <pre>{JSON.stringify(v, null, 2)}</pre>}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
 const rowsOf = (v: unknown) => (Array.isArray(v) ? v.filter((r): r is string => typeof r === "string") : []);
 
 function Puzzle({ item }: { item: DailyItem }) {
   if (item.kind === "grid") return <Grid rows={rowsOf(item.state.grid)} />;
+
+  if (item.kind === "phrase") return <p className="dy-typed">{String(item.state.text ?? "")}</p>;
+
+  if (item.kind === "order" || item.kind === "route") return <Card state={item.state} />;
   const landings = item.state.landings && typeof item.state.landings === "object" ? item.state.landings : {};
 
   return (
@@ -234,13 +260,8 @@ export function DailyPage() {
   const items = useMemo(() => {
     if (!data) return [];
     const byId = new Map(data.items.map((i) => [i.id, i]));
-    const bank = {
-      ...data.bank,
-      schema: "checkable.bank/1" as const,
-      items: data.bank.ids.map((x) => ({ ...x, seed: 0, difficulty: 0, state: {}, questions: {}, truth: {} })),
-    };
 
-    return dailySet(bank, date).flatMap((id) => byId.get(id) ?? []);
+    return pickDaily(data.bank.ids, date).flatMap((id) => byId.get(id) ?? []);
   }, [data, date]);
 
   if (error) return <main className="daily"><p className="notice">{error}</p></main>;
@@ -273,14 +294,18 @@ export function DailyPage() {
         Can you out-call Jev today?
       </h1>
       <p className="lede">
-        Five puzzles with answers code can check. Spread your confidence, lock it in, then see Jev's recorded answer
-        and the truth. Both of you are scored the same way: a hedge costs a little when you're right, a confident
+        Five puzzles a day, the kind of judgement Jev is built for: what a typed phrase should become,
+        whether an order meets what the customer asked, who a message should go to. Every answer is fixed by
+        how the puzzle was made, so it can be checked. Spread your confidence, lock it in, then see Jev's
+        recorded answer and the truth. Both of you are scored the same way: a hedge costs a little when you're right, a confident
         miss costs a lot.
       </p>
       <p className="dy-honest">
         Jev's answers were recorded on {new Date(data.recordedAt).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}; it can't see your answers or change its own.{" "}
         {Number.isFinite(sureRate) &&
-          `When Jev says 90% or more on these puzzles it is right ${Math.round(sureRate * 100)}% of the time (${data.sure.right} of ${data.sure.n}), so expect it to be confidently wrong now and then.`}{" "}
+          (data.sure.right === data.sure.n
+            ? `When Jev has said 90% or more on these puzzles it has been right every time so far (${data.sure.n} of ${data.sure.n}). It is not infallible, so bet against it when you're sure.`
+            : `When Jev says 90% or more on these puzzles it is right ${Math.round(sureRate * 100)}% of the time (${data.sure.right} of ${data.sure.n}), so expect it to be confidently wrong now and then.`)}{" "}
         Probabilities are clamped to {CLAMP * 100}–{100 - CLAMP * 100}%.
       </p>
 
@@ -298,7 +323,7 @@ export function DailyPage() {
       {item && (
         <section className="dy-item" aria-labelledby="dy-q">
           <p className="muted small">
-            {item.kind === "tetris" ? "Tetris" : "Maze"} · puzzle {index + 1} of {items.length}
+            {KIND_LABEL[item.kind]} · puzzle {index + 1} of {items.length}
           </p>
           <h2 id="dy-q">
             {item.question.type === "noul" && <span className="muted">True or false: </span>}
@@ -329,7 +354,7 @@ export function DailyPage() {
           <h2>Today: you {wins}, Jev {losses}</h2>
           <p>
             Your total {done.reduce((s, i) => s + played[i.id].you, 0).toFixed(2)} against Jev's{" "}
-            {done.reduce((s, i) => s + played[i.id].jev, 0).toFixed(2)}. Five puzzles is too few to say who is better
+            {done.reduce((s, i) => s + played[i.id].jev, 0).toFixed(2)}. A handful of puzzles is too few to say who is better
             in general; come back tomorrow.
           </p>
           <p className="dy-share">{grid}</p>
