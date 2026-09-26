@@ -1685,3 +1685,114 @@ the second `check.sh` passed whole.
 
 Deferred: a check that leaves the copy by `..`; telling the learner the
 mode through `AgentConfig`; hardening the judge (a second judge, a quorum).
+
+## 2026-09-26: Stage 2 review, correctness of the learning loop
+
+Adversarial reviews found crash and stop paths that left the learning loop
+stuck or charged, and tests that couldn't fail. Every fix below has a daemon
+test (`crates/strived/tests`) that failed before it; each mutant named was
+applied by hand and the test failed.
+
+**A harness for the replay gate.** `tests/replay.rs` drives replays with a
+test connection as each run's host (`STRIVE_HOST` is a script that exits,
+and the test registers in its place): the daemon, gateway, sandbox and
+check are real, a fake model answers the judge and any run's calls, and the
+task is a real red-to-green turn made through `effect/run`. A run "follows
+the lesson" by touching the check's file only when the scratch copy has the
+proposal's memory, so replay passes deterministically. Most of the replay
+and gate fixes are tested there; the TS e2e keeps the real host.
+
+1. **A learner turn cut off by a crash stopped automatic learning for good.**
+   `busy` saw the request unfinished forever; only `strive learn` started
+   the host whose resume ends the turn. The trigger's limit now starts the
+   learning session's host when it finds an unfinished request (a no-op
+   with one registered or starting). Test: the crash's journal written
+   offline, a later scan's skip starts the host (a script that notes its
+   arguments), the "resumed" host ends the turn, the next scan asks.
+2. **Replay holds cut off by any stop.** Three parts:
+   - Each run is now named in the learning session (`ReplayRunStarted`, a new
+     event) before its prompt. At startup, before anything can begin a
+     replay, every hold with no `ReplayFinished` is finished, charged what
+     its runs' journals show (open calls at their reservation), or the
+     whole hold if a run's journal can't be read. Startup rather than the
+     learning writer's open: at startup no replay can be live, while a
+     writer can reopen (after a failed write) with one running.
+   - `strive stop`/SIGTERM stops replays first: the run's wait for its
+     host wakes on a watch, its check is registered so `cancel_effects`
+     cancels it, and each replay journals its end (no verdict, so the next
+     daemon replays it) before the writers stop; bounded at 10s, after
+     which the next start settles it.
+   - A budget refusal names held money: `Refusal::Usd` carries `held`, and
+     the messages add ", with $H of it held by replays that haven't
+     finished".
+   Tests: SIGKILL mid-run, restart, `replayFinished` charged the run's
+   exact spend; `strive stop` mid-run, the journal read offline has it;
+   a second replay refused by the first's hold names the held $1.
+3. **Accept and rollback write before journaling.** Chose idempotent
+   retries over an intent entry: no protocol change, and the file itself
+   says which half happened. An accept that finds the proposal's content
+   already there journals the decision and `proposalApplied` with the
+   recorded `before`; a rollback that finds the file already `before`
+   journals `proposalRolledBack`. The one ambiguity, someone writing the
+   exact proposed content by hand, ends the same way a person would want.
+4. **A rejected proposal was still replayed.** `judged` starts the replay
+   only while the proposal is `checking`; `decide(reject)` sets the running
+   replay's stop flag, checked before each run; a stopped replay journals
+   only its end. Tests: reject during a slow judge (no `replayStarted`),
+   reject during run 1 of 2 (one run, no verdict).
+5. **A proposal left `checking` by a crash held triggers back** until a list.
+   `scan_and_ask` calls `settled` under the lock before its limits.
+6. **Signs skipped while busy were lost; daemon-ended turns never scanned.**
+   `strive_learning::triggers::waiting` finds sessions whose latest skip was
+   for being busy with no automatic request naming them since; when a
+   learner's turn ends (host or daemon) or a judge/replay verdict lands, and
+   nothing is going, they're scanned again, oldest first, under the usual
+   limits. The daemon's own `end_open_turn` starts the idle wait. Tests: the
+   busy test now needs the rescan, checked as the exact order of requests
+   and skips; a host that leaves mid-turn gets a `turnFailed` request.
+   Predictions still catch up on daemon-ended turns only at `learning/run`,
+   as ADR-0019 says (a predictions test asserts that).
+7. **Small ones.**
+   - A gate that can't accept is logged as the gate's failure, not "could
+     not journal the replay" (test: the memory made a symlink mid-replay).
+   - An unreadable work journal isn't "prompted since" (test: a journal
+     tampered in the wait is logged as not verifying).
+   - The judge: 429, 529, `rate_limit_error` and `overloaded_error` are a
+     skip naming the provider's message; refusals and broken calls still
+     fail, and neither suggests `strive learn`, which doesn't re-judge.
+     Decision, in ADR-0017: an outage can make a proposal ready for a person
+     (marked not judged) but never accepted without one, since `gated`
+     accepts only a judge pass; a fail would block the proposal for good.
+     The fake model can now answer any status or cut its body.
+   - A replay run that is over can't call the model: the gateway refuses
+     (403) a replay session that isn't a run under way.
+   - Scratch areas carry a `strive-home` file (outside where commands may
+     write) and the daemon removes its own at startup, never another's.
+
+**Mutants killed.** M6 (`user.min(project)` → `project`): a project's gated
+under a user's suggest records `suggest` in `proposalMade.mode`. M8 (the
+judge's non-2xx arm → Skipped): 400 and 500 must fail. M3 (the gate's
+changed-file guard deleted): the gate over a file edited mid-replay must
+record nothing. Host: deleting `this.proposals -= 1` fails the refused
+proposals test, now followed by the rest of the allowance; deleting
+`this.proposals = 0` fails a new two-turn test.
+
+**Weak tests fixed or removed.** The gated trigger test's first half (it
+asserted no accept where the gate never runs); `wait_events(.., 1).len()
+== 1` in two trigger tests, now counts after a later signal; the e2e's
+"run the tests" check, now on `read_session`'s own result; the interrupt
+test's `elapsed < 4000`, now "the model hadn't answered when the turn
+ended" (`FakeAnthropic.answered`); fixture self-checks and a never-present
+string in `learner.test.ts`; a header constant in `journal-view.test.ts`;
+`fold.rs`'s restated status table; the desktop's pre-sorted `fileHistory`
+input (the function now sorts). Every run a learner test starts is
+stopped. Trigger, learning, predictions and judge connections wait 30s for
+a reply (`common::slow_rpc`).
+
+Deferred:
+- A cut-off replay's `ReplayFinished` names no runs (their outcome is
+  unknown); `ReplayRunStarted` names their sessions for audit.
+- The rescan after checks finish is tested only through a learner turn's
+  end; the checks path shares the same call and `waiting` is unit-tested.
+- Settling holds when a learning writer reopens mid-daemon.
+- Catching up idle waits a restart dropped (unchanged).

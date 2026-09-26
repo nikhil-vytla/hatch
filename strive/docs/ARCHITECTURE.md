@@ -317,7 +317,9 @@ it is admitted, held, journaled and charged like any call of that session.
 - **Skipped**, with the reason, and journaled with the proposal: after a
   static failure, with no Anthropic key, no price for the model, or no
   session to hold out. Skipped later if the learning session's budget
-  can't pay. Failed if the provider refuses or the call breaks.
+  can't pay, or if the provider is rate-limited or overloaded (429, 529):
+  that says nothing about the proposal, and `gated` never counts a skip as
+  a pass. Failed if the provider refuses otherwise or the call breaks.
 - **In the background:** otherwise the proposal stays `checking` while the
   call runs, without the project's lock. The verdict is journaled under the
   lock, and only if there isn't one. A set of running judges keeps a list
@@ -488,10 +490,13 @@ also runs without being asked, behind `learning` in settings: `mode` (`off`,
 `.strive/settings.json` may hold only `{"learning": {"mode"}}`, and the mode
 in effect is the lower of the two; one that can't be read turns automatic
 learning off there.
-- **When:** each work `turnEnded` starts a wait of `idleSeconds`; if no
-  prompt came in that session meanwhile, it is scanned. With `everyTurns`,
-  a session whose ended turns reach a multiple of it is scanned at once.
-  Waits live in the daemon's memory; one a restart cuts is dropped.
+- **When:** each work `turnEnded` (a host's, or one the daemon records for
+  a host that left) starts a wait of `idleSeconds`; if no prompt came in
+  that session meanwhile, it is scanned. With `everyTurns`, a session whose
+  ended turns reach a multiple of it is scanned at once. Once a learner's
+  turn or a proposal's checks end and nothing is going, sessions whose last
+  scan was skipped for being busy are scanned again. Waits live in the
+  daemon's memory; one a restart cuts is dropped.
 - **The pre-filter** (`strive_learning::signals`): one pass over the work
   journal, no model. Signs: a correction (the first prompt after a turn,
   by a fixed list of openers and phrases in its first 200 characters), an
@@ -507,7 +512,9 @@ learning off there.
   the learning session's ledger for one worst-case learner call. Failing
   one journals `learnSkipped {trigger, reason}`; passing all journals
   `learnRequested {sessions: [the session], trigger: {kind, signals}}` and
-  starts the host. The learner's prompt lists the signs.
+  starts the host. The learner's prompt lists the signs. Proposals a crash
+  left `checking` are settled first, and an unfinished request starts the
+  learning session's host, whose resume ends a turn a crash cut off.
 - **`gated`:** when the replay journals a pass (the cascade's last verdict)
   and every gate has a pass, none skipped (`every_check_passed`), the daemon
   applies the proposal as a person's accept would, with `proposalDecided

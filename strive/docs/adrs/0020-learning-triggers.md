@@ -90,14 +90,16 @@ and returns its signs, each anchored at the entry that completes it:
   seqs. The learning journal's automatic requests name their signs, so the
   next scan asks only for signs past the highest one acted on for that
   session. A skipped run acts on nothing: its signs are found again the next
-  time the session goes idle.
+  time the session goes idle, or sooner if it was skipped only because a
+  run or checks were going (below).
 - **A session with no sign triggers nothing** and journals nothing, and the
   learning session isn't created for it.
 
 ### When a scan runs
 
-- **Idle:** when a work session's host journals `turnEnded`, the daemon
-  waits `idleSeconds` (600 by default). If no prompt was journaled in that
+- **Idle:** when a work session's host journals `turnEnded`, or the daemon
+  ends a turn itself for a host that left (the `turnFailed` sign), the
+  daemon waits `idleSeconds` (600 by default). If no prompt was journaled in that
   session since, it scans it. Each turn's end starts its own wait; a wait
   that finds a later prompt ends there. Chosen over "the last client
   detached": a person often keeps the TUI or desktop open on a session they
@@ -108,6 +110,14 @@ and returns its signs, each anchored at the entry that completes it:
   `turnEnded` that makes its count of ended turns a multiple of N scans it
   at once, without waiting. Its idle scan still runs later and finds only
   newer signs.
+- **Once learning is quiet again:** when a learner's turn ends (by its host
+  or by the daemon) or a proposal's judge or replay verdict lands, and no
+  run or checks are going, the sessions whose latest skip was for being
+  busy, with no automatic request naming them since, are scanned again,
+  oldest first (`strive_learning::triggers::waiting`). The first may start
+  a run; the rest are skipped as busy again and wait for that one. Without
+  this, a session that went idle during a replay was never scanned again
+  unless it was prompted.
 - **Deferred:** idle-time consolidation across many sessions (a run that
   studies a week of sessions at a quiet moment), and catching up after a
   restart: a daemon that exits before a wait ends drops that scan.
@@ -120,7 +130,12 @@ learning session instead:
 1. **Nothing is going:** no request that no turn has finished, and no
    proposal still `checking`. A request whose host can't start stays
    unfinished, so automatic runs wait behind it as a person's `strive
-   learn` would.
+   learn` would. A request a crash cut off mid-turn is unfinished too, and
+   only its host's resume ends that turn, so when this limit finds an
+   unfinished request it starts the learning session's host (nothing
+   happens if one is registered or starting). A proposal a crash left
+   `checking` has its checks finished or restarted first (as a list does),
+   so it doesn't hold runs back until someone lists proposals.
 2. **The daily cap:** fewer than `dailyRuns` (3) automatic requests in the
    project's learning journal in the last 24 hours. Rolling, not by calendar
    day, so it needs no time zone. Manual runs don't count.
