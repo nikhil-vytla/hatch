@@ -10,7 +10,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { gunzipSync } from "node:zlib";
 import { answersSchema } from "../src/one-box/adapter";
 import { phrasesSchema } from "../src/one-box/phrases";
-import { QUESTIONS, type QuestionId } from "../src/one-box/questions";
+import { QUESTION_IDS, QUESTIONS, type QuestionId } from "../src/one-box/questions";
 import { prefixKeys } from "../src/one-box/replay";
 
 const doc = phrasesSchema.parse(
@@ -55,7 +55,8 @@ function label(
 }
 
 const rows: string[] = [];
-const ids = Object.keys(QUESTIONS) as QuestionId[];
+
+const ids = QUESTION_IDS;
 
 for (const line of log.split("\n")) {
   if (!line.trim()) continue;
@@ -75,6 +76,7 @@ for (const line of log.split("\n")) {
 const out = new URL("../.cache/one-box-tiny/", import.meta.url);
 
 mkdirSync(out, { recursive: true });
+
 writeFileSync(new URL("train.jsonl", out), `${rows.join("\n")}\n`);
 
 /**
@@ -83,7 +85,9 @@ writeFileSync(new URL("train.jsonl", out), `${rows.join("\n")}\n`);
  * every fold that contains them.
  */
 const FOLDS = 5;
+
 const dev = doc.phrases.filter((p) => p.split === "dev");
+
 let seed = 20260926;
 
 const rand = () => {
@@ -93,12 +97,15 @@ const rand = () => {
 };
 
 const shuffled = dev.map((p) => ({ p, r: rand() })).sort((a, b) => a.r - b.r);
+
 const phraseFold = Object.fromEntries(shuffled.map(({ p }, i) => [p.id, i % FOLDS]));
+
 const foldKeys = Array.from({ length: FOLDS }, (_, f) => [
   ...new Set(dev.filter((p) => phraseFold[p.id] === f).flatMap((p) => [...prefixKeys(p.text)])),
 ]);
 
 writeFileSync(new URL("folds.json", out), JSON.stringify({ phraseFold, foldKeys }));
+
 console.log(
   `${rows.length} training prefixes of ${train.size} eligible (${heldout.size} held-out prefixes excluded).`,
 );

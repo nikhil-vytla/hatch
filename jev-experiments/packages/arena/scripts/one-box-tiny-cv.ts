@@ -20,6 +20,7 @@ const doc = phrasesSchema.parse(
 );
 
 const cache = new URL("../.cache/one-box-tiny/", import.meta.url);
+
 const { phraseFold }: { phraseFold: Record<string, number> } = JSON.parse(
   readFileSync(new URL("folds.json", cache), "utf8"),
 );
@@ -32,8 +33,11 @@ const models = [0, 1, 2, 3, 4].map((f) =>
 );
 
 const dev = doc.phrases.filter((p) => p.split === "dev");
+
 const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / (xs.length || 1);
+
 const median = (xs: number[]) => [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 2)] ?? NaN;
+
 const pct = (x: number) => `${(x * 100).toFixed(1)}%`;
 
 for (const policy of ["cancel", "latest"] satisfies Policy[]) {
@@ -44,10 +48,12 @@ for (const policy of ["cancel", "latest"] satisfies Policy[]) {
 
     const rows = ps.map((p) => {
       const model = models[phraseFold[p.id]];
+
       const answerFor: AnswerFor = (key) => ({
         reading: toReading(model.answers(key)).reading,
         latencyMs: 1,
       });
+
       const full = toReading(model.answers(p.text.toLowerCase().replace(/\s+/g, " ").trim()))
         .reading.intent.value;
 
