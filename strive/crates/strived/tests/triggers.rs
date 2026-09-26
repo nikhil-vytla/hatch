@@ -216,6 +216,19 @@ fn a_prompt_before_the_idle_time_is_up_puts_the_scan_off() {
 }
 
 #[test]
+fn a_journal_that_stops_verifying_in_the_wait_is_logged_as_such_not_as_prompted() {
+    let env = daemon(&json!({"idleSeconds": 2}), true);
+    let cwd = project();
+    let mut w = Work::new(&env, &cwd);
+    w.exchange("tamper-with-me", &json!({"kind": "interrupted"}));
+    let path = env.session_dir(&w.id).join("journal.jsonl");
+    let text = fs::read_to_string(&path).unwrap();
+    fs::write(&path, text.replace("tamper-with-me", "TAMPER-WITH-ME")).unwrap();
+    wait_log(&env, &format!("session {} not scanned for learning: its journal doesn't verify", w.id), 0);
+    assert!(!log(&env).contains("prompted within idleSeconds"), "{}", log(&env));
+}
+
+#[test]
 fn every_n_turns_scans_without_waiting_for_idle() {
     let env = daemon(&json!({"idleSeconds": 3600, "everyTurns": 2}), true);
     let cwd = project();

@@ -79,11 +79,11 @@ fn last_turn_end(state: &State, work: &SessionId) -> Option<(u64, u64)> {
     Some((*ends.last()?, ends.len() as u64))
 }
 
-/// Whether a prompt was journaled after entry `ended`, or the journal can't
-/// be read: either way the session isn't idle since then.
+/// Whether a prompt was journaled after entry `ended`. A journal that can't
+/// be read says nothing about prompts; the scan logs why it can't read it.
 fn prompted_since(state: &State, work: &SessionId, ended: u64) -> bool {
     verified(state, work)
-        .is_none_or(|entries| entries.iter().any(|e| e.seq > ended && matches!(e.event, Event::UserMessage { .. })))
+        .is_some_and(|entries| entries.iter().any(|e| e.seq > ended && matches!(e.event, Event::UserMessage { .. })))
 }
 
 /// The session's entries, if its journal verifies.
