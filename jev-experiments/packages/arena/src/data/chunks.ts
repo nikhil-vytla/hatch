@@ -118,6 +118,44 @@ export const timedReplaySchema = z.object({
 
 export const replaySchema = z.discriminatedUnion("schema", [turnsReplaySchema, timedReplaySchema]);
 
+/** One box: the phrases replayed on a card, in order; `acceptable` lists other fair cards. */
+export const oneBoxPhrasesSchema = z.object({
+  schema: z.literal("arena.onebox.phrases/1"),
+  split: z.string(),
+  typing: z.object({ msPerKey: z.number(), wordPauseMs: z.number(), debounceMs: z.number() }),
+  phrases: z.array(
+    z.object({
+      id: z.string(),
+      text: z.string(),
+      kind: z.enum(["plain", "ambiguous", "adversarial"]),
+      intent: z.string(),
+      acceptable: z.array(z.string()),
+    }),
+  ),
+});
+
+/**
+ * One box: what one contestant's box showed on each phrase, as [ms, state, characters typed]
+ * frames. State is "input", "ghost:<card>", "committed:<card>" or "choose:<a>|<b>". `final` is
+ * the contestant's top card and its confidence for the whole phrase asked at once.
+ */
+export const oneBoxFramesSchema = z.object({
+  schema: z.literal("arena.onebox.frames/1"),
+  contestant: z.string(),
+  policy: z.enum(["cancel", "latest"]),
+  phrases: z.array(
+    z.object({
+      id: z.string(),
+      frames: z.array(z.tuple([z.number(), z.string(), z.number()])),
+      final: z.tuple([z.string(), z.number()]),
+    }),
+  ),
+});
+
+export type OneBoxPhrases = z.infer<typeof oneBoxPhrasesSchema>;
+
+export type OneBoxFrames = z.infer<typeof oneBoxFramesSchema>;
+
 export type Targets = z.infer<typeof targetsSchema>;
 
 export type Preds = z.infer<typeof predsSchema>;
