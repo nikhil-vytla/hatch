@@ -9,6 +9,7 @@ import { defaults, formatValue, loadIndex, readView, viewHash, type View } from 
 import { caption, colorVars, compareBy, LENS_LABEL, useCardModel, type CardModel } from "./model";
 import { Picker } from "./picker";
 import { Table } from "./table";
+import { Dial, Room } from "./confidence";
 import { TryBox } from "./try-box";
 import { TypingWatch } from "./typing";
 import { Watch } from "./watch";
@@ -177,6 +178,10 @@ function LensBody({ model: m }: { model: CardModel }) {
       return <Watch model={m} />;
     case "try":
       return <TryBox model={m} />;
+    case "room":
+      return <Room model={m} />;
+    case "dial":
+      return <Dial model={m} />;
     case "typing":
       return <TypingWatch model={m} />;
   }
@@ -188,7 +193,8 @@ function CardArticle({ card, view }: { card: Card; view: View }) {
   const measureApplies = m.lens === "bars" || m.lens === "per-item";
 
   const slices =
-    card.slices && ["bars", "scatter", "table", "reliability", "case", "typing"].includes(m.lens);
+    card.slices &&
+    ["bars", "scatter", "table", "reliability", "case", "typing", "room", "dial"].includes(m.lens);
 
   useEffect(() => {
     document.title = `${card.title} · Arena · Jev experiments`;

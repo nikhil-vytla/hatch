@@ -544,7 +544,7 @@ function studyCard(out: string): Card {
     slices,
     provenance: `Agreement with a soft reference · ${doc.cases.length} cases × 5 questions · Typed Decisions test split (${doc.provenance.license}, rev ${doc.provenance.revision.slice(0, 7)}) · local models on ${doc.hardware}, Jev via AI Gateway · recorded 20 Sep 2026 · 95% case-bootstrap intervals`,
     chunks: { preds, targets: "typed-decisions.targets.json", cases: "typed-decisions.cases.json" },
-    lenses: ["bars", "scatter", "reliability", "table", "case"],
+    lenses: ["bars", "room", "dial", "scatter", "reliability", "table", "case"],
     protocolGroups: [{ hash: rs.protocolHash, label: rs.label, runSets: [rs.id] }],
   };
 }

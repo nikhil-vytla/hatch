@@ -35,6 +35,8 @@ export const LENS_LABEL: Record<Lens, string> = {
   case: "Case",
   typing: "Watch",
   try: "Try it",
+  room: "The room",
+  dial: "The dial",
 };
 
 /** Negative when `a` is better than `b`. */
@@ -268,6 +270,10 @@ export function caption(m: CardModel) {
       return "Across: stated confidence. Up: how often the top answer agrees with the reference. Each dot is a confidence bin, sized by how many decisions fall in it; dots on the diagonal mean the confidence is honest.";
     case "case":
       return "One case: the reference distribution beside each contestant's. An outline marks an answer that is confident and disagrees.";
+    case "room":
+      return "Each envelope is one recorded decision the contestant made at the chosen confidence; open it to see whether its top answer agrees with the reference. Honest confidence means a 90% room holds about 18 agreements in 20. Honest is not the same as useful: the line under each room says how often the contestant is that sure at all. Draw again as often as you like.";
+    case "dial":
+      return "Everything the contestant is less sure of than the cutoff goes to a person; the rest goes through. A confidence you can route on trades volume for reliability as the cutoff rises. One that carries no signal stays flat.";
     case "try":
       return "Your text goes to every contestant that can run here, under the same calm rules. The keyword rules and the tiny model run in your browser; Jev runs live with your key. Laya runs only on a Mac, so it has no live lane.";
     case "typing":
