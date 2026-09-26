@@ -787,13 +787,19 @@ async fn apply(
     }
     let accepted = Event::ProposalDecided { proposal: id, decision: ProposalDecision::Accept, by, automatic };
     let mut events = vec![accepted];
+    let after = state.cas.put(p.content.as_bytes()).map_err(|e| internal(&e))?;
     if now == f.state.before {
-        let after = state.cas.put(p.content.as_bytes()).map_err(|e| internal(&e))?;
         let (content, path_, rel_) = (p.content.clone().into_bytes(), path.clone(), rel.clone());
         tokio::task::spawn_blocking(move || write_now(&path_, &rel_, Some(&content)))
             .await
             .map_err(|e| internal(&e))?
             .map_err(|why| refused(format!("{why}; nothing was written")))?;
+        events.push(Event::ProposalApplied { proposal: id, before: f.state.before, after });
+    } else if now == Some(after) {
+        // The file is written and journals come after it, so a crash between
+        // leaves the proposal's content with nothing recorded: this retry
+        // records the apply over the file as the learner saw it, so it can
+        // be rolled back.
         events.push(Event::ProposalApplied { proposal: id, before: f.state.before, after });
     }
     state.sessions.append(sid, events).await.map_err(session_error).map(Some)
@@ -820,16 +826,19 @@ async fn rollback(state: &Arc<State>, cwd: &str, id: u64, by: String) -> Reply {
     let _project = state.sessions.workspaces.effect(vec![PathBuf::from(cwd)]).await;
     let now = file_now(state, cwd, &rel).await?.map_err(refused)?;
     let now = now.map(|b| state.cas.put(&b)).transpose().map_err(|e| internal(&e))?;
-    if now != Some(applied.after) {
+    if now == Some(applied.after) {
+        let old = applied.before.map(|d| state.cas.get(&d)).transpose().map_err(|e| internal(&e))?;
+        tokio::task::spawn_blocking(move || write_now(&path, &rel, old.as_deref()))
+            .await
+            .map_err(|e| internal(&e))?
+            .map_err(|why| refused(format!("{why}; nothing was rolled back")))?;
+    } else if now != applied.before {
         return Err(refused(format!(
             "{rel} has changed since proposal #{id} was applied, so nothing was rolled back; edit it by hand instead"
         )));
     }
-    let old = applied.before.map(|d| state.cas.get(&d)).transpose().map_err(|e| internal(&e))?;
-    tokio::task::spawn_blocking(move || write_now(&path, &rel, old.as_deref()))
-        .await
-        .map_err(|e| internal(&e))?
-        .map_err(|why| refused(format!("{why}; nothing was rolled back")))?;
+    // Otherwise the file is already as it was before: a rollback a crash cut
+    // off between its write and its journal, which this retry records.
     let entries = state
         .sessions
         .append(&sid, vec![Event::ProposalRolledBack { proposal: id, by }])

@@ -777,6 +777,44 @@ fn rolling_back_leaves_a_file_changed_since_it_was_applied() {
 }
 
 #[test]
+fn an_accept_a_crash_cut_off_after_the_write_is_journaled_when_retried() {
+    let env = Env::new();
+    let cwd = project();
+    let work = work_session(&env, &cwd);
+    write(&memory_file(&cwd), "old\n");
+    let (mut host, id) = learner(&env, &cwd);
+    let p = propose(&mut host, &id, &memory("new\n", &work));
+    // What a crash between the accept's write and its journal leaves: the
+    // file is the proposal's, and the journal says nothing.
+    write(&memory_file(&cwd), "new\n");
+    assert!(decide(&env, &cwd, p, "accept").get("error").is_none());
+    assert_eq!(status(&env, &cwd, p), "applied");
+    assert_eq!(
+        events(&env, &id, "proposalApplied"),
+        vec![json!({"type": "proposalApplied", "proposal": p, "before": digest(b"old\n"), "after": digest(b"new\n")})]
+    );
+    // So it can be undone.
+    assert!(rollback(&env, &cwd, p).get("error").is_none());
+    assert_eq!(fs::read_to_string(memory_file(&cwd)).unwrap(), "old\n");
+}
+
+#[test]
+fn a_rollback_a_crash_cut_off_after_the_write_is_journaled_when_retried() {
+    let env = Env::new();
+    let cwd = project();
+    let work = work_session(&env, &cwd);
+    let (mut host, id) = learner(&env, &cwd);
+    let p = propose(&mut host, &id, &memory("new\n", &work));
+    assert!(decide(&env, &cwd, p, "accept").get("error").is_none());
+    // The rollback removed the file it made, and the crash came before the journal.
+    fs::remove_file(memory_file(&cwd)).unwrap();
+    let r = rollback(&env, &cwd, p);
+    assert!(r.get("error").is_none(), "{r}");
+    assert_eq!(status(&env, &cwd, p), "rolledBack");
+    assert_eq!(events(&env, &id, "proposalRolledBack").len(), 1);
+}
+
+#[test]
 fn proposals_are_listed_newest_first_and_survive_a_restart() {
     let env = Env::new();
     let cwd = project();
