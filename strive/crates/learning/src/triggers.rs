@@ -30,6 +30,11 @@ pub fn automatic_since(learning: &[Entry], since_ms: u64) -> usize {
         .count()
 }
 
+/// `busy`'s reason while a request no turn has finished is in the journal.
+pub const RUN_GOING: &str = "a learner run is still going";
+/// `busy`'s reason while a proposal is `checking`.
+pub const CHECKS_GOING: &str = "a proposal's checks are still going";
+
 /// Why an automatic run shouldn't start now, if it shouldn't: a request
 /// that no turn has finished, or a proposal whose checks haven't.
 pub fn busy(learning: &[Entry]) -> Option<&'static str> {
@@ -49,11 +54,11 @@ pub fn busy(learning: &[Entry]) -> Option<&'static str> {
             }
         }
         if !done {
-            return Some("a learner run is still going");
+            return Some(RUN_GOING);
         }
     }
     if crate::fold(learning).iter().any(|f| f.state.status == ProposalStatus::Checking) {
-        return Some("a proposal's checks are still going");
+        return Some(CHECKS_GOING);
     }
     None
 }

@@ -127,6 +127,13 @@ async fn scan_and_ask(state: &Arc<State>, cwd: &str, work: &SessionId, kind: Tri
 /// Why an automatic run shouldn't start now, if it shouldn't.
 async fn held_back(state: &State, sid: &SessionId, learning: &[Entry]) -> Result<Option<String>, RpcError> {
     if let Some(why) = strive_learning::triggers::busy(learning) {
+        // A turn a crash cut off ends only when its host resumes, and only
+        // `strive learn` would start that host: without it, this request
+        // would hold every automatic run back for good. With a host
+        // registered or starting, this does nothing.
+        if why == strive_learning::triggers::RUN_GOING {
+            state.hosts.ensure(sid, &state.home.socket(), &state.sessions.session_dir(sid).join("host.log"));
+        }
         return Ok(Some(why.to_string()));
     }
     let cap = state.settings.learning.daily_runs;

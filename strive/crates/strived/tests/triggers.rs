@@ -457,3 +457,57 @@ fn a_proposal_a_crash_left_checking_doesnt_hold_the_next_run_back() {
     assert_eq!(asked[0]["sessions"], json!([w.id]), "{asked:?}");
     assert_eq!(events(&env, &learning_id, "learnSkipped"), Vec::<Value>::new());
 }
+
+/// An agent host command that only notes each start (its arguments) in a
+/// file, and exits: a test connection then plays the host it would be.
+fn noting_host(env: &mut Env) -> PathBuf {
+    use std::os::unix::fs::PermissionsExt as _;
+    let dir = tempfile::Builder::new().prefix("strv-host").tempdir_in("/tmp").unwrap().keep();
+    let (script, started) = (dir.join("host.sh"), dir.join("started"));
+    fs::write(&script, format!("#!/bin/sh\necho \"$@\" >> {}\n", started.display())).unwrap();
+    fs::set_permissions(&script, fs::Permissions::from_mode(0o755)).unwrap();
+    env.vars.push(("STRIVE_HOST".into(), script.display().to_string()));
+    started
+}
+
+fn wait_started(started: &Path, session: &str) {
+    common::wait_for(&format!("a host started for {session}"), Duration::from_secs(20), || {
+        fs::read_to_string(started).unwrap_or_default().contains(&format!("--session {session}"))
+    });
+}
+
+#[test]
+fn a_learner_run_a_crash_cut_off_is_finished_by_starting_its_host_again() {
+    let mut env = daemon(&idle(), true);
+    let started = noting_host(&mut env);
+    let cwd = project();
+    Work::new(&env, &cwd);
+    let learning_id = env.rpc().ok("learning/open", &json!({"cwd": cwd}))["id"].as_str().unwrap().to_string();
+    env.stop();
+    // What a crash in the middle of a learner's turn leaves.
+    let asked = common::next_seq_offline(&env, &learning_id);
+    common::append_offline(
+        &env,
+        &learning_id,
+        &json!([
+            {"type": "learnRequested", "sessions": []},
+            {"type": "turnStarted", "turn": 1, "throughSeq": asked},
+        ]),
+    );
+
+    let mut w = Work::new(&env, &cwd);
+    w.exchange("go", &json!({"kind": "interrupted"}));
+    let skipped = wait_events(&env, &cwd, "learnSkipped", 1);
+    assert_eq!(skipped[0]["reason"], "a learner run is still going");
+    // Only its host's resume can end that turn, so the daemon starts it.
+    wait_started(&started, &learning_id);
+
+    // The host resumes: it ends the cut-off turn, which finishes the request.
+    let mut host = env.rpc();
+    host.ok("host/register", &json!({"id": learning_id}));
+    let failed = json!({"kind": "failed", "error": "the agent host stopped during this turn"});
+    host.ok("host/record", &json!({"id": learning_id, "event": {"type": "turnEnded", "turn": 1, "reason": failed}}));
+    w.exchange("again", &json!({"kind": "interrupted"}));
+    let asked = wait_events(&env, &cwd, "learnRequested", 2);
+    assert_eq!(asked[1]["sessions"], json!([w.id]), "{asked:?}");
+}
