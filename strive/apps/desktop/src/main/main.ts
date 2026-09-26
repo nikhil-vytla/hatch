@@ -122,9 +122,9 @@ async function main() {
   const cwd = current.snapshot.session.cwd;
 
   await app.whenReady();
-  // Tests and screenshot runs drive the window over CDP, which needs no OS
-  // focus: in the background it opens behind what the person is doing, with
-  // no Dock icon or menu bar, and never takes the keyboard.
+  // Tests and screenshot runs drive the window over CDP, which needs neither
+  // a visible window nor OS focus: in the background the window is never
+  // shown (it still renders), and the app has no Dock icon or menu bar.
   const background = process.env.STRIVE_DESKTOP_BACKGROUND === "1";
 
   if (background && process.platform === "darwin") app.setActivationPolicy("accessory");
@@ -153,18 +153,17 @@ async function main() {
     title: `strive · ${cwd}`,
     backgroundColor: "#0b0b0c",
     show: !background,
+    paintWhenInitiallyHidden: true,
     ...(process.platform === "darwin" && { titleBarStyle: "hiddenInset", trafficLightPosition: { x: 16, y: 17 } }),
     webPreferences: {
       preload: join(built(), "preload.cjs"),
       contextIsolation: true,
       sandbox: true,
       nodeIntegration: false,
-      // Behind other windows a page is otherwise throttled, and runs slow.
+      // A hidden page is otherwise throttled, and runs slow.
       backgroundThrottling: !background,
     },
   });
-
-  if (background) window.showInactive();
 
   const page = pathToFileURL(join(built(), "renderer", "index.html")).href;
 

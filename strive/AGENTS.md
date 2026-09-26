@@ -69,8 +69,9 @@ strive is a Rust daemon (`crates/`) plus TypeScript clients (`packages/`). Read
 - Don't hard-code journal sequence numbers. Find entries by type, or derive seqs
   from the journal.
 - Launch the desktop app for tests or screenshots with `STRIVE_DESKTOP_BACKGROUND=1`.
-  It opens behind the person's windows, with no Dock icon, and never takes focus;
-  Playwright drives and captures it without focus.
+  Its window is never shown (it still renders) and it has no Dock icon, so it
+  never covers or takes over the person's screen. Drive it with Playwright and
+  capture it with `page.screenshot`; `screencapture` can't see it.
 - Wait for a condition (`wait_for`, `term.waitFor`), not for a fixed time.
   "Visible on disk" is not "committed and reported". Wait for the signal the code
   under test acts on.
