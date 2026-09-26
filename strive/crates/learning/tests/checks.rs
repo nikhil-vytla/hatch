@@ -247,3 +247,23 @@ fn control_characters_are_refused() {
     }
     assert_eq!(rules(&memory("Tabs\tand\nnewlines are fine.\n")), vec![]);
 }
+
+/// Every field a person reads is scanned, not only the content and summary.
+#[test]
+fn hidden_text_is_refused_in_every_field_a_person_reads() {
+    let base = || memory("Tests run with `bun test`.\n");
+    let cases: Vec<(&str, Proposal)> = vec![
+        ("rationale", Proposal { rationale: "npm failed\u{200B}".into(), ..base() }),
+        ("prediction", Proposal { prediction: "no npm\u{1b}[8m".into(), ..base() }),
+        ("evidence notes", {
+            let mut p = base();
+            p.evidence[0].note = "failed\u{202E}".into();
+            p
+        }),
+    ];
+    for (what, p) in cases {
+        let found = check(&p, &[]);
+        assert_eq!(found.iter().map(|f| f.rule).collect::<Vec<_>>(), vec![Rule::Hidden], "{what}");
+        assert!(found[0].detail.contains(what), "{what}: {found:?}");
+    }
+}
