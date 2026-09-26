@@ -116,7 +116,16 @@ machinery, driven by the daemon, as the judge's call is:
 - **`ReplayFinished`** records the runs' actual cost (read from their
   journals, calls left open charged in full) and each run's session, side
   and outcome. It releases the hold, in the same commit as the verdict.
-- **A crash** leaves the hold charged in full: the runs' cost is unknown.
+- **Each run is named** in the learning session (`ReplayRunStarted`)
+  before its first prompt, so a hold's runs can always be found.
+- **A crash** leaves a hold with no `ReplayFinished`. When the daemon next
+  starts, before anything can begin a replay, it finishes each such hold,
+  charged what its runs' journals show they spent (calls left open at what
+  they reserved). A run whose journal can't be read makes it the whole
+  hold. The proposal is still `checking`, so the next look replays it.
+- **Rejecting a proposal** stops its replay before the next run, also
+  with its end journaled and no verdict; a proposal decided while it is
+  judged isn't replayed at all.
 - **A refused call** (the cap ran out) stops the replay: the gate is
   skipped, saying after how many runs.
 - **The model:** `replay.model`, else the cheaper of `model` and

@@ -244,6 +244,8 @@ export function describe(entry: Entry, options: DescribeOptions = {}): Line[] {
       return note("muted", `#${e.proposal} rolled back by ${e.by} (a client)`);
     case "replayStarted":
       return note("faint", `#${e.proposal} replaying past tasks, holding up to ${formatUsd(e.reservedUsdMicros)}`);
+    case "replayRunStarted":
+      return note("faint", `#${e.proposal} replay run in session ${e.session}`);
     case "replayFinished":
       return note("faint", `#${e.proposal} replayed in ${e.runs.length} runs · ${formatUsd(e.costUsdMicros)}`);
     case "predictionChecked":

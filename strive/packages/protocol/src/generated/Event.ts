@@ -120,7 +120,7 @@ mode?: LearningMode, } | { "type": "gateFinished", proposal: number, gate: Gate,
 /**
  * What it found, for a person reviewing the proposal.
  */
-detail: string, } | { "type": "replayStarted", proposal: number, reservedUsdMicros: number, } | { "type": "replayFinished", proposal: number, costUsdMicros: number, tokens: number, runs: Array<ReplayRun>, } | { "type": "proposalDecided", proposal: number, decision: ProposalDecision, 
+detail: string, } | { "type": "replayStarted", proposal: number, reservedUsdMicros: number, } | { "type": "replayRunStarted", proposal: number, session: string, } | { "type": "replayFinished", proposal: number, costUsdMicros: number, tokens: number, runs: Array<ReplayRun>, } | { "type": "proposalDecided", proposal: number, decision: ProposalDecision, 
 /**
  * The client that decided, or `gate`.
  */

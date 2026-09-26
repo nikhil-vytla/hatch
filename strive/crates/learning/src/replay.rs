@@ -9,6 +9,43 @@
 
 use strive_proto::{EffectOutcome, EffectRecord, Entry, Event, Verdict};
 
+/// A replay's hold on the learning session's budget that no
+/// `ReplayFinished` released: a crash cut it off.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CutOff {
+    pub proposal: u64,
+    pub reserved_usd_micros: u64,
+    /// Its runs' sessions, in the order they began.
+    pub runs: Vec<String>,
+}
+
+/// The holds in a learning journal that no `ReplayFinished` released, with
+/// their runs, oldest first. `ReplayFinished` releases its proposal's latest
+/// hold, as the ledger does.
+pub fn cut_off(learning: &[Entry]) -> Vec<CutOff> {
+    let mut open: Vec<CutOff> = Vec::new();
+    for e in learning {
+        match &e.event {
+            Event::ReplayStarted { proposal, reserved_usd_micros } => {
+                let hold = CutOff { proposal: *proposal, reserved_usd_micros: *reserved_usd_micros, runs: Vec::new() };
+                open.push(hold);
+            }
+            Event::ReplayRunStarted { proposal, session } => {
+                if let Some(hold) = open.iter_mut().rev().find(|h| h.proposal == *proposal) {
+                    hold.runs.push(session.clone());
+                }
+            }
+            Event::ReplayFinished { proposal, .. } => {
+                if let Some(i) = open.iter().rposition(|h| h.proposal == *proposal) {
+                    open.remove(i);
+                }
+            }
+            _ => {}
+        }
+    }
+    open
+}
+
 /// The most tasks a replay runs.
 pub const TASKS: usize = 3;
 /// The longest check command a task keeps: longer ones are rarely a plain

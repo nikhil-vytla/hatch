@@ -154,6 +154,9 @@ pub fn describe(e: &Entry) -> String {
         Event::ReplayStarted { proposal, reserved_usd_micros } => {
             format!("proposal #{proposal}: replaying past tasks, holding up to {}", format_usd(*reserved_usd_micros))
         }
+        Event::ReplayRunStarted { proposal, session } => {
+            format!("proposal #{proposal}: a replay run in session {session}")
+        }
         Event::ReplayFinished { proposal, cost_usd_micros, runs, .. } => {
             format!("proposal #{proposal}: {} replay runs done · {}", runs.len(), format_usd(*cost_usd_micros))
         }

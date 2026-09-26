@@ -360,8 +360,11 @@ the project, run again by the agent with and without the proposal.
   the learning session's ledger, or the gate is skipped. Each run's budget
   is what the cap has left. `ReplayFinished` names every run and charges
   their actual cost in place of the hold, in the same commit as the
-  verdict. A hold a crash cut off stays charged in full. A call refused
-  for the cap stops the replay.
+  verdict. Each run is named (`ReplayRunStarted`) before its prompt; a
+  hold a crash cut off is finished when the daemon next starts, charged
+  what those runs' journals show (the whole hold if one can't be read). A
+  call refused for the cap stops the replay. A reject stops it before its
+  next run, and a proposal decided while judged isn't replayed.
 - **Verdict:** pass when runs with the change passed more often than
   without; fail when less often; skipped (inconclusive) when as often,
   every run failing on both sides included, and with the reason when it couldn't run (static or judge failed,
@@ -430,8 +433,10 @@ project's directory against rewinds.
   it writes `before` back, or removes a file that didn't exist, then
   journals `proposalRolledBack`.
 - The file is written before its record. A crash between leaves the file
-  changed and the proposal `ready`; accepting it again finds the file
-  isn't `before` and marks it stale, so nothing is written twice.
+  changed and nothing recorded. Accepting again finds the file already
+  holds the proposal's content and journals the accept and the apply
+  (with `before`), writing nothing; rolling back again finds it already
+  `before` and journals the rollback.
 
 **Learned files outside review.** The daemon's own write on accept and
 rollback is not an agent effect, so the checks below don't apply to it.

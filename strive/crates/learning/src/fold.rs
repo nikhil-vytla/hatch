@@ -134,6 +134,7 @@ pub fn fold(entries: &[Entry]) -> Vec<Folded> {
             | Event::LayoutProposed { .. }
             | Event::Compacted { .. }
             | Event::ReplayStarted { .. }
+            | Event::ReplayRunStarted { .. }
             | Event::ReplayFinished { .. }
             | Event::ModelSet { .. } => {}
         }

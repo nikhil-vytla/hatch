@@ -157,15 +157,14 @@ struct Run {
 }
 
 impl Replay {
-    fn events(&self, id: &str, kind: &str) -> Vec<Value> {
+    /// A session's events, in order.
+    fn entries(&self, id: &str) -> Vec<Value> {
         let r = self.env.rpc().ok("session/read", &json!({"id": id}));
-        r["entries"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .filter(|e| e["event"]["type"] == kind)
-            .map(|e| e["event"].clone())
-            .collect()
+        r["entries"].as_array().unwrap().iter().map(|e| e["event"].clone()).collect()
+    }
+
+    fn events(&self, id: &str, kind: &str) -> Vec<Value> {
+        self.entries(id).into_iter().filter(|e| e["type"] == kind).collect()
     }
 
     fn wait_events(&self, id: &str, kind: &str, n: usize) -> Vec<Value> {
@@ -318,4 +317,60 @@ fn rejecting_a_proposal_stops_its_replay_after_the_run_under_way() {
     assert_eq!(listed["sessions"].as_array().unwrap().len(), 1, "no run started after the reject: {listed}");
     assert_eq!(r.gate("replay"), None, "a rejected proposal gets no replay verdict");
     assert_eq!(r.proposal()["status"], "rejected");
+}
+
+/// A model call through the gateway as `session`'s agent: its HTTP status.
+fn call_model(env: &Env, session: &str) -> u16 {
+    let base = env.rpc().ok("session/gateway", &json!({"id": session}))["anthropic"].as_str().unwrap().to_string();
+    let body = json!({"model": "claude-haiku-4-5", "max_tokens": 100, "messages": [{"role": "user", "content": "hi"}]});
+    tokio::runtime::Runtime::new().unwrap().block_on(async {
+        let r = reqwest::Client::new()
+            .post(format!("{base}/v1/messages"))
+            .header("anthropic-version", "2023-06-01")
+            .header("content-type", "application/json")
+            .body(body.to_string())
+            .send()
+            .await
+            .unwrap();
+        let status = r.status().as_u16();
+        r.bytes().await.unwrap();
+        status
+    })
+}
+
+/// What `events` (a session's) charge for their model calls.
+fn charged(events: &[Value]) -> u64 {
+    events
+        .iter()
+        .filter(|e| e["type"] == "modelCallFinished")
+        .map(|e| e["outcome"]["costUsdMicros"].as_u64().unwrap())
+        .sum()
+}
+
+/// Kills the daemon as a crash would, and waits for it to be gone.
+fn crash(env: &Env) {
+    let pid = common::pid(&env.status());
+    assert!(std::process::Command::new("kill").args(["-9", &pid.to_string()]).status().unwrap().success());
+    common::wait_for("the daemon to die", Duration::from_secs(10), || {
+        !std::process::Command::new("kill").args(["-0", &pid.to_string()]).status().unwrap().success()
+    });
+}
+
+#[test]
+fn a_hold_a_crash_cut_off_is_charged_what_its_runs_spent_when_the_daemon_starts_again() {
+    let mut r = replay(&json!({}));
+    let run = r.play();
+    assert_eq!(call_model(&r.env, &run.id), 200);
+    let started = r.events(&r.learning, "replayStarted");
+    crash(&r.env);
+
+    let finished = r.wait_events(&r.learning, "replayFinished", 1);
+    let spent = charged(&r.entries(&run.id));
+    assert!(spent > 0);
+    assert_eq!(finished[0]["costUsdMicros"], spent, "{finished:?}");
+    assert_eq!(finished[0]["proposal"], started[0]["proposal"]);
+    assert_eq!(
+        r.events(&r.learning, "replayRunStarted"),
+        [json!({"type": "replayRunStarted", "proposal": r.proposal, "session": run.id})]
+    );
 }

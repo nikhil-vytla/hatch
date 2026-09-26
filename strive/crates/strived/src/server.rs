@@ -131,6 +131,8 @@ pub async fn run(cfg: Config) -> Result<Started> {
         hosts: crate::hosts::Hosts::default(),
         learning: crate::learning::Locks::default(),
     });
+    // Before anything can start a replay, so every open hold is a dead one.
+    crate::replay::settle_cut_off(&state).await;
     let gateway_task = tokio::spawn(axum::serve(gateway_listener, gateway::router(state.clone())).into_future());
     log!("daemon {} listening on {} (pid {})", state.info.build, socket.display(), state.info.pid);
 

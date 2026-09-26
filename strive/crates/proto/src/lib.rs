@@ -1243,10 +1243,18 @@ pub enum Event {
     },
     /// The replay gate began on a proposal (ADR-0018), holding up to
     /// `reserved_usd_micros` of this learning session's budget until
-    /// `ReplayFinished`. A hold that never finishes stays charged in full.
+    /// `ReplayFinished`. A hold a crash cut off is finished when the daemon
+    /// next starts, charged what its runs' journals show they spent.
     ReplayStarted {
         proposal: u64,
         reserved_usd_micros: u64,
+    },
+    /// One run of a proposal's replay begins, in replay session `session`.
+    /// Named before the run's first prompt, so a hold a crash cuts off can
+    /// be charged from its runs' journals.
+    ReplayRunStarted {
+        proposal: u64,
+        session: String,
     },
     /// The replay gate's runs are over: what they cost is charged in place of
     /// the hold, and each run's session is named for audit.

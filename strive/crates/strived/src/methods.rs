@@ -375,6 +375,7 @@ fn host_may_record(event: &Event, kind: SessionKind) -> bool {
         | Event::ProposalRolledBack { .. }
         | Event::PredictionChecked { .. }
         | Event::ReplayStarted { .. }
+        | Event::ReplayRunStarted { .. }
         | Event::ReplayFinished { .. }
         | Event::ModelSet { .. } => false,
     }

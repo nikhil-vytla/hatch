@@ -438,6 +438,7 @@ impl Ledger {
                 | Event::ProposalApplied { .. }
                 | Event::ProposalRolledBack { .. }
                 | Event::PredictionChecked { .. }
+                | Event::ReplayRunStarted { .. }
                 | Event::ModelSet { .. } => {}
                 Event::ReplayStarted { proposal, reserved_usd_micros } => {
                     l.holds.push((*proposal, *reserved_usd_micros));

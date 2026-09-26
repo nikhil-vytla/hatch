@@ -290,3 +290,31 @@ fn every_run_failing_on_both_sides_is_inconclusive() {
     assert_eq!(verdict(&[tally((0, 3), (1, 3))], "m", "c").0, Verdict::Fail);
     assert_eq!(verdict(&[tally((1, 3), (0, 3))], "m", "c").0, Verdict::Pass);
 }
+
+#[test]
+fn a_hold_no_replay_finished_released_is_cut_off_with_its_own_runs() {
+    use strive_learning::replay::{CutOff, cut_off};
+    let started = |proposal, usd| Event::ReplayStarted { proposal, reserved_usd_micros: usd };
+    let run = |proposal, s: &str| Event::ReplayRunStarted { proposal, session: s.into() };
+    let finished = |proposal| Event::ReplayFinished { proposal, cost_usd_micros: 1, tokens: 1, runs: vec![] };
+    let mut j = Journal::new();
+    j.events.extend([
+        started(5, 100),
+        run(5, "a"),
+        started(9, 200),
+        run(9, "b"),
+        run(5, "c"),
+        finished(9),
+        // Proposal 5's replay is cut off, then runs again and is cut off too.
+        started(5, 300),
+        run(5, "d"),
+    ]);
+    let hold = |proposal, usd, runs: &[&str]| CutOff {
+        proposal,
+        reserved_usd_micros: usd,
+        runs: runs.iter().map(|s| (*s).to_string()).collect(),
+    };
+    assert_eq!(cut_off(&j.entries()), [hold(5, 100, &["a", "c"]), hold(5, 300, &["d"])]);
+    j.events.push(finished(5));
+    assert_eq!(cut_off(&j.entries()), [hold(5, 100, &["a", "c"])], "the latest hold is released first");
+}

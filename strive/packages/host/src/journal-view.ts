@@ -185,6 +185,7 @@ async function block(entry: Entry, effects: Map<number, Effect>, ran: Set<string
     case "modelCallStarted":
     case "checkpointed":
     case "replayStarted":
+    case "replayRunStarted":
       return "";
     default:
       return e satisfies never;

@@ -311,7 +311,7 @@ async fn run(state: &Arc<State>, learning: &SessionId, id: u64, r: Replay, stop:
                     return (Ended::Stopped("it was rejected"), done);
                 }
                 let left = r.cap.saturating_sub(done.cost_usd_micros);
-                let ran = match once(state, &r, task, with_change, left).await {
+                let ran = match once(state, (learning, id), &r, task, with_change, left).await {
                     Ok(ran) => ran,
                     Err(Unrun::SetAside(why)) => {
                         set_aside.push(format!(
@@ -478,7 +478,16 @@ fn materialize(state: &State, r: &Replay, task: &Task, with_change: bool, s: &Sc
     Ok(())
 }
 
-async fn once(state: &Arc<State>, r: &Replay, task: &Task, with_change: bool, left: u64) -> Result<Ran, Unrun> {
+/// One run of proposal `of.1`'s replay in learning session `of.0`, with
+/// `left` of its cap to spend.
+async fn once(
+    state: &Arc<State>,
+    of: (&SessionId, u64),
+    r: &Replay,
+    task: &Task,
+    with_change: bool,
+    left: u64,
+) -> Result<Ran, Unrun> {
     let broke = |why: &str| Unrun::Broke(why.to_string());
     let project = state
         .sessions
@@ -498,6 +507,14 @@ async fn once(state: &Arc<State>, r: &Replay, task: &Task, with_change: bool, le
         .await
         .map_err(|e| broke(&format!("creating a replay session: {e:?}")))?;
     let sid = SessionId::parse(&info.id).ok_or_else(|| broke("the replay session's id isn't valid"))?;
+    // Named before it can spend: a crash from here on leaves the hold's runs findable.
+    let (learning, proposal) = of;
+    let named = Event::ReplayRunStarted { proposal, session: info.id.clone() };
+    state
+        .sessions
+        .append(learning, vec![named])
+        .await
+        .map_err(|e| broke(&format!("naming the run in the learning session: {e:?}")))?;
     crate::sync::lock(&state.learning.replaying.runs).insert(sid.clone(), false);
     let result = drive(state, &sid, r, task, &project, &s).await;
     let refused = crate::sync::lock(&state.learning.replaying.runs).remove(&sid).unwrap_or(false);
@@ -629,6 +646,62 @@ fn spent(state: &State, sid: &SessionId, left: u64) -> (u64, u64) {
             (left, 0)
         }
     }
+}
+
+/// Finishes, in every learning session, the replay holds a crash cut off.
+/// Each is charged what its runs' journals show they spent (calls left open
+/// at what they reserved), or the whole hold if a run's journal can't be
+/// read. Without this a hold would stay charged in full for good. Call at
+/// startup, before any replay can begin, so none of these holds is live.
+pub async fn settle_cut_off(state: &State) {
+    let learning = match state.sessions.list(None, SessionKind::Learning) {
+        Ok((sessions, _)) => sessions,
+        Err(e) => {
+            crate::log!("could not list learning sessions to settle cut-off replays: {e}");
+            return;
+        }
+    };
+    for sid in learning.iter().filter_map(|s| SessionId::parse(&s.id)) {
+        let entries = match state.sessions.read(&sid) {
+            Ok((_, report)) if report.problem.is_none() => report.entries,
+            Ok(_) | Err(_) => continue,
+        };
+        // Latest first: `ReplayFinished` releases its proposal's latest hold.
+        for hold in strive_learning::replay::cut_off(&entries).into_iter().rev() {
+            let (cost, tokens) = cut_off_cost(state, &hold);
+            crate::log!(
+                "the replay of proposal #{} in learning session {} was cut off after {} runs; charged {} of its {} hold",
+                hold.proposal,
+                sid.as_str(),
+                hold.runs.len(),
+                format_usd(cost),
+                format_usd(hold.reserved_usd_micros)
+            );
+            let done = ReplayDone { proposal: hold.proposal, cost_usd_micros: cost, tokens, runs: Vec::new() };
+            if let Err(e) = state.sessions.release(&sid, done, Vec::new()).await {
+                crate::log!("could not settle the replay of proposal #{}: {e:?}", hold.proposal);
+            }
+        }
+    }
+}
+
+/// What a cut-off hold's runs spent: the whole hold, at least, if one of
+/// their journals can't be read.
+fn cut_off_cost(state: &State, hold: &strive_learning::replay::CutOff) -> (u64, u64) {
+    let (mut cost, mut tokens, mut unread) = (0u64, 0u64, false);
+    for run in &hold.runs {
+        let read = SessionId::parse(run).map(|sid| state.sessions.read(&sid));
+        match read {
+            Some(Ok((_, report))) if report.problem.is_none() => {
+                let events: Vec<Event> = report.entries.into_iter().map(|e| e.event).collect();
+                let l = Ledger::replay(&events);
+                cost = cost.saturating_add(l.spent_usd());
+                tokens = tokens.saturating_add(l.spent_tokens());
+            }
+            Some(Ok(_) | Err(_)) | None => unread = true,
+        }
+    }
+    if unread { (cost.max(hold.reserved_usd_micros), tokens) } else { (cost, tokens) }
 }
 
 /// Whether the journal already has proposal `id`'s replay verdict.
