@@ -15,7 +15,7 @@
  * The log is append-only. Rerunning resumes: prefixes already recorded are skipped, never
  * re-asked or overwritten.
  *
- *   bun jev-experiments/packages/arena/scripts/record-one-box.ts [words|all]
+ *   bun jev-experiments/packages/arena/scripts/record-one-box.ts [words|all] [phrases.json] [log.jsonl]
  *
  * `words` asks only prefixes that end a word (about 1,300 requests); `all` asks every prefix
  * (about 5,500). Upstream's cancel-on-keystroke policy only ever lands word-end prefixes and
@@ -36,11 +36,15 @@ const scope = process.argv[2] ?? "all";
 
 if (scope !== "words" && scope !== "all") throw Error("Scope is words or all.");
 
-const out = new URL("../recordings/one-box.jsonl", import.meta.url);
+/**
+ * Optional third and fourth arguments point at another phrase file and log, e.g. the sealed
+ * set, which lives in the gitignored packages/arena/sealed/ and is recorded there.
+ */
+const phrasesPath =
+  process.argv[3] ?? new URL("../src/one-box/phrases.json", import.meta.url).pathname;
+const out = process.argv[4] ?? new URL("../recordings/one-box.jsonl", import.meta.url).pathname;
 
-const doc = phrasesSchema.parse(
-  JSON.parse(readFileSync(new URL("../src/one-box/phrases.json", import.meta.url), "utf8")),
-);
+const doc = phrasesSchema.parse(JSON.parse(readFileSync(phrasesPath, "utf8")));
 
 /** Every prefix key and the phrases that produce it. */
 const prefixes = new Map<string, string[]>();
