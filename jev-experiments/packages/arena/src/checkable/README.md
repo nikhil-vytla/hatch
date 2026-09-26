@@ -154,13 +154,13 @@ where a human should win; the strong ones (fills a row, clears the most) are whe
 150 items, 414 attempts (63.8% busy and retried), latency median 270 ms, 90th percentile
 437 ms, no answers dropped. Against the answers code computes:
 
-| Question | n | Jev right | Most common answer | Jev log score | Uniform |
-|---|---|---|---|---|---|
-| Order · breaks which request | 75 | 90.7% | 50.7% | −0.205 | −1.090 |
-| Order · meets everything | 75 | 89.3% | 50.7% | −0.273 | −0.693 |
-| Order · meets one named request | 75 | 98.7% | 70.7% | −0.085 | −0.693 |
-| Route · which team | 75 | 86.7% | 32.0% | −0.381 | −1.491 |
-| Route · needs a person today | 75 | 82.7% | 74.7% | −0.412 | −0.693 |
+| Question                        | n   | Jev right | Most common answer | Jev log score | Uniform |
+| ------------------------------- | --- | --------- | ------------------ | ------------- | ------- |
+| Order · breaks which request    | 75  | 90.7%     | 50.7%              | −0.205        | −1.090  |
+| Order · meets everything        | 75  | 89.3%     | 50.7%              | −0.273        | −0.693  |
+| Order · meets one named request | 75  | 98.7%     | 70.7%              | −0.085        | −0.693  |
+| Route · which team              | 75  | 86.7%     | 32.0%              | −0.381        | −1.491  |
+| Route · needs a person today    | 75  | 82.7%     | 74.7%              | −0.412        | −0.693  |
 
 Easy and hard items differ: "which request does it break" is 97.7% right on easy orders and
 80.6% on hard ones (a retraction or three requests); "which team" is 97.8% on easy routes and
