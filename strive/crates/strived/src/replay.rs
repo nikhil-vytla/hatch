@@ -9,8 +9,9 @@
 //! agent's writes elsewhere ask, and are refused. The task's check command
 //! runs afterwards as an effect of that session, sandboxed and journaled.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex as StdMutex};
 use std::time::Duration;
 
@@ -54,18 +55,26 @@ pub struct Replay {
     content: String,
 }
 
-/// Replays running, by learning session and proposal, and the sessions
-/// their runs use, with whether the gateway refused one of their calls
-/// for want of budget.
+/// Replays running, by learning session and proposal, with a flag that
+/// stops each before its next run; and the sessions their runs use, with
+/// whether the gateway refused one of their calls for want of budget.
 #[derive(Default)]
 pub struct Running {
-    proposals: StdMutex<HashSet<(SessionId, u64)>>,
+    proposals: StdMutex<HashMap<(SessionId, u64), Arc<AtomicBool>>>,
     runs: StdMutex<HashMap<SessionId, bool>>,
 }
 
 impl Running {
     pub fn has(&self, sid: &SessionId, id: u64) -> bool {
-        crate::sync::lock(&self.proposals).contains(&(sid.clone(), id))
+        crate::sync::lock(&self.proposals).contains_key(&(sid.clone(), id))
+    }
+
+    /// Stops proposal `id`'s replay, if one is going, before its next run:
+    /// a person rejected it, so its verdict can't matter.
+    pub fn cancel(&self, sid: &SessionId, id: u64) {
+        if let Some(stop) = crate::sync::lock(&self.proposals).get(&(sid.clone(), id)) {
+            stop.store(true, Ordering::SeqCst);
+        }
     }
 
     /// Replays running now: they keep the daemon from idling out.
@@ -213,16 +222,27 @@ fn alias(dir: &str) -> Option<&str> {
 /// project's lock held, so no other look starts one too.
 pub fn start(state: &Arc<State>, sid: &SessionId, id: u64, replay: Replay) {
     let key = (sid.clone(), id);
-    if !crate::sync::lock(&state.learning.replaying.proposals).insert(key.clone()) {
-        return;
+    let stop = Arc::new(AtomicBool::new(false));
+    {
+        let mut running = crate::sync::lock(&state.learning.replaying.proposals);
+        if running.contains_key(&key) {
+            return;
+        }
+        running.insert(key.clone(), stop.clone());
     }
     let mark = Mark { state: state.clone(), key };
     let (state, sid) = (state.clone(), sid.clone());
     tokio::spawn(async move {
         match state.sessions.hold(&sid, id, replay.cap).await {
             Ok(Ok(_)) => {
-                let (verdict, detail, done) = run(&state, &sid, id, replay).await;
-                if let Err(e) = crate::learning::replayed(&state, &sid, id, verdict, detail, Some(done)).await {
+                let (ended, done) = run(&state, &sid, id, replay, &stop).await;
+                let journaled = match ended {
+                    Ended::Verdict(verdict, detail) => {
+                        crate::learning::replayed(&state, &sid, id, verdict, detail, Some(done)).await
+                    }
+                    Ended::Stopped(why) => crate::learning::replay_stopped(&state, &sid, id, why, done).await,
+                };
+                if let Err(e) = journaled {
                     crate::log!("could not journal the replay of proposal #{id}: {e:?}");
                 }
             }
@@ -263,10 +283,17 @@ struct Ran {
     out_of_budget: bool,
 }
 
+/// How a replay ended: with a verdict and its detail, or stopped before its
+/// runs were over, for this reason, with none.
+enum Ended {
+    Verdict(Verdict, String),
+    Stopped(&'static str),
+}
+
 /// Every run, interleaved (without, with, without, ...) so a cap that runs
-/// out doesn't fall on one side. Returns the verdict, its detail, and what
-/// `ReplayFinished` records.
-async fn run(state: &Arc<State>, learning: &SessionId, id: u64, r: Replay) -> (Verdict, String, ReplayDone) {
+/// out doesn't fall on one side, until `stop` is set. Returns how it ended
+/// and what `ReplayFinished` records.
+async fn run(state: &Arc<State>, learning: &SessionId, id: u64, r: Replay, stop: &AtomicBool) -> (Ended, ReplayDone) {
     let mut done = ReplayDone { proposal: id, cost_usd_micros: 0, tokens: 0, runs: Vec::new() };
     let mut tallies = Vec::new();
     let mut stopped: Option<String> = None;
@@ -280,6 +307,9 @@ async fn run(state: &Arc<State>, learning: &SessionId, id: u64, r: Replay) -> (V
         };
         for _ in 0..r.runs {
             for with_change in [false, true] {
+                if stop.load(Ordering::SeqCst) {
+                    return (Ended::Stopped("it was rejected"), done);
+                }
                 let left = r.cap.saturating_sub(done.cost_usd_micros);
                 let ran = match once(state, &r, task, with_change, left).await {
                     Ok(ran) => ran,
@@ -334,13 +364,16 @@ async fn run(state: &Arc<State>, learning: &SessionId, id: u64, r: Replay) -> (V
     let cost = format!("{} of its {} cap", format_usd(done.cost_usd_micros), format_usd(r.cap));
     let aside: String = set_aside.iter().flat_map(|l| ["\n", l.as_str()]).collect();
     if let Some(why) = stopped {
-        return (Verdict::Skipped, format!("not run to the end: {why}\n{}, {cost}{aside}", r.model), done);
+        return (
+            Ended::Verdict(Verdict::Skipped, format!("not run to the end: {why}\n{}, {cost}{aside}", r.model)),
+            done,
+        );
     }
     if tallies.is_empty() {
-        return (Verdict::Skipped, format!("not run: every task was set aside{aside}"), done);
+        return (Ended::Verdict(Verdict::Skipped, format!("not run: every task was set aside{aside}")), done);
     }
     let (verdict, detail) = strive_learning::replay::verdict(&tallies, &r.model, &cost);
-    (verdict, format!("{detail}{aside}"), done)
+    (Ended::Verdict(verdict, format!("{detail}{aside}")), done)
 }
 
 /// A scratch area outside the project: `work` is the copy the agent runs

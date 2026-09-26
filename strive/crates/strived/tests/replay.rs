@@ -19,8 +19,9 @@ use common::{Env, Rpc};
 use serde_json::{Value, json};
 
 /// A fake Anthropic API: every call gets a judge's passing verdict, which
-/// is also a model answer a run's calls can be charged for.
-fn model() -> SocketAddr {
+/// is also a model answer a run's calls can be charged for. Each answer
+/// comes after `delay_ms`.
+fn model(delay_ms: u64) -> SocketAddr {
     let criteria: serde_json::Map<String, Value> = ["supported", "generalizes", "novel", "safe", "checkable"]
         .iter()
         .map(|c| ((*c).to_string(), json!({"pass": true, "reason": "holds"})))
@@ -40,6 +41,7 @@ fn model() -> SocketAddr {
             let app = axum::Router::new().fallback(move |_: Bytes| {
                 let reply = reply.clone();
                 async move {
+                    tokio::time::sleep(Duration::from_millis(delay_ms)).await;
                     Response::builder()
                         .status(200)
                         .header("content-type", "application/json")
@@ -87,7 +89,13 @@ fn absent_host(env: &mut Env) {
 /// a task session whose check went red to green, and a proposal whose
 /// replay has begun (the judge passes it at once).
 fn replay(settings: &Value) -> Replay {
-    let addr = model();
+    replay_after(settings, 0)
+}
+
+/// As `replay`, with a model that answers each call after `delay_ms`: the
+/// proposal is being judged when this returns.
+fn replay_after(settings: &Value, delay_ms: u64) -> Replay {
+    let addr = model(delay_ms);
     let mut env = Env::with_vars(&[
         ("STRIVE_UPSTREAM_ANTHROPIC", &format!("http://{addr}")),
         ("ANTHROPIC_API_KEY", "sk-test-replay"),
@@ -277,4 +285,37 @@ fn a_gate_that_cant_accept_says_so_in_the_log() {
     common::wait_for("the gate's failure in the log", Duration::from_secs(20), || r.log().contains(&said));
     assert!(!r.log().contains("could not journal the replay"), "the replay was journaled: {}", r.log());
     assert_eq!(r.proposal()["status"], "ready");
+}
+
+impl Replay {
+    fn reject(&self) {
+        let params = json!({"cwd": self.cwd, "proposal": self.proposal, "decision": "reject"});
+        common::slow_rpc(&self.env).ok("proposal/decide", &params);
+    }
+}
+
+#[test]
+fn a_proposal_rejected_while_it_is_judged_isnt_replayed() {
+    let r = replay_after(&json!({}), 1500);
+    r.reject();
+    assert_eq!(r.wait_gate("judge").0, "pass");
+    let said = format!("proposal #{} was rejected before its checks finished; it isn't replayed", r.proposal);
+    common::wait_for("the log to say it isn't replayed", Duration::from_secs(20), || r.log().contains(&said));
+    assert_eq!(r.events(&r.learning, "replayStarted"), Vec::<Value>::new());
+    assert_eq!(r.proposal()["status"], "rejected");
+}
+
+#[test]
+fn rejecting_a_proposal_stops_its_replay_after_the_run_under_way() {
+    let mut r = replay(&json!({"replay": {"runs": 2, "tasks": 1}}));
+    let mut first = r.play();
+    r.reject();
+    Replay::end(&mut first);
+    let finished = r.wait_events(&r.learning, "replayFinished", 1);
+    let runs: Vec<&Value> = finished[0]["runs"].as_array().unwrap().iter().map(|run| &run["session"]).collect();
+    assert_eq!(runs, [&json!(first.id)], "{finished:?}");
+    let listed = r.env.rpc().ok("session/list", &json!({"kind": "replay"}));
+    assert_eq!(listed["sessions"].as_array().unwrap().len(), 1, "no run started after the reject: {listed}");
+    assert_eq!(r.gate("replay"), None, "a rejected proposal gets no replay verdict");
+    assert_eq!(r.proposal()["status"], "rejected");
 }

@@ -297,7 +297,15 @@ pub async fn judged(
     let mut events = vec![Event::GateFinished { proposal: id, gate: Gate::Judge, verdict, detail }];
     let mut replay = None;
     let made = strive_learning::fold(&entries).into_iter().find(|f| f.state.id == id);
-    if let Some(f) = made
+    // A proposal decided while it was judged gets no replay: its verdict
+    // couldn't change anything, and it would spend the budget for nothing.
+    if let Some(f) = made.as_ref().filter(|f| f.state.status != ProposalStatus::Checking) {
+        crate::log!(
+            "proposal #{id} was {} before its checks finished; it isn't replayed",
+            strive_learning::status_name(f.state.status)
+        );
+    }
+    if let Some(f) = made.filter(|f| f.state.status == ProposalStatus::Checking)
         && !crate::replay::has_verdict(&entries, id)
         && !state.learning.replaying.has(sid, id)
     {
@@ -370,6 +378,23 @@ pub async fn replayed(
             e.message
         );
     }
+    crate::triggers::learning_quiet(state, sid.clone());
+    Ok(())
+}
+
+/// Journals the end of a replay stopped before its runs were over, which
+/// releases its hold and charges what its runs cost, with no verdict.
+pub async fn replay_stopped(
+    state: &Arc<State>,
+    sid: &SessionId,
+    id: u64,
+    why: &str,
+    done: crate::sessions::ReplayDone,
+) -> Result<(), RpcError> {
+    let lock = state.learning.project(sid);
+    let _held = lock.lock().await;
+    crate::log!("replay of proposal #{id} stopped after {} runs: {why}", done.runs.len());
+    state.sessions.release(sid, done, Vec::new()).await.map_err(session_error)?;
     crate::triggers::learning_quiet(state, sid.clone());
     Ok(())
 }
@@ -739,6 +764,7 @@ async fn decide(state: &Arc<State>, cwd: &str, id: u64, decision: ProposalDecisi
             ProposalStatus::Checking | ProposalStatus::Ready | ProposalStatus::Failed => {
                 let decided = Event::ProposalDecided { proposal: id, decision, by, automatic: None };
                 let entries = state.sessions.append(&sid, vec![decided]).await.map_err(session_error)?;
+                state.learning.replaying.cancel(&sid, id);
                 reply::<ProposalDecide>(Appended { seq: entries.last().map_or(0, |e| e.seq) })
             }
             ProposalStatus::Rejected | ProposalStatus::Applied | ProposalStatus::Stale | ProposalStatus::RolledBack => {
