@@ -105,3 +105,23 @@ Record new runs with `bun jev-experiments/packages/arena/scripts/record-framings
 - Dev split, Shapeshift's cancel policy (`scripts/one-box-compare.ts`): Laya's box ends on the
   right card for 64.7% of phrases (keyword classifier 67.3%, Jev 98.0%), with 2.31 visible
   changes per phrase; on the full phrase alone Laya picks the right card 73.3% of the time.
+
+### One box held-out result (scored once, 26 Sep 2026)
+
+Run after Jev, Laya and the tiny model were all recorded, with nothing tuned: the calm-UI
+thresholds and keyword rules are Shapeshift's, the tiny model trained on development prefixes
+only (held-out prefixes excluded), and Laya and Jev are zero-shot.
+`bun packages/arena/scripts/one-box-compare.ts cancel heldout`, 50 phrases, upstream's
+cancel-on-keystroke policy (95% case-bootstrap interval from the arena card):
+
+| Contestant | Box right at end | Full phrase right | Wrong commits / phrase | Changes / phrase |
+|---|---|---|---|---|
+| Jev | 94.0% (86–100) | 98.0% | 0.02 | 1.22 |
+| Laya (intent asked in 3 groups) | 70.0% (56–82) | 80.0% | 0.04 | 1.98 |
+| Keyword classifier | 62.0% (48–76) | 66.0% | 0.20 | 1.92 |
+| Tiny model (distilled from Jev) | 30.0% (18–44) | 36.0% | 0.10 | 1.48 |
+
+Under keep-the-latest, final cards are unchanged and the boxes change more (Jev 3.14,
+Laya 5.70 per phrase). The development split gave the same order (Jev 98.0%, keyword 67.3%,
+Laya 64.7%, tiny 26.7%); Laya and the keyword classifier swap places between splits and
+their intervals overlap on both.

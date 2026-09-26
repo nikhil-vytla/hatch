@@ -180,7 +180,10 @@ export function TypingWatch({ model: m }: { model: CardModel }) {
   }, [framePaths, lineup]);
 
   const list = useMemo(
-    () => (phrases?.phrases ?? []).filter((p) => !m.view.wf || p.kind === m.view.wf),
+    () =>
+      (phrases?.phrases ?? []).filter(
+        (p) => !m.view.wf || p.kind === m.view.wf || p.split === m.view.wf,
+      ),
     [phrases, m.view.wf],
   );
 

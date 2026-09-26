@@ -477,7 +477,7 @@ export function Calibration({ model: m }: { model: CardModel }) {
         const p = await loadChunk(path, predsSchema);
 
         const answers = targets.rows.flatMap((r, i) =>
-          (!wf || r.wf === wf) && (!qt || r.type === qt)
+          (!wf || r.wf === wf || r.split === wf) && (!qt || r.type === qt)
             ? [{ prediction: p.p[i], reference: r.target }]
             : [],
         );
