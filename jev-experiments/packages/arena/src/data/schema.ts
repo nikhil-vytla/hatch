@@ -75,6 +75,8 @@ export const lensSchema = z.enum([
   "reliability",
   "board",
   "case",
+  /** One box: phrases typed out, one text box per contestant. */
+  "typing",
 ]);
 
 export const cardSchema = z.object({
@@ -108,6 +110,9 @@ export const cardSchema = z.object({
     cases: z.string().optional(),
     replay: z.record(z.string(), z.record(z.string(), z.string())).optional(),
     rows: z.string().optional(),
+    /** One box: the phrases (text, kind, expected card) and, per contestant, what its box showed. */
+    phrases: z.string().optional(),
+    frames: z.record(z.string(), z.string()).optional(),
   }),
   lenses: z.array(lensSchema),
   protocolGroups: z.array(z.object({ hash: z.string(), label: z.string(), runSets: z.array(id) })),

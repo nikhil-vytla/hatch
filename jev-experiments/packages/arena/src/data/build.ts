@@ -36,6 +36,7 @@ import {
   type Field,
 } from "../../../../cafe-jev/engine";
 import { keywordAnswers, priorAnswers, tokensFor } from "../cafe-baselines";
+import { oneBoxCard } from "./one-box-card";
 
 // ---------------------------------------------------------------- inputs
 // Every recording and study file is parsed here. Where a chunk echoes its input,
@@ -1521,6 +1522,7 @@ const TRADEOFF = new Map<string, [string, string]>([
   ["spot-robustness", ["meanChange", "sameChoice"]],
   ["typed-decisions", ["ece", "agreement"]],
   ["cafe", ["violation", "exact"]],
+  ["one-box", ["changes", "right"]],
 ]);
 
 const INSIGHTS = new Map(
@@ -1533,6 +1535,8 @@ const INSIGHTS = new Map(
       "Asking twice barely moves Jev's judgement; reversing the order never changed a chosen spot. Asking about spots one at a time moves judgements most, so batching helps as well as saving requests.",
     "typed-decisions":
       "Jev agrees with the reference most often and its stated confidence tracks how often it agrees. Qwen3-4B, scored on its label probabilities, is often confident and wrong.",
+    "one-box":
+      "On the development phrases Jev's box ends on the right card about 98% of the time, against about 67% for Shapeshift's keyword rules, and commits fewer wrong cards on the way. Keeping the latest answer gets Jev to the right card sooner but makes the box change about twice as often. The phrases were written by a model that never saw any contestant, which may still favour a model.",
     cafe: "Jev never served a drink that breaks a stated requirement. The keyword reader, written after reading these exact cases, gets more preferences exactly right but breaks a requirement in 3.9% of cases.",
   }),
 );
@@ -1589,6 +1593,7 @@ export async function buildArena(outDir: string) {
     robustnessCard(outDir),
     studyCard(outDir),
     cafeCard(outDir),
+    oneBoxCard(outDir, { recordings, phrases: resolve(here, "src/one-box/phrases.json") }, runSet),
   ].map(finalize);
 
   const runSets: RunSet[] = [
