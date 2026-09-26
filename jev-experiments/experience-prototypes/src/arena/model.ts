@@ -33,6 +33,7 @@ export const LENS_LABEL: Record<Lens, string> = {
   reliability: "Calibration",
   board: "Watch",
   case: "Case",
+  typing: "Watch",
 };
 
 /** Negative when `a` is better than `b`. */
@@ -256,6 +257,8 @@ export function caption(m: CardModel) {
       return "Across: stated confidence. Up: how often the top answer agrees with the reference. Each dot is a confidence bin, sized by how many decisions fall in it; dots on the diagonal mean the confidence is honest.";
     case "case":
       return "One case: the reference distribution beside each contestant's. An outline marks an answer that is confident and disagrees.";
+    case "typing":
+      return "Each box receives the same keystrokes at the same pace. The strip under each box shows everything it showed over the phrase; the line marks now.";
     case "board":
       return `Recorded games replayed side by side on seed ${view.seed ?? card.items?.[0]?.id ?? ""}. Every lane gets the same pieces; the faces show how each player is doing.`;
   }
