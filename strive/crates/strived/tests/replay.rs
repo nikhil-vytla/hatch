@@ -62,8 +62,10 @@ struct Replay {
     env: Env,
     cwd: PathBuf,
     learning: String,
-    /// The learner's connection, kept open.
-    _learner: Rpc,
+    /// The learner's connection, registered as the learning session's host.
+    learner: Rpc,
+    /// The work session the proposals cite.
+    cited: String,
     proposal: u64,
     /// Replay sessions already seen.
     runs: HashSet<String>,
@@ -135,18 +137,25 @@ fn replay_after(settings: &Value, delay_ms: u64) -> Replay {
     let learning = person.ok("learning/open", &json!({"cwd": cwd}))["id"].as_str().unwrap().to_string();
     let mut learner = common::slow_rpc(&env);
     learner.ok("host/register", &json!({"id": learning}));
-    let proposal = json!({
-        "artifact": {"kind": "memory"},
-        "content": "- Touch `ok` before running the check.\n",
-        "summary": "Touch ok first",
-        "rationale": "The check passed once ok existed",
-        "evidence": [{"session": cited, "seqs": [1], "note": "the session began here"}],
-        "prediction": "later checks pass first time",
-    });
-    let r =
-        learner.ok("host/record", &json!({"id": learning, "event": {"type": "proposalMade", "proposal": proposal}}));
-    let proposal = r["seq"].as_u64().unwrap();
-    Replay { env, cwd, learning, _learner: learner, proposal, runs: HashSet::new() }
+    let mut r = Replay { env, cwd, learning, learner, cited, proposal: 0, runs: HashSet::new() };
+    r.proposal = r.propose("- Touch `ok` before running the check.\n");
+    r
+}
+
+impl Replay {
+    /// The learner proposes this memory; the proposal's id.
+    fn propose(&mut self, content: &str) -> u64 {
+        let proposal = json!({
+            "artifact": {"kind": "memory"},
+            "content": content,
+            "summary": "Touch ok first",
+            "rationale": "The check passed once ok existed",
+            "evidence": [{"session": self.cited, "seqs": [1], "note": "the session began here"}],
+            "prediction": "later checks pass first time",
+        });
+        let made = json!({"id": self.learning, "event": {"type": "proposalMade", "proposal": proposal}});
+        self.learner.ok("host/record", &made)["seq"].as_u64().unwrap()
+    }
 }
 
 /// One run, as its host plays it.
@@ -391,4 +400,22 @@ fn stopping_the_daemon_ends_a_running_replay_charged_what_its_runs_spent() {
     assert_eq!(finished[0]["costUsdMicros"], spent, "{finished:?}");
     let verdicts = learning.iter().filter(|e| e["type"] == "gateFinished" && e["gate"] == "replay").count();
     assert_eq!(verdicts, 0, "cut short, it has no verdict; the next daemon replays it");
+}
+
+#[test]
+fn a_replay_the_budget_cant_hold_names_the_money_other_replays_hold() {
+    let mut r = replay(&json!({"budget": {"usd": 1.5}}));
+    let _first = r.next_run();
+    // The first replay holds $1.00 of the $1.50 while its run goes on.
+    let second = r.propose("- Touch `ok` first, then run the check.\n");
+    let mut detail = String::new();
+    common::wait_for("the second replay's verdict", Duration::from_secs(60), || {
+        let listed = r.env.rpc().ok("proposal/list", &json!({"cwd": r.cwd}));
+        let p = listed["proposals"].as_array().unwrap().iter().find(|p| p["id"] == second).unwrap().clone();
+        let gate = p["gates"].as_array().unwrap().iter().find(|g| g["gate"] == "replay").cloned();
+        detail = gate.map(|g| g["detail"].as_str().unwrap().to_string()).unwrap_or_default();
+        !detail.is_empty()
+    });
+    assert!(detail.contains("of the learning session's $1.5000 budget is left"), "{detail}");
+    assert!(detail.contains("$1.0000 of it held by replays that haven't finished"), "{detail}");
 }

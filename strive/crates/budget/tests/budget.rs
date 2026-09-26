@@ -118,7 +118,7 @@ fn reservations_are_admitted_only_within_the_limit() {
     l.reserve(1, Reservation { usd_micros: 6000, tokens: 10 }).unwrap();
     assert_eq!(
         l.reserve(2, Reservation { usd_micros: 5000, tokens: 10 }),
-        Err(Refusal::Usd { limit: 10_000, committed: 6000, wanted: 5000 })
+        Err(Refusal::Usd { limit: 10_000, committed: 6000, wanted: 5000, held: 0 })
     );
     l.reserve(3, Reservation { usd_micros: 4000, tokens: 10 }).unwrap();
     assert_eq!(l.committed_usd(), 10_000);
@@ -127,8 +127,13 @@ fn reservations_are_admitted_only_within_the_limit() {
 #[test]
 fn refusals_explain_the_numbers() {
     assert_eq!(
-        Refusal::Usd { limit: 1_000_000, committed: 990_000, wanted: 12_000 }.to_string(),
+        Refusal::Usd { limit: 1_000_000, committed: 990_000, wanted: 12_000, held: 0 }.to_string(),
         "this call could cost up to $0.0120, but only $0.0100 of the $1.0000 session budget is left"
+    );
+    assert_eq!(
+        Refusal::Usd { limit: 1_000_000, committed: 990_000, wanted: 12_000, held: 900_000 }.to_string(),
+        "this call could cost up to $0.0120, but only $0.0100 of the $1.0000 session budget is left, \
+         with $0.9000 of it held by replays that haven't finished"
     );
     assert_eq!(
         Refusal::Tokens { limit: 1000, committed: 900, wanted: 200 }.to_string(),
@@ -163,7 +168,7 @@ fn lowering_the_limit_below_spend_refuses_further_calls() {
     l.set_limits(Limits { usd_micros: Some(4000), tokens: None });
     assert_eq!(
         l.reserve(2, Reservation { usd_micros: 1, tokens: 1 }),
-        Err(Refusal::Usd { limit: 4000, committed: 5000, wanted: 1 })
+        Err(Refusal::Usd { limit: 4000, committed: 5000, wanted: 1, held: 0 })
     );
 }
 
@@ -292,9 +297,9 @@ fn a_replay_hold_counts_against_calls_until_it_is_released_at_its_cost() {
     l.hold(7, 8000).unwrap();
     assert_eq!(
         l.reserve(1, Reservation { usd_micros: 3000, tokens: 1 }),
-        Err(Refusal::Usd { limit: 10_000, committed: 8000, wanted: 3000 })
+        Err(Refusal::Usd { limit: 10_000, committed: 8000, wanted: 3000, held: 8000 })
     );
-    assert_eq!(l.hold(8, 3000), Err(Refusal::Usd { limit: 10_000, committed: 8000, wanted: 3000 }));
+    assert_eq!(l.hold(8, 3000), Err(Refusal::Usd { limit: 10_000, committed: 8000, wanted: 3000, held: 8000 }));
     l.release(7, 1500, 400);
     assert_eq!((l.spent_usd(), l.committed_usd(), l.spent_tokens()), (1500, 1500, 400));
     l.reserve(1, Reservation { usd_micros: 3000, tokens: 1 }).unwrap();

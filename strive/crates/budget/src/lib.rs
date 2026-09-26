@@ -274,19 +274,43 @@ pub struct Limits {
 /// Why a call was not admitted.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Refusal {
-    Usd { limit: u64, committed: u64, wanted: u64 },
-    Tokens { limit: u64, committed: u64, wanted: u64 },
+    /// `committed` includes `held`, what replays hold until they finish.
+    Usd {
+        limit: u64,
+        committed: u64,
+        wanted: u64,
+        held: u64,
+    },
+    Tokens {
+        limit: u64,
+        committed: u64,
+        wanted: u64,
+    },
+}
+
+impl Refusal {
+    /// ", with $H of it held by replays that haven't finished", or nothing:
+    /// held money isn't spent, and `strive log` wouldn't show it.
+    pub fn held_note(&self) -> String {
+        match *self {
+            Refusal::Usd { held, .. } if held > 0 => {
+                format!(", with {} of it held by replays that haven't finished", format_usd(held))
+            }
+            Refusal::Usd { .. } | Refusal::Tokens { .. } => String::new(),
+        }
+    }
 }
 
 impl std::fmt::Display for Refusal {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match *self {
-            Refusal::Usd { limit, committed, wanted } => write!(
+            Refusal::Usd { limit, committed, wanted, .. } => write!(
                 f,
-                "this call could cost up to {}, but only {} of the {} session budget is left",
+                "this call could cost up to {}, but only {} of the {} session budget is left{}",
                 format_usd(wanted),
                 format_usd(limit.saturating_sub(committed)),
-                format_usd(limit)
+                format_usd(limit),
+                self.held_note()
             ),
             Refusal::Tokens { limit, committed, wanted } => write!(
                 f,
@@ -346,7 +370,8 @@ impl Ledger {
         if let Some(limit) = self.limits.usd_micros {
             let committed = self.committed_usd();
             if committed.saturating_add(r.usd_micros) > limit {
-                return Err(Refusal::Usd { limit, committed, wanted: r.usd_micros });
+                let held = self.holds.iter().fold(0u64, |a, (_, usd)| a.saturating_add(*usd));
+                return Err(Refusal::Usd { limit, committed, wanted: r.usd_micros, held });
             }
         }
         if let Some(limit) = self.limits.tokens {

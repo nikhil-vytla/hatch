@@ -280,10 +280,11 @@ pub fn start(state: &Arc<State>, sid: &SessionId, id: u64, replay: Replay) {
 fn unaffordable(r: &Refusal, cap: u64) -> String {
     match *r {
         Refusal::Usd { limit, committed, .. } => format!(
-            "the replay may spend up to {} (\"replay\": {{\"budgetUsd\"}} in ~/.strive/settings.json), but only {} of the learning session's {} budget is left",
+            "the replay may spend up to {} (\"replay\": {{\"budgetUsd\"}} in ~/.strive/settings.json), but only {} of the learning session's {} budget is left{}",
             format_usd(cap),
             format_usd(limit.saturating_sub(committed)),
-            format_usd(limit)
+            format_usd(limit),
+            r.held_note()
         ),
         Refusal::Tokens { limit, committed, .. } => {
             format!("the learning session has used {committed} of its {limit} tokens")
