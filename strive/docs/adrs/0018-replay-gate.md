@@ -61,6 +61,11 @@ machinery, driven by the daemon, as the judge's call is:
     shown (the learning session's latest `contextLoaded.learned`), on both
     sides. The runs with the change then write the proposal's file. So the
     two sides differ by exactly the proposal.
+  - The daemon does this unsandboxed, and a checkpoint's tree can hold
+    symlinks. So a task whose copy has a symlink anywhere on the way to a
+    learned file (`.strive` itself, say) is set aside, with the reason in
+    the detail, and the other tasks still run. The writes don't follow
+    symlinks either. When every task is set aside, the gate is skipped.
 - **Paths:** the project's directory, wherever it appears as a whole path
   in the prompt or the check (and as `/tmp/...` for `/private/tmp/...`),
   becomes the scratch copy's (`strive_learning::replay::relocate`). Agents
@@ -126,6 +131,7 @@ Counted over every run of every task:
 | No task could be mined | skipped, saying so |
 | The learning session can't hold the cap | skipped, with the numbers |
 | The cap ran out, or a run couldn't be set up | skipped, saying why |
+| Every task was set aside (a symlink on the way to a learned file) | skipped, naming each |
 
 The detail's first line reads "with the change 3/3 passed, without 1/3;
 1 task", then the model and cost, then one line per task.

@@ -245,6 +245,7 @@ async fn run(state: &Arc<State>, learning: &SessionId, id: u64, r: Replay) -> (V
     let mut done = ReplayDone { proposal: id, cost_usd_micros: 0, tokens: 0, runs: Vec::new() };
     let mut tallies = Vec::new();
     let mut stopped: Option<String> = None;
+    let mut set_aside: Vec<String> = Vec::new();
     'tasks: for task in &r.tasks {
         let mut tally = TaskTally {
             session: task.session.clone(),
@@ -257,7 +258,14 @@ async fn run(state: &Arc<State>, learning: &SessionId, id: u64, r: Replay) -> (V
                 let left = r.cap.saturating_sub(done.cost_usd_micros);
                 let ran = match once(state, &r, task, with_change, left).await {
                     Ok(ran) => ran,
-                    Err(why) => {
+                    Err(Unrun::SetAside(why)) => {
+                        set_aside.push(format!(
+                            "session {} #{} `{}`: set aside: {why}",
+                            task.session, task.prompt_seq, task.check
+                        ));
+                        continue 'tasks;
+                    }
+                    Err(Unrun::Broke(why)) => {
                         stopped = Some(format!("a run couldn't be set up ({why})"));
                         break 'tasks;
                     }
@@ -299,11 +307,15 @@ async fn run(state: &Arc<State>, learning: &SessionId, id: u64, r: Replay) -> (V
     }
     crate::log!("replay of proposal #{id} in learning session {} done", learning.as_str());
     let cost = format!("{} of its {} cap", format_usd(done.cost_usd_micros), format_usd(r.cap));
+    let aside: String = set_aside.iter().flat_map(|l| ["\n", l.as_str()]).collect();
     if let Some(why) = stopped {
-        return (Verdict::Skipped, format!("not run to the end: {why}\n{}, {cost}", r.model), done);
+        return (Verdict::Skipped, format!("not run to the end: {why}\n{}, {cost}{aside}", r.model), done);
+    }
+    if tallies.is_empty() {
+        return (Verdict::Skipped, format!("not run: every task was set aside{aside}"), done);
     }
     let (verdict, detail) = strive_learning::replay::verdict(&tallies, &r.model, &cost);
-    (verdict, detail, done)
+    (verdict, format!("{detail}{aside}"), done)
 }
 
 /// A scratch area outside the project: `work` is the copy the agent runs
@@ -330,62 +342,104 @@ fn scratch(project: &Path) -> std::io::Result<Scratch> {
     Ok(Scratch { _dir: dir, root, work })
 }
 
-/// Writes `bytes` at `rel` under `root`, making its directories.
+/// Why a run couldn't start.
+enum Unrun {
+    /// The task can't be replayed safely; the other tasks still can.
+    SetAside(String),
+    /// Something broke; the replay stops.
+    Broke(String),
+}
+
+/// The first path from `work` to any of `rels` (each component, the last
+/// included) that is a symlink in the copy. A checkpoint's tree can hold
+/// symlinks, and the daemon, which runs unsandboxed, must not remove or
+/// write the learned files through one.
+fn linked(work: &Path, rels: &[&str]) -> Option<String> {
+    rels.iter().find_map(|rel| {
+        let mut at = PathBuf::new();
+        Path::new(rel).components().find_map(|c| {
+            at.push(c);
+            let link = work.join(&at).symlink_metadata().is_ok_and(|m| m.file_type().is_symlink());
+            link.then(|| at.display().to_string())
+        })
+    })
+}
+
+/// Writes `bytes` at `rel` under `root`, making its directories, without
+/// following a symlink on the way.
 fn put(root: &Path, rel: &str, bytes: &[u8]) -> std::io::Result<()> {
-    let path = root.join(rel);
-    if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent)?;
-    }
-    std::fs::write(path, bytes)
+    use crate::pinned::Error as E;
+    crate::pinned::parent(&root.join(rel), true).and_then(|(dir, name)| dir.replace(&name, bytes)).map_err(
+        |e| match e {
+            E::Changed => std::io::Error::other(format!("a directory on the way to {rel} is a symlink")),
+            E::NotRegular => std::io::Error::other(format!("{rel} isn't a regular file")),
+            E::NotFound => std::io::Error::from(std::io::ErrorKind::NotFound),
+            E::Io(e) => e,
+        },
+    )
 }
 
 /// The task's files as they were before its prompt, with the learned files
 /// as the learner was shown them in place of the checkpoint's, and the
-/// proposal's file when `with_change`.
-fn materialize(state: &State, r: &Replay, task: &Task, with_change: bool, s: &Scratch) -> std::io::Result<()> {
-    let sid = SessionId::parse(&task.session).ok_or_else(|| std::io::Error::other("the task's session id"))?;
+/// proposal's file when `with_change`. A checkpoint with a symlink on the
+/// way to a learned file sets the task aside.
+fn materialize(state: &State, r: &Replay, task: &Task, with_change: bool, s: &Scratch) -> Result<(), Unrun> {
+    let broke = |e: std::io::Error| {
+        Unrun::Broke(format!("copying checkpoint {} of session {}: {e}", task.commit, task.session))
+    };
+    let sid =
+        SessionId::parse(&task.session).ok_or_else(|| Unrun::Broke("the task's session id isn't valid".into()))?;
     let shadow = crate::checkpoints::Shadow::new(&state.sessions.checkpoint_dir(&sid), &s.work)
-        .ok_or_else(|| std::io::Error::other("checkpoints need git, which isn't available"))?;
+        .ok_or_else(|| Unrun::Broke("checkpoints need git, which isn't available".into()))?;
     let index = s.root.join("index");
-    shadow.export(&task.commit, &index)?;
-    std::fs::remove_file(&index)?;
+    shadow.export(&task.commit, &index).map_err(broke)?;
+    std::fs::remove_file(&index).map_err(broke)?;
+    let mut rels = vec![strive_learning::MEMORY_PATH, strive_learning::SKILLS_DIR, r.path.as_str()];
+    rels.extend(r.learned.iter().map(|(rel, _)| rel.as_str()));
+    if let Some(link) = linked(&s.work, &rels) {
+        return Err(Unrun::SetAside(format!(
+            "{link} is a symlink in the task's checkpoint, so the learned files can't be put in the copy safely"
+        )));
+    }
     let memory = s.work.join(strive_learning::MEMORY_PATH);
     if memory.symlink_metadata().is_ok() {
-        std::fs::remove_file(&memory)?;
+        std::fs::remove_file(&memory).map_err(broke)?;
     }
+    // No symlink leads here (checked above), and `remove_dir_all` doesn't
+    // follow the ones inside.
     let skills = s.work.join(strive_learning::SKILLS_DIR);
     if skills.symlink_metadata().is_ok() {
-        std::fs::remove_dir_all(&skills)?;
+        std::fs::remove_dir_all(&skills).map_err(broke)?;
     }
     for (rel, digest) in &r.learned {
-        put(&s.work, rel, &state.cas.get(digest)?)?;
+        put(&s.work, rel, &state.cas.get(digest).map_err(broke)?).map_err(broke)?;
     }
     if with_change {
-        put(&s.work, &r.path, r.content.as_bytes())?;
+        put(&s.work, &r.path, r.content.as_bytes()).map_err(broke)?;
     }
     Ok(())
 }
 
-async fn once(state: &Arc<State>, r: &Replay, task: &Task, with_change: bool, left: u64) -> Result<Ran, String> {
+async fn once(state: &Arc<State>, r: &Replay, task: &Task, with_change: bool, left: u64) -> Result<Ran, Unrun> {
+    let broke = |why: &str| Unrun::Broke(why.to_string());
     let project = state
         .sessions
-        .peek(&SessionId::parse(&task.session).ok_or("the task's session id isn't valid")?)
+        .peek(&SessionId::parse(&task.session).ok_or_else(|| broke("the task's session id isn't valid"))?)
         .map(|i| PathBuf::from(i.cwd))
-        .ok_or("the task's session is gone")?;
-    let s = scratch(&project).map_err(|e| format!("making a scratch copy: {e}"))?;
+        .ok_or_else(|| broke("the task's session is gone"))?;
+    let s = scratch(&project).map_err(|e| broke(&format!("making a scratch copy: {e}")))?;
     let (st, rr, t) = (state.clone(), r.clone(), task.clone());
     let s = tokio::task::spawn_blocking(move || materialize(&st, &rr, &t, with_change, &s).map(|()| s))
         .await
-        .map_err(|e| e.to_string())?
-        .map_err(|e| format!("copying checkpoint {} of session {}: {e}", task.commit, task.session))?;
+        .map_err(|e| broke(&e.to_string()))??;
     let cwd = s.work.display().to_string();
     let limits = Limits { usd_micros: Some(left), tokens: None };
     let info = state
         .sessions
         .create(cwd, limits, ApprovalMode::FullAuto, Some(SessionKind::Replay))
         .await
-        .map_err(|e| format!("creating a replay session: {e:?}"))?;
-    let sid = SessionId::parse(&info.id).ok_or("the replay session's id isn't valid")?;
+        .map_err(|e| broke(&format!("creating a replay session: {e:?}")))?;
+    let sid = SessionId::parse(&info.id).ok_or_else(|| broke("the replay session's id isn't valid"))?;
     crate::sync::lock(&state.learning.replaying.runs).insert(sid.clone(), false);
     let result = drive(state, &sid, r, task, &project, &s).await;
     let refused = crate::sync::lock(&state.learning.replaying.runs).remove(&sid).unwrap_or(false);

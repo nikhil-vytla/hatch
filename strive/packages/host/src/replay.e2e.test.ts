@@ -3,7 +3,17 @@
 // in scratch copies, with and without the proposal. Real daemon, hosts,
 // gateway and sandbox; a scripted model at the network boundary.
 import { afterEach, expect, setDefaultTimeout, test } from "bun:test";
-import { existsSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  realpathSync,
+  symlinkSync,
+  unlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { join, resolve } from "node:path";
 import { type Entry, type Event, type ProposalState, StriveClient } from "@strive/protocol";
 import {
@@ -97,6 +107,8 @@ type Setup = {
   judgePasses?: boolean;
   /** Whether a work session ran the check red to green. */
   minable?: boolean;
+  /** The task's checkpoint has `.strive` as a symlink to this directory; the project doesn't, by the time of the proposal. */
+  linkedStrive?: string;
 };
 
 type World = { c: StriveClient; project: string; learning: string; id: number; task?: string };
@@ -144,10 +156,12 @@ async function world(s: Setup): Promise<World> {
       { toolCalls: [{ id: "b2", name: "bash", input: { command: check } }] },
       { text: "The check passes now." },
     );
+    if (s.linkedStrive) symlinkSync(s.linkedStrive, join(project, ".strive"));
     task = (await c.request("session/create", { cwd: project })).id;
     await c.request("session/approvals", { id: task, mode: "fullAuto" });
     await c.request("session/prompt", { id: task, text: "make the check pass" });
     await until("the task's turn", () => entries(c, task!), ended);
+    if (s.linkedStrive) unlinkSync(join(project, ".strive"));
   }
 
   work.push({ text: "Hello." });
@@ -359,6 +373,23 @@ test("a replayed agent can't reach the project: its writes there are refused and
   expect(outcome("e1")).toMatchObject({ kind: "refused" });
   const bash = outcome("e2");
   expect(bash?.kind === "done" && bash.exitCode !== undefined && bash.exitCode !== 0).toBe(true);
+});
+
+test("a task whose checkpoint has .strive linked outside the copy is set aside, and nothing there is touched", async () => {
+  const outside = realpathSync(mkdtempSync("/tmp/strv-replay-outside-"));
+  mkdirSync(join(outside, "skills/keep"), { recursive: true });
+  writeFileSync(join(outside, "memory.md"), "outside\n");
+  writeFileSync(join(outside, "skills/keep/SKILL.md"), "keep\n");
+
+  const w = await world({ linkedStrive: outside, settings: { replay: { runs: 1 } } });
+  const p = await settledProposal(w);
+
+  expect(readFileSync(join(outside, "memory.md"), "utf8")).toBe("outside\n");
+  expect(readFileSync(join(outside, "skills/keep/SKILL.md"), "utf8")).toBe("keep\n");
+  expect(readdirSync(outside).sort()).toEqual(["memory.md", "skills"]);
+  expect(gate(p, "replay")?.verdict).toBe("skipped");
+  expect(gate(p, "replay")?.detail).toContain(".strive is a symlink");
+  expect(gate(p, "replay")?.detail).toContain(`session ${w.task} #`);
 });
 
 // `gated` (ADR-0020): the daemon accepts only a proposal whose every check passed.

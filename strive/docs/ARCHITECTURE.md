@@ -330,7 +330,9 @@ the project, run again by the agent with and without the proposal.
   directory outside the project (`$TMPDIR/strive-replay-*/work`):
   - the checkpoint's tree, exported from the task session's shadow
     repository; the learned files as the learner was shown them in place of
-    the checkpoint's; and, on the side with the change, the proposal's file;
+    the checkpoint's; and, on the side with the change, the proposal's file.
+    A task whose copy has a symlink on the way to a learned file is set
+    aside, since the daemon writes them unsandboxed;
   - full-auto approvals with no person attached, so whatever would ask is
     refused; no MCP servers; the model `replay.model`, else the cheaper of
     `model` and `judgeModel`;
