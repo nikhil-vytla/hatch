@@ -62,9 +62,28 @@ pub struct Replay {
 pub struct Running {
     proposals: StdMutex<HashMap<(SessionId, u64), Arc<AtomicBool>>>,
     runs: StdMutex<HashMap<SessionId, bool>>,
+    /// Set when the daemon stops: every replay ends at once.
+    stopping: tokio::sync::watch::Sender<bool>,
 }
 
 impl Running {
+    /// The daemon is stopping: every replay ends now, in the middle of a run
+    /// or before the next, and journals what its runs spent.
+    pub fn stop_all(&self) {
+        self.stopping.send_replace(true);
+    }
+
+    /// Why a replay should end before its next run, if it should.
+    fn stopped(&self, rejected: &AtomicBool) -> Option<&'static str> {
+        if *self.stopping.borrow() {
+            Some("the daemon stopped")
+        } else if rejected.load(Ordering::SeqCst) {
+            Some("it was rejected")
+        } else {
+            None
+        }
+    }
+
     pub fn has(&self, sid: &SessionId, id: u64) -> bool {
         crate::sync::lock(&self.proposals).contains_key(&(sid.clone(), id))
     }
@@ -307,8 +326,8 @@ async fn run(state: &Arc<State>, learning: &SessionId, id: u64, r: Replay, stop:
         };
         for _ in 0..r.runs {
             for with_change in [false, true] {
-                if stop.load(Ordering::SeqCst) {
-                    return (Ended::Stopped("it was rejected"), done);
+                if let Some(why) = state.learning.replaying.stopped(stop) {
+                    return (Ended::Stopped(why), done);
                 }
                 let left = r.cap.saturating_sub(done.cost_usd_micros);
                 let ran = match once(state, (learning, id), &r, task, with_change, left).await {
@@ -321,12 +340,21 @@ async fn run(state: &Arc<State>, learning: &SessionId, id: u64, r: Replay, stop:
                         continue 'tasks;
                     }
                     Err(Unrun::Broke(why)) => {
+                        if let Some(why) = state.learning.replaying.stopped(stop) {
+                            return (Ended::Stopped(why), done);
+                        }
                         stopped = Some(format!("a run couldn't be set up ({why})"));
                         break 'tasks;
                     }
                 };
                 done.cost_usd_micros = done.cost_usd_micros.saturating_add(ran.cost);
                 done.tokens = done.tokens.saturating_add(ran.tokens);
+                // A run the daemon's stop cut short has no outcome, only a cost.
+                if let Some(why) = state.learning.replaying.stopped(stop)
+                    && ran.passed.is_err()
+                {
+                    return (Ended::Stopped(why), done);
+                }
                 let passed = match ran.passed {
                     Ok(passed) => passed,
                     Err(why) => {
@@ -556,9 +584,15 @@ async fn drive(
     let started = tokio::time::Instant::now();
     let turn_limit = Duration::from_secs(state.settings.turn_seconds) + TURN_GRACE;
     let mut turn: Option<(u64, tokio::time::Instant)> = None;
+    let mut stopping = state.learning.replaying.stopping.subscribe();
     loop {
         let deadline = turn.map_or(started + START_LIMIT, |(_, at)| at + turn_limit);
-        let push = match tokio::time::timeout_at(deadline, stream.recv()).await {
+        let next = tokio::select! {
+            // Either way (stopping, or the sender gone with the daemon) the run ends.
+            _ = stopping.wait_for(|s| *s) => return Err("the daemon is stopping".into()),
+            next = tokio::time::timeout_at(deadline, stream.recv()) => next,
+        };
+        let push = match next {
             Ok(Some(push)) => push,
             Ok(None) => return Err("the replay session's journal stopped".into()),
             Err(_) if turn.is_none() => {
@@ -608,13 +642,15 @@ async fn check(state: &Arc<State>, sid: &SessionId, command: &str, s: &Scratch) 
     let result = match gate {
         crate::effects::Gate::Allow => {
             let files = state.sessions.workspaces.effect(vec![s.work.clone()]).await;
-            let cancelled = std::sync::atomic::AtomicBool::new(false);
-            tokio::task::spawn_blocking(move || {
+            // Registered, so a daemon that stops cancels it as it does any command.
+            let cancelled = state.sessions.cancel_flag(sid, CHECK_CALL);
+            let done = tokio::task::spawn_blocking(move || {
                 let _held = files;
                 crate::effects::perform(&scope, &request, &target, &cancelled)
             })
-            .await
-            .map_err(|e| e.to_string())?
+            .await;
+            state.sessions.forget_cancel(sid, CHECK_CALL);
+            done.map_err(|e| e.to_string())?
         }
         crate::effects::Gate::Ask(what) => crate::effects::Result::Refused(format!("{what} would need approval")),
         crate::effects::Gate::Deny(why) => crate::effects::Result::Refused(why),

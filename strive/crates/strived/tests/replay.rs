@@ -374,3 +374,21 @@ fn a_hold_a_crash_cut_off_is_charged_what_its_runs_spent_when_the_daemon_starts_
         [json!({"type": "replayRunStarted", "proposal": r.proposal, "session": run.id})]
     );
 }
+
+#[test]
+fn stopping_the_daemon_ends_a_running_replay_charged_what_its_runs_spent() {
+    let mut r = replay(&json!({}));
+    let run = r.play();
+    assert_eq!(call_model(&r.env, &run.id), 200);
+    r.env.stop();
+
+    // Read with no daemon running: nothing settled it at a later start.
+    let learning = common::events_offline(&r.env, &r.learning);
+    let finished: Vec<&Value> = learning.iter().filter(|e| e["type"] == "replayFinished").collect();
+    let spent = charged(&common::events_offline(&r.env, &run.id));
+    assert!(spent > 0);
+    assert_eq!(finished.len(), 1, "{learning:?}");
+    assert_eq!(finished[0]["costUsdMicros"], spent, "{finished:?}");
+    let verdicts = learning.iter().filter(|e| e["type"] == "gateFinished" && e["gate"] == "replay").count();
+    assert_eq!(verdicts, 0, "cut short, it has no verdict; the next daemon replays it");
+}

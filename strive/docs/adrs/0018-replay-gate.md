@@ -123,6 +123,10 @@ machinery, driven by the daemon, as the judge's call is:
   charged what its runs' journals show they spent (calls left open at what
   they reserved). A run whose journal can't be read makes it the whole
   hold. The proposal is still `checking`, so the next look replays it.
+- **Stopping the daemon** (`strive stop`, SIGTERM) ends running replays
+  first, the run under way included (its check is cancelled like any
+  command), and journals each one's `ReplayFinished` charged what its runs
+  spent, with no verdict, so the next daemon replays it.
 - **Rejecting a proposal** stops its replay before the next run, also
   with its end journaled and no verdict; a proposal decided while it is
   judged isn't replayed at all.

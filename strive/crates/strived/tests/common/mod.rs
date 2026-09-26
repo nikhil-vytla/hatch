@@ -177,6 +177,15 @@ pub fn append_offline(env: &Env, session: &str, events: &Value) -> Vec<u64> {
     written.iter().map(|e| e.seq).collect()
 }
 
+/// A session's events, read while no daemon runs, as JSON.
+pub fn events_offline(env: &Env, session: &str) -> Vec<Value> {
+    let key: [u8; 32] = std::fs::read(env.home.path().join("keys/journal.key")).unwrap().try_into().unwrap();
+    let key = strive_journal::Key::from_bytes(key);
+    let report = strive_journal::read(&env.session_dir(session), session, &key).unwrap();
+    assert!(report.problem.is_none(), "{:?}", report.problem);
+    report.entries.into_iter().map(|e| serde_json::to_value(e.event).unwrap()).collect()
+}
+
 /// The seq the next entry of a session's journal gets, while no daemon runs.
 pub fn next_seq_offline(env: &Env, session: &str) -> u64 {
     open_offline(env, session).1.last().unwrap().seq + 1

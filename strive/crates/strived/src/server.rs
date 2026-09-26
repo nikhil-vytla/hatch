@@ -193,10 +193,20 @@ pub async fn run(cfg: Config) -> Result<Started> {
     Ok(Started::Served)
 }
 
-/// Ends the daemon's work: commands first, while their ends can still be
-/// journaled; then the session writers; then MCP servers.
+/// Ends the daemon's work: replays and commands first, while their ends can
+/// still be journaled; then the session writers; then MCP servers.
 async fn stand_down(state: &State) {
+    state.learning.replaying.stop_all();
     let settled = state.sessions.cancel_effects(Duration::from_secs(10)).await;
+    // Each replay journals its end, releasing its hold, once its run stops.
+    let deadline = Instant::now() + Duration::from_secs(10);
+    while state.learning.replaying.count() > 0 {
+        if Instant::now() >= deadline {
+            log!("replays still running after 10s; the next start settles their holds");
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
     state.sessions.shutdown().await;
     state.mcp.stop_all().await;
     if !settled {
