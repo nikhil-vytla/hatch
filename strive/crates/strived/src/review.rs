@@ -58,7 +58,7 @@ pub async fn learn(c: &mut Client, home: &std::path::Path, sessions: Vec<String>
     let mine: Vec<&ProposalState> = all.iter().filter(|p| made.contains(&p.id)).collect();
     println!("{} proposal{}:", mine.len(), if mine.len() == 1 { "" } else { "s" });
     for p in &mine {
-        println!("  {}", line(p));
+        println!("  {}", crate::terminal::visible(&line(p)));
     }
     println!("`strive review ID` shows one with its diff, and accepts or rejects it");
     Ok(code)
@@ -106,7 +106,7 @@ pub async fn review(c: &mut Client, id: Option<u64>, action: Option<Action>) -> 
             println!("no proposals for {cwd}; `strive learn` asks the learner to study this project's sessions");
         }
         for p in &proposals {
-            println!("{}", line(p));
+            println!("{}", crate::terminal::visible(&line(p)));
         }
         for rel in &listed.changed_outside_review {
             println!("{rel} changed outside review: it isn't what an accepted proposal last left there");
@@ -115,7 +115,12 @@ pub async fn review(c: &mut Client, id: Option<u64>, action: Option<Action>) -> 
             println!("{}", rollback_line(p));
         }
         for s in &listed.may_be_stale {
-            println!("{} line {} may be stale: it names {}, which isn't in the project", s.file, s.line, s.missing);
+            println!(
+                "{} line {} may be stale: it names {}, which isn't in the project",
+                s.file,
+                s.line,
+                crate::terminal::visible(&s.missing)
+            );
         }
         if let Some(s) = &listed.skipped {
             println!(
@@ -271,7 +276,7 @@ async fn show(c: &mut Client, p: &ProposalState, rel: &str) -> Result<()> {
     if !next.is_empty() {
         writeln!(out, "\n{next}")?;
     }
-    print!("{out}");
+    print!("{}", crate::terminal::visible(&out));
     Ok(())
 }
 

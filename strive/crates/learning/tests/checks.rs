@@ -235,3 +235,15 @@ fn role_tags_are_refused() {
     }
     assert_eq!(rules(&memory("The system prompt lives in `src/prompt.ts`.\n")), vec![]);
 }
+
+/// Control characters make a terminal hide, erase or overwrite text: a
+/// reviewer reading `strive review` would see something other than what's
+/// proposed. Only newline and tab are allowed.
+#[test]
+fn control_characters_are_refused() {
+    for c in ['\u{1b}', '\r', '\u{8}', '\u{7}', '\u{0}', '\u{7f}', '\u{9b}'] {
+        let content = format!("Tests run with bun{c}[8m hidden\n");
+        assert_eq!(rules(&memory(&content)), vec![Rule::Hidden], "U+{:04X}", c as u32);
+    }
+    assert_eq!(rules(&memory("Tabs\tand\nnewlines are fine.\n")), vec![]);
+}

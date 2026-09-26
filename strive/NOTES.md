@@ -1604,3 +1604,17 @@ Deferred:
 - Non-English correction phrasing.
 - A desktop e2e of a gate accept (it needs the full replay stack; the note's
   text is unit-tested, and the host e2e covers the accept itself).
+
+## 2026-09-26: Stage 2 review, control characters
+
+A trust-boundary review of Stage 2 found that `hidden()` let C0/C1 control
+characters through, and `strive review` and `strive log` print journal
+text raw. A proposal could carry `ESC[8m` (concealed text), `ESC[1A ESC[2K`
+(erase the line above) or `\r` and show a reviewer a harmless diff, or fake
+a "judge: passed" line; an escape code inside a phrase also broke the
+safeguard match. The static gate now refuses every control character but
+newline and tab, and review and log print control characters written out
+(`\u{1b}`) via `terminal::visible`, since a failed proposal's summary is
+still listed. Both tests failed first.
+Not yet: `strive run` and the TUI print model text as it comes; the same
+class, a broader change.

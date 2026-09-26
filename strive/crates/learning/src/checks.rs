@@ -91,7 +91,10 @@ pub fn check(p: &Proposal, known: &[String]) -> Vec<Finding> {
         if let Some(c) = text.chars().find(|c| hidden(*c)) {
             found.push(Finding::new(
                 Rule::Hidden,
-                format!("the {what} holds U+{:04X}, a character a reviewer can't see", u32::from(c)),
+                format!(
+                    "the {what} holds U+{:04X}, a character a reviewer can't see or a terminal obeys",
+                    u32::from(c)
+                ),
             ));
         }
     }
@@ -105,30 +108,33 @@ pub fn check(p: &Proposal, known: &[String]) -> Vec<Finding> {
     found
 }
 
-/// Invisible or direction-changing: zero-width and joiner characters, bidi
+/// Control characters, and invisible or direction-changing ones: zero-width and joiner characters, bidi
 /// controls and isolates, word joiners and invisible operators, the BOM, the
 /// soft hyphen, fillers, and tag characters (which can spell out hidden
 /// ASCII). Variation selectors stay allowed: emoji use them.
 fn hidden(c: char) -> bool {
-    matches!(
-        u32::from(c),
-        0x00AD
-            | 0x034F
-            | 0x061C
-            | 0x115F
-            | 0x1160
-            | 0x180E
-            | 0x200B..=0x200F
-            | 0x202A..=0x202E
-            | 0x2060..=0x2064
-            | 0x2066..=0x206F
-            | 0x3164
-            | 0xFEFF
-            | 0xFFA0
-            | 0xFFF9..=0xFFFB
-            | 0x1D173..=0x1D17A
-            | 0xE0000..=0xE007F
-    )
+    // Control characters but newline and tab: a terminal obeys them (ESC
+    // sequences hide or erase text, CR overwrites a line).
+    (c.is_control() && c != '\n' && c != '\t')
+        || matches!(
+            u32::from(c),
+            0x00AD
+                | 0x034F
+                | 0x061C
+                | 0x115F
+                | 0x1160
+                | 0x180E
+                | 0x200B..=0x200F
+                | 0x202A..=0x202E
+                | 0x2060..=0x2064
+                | 0x2066..=0x206F
+                | 0x3164
+                | 0xFEFF
+                | 0xFFA0
+                | 0xFFF9..=0xFFFB
+                | 0x1D173..=0x1D17A
+                | 0xE0000..=0xE007F
+        )
 }
 
 /// Fullwidth ASCII (`ｉｇｎｏｒｅ`) read as ASCII, so a phrase can't hide in it.

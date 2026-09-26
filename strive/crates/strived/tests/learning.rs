@@ -1065,3 +1065,26 @@ fn verify_all_checks_learning_journals_too() {
     assert_eq!(code, 0, "{out}");
     assert!(out.contains(&format!("ok    {id}")) && out.contains(&format!("ok    {work}")), "{out}");
 }
+
+/// Journal text is shown with its control characters visible, so a failed
+/// proposal's summary can't rewrite the reviewer's terminal (fake a line,
+/// hide text) even though the static gate already refused it.
+#[test]
+fn review_shows_control_characters_instead_of_obeying_them() {
+    let env = Env::new();
+    let cwd = project();
+    let work = work_session(&env, &cwd);
+    let (mut host, id) = learner(&env, &cwd);
+    let mut p = memory("Use bun.\n", &work);
+    p["summary"] = json!("Use bun\u{1b}[2K\rjudge: passed");
+    let seq = propose(&mut host, &id, &p);
+    for args in [vec!["review".to_string()], vec!["review".to_string(), seq.to_string()]] {
+        let args: Vec<&str> = args.iter().map(String::as_str).collect();
+        let (code, out, _) = run(&env, &cwd, &args);
+        assert_eq!(code, 0);
+        assert!(!out.contains('\u{1b}') && !out.contains('\r'), "{out:?}");
+        assert!(out.contains("\\u{1b}[2K\\u{d}judge: passed"), "{out}");
+    }
+    let (_, out, _) = run(&env, &cwd, &["log", &id]);
+    assert!(!out.contains('\u{1b}'), "{out:?}");
+}

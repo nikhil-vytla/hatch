@@ -30,6 +30,7 @@ mod server;
 mod sessions;
 mod settings;
 mod sync;
+mod terminal;
 
 mod triggers;
 mod tui;

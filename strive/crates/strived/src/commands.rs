@@ -217,9 +217,9 @@ pub async fn log(c: &mut Client, id: Option<String>, json: bool) -> Result<ExitC
     if json {
         println!("{}", serde_json::to_string_pretty(&r)?);
     } else {
-        println!("session {}  {}", r.session.id, r.session.cwd);
+        println!("session {}  {}", r.session.id, crate::terminal::visible(&r.session.cwd));
         for e in &r.entries {
-            println!("#{} {}  {}", e.seq, clock(e.ts_ms), describe(e));
+            println!("#{} {}  {}", e.seq, clock(e.ts_ms), crate::terminal::visible(&describe(e)));
         }
         if let Some(p) = &r.problem {
             println!("journal FAILED verification: {p}");
