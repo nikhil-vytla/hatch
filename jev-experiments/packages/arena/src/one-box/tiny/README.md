@@ -60,6 +60,7 @@ bun packages/arena/scripts/record-one-box-tiny.ts      # recordings/one-box.tiny
 ```
 
 Training is deterministic: rerunning reproduces `vectorizer.json` and `heads.json` byte for byte.
+
 ## The recording is out of fold on development phrases
 
 `recordings/one-box.tiny.jsonl.gz` holds every prefix of all 200 phrases, numbers rounded to 4
