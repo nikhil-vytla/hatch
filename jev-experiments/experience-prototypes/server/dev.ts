@@ -63,8 +63,14 @@ Bun.serve({
     await (path === "/api/wardrobe-token" ? wardrobeTokenHandler : evaluateHandler)(
       {
         method: req.method,
-        headers: { authorization: req.headers.get("authorization") },
+        headers: {
+          authorization: req.headers.get("authorization"),
+          "x-jev-deadline-ms": req.headers.get("x-jev-deadline-ms") ?? undefined,
+          "x-jev-max-attempts": req.headers.get("x-jev-max-attempts") ?? undefined,
+        },
         body: await req.json().catch(() => null),
+        // The browser aborting its request stops the call to Jev too.
+        signal: req.signal,
       },
       response,
     );

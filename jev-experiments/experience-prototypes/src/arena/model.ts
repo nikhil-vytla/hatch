@@ -34,6 +34,7 @@ export const LENS_LABEL: Record<Lens, string> = {
   board: "Watch",
   case: "Case",
   typing: "Watch",
+  try: "Try it",
 };
 
 /** Negative when `a` is better than `b`. */
@@ -267,6 +268,8 @@ export function caption(m: CardModel) {
       return "Across: stated confidence. Up: how often the top answer agrees with the reference. Each dot is a confidence bin, sized by how many decisions fall in it; dots on the diagonal mean the confidence is honest.";
     case "case":
       return "One case: the reference distribution beside each contestant's. An outline marks an answer that is confident and disagrees.";
+    case "try":
+      return "Your text goes to every contestant that can run here, under the same calm rules. The keyword rules and the tiny model run in your browser; Jev runs live with your key. Laya runs only on a Mac, so it has no live lane.";
     case "typing":
       return "Each box receives the same keystrokes at the same pace. The strip under each box shows everything it showed over the phrase; the line marks now.";
     case "board":

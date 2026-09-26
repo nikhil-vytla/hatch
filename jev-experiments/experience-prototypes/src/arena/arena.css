@@ -1442,3 +1442,53 @@ th[aria-sort="descending"] .sort {
     min-height: 44px;
   }
 }
+
+/* ---------------------------------------------------------------- one box, live */
+.ob-try-input input {
+  width: 100%;
+  font: inherit;
+  font-size: 18px;
+  min-height: 52px;
+  padding: 0 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--ink);
+  box-shadow: var(--shadow-border);
+}
+.ob-try-input input::placeholder {
+  color: var(--muted);
+}
+.ob-try-examples {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin: 12px 0 18px;
+}
+.ob-try-examples button {
+  font: inherit;
+  font-size: 13px;
+  min-height: 40px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--ink);
+  box-shadow: var(--shadow-border);
+  cursor: pointer;
+}
+.ob-lane-ms {
+  margin-left: auto;
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+.ob-lane-note {
+  min-height: 1.5em;
+  margin: 8px 0 0;
+}
+@media (pointer: coarse) {
+  .ob-try-examples button {
+    min-height: 44px;
+  }
+}
