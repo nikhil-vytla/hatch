@@ -5,6 +5,7 @@
  * aggregates, never phrases or per-item results.
  */
 import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
+import { gunzipSync, gzipSync } from "node:zlib";
 import { z } from "zod";
 import { answersSchema, toReading } from "../one-box/adapter";
 import { keyword } from "../one-box/keyword";
@@ -34,7 +35,8 @@ export function seal(sealed: Sealed, keyBase64: string) {
   const key = Buffer.from(keyBase64, "base64");
   const iv = randomBytes(12);
   const cipher = createCipheriv("aes-256-gcm", key, iv);
-  const body = Buffer.concat([cipher.update(JSON.stringify(sealed), "utf8"), cipher.final()]);
+  // Compressed before encrypting (ciphertext does not compress).
+  const body = Buffer.concat([cipher.update(gzipSync(JSON.stringify(sealed))), cipher.final()]);
 
   return Buffer.concat([iv, cipher.getAuthTag(), body]).toString("base64");
 }
@@ -50,9 +52,9 @@ export function unseal(blob: string, keyBase64: string): Sealed {
 
   decipher.setAuthTag(raw.subarray(12, 28));
 
-  const json = Buffer.concat([decipher.update(raw.subarray(28)), decipher.final()]).toString(
-    "utf8",
-  );
+  const json = gunzipSync(
+    Buffer.concat([decipher.update(raw.subarray(28)), decipher.final()]),
+  ).toString("utf8");
 
   return sealedSchema.parse(JSON.parse(json));
 }
