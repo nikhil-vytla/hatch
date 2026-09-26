@@ -11,6 +11,7 @@ fn proposal(summary: &str) -> Proposal {
         rationale: "r".into(),
         evidence: vec![],
         prediction: "p".into(),
+        watch: None,
     }
 }
 
@@ -101,6 +102,7 @@ fn decisions_and_writes_set_the_status() {
     events.push(decided(3, ProposalDecision::Accept));
     events.push(decided(4, ProposalDecision::Accept));
     events.push(Event::ProposalApplied { proposal: 4, before: None, after: digest(4) });
+    let applied_at = events.len() as u64 * 1000;
     events.push(decided(5, ProposalDecision::Accept));
     events.push(Event::ProposalApplied { proposal: 5, before: Some(digest(1)), after: digest(5) });
     events.push(Event::ProposalRolledBack { proposal: 5, by: "test".into() });
@@ -112,7 +114,7 @@ fn decisions_and_writes_set_the_status() {
         vec![
             (2, ProposalStatus::Rejected, None),
             (3, ProposalStatus::Stale, None),
-            (4, ProposalStatus::Applied, Some(Applied { before: None, after: digest(4) })),
+            (4, ProposalStatus::Applied, Some(Applied { before: None, after: digest(4), at_ms: applied_at })),
             (5, ProposalStatus::RolledBack, None),
         ]
     );

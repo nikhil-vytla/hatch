@@ -21,6 +21,8 @@ export type DescribeOptions = {
 
 const note = (tone: Tone, text: string): Line[] => [{ kind: "note", tone, text }];
 
+const OUTCOMES = { confirmed: "held", contradicted: "was contradicted", notApplicable: "didn't apply" } as const;
+
 export function budgetText(usd?: number, tokens?: number): string {
   if (usd === undefined && tokens === undefined) return "unlimited";
 
@@ -207,6 +209,11 @@ export function describe(entry: Entry, options: DescribeOptions = {}): Line[] {
       return note("faint", `#${e.proposal} replaying past tasks, holding up to ${formatUsd(e.reservedUsdMicros)}`);
     case "replayFinished":
       return note("faint", `#${e.proposal} replayed in ${e.runs.length} runs · ${formatUsd(e.costUsdMicros)}`);
+    case "predictionChecked":
+      return note(
+        e.outcome === "contradicted" ? "danger" : "faint",
+        `#${e.proposal}'s prediction ${OUTCOMES[e.outcome]} in session ${e.session}: ${e.detail}`,
+      );
     default:
       return e satisfies never;
   }

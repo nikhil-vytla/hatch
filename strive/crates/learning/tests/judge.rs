@@ -140,6 +140,7 @@ fn proposal() -> Proposal {
         rationale: "because".into(),
         evidence: vec![Evidence { session: "s1".into(), seqs: vec![3], note: "it failed".into() }],
         prediction: "later sessions run tests".into(),
+        watch: None,
     }
 }
 

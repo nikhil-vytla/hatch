@@ -131,6 +131,7 @@ fn block(entry: &Entry, starts: &HashMap<u64, (u64, &EffectRecord)>, blob: Blob)
         | Event::ProposalDecided { .. }
         | Event::ProposalApplied { .. }
         | Event::ProposalRolledBack { .. }
+        | Event::PredictionChecked { .. }
         | Event::LayoutProposed { .. }
         | Event::ReplayStarted { .. }
         | Event::ReplayFinished { .. }

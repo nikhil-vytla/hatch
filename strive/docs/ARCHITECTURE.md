@@ -22,7 +22,7 @@ calls go through the daemon's gateway. Why: [ADR-0015](adrs/0015-rebuild-daemon-
 | `crates/journal` | Authenticated session journals: format, verification, crash recovery |
 | `crates/budget` | Prices, costs, reservations and the ledger rebuilt from journal events |
 | `crates/gateway` | Provider wire formats: which API, what a request asks for, usage from bodies and streams |
-| `crates/learning` | Trusted learning's pure parts: where proposals write, the static gate's text checks, proposal status, the judge's rubric, the replay gate's task mining and verdict |
+| `crates/learning` | Trusted learning's pure parts: where proposals write, the static gate's text checks, proposal status, the judge's rubric, the replay gate's task mining and verdict, watches and their tallies, memory's named paths |
 | `crates/strived` | The `strive` binary: CLI, launcher, daemon, sessions |
 | `packages/protocol` | Generated TS types + the typed socket client |
 | `packages/tui` | The terminal client; its binary also runs the agent host |
@@ -298,7 +298,7 @@ machine). Every finding is listed in the gate's detail:
 own model call, through its gateway with the learning session's token, so
 it is admitted, held, journaled and charged like any call of that session.
 - **What it's shown**, as one JSON document the system prompt calls data:
-  the proposal, the file it replaces and the other memory and skills as
+  the proposal (with its watch, if any, and how it reads), the file it replaces and the other memory and skills as
   the learner was shown them, the cited sessions (cited entries kept
   first), and up to three held-out sessions: the project's newest work
   sessions the proposal doesn't cite, begun before it, with a prompt and a
@@ -371,6 +371,40 @@ the project, run again by the agent with and without the proposal.
 
 Gates a crash cut short (a proposal with no verdicts) are run again on the
 next `proposal/list` or decision.
+
+**Predictions checked** ([ADR-0019](adrs/0019-predictions-checked.md)). A
+proposal may carry a `watch` beside its prose prediction: the prediction as
+a predicate the daemon evaluates on a work journal, with no model.
+- **The language** (`strive_learning::watch`): a session is its steps, each
+  prompt and each command that ran (text, output, exit). A step pattern is
+  case-insensitive substrings: `prompt` alone, or `command`, `output` and
+  `exit` of one command. A watch is an optional `when` pattern and one of
+  `never`, `any` or `first {of, is}`. The static gate's `watch` rule fails
+  an empty or mixed pattern, a `first` whose halves can't match one step,
+  and strings that are empty, over 200 bytes or hold a line break; unknown
+  fields are refused when the record is parsed.
+- **Bounded:** at most 2,000 steps, 256 KiB of one output (its two ends)
+  and 8 MiB of output per session, fetched only for patterns that name
+  `output`. An outcome that depends on what wasn't read is not applicable.
+- **When:** after a work session's host records `turnEnded`, in the
+  background, and for every session on `learning/run` (which catches up on
+  turns that ended without their host). Only applied proposals are checked,
+  and only against sessions created at or after the apply, read up to their
+  last `turnEnded`.
+- **Journal:** `predictionChecked {proposal, session, throughSeq, outcome,
+  detail}` in the learning session, under the project's lock, when the
+  pair has no record or its outcome changed. The latest per pair counts.
+- **Tally:** each `proposal/list` entry with a watch has `prediction`:
+  confirmed, contradicted and not applicable, and over the last 10
+  sessions it applied to, how many confirmed and contradicted it. At least
+  3 contradictions there, outnumbering confirmations, is `notHolding`.
+- **Suggested, never done:** for an applied proposal that is not holding,
+  `strive review` prints a line naming `strive review ID rollback`, and its
+  detail shows the watch and tally ("prediction not machine-checked" when
+  there's no watch). The daemon never rolls anything back.
+- **Stale memory:** `proposal/list`'s `mayBeStale` lists memory lines that
+  name a relative project path, in backticks, that no longer exists
+  (`strive_learning::stale`); `strive review` prints each.
 
 **Deciding.** `proposal/decide` and `proposal/rollback` are people only,
 as approvals are. Both hold the file (as an agent's write does) and the
@@ -470,6 +504,10 @@ prediction and checks) and accepts, rejects or rolls it back.
     detail is read by criterion when it has the daemon's line shape, else
     shown as is; the other proposals for the same file come from
     `proposal/list`.
+  - The Prediction section shows the watch and its tally, or "Prediction
+    not machine-checked." An applied proposal that is not holding says so
+    there; Roll back stays the person's click. The list reloads when a
+    `predictionChecked` entry arrives.
 
 ## Effects
 

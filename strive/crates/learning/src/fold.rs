@@ -7,15 +7,23 @@
 //! - an accept followed by `proposalApplied` makes it `applied`; an accept
 //!   with nothing written (the file had changed) makes it `stale`;
 //! - `proposalRolledBack` makes an applied one `rolledBack`.
+//!
+//! A proposal with a watch gets a tally of its `predictionChecked` records,
+//! each session counted once, by its latest.
 
-use strive_proto::{Digest, Entry, Event, GateOutcome, ProposalDecision, ProposalState, ProposalStatus, Verdict};
+use std::collections::BTreeMap;
+
+use strive_proto::{
+    Digest, Entry, Event, GateOutcome, ProposalDecision, ProposalState, ProposalStatus, Verdict, WatchOutcome,
+};
 
 /// What an accepted proposal wrote: the file before (none: it didn't
-/// exist) and after.
+/// exist) and after, and when.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Applied {
     pub before: Option<Digest>,
     pub after: Digest,
+    pub at_ms: u64,
 }
 
 /// A proposal's state, plus what rolling it back needs.
@@ -32,6 +40,8 @@ struct Marks {
     rejected: bool,
     applied: Option<Applied>,
     rolled_back: bool,
+    /// Each session's latest watch outcome, by session id.
+    checked: BTreeMap<String, WatchOutcome>,
 }
 
 /// Every proposal in the journal, oldest first.
@@ -48,6 +58,7 @@ pub fn fold(entries: &[Entry]) -> Vec<Folded> {
                     before: *before,
                     status: ProposalStatus::Checking,
                     gates: Vec::new(),
+                    prediction: None,
                 },
                 Marks::default(),
             )),
@@ -73,12 +84,17 @@ pub fn fold(entries: &[Entry]) -> Vec<Folded> {
             }
             Event::ProposalApplied { proposal, before, after } => {
                 if let Some(i) = find(&mut out, *proposal) {
-                    out[i].1.applied = Some(Applied { before: *before, after: *after });
+                    out[i].1.applied = Some(Applied { before: *before, after: *after, at_ms: e.ts_ms });
                 }
             }
             Event::ProposalRolledBack { proposal, .. } => {
                 if let Some(i) = find(&mut out, *proposal) {
                     out[i].1.rolled_back = true;
+                }
+            }
+            Event::PredictionChecked { proposal, session, outcome, .. } => {
+                if let Some(i) = find(&mut out, *proposal) {
+                    out[i].1.checked.insert(session.clone(), *outcome);
                 }
             }
             Event::SessionStarted { .. }
@@ -109,6 +125,7 @@ pub fn fold(entries: &[Entry]) -> Vec<Folded> {
     out.into_iter()
         .map(|(mut state, marks)| {
             state.status = status(&state.gates, &marks);
+            state.prediction = state.proposal.watch.as_ref().map(|_| crate::watch::tally(&marks.checked));
             let applied = if marks.rolled_back { None } else { marks.applied };
             Folded { state, applied }
         })

@@ -822,11 +822,11 @@ async function learner(cwd: string, at = home): Promise<Learner> {
   return { host, id };
 }
 
-type Proposed = { summary: string; content: string; evidence?: string; seqs?: number[]; note?: string };
+type Proposed = { summary: string; content: string; evidence?: string; seqs?: number[]; note?: string; watch?: Json };
 
 /** Proposes a change to the project's memory, citing a work session's entries (its first by default); its id. */
 async function proposeMemory(l: Learner, cwd: string, p: Proposed): Promise<number> {
-  const proposal = {
+  const plain = {
     artifact: { kind: "memory" },
     content: p.content,
     summary: p.summary,
@@ -836,6 +836,8 @@ async function proposeMemory(l: Learner, cwd: string, p: Proposed): Promise<numb
     ],
     prediction: `Later sessions follow: ${p.summary}.`,
   };
+
+  const proposal = p.watch === undefined ? plain : { ...plain, watch: p.watch };
 
   const r = await l.host.call("host/record", { id: l.id, event: { type: "proposalMade", proposal } });
 
@@ -1143,6 +1145,76 @@ async function reopenLearned(page: Page) {
 
   return learnedPane(page);
 }
+
+/** A work session in `cwd` whose agent runs `command` in one turn, recorded as a host records it. */
+async function workTurn(cwd: string, command: string): Promise<string> {
+  const person = await Rpc.open();
+  const id = String(resultOf(await person.call("session/create", { cwd })).id);
+  resultOf(await person.call("session/approvals", { id, mode: "fullAuto" }));
+  resultOf(await person.call("session/prompt", { id, text: "run the tests" }));
+  const host = await Rpc.open();
+  resultOf(await host.call("host/register", { id }));
+  resultOf(await host.call("host/record", { id, event: { type: "turnStarted", turn: 1 } }));
+  resultOf(await host.call("effect/run", { id, callId: "c1", request: { kind: "bash", command } }));
+  const end = { type: "turnEnded", turn: 1, reason: { kind: "done" } };
+  resultOf(await host.call("host/record", { id, event: end }));
+  host.close();
+  person.close();
+
+  return id;
+}
+
+test("a prediction contradicted by later sessions shows as not holding, and Roll back is still a person's click", async () => {
+  const { page, cwd } = await openApp();
+  const l = await learner(cwd);
+  const plain = await proposeMemory(l, cwd, { summary: "Sort the changelog", content: "- Sort it.\n" });
+
+  const id = await proposeMemory(l, cwd, {
+    summary: "Run the host tests only",
+    content: "- Run `bun test packages/host`.\n",
+    watch: {
+      when: { command: "bun test" },
+      expect: { kind: "never", step: { command: "bun test", output: "no display" } },
+    },
+  });
+
+  const pane = await openProposal(page, plain);
+  await pane.getByRole("region", { name: "prediction" }).getByText("Prediction not machine-checked.").waitFor();
+  await pane.getByRole("button", { name: "all proposals" }).click();
+  await pane.locator(`.learned-item[data-proposal="${id}"]`).click();
+  const prediction = pane.getByRole("region", { name: "prediction" });
+
+  await prediction
+    .getByText('never a command containing "bun test" whose output contains "no display"', { exact: false })
+    .waitFor();
+
+  await prediction.getByText("No session has been checked against it yet.").waitFor();
+  await pane.getByRole("button", { name: "Accept" }).click();
+  await pane.getByRole("button", { name: "Write it" }).click();
+  await pane.locator(".learned-title .badge", { hasText: "applied" }).waitFor();
+
+  // Three later sessions whose tests fail for want of a display.
+  for (let i = 0; i < 3; i++) await workTurn(cwd, "echo 'error: no display' >&2; exit 1; : bun test");
+
+  // The pane follows the learning session: each check reaches it as it's journaled.
+  await prediction.locator('[data-standing="not-holding"]').waitFor();
+  await prediction.getByText("Confirmed in 0, contradicted in 3 of 3 sessions.").waitFor();
+  await prediction
+    .getByText("Not holding: 3 of the last 3 sessions it applied to contradicted it.", { exact: false })
+    .waitFor();
+
+  // Suggested, not done: the file is as accepted until a person rolls it back.
+  assert.equal(readFileSync(memoryFile(cwd), "utf8"), "- Run `bun test packages/host`.\n");
+  assert.equal((await learningEvents(cwd, "proposalRolledBack")).length, 0);
+  assert.equal((await learningEvents(cwd, "predictionChecked")).length, 3);
+  await pane.getByRole("button", { name: "Roll back" }).click();
+  await pane.getByRole("group", { name: "confirm rollback" }).getByRole("button", { name: "Roll back" }).click();
+  await pane.locator(".learned-title .badge", { hasText: "rolled back" }).waitFor();
+  assert.equal(existsSync(memoryFile(cwd)), false);
+  // Rolled back, it no longer says the change may be hurting.
+  assert.equal(await prediction.locator('[data-standing="not-holding"]').count(), 0);
+  l.host.close();
+});
 
 test("a learned file edited by hand after an accept shows as changed outside review", async () => {
   const { page, cwd } = await openApp();

@@ -367,6 +367,7 @@ fn host_may_record(event: &Event, kind: SessionKind) -> bool {
         | Event::ProposalDecided { .. }
         | Event::ProposalApplied { .. }
         | Event::ProposalRolledBack { .. }
+        | Event::PredictionChecked { .. }
         | Event::ReplayStarted { .. }
         | Event::ReplayFinished { .. }
         | Event::ModelSet { .. } => false,
@@ -530,6 +531,10 @@ async fn route_host(state: &Arc<State>, conn: &Arc<Conn>, method: &str, params: 
                 .map_err(|why| RpcError::new(RpcError::INVALID_PARAMS, why))?;
             if let Some(open) = opened {
                 *crate::sync::lock(&conn.open_turn) = open;
+            }
+            // A work turn's end is when the project's predictions are checked against it.
+            if opened == Some(None) && kind == SessionKind::Work {
+                crate::watch::turn_ended(state, info.cwd.clone(), sid.clone());
             }
             reply::<HostRecord>(Appended { seq: entries[0].seq })
         }

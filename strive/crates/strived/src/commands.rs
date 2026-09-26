@@ -128,6 +128,10 @@ pub fn describe(e: &Entry) -> String {
         Event::ProposalApplied { proposal, before: None, .. } => format!("proposal #{proposal} applied: file created"),
         Event::ProposalApplied { proposal, .. } => format!("proposal #{proposal} applied: file replaced"),
         Event::ProposalRolledBack { proposal, by } => format!("proposal #{proposal} rolled back by {by}"),
+        Event::PredictionChecked { proposal, session, outcome, detail, .. } => format!(
+            "proposal #{proposal}: its prediction {} in session {session}: {detail}",
+            crate::review::outcome_name(*outcome)
+        ),
         Event::ReplayStarted { proposal, reserved_usd_micros } => {
             format!("proposal #{proposal}: replaying past tasks, holding up to {}", format_usd(*reserved_usd_micros))
         }

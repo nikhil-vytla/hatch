@@ -138,6 +138,20 @@ export type * from "./generated/SessionKind";
 
 export type * from "./generated/ReplayRun";
 
+export type * from "./generated/Watch";
+
+export type * from "./generated/Expect";
+
+export type * from "./generated/StepMatch";
+
+export type * from "./generated/ExitMatch";
+
+export type * from "./generated/WatchOutcome";
+
+export type * from "./generated/PredictionTally";
+
+export type * from "./generated/StaleMention";
+
 export type * from "./generated/Verdict";
 
 export type * from "./generated/SessionChangesParams";

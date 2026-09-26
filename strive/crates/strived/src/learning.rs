@@ -17,7 +17,7 @@ use strive_proto::rpc::RpcError;
 use strive_proto::{
     Appended, Digest, Entry, Event, Evidence, Gate, LearningOpen, LearningRun, LearningRunParams, Method, ProjectRef,
     Proposal, ProposalDecide, ProposalDecideParams, ProposalDecision, ProposalList, ProposalListResult, ProposalRef,
-    ProposalRollback, ProposalStatus, SessionInfo, SessionKind, Verdict,
+    ProposalRollback, ProposalStatus, SessionInfo, SessionKind, StaleMention, Verdict,
 };
 
 use crate::methods::{Conn, Reply, client_name, internal, parse, reply, require_person, session_error};
@@ -39,7 +39,7 @@ pub struct Locks {
 }
 
 impl Locks {
-    fn project(&self, sid: &SessionId) -> Arc<tokio::sync::Mutex<()>> {
+    pub fn project(&self, sid: &SessionId) -> Arc<tokio::sync::Mutex<()>> {
         crate::sync::lock(&self.projects).entry(sid.clone()).or_default().clone()
     }
 }
@@ -73,7 +73,8 @@ pub async fn route(state: &Arc<State>, conn: &Arc<Conn>, method: &str, params: V
                 entries = journal(state, &sid)?;
             }
             let changed_outside_review = outside_review(state, &cwd, &entries).await?;
-            reply::<ProposalList>(ProposalListResult { proposals, changed_outside_review })
+            let may_be_stale = stale(state, &cwd).await?;
+            reply::<ProposalList>(ProposalListResult { proposals, changed_outside_review, may_be_stale })
         }
         ProposalDecide::NAME => {
             require_person(conn)?;
@@ -106,7 +107,7 @@ fn project(cwd: &str) -> Result<String, RpcError> {
 
 /// The project's learning session, if it has one. The oldest wins, so the
 /// answer never changes once there is one.
-fn find(state: &State, cwd: &str) -> Result<Option<SessionId>, RpcError> {
+pub fn find(state: &State, cwd: &str) -> Result<Option<SessionId>, RpcError> {
     let (found, _) = state.sessions.list(Some(cwd), SessionKind::Learning).map_err(|e| internal(&e))?;
     Ok(found.last().and_then(|s| SessionId::parse(&s.id)))
 }
@@ -146,6 +147,11 @@ async fn run(state: &Arc<State>, cwd: &str, sessions: Vec<String>) -> Reply {
         work_session(state, cwd, s).map_err(|why| RpcError::new(RpcError::INVALID_PARAMS, why))?;
     }
     let sid = learning_id(&open(state, cwd).await?)?;
+    // Catches up on turns whose end wasn't checked: the daemon stopped
+    // first, or the turn ended without its host.
+    if let Err(e) = crate::watch::check(state, cwd, None).await {
+        crate::log!("could not check predictions for {cwd}: {e:?}");
+    }
     let entries = state.sessions.append(&sid, vec![Event::LearnRequested { sessions }]).await.map_err(session_error)?;
     state.hosts.ensure(&sid, &state.home.socket(), &state.sessions.session_dir(&sid).join("host.log"));
     reply::<LearningRun>(Appended { seq: entries.last().map_or(0, |e| e.seq) })
@@ -393,6 +399,26 @@ async fn outside_review(state: &State, cwd: &str, entries: &[Entry]) -> Result<V
     Ok(changed)
 }
 
+/// Lines of the project's memory, as it is now, that name a project path
+/// which isn't there (`strive_learning::stale`). Nothing if the memory
+/// can't be read as a learned file.
+async fn stale(state: &State, cwd: &str) -> Result<Vec<StaleMention>, RpcError> {
+    let rel = strive_learning::MEMORY_PATH;
+    let Ok(Some(bytes)) = file_now(state, cwd, rel).await? else { return Ok(Vec::new()) };
+    let text = String::from_utf8_lossy(&bytes);
+    let named = strive_learning::stale::named_paths(&text);
+    let cwd = cwd.to_string();
+    tokio::task::spawn_blocking(move || {
+        named
+            .into_iter()
+            .filter(|(_, p)| std::fs::symlink_metadata(Path::new(&cwd).join(p)).is_err())
+            .map(|(line, missing)| StaleMention { file: rel.to_string(), line, missing })
+            .collect()
+    })
+    .await
+    .map_err(|e| internal(&e))
+}
+
 /// The static gate: the proposal's own text, where its file resolves (and
 /// that what's there now is a file it could replace), and its evidence.
 async fn static_gate(state: &State, cwd: &str, p: &Proposal) -> Result<Vec<Finding>, RpcError> {
@@ -516,7 +542,7 @@ fn last_seq(state: &State, cwd: &str, id: &str) -> Result<u64, String> {
 }
 
 /// The learning session's committed entries, verified.
-fn journal(state: &State, sid: &SessionId) -> Result<Vec<Entry>, RpcError> {
+pub fn journal(state: &State, sid: &SessionId) -> Result<Vec<Entry>, RpcError> {
     let (_, report) = state.sessions.read(sid).map_err(session_error)?;
     match report.problem {
         Some(p) => Err(session_error(SessionError::Invalid(p))),

@@ -595,6 +595,93 @@ pub struct Proposal {
     pub evidence: Vec<Evidence>,
     /// A falsifiable claim about what the change will do, checked later.
     pub prediction: String,
+    /// The prediction in a form the daemon checks on each later work
+    /// session, without a model (ADR-0019). None: it isn't machine-checked.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub watch: Option<Box<Watch>>,
+}
+
+/// A machine-checkable prediction: in the sessions it applies to (those with
+/// a step matching `when`, or every session with a prompt), what should hold.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[ts(export)]
+pub struct Watch {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub when: Option<StepMatch>,
+    pub expect: Expect,
+}
+
+/// What a watch expects of a session's steps.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(tag = "kind", rename_all = "camelCase", deny_unknown_fields)]
+#[ts(export)]
+pub enum Expect {
+    /// No step matches.
+    Never { step: StepMatch },
+    /// Some step matches.
+    Any { step: StepMatch },
+    /// The first step matching `of` also matches `is`.
+    First { of: StepMatch, is: StepMatch },
+}
+
+/// One step of a session to look for, by case-insensitive substrings: a
+/// prompt containing `prompt`, or a command that ran whose text, output and
+/// exit match every field given.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[ts(export)]
+pub struct StepMatch {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub prompt: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub command: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub output: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub exit: Option<ExitMatch>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub enum ExitMatch {
+    Zero,
+    /// Any other status, or stopped by its time limit.
+    NonZero,
+}
+
+/// How a watch read one session.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub enum WatchOutcome {
+    Confirmed,
+    Contradicted,
+    NotApplicable,
+}
+
+/// How an applied proposal's watch has fared in later work sessions, each
+/// session counted once, by its latest check.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct PredictionTally {
+    pub confirmed: u32,
+    pub contradicted: u32,
+    pub not_applicable: u32,
+    /// Of the last sessions it applied to (`strive_learning::watch::RECENT`).
+    pub recent_confirmed: u32,
+    pub recent_contradicted: u32,
+    /// Enough recent sessions contradicted it, and more than confirmed it,
+    /// that rolling it back is worth a look. Never acted on by the daemon.
+    pub not_holding: bool,
 }
 
 /// What a proposal changes. Paths are fixed by kind, inside the project:
@@ -680,6 +767,23 @@ pub struct ProposalListResult {
     /// by git), or there with no applied proposal behind them.
     #[serde(default)]
     pub changed_outside_review: Vec<String>,
+    /// Lines of the project's memory that name a project path which no
+    /// longer exists: the lesson may be stale.
+    #[serde(default)]
+    pub may_be_stale: Vec<StaleMention>,
+}
+
+/// A memory line naming a path in the project that isn't there.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct StaleMention {
+    /// The learned file, by path in the project.
+    pub file: String,
+    /// 1-based.
+    pub line: u32,
+    /// The missing path, as the line names it.
+    pub missing: String,
 }
 
 /// A proposal as it stands, folded from the learning session's journal.
@@ -697,6 +801,10 @@ pub struct ProposalState {
     pub before: Option<Digest>,
     pub status: ProposalStatus,
     pub gates: Vec<GateOutcome>,
+    /// How its watch has fared in later sessions; none: it has no watch.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub prediction: Option<PredictionTally>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
@@ -1056,6 +1164,16 @@ pub enum Event {
     ProposalRolledBack {
         proposal: u64,
         by: String,
+    },
+    /// An applied proposal's watch was evaluated on a later work session,
+    /// read up to `through_seq` (ADR-0019). Journaled when the pair has no
+    /// record yet or its outcome changed; the latest counts.
+    PredictionChecked {
+        proposal: u64,
+        session: String,
+        through_seq: u64,
+        outcome: WatchOutcome,
+        detail: String,
     },
     /// The agent proposed a change to the desktop workspace's layout. It
     /// changes nothing until a person accepts it in the desktop app.

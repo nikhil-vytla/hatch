@@ -11,6 +11,7 @@ fn memory(content: &str) -> Proposal {
         rationale: "npm test failed twice".into(),
         evidence: vec![Evidence { session: "S".into(), seqs: vec![4], note: "npm failed".into() }],
         prediction: "no session runs npm test".into(),
+        watch: None,
     }
 }
 

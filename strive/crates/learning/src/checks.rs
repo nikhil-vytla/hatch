@@ -23,6 +23,8 @@ pub enum Rule {
     Weakening,
     /// The evidence must name real work sessions of the project.
     Evidence,
+    /// A watch must be well formed and within its bounds (ADR-0019).
+    Watch,
 }
 
 impl Rule {
@@ -35,6 +37,7 @@ impl Rule {
             Rule::Hidden => "hidden text",
             Rule::Weakening => "safeguards",
             Rule::Evidence => "evidence",
+            Rule::Watch => "watch",
         }
     }
 }
@@ -76,12 +79,14 @@ pub fn check(p: &Proposal, known: &[String]) -> Vec<Finding> {
         }
     }
     let notes = p.evidence.iter().map(|e| e.note.as_str()).collect::<Vec<_>>().join("\n");
+    let watch = p.watch.as_ref().map(|w| crate::watch::strings(w).join("\n")).unwrap_or_default();
     for (what, text) in [
         ("content", p.content.as_str()),
         ("summary", &p.summary),
         ("rationale", &p.rationale),
         ("prediction", &p.prediction),
         ("evidence notes", &notes),
+        ("watch", &watch),
     ] {
         if let Some(c) = text.chars().find(|c| hidden(*c)) {
             found.push(Finding::new(
@@ -93,6 +98,9 @@ pub fn check(p: &Proposal, known: &[String]) -> Vec<Finding> {
     found.extend(weakening(&p.content).into_iter().map(|d| Finding::new(Rule::Weakening, d)));
     if p.evidence.is_empty() {
         found.push(Finding::new(Rule::Evidence, "it names no sessions as evidence"));
+    }
+    if let Some(w) = &p.watch {
+        found.extend(crate::watch::problems(w).into_iter().map(|d| Finding::new(Rule::Watch, d)));
     }
     found
 }

@@ -1,7 +1,17 @@
 // What the Learned pane shows of the project's learning: proposals as
 // people read them, and the state of the latest run, folded from the
 // learning session's journal.
-import type { Artifact, Entry, Gate, ProposalState, ProposalStatus, Verdict } from "@strive/protocol";
+import type {
+  Artifact,
+  Entry,
+  Gate,
+  PredictionTally,
+  ProposalState,
+  ProposalStatus,
+  StepMatch,
+  Verdict,
+  Watch,
+} from "@strive/protocol";
 
 /**
  * A failed bridge call as a person reads it: the main process's message,
@@ -169,4 +179,48 @@ export function fileHistory(proposals: readonly ProposalState[], p: ProposalStat
   const path = artifactPath(p.proposal.artifact);
 
   return proposals.filter((q) => artifactPath(q.proposal.artifact) === path);
+}
+
+function stepText(m: StepMatch): string {
+  if (m.prompt !== undefined) return `a prompt containing "${m.prompt.trim()}"`;
+
+  const parts = ["a command"];
+
+  if (m.command !== undefined) parts.push(`containing "${m.command.trim()}"`);
+
+  if (m.output !== undefined) parts.push(`whose output contains "${m.output.trim()}"`);
+
+  if (m.exit === "zero") parts.push("that exited 0");
+
+  if (m.exit === "nonZero") parts.push("that failed");
+
+  return parts.join(" ");
+}
+
+/** A watch as `strive review` reads it (`strive_learning::watch::describe`). */
+export function watchText(w: Watch): string {
+  const e = w.expect;
+
+  const expect =
+    e.kind === "never"
+      ? `never ${stepText(e.step)}`
+      : e.kind === "any"
+        ? `at least once, ${stepText(e.step)}`
+        : `the first step that is ${stepText(e.of)} is also ${stepText(e.is)}`;
+
+  return w.when === undefined ? `in every session: ${expect}` : `in sessions with ${stepText(w.when)}: ${expect}`;
+}
+
+/** How a watch has fared, as counts a person reads. */
+export function tallyText(t: PredictionTally | undefined): string {
+  const checked = (t?.confirmed ?? 0) + (t?.contradicted ?? 0);
+
+  if (t === undefined || checked === 0)
+    return t === undefined || t.notApplicable === 0
+      ? "No session has been checked against it yet."
+      : `It hasn't applied to any of the ${t.notApplicable} sessions checked.`;
+
+  const others = t.notApplicable === 0 ? "" : ` (${t.notApplicable} more it didn't apply to)`;
+
+  return `Confirmed in ${t.confirmed}, contradicted in ${t.contradicted} of ${checked} session${checked === 1 ? "" : "s"}${others}.`;
 }

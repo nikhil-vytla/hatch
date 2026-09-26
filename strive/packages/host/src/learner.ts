@@ -72,6 +72,12 @@ What cost a session time and will come up again:
 - rationale: what went wrong, how often, and why this text prevents it.
 - evidence: every session and the entry seqs you rely on, each with a note on what those entries show ("#12 \`bun test\` fails: no display; #15 the user says to run packages/host only"). Cite only this project's sessions, and only entries you read.
 - prediction: a falsifiable claim about later sessions that someone could check, naming what would be observed: "Sessions that run the host tests won't first fail with 'no display'." Not "the agent will be more efficient".
+- watch: the prediction as a check the daemon runs on every later session once the change is accepted. Give one whenever the prediction is about commands, their output or exit, or what the user says; leave it out otherwise. A session is its steps in order: each prompt, and each command that ran. A step pattern matches by substrings, ignoring case: \`prompt\` alone, or any of \`command\`, \`output\` and \`exit\` ("zero" or "nonZero"), which must all hold for the same command. \`when\` limits the check to sessions with a matching step. \`expect\` is one of:
+  - never: no step matches. {"when": {"command": "bun test"}, "expect": {"kind": "never", "step": {"command": "bun test", "output": "no display"}}}
+  - any: some step matches. {"when": {"command": "release"}, "expect": {"kind": "any", "step": {"command": "bun run changelog", "exit": "zero"}}}
+  - first: the first step matching \`of\` also matches \`is\`. {"expect": {"kind": "first", "of": {"command": "test"}, "is": {"command": "bun test packages/host"}}}
+  - A correction the user shouldn't have to repeat: {"expect": {"kind": "never", "step": {"prompt": "use bun, not npm"}}}
+  Keep each string short and specific (at most 200 bytes, one line): a string that also appears where the lesson doesn't apply makes the check wrong. If contradictions pile up in later sessions, a person is told the change may be hurting.
 - If the daemon refuses a proposal, or its static check fails, the tool result says why. Fix that and propose again, or drop it.
 
 # Never
@@ -139,6 +145,44 @@ function artifactSchema() {
   ]);
 }
 
+function stepSchema(what: string) {
+  const text = (d: string) =>
+    Type.Optional(Type.String({ description: `${d}; case doesn't matter, at most 200 bytes` }));
+
+  return Type.Object(
+    {
+      prompt: text("A prompt the user sent contains this. Use alone"),
+      command: text("A command that ran contains this"),
+      output: text("That command's output contains this"),
+      exit: Type.Optional(
+        Type.Union([Type.Literal("zero"), Type.Literal("nonZero")], { description: "How that command exited" }),
+      ),
+    },
+    { additionalProperties: false, description: what },
+  );
+}
+
+function watchSchema() {
+  return Type.Object(
+    {
+      when: Type.Optional(stepSchema("Only sessions with a step like this count; leave out for every session")),
+      expect: Type.Union([
+        Type.Object({ kind: Type.Literal("never"), step: stepSchema("No step is like this") }),
+        Type.Object({ kind: Type.Literal("any"), step: stepSchema("Some step is like this") }),
+        Type.Object({
+          kind: Type.Literal("first"),
+          of: stepSchema("The first step like this..."),
+          is: stepSchema("...is also like this"),
+        }),
+      ]),
+    },
+    {
+      additionalProperties: false,
+      description: "The prediction as a check the daemon runs on each later session. Optional; see the rules",
+    },
+  );
+}
+
 /** propose_change's parameters: the protocol's `Proposal`, field for field. */
 export const ProposalParams = Type.Object({
   artifact: artifactSchema(),
@@ -153,6 +197,7 @@ export const ProposalParams = Type.Object({
     }),
   ),
   prediction: Type.String({ description: "A falsifiable claim about later sessions, checked later" }),
+  watch: Type.Optional(watchSchema()),
 });
 
 export const ReadSessionParams = Type.Object({
@@ -284,7 +329,7 @@ class Learner {
       name: "propose_change",
       label: "propose_change",
       description: [
-        "Propose a change to memory or a skill: the file's whole new content, a one-line summary, the rationale, the evidence (sessions, entry seqs, what they show) and a falsifiable prediction.",
+        "Propose a change to memory or a skill: the file's whole new content, a one-line summary, the rationale, the evidence (sessions, entry seqs, what they show), a falsifiable prediction and, when it can be, a watch that checks it.",
         "The daemon records and checks it; nothing changes until a person accepts it.",
         `At most ${MAX_PROPOSALS} a run. The result is the proposal's id, or why it was refused.`,
       ].join(" "),

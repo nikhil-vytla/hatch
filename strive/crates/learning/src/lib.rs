@@ -4,7 +4,8 @@
 //! - a proposal's status, folded from the learning session's journal;
 //! - the judge gate's rubric, request and strict reading of its answer,
 //!   and how a work session is rendered for it;
-//! - the replay gate's tasks, mined from work journals, and its verdict.
+//! - the replay gate's tasks, mined from work journals, and its verdict;
+//! - watches: predictions checked on later work journals, and their tallies.
 //!
 //! The daemon adds what needs the machine: the path as it resolves on
 //! disk, the file's digest, and whether the evidence's sessions exist.
@@ -14,6 +15,8 @@ mod fold;
 pub mod judge;
 pub mod render;
 pub mod replay;
+pub mod stale;
+pub mod watch;
 
 pub use checks::{Finding, Rule, check, frontmatter, verdict};
 pub use fold::{Applied, Folded, fold};

@@ -1440,3 +1440,62 @@ detail. 4/4 alone and 2/2 with two copies at once.
 - The copy has no `.git` and no ignored files (`node_modules`), so checks
   that need them fail on both sides (inconclusive).
 - A daemon stopped mid-replay leaves its scratch directory behind.
+
+## 2026-09-25: M11, predictions checked and drift
+
+Design in [ADR-0019](docs/adrs/0019-predictions-checked.md). bb's
+suggestion 2, and the cheap half of 4.
+- **A watch beside the prose.** `Proposal.watch` (optional): a `when`
+  step pattern and `never` / `any` / `first {of, is}`. A step is a prompt or
+  a command that ran; a pattern is case-insensitive substrings (`prompt`
+  alone, or `command` + `output` + `exit` of one command). No regexes, no
+  nesting, one pass. `deny_unknown_fields` on the watch types, so a
+  learner's invented `regex` field is refused at parse instead of silently
+  widening the match (ts-rs can't read that attribute; its
+  `no-serde-warnings` feature quiets the build).
+- **Bounds** (`strive_learning::watch`): 2,000 steps, 256 KiB of one
+  output (both ends), 8 MiB per session, outputs fetched lazily and once.
+  A miss in what wasn't read is unknown, so `never` over a cut session is
+  "not applicable", not "confirmed".
+- **When:** a work host's `turnEnded` (background task) and `learning/run`
+  (catch-up, covers turns the daemon ended after a host died). Only applied
+  proposals, only sessions created at or after the apply, read up to their
+  last `turnEnded`. `predictionChecked` is journaled only when the pair's
+  outcome is new or changed; the fold counts each session once, by its
+  latest. Evaluating on `proposal/list` was rejected: it would re-read
+  every later session's journal on each desktop focus.
+- **Drift:** ≥ 3 contradictions among the last 10 applicable sessions (by
+  ULID order), outnumbering confirmations, is `notHolding`. `strive review`
+  prints "#N may be hurting ... `strive review N rollback` ..."; the
+  detail shows the watch as a sentence and the tally. The desktop's
+  Prediction section shows the same and relies on the existing Roll back
+  button. Nothing rolls back on its own; a test checks the file and the
+  journal are untouched until a person acts, and that the learner's host
+  is refused.
+- **Staleness:** `mayBeStale` in `proposal/list`: memory lines with a
+  backticked relative path (with `/`, no spaces or globs) that isn't there.
+  Shown by `strive review` only.
+- **Judge:** the document includes the watch and its sentence; `checkable`
+  asks, when there is one, whether it tests the prediction.
+
+Tests. Unit (`crates/learning/tests/watch.rs`, 18): each expectation's
+three outcomes, prompts vs commands, refused commands and unended turns,
+lazy/once output reads, a 1 MiB output with the needle mid (unknown) and at
+the end (found), the 8 MiB total, the step limit, huge prompts, malformed
+forms, the static gate, the sentence, the tally threshold and window, the
+fold's latest-wins, and named paths. Daemon (`tests/predictions.rs`, 8):
+confirm/contradict/not-applicable through real turns and sandboxed
+commands, idempotence and a changed answer, the threshold, review output
+and a person-only rollback, sessions before the apply, catch-up on
+`learning/run`, a 20 MB output, malformed and unknown-field watches,
+staleness. Host e2e: the learner's `propose_change` carries a watch and
+the next real session contradicts it. Desktop e2e: not machine-checked,
+then not holding after three sessions, then Roll back. Mutations checked:
+dropping the dedupe failed the idempotence test; dropping the apply-time
+filter failed the before-the-apply test.
+
+Deferred:
+- Telling the learner how its predictions fared.
+- A quality-peaks-then-declines watch (ADR-0016's second M11 bullet).
+- Watches on file effects and on the order of two steps.
+- Staleness in the desktop pane, for skills, and for commands that later fail.

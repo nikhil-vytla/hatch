@@ -32,6 +32,7 @@ mod settings;
 mod sync;
 
 mod tui;
+mod watch;
 mod workspaces;
 
 use std::process::ExitCode;

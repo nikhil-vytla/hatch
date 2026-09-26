@@ -150,9 +150,14 @@ A proposal is `ready` when every check that ran passed or was skipped, and
   the change, the verdict ([ADR-0018](0018-replay-gate.md)). Reusing the
   "without" runs across proposals is deferred.
 - **M11 Predictions checked, and drift:**
-  - predictions checked against later sessions;
-  - a watch for quality that peaks and then declines;
-  - rollback scoped to what regressed.
+  - predictions checked against later sessions: a proposal's optional
+    `watch`, evaluated by the daemon on each later work session
+    ([ADR-0019](0019-predictions-checked.md));
+  - drift: an applied proposal whose watch later sessions keep
+    contradicting is marked not holding;
+  - rollback scoped to what regressed: that one proposal's rollback is
+    suggested, and a person makes it. A watch for quality that peaks and
+    then declines is deferred.
 - **Triggers:** end of session, every N turns, and idle-time consolidation.
   These come after M8, behind the `learning` setting (`off`, `suggest` by
   default, `gated`, `auto`).

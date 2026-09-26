@@ -19,7 +19,8 @@ clap = { version = "4.6.7", features = ["derive", "env"] }
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.151"
 tokio = { version = "1.53.1", features = ["rt-multi-thread", "net", "io-util", "macros", "time", "sync", "signal", "process"] }
-ts-rs = "12.0.1"
+# The serde attributes ts-rs can't read (deny_unknown_fields) don't change the TS type.
+ts-rs = { version = "12.0.1", features = ["no-serde-warnings"] }
 tempfile = "3.27.0"
 
 [workspace.lints.rust]

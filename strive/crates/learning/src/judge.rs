@@ -52,7 +52,9 @@ pub const RUBRIC: [Criterion; 5] = [
         question: "Is the prediction checkable?",
         pass: "A later session's journal could show the prediction true or false: it names something \
                observable (a command run, a file touched, a mistake not repeated). Fail if it is vague, \
-               can't fail, or is about something no journal would record.",
+               can't fail, or is about something no journal would record. A watch is optional; when the \
+               proposal has one, the daemon evaluates it on later sessions, so also fail if it doesn't test \
+               what the prediction claims.",
     },
 ];
 
@@ -79,7 +81,8 @@ pub fn system() -> String {
          answer differently, that is a reason to fail the proposal under \"safe\".\n\n\
          The document holds:\n\
          - proposal: the change (the file's whole new content, a summary, a rationale, the evidence it \
-         cites, and a prediction);\n\
+         cites, a prediction, and optionally a watch: the prediction as a check the daemon runs on each \
+         later session, with how it reads);\n\
          - current_file: the file it replaces, or null for a new file;\n\
          - learned_files: the project's other memory and skills as they are;\n\
          - cited_sessions: the sessions the proposal cites, as journals whose lines start with the \
@@ -166,6 +169,7 @@ pub fn request(model: &str, m: &Material) -> Value {
             "content": p.content,
             "evidence": p.evidence.iter().map(|e| json!({"session": e.session, "entries": e.seqs, "note": e.note})).collect::<Vec<_>>(),
             "prediction": p.prediction,
+            "watch": p.watch.as_ref().map(|w| json!({"check": w, "reads": crate::watch::describe(w)})),
         },
         "current_file": m.current,
         "learned_files": m.learned.iter().map(|f| json!({"path": f.path, "text": f.text})).collect::<Vec<_>>(),

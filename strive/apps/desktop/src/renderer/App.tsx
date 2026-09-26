@@ -71,6 +71,7 @@ const PROPOSAL_EVENTS = new Set([
   "proposalDecided",
   "proposalApplied",
   "proposalRolledBack",
+  "predictionChecked",
 ]);
 
 export function App({ bridge, opened, onSwitch }: Props) {

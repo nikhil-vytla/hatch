@@ -15,6 +15,7 @@ import type { SessionKind } from "./SessionKind";
 import type { ToolCall } from "./ToolCall";
 import type { TurnEnd } from "./TurnEnd";
 import type { Verdict } from "./Verdict";
+import type { WatchOutcome } from "./WatchOutcome";
 
 /**
  * Something that happened in a session. Journaled in order; never edited.
@@ -109,7 +110,7 @@ detail: string, } | { "type": "replayStarted", proposal: number, reservedUsdMicr
 /**
  * The client that decided.
  */
-by: string, } | { "type": "proposalApplied", proposal: number, before?: Digest, after: Digest, } | { "type": "proposalRolledBack", proposal: number, by: string, } | { "type": "layoutProposed", 
+by: string, } | { "type": "proposalApplied", proposal: number, before?: Digest, after: Digest, } | { "type": "proposalRolledBack", proposal: number, by: string, } | { "type": "predictionChecked", proposal: number, session: string, throughSeq: number, outcome: WatchOutcome, detail: string, } | { "type": "layoutProposed", 
 /**
  * The agent's tool call that made the proposal, whose result it is.
  */
