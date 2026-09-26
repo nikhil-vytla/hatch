@@ -17,6 +17,7 @@ import { prepareLiveWorlds } from "../../live-worlds/prepare";
 import { preparePublicHarnessEvidence } from "../../capability-atlas-2026-09-22/publication-projection";
 import { prepareCapabilityAtlas } from "../../capability-atlas-2026-09-22/prepare-atlas";
 import { buildArena } from "../../packages/arena/src/data/build";
+import { buildDaily } from "../../packages/arena/src/checkable/build-daily";
 const lab = resolve(".."),
   dest = resolve("public/data");
 const publication: Record<string, string> = JSON.parse(
@@ -122,3 +123,4 @@ console.log("Prepared recorded evidence and companion.");
 
 // The arena reads recordings and public/data, so it runs after publication.
 await buildArena(resolve("public/arena"));
+buildDaily(resolve("../packages/arena"), resolve("public/daily"));
