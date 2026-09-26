@@ -77,6 +77,8 @@ export const lensSchema = z.enum([
   "case",
   /** One box: phrases typed out, one text box per contestant. */
   "typing",
+  /** One box, live: the visitor types; in-browser contestants and live Jev answer. */
+  "try",
 ]);
 
 export const cardSchema = z.object({
