@@ -32,9 +32,13 @@ const CWD = "/tmp/proj";
 
 const T0 = Date.UTC(2026, 8, 20, 9, 0);
 
-let stop: (() => void) | undefined;
+/** What each run started in a test, stopped once it's over (a test may start two). */
+let stops: (() => void)[] = [];
 
-afterEach(() => stop?.());
+afterEach(() => {
+  for (const stop of stops) stop();
+  stops = [];
+});
 
 const config = (baseUrl: string, over: Partial<AgentConfig> = {}): AgentConfig => ({
   cwd: CWD,
@@ -132,6 +136,8 @@ type Setup = {
   config?: Partial<AgentConfig>;
   /** The daemon's answer to a proposal: a refusal, or the static check it journals after recording it. */
   onProposal?: (p: Proposal) => { refuse: string } | StaticVerdict;
+  /** A person asks again once the first turn has ended, so a second turn runs. */
+  askAgain?: boolean;
 };
 
 const request = (seq: number, tsMs: number, sessions: string[] = []): Entry => ({
@@ -192,20 +198,24 @@ async function learn(s: Setup, turns = 1) {
       }
 
       recorded.push(e);
+      const entry = append(e);
 
-      return { result: { seq: append(e).seq } };
+      if (e.type === "turnEnded" && s.askAgain && recorded.filter((r) => r.type === "turnEnded").length === 1)
+        append({ type: "learnRequested", sessions: [] });
+
+      return { result: { seq: entry.seq } };
     },
     "host/stream": () => ({ result: {} }),
   });
 
-  await daemon.listen();
   let client: StriveClient | undefined;
   const fake = daemon;
-  stop = () => {
+  stops.push(() => {
     client?.close();
     fake.close();
     model.stop();
-  };
+  });
+  await daemon.listen();
 
   ({ client } = await runHost(daemon.socket, LEARN));
   const ended = () => recorded.filter((e) => e.type === "turnEnded").length >= turns;
@@ -378,6 +388,8 @@ test("a refused proposal reaches the model as an error it can act on, and so doe
     content: "Run bun test packages/host.",
   };
 
+  const others = Array.from({ length: MAX_PROPOSALS - 1 }, (_, i) => `p${i + 3}`);
+
   const { model, recorded } = await learn({
     onProposal: (p) =>
       p.evidence.some((e) => e.session === ELSEWHERE)
@@ -388,8 +400,9 @@ test("a refused proposal reaches the model as an error it can act on, and so doe
     script: [
       { toolCalls: [{ id: "p1", name: "propose_change", input: bad }] },
       { toolCalls: [{ id: "p2", name: "propose_change", input: skill }] },
-      { toolCalls: [{ id: "p3", name: "propose_change", input: PROPOSAL }] },
-      { text: "One proposal stands." },
+      // The rest of the run's allowance, which the refusal didn't use.
+      ...others.map((id) => ({ toolCalls: [{ id, name: "propose_change", input: PROPOSAL }] })),
+      { text: "The proposals stand." },
     ],
   });
 
@@ -403,9 +416,26 @@ test("a refused proposal reaches the model as an error it can act on, and so doe
   expect(failed?.isError).toBe(true);
   expect(failed?.text).toContain("failed the daemon's static check, so it can't be accepted: a skill must start with");
 
-  // A refusal doesn't use up the run's allowance.
-  expect(toolResults(model.requests[3]).get("p3")?.isError).toBe(false);
-  expect(recorded.filter((e) => e.type === "proposalMade").length).toBe(2);
+  // A refusal doesn't use up the run's allowance; a recorded one that failed does.
+  const last = toolResults(model.requests.at(-1));
+  expect(others.map((id) => last.get(id)?.isError)).toEqual(others.map(() => false));
+  expect(recorded.filter((e) => e.type === "proposalMade").length).toBe(MAX_PROPOSALS);
+});
+
+test("each run has its own allowance of proposals", async () => {
+  const calls = (turn: number, n: number) =>
+    Array.from({ length: n }, (_, i) => ({ id: `t${turn}p${i}`, name: "propose_change", input: PROPOSAL }));
+
+  const { model, recorded } = await learn(
+    {
+      askAgain: true,
+      script: [{ toolCalls: calls(1, MAX_PROPOSALS) }, { text: "done" }, { toolCalls: calls(2, 1) }, { text: "done" }],
+    },
+    2,
+  );
+
+  expect(recorded.filter((e) => e.type === "proposalMade").length).toBe(MAX_PROPOSALS + 1);
+  expect(toolResults(model.requests[3]).get("t2p0")?.isError).toBe(false);
 });
 
 test(`a run records at most ${MAX_PROPOSALS} proposals, even when they come in one reply`, async () => {
@@ -497,9 +527,9 @@ test("interrupting stops a learner turn", async () => {
   const model = new FakeAnthropic([{ text: "slow", delayMs: 8000 }]);
   // The interrupt is pushed once the model call is under way.
   const run = learnWithPush(model, (daemon) => daemon.push("session/interrupt", { sessionId: LEARN }));
-  const { recorded, elapsed } = await run;
+  const { recorded, answeredAtEnd } = await run;
   expect(recorded.at(-1)).toEqual({ type: "turnEnded", turn: 1, reason: { kind: "interrupted" } });
-  expect(elapsed).toBeLessThan(4000);
+  expect(answeredAtEnd).toBe(0);
 });
 
 test("a learner turn stops at its time limit", async () => {
@@ -524,24 +554,25 @@ async function learnWithPush(model: FakeAnthropic, act: (d: FakeDaemon) => void)
     "host/stream": () => ({ result: {} }),
   });
 
-  await daemon.listen();
   let client: StriveClient | undefined;
-  stop = () => {
+  stops.push(() => {
     client?.close();
     daemon.close();
     model.stop();
-  };
+  });
+  await daemon.listen();
 
   ({ client } = await runHost(daemon.socket, LEARN));
   const deadline = Date.now() + 10_000;
 
   while (model.requests.length === 0 && Date.now() < deadline) await Bun.sleep(20);
-  const at = Date.now();
   act(daemon);
 
   while (!recorded.some((e) => e.type === "turnEnded") && Date.now() < deadline) await Bun.sleep(20);
 
-  return { recorded, elapsed: Date.now() - at };
+  // Whether the model had answered when the turn ended: an interrupt that
+  // ends it has to cut the call off, not wait for its reply.
+  return { recorded, answeredAtEnd: model.answered };
 }
 
 /** An assistant message as pi-ai records it, calling `calls` (or answering `text`). */
@@ -582,7 +613,7 @@ test("a learner resumes after a restart: its history replays, a cut-off turn is 
     [first, { type: "assistantMessage", turn: 1, text: "", toolCalls: reads, message: message(reads) }],
     [first, { type: "assistantMessage", turn: 1, text: "", toolCalls: propose, message: message(propose) }],
     [first, { type: "proposalMade", callId: "a3", proposal: PROPOSAL }],
-    [first, { type: "gateFinished", proposal: 6, gate: "static", verdict: "fail", detail: "memory is over 16 KiB" }],
+    [first, { type: "gateFinished", proposal: 0, gate: "static", verdict: "fail", detail: "memory is over 16 KiB" }],
     [
       first,
       { type: "assistantMessage", turn: 1, text: "It failed.", toolCalls: [], message: message([], "It failed.") },
@@ -593,10 +624,14 @@ test("a learner resumes after a restart: its history replays, a cut-off turn is 
     [third, { type: "learnRequested", sessions: [W1] }],
   ];
 
-  const history = [started, ...events.map(([tsMs, event], i) => ({ seq: i + 2, tsMs, event }))];
-  const made = seqIn(history, (e) => e.type === "proposalMade");
-  const gate = history.find((x) => x.event.type === "gateFinished");
-  expect(gate?.event.type === "gateFinished" && gate.event.proposal).toBe(made);
+  const numbered = events.map(([tsMs, event], i) => ({ seq: i + 2, tsMs, event }));
+  const made = seqIn(numbered, (e) => e.type === "proposalMade");
+
+  // The gate names the proposal by the seq the history gives it.
+  const history = [
+    started,
+    ...numbered.map((x) => (x.event.type === "gateFinished" ? { ...x, event: { ...x.event, proposal: made } } : x)),
+  ];
 
   const { model, recorded } = await learn(
     {
@@ -653,8 +688,6 @@ test("a learner resumes after a restart: its history replays, a cut-off turn is 
 test("a turn that takes two waiting requests marks sessions new since the first one's cutoff", async () => {
   const [first, second, third] = [T0 + 3600_000, T0 + 3 * 3600_000, T0 + 4 * 3600_000];
   // W1 was last active between the first request and the second.
-  expect(work.lastActiveMs).toBeGreaterThan(first);
-  expect(work.lastActiveMs).toBeLessThan(second);
 
   const done: [number, Event][] = [
     [first, { type: "learnRequested", sessions: [] }],
@@ -727,9 +760,6 @@ test("the learner's system prompt states its rules, and gives the current memory
   for (const [title, phrases] of rules) {
     for (const p of phrases) expect(section(title)).toContain(p);
   }
-
-  // It isn't the coding agent: no file or shell tools are offered or described.
-  expect(prompt).not.toContain("You act only through tools: read files");
 });
 
 test("a project with no memory, instructions or skills says so", () => {

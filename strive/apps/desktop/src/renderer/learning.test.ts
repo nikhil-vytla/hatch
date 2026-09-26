@@ -138,11 +138,12 @@ test("a file's history is every proposal for the same file, newest first", () =>
     gates: [],
   });
 
+  // Not in the order proposal/list gives them, so the order comes from the ids.
   const listed = [
-    state(9, { kind: "skill", name: "release" }),
-    state(7, { kind: "memory" }),
-    state(4, { kind: "skill", name: "deploy" }),
     state(2, { kind: "memory" }),
+    state(9, { kind: "skill", name: "release" }),
+    state(4, { kind: "skill", name: "deploy" }),
+    state(7, { kind: "memory" }),
   ];
 
   expect(fileHistory(listed, state(7, { kind: "memory" })).map((p) => p.id)).toEqual([7, 2]);

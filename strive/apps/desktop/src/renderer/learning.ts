@@ -204,7 +204,8 @@ export function readJudge(detail: string): JudgeReading | undefined {
 export function fileHistory(proposals: readonly ProposalState[], p: ProposalState): ProposalState[] {
   const path = artifactPath(p.proposal.artifact);
 
-  return proposals.filter((q) => artifactPath(q.proposal.artifact) === path);
+  // An id is its entry's seq, so a higher one is newer.
+  return proposals.filter((q) => artifactPath(q.proposal.artifact) === path).sort((a, b) => b.id - a.id);
 }
 
 function stepText(m: StepMatch): string {

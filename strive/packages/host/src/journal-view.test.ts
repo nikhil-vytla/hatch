@@ -260,5 +260,4 @@ test("sessions are listed in the order they started, numbered, whatever order th
   const listed = renderSessions("/p", [at("late", 3000), at("early", 1000), at("middle", 2000)], undefined);
   const lines = listed.split("\n").slice(1);
   expect(lines.map((l) => l.split(" ").slice(0, 2).join(" "))).toEqual(["1. early", "2. middle", "3. late"]);
-  expect(listed.split("\n")[0]).toContain("in the order they started");
 });

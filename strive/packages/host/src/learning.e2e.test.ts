@@ -52,6 +52,41 @@ const ended = (n: number) => (es: Entry[]) => es.filter((e) => e.event.type === 
 
 const MEMORY = "- Run the tests with `bun test src`: the root run also needs a display.\n";
 
+type TextBlock = { type: "text"; text: string };
+
+type ToolResultBlock = { type: "tool_result"; tool_use_id: string; content: TextBlock[] | string };
+
+function isTextBlock(v: unknown): v is TextBlock {
+  return typeof v === "object" && v !== null && "type" in v && v.type === "text" && "text" in v;
+}
+
+function isToolResult(v: unknown): v is ToolResultBlock {
+  return (
+    typeof v === "object" &&
+    v !== null &&
+    "type" in v &&
+    v.type === "tool_result" &&
+    "tool_use_id" in v &&
+    "content" in v &&
+    (typeof v.content === "string" || (Array.isArray(v.content) && v.content.every(isTextBlock)))
+  );
+}
+
+/** The text of the tool result for call `callId` in a model request, if it carries one. */
+function toolResult(req: any, callId: string): string | undefined {
+  for (const m of req.messages) {
+    if (!Array.isArray(m.content)) continue;
+
+    for (const c of m.content) {
+      if (!isToolResult(c) || c.tool_use_id !== callId) continue;
+
+      return Array.isArray(c.content) ? c.content.map((t) => t.text).join("") : c.content;
+    }
+  }
+
+  return undefined;
+}
+
 test("a learner's proposal, once a person accepts it, is what the next session's agent is told", async () => {
   // One script for every model call, in order; the learner's replies are
   // added once the work session's seqs are known.
@@ -91,9 +126,9 @@ test("a learner's proposal, once a person accepts it, is what the next session's
   const made = learned.find((e) => e.event.type === "proposalMade");
   expect(made?.event).toMatchObject({ type: "proposalMade", callId: "l3", proposal });
 
-  // What the learner saw of the work session is what it was told.
-  const read = JSON.stringify(fake.requests.at(-1)?.messages);
-  expect(read).toContain("run the tests");
+  // What read_session gave the learner is the work session's journal (the
+  // proposal it then made also says "run the tests", so only that result counts).
+  expect(toolResult(fake.requests.at(-1), "l2")).toContain(`#${prompt?.seq} user: run the tests`);
 
   // The daemon's checks, then a person.
   const listed = await until(

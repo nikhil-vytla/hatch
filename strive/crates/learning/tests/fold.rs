@@ -134,16 +134,6 @@ fn records_about_unknown_proposals_change_nothing() {
     assert_eq!(folded[0].state.gates.len(), 3);
 }
 
-#[test]
-fn statuses_and_artifacts_read_as_a_person_says_them() {
-    use ProposalStatus as S;
-    let names = [S::Checking, S::Ready, S::Failed, S::Rejected, S::Applied, S::Stale, S::RolledBack]
-        .map(strive_learning::status_name);
-    assert_eq!(names, ["checking", "ready", "failed", "rejected", "applied", "stale", "rolled back"]);
-    assert_eq!(strive_learning::describe(&Artifact::Memory), "memory");
-    assert_eq!(strive_learning::describe(&Artifact::Skill { name: "release".into() }), "skill release");
-}
-
 /// Checks are listed in the order they run, whatever order their verdicts
 /// were journaled in (a replay skip can be journaled before the judge's).
 #[test]

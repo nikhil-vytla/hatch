@@ -28,6 +28,8 @@ const sse = (event: string, data: Json) => `event: ${event}\ndata: ${JSON.string
 
 export class FakeAnthropic {
   readonly requests: any[] = [];
+  /** Requests answered so far: their delay, if any, is over. */
+  answered = 0;
   private server?: ReturnType<typeof Bun.serve>;
 
   /** A list is answered in order; a function answers each request by what it holds. */
@@ -50,6 +52,7 @@ export class FakeAnthropic {
           : this.script(body);
 
         if (reply.delayMs) await Bun.sleep(reply.delayMs);
+        this.answered += 1;
 
         if (reply.status) {
           return Response.json(
