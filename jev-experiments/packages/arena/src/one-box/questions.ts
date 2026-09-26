@@ -157,3 +157,6 @@ export const entriesOf = <T extends string>(p: Partial<Record<T, number>>) =>
   Object.entries(p) as [T, number | undefined][];
 
 export const INTENTS = optionsOf("intent");
+
+// SAFETY: QUESTIONS is a literal table; Object.keys only widens its keys to string.
+export const QUESTION_IDS = Object.keys(QUESTIONS) as QuestionId[];
