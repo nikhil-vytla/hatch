@@ -25,7 +25,7 @@ The design is [ADR-0016](adrs/0016-trusted-learning.md).
 | M10 Replay gate | Past tasks with checkable outcomes, run with and without a change | First slice done ([ADR-0018](adrs/0018-replay-gate.md)): mining, sandboxed runs in a scratch copy, a budget hold. A tie is inconclusive. Deferred: reusing "without" runs, parallel runs, `.git` and ignored files in the copy |
 | M11 Predictions and drift | Predictions checked against later sessions; a watch for decline; scoped rollback | Done ([ADR-0019](adrs/0019-predictions-checked.md)): a small watch language, tallies, "may be hurting" with a suggested rollback, memory that may be stale. Deferred: the peak-then-decline watch |
 | Triggers | Automatic runs from a no-model scan of finished sessions; the `learning` setting | Done ([ADR-0020](adrs/0020-learning-triggers.md)): `off`/`suggest`/`gated`, idle and every-N-turns triggers, a daily cap; `gated` accepts only when every check passed. Deferred: idle-time consolidation |
-| Review | Adversarial reviews of the trust boundary, correctness and tests | Trust fixes merged (symlinks in replay setup, ties, citation steering, control characters, mode at proposal time). Correctness and test fixes in progress |
+| Review | Adversarial reviews of the trust boundary, correctness and tests | Done. Trust: symlinks in replay setup, ties, citation steering, control characters, mode at proposal time. Correctness: crash recovery for learner turns and replay holds, idempotent accept/rollback, rejected proposals stop checking, lost trigger signs. Tests: surviving mutants killed, weak tests fixed |
 
 ## Later stages
 
