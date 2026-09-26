@@ -351,6 +351,28 @@ fn a_request_no_turn_has_finished_or_a_proposal_being_checked_keeps_automatic_ru
 }
 
 #[test]
+fn sessions_skipped_for_being_busy_wait_until_a_request_names_them_or_a_later_skip_isnt_busy() {
+    use strive_learning::triggers::{CHECKS_GOING, RUN_GOING, waiting};
+    let skip = |session: &str, reason: &str| Event::LearnSkipped {
+        trigger: trigger(vec![(session, 3)]),
+        reason: reason.into(),
+    };
+    let mut j = Journal::new();
+    j.push(skip("A", RUN_GOING));
+    j.push(skip("B", CHECKS_GOING));
+    j.push(skip("C", "the daily cap"));
+    j.push(skip("D", RUN_GOING));
+    j.push(requested(None));
+    let names = |j: &Journal| waiting(&j.entries()).into_iter().map(|(s, _)| s).collect::<Vec<_>>();
+    assert_eq!(names(&j), ["A", "B", "D"], "a person's run names no session");
+    j.push(requested(Some(trigger(vec![("A", 3)]))));
+    j.push(skip("D", "the daily cap"));
+    assert_eq!(names(&j), ["B"]);
+    j.push(skip("C", RUN_GOING));
+    assert_eq!(waiting(&j.entries()), [("B".to_string(), TriggerKind::Idle), ("C".to_string(), TriggerKind::Idle)]);
+}
+
+#[test]
 fn the_latest_skip_shows_until_an_automatic_run_starts() {
     let mut j = Journal::new();
     assert_eq!(skipped(&j.entries()), None);

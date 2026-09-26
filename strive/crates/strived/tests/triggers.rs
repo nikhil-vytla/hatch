@@ -245,7 +245,51 @@ fn a_run_still_going_holds_the_next_automatic_one_back() {
     assert_eq!(skipped[0]["reason"], "a learner run is still going");
     assert_eq!(skipped[0]["trigger"]["signals"][0]["seq"], fix);
     assert_eq!(skipped[0]["trigger"]["signals"][0]["session"], json!(b.id));
-    assert_eq!(wait_events(&env, &cwd, "learnRequested", 1).len(), 1);
+
+    // Once that run is over, the session skipped meanwhile is scanned again:
+    // nothing else would, as it isn't prompted again.
+    Learner::new(&env, &cwd).turn(&[]);
+    wait_events(&env, &cwd, "learnRequested", 2);
+    let asked: Vec<(Value, Value)> =
+        runs(&env, &cwd).iter().map(|e| (e["type"].clone(), e["trigger"]["signals"][0]["session"].clone())).collect();
+    assert_eq!(
+        asked,
+        [
+            (json!("learnRequested"), json!(a.id)),
+            (json!("learnSkipped"), json!(b.id)),
+            (json!("learnRequested"), json!(b.id))
+        ]
+    );
+}
+
+/// The learning session's requests and skips, in order.
+fn runs(env: &Env, cwd: &Path) -> Vec<Value> {
+    let id = learning(env, cwd).unwrap();
+    let r = env.rpc().ok("session/read", &json!({"id": id}));
+    r["entries"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|e| e["event"].clone())
+        .filter(|e| e["type"] == "learnRequested" || e["type"] == "learnSkipped")
+        .collect()
+}
+
+#[test]
+fn a_turn_the_daemon_ends_for_a_host_that_left_is_scanned_once_idle() {
+    let env = daemon(&idle(), true);
+    let cwd = project();
+    let mut person = env.rpc();
+    let id = person.ok("session/create", &json!({"cwd": cwd}))["id"].as_str().unwrap().to_string();
+    let mut host = env.rpc();
+    host.ok("host/register", &json!({"id": id}));
+    person.ok("session/prompt", &json!({"id": id, "text": "go"}));
+    host.ok("host/record", &json!({"id": id, "event": {"type": "turnStarted", "turn": 1}}));
+    // The host goes mid-turn: the daemon ends the turn as failed.
+    drop(host);
+    let asked = wait_events(&env, &cwd, "learnRequested", 1);
+    assert_eq!(asked[0]["trigger"]["signals"][0]["kind"], "turnFailed", "{asked:?}");
+    assert_eq!(asked[0]["sessions"], json!([id]));
 }
 
 #[test]
@@ -263,7 +307,11 @@ fn the_daily_cap_skips_runs_past_it_and_review_says_why() {
     let reason = skipped[0]["reason"].as_str().unwrap();
     assert!(reason.starts_with("1 automatic run already started in the last 24 hours"), "{reason}");
     assert_eq!(skipped[0]["trigger"]["signals"][0]["kind"], "turnFailed");
-    assert_eq!(wait_events(&env, &cwd, "learnRequested", 1).len(), 1);
+    // A later scan of the same session is skipped too, and nothing ran between.
+    b.exchange("thanks", &done());
+    wait_events(&env, &cwd, "learnSkipped", 2);
+    let kinds: Vec<Value> = runs(&env, &cwd).iter().map(|e| e["type"].clone()).collect();
+    assert_eq!(kinds, [json!("learnRequested"), json!("learnSkipped"), json!("learnSkipped")]);
 
     let listed = review(&env, &cwd, &["review"]);
     assert!(

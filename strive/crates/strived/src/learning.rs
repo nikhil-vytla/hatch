@@ -324,8 +324,9 @@ pub async fn judged(
         }
     }
     state.sessions.append(sid, events).await.map_err(session_error)?;
-    if let Some(r) = replay {
-        crate::replay::start(state, sid, id, r);
+    match replay {
+        Some(r) => crate::replay::start(state, sid, id, r),
+        None => crate::triggers::learning_quiet(state, sid.clone()),
     }
     Ok(())
 }
@@ -334,7 +335,7 @@ pub async fn judged(
 /// has one). The end, which releases the replay's hold on the budget, is
 /// journaled either way.
 pub async fn replayed(
-    state: &State,
+    state: &Arc<State>,
     sid: &SessionId,
     id: u64,
     verdict: Verdict,
@@ -363,6 +364,7 @@ pub async fn replayed(
     if journaled && verdict == Verdict::Pass {
         gate_accept(state, sid, id).await?;
     }
+    crate::triggers::learning_quiet(state, sid.clone());
     Ok(())
 }
 

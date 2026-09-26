@@ -136,10 +136,15 @@ impl Conn {
                 // Only a turn this host started: once it's gone, a new host
                 // may already have started one of its own.
                 let Some(turn) = *crate::sync::lock(&conn.open_turn) else { return };
-                if let Err(e) =
-                    state.sessions.end_open_turn(&sid, turn, "the agent host stopped during this turn").await
-                {
-                    crate::log!("could not end session {}'s open turn: {e:?}", sid.as_str());
+                match state.sessions.end_open_turn(&sid, turn, "the agent host stopped during this turn").await {
+                    // Predictions catch up on this turn at the next `learning/run`.
+                    Ok(true) => match state.sessions.peek(&sid).map(|i| (i.kind.unwrap_or_default(), i.cwd)) {
+                        Some((SessionKind::Work, cwd)) => crate::triggers::turn_ended(&state, cwd, sid.clone()),
+                        Some((SessionKind::Learning, _)) => crate::triggers::learning_quiet(&state, sid.clone()),
+                        Some((SessionKind::Replay, _)) | None => {}
+                    },
+                    Ok(false) => {}
+                    Err(e) => crate::log!("could not end session {}'s open turn: {e:?}", sid.as_str()),
                 }
             });
         }
@@ -540,9 +545,8 @@ async fn route_host(state: &Arc<State>, conn: &Arc<Conn>, method: &str, params: 
                 *crate::sync::lock(&conn.open_turn) = open;
             }
             // A work turn's end is when the project's predictions are checked against it.
-            if opened == Some(None) && kind == SessionKind::Work {
-                crate::watch::turn_ended(state, info.cwd.clone(), sid.clone());
-                crate::triggers::turn_ended(state, info.cwd.clone(), sid.clone());
+            if opened == Some(None) {
+                turn_over(state, kind, info.cwd.clone(), &sid);
             }
             reply::<HostRecord>(Appended { seq: entries[0].seq })
         }
@@ -553,6 +557,20 @@ async fn route_host(state: &Arc<State>, conn: &Arc<Conn>, method: &str, params: 
             reply::<HostStream>(Empty {})
         }
         other => Err(RpcError::new(RpcError::METHOD_NOT_FOUND, format!("unknown method {other}"))),
+    }
+}
+
+/// A session's host recorded a turn's end. A work turn's end is when the
+/// project's predictions are checked against it and its idle wait starts; a
+/// learner's lets skipped scans run.
+fn turn_over(state: &Arc<State>, kind: SessionKind, cwd: String, sid: &SessionId) {
+    match kind {
+        SessionKind::Work => {
+            crate::watch::turn_ended(state, cwd.clone(), sid.clone());
+            crate::triggers::turn_ended(state, cwd, sid.clone());
+        }
+        SessionKind::Learning => crate::triggers::learning_quiet(state, sid.clone()),
+        SessionKind::Replay => {}
     }
 }
 

@@ -2,7 +2,7 @@
 //! which signs were already acted on, how many runs started lately, whether
 //! a run is going, and the latest run that didn't start.
 
-use strive_proto::{Entry, Event, ProposalStatus, SkippedRun};
+use strive_proto::{Entry, Event, ProposalStatus, SkippedRun, TriggerKind};
 
 /// The highest seq of `session`'s signs that an automatic run was started
 /// for. Signs at or below it were studied (or are being studied), so a
@@ -61,6 +61,36 @@ pub fn busy(learning: &[Entry]) -> Option<&'static str> {
         return Some(CHECKS_GOING);
     }
     None
+}
+
+/// Sessions whose scan found signs while a run or checks were going, to scan
+/// again once nothing is: each one's latest skip was for being busy, and no
+/// automatic request named it since. Oldest skip first, with its trigger's
+/// kind. A skip for another reason (the daily cap, no key) isn't retried: the
+/// session's next idle scan finds its signs again.
+pub fn waiting(learning: &[Entry]) -> Vec<(String, TriggerKind)> {
+    let mut latest: Vec<(String, Option<TriggerKind>)> = Vec::new();
+    let mut set = |session: &str, retry: Option<TriggerKind>| {
+        latest.retain(|(s, _)| s != session);
+        latest.push((session.to_string(), retry));
+    };
+    for e in learning {
+        match &e.event {
+            Event::LearnRequested { trigger: Some(t), .. } => {
+                for s in &t.signals {
+                    set(&s.session, None);
+                }
+            }
+            Event::LearnSkipped { trigger, reason } => {
+                let busy = reason == RUN_GOING || reason == CHECKS_GOING;
+                for s in &trigger.signals {
+                    set(&s.session, busy.then_some(trigger.kind));
+                }
+            }
+            _ => {}
+        }
+    }
+    latest.into_iter().filter_map(|(s, retry)| Some((s, retry?))).collect()
 }
 
 /// The latest automatic run that didn't start, unless one started after it.

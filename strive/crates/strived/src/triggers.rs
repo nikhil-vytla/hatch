@@ -44,6 +44,34 @@ pub fn turn_ended(state: &Arc<State>, cwd: String, work: SessionId) {
     });
 }
 
+/// A learner's turn or a proposal's checks ended in learning session `sid`.
+/// Once nothing is going there, the sessions whose scans were skipped for
+/// that meanwhile are scanned again, oldest first: nothing else would scan
+/// them until they were prompted again. The daily cap and the other limits
+/// apply as to any scan.
+pub fn learning_quiet(state: &Arc<State>, sid: SessionId) {
+    let state = state.clone();
+    tokio::spawn(async move {
+        if let Err(e) = rescan(&state, &sid).await {
+            crate::log!("could not scan again the sessions learning session {} skipped: {e:?}", sid.as_str());
+        }
+    });
+}
+
+async fn rescan(state: &Arc<State>, sid: &SessionId) -> Result<(), RpcError> {
+    let Some(cwd) = state.sessions.peek(sid).map(|i| i.cwd) else { return Ok(()) };
+    let learning = crate::learning::journal(state, sid)?;
+    if strive_learning::triggers::busy(&learning).is_some() {
+        return Ok(());
+    }
+    for (session, kind) in strive_learning::triggers::waiting(&learning) {
+        let Some(work) = SessionId::parse(&session) else { continue };
+        crate::log!("session {session} scanned again for learning: its last scan was skipped while learning was busy");
+        consider(state, &cwd, &work, kind).await;
+    }
+    Ok(())
+}
+
 /// The seq of the session's last `turnEnded`, and how many turns it has ended.
 fn last_turn_end(state: &State, work: &SessionId) -> Option<(u64, u64)> {
     let entries = verified(state, work)?;
