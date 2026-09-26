@@ -64,7 +64,10 @@ machinery, driven by the daemon, as the judge's call is:
   project, with the settings' model and budget, and list it with the user's
   work. The daemon would then have to trust its report of the check.
 - **The scratch copy:** `$TMPDIR/strive-replay-*/work`, checked not to
-  overlap the project. The checkpoint's tree is written there from the
+  overlap the project. The scratch area's `strive-home` file names the
+  home whose daemon made it (outside `work` and `tmp`, where a run's
+  commands can't write); the daemon removes its own leftovers when it
+  starts, and never another home's. The checkpoint's tree is written there from the
   task session's shadow repository through an index of the replay's own.
   - The checkpoint's learned files are replaced by the ones the learner was
     shown (the learning session's latest `contextLoaded.learned`), on both

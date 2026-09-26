@@ -418,8 +418,8 @@ struct Scratch {
     work: PathBuf,
 }
 
-fn scratch(project: &Path) -> std::io::Result<Scratch> {
-    let dir = tempfile::Builder::new().prefix("strive-replay-").tempdir_in(std::env::temp_dir())?;
+fn scratch(project: &Path, home: &Path) -> std::io::Result<Scratch> {
+    let dir = tempfile::Builder::new().prefix(SCRATCH_PREFIX).tempdir_in(std::env::temp_dir())?;
     let root = dir.path().canonicalize()?;
     if root.starts_with(project) || project.starts_with(&root) {
         return Err(std::io::Error::other(format!(
@@ -428,10 +428,31 @@ fn scratch(project: &Path) -> std::io::Result<Scratch> {
             project.display()
         )));
     }
+    // Outside `work` and `tmp`, so a run's commands can't write it.
+    std::fs::write(root.join(OWNER), home.as_os_str().as_encoded_bytes())?;
     let work = root.join("work");
     std::fs::create_dir(&work)?;
     std::fs::create_dir(root.join("tmp"))?;
     Ok(Scratch { _dir: dir, root, work })
+}
+
+const SCRATCH_PREFIX: &str = "strive-replay-";
+/// In a scratch area: the strive home whose daemon made it.
+const OWNER: &str = "strive-home";
+
+/// Removes the scratch areas a crash left in the temp directory, and only
+/// those this home's daemon made (another home's daemon may be using its
+/// own). Call at startup, before any replay runs.
+fn sweep_scratch(home: &Path) {
+    let Ok(dir) = std::fs::read_dir(std::env::temp_dir()) else { return };
+    for entry in dir.filter_map(Result::ok) {
+        let ours = entry.file_name().to_str().is_some_and(|n| n.starts_with(SCRATCH_PREFIX))
+            && entry.file_type().is_ok_and(|t| t.is_dir())
+            && std::fs::read(entry.path().join(OWNER)).is_ok_and(|b| b == home.as_os_str().as_encoded_bytes());
+        if ours && let Err(e) = std::fs::remove_dir_all(entry.path()) {
+            crate::log!("could not remove the replay's scratch area {}: {e}", entry.path().display());
+        }
+    }
 }
 
 /// Why a run couldn't start.
@@ -528,7 +549,8 @@ async fn once(
         .peek(&SessionId::parse(&task.session).ok_or_else(|| broke("the task's session id isn't valid"))?)
         .map(|i| PathBuf::from(i.cwd))
         .ok_or_else(|| broke("the task's session is gone"))?;
-    let s = scratch(&project).map_err(|e| broke(&format!("making a scratch copy: {e}")))?;
+    let home = state.home.root.canonicalize().map_err(|e| broke(&format!("finding strive's home: {e}")))?;
+    let s = scratch(&project, &home).map_err(|e| broke(&format!("making a scratch copy: {e}")))?;
     let (st, rr, t) = (state.clone(), r.clone(), task.clone());
     let s = tokio::task::spawn_blocking(move || materialize(&st, &rr, &t, with_change, &s).map(|()| s))
         .await
@@ -690,12 +712,21 @@ fn spent(state: &State, sid: &SessionId, left: u64) -> (u64, u64) {
     }
 }
 
+/// What an earlier daemon's crash left of its replays: their holds, and
+/// their scratch areas. Call at startup, before any replay can begin.
+pub async fn recover(state: &State) {
+    settle_cut_off(state).await;
+    if let Ok(home) = state.home.root.canonicalize() {
+        sweep_scratch(&home);
+    }
+}
+
 /// Finishes, in every learning session, the replay holds a crash cut off.
 /// Each is charged what its runs' journals show they spent (calls left open
 /// at what they reserved), or the whole hold if a run's journal can't be
 /// read. Without this a hold would stay charged in full for good. Call at
 /// startup, before any replay can begin, so none of these holds is live.
-pub async fn settle_cut_off(state: &State) {
+async fn settle_cut_off(state: &State) {
     let learning = match state.sessions.list(None, SessionKind::Learning) {
         Ok((sessions, _)) => sessions,
         Err(e) => {

@@ -163,6 +163,8 @@ struct Run {
     id: String,
     host: Rpc,
     with_change: bool,
+    /// Its workspace, in its scratch area.
+    cwd: PathBuf,
 }
 
 impl Replay {
@@ -206,7 +208,7 @@ impl Replay {
         host.ok("host/register", &json!({"id": id}));
         let with_change = Path::new(&cwd).join(".strive/memory.md").exists();
         host.ok("host/record", &json!({"id": id, "event": {"type": "turnStarted", "turn": 1}}));
-        Run { id, host, with_change }
+        Run { id, host, with_change, cwd: PathBuf::from(cwd) }
     }
 
     /// A run that follows the lesson when it has it: its check passes only then.
@@ -430,4 +432,19 @@ fn a_run_that_is_over_can_spend_nothing_more() {
     let status = call_model(&r.env, &first.id);
     assert_eq!(status, 403, "a late call of a finished run is refused");
     assert_eq!(r.events(&first.id, "modelCallStarted"), Vec::<Value>::new());
+}
+
+#[test]
+fn scratch_areas_a_crash_left_are_removed_when_the_daemon_starts_again_but_only_its_own() {
+    let mut r = replay(&json!({}));
+    let run = r.play();
+    let scratch = run.cwd.parent().unwrap().to_path_buf();
+    assert!(scratch.file_name().unwrap().to_str().unwrap().starts_with("strive-replay-"), "{}", scratch.display());
+    // One that looks the same but that this home didn't make.
+    let other = tempfile::Builder::new().prefix("strive-replay-").tempdir_in(scratch.parent().unwrap()).unwrap();
+    crash(&r.env);
+
+    r.env.status();
+    assert!(!scratch.exists(), "{} is left", scratch.display());
+    assert!(other.path().exists(), "another's scratch area was removed");
 }
