@@ -84,3 +84,24 @@ Record new runs with `bun jev-experiments/packages/arena/scripts/record-framings
 - Development split (150 phrases; held-out 50 not yet scored), `scripts/one-box-compare.ts`:
   Jev's box ends on the right card for 98.0% of phrases under either request policy; the
   keyword classifier for 67.3%.
+
+## One box: Laya (local)
+
+- `one-box.laya.jsonl.gz`: Laya's promoted local default (`laya-readout-experimental`,
+  `jev/laya-typed-readout-v1-seed17`, revision `9284b27…`, on `convaiinnovations/laya` at
+  `1c5edc1…`) answering the same 14 questions for the same 5,666 prefixes as Jev, recorded
+  26 Sep 2026 on an Apple M4 Max (48 GiB) with mlx 0.32.2 by `scripts/record-one-box-laya.py`
+  through `roadmap/mac/jev_local.py`'s Runtime, loaded once and warm. Details in
+  `one-box.laya.meta.json`. No errors; latency median 270 ms, 90th percentile 289 ms per prefix
+  (all 14 questions, two local requests).
+- Workarounds, not Laya's native behaviour:
+  - `intent` has 20 options and Laya accepts at most 8. The options are split in question order
+    into groups of 7, 7 and 6, each asked on its own, then a final choice between the three
+    group winners: p(option) = p(option | group) × p(group winner in the final), renormalised.
+  - The v2 runtime rejects descriptive ordinal levels, so readiness and urgency go as bare 0–2
+    ordinals with the level texts appended to the prompt.
+- The committed copy rounds probabilities to 4 decimals (1.8 MB); every dev-split number is
+  identical to the full-precision raw log, which stays local and gitignored.
+- Dev split, Shapeshift's cancel policy (`scripts/one-box-compare.ts`): Laya's box ends on the
+  right card for 64.7% of phrases (keyword classifier 67.3%, Jev 98.0%), with 2.31 visible
+  changes per phrase; on the full phrase alone Laya picks the right card 73.3% of the time.
