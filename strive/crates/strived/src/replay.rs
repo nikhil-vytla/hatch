@@ -96,6 +96,11 @@ impl Running {
         }
     }
 
+    /// Whether `session` is a replay run under way: only then may it call the model.
+    pub fn is_run(&self, session: &SessionId) -> bool {
+        crate::sync::lock(&self.runs).contains_key(session)
+    }
+
     /// Replays running now: they keep the daemon from idling out.
     pub fn count(&self) -> u32 {
         u32::try_from(crate::sync::lock(&self.proposals).len()).unwrap_or(u32::MAX)

@@ -419,3 +419,15 @@ fn a_replay_the_budget_cant_hold_names_the_money_other_replays_hold() {
     assert!(detail.contains("of the learning session's $1.5000 budget is left"), "{detail}");
     assert!(detail.contains("$1.0000 of it held by replays that haven't finished"), "{detail}");
 }
+
+#[test]
+fn a_run_that_is_over_can_spend_nothing_more() {
+    let mut r = replay(&json!({}));
+    let mut first = r.play();
+    Replay::end(&mut first);
+    // The next run starts once the first is checked, charged and closed.
+    let _second = r.next_run();
+    let status = call_model(&r.env, &first.id);
+    assert_eq!(status, 403, "a late call of a finished run is refused");
+    assert_eq!(r.events(&first.id, "modelCallStarted"), Vec::<Value>::new());
+}

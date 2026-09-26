@@ -157,6 +157,16 @@ async fn admit(
     })?;
     let bad = |status, kind, why: &str| refuse(Some(api), status, kind, why);
     let session_failed = |e| bad(StatusCode::INTERNAL_SERVER_ERROR, "api_error", &format!("{e:?}"));
+    // A replay run's cost is read once it's over; a late call from its host
+    // would reopen its journal and spend past the replay's cap.
+    let replay_run = state.sessions.peek(&session).is_some_and(|i| i.kind == Some(strive_proto::SessionKind::Replay));
+    if replay_run && !state.learning.replaying.is_run(&session) {
+        return Err(bad(
+            StatusCode::FORBIDDEN,
+            "permission_error",
+            "this replay run is over, so it can't call the model",
+        ));
+    }
     strive_gateway::check_betas(betas).map_err(|why| bad(StatusCode::BAD_REQUEST, "invalid_request_error", why))?;
     let (info, sent) =
         prepare_request(api, body).map_err(|why| bad(StatusCode::BAD_REQUEST, "invalid_request_error", why))?;
