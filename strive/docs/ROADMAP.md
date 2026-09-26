@@ -19,11 +19,13 @@ The design is [ADR-0016](adrs/0016-trusted-learning.md).
 | Milestone | Scope | Status |
 | --- | --- | --- |
 | M7 Proposals | The learning session, `learning/open` and `learning/run`; `proposalMade` from its host only; the static gate; `proposal/list`, `decide` and `rollback`; stale detection; `.strive/memory.md` in the agent's context; `strive review` and `strive learn` | Done. The learner's host is also given its memory and skills whole (`learnedFiles`), and `before` is the file as it was shown. The judge and replay gates are journaled as skipped |
-| M8 Learner | Learning mode in `packages/host`: its prompt, `list_sessions`, `read_session`, `propose_change`; evidence within a token budget | In progress |
-| M8b Desktop | The Learned pane | Planned |
-| M9 Judge gate | A model the learner doesn't control scores proposals against held-out sessions | Planned |
-| M10 Replay gate | Past tasks with checkable outcomes, run with and without a change | Planned |
-| M11 Predictions and drift | Predictions checked against later sessions; a watch for decline; scoped rollback | Planned |
+| M8 Learner | Learning mode in `packages/host`: its prompt, `list_sessions`, `read_session`, `propose_change`; evidence within a token budget | Done. A real Haiku run proposed "run `bun test src`"; accepted, the next session ran it first, as predicted ($0.06) |
+| M8b Desktop | The Learned pane | Done. Diff, reasons, evidence (with the cited entries inline), checks (the judge by criterion), per-file history, files changed outside review, accept/reject/rollback |
+| M9 Judge gate | A model the learner doesn't control scores proposals against held-out sessions | Done ([ADR-0017](adrs/0017-judge-gate.md)). ~$0.008 a proposal on Haiku |
+| M10 Replay gate | Past tasks with checkable outcomes, run with and without a change | First slice done ([ADR-0018](adrs/0018-replay-gate.md)): mining, sandboxed runs in a scratch copy, a budget hold. A tie is inconclusive. Deferred: reusing "without" runs, parallel runs, `.git` and ignored files in the copy |
+| M11 Predictions and drift | Predictions checked against later sessions; a watch for decline; scoped rollback | Done ([ADR-0019](adrs/0019-predictions-checked.md)): a small watch language, tallies, "may be hurting" with a suggested rollback, memory that may be stale. Deferred: the peak-then-decline watch |
+| Triggers | Automatic runs from a no-model scan of finished sessions; the `learning` setting | Done ([ADR-0020](adrs/0020-learning-triggers.md)): `off`/`suggest`/`gated`, idle and every-N-turns triggers, a daily cap; `gated` accepts only when every check passed. Deferred: idle-time consolidation |
+| Review | Adversarial reviews of the trust boundary, correctness and tests | Trust fixes merged (symlinks in replay setup, ties, citation steering, control characters, mode at proposal time). Correctness and test fixes in progress |
 
 ## Later stages
 
