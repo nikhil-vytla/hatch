@@ -15,9 +15,10 @@ use serde_json::Value;
 use strive_learning::{Finding, Folded, Rule};
 use strive_proto::rpc::RpcError;
 use strive_proto::{
-    Appended, Automatic, Digest, Entry, Event, Evidence, Gate, LearningOpen, LearningRun, LearningRunParams, Method,
-    ProjectRef, Proposal, ProposalDecide, ProposalDecideParams, ProposalDecision, ProposalList, ProposalListResult,
-    ProposalRef, ProposalRollback, ProposalStatus, SessionInfo, SessionKind, StaleMention, Verdict,
+    Appended, Automatic, Digest, Entry, Event, Evidence, Gate, LearningMode, LearningOpen, LearningRun,
+    LearningRunParams, Method, ProjectRef, Proposal, ProposalDecide, ProposalDecideParams, ProposalDecision,
+    ProposalList, ProposalListResult, ProposalRef, ProposalRollback, ProposalStatus, SessionInfo, SessionKind,
+    StaleMention, Verdict,
 };
 
 use crate::methods::{Conn, Reply, client_name, internal, parse, reply, require_person, session_error};
@@ -194,7 +195,8 @@ pub async fn propose(
     };
     let (verdict, detail) = strive_learning::verdict(&findings);
     let now = crate::server::epoch_ms();
-    let made = crate::judge::Made { proposal: &proposal, before, at_ms: now, gated: gated(state, cwd).await };
+    let in_effect = mode(state, cwd).await;
+    let made = crate::judge::Made { proposal: &proposal, before, at_ms: now, gated: in_effect == LearningMode::Gated };
     let judge = judge_plan(state, cwd, verdict, &made, &entries);
     let mut gates = vec![(Gate::Static, verdict, detail)];
     let (mut call, mut replay) = (None, None);
@@ -209,7 +211,7 @@ pub async fn propose(
         // The replay waits for the judge's verdict.
         crate::judge::Plan::Call(c) => call = Some(c),
     }
-    let made = Event::ProposalMade { call_id, proposal, before };
+    let made = Event::ProposalMade { call_id, proposal, before, mode: Some(in_effect) };
     let written = state.sessions.propose(sid, made, gates).await.map_err(session_error)?;
     if let Some(made) = written.first() {
         if let Some(call) = call {
@@ -237,9 +239,24 @@ fn judge_plan(
     }
 }
 
-/// Whether the project's learning mode is `gated` now.
-async fn gated(state: &State, cwd: &str) -> bool {
-    crate::triggers::mode(state, cwd).await == crate::settings::LearningMode::Gated
+/// The project's learning mode in effect now.
+async fn mode(state: &State, cwd: &str) -> LearningMode {
+    use crate::settings::LearningMode as Setting;
+    match crate::triggers::mode(state, cwd).await {
+        Setting::Suggest => LearningMode::Suggest,
+        Setting::Gated => LearningMode::Gated,
+        // `auto` is refused when settings load, so never in effect; read as the safe end.
+        Setting::Off | Setting::Auto => LearningMode::Off,
+    }
+}
+
+/// Whether `gated` may accept a proposal made under `made` (the mode it
+/// recorded) now: it must have been `gated` then and be `gated` now. A
+/// proposal made under `suggest` was made with a person deciding, and a
+/// mode raised later (a restart, a project's own lower setting removed)
+/// doesn't change that.
+async fn gated(state: &State, cwd: &str, made: Option<LearningMode>) -> bool {
+    made == Some(LearningMode::Gated) && mode(state, cwd).await == LearningMode::Gated
 }
 
 /// The replay's plan, given the earlier gates' verdicts: it runs only when
@@ -355,13 +372,13 @@ pub async fn replayed(
 /// over the file as the learner saw it; otherwise it's left for a person.
 async fn gate_accept(state: &State, sid: &SessionId, id: u64) -> Result<(), RpcError> {
     let cwd = cwd_of(state, sid)?;
-    if crate::triggers::mode(state, &cwd).await != crate::settings::LearningMode::Gated {
-        return Ok(());
-    }
     let folded = strive_learning::fold(&journal(state, sid)?);
     let Some(f) = folded.iter().find(|f| f.state.id == id) else {
         return Ok(());
     };
+    if !gated(state, &cwd, f.mode).await {
+        return Ok(());
+    }
     if f.state.status != ProposalStatus::Ready || !strive_learning::every_check_passed(&f.state.gates) {
         return Ok(());
     }
@@ -641,7 +658,7 @@ async fn settled(state: &Arc<State>, sid: &SessionId, cwd: &str) -> Result<Vec<F
                     proposal: &p.proposal,
                     before: p.before,
                     at_ms: p.made_at_ms,
-                    gated: gated(state, cwd).await,
+                    gated: gated(state, cwd, f.mode).await,
                 },
                 &entries,
             ) {

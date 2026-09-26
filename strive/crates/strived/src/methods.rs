@@ -515,7 +515,13 @@ async fn route_host(state: &Arc<State>, conn: &Arc<Conn>, method: &str, params: 
                     },
                 ));
             }
-            if let Event::ProposalMade { call_id, proposal, before } = event {
+            if let Event::ProposalMade { call_id, proposal, before, mode } = event {
+                if mode.is_some() {
+                    return Err(RpcError::new(
+                        RpcError::INVALID_PARAMS,
+                        "the daemon records the learning mode in effect (mode) itself; leave it out",
+                    ));
+                }
                 let entries = crate::learning::propose(state, &sid, &info.cwd, call_id, proposal, before).await?;
                 return reply::<HostRecord>(Appended { seq: entries[0].seq });
             }

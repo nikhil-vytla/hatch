@@ -162,6 +162,8 @@ export type * from "./generated/SignalKind";
 
 export type * from "./generated/Automatic";
 
+export type * from "./generated/LearningMode";
+
 export type * from "./generated/SkippedRun";
 
 export type * from "./generated/Verdict";

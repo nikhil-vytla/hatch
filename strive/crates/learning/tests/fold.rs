@@ -25,7 +25,7 @@ fn journal(events: Vec<Event>) -> Vec<Entry> {
 }
 
 fn made(summary: &str, before: Option<Digest>) -> Event {
-    Event::ProposalMade { call_id: None, proposal: proposal(summary), before }
+    Event::ProposalMade { call_id: None, proposal: proposal(summary), before, mode: None }
 }
 
 fn gate(proposal: u64, gate: Gate, verdict: Verdict) -> Event {

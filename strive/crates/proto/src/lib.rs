@@ -841,6 +841,17 @@ pub enum SignalKind {
     TurnFailed,
 }
 
+/// The `learning` setting's mode in effect for a project (ADR-0020): the
+/// lower of the user's and the project's own.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub enum LearningMode {
+    Off,
+    Suggest,
+    Gated,
+}
+
 /// Who, other than a person, decided on a proposal.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
@@ -1215,6 +1226,12 @@ pub enum Event {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         #[ts(optional)]
         before: Option<Digest>,
+        /// The learning mode in effect for the project when the daemon took
+        /// the proposal. Recorded by the daemon, never the host: `gated`
+        /// accepts a proposal only if it was `gated` then and still is.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[ts(optional)]
+        mode: Option<LearningMode>,
     },
     /// A check of a proposal finished.
     GateFinished {

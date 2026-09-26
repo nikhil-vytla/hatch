@@ -14,8 +14,8 @@
 use std::collections::BTreeMap;
 
 use strive_proto::{
-    Digest, Entry, Event, GateOutcome, LearnTrigger, ProposalDecision, ProposalState, ProposalStatus, Verdict,
-    WatchOutcome,
+    Digest, Entry, Event, GateOutcome, LearnTrigger, LearningMode, ProposalDecision, ProposalState, ProposalStatus,
+    Verdict, WatchOutcome,
 };
 
 /// What an accepted proposal wrote: the file before (none: it didn't
@@ -33,6 +33,9 @@ pub struct Folded {
     pub state: ProposalState,
     /// Set while it's applied (not after a rollback).
     pub applied: Option<Applied>,
+    /// The learning mode in effect when the daemon took it (none: recorded
+    /// before the daemon kept it).
+    pub mode: Option<LearningMode>,
 }
 
 #[derive(Default)]
@@ -47,15 +50,17 @@ struct Marks {
 
 /// Every proposal in the journal, oldest first.
 pub fn fold(entries: &[Entry]) -> Vec<Folded> {
-    let mut out: Vec<(ProposalState, Marks)> = Vec::new();
+    let mut out: Vec<(ProposalState, Marks, Option<LearningMode>)> = Vec::new();
     // The latest request's trigger: a proposal belongs to the run that was
     // asked for last before it.
     let mut trigger: Option<LearnTrigger> = None;
     for e in entries {
-        let find = |out: &mut Vec<(ProposalState, Marks)>, id: u64| out.iter_mut().position(|(s, _)| s.id == id);
+        let find = |out: &mut Vec<(ProposalState, Marks, Option<LearningMode>)>, id: u64| {
+            out.iter_mut().position(|(s, ..)| s.id == id)
+        };
         match &e.event {
             Event::LearnRequested { trigger: t, .. } => trigger.clone_from(t),
-            Event::ProposalMade { proposal, before, .. } => out.push((
+            Event::ProposalMade { proposal, before, mode, .. } => out.push((
                 ProposalState {
                     id: e.seq,
                     made_at_ms: e.ts_ms,
@@ -68,6 +73,7 @@ pub fn fold(entries: &[Entry]) -> Vec<Folded> {
                     automatic: None,
                 },
                 Marks::default(),
+                *mode,
             )),
             Event::GateFinished { proposal, gate, verdict, detail } => {
                 if let Some(i) = find(&mut out, *proposal) {
@@ -133,11 +139,11 @@ pub fn fold(entries: &[Entry]) -> Vec<Folded> {
         }
     }
     out.into_iter()
-        .map(|(mut state, marks)| {
+        .map(|(mut state, marks, mode)| {
             state.status = status(&state.gates, &marks);
             state.prediction = state.proposal.watch.as_ref().map(|_| crate::watch::tally(&marks.checked));
             let applied = if marks.rolled_back { None } else { marks.applied };
-            Folded { state, applied }
+            Folded { state, applied, mode }
         })
         .collect()
 }

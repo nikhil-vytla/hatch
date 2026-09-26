@@ -9,6 +9,7 @@ import type { EffectOutcome } from "./EffectOutcome";
 import type { EffectRecord } from "./EffectRecord";
 import type { Gate } from "./Gate";
 import type { LearnTrigger } from "./LearnTrigger";
+import type { LearningMode } from "./LearningMode";
 import type { McpStatus } from "./McpStatus";
 import type { Proposal } from "./Proposal";
 import type { ProposalDecision } from "./ProposalDecision";
@@ -109,7 +110,13 @@ callId?: string, proposal: Proposal,
  * Recorded by the daemon, never the host: accepting writes only
  * over this same file.
  */
-before?: Digest, } | { "type": "gateFinished", proposal: number, gate: Gate, verdict: Verdict, 
+before?: Digest, 
+/**
+ * The learning mode in effect for the project when the daemon took
+ * the proposal. Recorded by the daemon, never the host: `gated`
+ * accepts a proposal only if it was `gated` then and still is.
+ */
+mode?: LearningMode, } | { "type": "gateFinished", proposal: number, gate: Gate, verdict: Verdict, 
 /**
  * What it found, for a person reviewing the proposal.
  */

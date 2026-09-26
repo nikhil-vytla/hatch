@@ -336,7 +336,7 @@ fn a_request_no_turn_has_finished_or_a_proposal_being_checked_keeps_automatic_ru
 
     j.push(Event::TurnStarted { turn: 1, through_seq: Some(asked) });
     assert!(busy(&j.entries()).is_some(), "the turn that took it runs");
-    let made = j.push(Event::ProposalMade { call_id: None, proposal: proposal(), before: None });
+    let made = j.push(Event::ProposalMade { call_id: None, proposal: proposal(), before: None, mode: None });
     j.push(Event::TurnEnded { turn: 1, reason: TurnEnd::Done });
     assert!(busy(&j.entries()).is_some_and(|w| w.contains("checks")), "the proposal is checking");
     for gate in strive_learning::GATES {

@@ -11,6 +11,7 @@ import {
   readFileSync,
   realpathSync,
   symlinkSync,
+  rmSync,
   unlinkSync,
   writeFileSync,
 } from "node:fs";
@@ -111,6 +112,10 @@ type Setup = {
   check?: (project: string) => string;
   /** The task's checkpoint has `.strive` as a symlink to this directory; the project doesn't, by the time of the proposal. */
   linkedStrive?: string;
+  /** The project's own learning mode (`.strive/settings.json`) when the proposal is made. */
+  projectMode?: string;
+  /** Removes that file once the replay runs, so the mode in effect then is the user's. */
+  dropProjectModeOnReplay?: boolean;
 };
 
 type World = {
@@ -138,6 +143,8 @@ async function world(s: Setup): Promise<World> {
     const system = JSON.stringify(request.system ?? "");
 
     if (system.includes("strive-replay-")) {
+      if (s.dropProjectModeOnReplay) rmSync(join(project, ".strive/settings.json"), { force: true });
+
       if (afterTool(request)) return { text: "Done." };
 
       return s.replay?.(system) ?? { text: "Nothing to do." };
@@ -184,6 +191,12 @@ async function world(s: Setup): Promise<World> {
 
   // The learner, played by this test: the learning session's host.
   const learning = (await c.request("learning/open", { cwd: project })).id;
+
+  if (s.projectMode) {
+    mkdirSync(join(project, ".strive"), { recursive: true });
+    writeFileSync(join(project, ".strive/settings.json"), JSON.stringify({ learning: { mode: s.projectMode } }));
+  }
+
   const host = await connect("strive-host");
   await host.request("host/register", { id: learning });
 
@@ -501,6 +514,26 @@ test("under gated, a change that made no difference in replay is inconclusive an
   expect(p.status).toBe("ready");
   expect(await decisions(w)).toEqual([]);
   expect(existsSync(join(w.project, ".strive/memory.md"))).toBe(false);
+});
+
+test("a proposal made while the mode in effect wasn't gated is left for a person, though it is gated when its checks pass", async () => {
+  // The project lowers the user's gated to suggest; the file is gone by the time replay passes.
+  const w = await world({
+    settings: { ...GATED, replay: { runs: 1 } },
+    replay: helped,
+    projectMode: "suggest",
+    dropProjectModeOnReplay: true,
+  });
+
+  const p = await settledProposal(w);
+
+  expect(existsSync(join(w.project, ".strive/settings.json"))).toBe(false);
+  expect(p.gates.map((g) => g.verdict)).toEqual(["pass", "pass", "pass"]);
+  expect(p.status).toBe("ready");
+  expect(await decisions(w)).toEqual([]);
+  expect(existsSync(join(w.project, ".strive/memory.md"))).toBe(false);
+  const made = (await events(w)).find((e) => e.event.type === "proposalMade")?.event;
+  expect(made?.type === "proposalMade" && made.mode).toBe("suggest");
 });
 
 test("under gated, a proposal the judge skipped is left for a person, even when replay passed", async () => {

@@ -333,6 +333,7 @@ fn the_learner_can_only_propose() {
         json!({"type": "learnRequested", "sessions": []}),
         json!({"type": "layoutProposed", "label": "l", "ops": []}),
         json!({"type": "proposalMade", "proposal": proposal, "before": digest(b"what the learner says")}),
+        json!({"type": "proposalMade", "proposal": proposal, "mode": "gated"}),
     ] {
         let r = record(&mut host, &id, &event);
         assert_eq!(r["error"]["code"], RpcError::INVALID_PARAMS, "{event} -> {r}");

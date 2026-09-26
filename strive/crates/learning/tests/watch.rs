@@ -418,8 +418,8 @@ fn the_fold_tallies_each_sessions_latest_check_for_watched_proposals_only() {
     plain.watch = None;
     let events = vec![
         started,
-        Event::ProposalMade { call_id: None, proposal: with_watch(no_display()), before: None },
-        Event::ProposalMade { call_id: None, proposal: plain, before: None },
+        Event::ProposalMade { call_id: None, proposal: with_watch(no_display()), before: None, mode: None },
+        Event::ProposalMade { call_id: None, proposal: plain, before: None, mode: None },
         checked("S1", X),
         checked("S1", C),
         checked("S2", X),

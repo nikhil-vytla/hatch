@@ -498,7 +498,10 @@ learning off there.
   applies the proposal as a person's accept would, with `proposalDecided
   {by: "gate", automatic: "gate"}`, only over the file as the learner saw it.
   `automatic` is only ever set there. A crash before the accept leaves the
-  proposal for a person. Rollback is unchanged, and it sticks: the gate
+  proposal for a person. The mode must be `gated` both when the proposal
+  was made (`proposalMade.mode`, which only the daemon records) and when
+  the replay passes, so a mode raised in between (a restart, a project's
+  lower setting deleted) doesn't reach it. Rollback is unchanged, and it sticks: the gate
   never accepts content a rolled-back proposal for the same file put there
   (compared by digest), and the judge is shown those contents.
 - **Shown:** `proposal/list` gives each proposal its `trigger` and

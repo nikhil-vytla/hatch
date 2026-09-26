@@ -168,8 +168,24 @@ A proposal is attributed to the run whose request came last before it
 - **When:** only at the moment the replay journals a `pass`, the last
   verdict of the cascade, under the project's lock. A crash between that
   verdict and the accept leaves the proposal `ready` for a person; the
-  daemon doesn't accept it later on a list or restart. So a proposal made
-  under `suggest` is never accepted because the mode became `gated` after.
+  daemon doesn't accept it later on a list or restart.
+- **The mode, twice:** the daemon records the mode in effect in
+  `proposalMade`'s `mode` when it takes the proposal (a host that sets it
+  is refused), and the gate accepts only if that was `gated` and the mode
+  is still `gated` when the replay passes. The replay can finish after a
+  restart (a list reruns it), and the mode read then could be higher than
+  when the proposal was made: the daemon restarted with `gated`, or a
+  project's lower `.strive/settings.json` was removed meanwhile. So a
+  proposal made under `suggest` is never accepted because the mode became
+  `gated` after. The judge is told its verdict may be final on the same
+  terms.
+- **What recording doesn't close:** `.strive/settings.json` is an ordinary
+  file (the sandbox guards memory and skills, not the rest of `.strive`),
+  so a work session's command, or a commit, can delete a project's lower
+  setting. Proposals made after that are made under the user's `gated`.
+  Recording the mode narrows this to proposals made once the file is gone;
+  it can't tell a person's deletion from a command's. A user who wants a
+  project held below `gated` sets the user-wide mode lower instead.
 - **What it writes:** the same apply as a person's accept (the file must
   still be as the learner saw it, a pinned write, `proposalApplied`), with
   `proposalDecided {by: "gate", automatic: "gate"}`. The `automatic` field
