@@ -303,7 +303,8 @@ own model call, through its gateway with the learning session's token, so
 it is admitted, held, journaled and charged like any call of that session.
 - **What it's shown**, as one JSON document the system prompt calls data:
   the proposal (with its watch, if any, and how it reads), the file it replaces and the other memory and skills as
-  the learner was shown them, the cited sessions (cited entries kept
+  the learner was shown them, earlier proposals for the same file that a
+  person rolled back, the cited sessions (cited entries kept
   first), and up to three held-out sessions: the project's newest work
   sessions the proposal doesn't cite, begun before it, with a prompt and a
   journal that verifies. Nothing of the learning session's own goes in.
@@ -497,7 +498,9 @@ learning off there.
   applies the proposal as a person's accept would, with `proposalDecided
   {by: "gate", automatic: "gate"}`, only over the file as the learner saw it.
   `automatic` is only ever set there. A crash before the accept leaves the
-  proposal for a person. Rollback is unchanged.
+  proposal for a person. Rollback is unchanged, and it sticks: the gate
+  never accepts content a rolled-back proposal for the same file put there
+  (compared by digest), and the judge is shown those contents.
 - **Shown:** `proposal/list` gives each proposal its `trigger` and
   `automatic`, and `skipped`, the latest skip with no automatic request
   since. `strive review` marks `[automatic run]` and `[accepted

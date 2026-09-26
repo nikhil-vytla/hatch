@@ -15,7 +15,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { join, resolve } from "node:path";
-import { type Entry, type Event, type ProposalState, StriveClient } from "@strive/protocol";
+import { type Entry, type Event, type Proposal, type ProposalState, StriveClient } from "@strive/protocol";
 import {
   type DaemonSettings,
   FakeAnthropic,
@@ -113,7 +113,16 @@ type Setup = {
   linkedStrive?: string;
 };
 
-type World = { c: StriveClient; project: string; learning: string; id: number; task?: string };
+type World = {
+  c: StriveClient;
+  /** The learner, played by the test. */
+  host: StriveClient;
+  project: string;
+  learning: string;
+  id: number;
+  proposal: Proposal;
+  task?: string;
+};
 
 /**
  * A project with a check that fails until `fixed.txt` exists; a work session
@@ -158,11 +167,13 @@ async function world(s: Setup): Promise<World> {
       { toolCalls: [{ id: "b2", name: "bash", input: { command: check } }] },
       { text: "The check passes now." },
     );
+
     if (s.linkedStrive) symlinkSync(s.linkedStrive, join(project, ".strive"));
     task = (await c.request("session/create", { cwd: project })).id;
     await c.request("session/approvals", { id: task, mode: "fullAuto" });
     await c.request("session/prompt", { id: task, text: "make the check pass" });
     await until("the task's turn", () => entries(c, task!), ended);
+
     if (s.linkedStrive) unlinkSync(join(project, ".strive"));
   }
 
@@ -187,7 +198,7 @@ async function world(s: Setup): Promise<World> {
 
   const made = await host.request("host/record", { id: learning, event: { type: "proposalMade", proposal } });
 
-  return { c, project, learning, id: made.seq, task };
+  return { c, host, project, learning, id: made.seq, proposal, task };
 }
 
 async function settledProposal(w: World): Promise<ProposalState> {
@@ -446,6 +457,36 @@ test("under gated, a proposal whose static, judge and replay checks all passed i
   expect(existsSync(memory)).toBe(false);
   const after = (await w.c.request("proposal/list", { cwd: w.project })).proposals.find((q) => q.id === w.id);
   expect(after?.status).toBe("rolledBack");
+});
+
+test("under gated, content a person rolled back isn't accepted again by the gate, and the judge is shown it", async () => {
+  const w = await world({ settings: { ...GATED, replay: { runs: 1 } }, replay: helped });
+  const first = await settledProposal(w);
+
+  expect(first.status).toBe("applied");
+  const back = Bun.spawnSync([STRIVE, "review", String(w.id), "rollback"], { cwd: w.project, env: daemon!.env });
+  expect(back.exitCode).toBe(0);
+
+  // The learner proposes the same file again.
+  const judged = fake!.requests.length;
+
+  const again = await w.host.request("host/record", {
+    id: w.learning,
+    event: { type: "proposalMade", proposal: w.proposal },
+  });
+
+  const p = await settledProposal({ ...w, id: again.seq });
+
+  expect(p.gates.map((g) => g.verdict)).toEqual(["pass", "pass", "pass"]);
+  expect(p.status).toBe("ready");
+  expect(p.automatic).toBeUndefined();
+  expect((await decisions(w)).filter((d) => d.proposal === again.seq)).toEqual([]);
+  expect(existsSync(join(w.project, ".strive/memory.md"))).toBe(false);
+
+  const judge = fake!.requests.slice(judged).find((r) => r.tool_choice?.name === "record_verdict");
+  const text = String(judge?.messages?.[0]?.content ?? "");
+  const doc = JSON.parse(text.slice(text.indexOf("{")));
+  expect(doc.rolled_back).toEqual([{ proposal: w.id, content: `- ${MARKER}\n` }]);
 });
 
 test("under gated, a change that made no difference in replay is inconclusive and left for a person", async () => {

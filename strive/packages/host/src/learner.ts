@@ -331,7 +331,7 @@ class Learner {
       label: "propose_change",
       description: [
         "Propose a change to memory or a skill: the file's whole new content, a one-line summary, the rationale, the evidence (sessions, entry seqs, what they show), a falsifiable prediction and, when it can be, a watch that checks it.",
-        "The daemon records and checks it; nothing changes until it is accepted: by a person, or, where learning is set to \"gated\", by the daemon once every check passes.",
+        'The daemon records and checks it; nothing changes until it is accepted: by a person, or, where learning is set to "gated", by the daemon once every check passes.',
         `At most ${MAX_PROPOSALS} a run. The result is the proposal's id, or why it was refused.`,
       ].join(" "),
       parameters: ProposalParams,

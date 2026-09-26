@@ -358,13 +358,26 @@ async fn gate_accept(state: &State, sid: &SessionId, id: u64) -> Result<(), RpcE
     if crate::triggers::mode(state, &cwd).await != crate::settings::LearningMode::Gated {
         return Ok(());
     }
-    let Some(f) = strive_learning::fold(&journal(state, sid)?).into_iter().find(|f| f.state.id == id) else {
+    let folded = strive_learning::fold(&journal(state, sid)?);
+    let Some(f) = folded.iter().find(|f| f.state.id == id) else {
         return Ok(());
     };
     if f.state.status != ProposalStatus::Ready || !strive_learning::every_check_passed(&f.state.gates) {
         return Ok(());
     }
-    if apply(state, sid, &cwd, &f, GATE.into(), Some(Automatic::Gate)).await?.is_none() {
+    // A person rolled this content back once; only a person brings it back.
+    let content = strive_journal::cas::digest(f.state.proposal.content.as_bytes());
+    let undone = strive_learning::rolled_back(&folded, &f.state.proposal.artifact)
+        .into_iter()
+        .find(|r| strive_journal::cas::digest(r.proposal.content.as_bytes()) == content);
+    if let Some(r) = undone {
+        crate::log!(
+            "proposal #{id} passed every check, but it's what proposal #{} put there before a person rolled it back; left for a person",
+            r.id
+        );
+        return Ok(());
+    }
+    if apply(state, sid, &cwd, f, GATE.into(), Some(Automatic::Gate)).await?.is_none() {
         crate::log!(
             "proposal #{id} passed every check, but its file changed since the learner read it; left for a person"
         );

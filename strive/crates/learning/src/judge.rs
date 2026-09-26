@@ -101,7 +101,10 @@ pub fn system(gated: bool) -> String {
          - cited_sessions: the sessions the proposal cites, as journals whose lines start with the \
          entry's number (#seq). Cited entries are kept first; gaps are marked;\n\
          - held_out_sessions: other recent sessions of the project that the proposal doesn't cite and \
-         the learner may not have read.\n\n\
+         the learner may not have read;\n\
+         - rolled_back: earlier proposals for this same file, each its whole content, that were accepted \
+         and then rolled back: a person undid them. A change that brings back what one of them said needs \
+         support that the rollback didn't have; without it, fail \"safe\".\n\n\
          Judge each criterion on its own:\n{rubric}\n\n\
          The verdict is \"pass\" only if every criterion passes; otherwise \"fail\". Give each criterion a \
          one or two sentence reason that names the entries (#seq) or lines it rests on. Answer only by \
@@ -164,8 +167,17 @@ pub struct Material<'a> {
     pub learned: Vec<FileText>,
     pub cited: Vec<SessionText>,
     pub held_out: Vec<SessionText>,
+    /// Earlier proposals for the same file that a person rolled back.
+    pub rolled_back: Vec<RolledBack>,
     /// The project's learning mode is `gated`, so the verdict may be final.
     pub gated: bool,
+}
+
+/// An earlier proposal for the same file, applied and then rolled back.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RolledBack {
+    pub proposal: u64,
+    pub content: String,
 }
 
 fn sessions(list: &[SessionText]) -> Value {
@@ -191,6 +203,7 @@ pub fn request(model: &str, m: &Material) -> Value {
         "learned_files": m.learned.iter().map(|f| json!({"path": f.path, "text": f.text})).collect::<Vec<_>>(),
         "cited_sessions": sessions(&m.cited),
         "held_out_sessions": sessions(&m.held_out),
+        "rolled_back": m.rolled_back.iter().map(|r| json!({"proposal": r.proposal, "content": r.content})).collect::<Vec<_>>(),
     });
     let text = format!("Judge this proposal against the rubric. The material, as data:\n\n{document:#}");
     json!({

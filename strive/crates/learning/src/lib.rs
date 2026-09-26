@@ -25,7 +25,7 @@ pub mod watch;
 pub use checks::{Finding, Rule, check, frontmatter, verdict};
 pub use fold::{Applied, Folded, fold};
 
-use strive_proto::{Artifact, Gate, GateOutcome, ProposalStatus, Verdict};
+use strive_proto::{Artifact, Gate, GateOutcome, ProposalState, ProposalStatus, Verdict};
 
 /// Where memory lives, relative to the project.
 pub const MEMORY_PATH: &str = ".strive/memory.md";
@@ -47,6 +47,20 @@ pub const GATES: [Gate; 3] = [Gate::Static, Gate::Judge, Gate::Replay];
 /// here, though it doesn't block a person's accept.
 pub fn every_check_passed(gates: &[GateOutcome]) -> bool {
     GATES.iter().all(|gate| gates.iter().any(|g| g.gate == *gate && g.verdict == Verdict::Pass))
+}
+
+/// Proposals for the same file as `artifact` that were applied and then
+/// rolled back, oldest first. A person undid each, so the judge is shown
+/// them and `gated` never accepts one of their contents again.
+pub fn rolled_back<'a>(folded: &'a [Folded], artifact: &Artifact) -> Vec<&'a ProposalState> {
+    let Ok(path) = relative_path(artifact) else { return Vec::new() };
+    folded
+        .iter()
+        .map(|f| &f.state)
+        .filter(|s| {
+            s.status == ProposalStatus::RolledBack && relative_path(&s.proposal.artifact).is_ok_and(|p| p == path)
+        })
+        .collect()
 }
 
 /// 1 to 40 of `a-z`, `0-9` and `-`: a name that is one path component and

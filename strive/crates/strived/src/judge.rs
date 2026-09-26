@@ -10,7 +10,7 @@ use std::collections::HashSet;
 use std::sync::{Arc, Mutex as StdMutex};
 use std::time::Duration;
 
-use strive_learning::judge::{FileText, Material, SessionText};
+use strive_learning::judge::{FileText, Material, RolledBack, SessionText};
 use strive_proto::{Digest, Entry, Event, Gate, Proposal, SessionKind, Verdict};
 
 use crate::server::State;
@@ -145,7 +145,12 @@ pub fn plan(state: &State, cwd: &str, made: &Made, learning: &[Entry]) -> Plan {
         .filter(|(p, _)| *p != path)
         .filter_map(|(path, d)| Some(FileText { path, text: strive_learning::render::cut(&blob(&d)?, FILE_CHARS) }))
         .collect();
-    let material = Material { proposal, current: current.as_deref(), learned, cited, held_out, gated };
+    let folded = strive_learning::fold(learning);
+    let rolled_back = strive_learning::rolled_back(&folded, &proposal.artifact)
+        .into_iter()
+        .map(|s| RolledBack { proposal: s.id, content: s.proposal.content.clone() })
+        .collect();
+    let material = Material { proposal, current: current.as_deref(), learned, cited, held_out, rolled_back, gated };
     let body = strive_learning::judge::request(model, &material).to_string().into_bytes();
     Plan::Call(Call { model: model.to_string(), body, held_out: held.into_iter().map(|(id, _)| id).collect() })
 }

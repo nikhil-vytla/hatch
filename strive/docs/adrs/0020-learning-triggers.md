@@ -180,6 +180,12 @@ A proposal is attributed to the run whose request came last before it
 - **Rollback is unchanged:** `proposal/rollback` is a person's request and
   undoes a gate's accept as it undoes a person's. Predictions (ADR-0019)
   keep watching it, and a proposal that stops holding suggests its rollback.
+- **A rollback sticks:** the gate never accepts a proposal whose content
+  (by digest) is what a rolled-back proposal for the same file put there;
+  only a person can bring it back. The judge is shown those rolled-back
+  contents ([ADR-0017](0017-judge-gate.md)), so a paraphrase of one faces
+  them too. Without this, the learner could propose the same file again
+  after every rollback, and each copy would pass the same checks.
 
 ### Surfaces
 

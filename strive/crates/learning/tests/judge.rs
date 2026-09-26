@@ -2,7 +2,7 @@
 //! of its answer, the detail a reviewer reads, and how sessions are shown.
 
 use serde_json::{Value, json};
-use strive_learning::judge::{self, FileText, Material, SessionText};
+use strive_learning::judge::{self, FileText, Material, RolledBack, SessionText};
 use strive_learning::render::{cut, render};
 use strive_proto::{Artifact, Digest, EffectOutcome, EffectRecord, Entry, Event, Evidence, Proposal, Verdict};
 
@@ -153,6 +153,7 @@ fn the_request_forces_the_verdict_tool_and_carries_the_proposal_as_data() {
         learned: vec![FileText { path: ".strive/skills/x/SKILL.md".into(), text: "skill".into() }],
         cited: vec![SessionText { id: "s1".into(), journal: "#3 user: hi".into() }],
         held_out: vec![SessionText { id: "s2".into(), journal: "#2 user: other".into() }],
+        rolled_back: vec![RolledBack { proposal: 7, content: "Undone.".into() }],
         gated: false,
     };
     let r = judge::request("claude-haiku-4-5", &m);
@@ -177,6 +178,7 @@ fn the_request_forces_the_verdict_tool_and_carries_the_proposal_as_data() {
     assert_eq!(doc["learned_files"][0]["path"], ".strive/skills/x/SKILL.md");
     assert_eq!(doc["cited_sessions"], json!([{"id": "s1", "journal": "#3 user: hi"}]));
     assert_eq!(doc["held_out_sessions"][0]["id"], "s2");
+    assert_eq!(doc["rolled_back"], json!([{"proposal": 7, "content": "Undone."}]));
     let new = Material { current: None, ..m.clone() };
     let text = judge::request("m", &new)["messages"][0]["content"].as_str().unwrap().to_string();
     let doc: Value = serde_json::from_str(&text[text.find('{').unwrap()..]).unwrap();

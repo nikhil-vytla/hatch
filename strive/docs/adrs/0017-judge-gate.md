@@ -57,6 +57,10 @@ data:
   The judge needs both to say whether the lesson is already covered.
 - **The cited sessions,** rendered from their journals. Cited entries are
   kept first.
+- **Rolled back before:** the whole content of each earlier proposal for
+  the same file that was applied and then rolled back. A person undid
+  those; a change that brings one back needs support the rollback didn't
+  have, and the prompt says to fail `safe` without it.
 - **Held-out sessions:** the project's newest work sessions that the
   proposal doesn't cite, started before the proposal, with at least one
   prompt, and whose journals verify. At most three, and 12k tokens in all.
