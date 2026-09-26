@@ -79,6 +79,10 @@ export const lensSchema = z.enum([
   "typing",
   /** One box, live: the visitor types; in-browser contestants and live Jev answer. */
   "try",
+  /** Open twenty envelopes filled at one confidence and count the agreements. */
+  "room",
+  /** Hand everything below a confidence to a person: kept, handed over, slipped through. */
+  "dial",
 ]);
 
 export const cardSchema = z.object({
