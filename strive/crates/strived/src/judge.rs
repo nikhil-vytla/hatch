@@ -240,12 +240,26 @@ async fn judge(state: &State, sid: &SessionId, call: Call) -> (Verdict, String) 
         }
         Err(e) => return (Verdict::Fail, broke(&e.to_string())),
     };
+    let error = serde_json::from_slice::<serde_json::Value>(&bytes).ok().map(|v| v["error"].clone());
     let message = || {
-        serde_json::from_slice::<serde_json::Value>(&bytes)
-            .ok()
-            .and_then(|v| v["error"]["message"].as_str().map(str::to_string))
+        error
+            .as_ref()
+            .and_then(|e| e["message"].as_str().map(str::to_string))
             .unwrap_or_else(|| String::from_utf8_lossy(&bytes).chars().take(300).collect())
     };
+    let kind = error.as_ref().and_then(|e| e["type"].as_str()).unwrap_or_default();
+    // A rate limit or an overload says nothing about the proposal, and a
+    // fail would block it for good: it's a skip, which leaves it to a
+    // person and which `gated` never counts as a pass (ADR-0017).
+    if matches!(status, 429 | 529) || matches!(kind, "rate_limit_error" | "overloaded_error") {
+        return (
+            Verdict::Skipped,
+            format!(
+                "not run: the provider was too busy to judge it (HTTP {status}: {}); it can be accepted without the judge, but never automatically",
+                message()
+            ),
+        );
+    }
     match status {
         200 => match strive_learning::judge::read(&bytes) {
             Ok(j) => (j.verdict(), strive_learning::judge::detail(&j, &model, &held_out)),
@@ -260,10 +274,7 @@ async fn judge(state: &State, sid: &SessionId, call: Call) -> (Verdict, String) 
         401 if message().starts_with("strive: ") => (Verdict::Skipped, format!("not run: {}", ours(&message()))),
         status => (
             Verdict::Fail,
-            format!(
-                "failed: the judge's call was refused (HTTP {status}: {}), so it wasn't judged; `strive learn` asks for the proposal again",
-                message()
-            ),
+            format!("failed: the judge's call was refused (HTTP {status}: {}), so it wasn't judged", message()),
         ),
     }
 }
@@ -273,9 +284,7 @@ fn ours(message: &str) -> &str {
 }
 
 fn broke(why: &str) -> String {
-    format!(
-        "failed: the judge's call broke off ({why}), so it wasn't judged; `strive learn` asks for the proposal again"
-    )
+    format!("failed: the judge's call broke off ({why}), so it wasn't judged")
 }
 
 /// Whether the journal already has proposal `id`'s judge verdict.

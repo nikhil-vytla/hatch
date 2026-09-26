@@ -112,13 +112,18 @@ passes.
 | The learning session's budget can't hold the call | skipped, with the gateway's reason |
 | The judge model isn't an Anthropic model | skipped, naming the setting |
 | No price is known for the judge model | skipped, naming the setting |
-| The provider refused or the call broke | failed, with the reason: it wasn't judged |
+| The provider was rate-limited or overloaded (HTTP 429 or 529, `rate_limit_error`, `overloaded_error`) | skipped, with the provider's message |
+| The provider refused otherwise, or the call broke | failed, with the reason: it wasn't judged |
 | An answer that can't be read | failed |
 | An answer | pass or fail, with each criterion's reason |
 
 A skip isn't a pass, but it doesn't block. A person sees the reason in
-`strive review`. A provider error fails rather than skips, so an outage
-can't make proposals ready unjudged.
+`strive review`. A refusal or a broken call fails: something about this
+call went wrong, and a pass must never come of it. A rate limit or an
+overload is a skip. It says nothing about the proposal, and a fail blocks
+it for good, since nothing judges a proposal twice. So an outage can make
+a proposal ready for a person, marked as not judged, but never accepted
+without one: `gated` accepts only a judge `pass` (ADR-0020).
 
 ### When it runs
 

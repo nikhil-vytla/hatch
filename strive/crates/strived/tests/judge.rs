@@ -24,8 +24,43 @@ struct Model {
     seen: Arc<Mutex<Vec<Value>>>,
 }
 
+/// What the fake model answers.
+#[derive(Clone)]
+enum Reply {
+    /// This status and body.
+    Status(u16, Value),
+    /// A 200 whose body breaks off partway.
+    Cut,
+}
+
+impl Reply {
+    fn into_response(self) -> Response {
+        let (status, body) = match self {
+            Reply::Status(status, body) => (status, Body::from(body.to_string())),
+            Reply::Cut => {
+                use futures_util::StreamExt as _;
+                let parts: Vec<Result<Bytes, std::io::Error>> = vec![
+                    Ok(Bytes::from_static(b"{\"id\": \"msg_judge\", \"content\": [")),
+                    Err(std::io::Error::other("cut")),
+                ];
+                // Apart, so the head and the first part are sent before it breaks.
+                let parts = futures_util::stream::iter(parts).then(|p| async move {
+                    tokio::time::sleep(Duration::from_millis(200)).await;
+                    p
+                });
+                (200, Body::from_stream(parts))
+            }
+        };
+        Response::builder().status(status).header("content-type", "application/json").body(body).unwrap()
+    }
+}
+
 impl Model {
     fn start(reply: Value, delay_ms: u64) -> Self {
+        Self::replying(Reply::Status(200, reply), delay_ms)
+    }
+
+    fn replying(reply: Reply, delay_ms: u64) -> Self {
         let seen = Arc::new(Mutex::new(Vec::new()));
         let (tx, rx) = std::sync::mpsc::channel();
         let s = seen.clone();
@@ -38,11 +73,7 @@ impl Model {
                     async move {
                         s.lock().unwrap().push(serde_json::from_slice(&body).unwrap());
                         tokio::time::sleep(Duration::from_millis(delay_ms)).await;
-                        Response::builder()
-                            .status(200)
-                            .header("content-type", "application/json")
-                            .body(Body::from(reply.to_string()))
-                            .unwrap()
+                        reply.into_response()
                     }
                 });
                 axum::serve(listener, app).await.unwrap();
@@ -106,7 +137,10 @@ fn judge_after(reply: Value, delay_ms: u64) -> Judge {
 
 /// A daemon whose settings are `settings`.
 fn judge_with(reply: Value, delay_ms: u64, settings: &Value) -> Judge {
-    let model = Model::start(reply, delay_ms);
+    judge_on(Model::start(reply, delay_ms), settings)
+}
+
+fn judge_on(model: Model, settings: &Value) -> Judge {
     let url = model.url();
     let env = Env::with_vars(&[("STRIVE_UPSTREAM_ANTHROPIC", &url), ("ANTHROPIC_API_KEY", "sk-test-judge")]);
     fs::write(env.home.path().join("settings.json"), settings.to_string()).unwrap();
@@ -286,6 +320,52 @@ fn a_verdict_that_disagrees_with_its_criteria_fails() {
     let (v, detail) = j.judged(id);
     assert_eq!(v, "fail", "{detail}");
     assert!(detail.contains("verdict was fail though every criterion passed"), "{detail}");
+}
+
+fn provider_error(kind: &str, message: &str) -> Value {
+    json!({"type": "error", "error": {"type": kind, "message": message}})
+}
+
+/// A proposal judged by a model that answers `reply`: its judge verdict and detail, and its status.
+fn judged_by(reply: Reply) -> (String, String, String) {
+    let j = judge_on(Model::replying(reply, 0), &json!({"judgeModel": "claude-haiku-4-5"}));
+    let (cited, seq) = j.session("run the tests");
+    j.session("another task");
+    let (mut host, learning) = j.learner();
+    let id = Judge::propose(&mut host, &learning, &memory(&[(&cited, seq)]));
+    let (v, detail) = j.judged(id);
+    (v, detail, j.proposal(id)["status"].as_str().unwrap().to_string())
+}
+
+#[test]
+fn a_provider_refusal_or_a_broken_call_fails_the_judge() {
+    for (reply, why) in [
+        (
+            Reply::Status(400, provider_error("invalid_request_error", "prompt is too long")),
+            "HTTP 400: prompt is too long",
+        ),
+        (Reply::Status(500, provider_error("api_error", "internal error")), "HTTP 500: internal error"),
+        (Reply::Cut, "broke off"),
+    ] {
+        let (v, detail, status) = judged_by(reply);
+        assert_eq!((v.as_str(), status.as_str()), ("fail", "failed"), "{detail}");
+        assert!(detail.contains(why) && detail.contains("so it wasn't judged"), "{detail}");
+        assert!(!detail.contains("strive learn"), "`strive learn` doesn't judge it again: {detail}");
+    }
+}
+
+#[test]
+fn a_rate_limit_or_an_overload_skips_the_judge() {
+    for (reply, why) in [
+        (Reply::Status(429, provider_error("rate_limit_error", "slow down")), "HTTP 429: slow down"),
+        (Reply::Status(529, provider_error("overloaded_error", "Overloaded")), "HTTP 529: Overloaded"),
+    ] {
+        let (v, detail, status) = judged_by(reply);
+        assert_eq!(v, "skipped", "{detail}");
+        assert!(detail.starts_with("not run: the provider was too busy") && detail.contains(why), "{detail}");
+        // A person may accept past a skip; `gated` never counts one as a pass.
+        assert_eq!(status, "ready", "{detail}");
+    }
 }
 
 #[test]

@@ -162,9 +162,10 @@ A proposal is attributed to the run whose request came last before it
   static and replay measure text and outcomes; only the judge asks whether
   the lesson is sound and safe (its `safe` criterion covers paraphrased
   weakening the static lists miss). Its pass comes only from a strictly
-  parsed `record_verdict` with every criterion passing; a provider error or
-  an unreadable answer is a fail (ADR-0017). So an outage, a missing key or
-  a malformed answer can't open the gate.
+  parsed `record_verdict` with every criterion passing; a provider's
+  refusal, a broken call or an unreadable answer is a fail, and a rate
+  limit or an overload a skip (ADR-0017). So an outage, a missing key or a
+  malformed answer can't open the gate.
 - **When:** only at the moment the replay journals a `pass`, the last
   verdict of the cascade, under the project's lock. A crash between that
   verdict and the accept leaves the proposal `ready` for a person; the
