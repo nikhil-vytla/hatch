@@ -1602,3 +1602,35 @@ th[aria-sort="descending"] .sort {
 .cf-series circle {
   fill: var(--c);
 }
+
+/* ---------------------------------------------------------------- write a contestant */
+.ct-editor textarea {
+  width: 100%;
+  font: 13px/1.55 var(--mono);
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--ink);
+  tab-size: 2;
+  resize: vertical;
+  box-shadow: var(--shadow-border);
+}
+.ct-table {
+  margin-top: 8px;
+}
+.ct-you th,
+.ct-you td {
+  font-weight: 700;
+}
+.ct-diffs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+  margin-top: 12px;
+  font-size: 14px;
+}
+.ct-diffs ul {
+  margin: 0;
+  padding-left: 18px;
+}

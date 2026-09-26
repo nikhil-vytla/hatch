@@ -512,7 +512,7 @@ export function oneBoxCard(
       targets: "onebox/targets.json",
       cases: "onebox/cases.json",
     },
-    lenses: ["typing", "try", "bars", "scatter", "table", "reliability", "case"],
+    lenses: ["typing", "try", "contest", "bars", "scatter", "table", "reliability", "case"],
     protocolGroups: sets.map((s) => ({ hash: s.protocolHash, label: s.label, runSets: [s.id] })),
   };
 }
