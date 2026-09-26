@@ -10,6 +10,7 @@ import { caption, colorVars, compareBy, LENS_LABEL, useCardModel, type CardModel
 import { Picker } from "./picker";
 import { Table } from "./table";
 import { Dial, Room } from "./confidence";
+import { Contest } from "./contest";
 import { TryBox } from "./try-box";
 import { TypingWatch } from "./typing";
 import { Watch } from "./watch";
@@ -180,6 +181,8 @@ function LensBody({ model: m }: { model: CardModel }) {
       return <TryBox model={m} />;
     case "room":
       return <Room model={m} />;
+    case "contest":
+      return <Contest model={m} />;
     case "dial":
       return <Dial model={m} />;
     case "typing":
