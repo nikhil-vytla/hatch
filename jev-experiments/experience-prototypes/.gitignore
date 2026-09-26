@@ -27,3 +27,4 @@ public/capability-build.json
 
 # Generated arena index and chunks, built from packages/arena recordings.
 public/arena/
+public/daily/
