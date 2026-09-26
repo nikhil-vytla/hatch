@@ -125,3 +125,19 @@ Under keep-the-latest, final cards are unchanged and the boxes change more (Jev 
 Laya 5.70 per phrase). The development split gave the same order (Jev 98.0%, keyword 67.3%,
 Laya 64.7%, tiny 26.7%); Laya and the keyword classifier swap places between splits and
 their intervals overlap on both.
+
+## Breaking hard questions into small ones (decompose.jsonl, 26 Sep 2026)
+
+`scripts/decompose-experiment.ts` re-asked the first 30 Tetris and first 30 grid items of the
+checkable bank (bank order, not chosen by result), one call per item, with the hard question
+split into small local ones that code combines. Same state as the single-question recording.
+
+| Question | Asked as one question | Split, combined by code |
+|---|---|---|
+| Tetris · lowest stack (3 pairwise "drawn lower than") | 33% (10/30) | 70% (21/30) |
+| Tetris · fewest holes (per landing "empty cell under the piece") | 37% (11/30) | 53% (16/30) |
+| Grid · can reach the exit (3 reachability parts) | 77% (23/30) | 67% (20/30) |
+
+Local comparisons Jev can see at a glance help a lot; splitting route-finding into parts does
+not (each part is still route-finding, and combining errors compounds). Thirty items each is a
+small sample: read these as directions, not measurements.
