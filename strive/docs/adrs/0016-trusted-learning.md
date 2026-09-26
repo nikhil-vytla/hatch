@@ -195,5 +195,7 @@ A proposal is `ready` when every check that ran passed or was skipped, and
 - **A work session can't skip review:** its `write` and `edit` of memory or
   a skill ask a person in every approval mode, and the macOS sandbox denies
   commands writes there (Linux: where the files exist; `sandbox: off`: not
-  at all). An editor or git still can, and `strive review` lists such a file
-  as changed outside review.
+  at all). An editor or git still can, and so can an MCP server (they run
+  unsandboxed and are trusted as the user is); `strive review` lists such a
+  file as changed outside review. `AGENTS.md`, `CLAUDE.md` and
+  `.claude/skills` are ordinary project files outside review.

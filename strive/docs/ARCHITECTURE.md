@@ -435,6 +435,16 @@ project's directory against rewinds.
 
 **Learned files outside review.** The daemon's own write on accept and
 rollback is not an agent effect, so the checks below don't apply to it.
+"Only through review" covers `.strive/memory.md` and `.strive/skills`
+against the agent's own writes and commands, and nothing wider:
+- **Other instruction files are ordinary project files.** `AGENTS.md`,
+  `CLAUDE.md` and `.claude/skills` also reach every session's prompt, and
+  no review covers them (below).
+- **MCP servers can write anything.** They run unsandboxed, as the user,
+  in the session's directory, so a server can write `.strive/memory.md` or
+  a skill with no approval and no sandbox rule in the way. They are
+  configured by the user and trusted as the user is. Such a write shows up
+  as changed outside review, like an editor's.
 - **Loading:** memory and `.strive/skills` are loaded only when really
   there, reached without a symlink, as the learner already reads them. The
   checks below guard real paths; a skill linked to `docs/x` would otherwise
