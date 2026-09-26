@@ -1616,8 +1616,10 @@ safeguard match. The static gate now refuses every control character but
 newline and tab, and review and log print control characters written out
 (`\u{1b}`) via `terminal::visible`, since a failed proposal's summary is
 still listed. Both tests failed first.
-Not yet: `strive run` and the TUI print model text as it comes; the same
-class, a broader change.
+`strive run`'s text output now goes through `terminal::visible` too (a
+test with a reply holding ESC and CR failed first); its `--json` output was
+already escaped by serde. The TUI already filtered control characters
+(`printable` in `packages/tui/src/app.ts`, from the Stage 1 review).
 
 ## 2026-09-26: Stage 2 review, trust boundaries of the learning loop
 

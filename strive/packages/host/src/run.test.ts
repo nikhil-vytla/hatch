@@ -97,3 +97,14 @@ test("the task can come on stdin", async () => {
     text: "say hello",
   });
 });
+
+// A model's reply is printed as text, never as commands to the terminal: an
+// escape sequence in it could erase lines or fake output in the person's
+// terminal or a CI log.
+test("control characters in the model's reply are printed written out", async () => {
+  const r = await run([{ text: "Done.\u001b[2K\u001b[1A\rAll tests passed" }], ["say done"]);
+  expect(r.exitCode).toBe(0);
+  expect(r.stdout).not.toContain("\u001b");
+  expect(r.stdout).not.toContain("\r");
+  expect(r.stdout).toContain("Done.\\u{1b}[2K\\u{1b}[1A\\u{d}All tests passed");
+});

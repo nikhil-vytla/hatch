@@ -153,7 +153,7 @@ fn show(e: &Entry, json: bool) -> Result<()> {
     } else {
         let text = crate::commands::describe(e);
         if !text.is_empty() {
-            println!("{text}");
+            println!("{}", crate::terminal::visible(&text));
         }
     }
     Ok(())
