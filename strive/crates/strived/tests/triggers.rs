@@ -424,3 +424,36 @@ fn gated_leaves_a_proposal_with_a_skipped_check_to_a_person_and_a_client_named_g
     let logged = review(&env, &cwd, &["log", &learning_id]);
     assert!(logged.contains(&format!("proposal #{id} accepted by gate (a client)")), "{logged}");
 }
+
+/// A daemon with an Anthropic key whose settings are `settings`.
+fn daemon_with(settings: &Value) -> Env {
+    let env = Env::with_vars(&[("ANTHROPIC_API_KEY", "sk-test-trigger")]);
+    fs::write(env.home.path().join("settings.json"), settings.to_string()).unwrap();
+    env
+}
+
+#[test]
+fn a_proposal_a_crash_left_checking_doesnt_hold_the_next_run_back() {
+    // The judge on an OpenAI model is skipped at once, and replay (no host) too.
+    let env = daemon_with(&json!({"learning": idle(), "judgeModel": "gpt-4.1-mini"}));
+    let cwd = project();
+    let first = Work::new(&env, &cwd).id;
+    let learning_id = env.rpc().ok("learning/open", &json!({"cwd": cwd}))["id"].as_str().unwrap().to_string();
+    env.stop();
+    // What a crash in the judge's call leaves: a proposal with no judge verdict.
+    let next = common::next_seq_offline(&env, &learning_id);
+    common::append_offline(
+        &env,
+        &learning_id,
+        &json!([
+            {"type": "proposalMade", "proposal": memory(&first)},
+            {"type": "gateFinished", "proposal": next, "gate": "static", "verdict": "pass", "detail": "fine"},
+        ]),
+    );
+
+    let mut w = Work::new(&env, &cwd);
+    w.exchange("go", &json!({"kind": "interrupted"}));
+    let asked = wait_events(&env, &cwd, "learnRequested", 1);
+    assert_eq!(asked[0]["sessions"], json!([w.id]), "{asked:?}");
+    assert_eq!(events(&env, &learning_id, "learnSkipped"), Vec::<Value>::new());
+}

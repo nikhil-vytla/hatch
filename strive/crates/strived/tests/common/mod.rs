@@ -161,6 +161,35 @@ impl Rpc {
     }
 }
 
+fn open_offline(env: &Env, session: &str) -> (strive_journal::Journal, Vec<strive_proto::Entry>) {
+    let key: [u8; 32] = std::fs::read(env.home.path().join("keys/journal.key")).unwrap().try_into().unwrap();
+    let key = strive_journal::Key::from_bytes(key);
+    strive_journal::Journal::open(&env.session_dir(session), session, &key, 1).unwrap()
+}
+
+/// Appends `events` to a session's journal while no daemon runs, as a
+/// daemon that crashed after writing them would leave it; their seqs.
+pub fn append_offline(env: &Env, session: &str, events: &Value) -> Vec<u64> {
+    let (mut journal, entries) = open_offline(env, session);
+    let events: Vec<strive_proto::Event> = serde_json::from_value(events.clone()).unwrap();
+    let written = journal.append(entries.last().unwrap().ts_ms, &events).unwrap();
+    journal.commit().unwrap();
+    written.iter().map(|e| e.seq).collect()
+}
+
+/// The seq the next entry of a session's journal gets, while no daemon runs.
+pub fn next_seq_offline(env: &Env, session: &str) -> u64 {
+    open_offline(env, session).1.last().unwrap().seq + 1
+}
+
+/// A connection that waits up to 30s for each reply, for calls that do long
+/// work on a loaded machine.
+pub fn slow_rpc(env: &Env) -> Rpc {
+    let mut c = env.rpc();
+    c.wait_up_to(Duration::from_secs(30));
+    c
+}
+
 pub fn pid(status: &Value) -> u64 {
     status["server"]["pid"].as_u64().unwrap()
 }

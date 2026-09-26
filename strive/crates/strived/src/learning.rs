@@ -630,7 +630,7 @@ pub fn journal(state: &State, sid: &SessionId) -> Result<Vec<Entry>, RpcError> {
 /// The project's proposals, oldest first, after finishing any checks a
 /// crash cut short: gates without a verdict are run again, and a judge
 /// call that isn't running is started. Call with the project's lock held.
-async fn settled(state: &Arc<State>, sid: &SessionId, cwd: &str) -> Result<Vec<Folded>, RpcError> {
+pub async fn settled(state: &Arc<State>, sid: &SessionId, cwd: &str) -> Result<Vec<Folded>, RpcError> {
     let entries = journal(state, sid)?;
     let folded = strive_learning::fold(&entries);
     let mut events = Vec::new();

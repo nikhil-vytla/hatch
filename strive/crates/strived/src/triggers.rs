@@ -102,6 +102,9 @@ async fn scan_and_ask(state: &Arc<State>, cwd: &str, work: &SessionId, kind: Tri
     let sid = crate::learning::open_id(state, cwd).await?;
     let lock = state.learning.project(&sid);
     let _held = lock.lock().await;
+    // A proposal a crash left `checking` would hold the run back until
+    // someone listed proposals: its checks are finished (or restarted) first.
+    crate::learning::settled(state, &sid, cwd).await?;
     // Again under the lock: another trigger may have acted on these signs.
     let learning = crate::learning::journal(state, &sid)?;
     let signals = signs(&learning);
