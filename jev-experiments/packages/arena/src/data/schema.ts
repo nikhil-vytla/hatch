@@ -83,6 +83,8 @@ export const lensSchema = z.enum([
   "room",
   /** Hand everything below a confidence to a person: kept, handed over, slipped through. */
   "dial",
+  /** Write a contestant and run it on the public phrases under the same rules. */
+  "contest",
 ]);
 
 export const cardSchema = z.object({

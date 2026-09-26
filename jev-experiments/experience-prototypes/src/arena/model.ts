@@ -37,6 +37,7 @@ export const LENS_LABEL: Record<Lens, string> = {
   try: "Try it",
   room: "The room",
   dial: "The dial",
+  contest: "Write a contestant",
 };
 
 /** Negative when `a` is better than `b`. */
@@ -270,6 +271,8 @@ export function caption(m: CardModel) {
       return "Across: stated confidence. Up: how often the top answer agrees with the reference. Each dot is a confidence bin, sized by how many decisions fall in it; dots on the diagonal mean the confidence is honest.";
     case "case":
       return "One case: the reference distribution beside each contestant's. An outline marks an answer that is confident and disagrees.";
+    case "contest":
+      return "Your contestant is scored on the same 150 development phrases, keystroke by keystroke, as the recorded ones; the table repeats their development-split results beside yours. The per-phrase comparison with Jev uses the finished phrase.";
     case "room":
       return "Each envelope is one recorded decision the contestant made at the chosen confidence; open it to see whether its top answer agrees with the reference. Honest confidence means a 90% room holds about 18 agreements in 20. Honest is not the same as useful: the line under each room says how often the contestant is that sure at all. Draw again as often as you like.";
     case "dial":
