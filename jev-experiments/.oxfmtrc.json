@@ -4,6 +4,7 @@
   "singleQuote": false,
   "trailingComma": "all",
   "ignorePatterns": [
-    "packages/arena/src/one-box/tiny/*.json"
+    "packages/arena/src/one-box/tiny/*.json",
+    "packages/arena/src/checkable/bank.json"
   ]
 }
