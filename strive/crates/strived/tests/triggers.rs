@@ -84,9 +84,15 @@ fn log(env: &Env) -> String {
 
 /// Waits until the daemon's log holds `needle` more times than `before`.
 fn wait_log(env: &Env, needle: &str, before: usize) {
-    common::wait_for(&format!("the log to say {needle:?}"), Duration::from_secs(20), || {
-        log(env).matches(needle).count() > before
-    });
+    let deadline = std::time::Instant::now() + Duration::from_secs(20);
+    while log(env).matches(needle).count() <= before {
+        assert!(
+            std::time::Instant::now() < deadline,
+            "timed out waiting for the log to say {needle:?}; it says:\n{}",
+            log(env)
+        );
+        std::thread::sleep(Duration::from_millis(20));
+    }
 }
 
 /// The learner, played by a connection registered as the learning
@@ -201,7 +207,9 @@ fn a_clean_session_asks_nothing_and_makes_no_learning_session() {
 
 #[test]
 fn a_prompt_before_the_idle_time_is_up_puts_the_scan_off() {
-    let env = daemon(&json!({"idleSeconds": 2}), true);
+    // The prompt must land inside the wait, and a prompt takes a git
+    // checkpoint first, which a loaded machine has taken over 2s to make.
+    let env = daemon(&json!({"idleSeconds": 6}), true);
     let cwd = project();
     let mut w = Work::new(&env, &cwd);
     let (_, ended) = w.exchange("go", &json!({"kind": "interrupted"}));

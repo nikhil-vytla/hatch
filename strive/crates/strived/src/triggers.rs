@@ -27,7 +27,11 @@ const DAY_MS: u64 = 24 * 60 * 60 * 1000;
 pub fn turn_ended(state: &Arc<State>, cwd: String, work: SessionId) {
     let state = state.clone();
     tokio::spawn(async move {
-        let Some((ended, turns)) = last_turn_end(&state, &work) else { return };
+        let Some(entries) = verified(&state, &work) else {
+            crate::log!("session {} not scanned for learning: its journal doesn't verify", work.as_str());
+            return;
+        };
+        let Some((ended, turns)) = last_turn_end(&entries) else { return };
         let every = state.settings.learning.every_turns;
         if every > 0 && turns % every == 0 {
             consider(&state, &cwd, &work, TriggerKind::Turns).await;
@@ -73,8 +77,7 @@ async fn rescan(state: &Arc<State>, sid: &SessionId) -> Result<(), RpcError> {
 }
 
 /// The seq of the session's last `turnEnded`, and how many turns it has ended.
-fn last_turn_end(state: &State, work: &SessionId) -> Option<(u64, u64)> {
-    let entries = verified(state, work)?;
+fn last_turn_end(entries: &[Entry]) -> Option<(u64, u64)> {
     let ends: Vec<u64> = entries.iter().filter(|e| matches!(e.event, Event::TurnEnded { .. })).map(|e| e.seq).collect();
     Some((*ends.last()?, ends.len() as u64))
 }
