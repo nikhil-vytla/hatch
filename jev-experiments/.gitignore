@@ -20,3 +20,5 @@ results/smoke.json
 results/access.json
 packages/arena/recordings/one-box.jsonl
 packages/arena/recordings/one-box.laya.jsonl
+packages/arena/recordings/checkable.jsonl
+packages/arena/sealed/

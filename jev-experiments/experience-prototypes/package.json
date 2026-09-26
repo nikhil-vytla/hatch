@@ -27,6 +27,7 @@
     "d3-scale": "4.0.2",
     "lucide-react": "^0.577.0",
     "motion": "^12.35.0",
+    "quickjs-emscripten": "0.31.0",
     "radix-ui": "1.6.7",
     "react": "19.2.4",
     "react-dom": "19.2.4",
