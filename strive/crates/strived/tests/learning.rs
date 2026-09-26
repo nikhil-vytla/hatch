@@ -21,17 +21,17 @@ fn project() -> PathBuf {
 }
 
 fn work_session(env: &Env, cwd: &Path) -> String {
-    env.rpc().ok("session/create", &json!({"cwd": cwd}))["id"].as_str().unwrap().to_string()
+    common::slow_rpc(env).ok("session/create", &json!({"cwd": cwd}))["id"].as_str().unwrap().to_string()
 }
 
 fn learning_session(env: &Env, cwd: &Path) -> String {
-    env.rpc().ok("learning/open", &json!({"cwd": cwd}))["id"].as_str().unwrap().to_string()
+    common::slow_rpc(env).ok("learning/open", &json!({"cwd": cwd}))["id"].as_str().unwrap().to_string()
 }
 
 /// A connection registered as the project's learner.
 fn learner(env: &Env, cwd: &Path) -> (Rpc, String) {
     let id = learning_session(env, cwd);
-    let mut host = env.rpc();
+    let mut host = common::slow_rpc(env);
     host.ok("host/register", &json!({"id": id}));
     (host, id)
 }
@@ -77,7 +77,7 @@ fn propose(host: &mut Rpc, id: &str, proposal: &Value) -> u64 {
 }
 
 fn proposals(env: &Env, cwd: &Path) -> Vec<Value> {
-    env.rpc().ok("proposal/list", &json!({"cwd": cwd}))["proposals"].as_array().unwrap().clone()
+    common::slow_rpc(env).ok("proposal/list", &json!({"cwd": cwd}))["proposals"].as_array().unwrap().clone()
 }
 
 fn proposal(env: &Env, cwd: &Path, id: u64) -> Value {
@@ -96,16 +96,16 @@ fn static_gate(env: &Env, cwd: &Path, id: u64) -> (String, String) {
 }
 
 fn events(env: &Env, id: &str, kind: &str) -> Vec<Value> {
-    let r = env.rpc().ok("session/read", &json!({"id": id}));
+    let r = common::slow_rpc(env).ok("session/read", &json!({"id": id}));
     r["entries"].as_array().unwrap().iter().filter(|e| e["event"]["type"] == kind).map(|e| e["event"].clone()).collect()
 }
 
 fn decide(env: &Env, cwd: &Path, id: u64, decision: &str) -> Value {
-    env.rpc().call("proposal/decide", &json!({"cwd": cwd, "proposal": id, "decision": decision}))
+    common::slow_rpc(env).call("proposal/decide", &json!({"cwd": cwd, "proposal": id, "decision": decision}))
 }
 
 fn rollback(env: &Env, cwd: &Path, id: u64) -> Value {
-    env.rpc().call("proposal/rollback", &json!({"cwd": cwd, "proposal": id}))
+    common::slow_rpc(env).call("proposal/rollback", &json!({"cwd": cwd, "proposal": id}))
 }
 
 fn memory_file(cwd: &Path) -> PathBuf {
@@ -126,12 +126,12 @@ fn a_project_has_one_learning_session_that_work_lists_leave_out() {
     let work = work_session(&env, &cwd);
     let id = learning_session(&env, &cwd);
     assert_eq!(learning_session(&env, &cwd.join(".")), id, "the same project by another path");
-    let started = &env.rpc().ok("session/read", &json!({"id": id}))["entries"][0]["event"];
+    let started = &common::slow_rpc(&env).ok("session/read", &json!({"id": id}))["entries"][0]["event"];
     assert_eq!((started["type"].as_str(), started["kind"].as_str()), (Some("sessionStarted"), Some("learning")));
     assert_ne!(learning_session(&env, &project()), id, "another project has its own");
 
     let ids = |params: Value| -> Vec<String> {
-        let r = env.rpc().ok("session/list", &params);
+        let r = common::slow_rpc(&env).ok("session/list", &params);
         r["sessions"].as_array().unwrap().iter().map(|s| s["id"].as_str().unwrap().to_string()).collect()
     };
     assert_eq!(ids(json!({"cwd": cwd})), vec![work.clone()]);
@@ -158,7 +158,7 @@ fn opening_at_once_makes_one_learning_session() {
         opens.into_iter().map(|t| t.join().unwrap()).collect()
     });
     assert!(ids.iter().all(|i| *i == ids[0]), "{ids:?}");
-    let r = env.rpc().ok("session/list", &json!({"cwd": cwd, "kind": "learning"}));
+    let r = common::slow_rpc(&env).ok("session/list", &json!({"cwd": cwd, "kind": "learning"}));
     assert_eq!(r["sessions"].as_array().unwrap().len(), 1);
 }
 
@@ -171,12 +171,12 @@ fn a_learning_run_journals_the_request_and_starts_the_learner() {
     let env = Env::with_vars(&[("STRIVE_HOST", &format!("/bin/sh {}", script.display()))]);
     let cwd = project();
     let work = work_session(&env, &cwd);
-    let r = env.rpc().ok("learning/run", &json!({"cwd": cwd, "sessions": [work]}));
+    let r = common::slow_rpc(&env).ok("learning/run", &json!({"cwd": cwd, "sessions": [work]}));
     let id = learning_session(&env, &cwd);
     let asked = events(&env, &id, "learnRequested");
     assert_eq!(asked, vec![json!({"type": "learnRequested", "sessions": [work]})]);
     let seq = r["seq"].as_u64().unwrap();
-    let entries = env.rpc().ok("session/read", &json!({"id": id}))["entries"].clone();
+    let entries = common::slow_rpc(&env).ok("session/read", &json!({"id": id}))["entries"].clone();
     assert!(entries.as_array().unwrap().iter().any(|e| e["seq"] == seq && e["event"]["type"] == "learnRequested"));
     common::wait_for("the learner's host to start", Duration::from_secs(10), || seen.exists());
     assert_eq!(fs::read_to_string(&seen).unwrap().trim(), format!("--session {id}"));
@@ -189,13 +189,13 @@ fn the_learners_host_is_told_it_is_the_learner_and_gets_no_mcp_tools() {
     fs::write(env.home.path().join("settings.json"), settings.to_string()).unwrap();
     let cwd = project();
     let work = work_session(&env, &cwd);
-    let config = env.rpc().ok("host/register", &json!({"id": work}));
+    let config = common::slow_rpc(&env).ok("host/register", &json!({"id": work}));
     assert!(config.get("kind").is_none_or(|k| k == "work"), "{config}");
     let loaded = events(&env, &work, "contextLoaded");
     assert_eq!(loaded[0]["mcp"].as_array().unwrap().len(), 1, "a work session starts its MCP servers");
 
     let id = learning_session(&env, &cwd);
-    let config = env.rpc().ok("host/register", &json!({"id": id}));
+    let config = common::slow_rpc(&env).ok("host/register", &json!({"id": id}));
     assert_eq!((&config["kind"], &config["mcpTools"]), (&json!("learning"), &json!([])), "{config}");
     let loaded = events(&env, &id, "contextLoaded");
     assert_eq!(loaded[0]["mcp"], json!([]), "the learner starts no MCP server: {loaded:?}");
@@ -213,12 +213,12 @@ fn a_learning_run_studies_only_work_sessions_of_its_project() {
         (elsewhere.as_str(), "not in"),
         (id.as_str(), "learning session"),
     ] {
-        let r = env.rpc().call("learning/run", &json!({"cwd": cwd, "sessions": [named]}));
+        let r = common::slow_rpc(&env).call("learning/run", &json!({"cwd": cwd, "sessions": [named]}));
         assert_eq!(r["error"]["code"], RpcError::INVALID_PARAMS, "{named}: {r}");
         assert!(r["error"]["message"].as_str().unwrap().contains(why), "{named}: {r}");
     }
     assert_eq!(events(&env, &id, "learnRequested"), Vec::<Value>::new());
-    let r = env.rpc().call("learning/run", &json!({"cwd": cwd.join("missing")}));
+    let r = common::slow_rpc(&env).call("learning/run", &json!({"cwd": cwd.join("missing")}));
     assert_eq!(r["error"]["code"], RpcError::INVALID_PARAMS, "{r}");
 }
 
@@ -227,7 +227,7 @@ fn only_a_person_asks_the_learner_to_run() {
     let env = Env::new();
     let cwd = project();
     let work = work_session(&env, &cwd);
-    let mut agent = env.rpc();
+    let mut agent = common::slow_rpc(&env);
     agent.ok("host/register", &json!({"id": work}));
     let r = agent.call("learning/run", &json!({"cwd": cwd}));
     assert_eq!(r["error"]["code"], RpcError::NOT_A_PERSON, "{r}");
@@ -255,12 +255,12 @@ fn the_learner_is_given_its_memory_and_skills_whole() {
     );
 
     let work = work_session(&env, &cwd);
-    let config = env.rpc().ok("host/register", &json!({"id": work}));
+    let config = common::slow_rpc(&env).ok("host/register", &json!({"id": work}));
     assert!(config.get("learnedFiles").is_none(), "only the learner: {config}");
     assert!(events(&env, &work, "contextLoaded")[0].get("learned").is_none());
 
     let id = learning_session(&env, &cwd);
-    let config = env.rpc().ok("host/register", &json!({"id": id}));
+    let config = common::slow_rpc(&env).ok("host/register", &json!({"id": id}));
     assert_eq!(
         config["learnedFiles"],
         json!([
@@ -320,7 +320,7 @@ fn the_learner_can_only_propose() {
     let r = host.call("effect/run", &json!({"id": id, "callId": "c2", "request": {"kind": "bash", "command": "true"}}));
     assert_eq!(r["error"]["code"], RpcError::INVALID_REQUEST, "no commands: {r}");
     assert!(!memory_file(&cwd).exists());
-    let r = env.rpc().call("session/prompt", &json!({"id": id, "text": "write my memory"}));
+    let r = common::slow_rpc(&env).call("session/prompt", &json!({"id": id, "text": "write my memory"}));
     assert_eq!(r["error"]["code"], RpcError::INVALID_REQUEST, "no prompts: {r}");
 
     let proposal = memory("m", &work);
@@ -338,7 +338,7 @@ fn the_learner_can_only_propose() {
         let r = record(&mut host, &id, &event);
         assert_eq!(r["error"]["code"], RpcError::INVALID_PARAMS, "{event} -> {r}");
     }
-    let r = env.rpc().ok("session/read", &json!({"id": id}));
+    let r = common::slow_rpc(&env).ok("session/read", &json!({"id": id}));
     let types: Vec<&str> =
         r["entries"].as_array().unwrap().iter().filter_map(|e| e["event"]["type"].as_str()).collect();
     assert_eq!(types.iter().filter(|t| **t == "proposalMade").count(), 1, "{types:?}");
@@ -353,7 +353,7 @@ fn only_the_learning_sessions_host_proposes() {
     let env = Env::new();
     let cwd = project();
     let work = work_session(&env, &cwd);
-    let mut agent = env.rpc();
+    let mut agent = common::slow_rpc(&env);
     agent.ok("host/register", &json!({"id": work}));
     let made = json!({"type": "proposalMade", "proposal": memory("m", &work)});
     let r = record(&mut agent, &work, &made);
@@ -363,7 +363,7 @@ fn only_the_learning_sessions_host_proposes() {
     let id = learning_session(&env, &cwd);
     let r = record(&mut agent, &id, &made);
     assert_eq!(r["error"]["code"], RpcError::NOT_THE_HOST, "another session's host: {r}");
-    let r = record(&mut env.rpc(), &id, &made);
+    let r = record(&mut common::slow_rpc(&env), &id, &made);
     assert_eq!(r["error"]["code"], RpcError::NOT_THE_HOST, "a person: {r}");
     assert!(events(&env, &id, "proposalMade").is_empty());
     assert!(proposals(&env, &cwd).is_empty());
@@ -401,7 +401,7 @@ fn a_proposal_that_passes_is_ready_with_the_later_gates_skipped() {
 
     let p = proposal(&env, &cwd, replacing);
     assert_eq!(p["before"], digest(b"Old notes.\n"), "the file as it was when proposed");
-    let blob = env.rpc().ok("blob/get", &json!({"digest": p["before"]}));
+    let blob = common::slow_rpc(&env).ok("blob/get", &json!({"digest": p["before"]}));
     assert_eq!(blob["text"], "Old notes.\n", "kept in the content store");
 }
 
@@ -499,7 +499,7 @@ fn the_static_gate_refuses_secrets() {
     assert!(!static_gate(&env, &cwd, shaped).1.contains(key), "the key isn't repeated");
 
     // A stored key needs no known shape to be refused.
-    let mut c = env.rpc();
+    let mut c = common::slow_rpc(&env);
     c.ok("auth/set", &json!({"provider": "openai", "apiKey": "plainvalue-with-no-shape"}));
     let stored = propose(&mut host, &id, &memory("The key is plainvalue-with-no-shape.\n", &work));
     assert_fails(&env, &cwd, stored, "secrets", "stored API keys");
@@ -549,7 +549,8 @@ fn the_static_gate_wants_evidence_from_this_projects_work_sessions() {
         let made = propose(&mut host, &id, &p);
         assert_fails(&env, &cwd, made, "evidence", why);
     }
-    let last = env.rpc().ok("session/read", &json!({"id": work}))["entries"].as_array().unwrap().len() as u64;
+    let last =
+        common::slow_rpc(&env).ok("session/read", &json!({"id": work}))["entries"].as_array().unwrap().len() as u64;
     let fine = propose(&mut host, &id, &cite(&work, json!([1, last])));
     assert_eq!(status(&env, &cwd, fine), "ready", "its last entry is real");
 
@@ -597,7 +598,7 @@ fn only_a_person_decides_or_rolls_back() {
     let p = propose(&mut host, &id, &memory("m", &work));
     let r = host.call("proposal/decide", &json!({"cwd": cwd, "proposal": p, "decision": "accept"}));
     assert_eq!(r["error"]["code"], RpcError::NOT_A_PERSON, "the learner: {r}");
-    let mut agent = env.rpc();
+    let mut agent = common::slow_rpc(&env);
     agent.ok("host/register", &json!({"id": work}));
     let r = agent.call("proposal/decide", &json!({"cwd": cwd, "proposal": p, "decision": "accept"}));
     assert_eq!(r["error"]["code"], RpcError::NOT_A_PERSON, "a work session's agent: {r}");
@@ -857,7 +858,7 @@ fn a_work_session_cant_write_memory_but_an_accepted_proposal_does() {
     let env = Env::new();
     let cwd = project();
     let work = work_session(&env, &cwd);
-    let mut c = env.rpc();
+    let mut c = common::slow_rpc(&env);
     c.ok("session/approvals", &json!({"id": work, "mode": "fullAuto"}));
     let request = json!({"kind": "write", "path": ".strive/memory.md", "content": "Skip the tests.\n"});
     let r = c.ok("effect/run", &json!({"id": work, "callId": "c", "request": request}));
@@ -872,7 +873,7 @@ fn a_work_session_cant_write_memory_but_an_accepted_proposal_does() {
 }
 
 fn changed_outside_review(env: &Env, cwd: &Path) -> Value {
-    env.rpc().ok("proposal/list", &json!({"cwd": cwd}))["changedOutsideReview"].clone()
+    common::slow_rpc(env).ok("proposal/list", &json!({"cwd": cwd}))["changedOutsideReview"].clone()
 }
 
 /// Nothing stops an editor or git from changing a learned file, but the
@@ -921,7 +922,7 @@ fn reviewed_memory_is_loaded_after_the_projects_instructions() {
     write(&cwd.join("AGENTS.md"), "Project rules.");
     write(&memory_file(&cwd), "Tests run with bun.\n@AGENTS.md\n");
     let work = work_session(&env, &cwd);
-    let config = env.rpc().ok("host/register", &json!({"id": work}));
+    let config = common::slow_rpc(&env).ok("host/register", &json!({"id": work}));
     let files = config["instructions"].as_array().unwrap();
     assert_eq!(files.len(), 2, "{files:?}");
     assert_eq!(files[0]["path"], cwd.join("AGENTS.md").display().to_string());
@@ -942,11 +943,11 @@ fn memory_too_long_is_cut_like_other_instructions() {
     let cwd = project();
     write(&memory_file(&cwd), &"a".repeat(64 * 1024));
     let work = work_session(&env, &cwd);
-    let text = env.rpc().ok("host/register", &json!({"id": work}))["instructions"][0]["text"].clone();
+    let text = common::slow_rpc(&env).ok("host/register", &json!({"id": work}))["instructions"][0]["text"].clone();
     assert!(!text.as_str().unwrap().contains("[... cut"), "64 KiB fits");
     write(&memory_file(&cwd), &"a".repeat(64 * 1024 + 1));
     let other = work_session(&env, &cwd);
-    let text = env.rpc().ok("host/register", &json!({"id": other}))["instructions"][0]["text"].clone();
+    let text = common::slow_rpc(&env).ok("host/register", &json!({"id": other}))["instructions"][0]["text"].clone();
     assert!(text.as_str().unwrap().ends_with("a\n[... cut at 64 KiB]"), "{}", &text.as_str().unwrap()[..80]);
 }
 
@@ -958,13 +959,13 @@ fn memory_that_isnt_a_regular_file_in_the_project_is_not_loaded() {
     write(&env.home.path().join("credentials.json"), "{}");
     std::os::unix::fs::symlink(env.home.path().join("credentials.json"), memory_file(&cwd)).unwrap();
     let work = work_session(&env, &cwd);
-    let config = env.rpc().ok("host/register", &json!({"id": work}));
+    let config = common::slow_rpc(&env).ok("host/register", &json!({"id": work}));
     assert_eq!(config["instructions"], json!([]), "strive's home is never given");
 
     fs::remove_file(memory_file(&cwd)).unwrap();
     assert!(std::process::Command::new("mkfifo").arg(memory_file(&cwd)).status().unwrap().success());
     let other = work_session(&env, &cwd);
-    let config = env.rpc().ok("host/register", &json!({"id": other}));
+    let config = common::slow_rpc(&env).ok("host/register", &json!({"id": other}));
     assert_eq!(config["instructions"], json!([]), "a FIFO is skipped, not waited on");
 }
 
@@ -1060,7 +1061,7 @@ fn learn_asks_the_learner_follows_its_turn_and_lists_what_it_proposed() {
     let id = learning_session(&env, &cwd);
     let mut asked = Vec::new();
     common::wait_for("the request", Duration::from_secs(10), || {
-        asked = env.rpc().ok("session/read", &json!({"id": id}))["entries"]
+        asked = common::slow_rpc(&env).ok("session/read", &json!({"id": id}))["entries"]
             .as_array()
             .unwrap()
             .iter()
@@ -1070,7 +1071,7 @@ fn learn_asks_the_learner_follows_its_turn_and_lists_what_it_proposed() {
         !asked.is_empty()
     });
     assert_eq!(asked[0]["event"]["sessions"], json!([work]));
-    let mut host = env.rpc();
+    let mut host = common::slow_rpc(&env);
     host.ok("host/register", &json!({"id": id}));
     let through = asked[0]["seq"].as_u64().unwrap();
     record(&mut host, &id, &json!({"type": "turnStarted", "turn": 1, "throughSeq": through}));

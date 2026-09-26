@@ -8,7 +8,10 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use common::{Env, Rpc};
+// A checkpoint or rewind runs a dozen or more git processes one after
+// another; on a loaded machine that took longer than the 5s default, and
+// the test failed for the load, not the code.
+use common::{Env, Rpc, slow_rpc};
 use serde_json::{Value, json};
 
 struct Ws {
@@ -17,16 +20,6 @@ struct Ws {
     dir: tempfile::TempDir,
     id: String,
     c: Rpc,
-}
-
-/// A connection that waits up to 30s for each reply. A checkpoint or rewind
-/// runs a dozen or more git processes one after another; on a loaded
-/// machine that took longer than the 5s default, and the test failed for
-/// the load, not the code.
-fn slow_rpc(env: &Env) -> Rpc {
-    let mut c = env.rpc();
-    c.wait_up_to(std::time::Duration::from_secs(30));
-    c
 }
 
 impl Ws {

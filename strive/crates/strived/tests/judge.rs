@@ -151,14 +151,17 @@ fn judge_on(model: Model, settings: &Value) -> Judge {
 impl Judge {
     /// A work session with one prompt; its id and the prompt's seq.
     fn session(&self, prompt: &str) -> (String, u64) {
-        let mut c = self.env.rpc();
+        let mut c = common::slow_rpc(&self.env);
         let id = c.ok("session/create", &json!({"cwd": self.cwd}))["id"].as_str().unwrap().to_string();
         let seq = c.ok("session/prompt", &json!({"id": id, "text": prompt}))["seq"].as_u64().unwrap();
         (id, seq)
     }
     fn learner(&self) -> (Rpc, String) {
-        let id = self.env.rpc().ok("learning/open", &json!({"cwd": self.cwd}))["id"].as_str().unwrap().to_string();
-        let mut host = self.env.rpc();
+        let id = common::slow_rpc(&self.env).ok("learning/open", &json!({"cwd": self.cwd}))["id"]
+            .as_str()
+            .unwrap()
+            .to_string();
+        let mut host = common::slow_rpc(&self.env);
         host.ok("host/register", &json!({"id": id}));
         (host, id)
     }
@@ -168,7 +171,7 @@ impl Judge {
         r["result"]["seq"].as_u64().unwrap()
     }
     fn proposal(&self, id: u64) -> Value {
-        let r = self.env.rpc().ok("proposal/list", &json!({"cwd": self.cwd}));
+        let r = common::slow_rpc(&self.env).ok("proposal/list", &json!({"cwd": self.cwd}));
         r["proposals"].as_array().unwrap().iter().find(|p| p["id"] == id).unwrap().clone()
     }
     /// The judge's outcome, once it has one: (verdict, detail).
@@ -187,7 +190,7 @@ impl Judge {
         out.unwrap()
     }
     fn events(&self, id: &str, kind: &str) -> Vec<Value> {
-        let r = self.env.rpc().ok("session/read", &json!({"id": id}));
+        let r = common::slow_rpc(&self.env).ok("session/read", &json!({"id": id}));
         r["entries"]
             .as_array()
             .unwrap()
@@ -197,7 +200,8 @@ impl Judge {
             .collect()
     }
     fn decide(&self, id: u64, decision: &str) -> Value {
-        self.env.rpc().call("proposal/decide", &json!({"cwd": self.cwd, "proposal": id, "decision": decision}))
+        common::slow_rpc(&self.env)
+            .call("proposal/decide", &json!({"cwd": self.cwd, "proposal": id, "decision": decision}))
     }
 }
 
@@ -373,7 +377,7 @@ fn with_no_session_to_hold_out_the_judge_is_skipped() {
     let j = judge(answer(&verdict(&[])));
     let (cited, seq) = j.session("run the tests");
     // A session with no prompt has nothing to judge against.
-    j.env.rpc().ok("session/create", &json!({"cwd": j.cwd}));
+    common::slow_rpc(&j.env).ok("session/create", &json!({"cwd": j.cwd}));
     let (mut host, learning) = j.learner();
     let id = Judge::propose(&mut host, &learning, &memory(&[(&cited, seq)]));
     let p = j.proposal(id);
@@ -390,7 +394,7 @@ fn with_no_budget_left_the_judge_is_skipped() {
     let (cited, seq) = j.session("run the tests");
     j.session("another task");
     let (mut host, learning) = j.learner();
-    j.env.rpc().ok("session/budget", &json!({"id": learning, "usdMicros": 1}));
+    common::slow_rpc(&j.env).ok("session/budget", &json!({"id": learning, "usdMicros": 1}));
     let id = Judge::propose(&mut host, &learning, &memory(&[(&cited, seq)]));
     let (v, detail) = j.judged(id);
     assert_eq!(v, "skipped", "{detail}");
@@ -404,20 +408,20 @@ fn with_no_budget_left_the_judge_is_skipped() {
 fn with_no_key_the_judge_is_skipped() {
     let env = Env::new();
     let cwd = tempfile::Builder::new().prefix("strv-proj").tempdir_in("/tmp").unwrap().keep().canonicalize().unwrap();
-    let mut c = env.rpc();
+    let mut c = common::slow_rpc(&env);
     let work = c.ok("session/create", &json!({"cwd": cwd}))["id"].as_str().unwrap().to_string();
     let seq = c.ok("session/prompt", &json!({"id": work, "text": "run the tests"}))["seq"].as_u64().unwrap();
     let other = c.ok("session/create", &json!({"cwd": cwd}))["id"].as_str().unwrap().to_string();
     c.ok("session/prompt", &json!({"id": other, "text": "another"}));
     let learning = c.ok("learning/open", &json!({"cwd": cwd}))["id"].as_str().unwrap().to_string();
-    let mut host = env.rpc();
+    let mut host = common::slow_rpc(&env);
     host.ok("host/register", &json!({"id": learning}));
     let r = host.call(
         "host/record",
         &json!({"id": learning, "event": {"type": "proposalMade", "proposal": memory(&[(&work, seq)])}}),
     );
     let id = r["result"]["seq"].as_u64().unwrap();
-    let p = env.rpc().ok("proposal/list", &json!({"cwd": cwd}))["proposals"][0].clone();
+    let p = common::slow_rpc(&env).ok("proposal/list", &json!({"cwd": cwd}))["proposals"][0].clone();
     assert_eq!((p["id"].as_u64(), p["status"].as_str()), (Some(id), Some("ready")));
     let g = p["gates"].as_array().unwrap().iter().find(|g| g["gate"] == "judge").unwrap().clone();
     assert_eq!(g["verdict"], "skipped");
@@ -491,7 +495,8 @@ fn a_judge_cut_short_by_a_crash_runs_again_on_the_next_look() {
     let j = judge_after(answer(&verdict(&[])), 300);
     let (cited, seq) = j.session("run the tests");
     j.session("another task");
-    let learning = j.env.rpc().ok("learning/open", &json!({"cwd": j.cwd}))["id"].as_str().unwrap().to_string();
+    let learning =
+        common::slow_rpc(&j.env).ok("learning/open", &json!({"cwd": j.cwd}))["id"].as_str().unwrap().to_string();
     j.env.stop();
     // What a crash during the judge's call leaves: the proposal and the
     // gates decided at once, and no judge verdict.

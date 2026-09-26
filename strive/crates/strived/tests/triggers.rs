@@ -34,9 +34,9 @@ struct Work {
 
 impl Work {
     fn new(env: &Env, cwd: &Path) -> Self {
-        let mut person = env.rpc();
+        let mut person = common::slow_rpc(env);
         let id = person.ok("session/create", &json!({"cwd": cwd}))["id"].as_str().unwrap().to_string();
-        let mut host = env.rpc();
+        let mut host = common::slow_rpc(env);
         host.ok("host/register", &json!({"id": id}));
         Self { id, person, host, turn: 0 }
     }
@@ -59,12 +59,12 @@ fn done() -> Value {
 
 /// The project's learning session, if there is one; never creates it.
 fn learning(env: &Env, cwd: &Path) -> Option<String> {
-    let r = env.rpc().ok("session/list", &json!({"cwd": cwd, "kind": "learning"}));
+    let r = common::slow_rpc(env).ok("session/list", &json!({"cwd": cwd, "kind": "learning"}));
     r["sessions"].as_array().unwrap().first().map(|s| s["id"].as_str().unwrap().to_string())
 }
 
 fn events(env: &Env, id: &str, kind: &str) -> Vec<Value> {
-    let r = env.rpc().ok("session/read", &json!({"id": id}));
+    let r = common::slow_rpc(env).ok("session/read", &json!({"id": id}));
     r["entries"].as_array().unwrap().iter().filter(|e| e["event"]["type"] == kind).map(|e| e["event"].clone()).collect()
 }
 
@@ -100,7 +100,7 @@ struct Learner {
 impl Learner {
     fn new(env: &Env, cwd: &Path) -> Self {
         let id = learning(env, cwd).unwrap();
-        let mut host = env.rpc();
+        let mut host = common::slow_rpc(env);
         host.ok("host/register", &json!({"id": id}));
         Self { id, host, turn: 0 }
     }
@@ -278,7 +278,7 @@ fn a_run_still_going_holds_the_next_automatic_one_back() {
 /// The learning session's requests and skips, in order.
 fn runs(env: &Env, cwd: &Path) -> Vec<Value> {
     let id = learning(env, cwd).unwrap();
-    let r = env.rpc().ok("session/read", &json!({"id": id}));
+    let r = common::slow_rpc(env).ok("session/read", &json!({"id": id}));
     r["entries"]
         .as_array()
         .unwrap()
@@ -292,9 +292,9 @@ fn runs(env: &Env, cwd: &Path) -> Vec<Value> {
 fn a_turn_the_daemon_ends_for_a_host_that_left_is_scanned_once_idle() {
     let env = daemon(&idle(), true);
     let cwd = project();
-    let mut person = env.rpc();
+    let mut person = common::slow_rpc(&env);
     let id = person.ok("session/create", &json!({"cwd": cwd}))["id"].as_str().unwrap().to_string();
-    let mut host = env.rpc();
+    let mut host = common::slow_rpc(&env);
     host.ok("host/register", &json!({"id": id}));
     person.ok("session/prompt", &json!({"id": id, "text": "go"}));
     host.ok("host/record", &json!({"id": id, "event": {"type": "turnStarted", "turn": 1}}));
@@ -343,7 +343,7 @@ fn a_person_can_still_learn_past_the_cap() {
     a.exchange("go", &json!({"kind": "interrupted"}));
     let skipped = wait_events(&env, &cwd, "learnSkipped", 1);
     assert!(skipped[0]["reason"].as_str().unwrap().starts_with("0 automatic runs"), "{skipped:?}");
-    env.rpc().ok("learning/run", &json!({"cwd": cwd}));
+    common::slow_rpc(&env).ok("learning/run", &json!({"cwd": cwd}));
     let asked = wait_events(&env, &cwd, "learnRequested", 1);
     assert_eq!(asked[0], json!({"type": "learnRequested", "sessions": []}), "a person's request has no trigger");
 }
@@ -357,7 +357,7 @@ fn off_scans_nothing_and_a_person_can_still_ask() {
     w.exchange("no, the other file", &done());
     wait_log(&env, &format!("session {} not scanned for learning: \"learning\" is off", w.id), 0);
     assert_eq!(learning(&env, &cwd), None);
-    env.rpc().ok("learning/run", &json!({"cwd": cwd}));
+    common::slow_rpc(&env).ok("learning/run", &json!({"cwd": cwd}));
     assert_eq!(wait_events(&env, &cwd, "learnRequested", 1).len(), 1);
 }
 
@@ -377,6 +377,21 @@ fn a_projects_own_settings_can_turn_learning_off_and_a_bad_one_does_too() {
         assert_eq!(learning(&env, &cwd), None);
     }
     assert!(log(&env).contains(".strive/settings.json can't be read"), "{}", log(&env));
+}
+
+#[test]
+fn a_projects_own_settings_cant_raise_the_mode() {
+    // The user's mode is suggest (the default); the project asks for gated.
+    let env = daemon(&idle(), false);
+    let cwd = project();
+    fs::create_dir_all(cwd.join(".strive")).unwrap();
+    fs::write(cwd.join(".strive/settings.json"), json!({"learning": {"mode": "gated"}}).to_string()).unwrap();
+    let w = Work::new(&env, &cwd);
+    common::slow_rpc(&env).ok("learning/open", &json!({"cwd": cwd}));
+    let mut learner = Learner::new(&env, &cwd);
+    learner.turn(&[memory(&w.id)]);
+    let made = events(&env, &learner.id, "proposalMade");
+    assert_eq!(made[0]["mode"], "suggest", "the mode in effect is recorded with the proposal: {made:?}");
 }
 
 #[test]
@@ -417,7 +432,7 @@ fn review_shows_what_triggered_an_automatic_runs_proposal() {
     let made = learner.turn(&[memory(&w.id)]);
 
     // A person's run, for contrast.
-    env.rpc().ok("learning/run", &json!({"cwd": cwd}));
+    common::slow_rpc(&env).ok("learning/run", &json!({"cwd": cwd}));
     let manual = learner.turn(&[memory(&w.id)]);
 
     let listed = review(&env, &cwd, &["review"]);
@@ -448,25 +463,20 @@ fn auto_is_refused_on_load_naming_gated() {
 }
 
 #[test]
-fn gated_leaves_a_proposal_with_a_skipped_check_to_a_person_and_a_client_named_gate_is_still_a_person() {
-    // No key: the judge is skipped, and so is replay.
+fn under_gated_a_client_named_gate_is_still_a_person() {
+    // No key: the judge and replay are skipped, so the proposal is ready for a person.
+    // (That the gate itself leaves a skipped check to a person is the host e2e's.)
     let env = daemon(&json!({"mode": "gated"}), false);
     let cwd = project();
     let mut w = Work::new(&env, &cwd);
     w.exchange("go", &done());
-    env.rpc().ok("learning/open", &json!({"cwd": cwd}));
+    common::slow_rpc(&env).ok("learning/open", &json!({"cwd": cwd}));
     let id = Learner::new(&env, &cwd).turn(&[memory(&w.id)])[0];
-    let listed = env.rpc().ok("proposal/list", &json!({"cwd": cwd}));
-    let p = listed["proposals"].as_array().unwrap().iter().find(|p| p["id"] == id).unwrap().clone();
-    assert_eq!(p["status"], "ready", "{p}");
-    let verdicts: Vec<&Value> = p["gates"].as_array().unwrap().iter().map(|g| &g["verdict"]).collect();
-    assert_eq!(verdicts, vec!["pass", "skipped", "skipped"], "{p}");
     let learning_id = learning(&env, &cwd).unwrap();
-    assert_eq!(events(&env, &learning_id, "proposalDecided"), Vec::<Value>::new(), "not accepted without a person");
-    assert!(!cwd.join(".strive/memory.md").exists());
 
     // A person whose client calls itself "gate" decides as a person.
     let mut gate = env.raw();
+    gate.wait_up_to(Duration::from_secs(30));
     let init = gate.call_id(
         0,
         "initialize",
@@ -476,7 +486,7 @@ fn gated_leaves_a_proposal_with_a_skipped_check_to_a_person_and_a_client_named_g
     gate.ok("proposal/decide", &json!({"cwd": cwd, "proposal": id, "decision": "accept"}));
     let decided = events(&env, &learning_id, "proposalDecided");
     assert_eq!(decided, vec![json!({"type": "proposalDecided", "proposal": id, "decision": "accept", "by": "gate"})]);
-    let listed = env.rpc().ok("proposal/list", &json!({"cwd": cwd}));
+    let listed = common::slow_rpc(&env).ok("proposal/list", &json!({"cwd": cwd}));
     let p = listed["proposals"].as_array().unwrap().iter().find(|p| p["id"] == id).unwrap().clone();
     assert_eq!((p["status"].as_str(), p.get("automatic")), (Some("applied"), None), "{p}");
     let shown = review(&env, &cwd, &["review", &id.to_string()]);
@@ -499,7 +509,8 @@ fn a_proposal_a_crash_left_checking_doesnt_hold_the_next_run_back() {
     let env = daemon_with(&json!({"learning": idle(), "judgeModel": "gpt-4.1-mini"}));
     let cwd = project();
     let first = Work::new(&env, &cwd).id;
-    let learning_id = env.rpc().ok("learning/open", &json!({"cwd": cwd}))["id"].as_str().unwrap().to_string();
+    let learning_id =
+        common::slow_rpc(&env).ok("learning/open", &json!({"cwd": cwd}))["id"].as_str().unwrap().to_string();
     env.stop();
     // What a crash in the judge's call leaves: a proposal with no judge verdict.
     let next = common::next_seq_offline(&env, &learning_id);
@@ -543,7 +554,8 @@ fn a_learner_run_a_crash_cut_off_is_finished_by_starting_its_host_again() {
     let started = noting_host(&mut env);
     let cwd = project();
     Work::new(&env, &cwd);
-    let learning_id = env.rpc().ok("learning/open", &json!({"cwd": cwd}))["id"].as_str().unwrap().to_string();
+    let learning_id =
+        common::slow_rpc(&env).ok("learning/open", &json!({"cwd": cwd}))["id"].as_str().unwrap().to_string();
     env.stop();
     // What a crash in the middle of a learner's turn leaves.
     let asked = common::next_seq_offline(&env, &learning_id);
@@ -564,7 +576,7 @@ fn a_learner_run_a_crash_cut_off_is_finished_by_starting_its_host_again() {
     wait_started(&started, &learning_id);
 
     // The host resumes: it ends the cut-off turn, which finishes the request.
-    let mut host = env.rpc();
+    let mut host = common::slow_rpc(&env);
     host.ok("host/register", &json!({"id": learning_id}));
     let failed = json!({"kind": "failed", "error": "the agent host stopped during this turn"});
     host.ok("host/record", &json!({"id": learning_id, "event": {"type": "turnEnded", "turn": 1, "reason": failed}}));

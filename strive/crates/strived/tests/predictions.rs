@@ -20,12 +20,12 @@ fn project() -> PathBuf {
 }
 
 fn work_session(env: &Env, cwd: &Path) -> String {
-    env.rpc().ok("session/create", &json!({"cwd": cwd}))["id"].as_str().unwrap().to_string()
+    common::slow_rpc(env).ok("session/create", &json!({"cwd": cwd}))["id"].as_str().unwrap().to_string()
 }
 
 fn learner(env: &Env, cwd: &Path) -> (Rpc, String) {
-    let id = env.rpc().ok("learning/open", &json!({"cwd": cwd}))["id"].as_str().unwrap().to_string();
-    let mut host = env.rpc();
+    let id = common::slow_rpc(env).ok("learning/open", &json!({"cwd": cwd}))["id"].as_str().unwrap().to_string();
+    let mut host = common::slow_rpc(env);
     host.ok("host/register", &json!({"id": id}));
     (host, id)
 }
@@ -60,12 +60,12 @@ fn propose(host: &mut Rpc, id: &str, proposal: &Value) -> u64 {
 }
 
 fn proposal(env: &Env, cwd: &Path, id: u64) -> Value {
-    let r = env.rpc().ok("proposal/list", &json!({"cwd": cwd}));
+    let r = common::slow_rpc(env).ok("proposal/list", &json!({"cwd": cwd}));
     r["proposals"].as_array().unwrap().iter().find(|p| p["id"] == id).unwrap().clone()
 }
 
 fn events(env: &Env, id: &str, kind: &str) -> Vec<Value> {
-    let r = env.rpc().ok("session/read", &json!({"id": id}));
+    let r = common::slow_rpc(env).ok("session/read", &json!({"id": id}));
     r["entries"].as_array().unwrap().iter().filter(|e| e["event"]["type"] == kind).map(|e| e["event"].clone()).collect()
 }
 
@@ -74,7 +74,7 @@ fn applied(env: &Env, cwd: &Path, watch: Option<Value>) -> (u64, String, Rpc) {
     let cited = work_session(env, cwd);
     let (mut host, id) = learner(env, cwd);
     let p = propose(&mut host, &id, &memory(&cited, watch));
-    let r = env.rpc().call("proposal/decide", &json!({"cwd": cwd, "proposal": p, "decision": "accept"}));
+    let r = common::slow_rpc(env).call("proposal/decide", &json!({"cwd": cwd, "proposal": p, "decision": "accept"}));
     assert!(r.get("error").is_none(), "{r}");
     (p, id, host)
 }
@@ -83,10 +83,10 @@ fn applied(env: &Env, cwd: &Path, watch: Option<Value>) -> (u64, String, Rpc) {
 /// end as a host does, and leaves; its id.
 fn work_turn(env: &Env, cwd: &Path, commands: &[&str]) -> String {
     let id = work_session(env, cwd);
-    let mut person = env.rpc();
+    let mut person = common::slow_rpc(env);
     person.ok("session/approvals", &json!({"id": id, "mode": "fullAuto"}));
     person.ok("session/prompt", &json!({"id": id, "text": "run the tests"}));
-    let mut host = env.rpc();
+    let mut host = common::slow_rpc(env);
     host.ok("host/register", &json!({"id": id}));
     turn(&mut host, &id, 1, commands);
     id
@@ -135,7 +135,7 @@ fn a_watch_is_confirmed_contradicted_or_not_applicable_as_each_work_turn_ends() 
     let got = checks(&env, &learning, p, &bad, 1);
     assert_eq!(got[0]["outcome"], "contradicted", "{got:?}");
     assert!(got[0]["detail"].as_str().unwrap().contains("(exit 1)"), "{got:?}");
-    let read = env.rpc().ok("session/read", &json!({"id": bad}));
+    let read = common::slow_rpc(&env).ok("session/read", &json!({"id": bad}));
     let last = read["entries"].as_array().unwrap().last().unwrap()["seq"].clone();
     assert_eq!(got[0]["throughSeq"], last, "read up to the turn's end");
     let got = checks(&env, &learning, p, &other, 1);
@@ -155,16 +155,16 @@ fn checking_again_journals_nothing_until_a_sessions_answer_changes() {
     let cwd = project();
     let (p, learning, _host) = applied(&env, &cwd, Some(no_display()));
     let work = work_session(&env, &cwd);
-    let mut person = env.rpc();
+    let mut person = common::slow_rpc(&env);
     person.ok("session/approvals", &json!({"id": work, "mode": "fullAuto"}));
     person.ok("session/prompt", &json!({"id": work, "text": "run the tests"}));
-    let mut host = env.rpc();
+    let mut host = common::slow_rpc(&env);
     host.ok("host/register", &json!({"id": work}));
     turn(&mut host, &work, 1, &["echo ok; : bun test"]);
     assert_eq!(checks(&env, &learning, p, &work, 1).len(), 1);
 
     // learning/run checks every session again; nothing about this one is new.
-    env.rpc().ok("learning/run", &json!({"cwd": cwd}));
+    common::slow_rpc(&env).ok("learning/run", &json!({"cwd": cwd}));
     common::wait_for("the learning request", Duration::from_secs(10), || {
         !events(&env, &learning, "learnRequested").is_empty()
     });
@@ -220,7 +220,7 @@ fn three_contradictions_mark_it_not_holding_and_review_suggests_the_rollback_a_p
     review(&env, &cwd, &["review", &p.to_string(), "rollback"]);
     assert!(!file.exists(), "the person's rollback removes the file it created");
     let after = work_turn(&env, &cwd, &["echo 'no display'; : bun test"]);
-    env.rpc().ok("learning/run", &json!({"cwd": cwd}));
+    common::slow_rpc(&env).ok("learning/run", &json!({"cwd": cwd}));
     common::wait_for("the learning request", Duration::from_secs(10), || {
         !events(&env, &learning, "learnRequested").is_empty()
     });
@@ -246,18 +246,18 @@ fn only_sessions_after_the_apply_are_checked_and_a_proposal_without_a_watch_says
     // Registering again shows the learner the file as the plain one left it.
     host.ok("host/register", &json!({"id": learning}));
     let watched = propose(&mut host, &learning, &memory(&before, Some(no_display())));
-    let mut person = env.rpc();
+    let mut person = common::slow_rpc(&env);
     person.ok("session/approvals", &json!({"id": before, "mode": "fullAuto"}));
     person.ok("session/prompt", &json!({"id": before, "text": "run the tests"}));
     let r = person.call("proposal/decide", &json!({"cwd": cwd, "proposal": watched, "decision": "accept"}));
     assert!(r.get("error").is_none(), "{r}");
-    let mut work_host = env.rpc();
+    let mut work_host = common::slow_rpc(&env);
     work_host.ok("host/register", &json!({"id": before}));
     turn(&mut work_host, &before, 1, &["echo 'no display'; : bun test"]);
     let after = work_turn(&env, &cwd, &["echo 'no display'; : bun test"]);
     checks(&env, &learning, watched, &after, 1);
     // learning/run checks every session; still only the one after the apply is read.
-    env.rpc().ok("learning/run", &json!({"cwd": cwd}));
+    common::slow_rpc(&env).ok("learning/run", &json!({"cwd": cwd}));
     common::wait_for("the learning request", Duration::from_secs(10), || {
         !events(&env, &learning, "learnRequested").is_empty()
     });
@@ -271,11 +271,11 @@ fn a_turn_that_ended_without_its_host_is_checked_on_the_next_learning_run() {
     let cwd = project();
     let (p, learning, _host) = applied(&env, &cwd, Some(no_display()));
     let work = work_session(&env, &cwd);
-    let mut person = env.rpc();
+    let mut person = common::slow_rpc(&env);
     person.ok("session/approvals", &json!({"id": work, "mode": "fullAuto"}));
     person.ok("session/prompt", &json!({"id": work, "text": "run the tests"}));
     {
-        let mut host = env.rpc();
+        let mut host = common::slow_rpc(&env);
         host.ok("host/register", &json!({"id": work}));
         host.ok("host/record", &json!({"id": work, "event": {"type": "turnStarted", "turn": 1}}));
         let params =
@@ -287,7 +287,7 @@ fn a_turn_that_ended_without_its_host_is_checked_on_the_next_learning_run() {
         !events(&env, &work, "turnEnded").is_empty()
     });
     assert!(events(&env, &learning, "predictionChecked").is_empty());
-    env.rpc().ok("learning/run", &json!({"cwd": cwd}));
+    common::slow_rpc(&env).ok("learning/run", &json!({"cwd": cwd}));
     let got = checks(&env, &learning, p, &work, 1);
     assert_eq!(got[0]["outcome"], "contradicted", "{got:?}");
 }
@@ -336,7 +336,7 @@ fn a_memory_line_naming_a_path_that_is_gone_may_be_stale() {
     fs::write(cwd.join("src.ts"), "").unwrap();
     let memory = "- Tests: see `docs/testing.md`.\n- The parser is `src/parse.ts:40`.\n- Run `bun test src`.\n";
     fs::write(cwd.join(".strive/memory.md"), memory).unwrap();
-    let listed = env.rpc().ok("proposal/list", &json!({"cwd": cwd}));
+    let listed = common::slow_rpc(&env).ok("proposal/list", &json!({"cwd": cwd}));
     assert_eq!(
         listed["mayBeStale"],
         json!([{"file": ".strive/memory.md", "line": 2, "missing": "src/parse.ts"}]),
@@ -349,5 +349,5 @@ fn a_memory_line_naming_a_path_that_is_gone_may_be_stale() {
     );
     fs::create_dir_all(cwd.join("src")).unwrap();
     fs::write(cwd.join("src/parse.ts"), "").unwrap();
-    assert_eq!(env.rpc().ok("proposal/list", &json!({"cwd": cwd}))["mayBeStale"], json!([]));
+    assert_eq!(common::slow_rpc(&env).ok("proposal/list", &json!({"cwd": cwd}))["mayBeStale"], json!([]));
 }
