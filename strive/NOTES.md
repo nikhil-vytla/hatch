@@ -1618,3 +1618,68 @@ newline and tab, and review and log print control characters written out
 still listed. Both tests failed first.
 Not yet: `strive run` and the TUI print model text as it comes; the same
 class, a broader change.
+
+## 2026-09-26: Stage 2 review, trust boundaries of the learning loop
+
+An adversarial review of the learning loop found seven things. Each fix has
+a test that failed first (the e2e ones in `packages/host/src/replay.e2e.test.ts`
+drive the real daemon, hosts and sandbox with a scripted model).
+
+1. **Replay setup wrote through a checkpoint's symlinks** (high). The daemon
+   puts the learned files into each scratch copy unsandboxed, after `git
+   checkout-index` has recreated the checkpoint's symlinks, so a task whose
+   `.strive` linked to a directory elsewhere had the daemon remove and write
+   files there. The e2e proved it: the outside `memory.md` held the proposal.
+   A task whose copy has a symlink on the way to any learned file is now set
+   aside with the reason (the rest still run; all set aside is a skip), and
+   the writes go through `pinned` with `O_NOFOLLOW`.
+2. **Replay was easy to satisfy** (high, both reviewers).
+   - A tie (3/3 against 3/3) passed. It is now skipped, "inconclusive: the
+     change made no difference"; pass needs more passes with the change.
+     `gated` can't accept a change that did nothing; a person still can.
+   - A check naming a path outside the project after relocation (`test -f
+     /tmp/.ok`, `~/…`, `$HOME/…`) is no longer mined
+     (`replay::outside_path`); system tools and `/dev/null` are allowed.
+   - Citing steered the checks: cited sessions are excluded from the judge's
+     held-out sessions and from mining, and a citation could have no seqs.
+     The static gate now fails a citation with no entries and more than
+     `CITED_SESSIONS` (5) sessions.
+3. **The prompts misstated `gated`.** The judge was told a person reviews
+   its verdict; it now gets the mode and, under `gated`, is told its verdict
+   may be final (a daemon test compares the system text the provider
+   receives in both modes). The learner isn't told the mode (`AgentConfig`
+   has no such field), so its prompt and `propose_change` now describe both
+   paths. That text change has no test: it's a constant.
+4. **A rollback didn't stick under `gated`.** The same content could be
+   proposed again and accepted again. The gate now refuses content whose
+   digest equals a rolled-back proposal's for the same file, and the judge's
+   material carries those contents as `rolled_back`.
+5. **Mode switches.** `gate_accept` read the mode when replay's verdict
+   landed. The daemon now records the mode in effect in `proposalMade.mode`
+   (a host that sets it is refused) and needs `gated` then and at accept.
+   The e2e lowers the mode with a project `.strive/settings.json` and deletes
+   it from inside the scripted replay, which is deterministic where a
+   restart wouldn't be. Left open, in ADR-0020: a command or commit can
+   delete that file before a proposal is made.
+6. **Display.** A person's client named `gate` read as "accepted by gate".
+   Log, the view's descriptions and the learner's journal view now say "by
+   gate (a client)"; only `automatic` gives "accepted automatically".
+7. **Scope, docs only:** ARCHITECTURE says `AGENTS.md`/`CLAUDE.md`/
+   `.claude/skills` are outside review and MCP servers (unsandboxed,
+   user-trusted) can write memory. ADR-0017 records that `gated` rests on
+   one judge call; no prompt-injection hardening beyond the above.
+
+Two lint slips (blank lines oxlint wants in the e2e file, and a quote style
+biome wants in `learner.ts`) were fixed in the fix-4 commit, so commits 1
+and 3 alone don't pass Oxlint/Biome.
+
+**A flake seen, not reproduced.** The first `check.sh` failed one desktop
+e2e, "a decision made in one window survives another window's save", with
+"Target page, context or browser has been closed" while waiting for the
+second window's first line: the same shape as the flake noted in the
+triggers entry above. Nothing here touches that path. The desktop suite
+then passed 3/3 alone, the test 3/3 beside `bun test packages/host`, and
+the second `check.sh` passed whole.
+
+Deferred: a check that leaves the copy by `..`; telling the learner the
+mode through `AgentConfig`; hardening the judge (a second judge, a quorum).
