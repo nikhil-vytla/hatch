@@ -53,12 +53,28 @@ the calm rules keep waiting rather than commit.
 bun packages/arena/scripts/one-box-tiny-data.ts
 uv run --no-project --with scikit-learn==1.9.1 --with numpy==2.5.3 \
   python packages/arena/scripts/train-one-box-tiny.py
-bun packages/arena/scripts/record-one-box-tiny.ts      # recordings/one-box.tiny.jsonl.gz
 uv run --no-project --with scikit-learn==1.9.1 --with numpy==2.5.3 \
   python packages/arena/scripts/train-one-box-tiny.py --cv
 bun packages/arena/scripts/one-box-tiny-cv.ts          # out-of-fold dev estimate
+bun packages/arena/scripts/record-one-box-tiny.ts      # recordings/one-box.tiny.jsonl.gz
 ```
 
 Training is deterministic: rerunning reproduces `vectorizer.json` and `heads.json` byte for byte.
-The recording holds every prefix of all 200 phrases (predictions only), numbers rounded to 4
-decimals, latency recorded as 1 ms (the measured median is 0.008 ms for all 14 heads).
+## The recording is out of fold on development phrases
+
+`recordings/one-box.tiny.jsonl.gz` holds every prefix of all 200 phrases, numbers rounded to 4
+decimals, latency recorded as 1 ms (the measured median is about 0.01 ms for all 14 heads).
+So that no score is in-sample:
+
+- **Development prefixes** (4,239 keys) are answered by a cross-validation fold model: the
+  model for the lowest fold of any development phrase containing the key, which trained
+  without every key of that fold. Rows say `"model": "one-box-tiny/fold-<n>"`.
+- **Held-out prefixes** (1,427 keys that start no development phrase) are answered by the
+  committed full model, which never saw them. Rows say `"model": "one-box-tiny/full"`.
+
+Replaying this recording on development phrases gives the out-of-fold numbers above (26.7% box
+right at the end). Visible changes differ slightly (1.93 vs 1.90 per phrase) because a key
+shared by phrases in different folds is answered by one fold's model for all of them. The
+committed full model is what a held-out or live run uses.
+
+To regenerate, run the `--cv` training before `record-one-box-tiny.ts`.
