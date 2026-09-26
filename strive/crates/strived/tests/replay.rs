@@ -259,3 +259,22 @@ fn gated_records_nothing_when_the_file_changed_since_the_learner_read_it() {
     assert_eq!(r.events(&r.learning, "proposalDecided"), Vec::<Value>::new());
     assert_eq!(fs::read_to_string(r.cwd.join(".strive/memory.md")).unwrap(), "- mine\n");
 }
+
+#[test]
+fn a_gate_that_cant_accept_says_so_in_the_log() {
+    let mut r = replay(&json!({"learning": {"mode": "gated", "idleSeconds": 3600}}));
+    let mut without = r.play();
+    Replay::end(&mut without);
+    let mut with = r.play();
+    // The memory becomes a symlink: the gate's write is refused.
+    let elsewhere = tempfile::Builder::new().prefix("strv-else").tempdir_in("/tmp").unwrap().keep();
+    fs::create_dir_all(r.cwd.join(".strive")).unwrap();
+    std::os::unix::fs::symlink(elsewhere.join("memory.md"), r.cwd.join(".strive/memory.md")).unwrap();
+    Replay::end(&mut with);
+
+    assert_eq!(r.wait_gate("replay").0, "pass");
+    let said = format!("proposal #{} passed every check, but the gate could not accept it", r.proposal);
+    common::wait_for("the gate's failure in the log", Duration::from_secs(20), || r.log().contains(&said));
+    assert!(!r.log().contains("could not journal the replay"), "the replay was journaled: {}", r.log());
+    assert_eq!(r.proposal()["status"], "ready");
+}

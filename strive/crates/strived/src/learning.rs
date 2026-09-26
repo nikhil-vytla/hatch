@@ -361,8 +361,14 @@ pub async fn replayed(
     // The replay's verdict is the cascade's last, so this is the one moment
     // a proposal can become ready with every check passed. A crash before
     // the accept leaves it ready for a person.
-    if journaled && verdict == Verdict::Pass {
-        gate_accept(state, sid, id).await?;
+    if journaled
+        && verdict == Verdict::Pass
+        && let Err(e) = gate_accept(state, sid, id).await
+    {
+        crate::log!(
+            "proposal #{id} passed every check, but the gate could not accept it ({}); left for a person",
+            e.message
+        );
     }
     crate::triggers::learning_quiet(state, sid.clone());
     Ok(())
