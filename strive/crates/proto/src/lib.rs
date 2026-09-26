@@ -1199,8 +1199,9 @@ pub enum Event {
         reason: String,
     },
     /// The learner proposed a change to what the agent is given (its memory
-    /// or a skill). Nothing changes until a person accepts it. Its id is
-    /// this entry's seq.
+    /// or a skill). Nothing changes until it is accepted: by a person, or by
+    /// the `gated` learning mode once every check passes. Its id is this
+    /// entry's seq.
     ProposalMade {
         /// The learner's tool call that made it, whose result it is.
         #[serde(default, skip_serializing_if = "Option::is_none")]

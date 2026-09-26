@@ -307,6 +307,8 @@ it is admitted, held, journaled and charged like any call of that session.
   first), and up to three held-out sessions: the project's newest work
   sessions the proposal doesn't cite, begun before it, with a prompt and a
   journal that verifies. Nothing of the learning session's own goes in.
+  The system prompt says a person reviews the verdict, or, under `gated`,
+  that it may be final.
 - **The rubric** (`strive_learning::judge::RUBRIC`): supported, generalizes,
   novel, safe, checkable. The model must answer with one forced
   `record_verdict` call. It passes only if every criterion and the verdict

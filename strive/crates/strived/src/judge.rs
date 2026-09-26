@@ -73,17 +73,22 @@ fn model(state: &State) -> &str {
     state.settings.judge_model.as_deref().unwrap_or(&state.settings.model)
 }
 
+/// A proposal as the judge gate takes it.
+pub struct Made<'a> {
+    pub proposal: &'a Proposal,
+    /// The file as the learner was shown it.
+    pub before: Option<Digest>,
+    /// When it was made, so a later session isn't held out against it.
+    pub at_ms: u64,
+    /// The project's learning mode is `gated`, so the judge is told its
+    /// verdict may be final.
+    pub gated: bool,
+}
+
 /// Decides whether the proposal can be judged, and if so builds the call.
-/// `learning` is the learning session's journal; `made_at_ms` is when the
-/// proposal was made, so a later session isn't held out against it.
-pub fn plan(
-    state: &State,
-    cwd: &str,
-    proposal: &Proposal,
-    before: Option<Digest>,
-    made_at_ms: u64,
-    learning: &[Entry],
-) -> Plan {
+/// `learning` is the learning session's journal.
+pub fn plan(state: &State, cwd: &str, made: &Made, learning: &[Entry]) -> Plan {
+    let &Made { proposal, before, at_ms: made_at_ms, gated } = made;
     let model = model(state);
     if crate::methods::provider_of(model) != "anthropic" {
         return skipped(format!(
@@ -140,7 +145,7 @@ pub fn plan(
         .filter(|(p, _)| *p != path)
         .filter_map(|(path, d)| Some(FileText { path, text: strive_learning::render::cut(&blob(&d)?, FILE_CHARS) }))
         .collect();
-    let material = Material { proposal, current: current.as_deref(), learned, cited, held_out };
+    let material = Material { proposal, current: current.as_deref(), learned, cited, held_out, gated };
     let body = strive_learning::judge::request(model, &material).to_string().into_bytes();
     Plan::Call(Call { model: model.to_string(), body, held_out: held.into_iter().map(|(id, _)| id).collect() })
 }

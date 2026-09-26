@@ -101,10 +101,15 @@ fn judge(reply: Value) -> Judge {
 }
 
 fn judge_after(reply: Value, delay_ms: u64) -> Judge {
+    judge_with(reply, delay_ms, &json!({"judgeModel": "claude-haiku-4-5"}))
+}
+
+/// A daemon whose settings are `settings`.
+fn judge_with(reply: Value, delay_ms: u64, settings: &Value) -> Judge {
     let model = Model::start(reply, delay_ms);
     let url = model.url();
     let env = Env::with_vars(&[("STRIVE_UPSTREAM_ANTHROPIC", &url), ("ANTHROPIC_API_KEY", "sk-test-judge")]);
-    fs::write(env.home.path().join("settings.json"), json!({"judgeModel": "claude-haiku-4-5"}).to_string()).unwrap();
+    fs::write(env.home.path().join("settings.json"), settings.to_string()).unwrap();
     let cwd = tempfile::Builder::new().prefix("strv-proj").tempdir_in("/tmp").unwrap().keep().canonicalize().unwrap();
     Judge { env, model, cwd }
 }
@@ -358,6 +363,24 @@ fn the_judge_sees_the_proposal_but_not_the_learners_reasoning() {
     assert!(sent.contains("RATIONALE-TEXT"), "the proposal's own text is judged");
     assert!(!sent.contains("LEARNER-REASONING"), "the learner's replies aren't: {sent}");
     assert!(!sent.contains(&learning), "nor anything of the learning session's");
+}
+
+#[test]
+fn the_judge_is_told_whether_a_person_reviews_its_verdict() {
+    let system = |settings: Value| {
+        let j = judge_with(answer(&verdict(&[])), 0, &settings);
+        let (cited, seq) = j.session("run the tests");
+        j.session("another task");
+        let (mut host, learning) = j.learner();
+        let id = Judge::propose(&mut host, &learning, &memory(&[(&cited, seq)]));
+        j.judged(id);
+        j.model.seen()[0]["system"].as_str().unwrap().to_string()
+    };
+    let suggest = system(json!({"judgeModel": "claude-haiku-4-5"}));
+    assert!(suggest.contains("A person reviews your verdict before anything is written"), "{suggest}");
+    let gated = system(json!({"judgeModel": "claude-haiku-4-5", "learning": {"mode": "gated"}}));
+    assert!(!gated.contains("A person reviews your verdict"), "{gated}");
+    assert!(gated.contains("your verdict may be final"), "{gated}");
 }
 
 #[test]

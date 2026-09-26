@@ -2,7 +2,7 @@
 // reads the project's work sessions and proposes changes to memory and
 // skills. It has no effect tools: it can't change a file or run a command,
 // and its only output is a proposal, which the daemon checks and a person
-// decides on.
+// decides on (or, under `gated`, the daemon accepts once every check passed).
 import { join } from "node:path";
 import { type Static, Type } from "@earendil-works/pi-ai";
 import type { AgentTool } from "@earendil-works/pi-agent-core";
@@ -27,7 +27,7 @@ const READS = ["list_sessions", "read_session", "read_artifact"];
 
 const RULES = `You are strive's learner for the project in {cwd}.
 
-strive is a coding agent. Its work sessions in this project are journaled: every prompt, reply, tool call, command and its output, approval, interrupt, rewind and failure. You read those journals and propose small, specific changes to what the coding agent is told when a session starts, so that the next sessions go better. You can't change files or run commands. Your only output is a proposal: the daemon checks it, and a person accepts or rejects it.
+strive is a coding agent. Its work sessions in this project are journaled: every prompt, reply, tool call, command and its output, approval, interrupt, rewind and failure. You read those journals and propose small, specific changes to what the coding agent is told when a session starts, so that the next sessions go better. You can't change files or run commands. Your only output is a proposal: the daemon checks it, then a person accepts or rejects it, or, where learning is set to "gated", the daemon accepts it with no person reading it once every check passes.
 
 # What you can change
 
@@ -331,7 +331,7 @@ class Learner {
       label: "propose_change",
       description: [
         "Propose a change to memory or a skill: the file's whole new content, a one-line summary, the rationale, the evidence (sessions, entry seqs, what they show), a falsifiable prediction and, when it can be, a watch that checks it.",
-        "The daemon records and checks it; nothing changes until a person accepts it.",
+        "The daemon records and checks it; nothing changes until it is accepted: by a person, or, where learning is set to \"gated\", by the daemon once every check passes.",
         `At most ${MAX_PROPOSALS} a run. The result is the proposal's id, or why it was refused.`,
       ].join(" "),
       parameters: ProposalParams,

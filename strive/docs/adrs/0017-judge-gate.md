@@ -65,6 +65,13 @@ The learning session's own entries never go in: the learner's replies, its
 tool calls, what it read. A test checks this against the bytes the
 provider receives.
 
+The system prompt also says who acts on the verdict, from the project's
+learning mode ([ADR-0020](0020-learning-triggers.md)): "a person reviews
+your verdict before anything is written", or, under `gated`, that a pass
+with a replay pass is written with no person reading it, so the verdict
+may be final. Telling the judge a person will look when none may would
+invite it to pass what it doubts.
+
 ### The rubric
 
 A fixed rubric, in `strive-learning`. The model answers by calling one
@@ -135,4 +142,13 @@ can't make proposals ready unjudged.
 - **The judge costs money,** a few cents with Haiku, against the learning
   session's budget.
 - **A model can still be fooled.** The judge is one check in a cascade, not
-  proof. Replay (M10) measures the change. A person still decides.
+  proof. Replay (M10) measures the change. A person still decides, except
+  under `gated`.
+- **Known limit: `gated` rests on one judge call.** Static and replay can't
+  tell a sound lesson from a harmful one that happens to help the replayed
+  tasks; only the judge's `safe` criterion asks. A proposal that talks one
+  model call into passing it, and helps replay, goes in unread. The prompt
+  calls the document data and fails text that addresses the judge, but
+  nothing beyond that hardens the call against prompt injection (no second
+  judge, no quorum, no separate model family). A person who wants that bar
+  keeps `suggest`.

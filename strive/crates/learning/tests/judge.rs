@@ -153,6 +153,7 @@ fn the_request_forces_the_verdict_tool_and_carries_the_proposal_as_data() {
         learned: vec![FileText { path: ".strive/skills/x/SKILL.md".into(), text: "skill".into() }],
         cited: vec![SessionText { id: "s1".into(), journal: "#3 user: hi".into() }],
         held_out: vec![SessionText { id: "s2".into(), journal: "#2 user: other".into() }],
+        gated: false,
     };
     let r = judge::request("claude-haiku-4-5", &m);
     assert_eq!(r["model"], "claude-haiku-4-5");
@@ -176,10 +177,15 @@ fn the_request_forces_the_verdict_tool_and_carries_the_proposal_as_data() {
     assert_eq!(doc["learned_files"][0]["path"], ".strive/skills/x/SKILL.md");
     assert_eq!(doc["cited_sessions"], json!([{"id": "s1", "journal": "#3 user: hi"}]));
     assert_eq!(doc["held_out_sessions"][0]["id"], "s2");
-    let new = Material { current: None, ..m };
+    let new = Material { current: None, ..m.clone() };
     let text = judge::request("m", &new)["messages"][0]["content"].as_str().unwrap().to_string();
     let doc: Value = serde_json::from_str(&text[text.find('{').unwrap()..]).unwrap();
     assert_eq!(doc["current_file"], Value::Null);
+
+    assert!(system.contains("A person reviews your verdict before anything is written"), "{system}");
+    let gated = judge::request("m", &Material { gated: true, ..m });
+    let gated = gated["system"].as_str().unwrap();
+    assert!(!gated.contains("A person reviews") && gated.contains("your verdict may be final"), "{gated}");
 }
 
 fn d(b: u8) -> Digest {

@@ -194,7 +194,8 @@ pub async fn propose(
     };
     let (verdict, detail) = strive_learning::verdict(&findings);
     let now = crate::server::epoch_ms();
-    let judge = judge_plan(state, cwd, verdict, &proposal, before, now, &entries);
+    let made = crate::judge::Made { proposal: &proposal, before, at_ms: now, gated: gated(state, cwd).await };
+    let judge = judge_plan(state, cwd, verdict, &made, &entries);
     let mut gates = vec![(Gate::Static, verdict, detail)];
     let (mut call, mut replay) = (None, None);
     match judge {
@@ -227,15 +228,18 @@ fn judge_plan(
     state: &State,
     cwd: &str,
     static_verdict: Verdict,
-    proposal: &Proposal,
-    before: Option<Digest>,
-    made_at_ms: u64,
+    made: &crate::judge::Made,
     learning: &[Entry],
 ) -> crate::judge::Plan {
     match static_verdict {
         Verdict::Fail => crate::judge::Plan::Now(Verdict::Skipped, AFTER_FAILURE.into()),
-        Verdict::Pass | Verdict::Skipped => crate::judge::plan(state, cwd, proposal, before, made_at_ms, learning),
+        Verdict::Pass | Verdict::Skipped => crate::judge::plan(state, cwd, made, learning),
     }
+}
+
+/// Whether the project's learning mode is `gated` now.
+async fn gated(state: &State, cwd: &str) -> bool {
+    crate::triggers::mode(state, cwd).await == crate::settings::LearningMode::Gated
 }
 
 /// The replay's plan, given the earlier gates' verdicts: it runs only when
@@ -616,7 +620,18 @@ async fn settled(state: &Arc<State>, sid: &SessionId, cwd: &str) -> Result<Vec<F
         let judge_verdict = match had(Gate::Judge) {
             Some(v) => Some(v),
             None if state.learning.judging.has(sid, id) => None,
-            None => match judge_plan(state, cwd, static_verdict, &p.proposal, p.before, p.made_at_ms, &entries) {
+            None => match judge_plan(
+                state,
+                cwd,
+                static_verdict,
+                &crate::judge::Made {
+                    proposal: &p.proposal,
+                    before: p.before,
+                    at_ms: p.made_at_ms,
+                    gated: gated(state, cwd).await,
+                },
+                &entries,
+            ) {
                 crate::judge::Plan::Now(verdict, detail) => {
                     events.push(Event::GateFinished { proposal: id, gate: Gate::Judge, verdict, detail });
                     Some(verdict)
