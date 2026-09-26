@@ -79,6 +79,37 @@ test("a failed command shows its exit code; a successful one adds nothing", () =
   expect(describe(entry(finished(2)))).toEqual([{ kind: "note", tone: "faint", text: "exit 2" }]);
 });
 
+test("automatic learning says what triggered a run, why one was skipped, and when the gate accepted", () => {
+  const trigger = {
+    kind: "idle" as const,
+    signals: [
+      { session: "S1", seq: 4, kind: "correction" as const, detail: "no, use bun" },
+      { session: "S1", seq: 9, kind: "interrupted" as const, detail: "turn 2 was interrupted" },
+      { session: "S1", seq: 12, kind: "correction" as const, detail: "i said bun" },
+    ],
+  };
+
+  const failed = {
+    kind: "turns" as const,
+    signals: [{ session: "S2", seq: 3, kind: "turnFailed" as const, detail: "turn 1 failed: overloaded" }],
+  };
+
+  const text = (e: Event) => describe(entry(e))[0]?.text;
+
+  expect(text({ type: "learnRequested", sessions: ["S1"], trigger })).toBe(
+    "Automatic learning run, after a session went idle: a correction and an interrupted turn in session S1",
+  );
+  expect(text({ type: "learnRequested", sessions: ["S1"] })).toBe("Asked to learn from S1");
+  expect(text({ type: "learnSkipped", trigger: failed, reason: "the cap" })).toBe(
+    "Automatic learning run skipped (after a session's turns reached learning.everyTurns: a failed turn in session S2): the cap",
+  );
+  expect(text({ type: "proposalDecided", proposal: 7, decision: "accept", by: "gate", automatic: "gate" })).toBe(
+    "#7 accepted automatically: every check passed",
+  );
+  // Only the daemon's field makes it automatic, not a client's name.
+  expect(text({ type: "proposalDecided", proposal: 7, decision: "accept", by: "gate" })).toBe("#7 accepted by gate");
+});
+
 test("budgets read as dollars, tokens, both, or unlimited", () => {
   expect(budgetText(5_000_000)).toBe("$5.0000");
   expect(budgetText(undefined, 1000)).toBe("1000 tokens");

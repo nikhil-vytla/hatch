@@ -1511,3 +1511,96 @@ page's thread. So a cut first line was likely even outside tests, and the
 cache kept it plain. The limit is now 5 s per line; lines after the first
 take about a millisecond. Under 12 busy loops the test failed 7/10 before
 and 0/10 after.
+## 2026-09-26: learning triggers, the pre-filter, and `gated`
+
+Design in [ADR-0020](docs/adrs/0020-learning-triggers.md). bb's suggestion 3
+and the last Stage 2 item in ADR-0016.
+- **The setting:** `learning: {mode, idleSeconds, everyTurns, dailyRuns}`,
+  `suggest` / 600 / 0 / 3 by default. `off` stops automatic runs only;
+  `strive learn` still works (a person asked). `auto` is refused on load with
+  a message naming `gated`: memory and skills are the only artifacts, and
+  they carry the same risk, so it would be an alias whose meaning would
+  change silently once a riskier kind exists. A project's
+  `.strive/settings.json` may only lower the mode (`min`): it's writable by
+  anyone who commits, and by a work session's commands (the sandbox guards
+  memory and skills, not the rest of `.strive`). A malformed one turns
+  automatic learning off for the project and logs why. Settings still load
+  once per daemon.
+- **The pre-filter** (`strive_learning::signals`, pure): corrections (first
+  prompt after a turn; fixed openers like "no", "actually", "don't" and
+  phrases like "I said", "you didn't" in the first 200 chars; "no problem"
+  and friends excluded), interrupts, declined approvals, commands that
+  failed then passed (`replay::fixed`, split out of `mine` without its
+  checkpoint requirement), failed or timed-out turns. Every sign is anchored
+  at the entry that completes it, so a longer journal finds the same signs
+  plus newer ones; the daemon asks only for signs past the highest seq an
+  earlier automatic request named for that session (`triggers::acted_on`).
+  Skips don't consume signs.
+- **When:** each work `turnEnded` spawns a wait of `idleSeconds`; a prompt
+  journaled in the meantime cancels it (logged). `everyTurns` scans at the
+  turn end. Idle beat "last client detached": `strive run` detaches every
+  turn and a person leaves the TUI open. 600s is under the daemon's 900s
+  idle exit, so a one-shot `strive run` still gets its scan.
+- **Limits:** under the project's lock, re-reading the learning journal:
+  a request no turn has finished, or a `checking` proposal, holds it back;
+  then the 24h rolling cap (automatic requests only); then key, price, and
+  the ledger admitting one worst-case learner call (whole context window
+  in, the agent's output cap out). Failing one journals `learnSkipped`; the
+  latest shows in `strive review` and the pane until an automatic run
+  starts. A clean session journals nothing and creates no learning session;
+  the log says "scanned for learning: no new signs", which the tests wait on.
+- **`gated`:** only at the replay's pass (the last verdict), only if every
+  gate is a pass (`every_check_passed`), only over the file as the learner
+  saw it (otherwise it records nothing, rather than a stale accept). The
+  decision carries `automatic: "gate"`, which only the daemon sets; `by:
+  "gate"` alone would be forgeable by a client named "gate" (a test does
+  that and gets a person's decision). A crash between verdict and accept
+  leaves it for a person; later lists never auto-accept, so switching to
+  `gated` doesn't sweep up old proposals.
+- **Found while testing:** the replay only runs after a judge that passed
+  or was skipped, so "replay passed" doesn't imply "judge passed". Checking
+  only the replay's verdict would auto-accept a proposal the judge never
+  saw. The e2e with the judge skipped (an OpenAI `judgeModel`) and replay
+  passing on Haiku fails if `every_check_passed` treats a skip as a pass
+  (checked by mutation: status became `applied`). The replay-skipped test
+  alone can't catch that mutant, since the gate never runs there.
+
+Tests. Unit (`crates/learning/tests/signals.rs`, 19): each sign, a clean
+session, first-prompt-only corrections, phrasing (yes and no lists, the
+200-char head), ordering and `after`, prefix stability, the limit and
+excerpts, `acted_on`, the cap count, `busy`, `skipped`, `every_check_passed`.
+Daemon (`tests/triggers.rs`, 14): the idle trigger once per sign (then
+nothing for a clean idle, then only the new interrupt), a clean session,
+a prompt inside the wait, every N turns, busy, the daily cap with review's
+skip line, a person past the cap, `off`, a project's lower mode and a
+malformed file, no key, no budget, review and log showing the trigger, `auto`
+refused, `gated` with skipped checks and a client named "gate". Host e2e
+(`replay.e2e.test.ts`): `gated` accepts with static/judge/replay all passed
+(`by: gate`, `automatic: gate`, review's marks, rollback via `strive review
+N rollback`); not with the judge skipped, replay skipped, replay failed, or
+judge failed. Learner unit: an automatic request's prompt lists its signs.
+Desktop e2e: the Automatic badge and the trigger's signs in the detail.
+Mutations checked: no watermark fails the once test; a skip counted as a
+pass fails the judge-skipped e2e.
+
+**A flake seen, not reproduced.** The first `check.sh` failed one desktop
+e2e, "the conversation has the window to itself until a panel is shown":
+after "Show spend" the app closed ("Target page, context or browser has
+been closed") 25 s into waiting for the panel, with nothing in the log.
+The second `check.sh` passed; so did the test 5/5 alone, the whole desktop
+suite 4/4, and the test with its neighbour 8/8 beside `bun test
+packages/host` load. The only per-window change here is that
+`proposal/list` awaits the main process's `learning.follow()` (one
+`session/list` when there's no learning session), which that test doesn't
+wait on. The app closing on its own, with no `window.close` in main, reads
+like the killed-process load failures noted on 2026-09-24; unconfirmed.
+
+Deferred:
+- Idle-time consolidation across many sessions.
+- Catching up scans that a daemon restart dropped (waits are in memory),
+  and a turn the daemon ended itself (a host that died) starts no wait.
+- An explicit "session ended" trigger; risk tiers and `auto`.
+- Telling the learner which proposals the gate accepted.
+- Non-English correction phrasing.
+- A desktop e2e of a gate accept (it needs the full replay stack; the note's
+  text is unit-tested, and the host e2e covers the accept itself).

@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import type { Entry, Event, Proposal, ProposalState } from "@strive/protocol";
-import { fileHistory, latestRun, readJudge, tallyText, watchText } from "./learning";
+import { fileHistory, latestRun, readJudge, statusNote, tallyText, watchText } from "./learning";
 
 const PROPOSAL: Proposal = {
   artifact: { kind: "memory" },
@@ -22,6 +22,16 @@ const reading: Event = {
   toolCalls: [{ id: "c1", name: "read_session" }],
   message: {},
 };
+
+test("an applied proposal says when the gate accepted it rather than a person", () => {
+  const applied: ProposalState = { id: 3, madeAtMs: 0, proposal: PROPOSAL, status: "applied", gates: [] };
+  const path = ".strive/memory.md";
+
+  expect(statusNote(applied, path)).toBe("Accepted and written to .strive/memory.md.");
+  expect(statusNote({ ...applied, automatic: "gate" }, path)).toBe(
+    "Accepted automatically: every check passed. Written to .strive/memory.md; Roll back undoes it.",
+  );
+});
 
 test("a run is running from its request until its own turn ends, saying what the learner is doing", () => {
   expect(latestRun(journal({ type: "userMessage", text: "not a request" }))).toBeUndefined();

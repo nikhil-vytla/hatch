@@ -1,6 +1,6 @@
 // What each journal entry looks like in a transcript, for every client: the
 // TUI and the desktop app render the same lines, each in its own way.
-import type { Entry } from "@strive/protocol";
+import type { Entry, LearnSignal, LearnTrigger, SignalKind } from "@strive/protocol";
 import * as v from "valibot";
 import { formatUsd } from "./format";
 
@@ -22,6 +22,37 @@ export type DescribeOptions = {
 const note = (tone: Tone, text: string): Line[] => [{ kind: "note", tone, text }];
 
 const OUTCOMES = { confirmed: "held", contradicted: "was contradicted", notApplicable: "didn't apply" } as const;
+
+/** A sign the pre-filter found, as `strive review` names it. */
+export const SIGN_NAMES: Record<SignalKind, string> = {
+  correction: "a correction",
+  interrupted: "an interrupted turn",
+  declined: "a declined approval",
+  failedThenPassed: "a command that failed, then passed",
+  turnFailed: "a failed turn",
+};
+
+/** A trigger's signs in one line: "a correction and an interrupted turn in session 01J…". */
+export function signsText(signals: LearnSignal[]): string {
+  const kinds = [...new Set(signals.map((s) => SIGN_NAMES[s.kind]))];
+  const sessions = [...new Set(signals.map((s) => s.session))].sort();
+
+  const what =
+    kinds.length === 0
+      ? "no signs"
+      : kinds.length === 1
+        ? kinds[0]
+        : `${kinds.slice(0, -1).join(", ")} and ${kinds.at(-1)}`;
+
+  return `${what} in session ${sessions.join(", ")}`;
+}
+
+/** What started an automatic run, as `strive review` says it. */
+export function triggerText(t: LearnTrigger): string {
+  const when = t.kind === "idle" ? "after a session went idle" : "after a session's turns reached learning.everyTurns";
+
+  return `${when}: ${signsText(t.signals)}`;
+}
 
 export function budgetText(usd?: number, tokens?: number): string {
   if (usd === undefined && tokens === undefined) return "unlimited";
@@ -186,12 +217,16 @@ export function describe(entry: Entry, options: DescribeOptions = {}): Line[] {
     // The learning session's own events: what the learner was asked, what it
     // proposed, and what became of each proposal.
     case "learnRequested":
+      if (e.trigger) return note("muted", `Automatic learning run, ${triggerText(e.trigger)}`);
+
       return note(
         "muted",
         e.sessions.length === 0
           ? "Asked to learn from recent sessions"
           : `Asked to learn from ${e.sessions.join(", ")}`,
       );
+    case "learnSkipped":
+      return note("faint", `Automatic learning run skipped (${triggerText(e.trigger)}): ${e.reason}`);
     case "proposalMade":
       return note("accent", `Proposed #${entry.seq}: ${e.proposal.summary}`);
     case "gateFinished":
@@ -200,6 +235,8 @@ export function describe(entry: Entry, options: DescribeOptions = {}): Line[] {
         `#${e.proposal} ${e.gate} check: ${e.verdict}. ${e.detail}`,
       );
     case "proposalDecided":
+      if (e.automatic === "gate") return note("accent", `#${e.proposal} accepted automatically: every check passed`);
+
       return note("muted", `#${e.proposal} ${e.decision === "accept" ? "accepted" : "rejected"} by ${e.by}`);
     case "proposalApplied":
       return note("accent", `#${e.proposal} applied`);

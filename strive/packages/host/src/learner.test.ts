@@ -316,6 +316,34 @@ test("a learning request runs a turn that lists sessions, reads one, and propose
   ]);
 });
 
+test("an automatic request's prompt names the signs that started it; a person's doesn't", async () => {
+  const trigger = {
+    kind: "idle" as const,
+    signals: [
+      {
+        session: W1,
+        seq: fixSeq,
+        kind: "correction" as const,
+        detail: "don't run the whole suite, run bun test packages/host",
+      },
+      { session: W1, seq: failSeq + 1, kind: "failedThenPassed" as const, detail: "bun test" },
+    ],
+  };
+
+  const automatic: Entry = { seq: 2, tsMs: T0, event: { type: "learnRequested", sessions: [W1], trigger } };
+  const { model } = await learn({ history: [started, automatic], script: [{ text: "Nothing worth it." }] });
+  const prompt = JSON.stringify(model.requests[0].messages[0].content);
+  expect(prompt).toContain(`Study these work sessions: ${W1}.`);
+  expect(prompt).toContain("Nobody asked for this run");
+  expect(prompt).toContain(
+    `- session ${W1} entry ${fixSeq}: the user corrected the agent: don't run the whole suite, run bun test packages/host`,
+  );
+  expect(prompt).toContain(`- session ${W1} entry ${failSeq + 1}: a command failed, then passed: bun test`);
+
+  const person = await learn({ history: [started, request(2, T0, [W1])], script: [{ text: "Nothing worth it." }] });
+  expect(JSON.stringify(person.model.requests[0].messages[0].content)).not.toContain("Nobody asked");
+});
+
 test("the learner never runs a file or shell effect, even when the model asks for one", async () => {
   const mcp = { server: "fs", name: "write", description: "writes", inputSchema: { type: "object" } };
 

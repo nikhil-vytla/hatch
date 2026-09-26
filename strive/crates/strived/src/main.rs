@@ -31,6 +31,7 @@ mod sessions;
 mod settings;
 mod sync;
 
+mod triggers;
 mod tui;
 mod watch;
 mod workspaces;

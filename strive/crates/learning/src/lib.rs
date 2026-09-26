@@ -5,7 +5,9 @@
 //! - the judge gate's rubric, request and strict reading of its answer,
 //!   and how a work session is rendered for it;
 //! - the replay gate's tasks, mined from work journals, and its verdict;
-//! - watches: predictions checked on later work journals, and their tallies.
+//! - watches: predictions checked on later work journals, and their tallies;
+//! - triggers (ADR-0020): the pre-filter's signs in a work journal, and
+//!   what the learning journal says about automatic runs.
 //!
 //! The daemon adds what needs the machine: the path as it resolves on
 //! disk, the file's digest, and whether the evidence's sessions exist.
@@ -15,13 +17,15 @@ mod fold;
 pub mod judge;
 pub mod render;
 pub mod replay;
+pub mod signals;
 pub mod stale;
+pub mod triggers;
 pub mod watch;
 
 pub use checks::{Finding, Rule, check, frontmatter, verdict};
 pub use fold::{Applied, Folded, fold};
 
-use strive_proto::{Artifact, Gate, ProposalStatus};
+use strive_proto::{Artifact, Gate, GateOutcome, ProposalStatus, Verdict};
 
 /// Where memory lives, relative to the project.
 pub const MEMORY_PATH: &str = ".strive/memory.md";
@@ -37,6 +41,13 @@ pub const SKILL_NAME_LIMIT: usize = 40;
 /// Every gate a proposal goes through, in cascade order. A proposal is
 /// ready once each has a verdict and none failed.
 pub const GATES: [Gate; 3] = [Gate::Static, Gate::Judge, Gate::Replay];
+
+/// Whether every gate ran and passed: the only proposals the `gated`
+/// learning mode accepts without a person (ADR-0020). A skip isn't a pass
+/// here, though it doesn't block a person's accept.
+pub fn every_check_passed(gates: &[GateOutcome]) -> bool {
+    GATES.iter().all(|gate| gates.iter().any(|g| g.gate == *gate && g.verdict == Verdict::Pass))
+}
 
 /// 1 to 40 of `a-z`, `0-9` and `-`: a name that is one path component and
 /// can't be `.` or `..`.

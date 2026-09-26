@@ -5,8 +5,8 @@ use std::process::ExitCode;
 use anyhow::{Result, anyhow};
 use strive_budget::format_usd;
 use strive_proto::{
-    ApprovalMode, CallOutcome, Decision, EffectOutcome, EffectRecord, Entry, Event, ProposalDecision, SessionInfo,
-    SessionList, SessionListParams, SessionRead, SessionReadResult, SessionRef, TurnEnd,
+    ApprovalMode, Automatic, CallOutcome, Decision, EffectOutcome, EffectRecord, Entry, Event, ProposalDecision,
+    SessionInfo, SessionList, SessionListParams, SessionRead, SessionReadResult, SessionRef, TurnEnd,
 };
 
 use crate::client::{Client, ServerError};
@@ -103,10 +103,18 @@ pub fn describe(e: &Entry) -> String {
         }
         Event::TurnStarted { turn, .. } => format!("turn {turn} started"),
         Event::LayoutProposed { label, .. } => format!("agent proposed a layout change: {label}"),
-        Event::LearnRequested { sessions } if sessions.is_empty() => {
+        Event::LearnRequested { trigger: Some(t), .. } => {
+            format!("automatic learning run, {}", crate::review::trigger_text(t))
+        }
+        Event::LearnRequested { sessions, trigger: None } if sessions.is_empty() => {
             "asked the learner to study recent sessions".into()
         }
-        Event::LearnRequested { sessions } => format!("asked the learner to study {}", sessions.join(", ")),
+        Event::LearnRequested { sessions, trigger: None } => {
+            format!("asked the learner to study {}", sessions.join(", "))
+        }
+        Event::LearnSkipped { trigger, reason } => {
+            format!("automatic learning run skipped ({}): {reason}", crate::review::trigger_text(trigger))
+        }
         Event::ProposalMade { proposal, .. } => format!(
             "learner proposed #{} ({}): {}",
             e.seq,
@@ -118,7 +126,15 @@ pub fn describe(e: &Entry) -> String {
             crate::review::gate_name(*gate),
             crate::review::verdict_name(*verdict)
         ),
-        Event::ProposalDecided { proposal, decision, by } => format!(
+        Event::ProposalDecided {
+            proposal,
+            decision: ProposalDecision::Accept,
+            automatic: Some(Automatic::Gate),
+            ..
+        } => {
+            format!("proposal #{proposal} accepted automatically: every check passed")
+        }
+        Event::ProposalDecided { proposal, decision, by, .. } => format!(
             "proposal #{proposal} {} by {by}",
             match decision {
                 ProposalDecision::Accept => "accepted",

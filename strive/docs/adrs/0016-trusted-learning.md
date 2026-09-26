@@ -107,7 +107,9 @@ A proposal is `ready` when every check that ran passed or was skipped, and
 ### A person decides; the daemon writes
 
 - **Only a person decides:** `proposal/decide {cwd, proposal, accept|reject}`
-  is refused for the learning session's host, as approvals are.
+  is refused for the learning session's host, as approvals are. The one
+  exception is the daemon's own, opt-in: `gated` accepts a proposal whose
+  every check passed ([ADR-0020](0020-learning-triggers.md)).
 - **Applying:** on accept, the daemon checks the file is still as it was
   when the learner read it, i.e. as it was when the proposal was made
   (`ProposalMade`'s entry time; the daemon keeps the file's digest from
@@ -158,9 +160,22 @@ A proposal is `ready` when every check that ran passed or was skipped, and
   - rollback scoped to what regressed: that one proposal's rollback is
     suggested, and a person makes it. A watch for quality that peaks and
     then declines is deferred.
-- **Triggers:** end of session, every N turns, and idle-time consolidation.
-  These come after M8, behind the `learning` setting (`off`, `suggest` by
-  default, `gated`, `auto`).
+- **Triggers** ([ADR-0020](0020-learning-triggers.md)): behind the
+  `learning` setting (`off`, `suggest` by default, `gated`; `auto` is
+  refused, since memory and skills have no risk tiers to tell it from
+  `gated`):
+  - a deterministic pre-filter over a work journal (corrections,
+    interrupts, declined approvals, commands that failed then passed,
+    failed turns), so only sessions with a sign start a run;
+  - the idle trigger (a session quiet for `idleSeconds` after a turn), and
+    every N turns; a daily cap, and no run while one or a proposal's checks
+    are going;
+  - `gated`: a proposal whose every check passed, none skipped, is accepted
+    by the daemon and marked so; a person can roll it back.
+
+  Deferred: idle-time consolidation across many sessions, and catching up
+  scans a restart dropped. "End of session" is the idle trigger: a session
+  has no explicit end.
 
 ## Consequences
 

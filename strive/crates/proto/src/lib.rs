@@ -771,6 +771,10 @@ pub struct ProposalListResult {
     /// longer exists: the lesson may be stale.
     #[serde(default)]
     pub may_be_stale: Vec<StaleMention>,
+    /// The latest automatic run that didn't start, and why.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub skipped: Option<SkippedRun>,
 }
 
 /// A memory line naming a path in the project that isn't there.
@@ -784,6 +788,77 @@ pub struct StaleMention {
     pub line: u32,
     /// The missing path, as the line names it.
     pub missing: String,
+}
+
+/// Why the daemon asked the learner to run on its own (ADR-0020).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct LearnTrigger {
+    pub kind: TriggerKind,
+    /// What the pre-filter found in the named sessions.
+    pub signals: Vec<LearnSignal>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub enum TriggerKind {
+    /// A work session's turn ended and no prompt came for `idleSeconds`.
+    Idle,
+    /// A work session ended a multiple of `everyTurns` turns.
+    Turns,
+}
+
+/// A sign in a work session that something is worth learning, found without
+/// a model (`strive_learning::signals`).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct LearnSignal {
+    pub session: String,
+    /// The entry that completes the sign: the correcting prompt, the turn's
+    /// end, the person's refusal, the command that passed.
+    pub seq: u64,
+    pub kind: SignalKind,
+    /// A short excerpt: the prompt's words, the command, the error.
+    pub detail: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub enum SignalKind {
+    /// The first prompt after a turn reads as a correction.
+    Correction,
+    /// Someone interrupted a turn.
+    Interrupted,
+    /// A person declined an approval.
+    Declined,
+    /// A command failed in a turn, and the same command later passed.
+    FailedThenPassed,
+    /// A turn failed or ran out of time.
+    TurnFailed,
+}
+
+/// Who, other than a person, decided on a proposal.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub enum Automatic {
+    /// The `gated` learning mode: every check passed, none skipped.
+    Gate,
+}
+
+/// The latest automatic run that was due and didn't start, if no automatic
+/// run started after it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct SkippedRun {
+    pub at_ms: u64,
+    pub reason: String,
+    pub trigger: LearnTrigger,
 }
 
 /// A proposal as it stands, folded from the learning session's journal.
@@ -805,6 +880,14 @@ pub struct ProposalState {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub prediction: Option<PredictionTally>,
+    /// The trigger of the automatic run that made it; none: a person asked.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub trigger: Option<LearnTrigger>,
+    /// Set when it was accepted without a person.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub automatic: Option<Automatic>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
@@ -1096,13 +1179,24 @@ pub enum Event {
         #[ts(optional)]
         learned: Option<Vec<ContextFile>>,
     },
-    /// A person asked the project's learner to study sessions (none named:
-    /// the ones since it last looked). Journaled in the learning session;
-    /// its host takes it as a prompt.
+    /// A person, or a trigger (ADR-0020), asked the project's learner to
+    /// study sessions (none named: the ones since it last looked).
+    /// Journaled in the learning session; its host takes it as a prompt.
     LearnRequested {
         /// The work sessions to study; empty: those since the learner last looked.
         #[serde(default)]
         sessions: Vec<String>,
+        /// Set when the daemon asked on its own: what triggered it. None: a
+        /// person asked.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[ts(optional)]
+        trigger: Option<LearnTrigger>,
+    },
+    /// An automatic learning run was due and didn't start (ADR-0020): the
+    /// daily cap, a run or checks still going, no key, no budget.
+    LearnSkipped {
+        trigger: LearnTrigger,
+        reason: String,
     },
     /// The learner proposed a change to what the agent is given (its memory
     /// or a skill). Nothing changes until a person accepts it. Its id is
@@ -1144,12 +1238,18 @@ pub enum Event {
         tokens: u64,
         runs: Vec<ReplayRun>,
     },
-    /// A person accepted or rejected a proposal.
+    /// A person accepted or rejected a proposal, or the `gated` learning
+    /// mode accepted one whose every check passed (ADR-0020).
     ProposalDecided {
         proposal: u64,
         decision: ProposalDecision,
-        /// The client that decided.
+        /// The client that decided, or `gate`.
         by: String,
+        /// Set only by the daemon's own accept. A person's decision never
+        /// has it, whatever its client calls itself.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[ts(optional)]
+        automatic: Option<Automatic>,
     },
     /// An accepted proposal was written: the file as it was (none if it
     /// didn't exist) and as it is now.

@@ -1,7 +1,8 @@
 // What the learner proposed for this project, for a person to review: each
 // proposal's diff, why, its evidence and the daemon's checks, and Accept,
 // Reject or Roll back. The same as `strive review`.
-import type { Evidence, GateOutcome, ProposalDecision, ProposalState, SessionInfo } from "@strive/protocol";
+import type { Evidence, GateOutcome, ProposalDecision, ProposalState, SessionInfo, SkippedRun } from "@strive/protocol";
+import { SIGN_NAMES, triggerText } from "@strive/view";
 import { useEffect, useState } from "react";
 import type { Cited } from "../shared/cited";
 import { blocks } from "./cited";
@@ -17,6 +18,7 @@ import {
   type Run,
   readJudge,
   STATUS_NAMES,
+  statusNote,
   tallyText,
   VERDICT_NAMES,
   watchText,
@@ -27,6 +29,8 @@ type Props = {
   proposals?: ProposalState[];
   /** Learned files, by path in the project, that aren't what an accepted proposal last left there. */
   outsideReview: string[];
+  /** The latest automatic run that didn't start, if none started since. */
+  skipped?: SkippedRun;
   run?: Run;
   /** This project's work sessions. */
   sessions: SessionInfo[];
@@ -82,6 +86,15 @@ function ago(ms: number, now: number): string {
 
 function Badge({ status }: { status: ProposalState["status"] }) {
   return <span className={`badge status-${status}`}>{STATUS_NAMES[status]}</span>;
+}
+
+/** On a proposal from a run nobody asked for. */
+function AutomaticBadge() {
+  return (
+    <span className="badge automatic" title="From a run strive started on its own">
+      Automatic
+    </span>
+  );
 }
 
 /** The learn button, and what's happening with the latest run. */
@@ -162,7 +175,18 @@ function OutsideReview({ paths }: { paths: string[] }) {
   );
 }
 
-function List({ proposals, outsideReview, run, onSelect, learn }: Props) {
+/** Why the latest automatic run didn't start. */
+function Skipped({ skipped }: { skipped?: SkippedRun }) {
+  if (!skipped) return null;
+
+  return (
+    <p className="status-note skipped small" role="status" data-skipped="">
+      An automatic run didn't start ({triggerText(skipped.trigger)}): {skipped.reason}
+    </p>
+  );
+}
+
+function List({ proposals, outsideReview, skipped, run, onSelect, learn }: Props) {
   const now = Date.now();
 
   if (proposals === undefined) return <div className="changes-body" />;
@@ -171,6 +195,7 @@ function List({ proposals, outsideReview, run, onSelect, learn }: Props) {
     <div className="changes-body">
       {run?.running && <Learning run={run} />}
       <OutsideReview paths={outsideReview} />
+      <Skipped skipped={skipped} />
       {proposals.length === 0 ? (
         <div className="learned-empty">
           <div className="mark">
@@ -178,7 +203,7 @@ function List({ proposals, outsideReview, run, onSelect, learn }: Props) {
           </div>
           <p>
             The learner reads this project's recent sessions and proposes changes to its memory and skills, which every
-            new session reads. Nothing changes until you accept a proposal, and you can roll it back.
+            new session reads. Nothing changes until a proposal is accepted, and you can roll it back.
           </p>
           <Learn run={run} learn={learn} />
         </div>
@@ -194,6 +219,7 @@ function List({ proposals, outsideReview, run, onSelect, learn }: Props) {
                   <span className="summary">{p.proposal.summary}</span>
                   <span className="meta">
                     <Badge status={p.status} />
+                    {p.trigger && <AutomaticBadge />}
                     <span className="mono">{artifactName(p.proposal.artifact)}</span>
                     <span className="spacer" />
                     <span className="when" title={new Date(p.madeAtMs).toLocaleString()}>
@@ -208,30 +234,6 @@ function List({ proposals, outsideReview, run, onSelect, learn }: Props) {
       )}
     </div>
   );
-}
-
-/** What a proposal's status means for its file, and what a person can do next. */
-function statusNote(p: ProposalState, path: string): string {
-  switch (p.status) {
-    case "checking":
-      return "Its checks haven't finished yet.";
-    case "ready":
-      return `Accepting writes ${path}. New sessions in this project read it.`;
-    case "failed":
-      return "A check failed, so it can't be accepted.";
-    case "rejected":
-      return "Rejected. Nothing was written.";
-    case "applied":
-      return `Accepted and written to ${path}.`;
-    case "stale":
-      return `${path} changed after the learner read it, so nothing was written. Learn again for a proposal against the file as it is now.`;
-    case "rolledBack":
-      return p.before === undefined
-        ? `Rolled back: ${path} was removed, as it didn't exist before.`
-        : `Rolled back: ${path} is as it was before.`;
-    default:
-      return p.status satisfies never;
-  }
 }
 
 type Confirming = "accept" | "rollback";
@@ -295,12 +297,28 @@ function Detail({
       <header className="learned-head">
         <div className="learned-title">
           <Badge status={p.status} />
+          {p.trigger && <AutomaticBadge />}
           <span className="faint small">#{p.id}</span>
         </div>
         <h3>{p.proposal.summary}</h3>
         <p className="faint small">
           <span className="mono">{path}</span> · proposed {new Date(p.madeAtMs).toLocaleString()}
         </p>
+        {p.trigger && (
+          <div className="trigger small" data-trigger={p.trigger.kind}>
+            <p>Automatic run, {triggerText(p.trigger)}.</p>
+            <ul>
+              {p.trigger.signals.map((s) => (
+                <li key={`${s.session}-${s.seq}`}>
+                  <span className="faint">
+                    {SIGN_NAMES[s.kind]}, entry {s.seq}:
+                  </span>{" "}
+                  {s.detail}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
         <p className={`status-note ${p.status}`}>{statusNote(p, path)}</p>
         {outsideReview.includes(path) && (
           <p className="status-note outside">

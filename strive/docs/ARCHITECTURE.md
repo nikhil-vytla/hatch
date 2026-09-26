@@ -22,7 +22,7 @@ calls go through the daemon's gateway. Why: [ADR-0015](adrs/0015-rebuild-daemon-
 | `crates/journal` | Authenticated session journals: format, verification, crash recovery |
 | `crates/budget` | Prices, costs, reservations and the ledger rebuilt from journal events |
 | `crates/gateway` | Provider wire formats: which API, what a request asks for, usage from bodies and streams |
-| `crates/learning` | Trusted learning's pure parts: where proposals write, the static gate's text checks, proposal status, the judge's rubric, the replay gate's task mining and verdict, watches and their tallies, memory's named paths |
+| `crates/learning` | Trusted learning's pure parts: where proposals write, the static gate's text checks, proposal status, the judge's rubric, the replay gate's task mining and verdict, watches and their tallies, memory's named paths, the triggers' pre-filter |
 | `crates/strived` | The `strive` binary: CLI, launcher, daemon, sessions |
 | `packages/protocol` | Generated TS types + the typed socket client |
 | `packages/tui` | The terminal client; its binary also runs the agent host |
@@ -243,7 +243,8 @@ by `learning/open`. Its `sessionStarted` says `kind: learning`.
   accepted what and replays what the replay gate saw.
 - `learning/run` (people only) journals `learnRequested`, naming work
   sessions of the project or none, and starts the session's host. Prompts
-  to a learning session are refused.
+  to a learning session are refused. The daemon's own triggers journal it
+  too, with a `trigger` (below).
 
 **What its host may do.** Its `host/register` returns `kind: learning`,
 no MCP tools, and `learnedFiles`: the project's memory and skills, each
@@ -454,6 +455,45 @@ rollback is not an agent effect, so the checks below don't apply to it.
   and the write. Writes and edits the agent asks for can't: they wait for
   the file.
 
+**Triggers** ([ADR-0020](adrs/0020-learning-triggers.md)): the learner
+also runs without being asked, behind `learning` in settings: `mode` (`off`,
+`suggest` by default, `gated`; `auto` is refused on load), `idleSeconds`
+(600), `everyTurns` (0: off) and `dailyRuns` (3). A project's
+`.strive/settings.json` may hold only `{"learning": {"mode"}}`, and the mode
+in effect is the lower of the two; one that can't be read turns automatic
+learning off there.
+- **When:** each work `turnEnded` starts a wait of `idleSeconds`; if no
+  prompt came in that session meanwhile, it is scanned. With `everyTurns`,
+  a session whose ended turns reach a multiple of it is scanned at once.
+  Waits live in the daemon's memory; one a restart cuts is dropped.
+- **The pre-filter** (`strive_learning::signals`): one pass over the work
+  journal, no model. Signs: a correction (the first prompt after a turn,
+  by a fixed list of openers and phrases in its first 200 characters), an
+  interrupted turn, a declined approval, a command that failed then passed
+  (the replay miner's pairs), a failed or timed-out turn. Each is anchored at
+  the entry that completes it; at most 20, each with a 120-character
+  excerpt. Only signs past the highest one an earlier automatic request
+  named for that session count. None: nothing is journaled (the log says the
+  session was scanned).
+- **Limits,** under the project's lock: no request a turn hasn't finished
+  and no proposal `checking`; fewer than `dailyRuns` automatic requests in
+  the last 24 hours; a key and a price for the learner's model; and room in
+  the learning session's ledger for one worst-case learner call. Failing
+  one journals `learnSkipped {trigger, reason}`; passing all journals
+  `learnRequested {sessions: [the session], trigger: {kind, signals}}` and
+  starts the host. The learner's prompt lists the signs.
+- **`gated`:** when the replay journals a pass (the cascade's last verdict)
+  and every gate has a pass, none skipped (`every_check_passed`), the daemon
+  applies the proposal as a person's accept would, with `proposalDecided
+  {by: "gate", automatic: "gate"}`, only over the file as the learner saw it.
+  `automatic` is only ever set there. A crash before the accept leaves the
+  proposal for a person. Rollback is unchanged.
+- **Shown:** `proposal/list` gives each proposal its `trigger` and
+  `automatic`, and `skipped`, the latest skip with no automatic request
+  since. `strive review` marks `[automatic run]` and `[accepted
+  automatically]`, prints the trigger and its signs in the detail, and the
+  skip under the list; `strive log` describes both entries.
+
 `strive learn` requests a run and follows the learning journal as
 `strive run` follows a turn, then lists what was proposed. `strive review`
 lists proposals, shows one (its diff against `before`, evidence,
@@ -508,6 +548,12 @@ prediction and checks) and accepts, rejects or rolls it back.
     not machine-checked." An applied proposal that is not holding says so
     there; Roll back stays the person's click. The list reloads when a
     `predictionChecked` entry arrives.
+  - Automatic learning: a proposal from an automatic run has an "Automatic"
+    badge, and its detail names the trigger and each sign; one the gate
+    accepted says "Accepted automatically: every check passed", with Roll
+    back as for any applied proposal; the latest skipped run shows as a
+    notice. `proposal/list` also starts following a learning session that an
+    automatic run created after the window opened.
 
 ## Effects
 

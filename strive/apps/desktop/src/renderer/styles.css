@@ -467,6 +467,14 @@ button.link:hover { background: transparent; text-decoration: underline; text-un
 .status-note.outside { padding: 8px 10px; border-radius: var(--r-item); background: var(--warn-soft); border: 1px solid rgb(250 204 21 / 0.2); color: var(--text); }
 .status-note.outside .mono { font-size: 12px; }
 
+/* Automatic learning (ADR-0020): a run nobody asked for, and one that didn't start. */
+.badge.automatic { background: var(--surface-2); color: var(--muted); }
+.trigger { margin-top: 8px; color: var(--muted); line-height: 1.5; }
+.trigger p { margin: 0; }
+.trigger ul { margin: 2px 0 0; padding-left: 16px; }
+.trigger li { overflow-wrap: anywhere; }
+.status-note.skipped { margin: 10px 12px 2px !important; padding: 8px 10px; border-radius: var(--r-item); background: var(--surface-2); }
+
 /* The entries a piece of evidence cites, opened under its note. */
 button.cited-toggle { display: inline-flex; align-items: center; gap: 4px; margin: 4px 0 0 -6px; padding: 2px 6px; font-size: 12px; color: var(--faint); }
 button.cited-toggle .icon { width: 12px; height: 12px; transition: transform var(--fast) var(--ease-out); }

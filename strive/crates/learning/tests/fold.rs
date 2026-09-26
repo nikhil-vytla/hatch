@@ -41,7 +41,7 @@ fn passed(proposal: u64) -> Vec<Event> {
 }
 
 fn decided(proposal: u64, decision: ProposalDecision) -> Event {
-    Event::ProposalDecided { proposal, decision, by: "test".into() }
+    Event::ProposalDecided { proposal, decision, by: "test".into(), automatic: None }
 }
 
 fn statuses(events: Vec<Event>) -> Vec<(u64, ProposalStatus)> {

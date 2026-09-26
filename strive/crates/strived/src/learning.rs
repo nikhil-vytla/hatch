@@ -15,9 +15,9 @@ use serde_json::Value;
 use strive_learning::{Finding, Folded, Rule};
 use strive_proto::rpc::RpcError;
 use strive_proto::{
-    Appended, Digest, Entry, Event, Evidence, Gate, LearningOpen, LearningRun, LearningRunParams, Method, ProjectRef,
-    Proposal, ProposalDecide, ProposalDecideParams, ProposalDecision, ProposalList, ProposalListResult, ProposalRef,
-    ProposalRollback, ProposalStatus, SessionInfo, SessionKind, StaleMention, Verdict,
+    Appended, Automatic, Digest, Entry, Event, Evidence, Gate, LearningOpen, LearningRun, LearningRunParams, Method,
+    ProjectRef, Proposal, ProposalDecide, ProposalDecideParams, ProposalDecision, ProposalList, ProposalListResult,
+    ProposalRef, ProposalRollback, ProposalStatus, SessionInfo, SessionKind, StaleMention, Verdict,
 };
 
 use crate::methods::{Conn, Reply, client_name, internal, parse, reply, require_person, session_error};
@@ -74,7 +74,8 @@ pub async fn route(state: &Arc<State>, conn: &Arc<Conn>, method: &str, params: V
             }
             let changed_outside_review = outside_review(state, &cwd, &entries).await?;
             let may_be_stale = stale(state, &cwd).await?;
-            reply::<ProposalList>(ProposalListResult { proposals, changed_outside_review, may_be_stale })
+            let skipped = strive_learning::triggers::skipped(&entries);
+            reply::<ProposalList>(ProposalListResult { proposals, changed_outside_review, may_be_stale, skipped })
         }
         ProposalDecide::NAME => {
             require_person(conn)?;
@@ -126,6 +127,11 @@ async fn open(state: &State, cwd: &str) -> Result<SessionInfo, RpcError> {
         .map_err(session_error)
 }
 
+/// The project's learning session, created if it has none.
+pub async fn open_id(state: &State, cwd: &str) -> Result<SessionId, RpcError> {
+    learning_id(&open(state, cwd).await?)
+}
+
 fn learning_id(info: &SessionInfo) -> Result<SessionId, RpcError> {
     SessionId::parse(&info.id).ok_or_else(|| internal(&format!("the learning session's id {:?} isn't valid", info.id)))
 }
@@ -152,7 +158,11 @@ async fn run(state: &Arc<State>, cwd: &str, sessions: Vec<String>) -> Reply {
     if let Err(e) = crate::watch::check(state, cwd, None).await {
         crate::log!("could not check predictions for {cwd}: {e:?}");
     }
-    let entries = state.sessions.append(&sid, vec![Event::LearnRequested { sessions }]).await.map_err(session_error)?;
+    let entries = state
+        .sessions
+        .append(&sid, vec![Event::LearnRequested { sessions, trigger: None }])
+        .await
+        .map_err(session_error)?;
     state.hosts.ensure(&sid, &state.home.socket(), &state.sessions.session_dir(&sid).join("host.log"));
     reply::<LearningRun>(Appended { seq: entries.last().map_or(0, |e| e.seq) })
 }
@@ -316,6 +326,7 @@ pub async fn replayed(
     if !crate::replay::has_verdict(&journal(state, sid)?, id) {
         then.push(Event::GateFinished { proposal: id, gate: Gate::Replay, verdict, detail });
     }
+    let journaled = !then.is_empty();
     match done {
         Some(done) => {
             state.sessions.release(sid, done, then).await.map_err(session_error)?;
@@ -325,8 +336,40 @@ pub async fn replayed(
         }
         None => {}
     }
+    // The replay's verdict is the cascade's last, so this is the one moment
+    // a proposal can become ready with every check passed. A crash before
+    // the accept leaves it ready for a person.
+    if journaled && verdict == Verdict::Pass {
+        gate_accept(state, sid, id).await?;
+    }
     Ok(())
 }
+
+/// Accepts proposal `id` without a person if the project's learning mode is
+/// `gated`, it's ready, and every check ran and passed (ADR-0020). A skip,
+/// which a person may accept past, never counts here. It's written only
+/// over the file as the learner saw it; otherwise it's left for a person.
+async fn gate_accept(state: &State, sid: &SessionId, id: u64) -> Result<(), RpcError> {
+    let cwd = cwd_of(state, sid)?;
+    if crate::triggers::mode(state, &cwd).await != crate::settings::LearningMode::Gated {
+        return Ok(());
+    }
+    let Some(f) = strive_learning::fold(&journal(state, sid)?).into_iter().find(|f| f.state.id == id) else {
+        return Ok(());
+    };
+    if f.state.status != ProposalStatus::Ready || !strive_learning::every_check_passed(&f.state.gates) {
+        return Ok(());
+    }
+    if apply(state, sid, &cwd, &f, GATE.into(), Some(Automatic::Gate)).await?.is_none() {
+        crate::log!(
+            "proposal #{id} passed every check, but its file changed since the learner read it; left for a person"
+        );
+    }
+    Ok(())
+}
+
+/// Who `ProposalDecided` names when the `gated` mode accepts.
+const GATE: &str = "gate";
 
 /// The project a learning session is for.
 fn cwd_of(state: &State, sid: &SessionId) -> Result<String, RpcError> {
@@ -436,7 +479,7 @@ async fn static_gate(state: &State, cwd: &str, p: &Proposal) -> Result<Vec<Findi
 
 /// The artifact's file as it is now, if it's where it may be: its bytes,
 /// none if it doesn't exist, or why it can't be used.
-async fn file_now(state: &State, cwd: &str, rel: &str) -> Result<Result<Option<Vec<u8>>, String>, RpcError> {
+pub async fn file_now(state: &State, cwd: &str, rel: &str) -> Result<Result<Option<Vec<u8>>, String>, RpcError> {
     let home = state.home.root.canonicalize().map_err(|e| internal(&e))?;
     let (cwd, rel) = (cwd.to_string(), rel.to_string());
     tokio::task::spawn_blocking(move || {
@@ -641,7 +684,7 @@ async fn decide(state: &Arc<State>, cwd: &str, id: u64, decision: ProposalDecisi
     match decision {
         ProposalDecision::Reject => match status {
             ProposalStatus::Checking | ProposalStatus::Ready | ProposalStatus::Failed => {
-                let decided = Event::ProposalDecided { proposal: id, decision, by };
+                let decided = Event::ProposalDecided { proposal: id, decision, by, automatic: None };
                 let entries = state.sessions.append(&sid, vec![decided]).await.map_err(session_error)?;
                 reply::<ProposalDecide>(Appended { seq: entries.last().map_or(0, |e| e.seq) })
             }
@@ -650,7 +693,10 @@ async fn decide(state: &Arc<State>, cwd: &str, id: u64, decision: ProposalDecisi
             }
         },
         ProposalDecision::Accept => match status {
-            ProposalStatus::Ready => apply(state, &sid, cwd, &f, by).await,
+            ProposalStatus::Ready => {
+                let entries = apply(state, &sid, cwd, &f, by, None).await?.unwrap_or_default();
+                reply::<ProposalDecide>(Appended { seq: entries.last().map_or(0, |e| e.seq) })
+            }
             ProposalStatus::Failed => Err(refused(format!(
                 "proposal #{id} failed its checks, so it can't be accepted; `strive review {id}` shows why"
             ))),
@@ -666,8 +712,16 @@ async fn decide(state: &Arc<State>, cwd: &str, id: u64, decision: ProposalDecisi
 }
 
 /// Writes an accepted proposal if the file is still as it was when it was
-/// proposed; otherwise records the accept alone, which makes it stale.
-async fn apply(state: &State, sid: &SessionId, cwd: &str, f: &Folded, by: String) -> Reply {
+/// proposed. Otherwise a person's accept is recorded alone, which makes it
+/// stale, and an automatic one records nothing (`None`).
+async fn apply(
+    state: &State,
+    sid: &SessionId,
+    cwd: &str,
+    f: &Folded,
+    by: String,
+    automatic: Option<Automatic>,
+) -> Result<Option<Vec<Entry>>, RpcError> {
     let id = f.state.id;
     let p = &f.state.proposal;
     let rel = strive_learning::relative_path(&p.artifact).map_err(refused)?;
@@ -681,7 +735,10 @@ async fn apply(state: &State, sid: &SessionId, cwd: &str, f: &Folded, by: String
     let _project = state.sessions.workspaces.effect(vec![PathBuf::from(cwd)]).await;
     let now = file_now(state, cwd, &rel).await?.map_err(refused)?;
     let now = now.map(|b| state.cas.put(&b)).transpose().map_err(|e| internal(&e))?;
-    let accepted = Event::ProposalDecided { proposal: id, decision: ProposalDecision::Accept, by };
+    if automatic.is_some() && now != f.state.before {
+        return Ok(None);
+    }
+    let accepted = Event::ProposalDecided { proposal: id, decision: ProposalDecision::Accept, by, automatic };
     let mut events = vec![accepted];
     if now == f.state.before {
         let after = state.cas.put(p.content.as_bytes()).map_err(|e| internal(&e))?;
@@ -692,8 +749,7 @@ async fn apply(state: &State, sid: &SessionId, cwd: &str, f: &Folded, by: String
             .map_err(|why| refused(format!("{why}; nothing was written")))?;
         events.push(Event::ProposalApplied { proposal: id, before: f.state.before, after });
     }
-    let entries = state.sessions.append(sid, events).await.map_err(session_error)?;
-    reply::<ProposalDecide>(Appended { seq: entries.last().map_or(0, |e| e.seq) })
+    state.sessions.append(sid, events).await.map_err(session_error).map(Some)
 }
 
 /// Puts an applied proposal's file back as it was, if it's still as applied.

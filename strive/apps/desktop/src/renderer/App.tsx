@@ -11,6 +11,7 @@ import {
   type ProposalDecision,
   type ProposalState,
   type SessionInfo,
+  type SkippedRun,
 } from "@strive/protocol";
 import { formatUsd as exactUsd, MODE_NAMES } from "@strive/view";
 import {
@@ -66,6 +67,8 @@ const SELECTED_KEY = "strive.learned.selected";
 
 /** Entries in the learning session after which the proposals may read differently. */
 const PROPOSAL_EVENTS = new Set([
+  "learnRequested",
+  "learnSkipped",
   "proposalMade",
   "gateFinished",
   "proposalDecided",
@@ -203,12 +206,14 @@ export function App({ bridge, opened, onSwitch }: Props) {
   const cwd = opened.session.cwd;
 
   const [outsideReview, setOutsideReview] = useState<string[]>([]);
+  const [skipped, setSkipped] = useState<SkippedRun>();
 
   const loadProposals = useCallback(
     () =>
       bridge.request("proposal/list", { cwd }).then((r) => {
         setProposals(r.proposals);
         setOutsideReview(r.changedOutsideReview);
+        setSkipped(r.skipped);
       }),
     [bridge, cwd],
   );
@@ -430,6 +435,7 @@ export function App({ bridge, opened, onSwitch }: Props) {
             <LearnedPane
               proposals={proposals}
               outsideReview={outsideReview}
+              skipped={skipped}
               run={run}
               sessions={projectSessions}
               currentSession={id}

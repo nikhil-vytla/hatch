@@ -1483,3 +1483,78 @@ test("a proposal shows the other proposals for its file, and one is a click away
   await pane.locator(`.learned-detail[data-proposal="${first}"]`).waitFor();
   l.host.close();
 });
+
+/** Resolves once `ready` holds, checking every 50ms, or fails after `ms`. */
+async function until(what: string, ready: () => Promise<boolean>, ms = 20_000): Promise<void> {
+  const deadline = Date.now() + ms;
+
+  while (!(await ready())) {
+    assert.ok(Date.now() < deadline, `timed out waiting for ${what}`);
+    await new Promise((ok) => setTimeout(ok, 50));
+  }
+}
+
+test("a proposal from an automatic run is badged, and says which signs started the run", async () => {
+  // A daemon of its own that scans a session a second after its turn ends, with a stand-in key.
+  const own = mkdtempSync(join(tmpdir(), "strv-desk-auto-"));
+  writeFileSync(join(own, "settings.json"), JSON.stringify({ learning: { idleSeconds: 1 } }));
+  const env = { ...keyless(), STRIVE_HOME: own, STRIVE_HOST: "none", ANTHROPIC_API_KEY: "sk-test-trigger" };
+  execFileSync(STRIVE, ["status"], { env });
+
+  try {
+    const { app, page, cwd } = await openApp(own);
+    const rpc = await Rpc.open(own);
+    const work = String(resultOf(await rpc.call("session/create", { cwd })).id);
+    const l = await learner(cwd, own);
+    // A person's run first: its proposal has no badge.
+    const asked = await proposeMemory(l, cwd, { summary: "Asked for", content: "- One.\n", evidence: work });
+
+    // The work session's host records two turns; the second prompt corrects the first.
+    const host = await Rpc.open(own);
+    resultOf(await host.call("host/register", { id: work }));
+    let fix = 0;
+
+    for (const [turn, text] of [
+      [1, "run the tests"],
+      [2, "no, use bun test"],
+    ] as const) {
+      fix = Number(resultOf(await rpc.call("session/prompt", { id: work, text })).seq);
+      resultOf(await host.call("host/record", { id: work, event: { type: "turnStarted", turn } }));
+      const ended = { type: "turnEnded", turn, reason: { kind: "done" } };
+      resultOf(await host.call("host/record", { id: work, event: ended }));
+    }
+
+    await until("the automatic request", async () => {
+      const read = resultOf(await rpc.call("session/read", { id: l.id }));
+
+      return read.entries.some(
+        (e: { event: { type: string; trigger?: Json } }) => e.event.type === "learnRequested" && e.event.trigger,
+      );
+    });
+
+    const automatic = await proposeMemory(l, cwd, { summary: "Use bun", content: "- Use bun.\n", evidence: work });
+    const pane = await learnedPane(page);
+    await pane.locator(`.learned-item[data-proposal="${automatic}"]`).waitFor();
+
+    assert.deepEqual(
+      await pane.locator(`.learned-item[data-proposal="${automatic}"] .badge.automatic`).allTextContents(),
+      ["Automatic"],
+    );
+    assert.equal(await pane.locator(`.learned-item[data-proposal="${asked}"] .badge.automatic`).count(), 0);
+
+    await pane.locator(`.learned-item[data-proposal="${automatic}"]`).click();
+    const detail = pane.locator(`.learned-detail[data-proposal="${automatic}"]`);
+    await detail.locator(".learned-title .badge.automatic").waitFor();
+    const trigger = detail.locator("[data-trigger=idle]");
+    await trigger.getByText(`Automatic run, after a session went idle: a correction in session ${work}.`).waitFor();
+    assert.deepEqual(await trigger.locator("li").allTextContents(), [`a correction, entry ${fix}: no, use bun test`]);
+
+    rpc.close();
+    host.close();
+    l.host.close();
+    await app.close();
+  } finally {
+    execFileSync(STRIVE, ["stop"], { env });
+    rmSync(own, { recursive: true, force: true });
+  }
+});

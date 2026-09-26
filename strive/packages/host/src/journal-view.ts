@@ -159,12 +159,16 @@ async function block(entry: Entry, effects: Map<number, Effect>, ran: Set<string
     case "layoutProposed":
       return `${at} proposed a desktop layout: ${e.label}`;
     case "learnRequested":
-      return `${at} learning requested`;
+      return `${at} ${e.trigger ? "automatic " : ""}learning requested`;
+    case "learnSkipped":
+      return `${at} an automatic learning run was skipped: ${e.reason}`;
     case "proposalMade":
       return `${at} proposal: ${e.proposal.summary}`;
     case "gateFinished":
       return `${at} proposal #${e.proposal}'s ${e.gate} check: ${e.verdict}`;
     case "proposalDecided":
+      if (e.automatic === "gate") return `${at} proposal #${e.proposal} accepted automatically: every check passed`;
+
       return `${at} proposal #${e.proposal} ${e.decision === "accept" ? "accepted" : "rejected"} by ${e.by}`;
     case "proposalApplied":
       return `${at} proposal #${e.proposal} applied`;

@@ -360,3 +360,99 @@ test("a replayed agent can't reach the project: its writes there are refused and
   const bash = outcome("e2");
   expect(bash?.kind === "done" && bash.exitCode !== undefined && bash.exitCode !== 0).toBe(true);
 });
+
+// `gated` (ADR-0020): the daemon accepts only a proposal whose every check passed.
+
+const GATED = { learning: { mode: "gated" } };
+
+const FIX: ScriptedReply = { toolCalls: [{ id: "r1", name: "write", input: { path: "fixed.txt", content: "x\n" } }] };
+
+/** The replayed agent fixes the task only when the memory tells it how. */
+const helped = (system: string): ScriptedReply =>
+  system.includes(MARKER) ? FIX : { text: "The check looks fine to me." };
+
+const decisions = async (w: World) =>
+  (await events(w)).flatMap((e) => (e.event.type === "proposalDecided" ? [e.event] : []));
+
+const review = (w: World, ...args: string[]) =>
+  Bun.spawnSync([STRIVE, "review", ...args], { cwd: w.project, env: daemon!.env }).stdout.toString();
+
+test("under gated, a proposal whose static, judge and replay checks all passed is accepted by the gate, and a person can roll it back", async () => {
+  const w = await world({ settings: { ...GATED, replay: { runs: 1 } }, replay: helped });
+  const p = await settledProposal(w);
+  const memory = join(w.project, ".strive/memory.md");
+
+  expect(p.gates.map((g) => g.verdict)).toEqual(["pass", "pass", "pass"]);
+  expect(p.status).toBe("applied");
+  expect(p.automatic).toBe("gate");
+  expect(readFileSync(memory, "utf8")).toBe(`- ${MARKER}\n`);
+  expect(await decisions(w)).toEqual([
+    { type: "proposalDecided", proposal: w.id, decision: "accept", by: "gate", automatic: "gate" },
+  ]);
+
+  expect(review(w)).toContain(`#${w.id}`);
+  expect(
+    review(w)
+      .split("\n")
+      .find((l) => l.startsWith(`#${w.id} `)),
+  ).toEndWith("[accepted automatically]");
+  expect(review(w, String(w.id))).toContain("decided     accepted automatically: every check passed");
+
+  const back = Bun.spawnSync([STRIVE, "review", String(w.id), "rollback"], { cwd: w.project, env: daemon!.env });
+  expect(back.stdout.toString()).toContain(`rolled back #${w.id}: removed .strive/memory.md`);
+  expect(existsSync(memory)).toBe(false);
+  const after = (await w.c.request("proposal/list", { cwd: w.project })).proposals.find((q) => q.id === w.id);
+  expect(after?.status).toBe("rolledBack");
+});
+
+test("under gated, a proposal the judge skipped is left for a person, even when replay passed", async () => {
+  // The judge runs only on Anthropic models, so it's skipped; replay runs on Haiku.
+  const w = await world({
+    settings: { ...GATED, judgeModel: "gpt-4.1-mini", replay: { runs: 1, model: "claude-haiku-4-5" } },
+    replay: helped,
+  });
+
+  const p = await settledProposal(w);
+
+  expect(p.gates.map((g) => g.verdict)).toEqual(["pass", "skipped", "pass"]);
+  expect(p.status).toBe("ready");
+  expect(p.automatic).toBeUndefined();
+  expect(await decisions(w)).toEqual([]);
+  expect(existsSync(join(w.project, ".strive/memory.md"))).toBe(false);
+});
+
+test("under gated, a proposal whose replay was skipped is left for a person", async () => {
+  // Replay off; the task session is still there for the judge to hold out.
+  const w = await world({ settings: { ...GATED, replay: { budgetUsd: 0 } } });
+  const p = await settledProposal(w);
+
+  expect(p.gates.map((g) => g.verdict)).toEqual(["pass", "pass", "skipped"]);
+  expect(gate(p, "replay")?.detail).toContain("replay is off");
+  expect(p.status).toBe("ready");
+  expect(p.automatic).toBeUndefined();
+  expect(await decisions(w)).toEqual([]);
+  expect(existsSync(join(w.project, ".strive/memory.md"))).toBe(false);
+});
+
+test("under gated, a proposal whose replay failed is left for a person", async () => {
+  const replayFails = await world({
+    settings: { ...GATED, replay: { runs: 1 } },
+    replay: (system) => (system.includes(MARKER) ? { text: "Nothing to fix." } : FIX),
+  });
+
+  const p = await settledProposal(replayFails);
+
+  expect(p.gates.map((g) => g.verdict)).toEqual(["pass", "pass", "fail"]);
+  expect(p.status).toBe("failed");
+  expect(await decisions(replayFails)).toEqual([]);
+  expect(existsSync(join(replayFails.project, ".strive/memory.md"))).toBe(false);
+});
+
+test("under gated, a proposal the judge failed is left for a person", async () => {
+  const w = await world({ settings: GATED, judgePasses: false });
+  const p = await settledProposal(w);
+
+  expect(p.gates.map((g) => g.verdict)).toEqual(["pass", "fail", "skipped"]);
+  expect(p.status).toBe("failed");
+  expect(await decisions(w)).toEqual([]);
+});

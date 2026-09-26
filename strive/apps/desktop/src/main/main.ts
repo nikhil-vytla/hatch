@@ -254,8 +254,8 @@ async function main() {
       throw new Error(describeError(err));
     });
 
-    // A run may have just made the project's learning session: follow it from here.
-    if (method === "learning/run") await learning.follow();
+    // A run, a person's or the daemon's own, may have made the project's learning session: follow it from here.
+    if (method === "learning/run" || method === "proposal/list") await learning.follow();
 
     return result;
   });

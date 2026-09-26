@@ -51,6 +51,63 @@ struct Run {
 /// The tasks in one work session's journal, in the order their turns ran:
 /// at most one per turn, its first command that failed and later passed.
 pub fn mine(session: &str, entries: &[Entry]) -> Vec<Task> {
+    let (turns, runs) = read(entries);
+    let mut tasks = Vec::new();
+    for (i, turn) in turns.iter().enumerate() {
+        let Some(commit) = &turn.commit else { continue };
+        if turn.prompt.is_empty() {
+            continue;
+        }
+        if let Some((failed, passed)) = first_fixed(&runs, i) {
+            tasks.push(Task {
+                session: session.to_string(),
+                prompt_seq: turn.prompt_seq,
+                prompt: turn.prompt.clone(),
+                commit: commit.clone(),
+                check: failed.command.clone(),
+                failed_seq: failed.seq,
+                passed_seq: passed.seq,
+            });
+        }
+    }
+    tasks
+}
+
+/// A command a turn ran that failed, and the same command's later run with
+/// exit 0 in the same session.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Fixed {
+    pub command: String,
+    pub failed_seq: u64,
+    pub passed_seq: u64,
+}
+
+/// Each turn's first command that failed and later passed, as `mine` finds
+/// them, whether or not the turn could be replayed (a checkpoint, a prompt).
+pub fn fixed(entries: &[Entry]) -> Vec<Fixed> {
+    let (turns, runs) = read(entries);
+    (0..turns.len())
+        .filter_map(|i| first_fixed(&runs, i))
+        .map(|(failed, passed)| Fixed {
+            command: failed.command.clone(),
+            failed_seq: failed.seq,
+            passed_seq: passed.seq,
+        })
+        .collect()
+}
+
+/// Turn `turn`'s first command that failed and that a later run passed.
+fn first_fixed(runs: &[Run], turn: usize) -> Option<(&Run, &Run)> {
+    runs.iter().filter(|r| r.turn == turn && r.exit != 0).find_map(|failed| {
+        let usable = !failed.command.is_empty() && failed.command.len() <= CHECK_LIMIT;
+        let passed = runs.iter().find(|r| r.seq > failed.seq && r.exit == 0 && r.command == failed.command);
+        passed.filter(|_| usable).map(|passed| (failed, passed))
+    })
+}
+
+/// A journal's turns, with their prompts and checkpoints, and the commands
+/// that ran to an exit, each with its turn.
+fn read(entries: &[Entry]) -> (Vec<Turn>, Vec<Run>) {
     // Prompts not yet taken by a turn: (seq, text, checkpoint before it).
     let mut waiting: Vec<(u64, String, Option<String>)> = Vec::new();
     let mut checkpoint: Option<(u64, String)> = None;
@@ -87,30 +144,7 @@ pub fn mine(session: &str, entries: &[Entry]) -> Vec<Task> {
             _ => {}
         }
     }
-    let mut tasks = Vec::new();
-    for (i, turn) in turns.iter().enumerate() {
-        let Some(commit) = &turn.commit else { continue };
-        if turn.prompt.is_empty() {
-            continue;
-        }
-        let red_to_green = runs.iter().filter(|r| r.turn == i && r.exit != 0).find_map(|failed| {
-            let usable = !failed.command.is_empty() && failed.command.len() <= CHECK_LIMIT;
-            let passed = runs.iter().find(|r| r.seq > failed.seq && r.exit == 0 && r.command == failed.command);
-            passed.filter(|_| usable).map(|passed| (failed, passed))
-        });
-        if let Some((failed, passed)) = red_to_green {
-            tasks.push(Task {
-                session: session.to_string(),
-                prompt_seq: turn.prompt_seq,
-                prompt: turn.prompt.clone(),
-                commit: commit.clone(),
-                check: failed.command.clone(),
-                failed_seq: failed.seq,
-                passed_seq: passed.seq,
-            });
-        }
-    }
-    tasks
+    (turns, runs)
 }
 
 /// `text` with the project's directory `from` replaced by `to` wherever it

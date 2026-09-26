@@ -6,9 +6,9 @@ use std::process::ExitCode;
 
 use anyhow::{Result, anyhow};
 use strive_proto::{
-    BlobGet, BlobGetParams, Event, Gate, LearningOpen, LearningRun, LearningRunParams, ProjectRef, ProposalDecide,
-    ProposalDecideParams, ProposalDecision, ProposalList, ProposalRef, ProposalRollback, ProposalState, ProposalStatus,
-    SessionAttach, SessionAttachParams, Verdict, WatchOutcome,
+    BlobGet, BlobGetParams, Event, Gate, LearnTrigger, LearningOpen, LearningRun, LearningRunParams, ProjectRef,
+    ProposalDecide, ProposalDecideParams, ProposalDecision, ProposalList, ProposalRef, ProposalRollback, ProposalState,
+    ProposalStatus, SessionAttach, SessionAttachParams, TriggerKind, Verdict, WatchOutcome,
 };
 
 use crate::client::Client;
@@ -70,13 +70,31 @@ const JUDGE_WAIT: std::time::Duration = std::time::Duration::from_secs(300);
 
 /// One proposal in a list.
 fn line(p: &ProposalState) -> String {
+    let mut marks = Vec::new();
+    if p.trigger.is_some() {
+        marks.push("automatic run");
+    }
+    if p.automatic.is_some() {
+        marks.push("accepted automatically");
+    }
+    let marks = if marks.is_empty() { String::new() } else { format!("  [{}]", marks.join(", ")) };
     format!(
-        "#{:<5} {:<12} {:<20} {}",
+        "#{:<5} {:<12} {:<20} {}{marks}",
         p.id,
         strive_learning::status_name(p.status),
         strive_learning::describe(&p.proposal.artifact),
         p.proposal.summary
     )
+}
+
+/// What started an automatic run, in one line: "after session X went idle:
+/// a correction".
+pub fn trigger_text(t: &LearnTrigger) -> String {
+    let signs = strive_learning::signals::describe(&t.signals);
+    match t.kind {
+        TriggerKind::Idle => format!("after a session went idle: {signs}"),
+        TriggerKind::Turns => format!("after a session's turns reached learning.everyTurns: {signs}"),
+    }
 }
 
 pub async fn review(c: &mut Client, id: Option<u64>, action: Option<Action>) -> Result<ExitCode> {
@@ -98,6 +116,14 @@ pub async fn review(c: &mut Client, id: Option<u64>, action: Option<Action>) -> 
         }
         for s in &listed.may_be_stale {
             println!("{} line {} may be stale: it names {}, which isn't in the project", s.file, s.line, s.missing);
+        }
+        if let Some(s) = &listed.skipped {
+            println!(
+                "an automatic learning run was skipped at {} ({}): {}",
+                when(s.at_ms),
+                trigger_text(&s.trigger),
+                s.reason
+            );
         }
         return Ok(ExitCode::SUCCESS);
     };
@@ -166,6 +192,28 @@ async fn show(c: &mut Client, p: &ProposalState, rel: &str) -> Result<()> {
     writeln!(out, "status      {status}")?;
     writeln!(out, "changes     {} ({rel})", strive_learning::describe(&p.proposal.artifact))?;
     writeln!(out, "proposed    {}", when(p.made_at_ms))?;
+    match &p.trigger {
+        Some(t) => {
+            writeln!(out, "run         automatic, {}", trigger_text(t))?;
+            for s in &t.signals {
+                writeln!(
+                    out,
+                    "              session {} entry {}: {}: {}",
+                    s.session,
+                    s.seq,
+                    strive_learning::signals::kind_name(s.kind),
+                    s.detail
+                )?;
+            }
+        }
+        None => writeln!(out, "run         asked for by a person")?,
+    }
+    if p.automatic.is_some() {
+        writeln!(
+            out,
+            "decided     accepted automatically: every check passed (\"learning\": {{\"mode\": \"gated\"}})"
+        )?;
+    }
     writeln!(out, "\nwhy\n{}", indent(&p.proposal.rationale))?;
     writeln!(out, "\nprediction\n{}", indent(&p.proposal.prediction))?;
     match (&p.proposal.watch, &p.prediction) {

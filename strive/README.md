@@ -87,6 +87,23 @@ changes until you accept it with `strive review`. Accepting writes the file
 only if it's still as the learner saw it; rolling back restores it. The
 agent reads the accepted memory, labeled as reviewed, after `AGENTS.md`.
 
+The learner also runs on its own when a session goes quiet (10 minutes after
+its last turn) and shows a sign worth learning from: a correction, an
+interrupted turn, a declined approval, a command that failed then passed, or
+a failed turn. The scan uses no model. At most 3 such runs a day per project,
+each on the learning session's budget; `strive review` says why each ran, or
+why one was skipped. `"learning"` in settings changes this:
+
+```json
+{ "learning": { "mode": "suggest", "idleSeconds": 600, "everyTurns": 0, "dailyRuns": 3 } }
+```
+
+`off` stops automatic runs (`strive learn` still works). `suggest`, the
+default, leaves every decision to you. `gated` also accepts a proposal whose
+every check passed, none skipped, and marks it "accepted automatically"; you
+can roll it back. A project's `.strive/settings.json` may set a lower mode
+(`{"learning": {"mode": "off"}}`), never a higher one.
+
 ## Benchmarks
 
 `harbor/strive_agent.py` runs strive as a [Harbor](https://github.com/harbor-framework/harbor)

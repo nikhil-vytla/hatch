@@ -8,10 +8,11 @@ still hold.
 
 | ADR | Decision | Status |
 | --- | --- | --- |
+| [0020](0020-learning-triggers.md) | Learning triggers, a cheap pre-filter, and the `learning` setting | Accepted; idle and every-N-turns triggers and `gated` implemented |
 | [0019](0019-predictions-checked.md) | Predictions are checked by a watch the daemon evaluates | Accepted; M11 implemented |
 | [0018](0018-replay-gate.md) | The replay gate runs past tasks again in scratch copies | Accepted; M10 first slice implemented |
 | [0017](0017-judge-gate.md) | The judge gate is the daemon's own model call | Accepted; M9 implemented |
-| [0016](0016-trusted-learning.md) | Trusted learning: proposals, the daemon's checks, a person's decision | Accepted; M7, M8, M9, M10, M11 implemented |
+| [0016](0016-trusted-learning.md) | Trusted learning: proposals, the daemon's checks, a person's decision | Accepted; M7, M8, M9, M10, M11 and triggers implemented |
 | [0015](0015-rebuild-daemon-and-host.md) | Rebuild as a usable agent on a Rust daemon with thin clients | Accepted; M0 implemented |
 | [0009](0009-harness-as-model.md) | Harness pluggability through bounded generation | Historical (Python); Accepted; native profiles and funded execution separately gated |
 | [0010](0010-benchmark-adapter-tau2.md) | General BenchmarkAdapter, tau2 telecom first | Historical (Python); Accepted; installed workload qualification required |

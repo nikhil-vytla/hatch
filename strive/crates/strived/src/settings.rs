@@ -34,6 +34,10 @@ pub struct Settings {
     /// The replay gate (ADR-0018): what it may spend and how much it runs.
     #[serde(default)]
     pub replay: ReplaySetting,
+    /// When the learner runs on its own, and whether anything is accepted
+    /// without a person (ADR-0020).
+    #[serde(default)]
+    pub learning: LearningSetting,
     /// The longest a turn may run before it is stopped.
     #[serde(default = "default_turn_seconds")]
     pub turn_seconds: u64,
@@ -109,6 +113,94 @@ impl ReplaySetting {
         m
     }
 }
+
+/// Automatic learning (ADR-0020).
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct LearningSetting {
+    #[serde(default)]
+    pub mode: LearningMode,
+    /// A work session whose turn ended this long ago, with no prompt since,
+    /// is scanned for signs worth learning from.
+    #[serde(default = "default_idle_seconds")]
+    pub idle_seconds: u64,
+    /// Also scan a work session each time it has ended this many turns; 0
+    /// never does.
+    #[serde(default)]
+    pub every_turns: u64,
+    /// The most automatic runs per project in any 24 hours.
+    #[serde(default = "default_daily_runs")]
+    pub daily_runs: usize,
+}
+
+fn default_idle_seconds() -> u64 {
+    600
+}
+
+fn default_daily_runs() -> usize {
+    3
+}
+
+impl Default for LearningSetting {
+    fn default() -> Self {
+        Self {
+            mode: LearningMode::default(),
+            idle_seconds: default_idle_seconds(),
+            every_turns: 0,
+            daily_runs: default_daily_runs(),
+        }
+    }
+}
+
+/// Ordered from least to most the daemon does on its own, so a project's
+/// own setting can only lower the user's (`min`).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum LearningMode {
+    /// No automatic runs. A person can still ask with `strive learn`.
+    Off,
+    /// Triggers start runs; a person decides on every proposal.
+    #[default]
+    Suggest,
+    /// As `suggest`, and a proposal whose every check passed (none skipped)
+    /// is accepted without a person.
+    Gated,
+    /// Named in ADR-0016 and refused on load: memory and skills carry the
+    /// same risk, so it would mean `gated` (ADR-0020).
+    Auto,
+}
+
+/// `.strive/settings.json` in a project: only what a project may set.
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ProjectSettings {
+    #[serde(default)]
+    pub learning: Option<ProjectLearning>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ProjectLearning {
+    pub mode: LearningMode,
+}
+
+/// Where a project's own settings live, relative to it.
+pub const PROJECT_SETTINGS: &str = ".strive/settings.json";
+
+impl ProjectSettings {
+    /// Parses a project's settings; the error says what's wrong, naming the file.
+    pub fn parse(bytes: &[u8]) -> Result<Self, String> {
+        let s: ProjectSettings =
+            serde_json::from_slice(bytes).map_err(|e| format!("{PROJECT_SETTINGS} can't be read: {e}"))?;
+        if s.learning.as_ref().is_some_and(|l| l.mode == LearningMode::Auto) {
+            return Err(format!("{PROJECT_SETTINGS}: {AUTO_REFUSED}"));
+        }
+        Ok(s)
+    }
+}
+
+const AUTO_REFUSED: &str = "learning.mode \"auto\" isn't available: memory and skills are the only things strive \
+                            learns, and they carry the same risk, so it would mean \"gated\"; use \"gated\"";
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -220,6 +312,12 @@ impl Settings {
         }
         if s.replay.runs == 0 || s.replay.runs > 10 || s.replay.tasks > 10 {
             anyhow::bail!("{}: replay.runs is 1 to 10 and replay.tasks 0 to 10", path.display());
+        }
+        if s.learning.mode == LearningMode::Auto {
+            anyhow::bail!("{}: {AUTO_REFUSED}", path.display());
+        }
+        if s.learning.idle_seconds == 0 {
+            anyhow::bail!("{}: learning.idleSeconds must be at least 1", path.display());
         }
         for (name, server) in &s.mcp_servers {
             if server.transport.as_deref().is_some_and(|t| t != "stdio") {

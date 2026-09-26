@@ -47,6 +47,32 @@ export const GATE_NAMES: Record<Gate, string> = { static: "Static", judge: "Judg
 
 export const VERDICT_NAMES: Record<Verdict, string> = { pass: "passed", fail: "failed", skipped: "skipped" };
 
+/** What a proposal's status means for its file, and what a person can do next. */
+export function statusNote(p: ProposalState, path: string): string {
+  switch (p.status) {
+    case "checking":
+      return "Its checks haven't finished yet.";
+    case "ready":
+      return `Accepting writes ${path}. New sessions in this project read it.`;
+    case "failed":
+      return "A check failed, so it can't be accepted.";
+    case "rejected":
+      return "Rejected. Nothing was written.";
+    case "applied":
+      return p.automatic === "gate"
+        ? `Accepted automatically: every check passed. Written to ${path}; Roll back undoes it.`
+        : `Accepted and written to ${path}.`;
+    case "stale":
+      return `${path} changed after the learner read it, so nothing was written. Learn again for a proposal against the file as it is now.`;
+    case "rolledBack":
+      return p.before === undefined
+        ? `Rolled back: ${path} was removed, as it didn't exist before.`
+        : `Rolled back: ${path} is as it was before.`;
+    default:
+      return p.status satisfies never;
+  }
+}
+
 /** What the learner's tools do, as the pane says it while a run goes on. */
 const STEPS = new Map([
   ["list_sessions", "Looking at this project's sessions"],

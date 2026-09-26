@@ -431,6 +431,7 @@ impl Ledger {
                 | Event::ContextLoaded { .. }
                 | Event::Compacted { .. }
                 | Event::LearnRequested { .. }
+                | Event::LearnSkipped { .. }
                 | Event::ProposalMade { .. }
                 | Event::GateFinished { .. }
                 | Event::ProposalDecided { .. }

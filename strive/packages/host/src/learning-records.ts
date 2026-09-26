@@ -1,7 +1,7 @@
 // How the learning session's own entries read to the learner, live and on
 // resume. The journal is the conversation, so these texts are what makes a
 // resumed learner see what a running one saw.
-import type { Entry, Verdict } from "@strive/protocol";
+import type { Entry, LearnTrigger, SignalKind, Verdict } from "@strive/protocol";
 import type { ToolResultText } from "./transcript";
 
 /** A time as the learner reads it, in list_sessions and in requests alike. */
@@ -9,8 +9,21 @@ export function when(ms: number): string {
   return `${new Date(ms).toISOString().slice(0, 16).replace("T", " ")} UTC`;
 }
 
-/** The prompt a `learnRequested` entry gives: which work sessions to study. */
-export function requestText(sessions: string[], sinceMs: number | undefined): string {
+/** What the daemon's pre-filter calls each sign, as the learner reads it. */
+const SIGNS: Record<SignalKind, string> = {
+  correction: "the user corrected the agent",
+  interrupted: "a turn was interrupted",
+  declined: "the user declined an approval",
+  failedThenPassed: "a command failed, then passed",
+  turnFailed: "a turn failed",
+};
+
+/**
+ * The prompt a `learnRequested` entry gives: which work sessions to study,
+ * and for an automatic run, the signs that started it, so the learner reads
+ * those entries first.
+ */
+export function requestText(sessions: string[], sinceMs: number | undefined, trigger?: LearnTrigger): string {
   const which =
     sessions.length > 0
       ? `Study these work sessions: ${sessions.join(", ")}.`
@@ -18,7 +31,17 @@ export function requestText(sessions: string[], sinceMs: number | undefined): st
         ? "Study this project's work sessions. You haven't looked at this project before."
         : `Study this project's work sessions active since ${when(sinceMs)}, when you last looked.`;
 
-  return `${which} Propose what the next sessions here should know, or nothing if nothing is worth it.`;
+  const ask = `${which} Propose what the next sessions here should know, or nothing if nothing is worth it.`;
+
+  if (!trigger) return ask;
+
+  const signs = trigger.signals.map((s) => `- session ${s.session} entry ${s.seq}: ${SIGNS[s.kind]}: ${s.detail}`);
+
+  return [
+    ask,
+    "Nobody asked for this run: strive started it because these entries looked worth learning from. Read them first; they may hold no lesson.",
+    ...signs,
+  ].join("\n");
 }
 
 /**
@@ -35,7 +58,7 @@ export class PromptReader {
     if (e.type === "userMessage") return e.text;
 
     if (e.type !== "learnRequested") return undefined;
-    const text = requestText(e.sessions, this.lastRequestMs);
+    const text = requestText(e.sessions, this.lastRequestMs, e.trigger);
     this.lastRequestMs = entry.tsMs;
 
     return text;

@@ -152,6 +152,18 @@ export type * from "./generated/PredictionTally";
 
 export type * from "./generated/StaleMention";
 
+export type * from "./generated/LearnTrigger";
+
+export type * from "./generated/LearnSignal";
+
+export type * from "./generated/TriggerKind";
+
+export type * from "./generated/SignalKind";
+
+export type * from "./generated/Automatic";
+
+export type * from "./generated/SkippedRun";
+
 export type * from "./generated/Verdict";
 
 export type * from "./generated/SessionChangesParams";

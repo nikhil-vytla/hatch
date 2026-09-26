@@ -14,7 +14,8 @@
 use std::collections::BTreeMap;
 
 use strive_proto::{
-    Digest, Entry, Event, GateOutcome, ProposalDecision, ProposalState, ProposalStatus, Verdict, WatchOutcome,
+    Digest, Entry, Event, GateOutcome, LearnTrigger, ProposalDecision, ProposalState, ProposalStatus, Verdict,
+    WatchOutcome,
 };
 
 /// What an accepted proposal wrote: the file before (none: it didn't
@@ -47,9 +48,13 @@ struct Marks {
 /// Every proposal in the journal, oldest first.
 pub fn fold(entries: &[Entry]) -> Vec<Folded> {
     let mut out: Vec<(ProposalState, Marks)> = Vec::new();
+    // The latest request's trigger: a proposal belongs to the run that was
+    // asked for last before it.
+    let mut trigger: Option<LearnTrigger> = None;
     for e in entries {
         let find = |out: &mut Vec<(ProposalState, Marks)>, id: u64| out.iter_mut().position(|(s, _)| s.id == id);
         match &e.event {
+            Event::LearnRequested { trigger: t, .. } => trigger.clone_from(t),
             Event::ProposalMade { proposal, before, .. } => out.push((
                 ProposalState {
                     id: e.seq,
@@ -59,6 +64,8 @@ pub fn fold(entries: &[Entry]) -> Vec<Folded> {
                     status: ProposalStatus::Checking,
                     gates: Vec::new(),
                     prediction: None,
+                    trigger: trigger.clone(),
+                    automatic: None,
                 },
                 Marks::default(),
             )),
@@ -74,10 +81,13 @@ pub fn fold(entries: &[Entry]) -> Vec<Folded> {
                     gates.sort_by_key(|g| crate::GATES.iter().position(|x| *x == g.gate));
                 }
             }
-            Event::ProposalDecided { proposal, decision, .. } => {
+            Event::ProposalDecided { proposal, decision, automatic, .. } => {
                 if let Some(i) = find(&mut out, *proposal) {
                     match decision {
-                        ProposalDecision::Accept => out[i].1.accepted = true,
+                        ProposalDecision::Accept => {
+                            out[i].1.accepted = true;
+                            out[i].0.automatic = *automatic;
+                        }
                         ProposalDecision::Reject => out[i].1.rejected = true,
                     }
                 }
@@ -114,7 +124,7 @@ pub fn fold(entries: &[Entry]) -> Vec<Folded> {
             | Event::AssistantMessage { .. }
             | Event::TurnEnded { .. }
             | Event::ContextLoaded { .. }
-            | Event::LearnRequested { .. }
+            | Event::LearnSkipped { .. }
             | Event::LayoutProposed { .. }
             | Event::Compacted { .. }
             | Event::ReplayStarted { .. }
