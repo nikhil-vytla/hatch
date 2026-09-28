@@ -37,6 +37,7 @@ mod tui;
 mod watch;
 mod workspaces;
 
+use std::path::Path;
 use std::process::ExitCode;
 use std::time::Duration;
 
@@ -149,8 +150,11 @@ enum Cmd {
 
 fn main() -> ExitCode {
     let cli = Cli::parse();
-    if matches!(cli.command, Some(Cmd::Daemon { .. })) {
-        close_inherited();
+    if matches!(cli.command, Some(Cmd::Daemon { .. }))
+        && let Err(e) = close_inherited(&[Path::new("/dev/fd"), Path::new("/proc/self/fd")])
+    {
+        eprintln!("strive: {e}");
+        return ExitCode::FAILURE;
     }
     let rt = match tokio::runtime::Builder::new_multi_thread().enable_all().build() {
         Ok(rt) => rt,
@@ -172,16 +176,38 @@ fn main() -> ExitCode {
 /// A launcher (a CI runner, an editor, a shell) can leave descriptors open
 /// across exec, and every command, host and MCP server the daemon starts
 /// would inherit them, sandboxed commands included. Run before the runtime
-/// exists, so nothing of the daemon's own is open yet.
-fn close_inherited() {
-    let Ok(entries) = std::fs::read_dir("/dev/fd") else { return };
-    // Collected first: the listing holds a descriptor of its own while it's read.
-    let open: Vec<i32> =
-        entries.filter_map(Result::ok).filter_map(|e| e.file_name().to_str()?.parse::<i32>().ok()).collect();
+/// exists, so nothing of the daemon's own is open yet. It fails closed: a
+/// daemon that can't list its descriptors, or finds one still open after
+/// closing, doesn't start.
+fn close_inherited(listings: &[&Path]) -> Result<()> {
+    let (listing, open) = listings
+        .iter()
+        .find_map(|dir| open_fds(dir).ok().map(|fds| (*dir, fds)))
+        .ok_or_else(|| {
+            anyhow::anyhow!(
+                "can't list the daemon's open descriptors (tried {}), so it can't close ones it was started with; not starting",
+                listings.iter().map(|d| d.display().to_string()).collect::<Vec<_>>().join(", ")
+            )
+        })?;
     for fd in open.into_iter().filter(|fd| *fd > 2) {
-        // The listing's own descriptor is gone by now: EBADF, harmlessly.
+        // EBADF is the listing's own descriptor, already closed; anything
+        // else shows as still open below.
         let _ = nix::unistd::close(fd);
     }
+    // The new listing opens one descriptor of its own, the lowest free one;
+    // it's the only one above stderr only if every other was closed.
+    let left: Vec<i32> = open_fds(listing)?.into_iter().filter(|fd| *fd > 2).collect();
+    anyhow::ensure!(
+        left.len() <= 1,
+        "descriptors it was started with stay open after closing them ({left:?}); not starting"
+    );
+    Ok(())
+}
+
+/// The descriptors a listing directory (`/dev/fd`) shows, read whole first:
+/// the listing holds a descriptor of its own while it's read.
+fn open_fds(dir: &Path) -> std::io::Result<Vec<i32>> {
+    Ok(std::fs::read_dir(dir)?.filter_map(Result::ok).filter_map(|e| e.file_name().to_str()?.parse().ok()).collect())
 }
 
 #[expect(clippy::too_many_lines, reason = "one short arm per command")]
@@ -284,5 +310,20 @@ async fn run(cli: Cli) -> Result<ExitCode> {
                 server::Started::Served | server::Started::AlreadyRunning => Ok(ExitCode::SUCCESS),
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::Path;
+
+    /// A daemon that can't see its descriptors doesn't start with them. Only
+    /// listings that don't exist are tried here: a real one would close the
+    /// test process's own descriptors.
+    #[test]
+    fn a_daemon_that_cant_list_its_descriptors_doesnt_start() {
+        let e = super::close_inherited(&[Path::new("/nonexistent/fd"), Path::new("/nonexistent/proc")]).unwrap_err();
+        let text = e.to_string();
+        assert!(text.contains("/nonexistent/fd, /nonexistent/proc") && text.ends_with("not starting"), "{text}");
     }
 }
