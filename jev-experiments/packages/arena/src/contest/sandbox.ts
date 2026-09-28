@@ -5,8 +5,8 @@
  * author; the browser's practice runs use a Web Worker instead.
  */
 import { getQuickJS, shouldInterruptAfterDeadline } from "quickjs-emscripten";
-import { QUESTIONS } from "../one-box/questions";
-import { asEntry, type Entry } from "./one-box";
+import { QUESTIONS } from "../one-box/questions.js";
+import { asEntry, type Entry } from "./one-box.js";
 
 /** A call that runs this long is stopped outright (the scoring budget is far lower). */
 const HARD_LIMIT_MS = 250;

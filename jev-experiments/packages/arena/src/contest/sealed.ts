@@ -7,11 +7,11 @@
 import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
 import { gunzipSync, gzipSync } from "node:zlib";
 import { z } from "zod";
-import { answersSchema, toReading } from "../one-box/adapter";
-import { keyword } from "../one-box/keyword";
-import { INTENTS } from "../one-box/questions";
-import { normalizeKey, outcome, replay, type AnswerFor } from "../one-box/replay";
-import { logScore, pairedGain, runEntry, type Entry } from "./one-box";
+import { answersSchema, toReading } from "../one-box/adapter.js";
+import { keyword } from "../one-box/keyword.js";
+import { INTENTS } from "../one-box/questions.js";
+import { normalizeKey, outcome, replay, type AnswerFor } from "../one-box/replay.js";
+import { logScore, pairedGain, runEntry, type Entry } from "./one-box.js";
 
 export const sealedSchema = z.object({
   schema: z.literal("one-box.sealed/1"),

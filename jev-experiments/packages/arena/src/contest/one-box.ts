@@ -8,8 +8,8 @@
  * it had), never as a disqualification.
  */
 import { z } from "zod";
-import { toReading, type WireAnswers } from "../one-box/adapter";
-import { INTENTS, QUESTION_IDS, QUESTIONS, type Reading } from "../one-box/questions";
+import { toReading, type WireAnswers } from "../one-box/adapter.js";
+import { INTENTS, QUESTION_IDS, QUESTIONS, type Reading } from "../one-box/questions.js";
 import {
   normalizeKey,
   outcome,
@@ -18,7 +18,7 @@ import {
   type Expected,
   type Outcome,
   type Policy,
-} from "../one-box/replay";
+} from "../one-box/replay.js";
 
 /** Time an entry has per keystroke; slower answers do not land for that keystroke. */
 export const BUDGET_MS = 50;
