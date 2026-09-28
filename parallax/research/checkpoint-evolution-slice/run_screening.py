@@ -9,6 +9,12 @@ Live (paid; requires an exported HUD_API_KEY and explicit approval):
 
     uv run python research/checkpoint-evolution-slice/run_screening.py \
         --live --approve-spend
+
+`--headroom-variant` swaps in the budget-headroom disambiguation family
+(`ce-tally-1-headroom`: caps 4096/8192/12288 instead of flat 4096, max
+output tokens 4096 instead of 2048, everything else identical) per
+PREREGISTRATION-HEADROOM.md. Note the original family no longer passes
+the live path's budget-headroom refusal; it is kept for the record.
 """
 
 from __future__ import annotations
@@ -19,11 +25,18 @@ from pathlib import Path
 
 from parallax.checkpoint_evolution import StageVerification
 from parallax.checkpoint_runner import CeRunRecord, read_ce_jsonl
-from parallax.checkpoint_screening import CE_TRIAL_SEEDS, run_ce_screening
+from parallax.checkpoint_screening import (
+    CE_MAX_OUTPUT_TOKENS,
+    CE_TRIAL_SEEDS,
+    run_ce_screening,
+)
 
 REPO = Path(__file__).resolve().parents[2]
 SEED_PATH = REPO / "tests" / "fixtures" / "checkpoint_family.json"
-EVIDENCE = Path(__file__).resolve().parent / "evidence"
+HERE = Path(__file__).resolve().parent
+HEADROOM_SEED_PATH = HERE / "fixtures" / "checkpoint_family_headroom.json"
+HEADROOM_MAX_OUTPUT_TOKENS = 4096
+EVIDENCE = HERE / "evidence"
 
 
 def main(argv: list[str]) -> int:
@@ -41,6 +54,11 @@ def main(argv: list[str]) -> int:
         default=len(CE_TRIAL_SEEDS),
         help="number of preregistered trial seeds to schedule",
     )
+    parser.add_argument(
+        "--headroom-variant",
+        action="store_true",
+        help="run the budget-headroom disambiguation family instead",
+    )
     arguments = parser.parse_args(argv)
     if arguments.live:
         mode, name = "live", "screening.jsonl"
@@ -48,16 +66,24 @@ def main(argv: list[str]) -> int:
         mode, name = "dry-run", "dry-run-sandbox.jsonl"
     else:
         mode, name = "dry-run", "dry-run.jsonl"
+    if arguments.headroom_variant:
+        seed_path = HEADROOM_SEED_PATH
+        max_output_tokens = HEADROOM_MAX_OUTPUT_TOKENS
+        name = name.replace(".jsonl", "-headroom.jsonl")
+    else:
+        seed_path = SEED_PATH
+        max_output_tokens = CE_MAX_OUTPUT_TOKENS
     output = EVIDENCE / name
     if output.exists():
         raise SystemExit(f"evidence already exists: {output}")
     runs = run_ce_screening(
         mode=mode,
-        seed_path=SEED_PATH,
+        seed_path=seed_path,
         output_path=output,
         trial_seeds=CE_TRIAL_SEEDS[: arguments.seeds],
         dry_run_execution="sandbox" if arguments.sandbox else "trusted-fixture",
         approve_spend=arguments.approve_spend,
+        max_output_tokens=max_output_tokens,
     )
     records = read_ce_jsonl(output)
     stage_receipts = [

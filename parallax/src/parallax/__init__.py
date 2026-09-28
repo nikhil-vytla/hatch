@@ -1,7 +1,9 @@
 from .checkpoint_agent import AgentReplyError, ProviderCheckpointAgent
 from .checkpoint_evolution import (
+    BudgetMatchingError,
     CheckpointError,
     admit_family,
+    budget_headroom_violations,
     load_seed_family,
     verify_stage,
 )
@@ -30,6 +32,7 @@ from .swebench import (
 __all__ = [
     "AgentReplyError",
     "BudgetError",
+    "BudgetMatchingError",
     "CheckpointError",
     "CheckpointRunError",
     "ConstructionError",
@@ -40,6 +43,7 @@ __all__ = [
     "SpendApprovalRequired",
     "SweBenchError",
     "admit_family",
+    "budget_headroom_violations",
     "build_screening_plan",
     "build_script_family",
     "build_swe_script_family",

@@ -159,6 +159,28 @@ insertions (`repair-scheduled`). A quality threshold inside $V_i$ is a
 verifier intervention and cannot be combined silently with any other
 contrast.
 
+**Constraint (effective, not just nominal, budget matching).** Sharing the
+declared caps is necessary but not sufficient: the intervention itself can
+change how much of a shared cap an arm must spend. With full-file-map
+replies, the evolved arm re-emits a carried workspace whose only bound is
+the *previous* stage's cap, so the budget guaranteed to remain for new
+stage content is the cap increment — flat caps guarantee zero increment
+while the carry-reference arm restarts every stage from the lean
+reference. The first paid screening run demonstrated the failure mode: a
+uniform evolved-arm stage-3 "budget" separation manufactured entirely by
+the flat 4096-byte cap (see the slice's screening reports). A family is
+budget-matched for the `evolved` vs `carry-reference` contrast only if
+the stage-1 cap covers at least $\kappa$ times the stage-1 reference and
+every later cap increment covers at least $\kappa$ times the reference
+increment ($\kappa = 2$ by default) — a floor that keeps failure from
+being built into the design, not a success guarantee. This is enforced
+structurally, not by convention: `budget_headroom_violations`
+(`checkpoint_evolution.py`) computes the rule, and the live screening
+path refuses to spend on a violating family (`BudgetMatchingError`).
+The same reasoning applies to any future reply format: whatever the
+agent must re-emit as a function of the carried state, the cap schedule
+must grow at least as fast as the legal carried state does.
+
 **Hypothesis.** Iterative extension of an agent's own artifact can expose
 compounding failure modes — verification decay and quality degradation —
 that matched single-episode or reference-workspace presentations of the same
@@ -208,8 +230,10 @@ An implementation requires Parallax-owned regression coverage for:
 - admission gates — *implemented*: schema round-trip, completeness,
   leakage lint, incremental gold, per-stage no-op, recorded in a
   digest-bound `AdmissionReceipt`; an unadmitted family is
-  unrepresentable to the runner (`AdmittedFamily`). Dual references,
-  mutant/ambiguity checks, churn-ratio design pressure, and headroom
+  unrepresentable to the runner (`AdmittedFamily`); the budget-headroom
+  rule above is *implemented* as a live-path refusal
+  (`budget_headroom_violations`). Dual references, mutant/ambiguity
+  checks, churn-ratio design pressure, and compute-priced headroom
   calibration are **deferred** (see the slice notes).
 
 These are semantic contracts. They do not require byte parity with the

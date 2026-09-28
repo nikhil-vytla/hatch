@@ -7,10 +7,13 @@ Parallax's second executable strategy, alongside Evolving Intent. The
 deliverable is an offline-verifiable vertical slice — typed domain
 model, black-box entrypoint verifier, executable admission gates, a
 harness-owned checkpoint runner with two controlled arms, and a
-hand-verified seed family — plus the first paid screening run over it:
-60 Haiku stage calls, sandboxed verification, $0.28 metered spend, and
-a complete evolved-vs-carry separation at stage 3
-([screening-report.md](screening-report.md)).
+hand-verified seed family — plus two paid screening runs over it: the
+preregistered 60-call screening whose complete stage-3 arm separation
+([screening-report.md](screening-report.md)) turned out to be
+manufactured by the instrument, and the preregistered disambiguation
+run that proved it and bought a structural design constraint
+([disambiguation-report.md](disambiguation-report.md)). Total metered
+spend ~$0.56.
 
 The as-implemented contract lives in
 [`../../docs/methods/checkpoint-evolution.md`](../../docs/methods/checkpoint-evolution.md);
@@ -28,10 +31,12 @@ this folder records how the work got there.
 | Provider adapter | `src/parallax/checkpoint_agent.py` | `ProviderCheckpointAgent`: renders (public spec, carried workspace, budget) into chat messages against the existing HUD-gateway provider boundary, parses the strict JSON file-map reply (exact ```json fence tolerated) into a `Workspace`, meters per-stage tokens/cost into `StageReceipt.usage` — including on stages that fail after spend |
 | Verifier sandbox | `src/parallax/checkpoint_sandbox.py` | `SandboxCaseExecution`: every sealed case in a disposable digest-pinned container (`python@sha256:57cd7c…710de`, `linux/amd64`), no network, read-only rootfs except the working directory, non-root user, CPU/memory/pid limits, in-container case timeout; docker faults are verifier RunFailures |
 | Screening driver | `src/parallax/checkpoint_screening.py`, launched by [`run_screening.py`](run_screening.py) | `run_ce_screening`: dry-run (scripted gateway, no key, no spend) and live (spend approval, hard cap, mandatory sandbox, reported-model drift check) over the preregistered design |
-| Tests | `tests/test_checkpoint_evolution.py`, `tests/test_checkpoint_runner.py`, `tests/test_checkpoint_agent.py`, `tests/test_checkpoint_sandbox.py`, `tests/test_checkpoint_screening.py` | 73 offline tests covering every invariant above, both arms end to end, the adapter wire behaviors, sandbox lockdown and fault classification, the full screening path, and real-container integration probes |
-| Mutation gauntlet | [`mutants/run_gauntlet.py`](mutants/run_gauntlet.py) | 24 targeted semantic mutants; all killed |
+| Tests | `tests/test_checkpoint_evolution.py`, `tests/test_checkpoint_runner.py`, `tests/test_checkpoint_agent.py`, `tests/test_checkpoint_sandbox.py`, `tests/test_checkpoint_screening.py` | 78 offline tests covering every invariant above, both arms end to end, the adapter wire behaviors, sandbox lockdown and fault classification, the full screening path, and real-container integration probes |
+| Mutation gauntlet | [`mutants/run_gauntlet.py`](mutants/run_gauntlet.py) | 25 targeted semantic mutants; all killed |
 | Dry-run evidence | [`evidence/`](evidence/) | `dry-run.jsonl` (10-seed preregistered shape, 60/60 stages verified, $0) and `dry-run-sandbox.jsonl` (2 seeds through the real container sandbox, 12/12 verified) |
 | Screening evidence | [`evidence/screening.jsonl`](evidence/screening.jsonl), summarized by [`summarize_screening.py`](summarize_screening.py) | the executed preregistered live run: 60/60 stage calls, receipt chain confirmed, $0.2813 metered; report in [screening-report.md](screening-report.md) |
+| Budget-headroom rule | `budget_headroom_violations` + `BudgetMatchingError` in `src/parallax/checkpoint_evolution.py`, enforced on the live path in `src/parallax/checkpoint_screening.py` (mutant M25) | structural refusal of budget-confounded designs: stage-1 cap ≥ 2× the stage-1 reference, every cap increment ≥ 2× the reference increment |
+| Disambiguation evidence | [`evidence/screening-headroom.jsonl`](evidence/screening-headroom.jsonl), family by [`make_headroom_family.py`](make_headroom_family.py), preregistered in [PREREGISTRATION-HEADROOM.md](PREREGISTRATION-HEADROOM.md) | the variant run (caps 4096/8192/12288, 4096 output tokens, all else identical): 60/60 strict, zero RunFailures, $0.2796; report in [disambiguation-report.md](disambiguation-report.md) |
 
 ## The invariants that matter
 
@@ -67,22 +72,37 @@ this folder records how the work got there.
   approval and an under-cap estimate (M24 dies), refuses any stage call
   that could cross the cap mid-run, and meters every stage — failed
   stages included — into receipts (M21 dies).
+- **Effective budget matching**: the live path refuses families whose
+  cap schedule leaves the arms nominally matched but effectively
+  unmatched — every cap increment must cover 2× the reference
+  increment (`budget_headroom_violations`; M25 dies). Bought by the
+  disambiguation run, which showed the first screening's stage-3
+  separation was manufactured by flat caps.
 
-## Screening result (executed 2026-08-03)
+## Screening results (executed 2026-08-03, two runs)
 
-The preregistered 60-call run executed unchanged: 10 seeds × 2 arms × 3
+**Run 1** (preregistered screening, $0.2813): 10 seeds × 2 arms × 3
 checkpoints, Claude Haiku 4.5, every sealed case verified inside the
 pinned container sandbox. Both arms passed stages 1–2 strict on all
-seeds. At stage 3 the arms separated completely: `carry-reference`
-verified strict 10/10, while `evolved` — re-serializing its own
-increasingly verbose workspace — exceeded the family's 4096-byte
-workspace budget 10/10 (replies of 4802–4864 bytes) and produced no
-verifiable stage-3 workspace. All failures are budget-classified agent
-behavior; infrastructure failures were zero, evidence completeness was
-100%, and actual spend was $0.2813, so the preregistered decision rule
-says proceed to multi-family synthesis. One family, one model,
-bounds-only language throughout — full tables and claim limits in
-[screening-report.md](screening-report.md).
+seeds; at stage 3 the arms separated completely — `carry-reference`
+strict 10/10, `evolved` 10/10 budget RunFailures against the flat
+4096-byte cap. Harness gate: 60/60 calls delivered and validated, zero
+infrastructure failures ([screening-report.md](screening-report.md)).
+
+**Run 2** (preregistered disambiguation, $0.2796): the separation was
+confounded — the evolved arm is the only arm that must re-emit its own
+accumulated workspace inside the shared cap, so flat caps are
+nominally matched but effectively unmatched. The variant family
+changed exactly one lever (mechanical output ceilings: caps
+4096/8192/12288, output tokens 4096) and the separation vanished:
+evolved strict 10/10 at every stage, paired bounds [0, 0]. **The
+original stage-3 finding was the instrument, not self-accumulation.**
+What survives is a cost/bloat signature: evolved workspaces still grow
+to 2.3× carry's and cost 1.52× on an identical schedule
+([disambiguation-report.md](disambiguation-report.md)). The confound
+is now a structural refusal on the live path
+(`budget_headroom_violations`), written into the method doc as a
+design constraint for future families.
 
 ## Task-family choice
 
@@ -102,15 +122,15 @@ churn-ratio, headroom) are the recorded next step. Full reasoning in
 All commands from the `parallax/` package root:
 
 ```bash
-uv run python -m pytest -q            # 197 passed (124 existing + 73 new)
-uv run python -O -m pytest -q         # 197 passed (expected -O assertion warning)
+uv run python -m pytest -q            # 216 passed (post-merge main + 78 slice tests)
+uv run python -O -m pytest -q         # 216 passed (expected -O assertion warning)
 uv run ruff check src tests research/checkpoint-evolution-slice   # clean
 uv run ruff format --check src tests  # clean
 uvx ty check src                      # clean
 uv run python -m compileall -q src    # clean
 uv build                              # sdist + wheel build
 uv run python research/checkpoint-evolution-slice/mutants/run_gauntlet.py
-                                      # 24/24 mutants killed
+                                      # 25/25 mutants killed
 uv run python research/checkpoint-evolution-slice/make_seed_family.py
                                       # regenerates the fixture; all 5 gates pass
 uv run python research/checkpoint-evolution-slice/run_screening.py
