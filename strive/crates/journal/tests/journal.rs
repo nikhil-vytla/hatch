@@ -192,6 +192,27 @@ fn appends_after_reopening_continue_the_sequence() {
     assert_eq!((report.problem, report.committed, report.entries.len()), (None, 4, 4));
 }
 
+/// The daemon names an entry before appending it (a proposal's id is the seq
+/// it's about to get), so `next_seq` must be the seq the next append gets,
+/// before and after a reopen.
+#[test]
+fn next_seq_is_the_seq_the_next_append_gets() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut j = Journal::create(dir.path(), SESSION, &key(), 1000, &[started()]).unwrap();
+    for text in ["a", "b"] {
+        let predicted = j.next_seq();
+        let appended = j.append(2000, &[msg(text)]).unwrap();
+        assert_eq!(appended.iter().map(|e| e.seq).collect::<Vec<_>>(), vec![predicted], "{text}");
+    }
+    j.commit().unwrap();
+    drop(j);
+    let (mut j, entries) = Journal::open(dir.path(), SESSION, &key(), 3000).unwrap();
+    let predicted = j.next_seq();
+    let appended = j.append(3000, &[msg("c"), msg("d")]).unwrap();
+    assert_eq!(appended[0].seq, predicted, "after the {} entries read back", entries.len());
+    assert_eq!(j.next_seq(), appended[1].seq + 1);
+}
+
 #[test]
 fn opening_a_tampered_journal_fails_with_the_problem() {
     let dir = tempfile::tempdir().unwrap();

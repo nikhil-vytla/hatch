@@ -212,12 +212,12 @@ impl Journal {
         Ok((j, entries))
     }
 
-    /// Buffers entries. They are durable only after [`Journal::commit`].
     /// The sequence number the next appended entry gets.
     pub fn next_seq(&self) -> u64 {
         self.next_seq
     }
 
+    /// Buffers entries. They are durable only after [`Journal::commit`].
     pub fn append(&mut self, ts_ms: u64, events: &[Event]) -> io::Result<Vec<Entry>> {
         self.check()?;
         let r = self.write_entries(ts_ms, events);
