@@ -1,6 +1,6 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, reason = "a test fails by panicking")]
 use serde_json::{Value, json};
-use strive_gateway::{Api, Holdback, RequestInfo, UsageMeter, check_betas, prepare_request};
+use strive_gateway::{Api, Holdback, MAX_METERED, RequestInfo, UsageMeter, check_betas, prepare_request};
 use strive_proto::Usage;
 
 fn usage(input: u64, output: u64, cache_write: u64, cache_read: u64) -> Usage {
@@ -341,13 +341,46 @@ fn inputs_the_provider_fetches_are_refused_and_inline_ones_are_not() {
             json!({"model": "gpt-5", "input": [{"role": "user", "content": [
             {"type": "input_file", "file_id": "file_1"}]}]}),
         ),
+        (
+            Api::OpenAiChat,
+            json!({"model": "gpt-4.1", "messages": [{"role": "user", "content": [
+            {"type": "file", "file": {"file_id": "file_1"}}]}]}),
+        ),
+        (
+            Api::OpenAiResponses,
+            json!({"model": "gpt-5", "input": [{"role": "user", "content": [
+            {"type": "input_image", "image_url": "https://example.com/a.png"}]}]}),
+        ),
+        (
+            Api::OpenAiResponses,
+            json!({"model": "gpt-5", "input": [{"role": "user", "content": [
+            {"type": "input_file", "file_url": "https://example.com/a.pdf"}]}]}),
+        ),
+        (Api::OpenAiResponses, json!({"model": "gpt-5", "input": [{"type": "item_reference", "id": "msg_1"}]})),
     ];
     for (api, body) in refused {
         assert_eq!(prepared(api, &body), Err(why), "{body}");
     }
-    let inline = json!({"model": "gpt-4.1", "messages": [{"role": "user", "content": [
-        {"type": "image_url", "image_url": {"url": "data:image/png;base64,iVBORw0KGgo="}}]}]});
-    assert!(prepared(Api::OpenAiChat, &inline).is_ok());
+    let inline = [
+        (
+            Api::OpenAiChat,
+            json!({"model": "gpt-4.1", "messages": [{"role": "user", "content": [
+            {"type": "image_url", "image_url": {"url": "data:image/png;base64,iVBORw0KGgo="}}]}]}),
+        ),
+        (
+            Api::OpenAiChat,
+            json!({"model": "gpt-4.1", "messages": [{"role": "user", "content": [
+            {"type": "file", "file": {"filename": "a.pdf", "file_data": "data:application/pdf;base64,JVBERi0="}}]}]}),
+        ),
+        (
+            Api::OpenAiResponses,
+            json!({"model": "gpt-5", "input": [{"role": "user", "content": [
+            {"type": "input_image", "image_url": "data:image/png;base64,iVBORw0KGgo="}]}]}),
+        ),
+    ];
+    for (api, body) in inline {
+        assert!(prepared(api, &body).is_ok(), "{body}");
+    }
     // The same names in a tool's schema or a tool call's arguments are the tool's own.
     let tool_names = json!({"model": "claude-haiku-4-5", "max_tokens": 1,
         "tools": [{"name": "open", "input_schema": {"type": "object", "properties": {"file_id": {"type": "string"}}}}],
@@ -416,4 +449,57 @@ fn betas_that_change_the_price_are_refused_and_others_are_not() {
     assert!(check_betas("context-1m-2025-08-07").is_err());
     assert!(check_betas("fine-grained-tool-streaming-2025-05-14, context-1m-2025-08-07").is_err());
     assert_eq!(check_betas("fine-grained-tool-streaming-2025-05-14,interleaved-thinking-2025-05-14"), Ok(()));
+}
+
+/// A whole line goes to the client as soon as it arrives: a client waiting
+/// for an event's closing blank line must not wait for the next chunk.
+#[test]
+fn whole_lines_pass_as_soon_as_they_arrive() {
+    let mut h = Holdback::default();
+    let first = &ANTHROPIC_SSE[..ANTHROPIC_SSE.find("event: content_block_delta").unwrap()];
+    assert_eq!(String::from_utf8(h.feed(first.as_bytes())).unwrap(), first);
+    let next = h.feed(b"event: content_block_delta\ndata: {");
+    assert_eq!(String::from_utf8(next).unwrap(), "event: content_block_delta\n");
+}
+
+/// [`MAX_METERED`] is the largest body, or stream event, still read.
+#[test]
+fn the_meter_reads_up_to_its_limit_exactly() {
+    let json = r#"{"content":[],"usage":{"input_tokens":9,"output_tokens":8}}"#;
+    let body = format!("{json}{}", " ".repeat(MAX_METERED - json.len()));
+    assert_eq!(metered(Api::AnthropicMessages, false, &body), Some(usage(9, 8, 0, 0)));
+    assert_eq!(metered(Api::AnthropicMessages, false, &format!("{body} ")), None);
+
+    let line = ANTHROPIC_SSE.lines().find(|l| l.contains("text_delta")).unwrap();
+    let pad = "y".repeat(MAX_METERED - (line.len() - "Hello".len()));
+    let sse = ANTHROPIC_SSE.replace("\"text\":\"Hello\"", &format!("\"text\":\"{pad}\""));
+    assert_eq!(sse.lines().map(str::len).max(), Some(MAX_METERED));
+    assert_eq!(metered(Api::AnthropicMessages, true, &sse), Some(usage(25, 15, 0, 1000)));
+    let over = ANTHROPIC_SSE.replace("\"text\":\"Hello\"", &format!("\"text\":\"{pad}y\""));
+    assert_eq!(metered(Api::AnthropicMessages, true, &over), None);
+}
+
+/// SSE joins an event's data lines with a line break. Glued together, a
+/// number split across two lines would read as another number; joined, the
+/// event isn't JSON and its usage is unknown.
+#[test]
+fn an_events_data_lines_are_joined_with_a_line_break() {
+    let split = "event: response.completed\n\
+data: {\"type\":\"response.completed\",\"response\":{\"usage\":{\"input_tokens\":1\n\
+data: 0,\"output_tokens\":4}}}\n\n";
+    assert_eq!(metered(Api::OpenAiResponses, true, split), None);
+}
+
+/// Without the breakdown, the writes the stream's start said were
+/// five-minute ones stay so; only the rest is priced as one-hour writes.
+#[test]
+fn a_final_delta_without_the_cache_breakdown_keeps_known_five_minute_writes() {
+    let sse = "event: message_start\n\
+data: {\"type\":\"message_start\",\"message\":{\"usage\":{\"input_tokens\":5,\"cache_creation_input_tokens\":300,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":300,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":1}}}\n\n\
+event: message_delta\n\
+data: {\"type\":\"message_delta\",\"usage\":{\"input_tokens\":5,\"cache_creation_input_tokens\":1000,\"cache_read_input_tokens\":0,\"output_tokens\":40}}\n\n";
+    assert_eq!(
+        metered(Api::AnthropicMessages, true, sse),
+        Some(Usage { input: 5, output: 40, cache_write: 300, cache_write_long: 700, cache_read: 0 })
+    );
 }
