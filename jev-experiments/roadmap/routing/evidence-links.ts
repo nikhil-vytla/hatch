@@ -3,22 +3,10 @@ import comparisonProtocol from "./comparison/PROTOCOL.md?url&no-inline";
 import comparisonReport from "./comparison/report.json?url&no-inline";
 import comparisonReadme from "./comparison/README.md?url&no-inline";
 import failureProtocol from "../integration/FAILURE-PROTOCOL.md?url&no-inline";
-import evidenceIndex from "../integration/evidence/index.json?url&no-inline";
-import opencodeSummary from "../integration/evidence/opencode/summary.json?url&no-inline";
-import opencodeAudit from "../integration/evidence/opencode/mcp-audit.jsonl?url&no-inline";
-import opencodeTranscript from "../integration/evidence/opencode/stdout.jsonl?url&no-inline";
-import opencodeDiff from "../integration/evidence/opencode/host.diff?url&no-inline";
-import opencodeTests from "../integration/evidence/opencode/tests-after.txt?url&no-inline";
-import claudeSummary from "../integration/evidence/claude/summary.json?url&no-inline";
-import claudeAudit from "../integration/evidence/claude/mcp-audit.jsonl?url&no-inline";
-import claudeTranscript from "../integration/evidence/claude/stdout.jsonl?url&no-inline";
-import claudeDiff from "../integration/evidence/claude/host.diff?url&no-inline";
-import claudeTests from "../integration/evidence/claude/tests-after.txt?url&no-inline";
-import codexSummary from "../integration/evidence/codex/summary.json?url&no-inline";
-import codexAudit from "../integration/evidence/codex/mcp-audit.jsonl?url&no-inline";
-import codexTranscript from "../integration/evidence/codex/stdout.jsonl?url&no-inline";
-import codexDiff from "../integration/evidence/codex/host.diff?url&no-inline";
-import codexTests from "../integration/evidence/codex/tests-after.txt?url&no-inline";
+
+// Build-only publication copies preserve the retained task evidence without
+// bundling raw host transcripts. Their index records source and output hashes.
+const evidenceUrl = (path: string) => `/routing-evidence/${path}`;
 
 export const protocolDownloads = [
   {
@@ -48,7 +36,7 @@ export const protocolDownloads = [
   },
   {
     label: "Client evidence index",
-    url: evidenceIndex,
+    url: evidenceUrl("index.json"),
     file: "jev-client-evidence-index.json",
   },
 ];
@@ -56,28 +44,28 @@ export const harnessDownloads = [
   {
     name: "OpenCode",
     id: "opencode",
-    summary: opencodeSummary,
-    audit: opencodeAudit,
-    transcript: opencodeTranscript,
-    diff: opencodeDiff,
-    tests: opencodeTests,
+    summary: evidenceUrl("opencode/summary.json"),
+    audit: evidenceUrl("opencode/mcp-audit.jsonl"),
+    transcript: evidenceUrl("opencode/stdout.jsonl"),
+    diff: evidenceUrl("opencode/host.diff"),
+    tests: evidenceUrl("opencode/tests-after.txt"),
   },
   {
     name: "Claude Code",
     id: "claude",
-    summary: claudeSummary,
-    audit: claudeAudit,
-    transcript: claudeTranscript,
-    diff: claudeDiff,
-    tests: claudeTests,
+    summary: evidenceUrl("claude/summary.json"),
+    audit: evidenceUrl("claude/mcp-audit.jsonl"),
+    transcript: evidenceUrl("claude/stdout.jsonl"),
+    diff: evidenceUrl("claude/host.diff"),
+    tests: evidenceUrl("claude/tests-after.txt"),
   },
   {
     name: "Codex",
     id: "codex",
-    summary: codexSummary,
-    audit: codexAudit,
-    transcript: codexTranscript,
-    diff: codexDiff,
-    tests: codexTests,
+    summary: evidenceUrl("codex/summary.json"),
+    audit: evidenceUrl("codex/mcp-audit.jsonl"),
+    transcript: evidenceUrl("codex/stdout.jsonl"),
+    diff: evidenceUrl("codex/host.diff"),
+    tests: evidenceUrl("codex/tests-after.txt"),
   },
 ];

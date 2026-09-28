@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "postinstall": "node scripts/link-packages.mjs",
     "dev": "bun scripts/prepare.ts && vite --host 127.0.0.1 --port 5191",
     "server": "bun server/dev.ts",
     "build": "bun scripts/prepare.ts && tsc --noEmit && vite build",
@@ -10,7 +11,9 @@
     "test": "bun ../live-worlds/prepare.ts && bun test server ../local-models-and-games/arcade/engine.test.ts ../local-models-and-games/integrity.test.ts ../music-arranger-v2 ../outcome-framing/*.test.ts ../cafe-jev ../judgment-reliability ../quality-and-simulation-review/paste-transactions.test.ts ../quality-and-simulation-review/composition-stream.test.ts ../visual-search/*.test.ts ../wardrobe-lab/*.test.ts ../icon-studio/*.test.ts ../live-worlds",
     "start": "bun scripts/start.ts",
     "record": "bun scripts/record.ts",
-    "recover": "bun scripts/recover.ts && ../.venv/bin/python scripts/metrics.py"
+    "recover": "bun scripts/recover.ts && ../.venv/bin/python scripts/metrics.py",
+    "lint:arena": "cd .. && experience-prototypes/node_modules/.bin/oxlint -c .oxlintrc.json experience-prototypes/src/arena packages/arena/src",
+    "format:arena": "cd .. && experience-prototypes/node_modules/.bin/oxfmt -c .oxfmtrc.json experience-prototypes/src/arena packages/arena/src packages/arena/scripts"
   },
   "dependencies": {
     "@fal-ai/client": "^1.10.1",
@@ -21,21 +24,30 @@
     "@tanstack/react-table": "^8.21.3",
     "@tonejs/midi": "^2.0.28",
     "@xyflow/react": "^12.10.0",
+    "cmdk": "1.1.1",
+    "d3-scale": "4.0.2",
     "lucide-react": "^0.577.0",
     "motion": "^12.35.0",
+    "quickjs-emscripten": "0.31.0",
+    "radix-ui": "1.6.7",
     "react": "19.2.4",
     "react-dom": "19.2.4",
+    "sonner": "2.0.8",
     "three": "^0.186.0",
     "tone": "^15.1.22",
     "zod": "^4.0.0"
   },
   "devDependencies": {
+    "@oxlint/plugins": "1.85.0",
     "@tailwindcss/vite": "^4.2.1",
+    "@types/d3-scale": "4.0.9",
     "@types/node": "^26.6.2",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@types/three": "^0.186.0",
     "@vitejs/plugin-react": "^5.1.4",
+    "oxfmt": "0.70.0",
+    "oxlint": "1.85.0",
     "tailwindcss": "^4.2.1",
     "typescript": "~5.9.3",
     "vite": "^7.3.0"

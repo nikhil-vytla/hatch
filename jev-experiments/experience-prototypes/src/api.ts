@@ -27,12 +27,15 @@ export async function run(
   state: unknown,
   questions: Record<string, unknown>,
   signal?: AbortSignal,
+  /** Real-time callers set a short budget so a slow request fails fast instead of retrying for up to 48 s. */
+  budget?: { deadlineMs: number; maxAttempts: number },
 ) {
   const response = await fetch("/api/evaluate", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${getApiKey()}`,
+      ...(budget ? { "x-jev-deadline-ms": String(budget.deadlineMs), "x-jev-max-attempts": String(budget.maxAttempts) } : {}),
     },
     body: JSON.stringify({ state, questions }),
     signal,

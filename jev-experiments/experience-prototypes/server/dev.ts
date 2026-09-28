@@ -1,4 +1,5 @@
 import evaluateHandler from "../api/evaluate";
+import contestHandler from "../api/contest";
 import wardrobeTokenHandler from "../api/wardrobe-token";
 import { apiKeyFromHeader, GatewayError } from "./gateway";
 import { compose } from "./compose";
@@ -59,12 +60,18 @@ Bun.serve({
       },
     };
     const path = new URL(req.url).pathname;
-    if (!["/api/evaluate", "/api/wardrobe-token"].includes(path)) return Response.json({ error: "Not found." }, { status: 404 });
-    await (path === "/api/wardrobe-token" ? wardrobeTokenHandler : evaluateHandler)(
+    if (!["/api/evaluate", "/api/wardrobe-token", "/api/contest"].includes(path)) return Response.json({ error: "Not found." }, { status: 404 });
+    await (path === "/api/wardrobe-token" ? wardrobeTokenHandler : path === "/api/contest" ? contestHandler : evaluateHandler)(
       {
         method: req.method,
-        headers: { authorization: req.headers.get("authorization") },
+        headers: {
+          authorization: req.headers.get("authorization"),
+          "x-jev-deadline-ms": req.headers.get("x-jev-deadline-ms") ?? undefined,
+          "x-jev-max-attempts": req.headers.get("x-jev-max-attempts") ?? undefined,
+        },
         body: await req.json().catch(() => null),
+        // The browser aborting its request stops the call to Jev too.
+        signal: req.signal,
       },
       response,
     );
