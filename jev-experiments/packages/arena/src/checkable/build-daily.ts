@@ -2,7 +2,8 @@
  * Builds public/daily/daily.json from every source the Daily draws on: the checkable bank
  * (Tetris, only its local "fills a row" questions; mazes stay in the arena), the judgement bank
  * (orders and routing) when it has been recorded, and One box phrases. Items Jev has not
- * answered are left out. "When Jev is sure" is measured over the same questions the Daily asks.
+ * answered are left out. Every eligible question is its own puzzle, and Jev's calibration is
+ * measured per kind over every puzzle in the pool.
  * Run by experience-prototypes/scripts/prepare.ts.
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -11,9 +12,16 @@ import { gunzipSync } from "node:zlib";
 import { z } from "zod";
 import { keyword } from "../one-box/keyword";
 import { phrasesSchema } from "../one-box/phrases";
-import { QUESTIONS } from "../one-box/questions";
 import { normalizeKey } from "../one-box/replay";
-import { dailySchema, optionKeys, truthKey, type DailyItem } from "./daily";
+import {
+  BANDS,
+  dailySchema,
+  jevPick,
+  optionKeys,
+  truthKey,
+  type Band,
+  type DailyItem,
+} from "./daily";
 import { bankSchema, rng, shuffled, type Item } from "./items";
 
 const answerSchema = z.object({
@@ -78,17 +86,7 @@ const eligible = (item: Item) =>
 
 export function buildDaily(root: string, outDir: string) {
   const items: DailyItem[] = [];
-  const sure = { n: 0, right: 0 };
   let recordedAt = "";
-
-  const tallySure = (d: Record<string, number>, right: string) => {
-    const [top, p] = Object.entries(d).reduce((x, y) => (y[1] > x[1] ? y : x));
-
-    if (p < 0.9) return;
-    sure.n++;
-
-    if (top === right) sure.right++;
-  };
 
   const banks: [string, string][] = [
     ["src/checkable/bank.json", "recordings/checkable.jsonl"],
@@ -102,35 +100,28 @@ export function buildDaily(root: string, outDir: string) {
 
     for (const item of bank.items) {
       const row = rows.get(item.id);
-      const questions = eligible(item);
 
-      if (!row?.answers || item.kind === "grid" || !questions.length) continue;
+      if (!row?.answers || item.kind === "grid") continue;
       recordedAt = row.at && row.at > recordedAt ? row.at : recordedAt;
 
-      for (const qid of questions) {
-        const a = row.answers[qid];
+      // Every eligible question is its own puzzle.
+      for (const qid of eligible(item)) {
+        const answer = row.answers[qid];
 
-        if (a)
-          tallySure(distribution(optionKeys(item.questions[qid]), a), truthKey(item.truth[qid]));
+        if (!answer) continue;
+
+        items.push({
+          id: `${item.id}:${qid}`,
+          kind: item.kind,
+          difficulty: item.difficulty,
+          state: item.state,
+          questionId: qid,
+          question: item.questions[qid],
+          truth: item.truth[qid],
+          jev: distribution(optionKeys(item.questions[qid]), answer),
+          jevMs: row.latencyMs ?? 0,
+        });
       }
-
-      // One question per item, fixed by its seed so every day that shows it asks the same.
-      const qid = questions[Math.floor(rng(item.seed * 7 + 3)() * questions.length)];
-      const answer = row.answers[qid];
-
-      if (!answer) continue;
-
-      items.push({
-        id: item.id,
-        kind: item.kind,
-        difficulty: item.difficulty,
-        state: item.state,
-        questionId: qid,
-        question: item.questions[qid],
-        truth: item.truth[qid],
-        jev: distribution(optionKeys(item.questions[qid]), answer),
-        jevMs: row.latencyMs ?? 0,
-      });
     }
   }
 
@@ -141,7 +132,6 @@ export function buildDaily(root: string, outDir: string) {
   );
 
   const oneBox = readLog(join(root, "recordings/one-box.jsonl"));
-  const cards: Record<string, string> = QUESTIONS.intent.criteria;
 
   for (const p of phrases.phrases) {
     const row = oneBox.get(normalizeKey(p.text));
@@ -158,9 +148,6 @@ export function buildDaily(root: string, outDir: string) {
       .map(([k]) => k);
 
     const options = shuffled([p.intent, ...distractors], rng(Number(p.id.replace(/\D/g, "")) || 1));
-    const jev = distribution(options, answer);
-
-    tallySure(jev, p.intent);
 
     items.push({
       id: `phrase-${p.id}`,
@@ -171,28 +158,43 @@ export function buildDaily(root: string, outDir: string) {
       question: {
         type: "choice",
         instructions: "Someone typed this into a box. What should the box become?",
-        criteria: Object.fromEntries(options.map((k) => [k, `${k}: ${cards[k] ?? k}`])),
+        criteria: Object.fromEntries(options.map((k) => [k, k.replaceAll("_", " ")])),
       },
       truth: p.intent,
-      jev,
+      jev: distribution(options, answer),
       jevMs: row.latencyMs ?? 0,
     });
   }
 
+  // How often Jev's top answer is right in each confidence band, per kind, over the whole pool.
+  const calibration: Record<string, Band[]> = {};
+
+  for (const kind of new Set(items.map((i) => i.kind))) {
+    calibration[kind] = BANDS.map(([lo, hi]) => {
+      const inBand = items.filter((i) => {
+        const { p } = jevPick(i);
+
+        return i.kind === kind && p >= lo && p < hi;
+      });
+
+      return {
+        lo,
+        hi: Math.min(1, hi),
+        n: inBand.length,
+        right: inBand.filter((i) => jevPick(i).key === truthKey(i.truth)).length,
+      };
+    });
+  }
+
   const daily = dailySchema.parse({
-    schema: "jev.daily/1",
+    schema: "jev.daily/2",
     recordedAt: recordedAt || new Date(0).toISOString(),
-    sure,
-    bank: {
-      schema: "checkable.bank/1",
-      generatedWith: "packages/arena/src/checkable and One box phrases",
-      ids: items.map((i) => ({ id: i.id, kind: i.kind })),
-    },
+    calibration,
     items,
   });
 
   mkdirSync(outDir, { recursive: true });
   writeFileSync(join(outDir, "daily.json"), JSON.stringify(daily));
 
-  return { items: items.length, sure };
+  return { items: items.length, calibration };
 }
