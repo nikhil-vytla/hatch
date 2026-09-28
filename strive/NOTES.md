@@ -1838,3 +1838,43 @@ macOS git compares nanoseconds, which is why it never showed here. The
 copy now keeps the index's mtime. A macOS test forcing seconds-only stat
 checks didn't reproduce it (racy detection there still uses nanoseconds);
 the Linux e2e tests are the regression tests.
+## 2026-09-28: the mutants CI found
+
+CI's mutants job (PR #77) missed 68 mutants. Each file was re-run with
+`cargo mutants --file <path> -j 2` after its tests went in. The full suite
+was then run once as `--shard k/8` (8 shards, `-j 2`), since the script's
+`-j 4` can't be overridden (`--jobs` twice is an error).
+
+- **Before:** 68 missed. **After:** 18 missed, all in `watch.rs` (14) and
+  `replay.rs` (4). Those two are deferred: that code may be simplified
+  soon, so they have no new tests and no excludes yet. The other 50 were
+  either killed by new tests (49) or recorded as equivalent (1).
+- **Killed, by file:** rpc.rs 13, gateway 9, learning `lib.rs` 8,
+  render.rs 6, proto `lib.rs` 4, stale.rs 3, journal 2, triggers.rs 1,
+  signals.rs 1, checks.rs 1, budget 1.
+  - rpc.rs: the predefined error codes are checked against JSON-RPC 2.0
+    section 5.1 by parsing and reserializing a response. strive's own codes
+    must be distinct and fall in the spec's server-error range (-32000 to
+    -32099).
+  - The "citing either half of an effect" render test passed whatever the
+    pairing did: its budget kept both halves anyway. Its prompt is now
+    sized so only the pairing keeps both. (Among the deferred ones, the
+    huge-output watch test has a similar gap: every mutated split of the
+    output still misses its needle.)
+  - Some mutants were only visible in timing or in text a person reads:
+    the holdback kept a line's newline until the next chunk arrived, the
+    meter's limit was off by one, and the ideographic-space fold only shows
+    in the quoted command of a finding.
+- **Equivalent (1):** `triggers.rs` `e.seq > asked` -> `>=` in `busy`. The
+  one entry with seq `asked` is the `LearnRequested` itself, and the loop
+  reads only `TurnStarted` and `TurnEnded`. It's excluded by name in
+  `.cargo/mutants.toml` (new, since Stage 1 recorded none).
+- **Real bugs:** none. The misplaced doc comment on `Journal::next_seq`
+  (it described `append`) is moved back.
+- **Tooling trap:** with `CARGO_TARGET_DIR` set, cargo-mutants' parallel
+  jobs share one target dir, and a test can run another mutant's binary.
+  At `-j 2` a hanging `watch.rs` mutant showed up as caught. Run mutants
+  with `CARGO_TARGET_DIR` unset. Also, `check.sh` from a worktree this deep
+  fails `the_sandbox_blocks_unix_sockets_outside_it`, because the socket
+  path under `target/tmp` goes over macOS's 104-byte limit. It passes with
+  a short target dir.
