@@ -3,9 +3,9 @@
  * and measures what the visitor would have seen. Answers come from a lookup (recorded, or a
  * local classifier), so a recording made once can be replayed under any request policy.
  */
-import { calm, cardOf, START, type Calm, type Shown } from "./calm";
-import { keyword } from "./keyword";
-import type { Reading } from "./questions";
+import { calm, cardOf, START, type Calm, type Shown } from "./calm.js";
+import { keyword } from "./keyword.js";
+import type { Reading } from "./questions.js";
 
 /** Frozen before any recording: a steady typist who pauses briefly between words. */
 export const TYPING = { msPerKey: 160, wordPauseMs: 240, debounceMs: 120, settleMs: 4000 } as const;

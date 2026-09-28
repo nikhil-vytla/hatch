@@ -3,7 +3,7 @@
  * The state Jev sees is `{ text }`, as upstream sends it.
  */
 import { z } from "zod";
-import { QUESTIONS, type QuestionId, type Reading } from "./questions";
+import { QUESTIONS, type QuestionId, type Reading } from "./questions.js";
 
 const wireAnswerSchema = z.object({
   value: z.union([z.string(), z.number()]),
