@@ -3,22 +3,24 @@ from __future__ import annotations
 import json
 
 import pytest
-from pydantic import ValidationError
 
-from parallax.evolving_intent import Message
+from parallax.intent_phases import (
+    BASE,
+    EVOLVED,
+    MATCHED,
+    PhaseArgument,
+    PhaseConstruction,
+    PhaseIntent,
+    build_phase_variants,
+    construct_phases,
+)
+from parallax.provider import Message
 from parallax.swebench import (
-    INITIAL_SCREENING_IDS,
     PUBLISHED_INSTANCE_IDS,
     SWE_BENCH_REVISION,
     ImageDigest,
-    SweArgument,
     SweBenchError,
-    SweConstruction,
-    SweIntent,
-    SweScriptFamily,
     VerifierRuntime,
-    build_swe_script_family,
-    construct_swe_intent,
     fetch_swebench_verified,
     load_swebench_rows,
 )
@@ -29,8 +31,6 @@ INSTANCE_ID = "astropy__astropy-13236"
 def test_published_source_set_is_exact_and_screening_is_a_subset() -> None:
     assert len(PUBLISHED_INSTANCE_IDS) == 50
     assert len(set(PUBLISHED_INSTANCE_IDS)) == 50
-    assert len(INITIAL_SCREENING_IDS) == 10
-    assert set(INITIAL_SCREENING_IDS) < set(PUBLISHED_INSTANCE_IDS)
 
 
 def row() -> dict[str, object]:
@@ -62,17 +62,17 @@ def runtime() -> VerifierRuntime:
     return VerifierRuntime(image_digest=ImageDigest("a" * 64))
 
 
-def construction() -> SweConstruction:
-    return SweConstruction(
-        source=SweIntent(
+def construction() -> PhaseConstruction:
+    return PhaseConstruction(
+        source=PhaseIntent(
             function="preserve structured ndarray columns",
             arguments=(
-                SweArgument(
+                PhaseArgument(
                     identifier="observed_symptom",
                     value="structured arrays become NdarrayMixin",
                     category="symptom",
                 ),
-                SweArgument(
+                PhaseArgument(
                     identifier="required_behavior",
                     value="construct a regular Column",
                     category="constraint",
@@ -80,15 +80,15 @@ def construction() -> SweConstruction:
             ),
         ),
         predecessors=(
-            SweIntent(
+            PhaseIntent(
                 function="inspect table column conversion",
                 arguments=(
-                    SweArgument(
+                    PhaseArgument(
                         identifier="current_symptom",
                         value="automatic mixin conversion occurs",
                         category="symptom",
                     ),
-                    SweArgument(
+                    PhaseArgument(
                         identifier="target_module",
                         value="astropy.table.table",
                         category="context",
@@ -255,13 +255,14 @@ def test_constructor_prompt_excludes_all_sealed_material() -> None:
         assert budget == 1024
         return construction().model_dump_json()
 
-    evidence = construct_swe_intent(
+    built, evidence = construct_phases(
         problem,
         provider,
         model="scripted-constructor",
     )
 
-    assert evidence.construction == construction()
+    assert built == construction()
+    assert evidence.accepted
 
 
 def test_constructor_accepts_exact_json_code_fence() -> None:
@@ -272,13 +273,13 @@ def test_constructor_accepts_exact_json_code_fence() -> None:
     )[0]
     output = f"```json\n{construction().model_dump_json()}\n```"
 
-    evidence = construct_swe_intent(
+    built, evidence = construct_phases(
         problem,
         lambda messages, budget: output,
         model="scripted-constructor",
     )
 
-    assert evidence.construction == construction()
+    assert built == construction()
     assert evidence.output == output
 
 
@@ -292,13 +293,13 @@ def test_constructor_normalizes_json_scalar_argument_values() -> None:
     payload["source"]["arguments"][0]["value"] = True
     output = json.dumps(payload)
 
-    evidence = construct_swe_intent(
+    built, _ = construct_phases(
         problem,
         lambda messages, budget: output,
         model="scripted-constructor",
     )
 
-    assert evidence.construction.source.arguments[0].value == "true"
+    assert built.source.arguments[0].value == "true"
 
 
 def test_swe_overlay_reinjects_symptoms_and_restores_source() -> None:
@@ -307,32 +308,35 @@ def test_swe_overlay_reinjects_symptoms_and_restores_source() -> None:
         (INSTANCE_ID,),
         runtimes={INSTANCE_ID: runtime()},
     )[0]
-    family = build_swe_script_family(
+    variants = build_phase_variants(
         problem,
         construction(),
-        seed=7,
         total_agent_steps=12,
         max_output_tokens=4096,
     )
+    base = variants.variant(BASE)
+    evolved = variants.variant(EVOLVED)
 
-    assert family.static.turns[0].text == problem.problem_statement
-    assert len(family.matched.turns) == len(family.evolved.turns) == 2
-    assert {script.total_agent_steps for script in family.scripts} == {12}
-    assert {script.max_output_tokens for script in family.scripts} == {4096}
-    assert family.evolved.turns[-1].state_after.intent == construction().source
-    assert all(
-        turn.state_after.intent == construction().source
-        for turn in family.matched.turns
+    assert variants.provenance == "reference_based"
+    assert len(base.turns) == 1
+    assert len(evolved.turns) == 2
+    assert base.total_steps == evolved.total_steps == 12
+    assert base.total_headroom == evolved.total_headroom == 12 * 4096
+    # both conditions carry the same extracted source intent; the SWE base arm
+    # used to carry none at all, so the arms did not share an intent.
+    for text in (base.turns[0].text, evolved.turns[-1].text):
+        assert construction().source.function in text
+        assert problem.problem_statement in text
+    assert "Do not implement the final issue yet" in evolved.turns[0].text
+    order = json.loads(variants.evidence[0].payload)["injected_argument_order"][0][1]
+    assert order == ["current_symptom", "target_module"]
+    assert evolved.turns[0].text.index("current symptom") < evolved.turns[0].text.index(
+        "target module"
     )
-    predecessor_order = family.overlay.injected_argument_order[0][1]
-    assert predecessor_order == ("current_symptom", "target_module")
-    assert family.evolved.turns[0].text.index("current symptom") < family.evolved.turns[
-        0
-    ].text.index("target module")
     assert all(
         "sealed test patch" not in turn.text
-        for script in family.scripts
-        for turn in script.turns
+        for variant in variants.variants
+        for turn in variant.turns
     )
 
 
@@ -346,69 +350,73 @@ def test_public_issue_can_name_an_official_test() -> None:
         runtimes={INSTANCE_ID: runtime()},
     )[0]
 
-    family = build_swe_script_family(
+    family = build_phase_variants(
         problem,
         construction(),
-        seed=7,
         total_agent_steps=12,
         max_output_tokens=4096,
     )
 
-    assert test_id in family.static.turns[0].text
+    assert test_id in family.variant(BASE).turns[0].text
 
 
-def test_episode_budget_rejects_fewer_steps_than_turns() -> None:
+def test_the_control_accumulates_information_instead_of_repeating_itself() -> None:
+    """The defect the retired SWE `matched` arm had, stated as a test.
+
+    It delivered the whole issue statement in every turn, so nothing
+    accumulated and the arm isolated nothing. GSM8K revealed one argument per
+    turn, which is the documented design and now the shared one.
+    """
+
     problem = load_swebench_rows(
         (row(),),
         (INSTANCE_ID,),
         runtimes={INSTANCE_ID: runtime()},
     )[0]
-
-    with pytest.raises(SweBenchError, match="cover every turn"):
-        build_swe_script_family(
-            problem,
-            construction(),
-            seed=0,
-            total_agent_steps=1,
-            max_output_tokens=1024,
-        )
-
-
-def test_swe_family_rejects_budget_and_restoration_drift() -> None:
-    problem = load_swebench_rows(
-        (row(),),
-        (INSTANCE_ID,),
-        runtimes={INSTANCE_ID: runtime()},
-    )[0]
-    valid = build_swe_script_family(
+    variants = build_phase_variants(
         problem,
         construction(),
-        seed=0,
         total_agent_steps=12,
-        max_output_tokens=1024,
+        max_output_tokens=4096,
     )
-    bad_static = valid.static.model_copy(update={"agent_steps": (1,)})
-    with pytest.raises(ValidationError, match="equal episode budgets"):
-        SweScriptFamily(
-            construction_seed=valid.construction_seed,
-            construction=valid.construction,
-            static=bad_static,
-            matched=valid.matched,
-            evolved=valid.evolved,
-            overlay=valid.overlay,
-        )
-    bad_final = valid.evolved.turns[-1].model_copy(
-        update={"state_after": valid.evolved.turns[0].state_after}
-    )
-    bad_evolved = valid.evolved.model_copy(
-        update={"turns": (*valid.evolved.turns[:-1], bad_final)}
-    )
-    with pytest.raises(ValidationError, match="restore source intent"):
-        SweScriptFamily(
-            construction_seed=valid.construction_seed,
-            construction=valid.construction,
-            static=valid.static,
-            matched=valid.matched,
-            evolved=bad_evolved,
-            overlay=valid.overlay,
-        )
+    matched = variants.variant(MATCHED)
+    evolved = variants.variant(EVOLVED)
+
+    assert variants.control == MATCHED
+    assert len(matched.turns) == len(evolved.turns)
+    assert matched.total_steps == evolved.total_steps
+    assert matched.total_headroom == evolved.total_headroom
+    # the goal never moves, and only the constraints accumulate
+    assert all(construction().source.function in turn.text for turn in matched.turns)
+    assert problem.problem_statement not in matched.turns[0].text
+    assert problem.problem_statement in matched.turns[-1].text
+    revealed = construction().source.arguments[0]
+    assert revealed.value in matched.turns[0].text
+    assert construction().source.arguments[1].value not in matched.turns[0].text
+
+
+def test_construction_prompts_state_the_schema_they_will_be_parsed_against() -> None:
+    """A construction round shipped asking only for "one strict JSON object".
+
+    The schema now comes from the model that validates the reply, so a prompt
+    cannot describe a shape its parser does not accept.
+    """
+
+    problem = load_swebench_rows(
+        (row(),),
+        (INSTANCE_ID,),
+        runtimes={INSTANCE_ID: runtime()},
+    )[0]
+    prompts: list[str] = []
+
+    def provider(messages, budget: int) -> str:
+        prompts.append(messages[0].content)
+        return construction().model_dump_json()
+
+    construct_phases(problem, provider, model="scripted-constructor")
+
+    assert prompts
+    for prompt in prompts:
+        schema = json.loads(prompt.split("JSON Schema:\n", 1)[1])
+        assert "predecessors" in json.dumps(schema)
+        assert "No Markdown fences" in prompt

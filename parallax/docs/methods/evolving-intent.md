@@ -220,7 +220,7 @@ failures, at most three times. G5 checks total and per-turn budgets. G6 records
 construction failures as uniform source rejections. Admission records contain
 digests, lengths, counts, and outcomes, but no sealed patch or test text.
 
-`TaskSpecV1` separates `PublicTaskV1` from `SealedAuthorityV1`.
+`SweTaskSpec` separates public source material from sealed authority.
 `compile_hud` creates agent artifacts only from the public branch. It tags each
 artifact as agent or evaluator, scans the agent build context for sealed
 fragments, and records a digest receipt. The HUD runtime uses a probed

@@ -6,7 +6,6 @@ import pytest
 
 from parallax.canonical import canonical_bytes
 from parallax.checkpoint_agent import (
-    HAIKU_STAGE_PRICING,
     AgentReplyError,
     ProviderCheckpointAgent,
     parse_file_map,
@@ -14,7 +13,13 @@ from parallax.checkpoint_agent import (
 )
 from parallax.checkpoint_runner import CheckpointDelivery, MeteredWorkspace
 from parallax.outcome import BudgetError
-from parallax.provider import HUD_GATEWAY_ENDPOINT, HudGatewayProvider
+from parallax.provider import (
+    HUD_GATEWAY_ENDPOINT,
+    HudGatewayProvider,
+)
+from parallax.provider import PRICING as _PRICING
+
+HAIKU_PRICING = _PRICING["claude-haiku-4-5"]
 
 MODEL = "adapter-test-model"
 ENVIRONMENT = {"HUD_API_KEY": "offline-test-credential"}
@@ -74,7 +79,7 @@ def _agent(
         contract=seed_fixture.family.contract,
         expected_response_model=expected_response_model,
         max_output_tokens=512,
-        pricing=HAIKU_STAGE_PRICING,
+        pricing=HAIKU_PRICING,
     )
 
 

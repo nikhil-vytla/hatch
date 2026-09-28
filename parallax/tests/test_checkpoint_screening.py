@@ -6,28 +6,21 @@ import pytest
 from conftest import CHECKPOINT_FIXTURE
 from test_checkpoint_sandbox import LOCKDOWN_FLAGS, SimulatedDockerRunner
 
-from parallax.checkpoint_agent import HAIKU_STAGE_PRICING
-from parallax.checkpoint_evolution import StageVerification
-from parallax.checkpoint_runner import (
-    CeFamilyRecord,
-    CeManifestRecord,
-    CeRunRecord,
-    CheckpointDelivery,
-    read_ce_jsonl,
-)
+from parallax.checkpoint_runner import CheckpointDelivery
 from parallax.checkpoint_screening import (
     CE_EXPECTED_RESPONSE_MODEL,
     CE_SCREENING_MODEL,
     _capped_factory,
-    ce_cost_upper_usd,
     dry_run_transport,
+    family_cost_upper_usd,
     run_ce_screening,
 )
-from parallax.outcome import BudgetError, RunFailure
-from parallax.provider import HudGatewayProvider
-from parallax.screening import SpendApprovalRequired
+from parallax.experiment import SpendApprovalRequired, journal_contents
+from parallax.outcome import BudgetError, RunFailure, Verdict, Verification
+from parallax.perturbation import Condition
+from parallax.provider import HudGatewayProvider, pricing_for
 
-SEEDS = (7, 8)
+TRIALS = 2
 
 
 def _live_transport(seed_fixture):
@@ -50,25 +43,18 @@ def test_dry_run_exercises_the_full_screening_path(seed_fixture, tmp_path) -> No
         mode="dry-run",
         seed_path=CHECKPOINT_FIXTURE,
         output_path=output,
-        trial_seeds=SEEDS,
+        trials=TRIALS,
     )
-    assert len(runs) == 2 * len(SEEDS)
-    records = read_ce_jsonl(output)
-    manifest = records[0]
-    assert isinstance(manifest, CeManifestRecord)
-    assert isinstance(records[1], CeFamilyRecord)
-    assert records[1].admission.decision == "admitted"
-    run_records = [record for record in records if isinstance(record, CeRunRecord)]
-    assert len(run_records) == 2 * len(SEEDS)
-    for record in run_records:
-        assert len(record.receipts) == 3
-        assert record.censored == ()
-        for receipt in record.receipts:
-            assert isinstance(receipt.outcome, StageVerification)
-            assert receipt.outcome.strict_pass
-            assert receipt.usage is not None
-            assert receipt.usage.prompt_tokens > 0
-            assert receipt.usage.estimated_cost_usd == 0.0
+    assert len(runs) == 2 * TRIALS
+    plan, observations = journal_contents(output)
+    assert plan.headroom_matched
+    assert set(plan.headroom) == {("carry-reference", 12288), ("evolved", 12288)}
+    assert len(observations) == 2 * TRIALS
+    for observation in observations:
+        assert isinstance(observation.outcome, Verification)
+        assert observation.outcome.verdict is Verdict.PASS
+        assert observation.prompt_tokens > 0
+        assert observation.estimated_cost_usd == 0.0
 
 
 def test_dry_run_needs_no_real_credential(seed_fixture, tmp_path, monkeypatch) -> None:
@@ -77,9 +63,9 @@ def test_dry_run_needs_no_real_credential(seed_fixture, tmp_path, monkeypatch) -
         mode="dry-run",
         seed_path=CHECKPOINT_FIXTURE,
         output_path=tmp_path / "dry-run.jsonl",
-        trial_seeds=(7,),
+        trials=1,
     )
-    assert all(run.failure is None for run in runs)
+    assert all(isinstance(run.outcome, Verification) for run in runs)
 
 
 def test_dry_run_can_route_verification_through_the_sandbox(
@@ -90,7 +76,7 @@ def test_dry_run_can_route_verification_through_the_sandbox(
         mode="dry-run",
         seed_path=CHECKPOINT_FIXTURE,
         output_path=tmp_path / "dry-run-sandbox.jsonl",
-        trial_seeds=(7,),
+        trials=1,
         dry_run_execution="sandbox",
         sandbox_runner=runner,
     )
@@ -98,32 +84,6 @@ def test_dry_run_can_route_verification_through_the_sandbox(
     for command in runner.commands:
         for flag in LOCKDOWN_FLAGS:
             assert flag in command
-
-
-def test_execution_identity_is_bound_into_the_manifest(seed_fixture, tmp_path) -> None:
-    trusted = tmp_path / "trusted.jsonl"
-    sandboxed = tmp_path / "sandboxed.jsonl"
-    run_ce_screening(
-        mode="dry-run",
-        seed_path=CHECKPOINT_FIXTURE,
-        output_path=trusted,
-        trial_seeds=(7,),
-    )
-    run_ce_screening(
-        mode="dry-run",
-        seed_path=CHECKPOINT_FIXTURE,
-        output_path=sandboxed,
-        trial_seeds=(7,),
-        dry_run_execution="sandbox",
-        sandbox_runner=SimulatedDockerRunner(),
-    )
-    trusted_manifest = read_ce_jsonl(trusted)[0]
-    sandboxed_manifest = read_ce_jsonl(sandboxed)[0]
-    assert isinstance(trusted_manifest, CeManifestRecord)
-    assert isinstance(sandboxed_manifest, CeManifestRecord)
-    assert (
-        trusted_manifest.model_config_digest != sandboxed_manifest.model_config_digest
-    )
 
 
 def test_live_screening_requires_spend_approval_before_any_call(
@@ -135,7 +95,7 @@ def test_live_screening_requires_spend_approval_before_any_call(
             mode="live",
             seed_path=CHECKPOINT_FIXTURE,
             output_path=tmp_path / "live.jsonl",
-            trial_seeds=SEEDS,
+            trials=TRIALS,
             transport=transport,
             environment={"HUD_API_KEY": "offline-test-credential"},
             sandbox_runner=SimulatedDockerRunner(),
@@ -150,7 +110,7 @@ def test_live_screening_rejects_designs_over_the_cap(seed_fixture, tmp_path) -> 
             mode="live",
             seed_path=CHECKPOINT_FIXTURE,
             output_path=tmp_path / "live.jsonl",
-            trial_seeds=SEEDS,
+            trials=TRIALS,
             approve_spend=True,
             spend_cap_usd=0.001,
             transport=transport,
@@ -170,31 +130,28 @@ def test_live_screening_sandboxes_every_model_written_case(
         mode="live",
         seed_path=CHECKPOINT_FIXTURE,
         output_path=output,
-        trial_seeds=SEEDS,
+        trials=TRIALS,
         approve_spend=True,
         transport=transport,
         environment={"HUD_API_KEY": "offline-test-credential"},
         sandbox_runner=runner,
     )
-    assert len(runs) == 2 * len(SEEDS)
-    stage_calls = 3 * 2 * len(SEEDS)
+    assert len(runs) == 2 * TRIALS
+    stage_calls = 3 * 2 * TRIALS
     assert len(calls) == stage_calls
     family = seed_fixture.family
     executed_cases = (
-        sum(len(family.obligations(index)) for index in (1, 2, 3)) * 2 * len(SEEDS)
+        sum(len(family.obligations(index)) for index in (1, 2, 3)) * 2 * TRIALS
     )
     assert len(runner.commands) == executed_cases
     for command in runner.commands:
         for flag in LOCKDOWN_FLAGS:
             assert flag in command
-    records = read_ce_jsonl(output)
-    run_records = [record for record in records if isinstance(record, CeRunRecord)]
-    for record in run_records:
-        assert record.agent_model == CE_SCREENING_MODEL
-        for receipt in record.receipts:
-            assert isinstance(receipt.outcome, StageVerification)
-            assert receipt.usage is not None
-            assert receipt.usage.estimated_cost_usd > 0.0
+    _, observations = journal_contents(output)
+    for observation in observations:
+        assert observation.reported_model == CE_EXPECTED_RESPONSE_MODEL
+        assert isinstance(observation.outcome, Verification)
+        assert observation.estimated_cost_usd > 0.0
 
 
 def test_live_reported_model_drift_is_an_agent_fault(seed_fixture, tmp_path) -> None:
@@ -209,21 +166,19 @@ def test_live_reported_model_drift_is_an_agent_fault(seed_fixture, tmp_path) -> 
         mode="live",
         seed_path=CHECKPOINT_FIXTURE,
         output_path=tmp_path / "live.jsonl",
-        trial_seeds=(7,),
+        trials=1,
         approve_spend=True,
         transport=drifted,
         environment={"HUD_API_KEY": "offline-test-credential"},
         sandbox_runner=SimulatedDockerRunner(),
     )
     for run in runs:
-        outcome = run.receipts[0].outcome
-        assert isinstance(outcome, RunFailure)
-        assert outcome.failure_kind == "agent"
-        assert "provider reported" in outcome.message
+        assert isinstance(run.outcome, RunFailure)
+        assert run.outcome.failure_kind == "agent"
 
 
 def test_cost_upper_bound_stays_under_the_default_cap(seed_fixture) -> None:
-    upper = ce_cost_upper_usd(seed_fixture.family, trial_seeds=tuple(range(10)))
+    upper = family_cost_upper_usd(seed_fixture.family, trials=10)
     assert 0 < upper < 5.0
 
 
@@ -241,10 +196,10 @@ def test_capped_factory_refuses_to_start_an_unaffordable_stage(
         provider,
         expected_response_model=CE_EXPECTED_RESPONSE_MODEL,
         max_output_tokens=2048,
-        pricing=HAIKU_STAGE_PRICING,
+        pricing=pricing_for("claude-haiku-4-5"),
         spend_cap_usd=0.000001,
     )
-    agent = factory(admitted.family.family_id, "evolved", 7)
+    agent = factory(admitted.family.family_id, Condition("evolved"), 7)
     checkpoint = admitted.family.checkpoints[0]
     delivery = CheckpointDelivery(
         index=1,

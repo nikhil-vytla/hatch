@@ -13,8 +13,10 @@ from parallax.checkpoint_evolution import (
     load_seed_family,
 )
 from parallax.checkpoint_runner import AdmittedFamily
-from parallax.evolving_intent import Message, ScriptFamily, build_script_family
-from parallax.gsm8k import Problem, load_gsm8k
+from parallax.gsm8k import Gsm8kTask, load_gsm8k
+from parallax.intent_evolution import build_intent_variants
+from parallax.perturbation import VariantSet
+from parallax.provider import Message
 from parallax.types import SourceId
 
 FIXTURE = Path(__file__).parent / "fixtures" / "gsm8k.jsonl"
@@ -122,42 +124,50 @@ def unsafe_problem(
     record_id: str,
     question: str,
     answer: object,
-) -> Problem:
-    return Problem.model_construct(
+) -> Gsm8kTask:
+    return Gsm8kTask.model_construct(
         record_id=SourceId(record_id),
         question=question,
         answer=answer,
     )
 
 
-def make_family(
+def make_variants(
     *,
     seed: int = 41,
     source_id: str = "gsm8k-1",
-    problem: Problem | None = None,
-) -> tuple[ScriptFamily, Constructor]:
+    problem: Gsm8kTask | None = None,
+) -> tuple[VariantSet, Constructor]:
     selected = problem or load_gsm8k(FIXTURE)[0]
     if selected.record_id != source_id:
-        selected = Problem(
+        selected = Gsm8kTask(
             record_id=SourceId(source_id),
             question=selected.question,
             answer=selected.answer,
         )
     constructor = Constructor()
-    family = build_script_family(
-        selected,
+    variants = build_intent_variants(
+        selected.task_id,
+        selected.question,
+        selected.public_digest,
         constructor,
         fallback=Fallback(),
         seed=seed,
         construction_model="offline-constructor",
         fallback_model="offline-fallback",
+        agent_contract=selected.agent_contract,
     )
-    return family, constructor
+    return variants, constructor
 
 
 @pytest.fixture
-def family() -> ScriptFamily:
-    return make_family()[0]
+def gsm8k_task() -> Gsm8kTask:
+    return load_gsm8k(FIXTURE)[0]
+
+
+@pytest.fixture
+def variants() -> VariantSet:
+    return make_variants()[0]
 
 
 def broken_total_workspace(stage_workspace: Workspace) -> Workspace:
