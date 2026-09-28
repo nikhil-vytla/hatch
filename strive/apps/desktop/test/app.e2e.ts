@@ -10,7 +10,7 @@ import { type AddressInfo, connect, createServer, type Socket } from "node:net";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { after, afterEach, before, test } from "node:test";
-import { type ElectronApplication, _electron as electron, type Page } from "playwright";
+import { type ElectronApplication, _electron as electron, type Locator, type Page } from "playwright";
 
 const ROOT = resolve(import.meta.dirname, "../../..");
 
@@ -261,6 +261,17 @@ test("a session the window has left doesn't wait on it for approvals", async () 
   agent.close();
 });
 
+/** Waits for `what` in `pane`; a timeout says what the pane showed instead. */
+async function shows(pane: Locator, what: Locator): Promise<void> {
+  try {
+    await what.waitFor();
+  } catch (e) {
+    const text = (await pane.textContent().catch(() => null)) ?? "(no pane)";
+    const why = e instanceof Error ? e.message : "the wait failed";
+    throw new Error(`${why}\nthe pane showed: ${text.slice(0, 2000)}`);
+  }
+}
+
 test("the changes pane shows what changed since the last prompt, file by file", async () => {
   const { page, cwd } = await openApp();
   writeFileSync(join(cwd, "notes.ts"), "const a = 1;\n");
@@ -271,7 +282,7 @@ test("the changes pane shows what changed since the last prompt, file by file", 
   writeFileSync(join(cwd, "new.txt"), "hello\n");
   await page.getByRole("button", { name: "changes", exact: true }).click();
   const pane = page.getByRole("complementary", { name: "changes" });
-  await pane.getByText("2 changed files").waitFor();
+  await shows(pane, pane.getByText("2 changed files"));
   assert.deepEqual(await pane.locator(".file-head .path").allTextContents(), ["new.txt", "notes.ts"]);
   const notes = pane.locator(".file", { hasText: "notes.ts" });
   assert.equal(await notes.locator(".row.remove").textContent(), "1−const a = 1;");
@@ -383,7 +394,7 @@ test("the changes pane follows a rewind", async () => {
   await page.getByRole("button", { name: "changes", exact: true }).click();
   const pane = page.getByRole("complementary", { name: "changes" });
   await pane.getByRole("tab", { name: "Whole session" }).click();
-  await pane.getByText("1 changed file").waitFor();
+  await shows(pane, pane.getByText("1 changed file"));
   await page.keyboard.press("Meta+k");
   await page.keyboard.type("Rewind to 1");
   await page.keyboard.press("Enter");
@@ -402,7 +413,7 @@ test("a change deep in a long file shows in the pane, with the unchanged lines f
   writeFileSync(join(cwd, "long.txt"), `${lines.join("\n")}\n`);
   await page.getByRole("button", { name: "changes", exact: true }).click();
   const pane = page.getByRole("complementary", { name: "changes" });
-  await pane.locator(".row.add", { hasText: "LINE 450" }).waitFor();
+  await shows(pane, pane.locator(".row.add", { hasText: "LINE 450" }));
   await pane.getByRole("button", { name: "⋯ 446 unchanged lines" }).click();
   await pane.locator(".row.keep", { hasText: "line 1" }).first().waitFor();
 });
@@ -418,7 +429,7 @@ test("a change at line 2,000 stays in view when the lines above it are opened", 
   writeFileSync(join(cwd, "big.txt"), `${lines.join("\n")}\n`);
   await page.getByRole("button", { name: "changes", exact: true }).click();
   const pane = page.getByRole("complementary", { name: "changes" });
-  await pane.locator(".row.add", { hasText: "LINE 2000" }).waitFor();
+  await shows(pane, pane.locator(".row.add", { hasText: "LINE 2000" }));
   await pane.getByRole("button", { name: "⋯ 1996 unchanged lines" }).click();
   await pane.locator(".row.keep", { hasText: "line 1996" }).waitFor();
   assert.equal(await pane.locator(".row.add", { hasText: "LINE 2000" }).count(), 1, "the change is still drawn");
