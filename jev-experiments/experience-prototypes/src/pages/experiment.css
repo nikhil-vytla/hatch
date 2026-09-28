@@ -1,0 +1,47 @@
+.scene-entry-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 18px 0 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--line);
+}
+.scene-entry-heading h1 {
+  margin: 0;
+  font-size: clamp(21px, 2.8vw, 30px);
+  line-height: 1.15;
+  letter-spacing: -.035em;
+}
+.scene-entry-heading button {
+  flex: none;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+}
+.scene-entry-heading button:hover,
+.scene-entry-heading button[aria-expanded="true"] {
+  color: var(--ink);
+  background: var(--soft);
+}
+.scene-entry-heading button:focus-visible {
+  outline: 2px solid var(--sage);
+  outline-offset: 3px;
+}
+.scene-entry-background {
+  margin-bottom: 24px;
+  padding: 0 0 16px;
+  border-bottom: 1px solid var(--line);
+}
+.scene-entry-background > p { max-width: 65ch; font-size: 14px; }
+.scene-entry-question { margin: 8px 0 18px; color: var(--muted); }
+.scene-entry-background .jev-role { margin-bottom: 0; }
+@media (max-width: 600px) {
+  .scene-entry-heading { gap: 12px; margin: 12px 0 20px; padding-bottom: 12px; }
+  .scene-entry .breadcrumbs { padding-top: 14px; }
+  .scene-entry-heading button { max-width: 108px; line-height: 1.4; }
+}

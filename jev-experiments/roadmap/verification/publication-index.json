@@ -390,8 +390,8 @@
     {
       "name": "visual-search",
       "source": "../visual-search/results.jsonl",
-      "sourceSha256": "d24771fb27756bd2177d1be40eacf619345607a1e68fd56443ae27cac78b1592",
-      "publicSha256": "d951d3dc0e41bf51087586049b54f6abf82dd85b91970e5908e4fa58459c4b8c",
+      "sourceSha256": "9ab7b35a502bcabc7e6ebeb15c9426cdc7a8db2c6df9b8f35601179452a89895",
+      "publicSha256": "45c91efb05d66046a5e862888a469ed0faa96496ef66d1dedbd7e3f026caf089",
       "publicBytes": 309579,
       "comparison": "original-record",
       "recipe": "readRecord + enrichProvenance + availability"

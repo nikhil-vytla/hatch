@@ -1,0 +1,129 @@
+{
+  "protocol": "turn-based; seeds 7/19/42; 40-piece limit; no retries of weak answers",
+  "recordedAt": "2026-09-23T04:40:12.378Z",
+  "games": [
+    {
+      "seed": 7,
+      "recordedAt": "2026-09-23T04:40:12.378Z",
+      "wallMs": 50407,
+      "pieceLimit": 40,
+      "lanes": [
+        {
+          "framing": "landing-choice",
+          "pieces": 19,
+          "lines": 1,
+          "score": 616,
+          "status": "over",
+          "applied": 12,
+          "failed": 8,
+          "medianMs": 287.20670900000005
+        },
+        {
+          "framing": "spot-clean",
+          "pieces": 19,
+          "lines": 1,
+          "score": 608,
+          "status": "over",
+          "applied": 10,
+          "failed": 9,
+          "medianMs": 275.798542
+        },
+        {
+          "framing": "spot-score",
+          "pieces": 19,
+          "lines": 2,
+          "score": 728,
+          "status": "over",
+          "applied": 10,
+          "failed": 10,
+          "medianMs": 284.50370899999984
+        }
+      ],
+      "requests": 59,
+      "knownCostUsd": 0,
+      "unknownCostRequests": 28
+    },
+    {
+      "seed": 19,
+      "recordedAt": "2026-09-23T04:40:12.378Z",
+      "wallMs": 2030,
+      "pieceLimit": 40,
+      "lanes": [
+        {
+          "framing": "landing-choice",
+          "pieces": 10,
+          "lines": 0,
+          "score": 208,
+          "status": "over",
+          "applied": 0,
+          "failed": 11,
+          "medianMs": 127.21258300000045
+        },
+        {
+          "framing": "spot-clean",
+          "pieces": 11,
+          "lines": 0,
+          "score": 244,
+          "status": "over",
+          "applied": 1,
+          "failed": 11,
+          "medianMs": 131.5056670000049
+        },
+        {
+          "framing": "spot-score",
+          "pieces": 10,
+          "lines": 0,
+          "score": 208,
+          "status": "over",
+          "applied": 0,
+          "failed": 11,
+          "medianMs": 117.07066699999996
+        }
+      ],
+      "requests": 34,
+      "knownCostUsd": 0,
+      "unknownCostRequests": 33
+    },
+    {
+      "seed": 42,
+      "recordedAt": "2026-09-23T04:40:12.378Z",
+      "wallMs": 1788,
+      "pieceLimit": 40,
+      "lanes": [
+        {
+          "framing": "landing-choice",
+          "pieces": 10,
+          "lines": 0,
+          "score": 208,
+          "status": "over",
+          "applied": 0,
+          "failed": 11,
+          "medianMs": 110.75520900000265
+        },
+        {
+          "framing": "spot-clean",
+          "pieces": 11,
+          "lines": 0,
+          "score": 246,
+          "status": "over",
+          "applied": 1,
+          "failed": 11,
+          "medianMs": 103.2311669999981
+        },
+        {
+          "framing": "spot-score",
+          "pieces": 10,
+          "lines": 0,
+          "score": 208,
+          "status": "over",
+          "applied": 0,
+          "failed": 11,
+          "medianMs": 99.35404199999903
+        }
+      ],
+      "requests": 34,
+      "knownCostUsd": 0,
+      "unknownCostRequests": 33
+    }
+  ]
+}

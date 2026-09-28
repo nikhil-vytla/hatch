@@ -344,11 +344,12 @@ export function ruleFromAnswers(
     );
   if (
     answers.support?.value !== "supported" ||
-    !["solid", "powder", "liquid", "gas"].includes(
-      String(answers.motion?.value),
-    ) ||
-    !Object.hasOwn(contacts, String(answers.contact?.value)) ||
-    !Object.hasOwn(ids, String(answers.becomes?.value))
+    typeof answers.motion?.value !== "string" ||
+    !["solid", "powder", "liquid", "gas"].includes(answers.motion.value) ||
+    typeof answers.contact?.value !== "string" ||
+    !Object.hasOwn(contacts, answers.contact.value) ||
+    typeof answers.becomes?.value !== "string" ||
+    !Object.hasOwn(ids, answers.becomes.value)
   )
     throw new Error(
       "The returned rule was incomplete or invalid. Your current material is unchanged.",

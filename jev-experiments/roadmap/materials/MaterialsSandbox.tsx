@@ -23,20 +23,23 @@ import {
   type Scene,
 } from "./engine";
 import "./materials.css";
+import { materialFrames } from "./frames";
+import { MaterialMechanism } from "./MaterialMechanism";
+import {
+  MATERIAL_PALETTE,
+  materialFill,
+  materialPaletteStyle,
+} from "./palette";
+import {
+  inspectWindow,
+  placeContactPair,
+  type StepTrace,
+  type RuleAttempt,
+} from "./mechanism";
 import protocolUrl from "./PROTOCOL.md?url&no-inline";
 import labelsUrl from "./labels.v1.json?url&no-inline";
 
 type Saved = { id: string; label: string; scene: Scene };
-const COLORS = [
-  "#f0ebdd",
-  "#c59a4a",
-  "#79abb3",
-  "#78836f",
-  "#ad7957",
-  "#e47d4c",
-  "#bbd5d0",
-  "#a487bd",
-];
 const MOTIONS: {
   value: Rule["motion"];
   label: string;
@@ -67,7 +70,8 @@ function renderMatter(
 ) {
   const sx = width / s.width,
     sy = height / s.height;
-  ctx.fillStyle = dark ? "#242d29" : COLORS[0];
+  const colors = MATERIAL_PALETTE[dark ? "dark" : "light"];
+  ctx.fillStyle = colors[0];
   ctx.fillRect(0, 0, width, height);
   ctx.fillStyle = dark ? "#46524a" : "#d9d3c4";
   for (let x = 4; x < s.width; x += 8)
@@ -81,7 +85,7 @@ function renderMatter(
     if (!cell) continue;
     const x = (i % s.width) * sx,
       y = Math.floor(i / s.width) * sy;
-    ctx.fillStyle = COLORS[cell];
+    ctx.fillStyle = colors[cell];
     if (cell === 1) {
       const size = 0.36 + ((i * 17) % 7) * 0.018;
       ctx.beginPath();
@@ -104,19 +108,19 @@ function renderMatter(
       ctx.closePath();
       ctx.fill();
     } else if (cell === 6) {
-      ctx.globalAlpha = 0.65;
+      ctx.strokeStyle = colors[cell];
+      ctx.lineWidth = Math.max(1, sx * 0.17);
       ctx.beginPath();
       ctx.ellipse(
         x + sx / 2,
         y + sy / 2,
-        sx * 0.65,
-        sy * 0.65,
+        sx * 0.3,
+        sy * 0.3,
         0,
         0,
         Math.PI * 2,
       );
-      ctx.fill();
-      ctx.globalAlpha = 1;
+      ctx.stroke();
     } else if (cell === 5) {
       ctx.beginPath();
       ctx.moveTo(x + sx / 2, y);
@@ -143,8 +147,16 @@ function renderMatter(
 const STORE = "jev-material-scenes-v1";
 export function MaterialsSandbox({
   compact = false,
-}: { compact?: boolean } = {}) {
-  const [expanded, setExpanded] = useState(!compact);
+}: {
+  compact?: boolean;
+} = {}) {
+  const [explaining, setExplaining] = useState(
+    () => matchMedia("(min-width: 960px)").matches,
+  );
+  const [stepTrace, setStepTrace] = useState<StepTrace | null>(null);
+  const [attempt, setAttempt] = useState<RuleAttempt | null>(null);
+  const mechanismTrigger = useRef<HTMLElement>(null);
+  const frames = useRef<ReturnType<typeof materialFrames> | null>(null);
   const initial = useRef<Scene | null>(null);
   if (!initial.current) {
     const preset = new URLSearchParams(location.search).get("preset");
@@ -174,19 +186,19 @@ export function MaterialsSandbox({
     abort = useRef<AbortController | null>(null),
     mounted = useRef(true),
     drawing = useRef<{ x: number; y: number } | null>(null);
-  const [playing, setPlaying] = useState(
-      () => !matchMedia("(prefers-reduced-motion: reduce)").matches,
-    ),
+  const [playing, setPlaying] = useState(false),
     [brush, setBrush] = useState<Material>(1),
     [radius, setRadius] = useState(2),
     [version, setVersion] = useState(0),
-    [cursor, setCursor] = useState({ x: 48, y: 20 });
+    [cursor, setCursor] = useState(() =>
+      initial.current?.label === "terrarium"
+        ? { x: 24, y: 48 }
+        : { x: 48, y: 20 },
+    );
   const [saved, setSaved] = useState<Saved[]>([]),
     [branches, setBranches] = useState<Saved[]>([]),
     [error, setError] = useState(""),
-    [message, setMessage] = useState(
-      "Paint sand into the pool, or try the purple bloom dust.",
-    ),
+    [message, setMessage] = useState(""),
     [busy, setBusy] = useState(false),
     [proposal, setProposal] = useState<Rule | null>(null);
   const runRef = useRef(playing);
@@ -196,7 +208,16 @@ export function MaterialsSandbox({
   const paintView = useRef({ brush, radius, mode, hovered, touching });
   paintView.current = { brush, radius, mode, hovered, touching };
   const bump = () => setVersion((v) => v + 1);
-  function invalidate() {
+  function invalidate(
+    reason = "The scene changed before the proposal was applied.",
+  ) {
+    setStepTrace(null);
+    setAttempt((previous) =>
+      previous &&
+      (previous.status === "pending" || previous.status === "proposed")
+        ? { ...previous, status: "discarded", error: reason }
+        : previous,
+    );
     revision.current.next();
     abort.current?.abort();
     abort.current = null;
@@ -210,6 +231,7 @@ export function MaterialsSandbox({
     setInspected(false);
     setHasPainted(false);
     scene.current = structuredClone(next);
+    setAttempt(null);
     setPlaying(false);
     setMessage(text);
     setError("");
@@ -217,6 +239,11 @@ export function MaterialsSandbox({
   }
   function updateRule(patch: Partial<Rule>) {
     invalidate();
+    setAttempt((previous) =>
+      previous?.status === "applied"
+        ? { ...previous, status: "superseded" }
+        : previous,
+    );
     scene.current.rule = {
       ...scene.current.rule,
       ...patch,
@@ -227,16 +254,12 @@ export function MaterialsSandbox({
   }
   function preserve(label = `Branch ${branches.length + 1}`) {
     invalidate();
-    setBranches((all) =>
-      [
-        ...all,
-        {
-          id: crypto.randomUUID(),
-          label: `${label} · tick ${scene.current.tick}`,
-          scene: structuredClone(scene.current),
-        },
-      ].slice(-12),
-    );
+    const snapshot = {
+      id: crypto.randomUUID(),
+      label: `${label} · tick ${scene.current.tick}`,
+      scene: structuredClone(scene.current),
+    };
+    setBranches((all) => [...all, snapshot].slice(-12));
     setMessage("This branch is preserved. Keep painting, or restore it below.");
   }
   function save() {
@@ -288,6 +311,7 @@ export function MaterialsSandbox({
       request = ruleRequest(instruction),
       controller = new AbortController();
     abort.current = controller;
+    setAttempt({ status: "pending", revision: token, request });
     setBusy(true);
     setError("");
     try {
@@ -303,7 +327,11 @@ export function MaterialsSandbox({
       )
         return;
       const rule = ruleFromAnswers(response.answers ?? {}, instruction);
-      setProposal({ ...rule, evidence: { request, response } });
+      setProposal({
+        ...rule,
+        evidence: { request, response, revision: token },
+      });
+      setAttempt({ status: "proposed", revision: token, request, response });
       setMessage(
         "Review the proposed controls, then apply them to the purple material.",
       );
@@ -312,12 +340,23 @@ export function MaterialsSandbox({
         mounted.current &&
         revision.current.valid(token) &&
         !controller.signal.aborted
-      )
-        setError(
+      ) {
+        const key = getApiKey();
+        const message =
           e instanceof Error
-            ? e.message.split(getApiKey()).join("[redacted]").slice(0, 500)
-            : "Interpretation failed. The current material is unchanged.",
-        );
+            ? (key ? e.message.split(key).join("[redacted]") : e.message).slice(
+                0,
+                500,
+              )
+            : "Interpretation failed. The current material is unchanged.";
+        setError(message);
+        setAttempt({
+          status: "failed",
+          revision: token,
+          request,
+          error: message,
+        });
+      }
     } finally {
       if (mounted.current && revision.current.valid(token)) {
         setBusy(false);
@@ -327,6 +366,23 @@ export function MaterialsSandbox({
   }
   useEffect(() => {
     mounted.current = true;
+    const reduced = matchMedia("(prefers-reduced-motion: reduce)");
+    if (reduced.matches) {
+      runRef.current = false;
+      setPlaying(false);
+    }
+    setBusy(false);
+    abort.current = null;
+    setProposal(null);
+    setAttempt((previous) =>
+      previous?.status === "pending" || previous?.status === "proposed"
+        ? {
+            ...previous,
+            status: "discarded",
+            error: "Interrupted while this scene was inactive.",
+          }
+        : previous,
+    );
     try {
       const stored = JSON.parse(localStorage.getItem(STORE) ?? "[]");
       if (!Array.isArray(stored) || stored.length > 8) throw new Error();
@@ -346,20 +402,7 @@ export function MaterialsSandbox({
         "Previously saved scenes could not be read. Your current scene still works.",
       );
     }
-    let raf = 0,
-      previous = 0,
-      lastPublish = 0,
-      accumulator = 0;
-    function frame(now: number) {
-      const delta = previous ? Math.min(80, now - previous) : 0;
-      previous = now;
-      if (runRef.current && !document.hidden) {
-        accumulator += delta;
-        while (accumulator >= 40) {
-          step(scene.current);
-          accumulator -= 40;
-        }
-      } else accumulator = 0;
+    function drawCurrent() {
       const el = canvas.current,
         ctx = el?.getContext("2d");
       if (ctx && el) {
@@ -387,7 +430,8 @@ export function MaterialsSandbox({
             );
             ctx.stroke();
             ctx.setLineDash([]);
-            ctx.fillStyle = COLORS[view.brush];
+            ctx.fillStyle =
+              MATERIAL_PALETTE[dark ? "dark" : "light"][view.brush];
             ctx.globalAlpha = 0.45;
             ctx.beginPath();
             ctx.arc((c.x + 0.5) * sx, (c.y + 0.5) * sy, 2.5, 0, Math.PI * 2);
@@ -412,26 +456,120 @@ export function MaterialsSandbox({
           );
         }
       }
-      if (now - lastPublish > 300) {
-        lastPublish = now;
-        bump();
-      }
-      raf = requestAnimationFrame(frame);
     }
-    raf = requestAnimationFrame(frame);
-    const reduced = matchMedia("(prefers-reduced-motion: reduce)");
+    const clock = materialFrames({
+      request: (callback) => requestAnimationFrame(callback),
+      cancel: (id) => cancelAnimationFrame(id),
+      step: () => step(scene.current),
+      draw: drawCurrent,
+      publish: bump,
+    });
+    frames.current = clock;
+    clock.setPlaying(runRef.current);
+    clock.setPageVisible(!document.hidden);
+    const visibility = () => clock.setPageVisible(!document.hidden);
+    document.addEventListener("visibilitychange", visibility);
+    const observer = new IntersectionObserver((entries) =>
+      clock.setVisible(
+        entries.some(
+          (entry) =>
+            entry.isIntersecting &&
+            entry.intersectionRect.width > 0 &&
+            entry.intersectionRect.height > 0,
+        ),
+      ),
+    );
+    if (canvas.current) observer.observe(canvas.current);
+    const theme = new MutationObserver(() => clock.invalidate());
+    theme.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["data-theme"],
+    });
     const change = () => {
-      if (reduced.matches) setPlaying(false);
+      if (reduced.matches) {
+        runRef.current = false;
+        clock.setPlaying(false);
+        setPlaying(false);
+      }
     };
     reduced.addEventListener("change", change);
     return () => {
       mounted.current = false;
       revision.current.next();
       abort.current?.abort();
-      cancelAnimationFrame(raf);
+      clock.dispose();
+      frames.current = null;
+      observer.disconnect();
+      theme.disconnect();
+      document.removeEventListener("visibilitychange", visibility);
       reduced.removeEventListener("change", change);
     };
   }, []);
+  useEffect(() => {
+    frames.current?.setPlaying(runRef.current);
+  }, [playing]);
+  useEffect(() => {
+    frames.current?.invalidate();
+  }, [
+    version,
+    cursor,
+    brush,
+    radius,
+    mode,
+    hovered,
+    touching,
+    fullscreen,
+    explaining,
+  ]);
+  function stepOnce() {
+    setPlaying(false);
+    frames.current?.setPlaying(false);
+    const before = inspectWindow(scene.current, cursorRef.current);
+    step(scene.current);
+    setStepTrace({
+      before,
+      after: inspectWindow(scene.current, cursorRef.current),
+    });
+    bump();
+  }
+  function placePair() {
+    preserve("Before test pair");
+    setPlaying(false);
+    frames.current?.setPlaying(false);
+    const point = placeContactPair(scene.current);
+    setCursor(point);
+    setMode("inspect");
+    setExplaining(true);
+    setInspected(false);
+    setHasPainted(true);
+    setMessage(
+      "Test pair placed. Step one tick to inspect the contact rule; your earlier scene is preserved as a branch.",
+    );
+    bump();
+  }
+  function closeMechanism() {
+    setExplaining(false);
+    mechanismTrigger.current?.focus({ preventScroll: true });
+  }
+  function applyProposal() {
+    if (!proposal) return;
+    const next = proposal;
+    invalidate();
+    scene.current.rule = next;
+    setAttempt((previous) =>
+      previous
+        ? {
+            ...previous,
+            status: "applied",
+            error: undefined,
+            appliedAt: scene.current.tick,
+          }
+        : previous,
+    );
+    setBrush(7);
+    setMessage("Applied the Jev proposal. Paint purple cells to try it.");
+    bump();
+  }
   function point(e: PointerEvent<HTMLCanvasElement>) {
     const rect = e.currentTarget.getBoundingClientRect();
     return {
@@ -483,56 +621,27 @@ export function MaterialsSandbox({
     setMode("paint");
     setInspected(false);
   }
-  function motionControls() {
-    return (
-      <div
-        className="mat-motions"
-        role="group"
-        aria-label="Custom material movement"
-      >
-        {MOTIONS.map((m) => (
-          <button
-            key={m.value}
-            aria-pressed={rule.motion === m.value}
-            title={m.detail}
-            onClick={() => updateRule({ motion: m.value })}
-          >
-            <span aria-hidden="true">{m.icon}</span>
-            {m.label}
-          </button>
-        ))}
-      </div>
-    );
+  function selectCursor(p: { x: number; y: number }) {
+    if (p.x !== cursor.x || p.y !== cursor.y) setStepTrace(null);
+    setCursor(p);
   }
   function inspectPoint(p: { x: number; y: number }) {
-    setCursor(p);
+    selectCursor(p);
     setInspected(true);
+    setExplaining(true);
     setPlaying(false);
+    frames.current?.setPlaying(false);
   }
   return (
     <div
-      className={`materials-lab ${compact ? "is-compact" : ""} ${expanded ? "show-details" : ""}`}
+      className={`materials-lab ${compact ? "is-compact" : ""}`}
+      style={materialPaletteStyle as CSSProperties}
     >
-      <header className="mat-intro">
-        <div>
-          <span className="mat-eyebrow">A small world made by hand</span>
-          <h2>Pour sand into the pool.</h2>
-          <p>
-            Pick a material and draw. Inspect a cell to see the rule behind it.
-          </p>
-        </div>
-        <span className="mat-local">Local simulation · 96 × 64 cells</span>
-      </header>
-      {compact && (
-        <button
-          className="mat-expand"
-          aria-expanded={expanded}
-          onClick={() => setExpanded(!expanded)}
-        >
-          {expanded
-            ? "Hide material controls and saved scenes"
-            : "Material controls, branches and export"}
-        </button>
+      {!compact && (
+        <header className="mat-intro">
+          <p>Paint a world. Change one rule.</p>
+          <span className="mat-local">Local simulation · 96 × 64 cells</span>
+        </header>
       )}
       <div className="mat-layout">
         <section
@@ -541,49 +650,23 @@ export function MaterialsSandbox({
           aria-label="Material canvas and tools"
         >
           <div className="mat-toolbar">
-            <div
-              className="mat-mode-switch"
-              role="group"
-              aria-label="Canvas tool"
-            >
-              <button
-                aria-pressed={mode === "paint"}
-                onClick={() => {
-                  setMode("paint");
-                  setInspected(false);
-                }}
-              >
-                Paint
-              </button>
-              <button
-                aria-pressed={mode === "inspect"}
-                onClick={() => {
-                  setMode("inspect");
-                  setPlaying(false);
-                  setInspected(false);
-                }}
-              >
-                Inspect
-              </button>
-            </div>
             <div className="mat-playback">
               <button
                 className="mat-primary"
-                onClick={() => setPlaying(!playing)}
+                onClick={() => {
+                  if (!playing) setStepTrace(null);
+                  setPlaying(!playing);
+                }}
               >
                 {playing ? "Pause" : "Play"}
               </button>
-              <button
-                onClick={() => {
-                  preserve("Before reset");
-                  replace(
-                    createScene(),
-                    "Reset to the terrarium. Your old scene is preserved below.",
-                  );
-                }}
-              >
-                Reset
-              </button>
+              <button onClick={stepOnce}>Step</button>
+              <span className="mat-tick">
+                <span>{playing ? "Running" : "Paused"}</span> Tick{" "}
+                {current.tick}
+              </span>
+            </div>
+            <div className="mat-canvas-actions">
               <button
                 className="mat-fullscreen"
                 onClick={async () => {
@@ -611,83 +694,6 @@ export function MaterialsSandbox({
             </div>
           </div>
           <div
-            className="mat-palette"
-            role="group"
-            aria-label="Painting material"
-          >
-            {palette.map((m) => (
-              <button
-                key={m.id}
-                aria-pressed={brush === m.id && mode === "paint"}
-                title={`${m.id}: ${m.description}`}
-                onClick={() => selectMaterial(m.id as Material)}
-              >
-                <i
-                  className={`mat-swatch mat-swatch-${m.id}`}
-                  style={{ background: COLORS[m.id] }}
-                />
-                <span>{m.name}</span>
-                <kbd>{m.id}</kbd>
-              </button>
-            ))}
-          </div>
-          <div className="mat-brush">
-            <div className="mat-selected">
-              <strong>
-                {mode === "inspect" ? "Inspect a cell" : selectedMaterial.name}
-              </strong>
-              <span>
-                {mode === "inspect"
-                  ? "Tap the world. The scene pauses while you look."
-                  : brushDescription}
-              </span>
-            </div>
-            <label>
-              <span className="mat-brush-label">Size</span>
-              <input
-                aria-label="Brush radius"
-                type="range"
-                min="0"
-                max="7"
-                value={radius}
-                onChange={(e) => setRadius(Number(e.target.value))}
-              />
-              <span
-                className="mat-size-preview"
-                style={
-                  {
-                    "--brush-size": `${Math.max(4, radius * 2 + 4)}px`,
-                  } as CSSProperties
-                }
-                aria-hidden="true"
-              />
-              <output>{radius * 2 + 1}</output>
-            </label>
-          </div>
-          {compact && brush === 7 && mode === "paint" && (
-            <div className="mat-quick-rule">
-              <div>
-                <span className="mat-eyebrow">
-                  Your material moves this way
-                </span>
-                <button
-                  className="mat-text-button"
-                  onClick={() => setExpanded(!expanded)}
-                  aria-expanded={expanded}
-                >
-                  {expanded ? "Close rule editor" : "Edit reaction ↗"}
-                </button>
-              </div>
-              {motionControls()}
-              <p>
-                {rule.contact === "none"
-                  ? "No contact reaction."
-                  : `Touches ${rule.contact} → becomes ${rule.becomes}.`}{" "}
-                <span>Changes every purple cell immediately.</span>
-              </p>
-            </div>
-          )}
-          <div
             className={`mat-stage ${mode === "inspect" ? "is-inspecting" : ""}`}
           >
             <canvas
@@ -698,6 +704,8 @@ export function MaterialsSandbox({
               role="application"
               aria-label="Material painting canvas. Arrow keys move the cursor; Space or Enter paints or inspects; number keys 0 to 7 choose material. Pointer and touch drag to paint."
               aria-describedby="mat-keyboard"
+              onFocus={() => frames.current?.invalidate()}
+              onBlur={() => frames.current?.invalidate()}
               onPointerDown={(e) => {
                 e.preventDefault();
                 e.currentTarget.focus({ preventScroll: true });
@@ -709,7 +717,7 @@ export function MaterialsSandbox({
                 else draw(p);
               }}
               onPointerMove={(e) => {
-                if (mode === "paint" || !inspected) setCursor(point(e));
+                if (mode === "paint" || !inspected) selectCursor(point(e));
                 if (drawing.current && mode === "paint") draw(point(e));
               }}
               onPointerEnter={() => setHovered(true)}
@@ -738,16 +746,16 @@ export function MaterialsSandbox({
                 if (moves[e.key]) {
                   e.preventDefault();
                   const [dx, dy] = moves[e.key];
-                  setCursor((c) => ({
+                  selectCursor({
                     x: Math.min(
                       WIDTH - 1,
-                      Math.max(0, c.x + dx * (e.shiftKey ? 5 : 1)),
+                      Math.max(0, cursor.x + dx * (e.shiftKey ? 5 : 1)),
                     ),
                     y: Math.min(
                       HEIGHT - 1,
-                      Math.max(0, c.y + dy * (e.shiftKey ? 5 : 1)),
+                      Math.max(0, cursor.y + dy * (e.shiftKey ? 5 : 1)),
                     ),
-                  }));
+                  });
                 } else if (e.key === " " || e.key === "Enter") {
                   e.preventDefault();
                   if (mode === "inspect") inspectPoint(cursor);
@@ -775,7 +783,7 @@ export function MaterialsSandbox({
                       "Plant some wood. Then try fire.",
                       "Touch fire to the wooden ledge.",
                       "Let a little steam rise.",
-                      "Give your material a place to grow.",
+                      "Paint your material here.",
                     ][brush]
                   }
                 </span>
@@ -791,7 +799,7 @@ export function MaterialsSandbox({
                 aria-label="Cell inspection"
               >
                 <div>
-                  <i style={{ background: COLORS[cell] }} />
+                  <i style={{ background: materialFill(cell) }} />
                   <strong>
                     {cell === 0 ? "Empty space" : observedMaterial.name}
                   </strong>
@@ -843,156 +851,137 @@ export function MaterialsSandbox({
               </span>
             </div>
           </div>
-          <div className="mat-scene-tools">
-            <p className="mat-hint" id="mat-keyboard">
-              Drag to paint.{" "}
+          <details
+            className="mat-rule-disclosure"
+            open={explaining}
+            onToggle={(event) => setExplaining(event.currentTarget.open)}
+          >
+            <summary ref={mechanismTrigger}>
               <span>
-                Arrows move · Space paints · 0–7 choose · Shift moves five
-                cells.
+                <i
+                  className="mat-swatch mat-swatch-7"
+                  style={{ background: materialFill(7) }}
+                />
+                {rule.name || "Your material"}
               </span>
-            </p>
-            <details>
-              <summary>Scene tools</summary>
-              <div>
+              <span className="mat-disclosure-label">Rule inspector</span>
+            </summary>
+            <MaterialMechanism
+              scene={current}
+              cursor={cursor}
+              trace={
+                stepTrace?.after.tick === current.tick &&
+                stepTrace.after.x === cursor.x &&
+                stepTrace.after.y === cursor.y
+                  ? stepTrace
+                  : null
+              }
+              attempt={attempt}
+              proposal={proposal}
+              busy={busy}
+              onRule={updateRule}
+              onStep={stepOnce}
+              onPair={placePair}
+              onClose={closeMechanism}
+              onInterpret={interpret}
+              onCancel={() => invalidate("Interpretation cancelled.")}
+              onApply={applyProposal}
+            />
+          </details>
+          <div className="mat-paint-tools">
+            <div className="mat-tools-heading">
+              <span className="mat-eyebrow">Palette</span>
+              <div
+                className="mat-mode-switch"
+                role="group"
+                aria-label="Canvas tool"
+              >
                 <button
+                  aria-pressed={mode === "paint"}
                   onClick={() => {
-                    setPlaying(false);
-                    step(current);
-                    bump();
+                    setMode("paint");
+                    setInspected(false);
                   }}
                 >
-                  One step
+                  Paint
                 </button>
-                <button onClick={() => preserve()}>Preserve branch</button>
-                <span>Tick {current.tick}</span>
+                <button
+                  aria-pressed={mode === "inspect"}
+                  onClick={() => {
+                    setMode("inspect");
+                    setPlaying(false);
+                    frames.current?.setPlaying(false);
+                    setExplaining(true);
+                    setInspected(false);
+                  }}
+                >
+                  Inspect
+                </button>
               </div>
-            </details>
+            </div>
+            <div
+              className="mat-palette"
+              role="group"
+              aria-label="Painting material"
+            >
+              {palette.map((m) => (
+                <button
+                  key={m.id}
+                  aria-pressed={brush === m.id && mode === "paint"}
+                  title={`${m.id}: ${m.description}`}
+                  onClick={() => selectMaterial(m.id as Material)}
+                >
+                  <i
+                    className={`mat-swatch mat-swatch-${m.id}`}
+                    style={{ background: materialFill(m.id) }}
+                  />
+                  <span>{m.name}</span>
+                  <kbd>{m.id}</kbd>
+                </button>
+              ))}
+            </div>
+            <div className="mat-brush">
+              <div className="mat-selected">
+                <strong>
+                  {mode === "inspect"
+                    ? "Inspect a cell"
+                    : selectedMaterial.name}
+                </strong>
+                <span>
+                  {mode === "inspect"
+                    ? "Tap the world. The scene pauses while you look."
+                    : brushDescription}
+                </span>
+              </div>
+              <label>
+                <span className="mat-brush-label">Size</span>
+                <input
+                  aria-label="Brush radius"
+                  type="range"
+                  min="0"
+                  max="7"
+                  value={radius}
+                  onChange={(e) => setRadius(Number(e.target.value))}
+                />
+                <span
+                  className="mat-size-preview"
+                  style={
+                    {
+                      "--brush-size": `${Math.max(4, radius * 2 + 4)}px`,
+                    } as CSSProperties
+                  }
+                  aria-hidden="true"
+                />
+                <output>{radius * 2 + 1} cells</output>
+              </label>
+            </div>
+
+            <p className="mat-hint mat-keyboard" id="mat-keyboard">
+              Drag to paint. Arrows move · Space paints or inspects · 0–7 choose
+              · Shift moves five cells.
+            </p>
           </div>
         </section>
-        <aside className="mat-inspector">
-          <span className="mat-eyebrow">One material you can rewrite</span>
-          <h3>
-            <i style={{ background: COLORS[7] }} />
-            {rule.name || "Your material"}
-          </h3>
-          <label>
-            Name
-            <input
-              maxLength={50}
-              value={rule.name}
-              onChange={(e) => updateRule({ name: e.target.value })}
-            />
-          </label>
-          <div className="mat-movement">
-            <span className="mat-control-label">Movement</span>
-            {motionControls()}
-            <p>{MOTIONS.find((m) => m.value === rule.motion)!.detail}</p>
-          </div>
-          <div className="mat-rule-row">
-            <label>
-              When it touches
-              <select
-                value={rule.contact}
-                onChange={(e) =>
-                  updateRule({ contact: e.target.value as Rule["contact"] })
-                }
-              >
-                {["none", "water", "fire", "sand", "wood"].map((v) => (
-                  <option key={v} value={v}>
-                    {v === "none" ? "Nothing · no reaction" : v}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              It becomes
-              <select
-                disabled={rule.contact === "none"}
-                value={rule.becomes}
-                onChange={(e) =>
-                  updateRule({ becomes: e.target.value as Rule["becomes"] })
-                }
-              >
-                {MATERIALS.map((m) => (
-                  <option key={m.id} value={m.name.toLowerCase()}>
-                    {m.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-          <p className="mat-hint">
-            Controls apply immediately to every purple cell. Only that cell
-            transforms. Its neighbor stays unchanged.
-          </p>
-          <details>
-            <summary>Describe a rule to Jev</summary>
-            <label>
-              Your instruction
-              <textarea
-                rows={3}
-                maxLength={600}
-                value={rule.instruction}
-                onChange={(e) => updateRule({ instruction: e.target.value })}
-              />
-            </label>
-            <button
-              disabled={busy || !rule.instruction.trim()}
-              onClick={interpret}
-            >
-              {busy ? "Interpreting…" : "Propose typed controls"}
-            </button>
-            {busy && <button onClick={invalidate}>Cancel</button>}
-            <p className="mat-hint">
-              Uses your connected key. Jev chooses controls; code simulates
-              their effect. Interpretation accuracy has not been measured.
-            </p>
-          </details>
-          {proposal && (
-            <div className="mat-proposal">
-              <strong>Proposed rule</strong>
-              <p>
-                {proposal.motion};{" "}
-                {proposal.contact === "none"
-                  ? "no reaction"
-                  : `${proposal.contact} contact → ${proposal.becomes}`}
-                .
-              </p>
-              <button
-                onClick={() => {
-                  const next = proposal;
-                  invalidate();
-                  scene.current.rule = next;
-                  setBrush(7);
-                  setMessage(
-                    "Applied the Jev proposal. Paint purple cells to try it.",
-                  );
-                  bump();
-                }}
-              >
-                Apply proposal
-              </button>
-              <details>
-                <summary>Inspect actual request and reply</summary>
-                <pre>{JSON.stringify(proposal.evidence, null, 2)}</pre>
-              </details>
-            </div>
-          )}
-          <div className="mat-presets">
-            <span className="mat-eyebrow">A fresh starting point</span>
-            {PRESETS.map((p) => (
-              <button
-                key={p}
-                onClick={() => {
-                  preserve("Before preset");
-                  replace(createScene(p), `Opened ${p}. Press Play to begin.`);
-                }}
-              >
-                {p}
-              </button>
-            ))}
-          </div>
-        </aside>
       </div>
       {error && (
         <p className="mat-error" role="alert">
@@ -1004,13 +993,14 @@ export function MaterialsSandbox({
       </p>
       <section className="mat-artifacts">
         <div>
-          <h3>Keep a world. Try another.</h3>
+          <h3>Scenes & branches</h3>
           <p>
             Branches stay in this tab. Saved scenes stay in this browser.
             Exported JSON includes your custom instruction.
           </p>
         </div>
         <div className="mat-artifact-actions">
+          <button onClick={() => preserve()}>Preserve branch</button>
           <button onClick={save}>Save scene</button>
           <button onClick={() => download("jev-material-scene.json", current)}>
             Export JSON
@@ -1027,6 +1017,34 @@ export function MaterialsSandbox({
               }}
             />
           </label>
+        </div>
+        <div className="mat-presets" role="group" aria-label="Starting scenes">
+          <span className="mat-eyebrow">Start again</span>
+          {PRESETS.map((preset) => (
+            <button
+              key={preset}
+              onClick={() => {
+                preserve("Before preset");
+                replace(
+                  createScene(preset),
+                  `Opened ${preset}. Press Play to begin.`,
+                );
+              }}
+            >
+              {preset}
+            </button>
+          ))}
+          <button
+            onClick={() => {
+              preserve("Before reset");
+              replace(
+                createScene(),
+                "Reset to the terrarium. Your old scene is preserved below.",
+              );
+            }}
+          >
+            Reset
+          </button>
         </div>
         {branches.length > 0 && (
           <div className="mat-scene-list">
@@ -1103,7 +1121,7 @@ export function MaterialsSandbox({
           </a>
         </p>
         <p>
-          Current purple rule source:{" "}
+          Current custom rule source:{" "}
           {rule.source === "jev"
             ? "Accepted live Jev proposal"
             : "Manual controls"}

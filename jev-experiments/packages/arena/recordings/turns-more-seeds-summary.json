@@ -1,0 +1,150 @@
+{
+  "recordedAt": "2026-09-23T06:44:30.655Z",
+  "protocol": "turn-based; seeds 3/11/23/31; 40 pieces; one lane per design; no retries of weak answers",
+  "games": [
+    {
+      "seed": 3,
+      "pieceLimit": 40,
+      "lanes": [
+        {
+          "name": "Jev · Pick one landing (features as JSON)",
+          "framing": "landing-choice",
+          "pieces": 30,
+          "lines": 3,
+          "score": 1095,
+          "status": "over",
+          "applied": 31,
+          "failed": 0
+        },
+        {
+          "name": "Jev · Judge each spot: clean or not",
+          "framing": "spot-clean",
+          "pieces": 40,
+          "lines": 12,
+          "score": 3174,
+          "status": "playing",
+          "applied": 40,
+          "failed": 0
+        },
+        {
+          "name": "Code planner",
+          "framing": "heuristic-0",
+          "pieces": 40,
+          "lines": 14,
+          "score": 3340,
+          "status": "playing",
+          "applied": 40,
+          "failed": 0
+        }
+      ]
+    },
+    {
+      "seed": 11,
+      "pieceLimit": 40,
+      "lanes": [
+        {
+          "name": "Jev · Pick one landing (features as JSON)",
+          "framing": "landing-choice",
+          "pieces": 23,
+          "lines": 1,
+          "score": 613,
+          "status": "over",
+          "applied": 24,
+          "failed": 0
+        },
+        {
+          "name": "Jev · Judge each spot: clean or not",
+          "framing": "spot-clean",
+          "pieces": 40,
+          "lines": 14,
+          "score": 3856,
+          "status": "playing",
+          "applied": 40,
+          "failed": 0
+        },
+        {
+          "name": "Code planner",
+          "framing": "heuristic-0",
+          "pieces": 40,
+          "lines": 15,
+          "score": 3478,
+          "status": "playing",
+          "applied": 40,
+          "failed": 0
+        }
+      ]
+    },
+    {
+      "seed": 23,
+      "pieceLimit": 40,
+      "lanes": [
+        {
+          "name": "Jev · Pick one landing (features as JSON)",
+          "framing": "landing-choice",
+          "pieces": 40,
+          "lines": 11,
+          "score": 2584,
+          "status": "playing",
+          "applied": 40,
+          "failed": 0
+        },
+        {
+          "name": "Jev · Judge each spot: clean or not",
+          "framing": "spot-clean",
+          "pieces": 40,
+          "lines": 8,
+          "score": 2192,
+          "status": "playing",
+          "applied": 40,
+          "failed": 0
+        },
+        {
+          "name": "Code planner",
+          "framing": "heuristic-0",
+          "pieces": 40,
+          "lines": 14,
+          "score": 3332,
+          "status": "playing",
+          "applied": 40,
+          "failed": 0
+        }
+      ]
+    },
+    {
+      "seed": 31,
+      "pieceLimit": 40,
+      "lanes": [
+        {
+          "name": "Jev · Pick one landing (features as JSON)",
+          "framing": "landing-choice",
+          "pieces": 40,
+          "lines": 7,
+          "score": 1746,
+          "status": "playing",
+          "applied": 40,
+          "failed": 0
+        },
+        {
+          "name": "Jev · Judge each spot: clean or not",
+          "framing": "spot-clean",
+          "pieces": 40,
+          "lines": 11,
+          "score": 3314,
+          "status": "playing",
+          "applied": 40,
+          "failed": 0
+        },
+        {
+          "name": "Code planner",
+          "framing": "heuristic-0",
+          "pieces": 40,
+          "lines": 13,
+          "score": 3170,
+          "status": "playing",
+          "applied": 40,
+          "failed": 0
+        }
+      ]
+    }
+  ]
+}

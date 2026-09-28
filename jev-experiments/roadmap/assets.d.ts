@@ -7,3 +7,9 @@ declare module "*?url&no-inline" {
   const url: string;
   export default url;
 }
+
+/** Vite's ?raw suffix imports a file's source as a string (MaterialMechanism shows engine.ts). */
+declare module "*?raw" {
+  const source: string;
+  export default source;
+}
