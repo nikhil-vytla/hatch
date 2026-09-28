@@ -82,6 +82,20 @@ fn configured_prices_override_and_extend_the_builtins() {
     );
 }
 
+/// The daemon lists the models it can price (`models/list`) from `iter`: an
+/// added model shows up, and each listed entry is the one `get` prices by.
+#[test]
+fn every_priced_model_is_listed_with_its_price() {
+    let json = r#"{"claude-opus-5-5": {"input": 5.0, "output": 25.0, "contextWindow": 1000000}}"#;
+    let m = Models::builtin().with_overrides(&serde_json::from_str(json).unwrap());
+    let listed: Vec<(&str, Price)> = m.iter().map(|(id, model)| (id, model.price)).collect();
+    assert!(listed.iter().any(|(id, _)| *id == "claude-opus-5-5"), "{listed:?}");
+    assert!(listed.iter().any(|(id, _)| *id == "claude-haiku-4-5"), "the builtins stay listed: {listed:?}");
+    for (id, price) in &listed {
+        assert_eq!(m.get(id).map(|model| model.price), Some(*price), "{id}");
+    }
+}
+
 #[test]
 fn a_reservation_bounds_input_by_bytes_and_the_context_window() {
     let m = Models::builtin();
