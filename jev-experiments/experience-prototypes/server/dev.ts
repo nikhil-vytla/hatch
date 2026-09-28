@@ -1,5 +1,4 @@
 import evaluateHandler from "../api/evaluate";
-import contestHandler from "../api/contest";
 import wardrobeTokenHandler from "../api/wardrobe-token";
 import { apiKeyFromHeader, GatewayError } from "./gateway";
 import { compose } from "./compose";
@@ -60,8 +59,8 @@ Bun.serve({
       },
     };
     const path = new URL(req.url).pathname;
-    if (!["/api/evaluate", "/api/wardrobe-token", "/api/contest"].includes(path)) return Response.json({ error: "Not found." }, { status: 404 });
-    await (path === "/api/wardrobe-token" ? wardrobeTokenHandler : path === "/api/contest" ? contestHandler : evaluateHandler)(
+    if (!["/api/evaluate", "/api/wardrobe-token"].includes(path)) return Response.json({ error: "Not found." }, { status: 404 });
+    await (path === "/api/wardrobe-token" ? wardrobeTokenHandler : evaluateHandler)(
       {
         method: req.method,
         headers: {

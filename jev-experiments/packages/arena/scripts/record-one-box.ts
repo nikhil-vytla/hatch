@@ -37,8 +37,7 @@ const scope = process.argv[2] ?? "all";
 if (scope !== "words" && scope !== "all") throw Error("Scope is words or all.");
 
 /**
- * Optional third and fourth arguments point at another phrase file and log, e.g. the sealed
- * set, which lives in the gitignored packages/arena/sealed/ and is recorded there.
+ * Optional third and fourth arguments point at another phrase file and log.
  */
 const phrasesPath =
   process.argv[3] ?? new URL("../src/one-box/phrases.json", import.meta.url).pathname;
