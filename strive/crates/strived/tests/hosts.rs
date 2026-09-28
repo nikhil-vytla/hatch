@@ -144,7 +144,11 @@ fn a_host_that_disconnects_between_turns_ends_nothing() {
 fn a_turn_started_just_before_the_host_disconnects_is_still_ended() {
     let env = Env::new();
     let started_seen = std::cell::Cell::new(false);
-    for _ in 0..20 {
+    // The host hangs up at once, or a little later: from nothing waited, where
+    // the daemon may see the hang-up before the record, to a few ms, where the
+    // record is journaled first. Both orderings must leave no turn open, and
+    // sweeping the wait makes sure each run meets the second one too.
+    for attempt in 0..20u64 {
         let id = session(&env);
         let mut s = UnixStream::connect(env.socket()).unwrap();
         let init = json!({"jsonrpc": "2.0", "id": 0, "method": "initialize",
@@ -160,7 +164,8 @@ fn a_turn_started_just_before_the_host_disconnects_is_still_ended() {
             std::io::BufRead::read_line(&mut r, &mut line).unwrap();
         }
         s.write_all(format!("{start}\n").as_bytes()).unwrap();
-        drop((r, s)); // at once: the record may still be on its way to the journal
+        std::thread::sleep(Duration::from_micros(attempt * 250));
+        drop((r, s)); // the record may still be on its way to the journal
         std::thread::sleep(Duration::from_millis(300));
         let mut reader = env.rpc();
         let started_any = &started_seen;
