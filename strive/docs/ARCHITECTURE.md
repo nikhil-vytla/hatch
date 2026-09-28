@@ -624,9 +624,21 @@ rewind to finish. MCP tools' own file changes are known only to the
 server, so they are coordinated by the session's directory alone.
 
 **The sandbox.**
+- **Files that run code outside the sandbox** (after sandbox-runtime's
+  list): `.git/hooks` and `.git/config` (in nested repositories too),
+  `.vscode`, `.idea`, `.claude/commands` and `.claude/agents`, and rc and
+  config files (`.bashrc`, `.zshrc`, `.profile`, `.gitconfig`,
+  `.gitmodules`, `.ripgreprc`, `.mcp.json`) anywhere in the project. Git or a
+  shell runs them later for the person, unsandboxed. Commands can't write
+  them, and the agent's write and edit ask a person in every approval
+  mode. The rest of `.git` stays writable, so git works in the sandbox;
+  `git config` doesn't. On Linux, bubblewrap binds read-only only those at
+  the project root that exist, so a command can still create a missing one
+  (a new `.vscode/tasks.json`) or change a nested repository's hooks.
 - **macOS (Seatbelt):**
   - Commands may write only in the workspace and temp directories, and not
-    to the project's learned files (see "Learned files outside review").
+    to the project's learned files (see "Learned files outside review") or
+    the files above, matched by pattern in any case.
     A replay's commands get their scratch directory in place of the temp
     directories.
   - strive's home is hidden.

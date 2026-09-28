@@ -672,3 +672,68 @@ fn a_command_doesnt_inherit_descriptors_the_daemon_was_started_with() {
     let text = w.text(json!({"kind": "bash", "command": "ls /dev/fd"}));
     assert!(!text.split_whitespace().any(|f| f == n), "descriptor {n} reached the command: {text}");
 }
+
+/// Some files in a project run code outside the sandbox later: git runs
+/// `.git/hooks` and reads `.git/config` (`core.fsmonitor`, aliases) when the
+/// person next uses git; shells read rc files; editors run tasks from
+/// `.vscode`. A sandboxed command can't change them, and git still works.
+#[test]
+fn the_sandbox_keeps_commands_from_files_that_run_code_outside_it() {
+    if !sandboxed() {
+        return;
+    }
+    let mut w = Ws::new();
+    let git = |args: &[&str]| {
+        let ok = std::process::Command::new("git").args(args).current_dir(w.path("")).status().unwrap().success();
+        assert!(ok, "git {args:?}");
+    };
+    git(&["init", "-q"]);
+    std::fs::create_dir_all(w.path("sub")).unwrap();
+    let nested = std::process::Command::new("git").args(["init", "-q"]).current_dir(w.path("sub")).status().unwrap();
+    assert!(nested.success());
+    let mut blocked = vec![
+        ".git/hooks/pre-commit",
+        ".git/config",
+        ".vscode/tasks.json",
+        ".bashrc",
+        ".mcp.json",
+        ".claude/commands/x.md",
+    ];
+    if cfg!(target_os = "macos") {
+        // Nested repositories and other spellings: macOS matches by pattern.
+        blocked.extend(["sub/.git/hooks/post-checkout", ".GIT/HOOKS/pre-push"]);
+    } else {
+        // Linux binds read-only only what exists at the project root: there,
+        // creating a missing one is still possible (see ARCHITECTURE).
+        for dir in [".vscode", ".claude/commands"] {
+            std::fs::create_dir_all(w.path(dir)).unwrap();
+        }
+        for file in [".bashrc", ".mcp.json"] {
+            std::fs::write(w.path(file), "").unwrap();
+        }
+    }
+    for path in blocked {
+        let cmd = format!("mkdir -p \"$(dirname '{path}')\" 2>/dev/null; echo x >> '{path}'; echo status=$?");
+        let text = w.text(json!({"kind": "bash", "command": cmd}));
+        assert!(text.ends_with("status=1\n"), "{path}: {text}");
+    }
+    assert!(!w.path(".git/hooks/pre-commit").exists());
+    let text = w.text(json!({"kind": "bash", "command":
+        "echo a > a.txt && git add a.txt && git -c user.name=t -c user.email=t@t commit -qm first && git log --oneline | wc -l"}));
+    assert_eq!(text.trim(), "1", "git still works in the sandbox: {text}");
+}
+
+/// The agent's own write tool asks before touching those files, in any
+/// approval mode; unattended, it's refused.
+#[test]
+fn writing_a_file_that_runs_code_outside_the_sandbox_needs_a_person() {
+    let mut w = Ws::new();
+    for path in [".git/hooks/pre-commit", ".vscode/settings.json", "sub/.git/config"] {
+        let (kind, text) = w.kind(json!({"kind": "write", "path": path, "content": "x"}));
+        assert_eq!(kind, "refused", "{path}: {text}");
+        assert!(text.contains("outside strive's sandbox") && text.contains("no client is attached"), "{path}: {text}");
+        assert!(!w.path(path).exists());
+    }
+    let (kind, _) = w.kind(json!({"kind": "write", "path": "src/ok.txt", "content": "fine"}));
+    assert_eq!(kind, "done");
+}

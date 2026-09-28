@@ -1878,3 +1878,18 @@ was then run once as `--shard k/8` (8 shards, `-j 2`), since the script's
   fails `the_sandbox_blocks_unix_sockets_outside_it`, because the socket
   path under `target/tmp` goes over macOS's 104-byte limit. It passes with
   a short target dir.
+
+## 2026-09-28: files that run code outside the sandbox
+
+The frontier survey for the simplification plan pointed at sandbox-runtime's
+list of "dangerous files". Checked here: a sandboxed command could write
+`.git/hooks/pre-commit`, and the agent's write tool wrote it without asking
+in auto-edit. Git runs hooks (and reads `.git/config`: `core.fsmonitor`,
+aliases) for the person later, outside any sandbox, so either was a way out.
+The same holds for shell rc files, `.vscode` tasks and `.claude` commands
+in the project. Commands now can't write them (Seatbelt: by pattern, in any
+case, nested repositories too; bwrap: read-only binds for those at the
+project root that exist), and write/edit ask a person in every mode. Git
+itself still works in the sandbox; `git config` doesn't. Both tests failed
+first. Not yet on Linux: nested repositories' hooks, and creating one of
+these files where none exists.
