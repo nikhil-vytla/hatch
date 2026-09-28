@@ -1,8 +1,8 @@
 /**
  * Write a contestant: a visitor writes one function that answers One box's questions, runs it
  * in their browser on the 150 public development phrases under the same rules as every
- * recorded contestant, and sees where it beats or trails Jev. Sealed scoring on phrases nobody
- * has seen needs a server run and is not here yet; the page says so.
+ * recorded contestant, and sees where it beats or trails Jev. Everything runs in the visitor's
+ * browser against recorded answers: nothing here calls Jev or a server.
  */
 import { useEffect, useRef, useState } from "react";
 import {
@@ -17,8 +17,6 @@ import {
   pairedGain,
   type EntryRun,
 } from "../../../packages/arena/src/contest/one-box";
-import type { SealedScore } from "../../../packages/arena/src/contest/sealed";
-import { readResponse } from "../api";
 import { loadChunk } from "./data";
 import { colorVars, type CardModel } from "./model";
 
@@ -53,29 +51,6 @@ export function Contest({ model: m }: { model: CardModel }) {
   const [dev, setDev] = useState<OneBoxPhrases["phrases"] | null>(null);
   const [jevScores, setJevScores] = useState<Map<string, number> | null>(null);
   const worker = useRef<Worker | null>(null);
-
-  const [sealed, setSealed] = useState<{ busy: boolean; score?: SealedScore; error?: string }>({
-    busy: false,
-  });
-
-  /** Sends the code (never the phrases, which only the server holds) for one sealed run. */
-  const submit = async () => {
-    setSealed({ busy: true });
-
-    try {
-      const response = await fetch("/api/contest", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code }),
-      });
-
-      const body: SealedScore & { error?: string } = await readResponse(response);
-
-      setSealed(response.ok ? { busy: false, score: body } : { busy: false, error: body.error });
-    } catch (error) {
-      setSealed({ busy: false, error: error instanceof Error ? error.message : String(error) });
-    }
-  };
 
   const { phrases: phrasesPath, targets: targetsPath, preds } = m.card.chunks;
 
@@ -184,8 +159,7 @@ export function Contest({ model: m }: { model: CardModel }) {
         Your function runs in your browser, with network access removed, on the 150 public
         development phrases: every keystroke, the same calm rules, {BUDGET_MS} ms per keystroke (a
         slower answer doesn't land for that keystroke). Scores are the same ones every contestant
-        gets. When it runs, you can submit it once for scoring on sealed phrases: the server runs
-        your code in a sandbox and returns only totals.
+        gets. Nothing leaves your browser.
       </p>
       <label className="ct-editor">
         <span className="sr-only">Your contestant</span>
@@ -203,9 +177,6 @@ export function Contest({ model: m }: { model: CardModel }) {
         <button type="button" onClick={() => setCode(STARTER)}>
           Reset to the starter
         </button>
-        <button type="button" onClick={() => void submit()} disabled={sealed.busy || !result?.ok}>
-          {sealed.busy ? "Scoring on sealed phrases…" : "Submit for sealed scoring"}
-        </button>
         {result?.ok && (
           <span className="watch-clock">
             {result.run.calls} calls · median {result.run.medianMs.toFixed(2)} ms ·{" "}
@@ -215,15 +186,6 @@ export function Contest({ model: m }: { model: CardModel }) {
       </div>
 
       <div role="status" aria-live="polite">
-        {sealed.error && <p className="notice">{sealed.error}</p>}
-        {sealed.score && (
-          <p className="finding">
-            Sealed phrases ({sealed.score.phrases} nobody outside the scorer has seen): your box
-            ends right on {pct(sealed.score.boxRight)}, Jev's on {pct(sealed.score.jevBoxRight)}.
-            Against Jev on the finished phrase: {sealed.score.gainOverJev.mean >= 0 ? "+" : ""}
-            {sealed.score.gainOverJev.mean.toFixed(3)} ± {sealed.score.gainOverJev.half.toFixed(3)}.
-          </p>
-        )}
         {result && !result.ok && <p className="notice">{result.error}</p>}
         {result?.ok && result.run.errors > 0 && (
           <p className="notice">
