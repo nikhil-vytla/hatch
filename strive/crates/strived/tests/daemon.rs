@@ -73,12 +73,27 @@ fn exits_when_idle() {
     wait_for("idle exit", Duration::from_secs(5), || !env.socket().exists());
 }
 
+/// Runs a just-written copy of `strive`. On Linux a file open for writing
+/// can't be executed ("Text file busy"), and a fork in another test thread
+/// holds the copy's write descriptor until it execs: wait that out.
+fn run_copy(env: &Env, exe: &std::path::Path, args: &[&str]) -> std::process::Output {
+    let deadline = std::time::Instant::now() + Duration::from_secs(10);
+    loop {
+        match env.command(exe, args).output() {
+            Err(e) if e.kind() == std::io::ErrorKind::ExecutableFileBusy && std::time::Instant::now() < deadline => {
+                std::thread::sleep(Duration::from_millis(20));
+            }
+            r => return r.unwrap(),
+        }
+    }
+}
+
 /// A copy of `strive` that looks like another build: build ids compare the
 /// executable's length and mtime, and a rebuild changes the mtime.
 fn older_build(env: &Env) -> std::path::PathBuf {
     let old = env.home.path().join("old-strive");
     std::fs::copy(&env.exe, &old).unwrap();
-    let f = std::fs::File::options().write(true).open(&old).unwrap();
+    let f = std::fs::File::open(&old).unwrap();
     f.set_modified(std::time::SystemTime::now() - Duration::from_secs(3600)).unwrap();
     old
 }
@@ -87,7 +102,7 @@ fn older_build(env: &Env) -> std::path::PathBuf {
 fn replaces_a_stale_daemon_from_another_build() {
     let env = Env::new();
     let old = older_build(&env);
-    let out = env.cmd(&old, &["status", "--json"]);
+    let out = run_copy(&env, &old, &["status", "--json"]);
     let old_status: Value = serde_json::from_slice(&out.stdout).unwrap();
     let new_status = env.status();
     assert_ne!(old_status["server"]["build"], new_status["server"]["build"]);
@@ -105,8 +120,8 @@ fn a_fresh_copy_of_the_same_build_keeps_the_daemon() {
     let copy = env.home.path().join("same-strive");
     std::fs::copy(&env.exe, &copy).unwrap();
     let mtime = std::fs::metadata(&env.exe).unwrap().modified().unwrap();
-    std::fs::File::options().write(true).open(&copy).unwrap().set_modified(mtime).unwrap();
-    let out = env.cmd(&copy, &["status", "--json"]);
+    std::fs::File::open(&copy).unwrap().set_modified(mtime).unwrap();
+    let out = run_copy(&env, &copy, &["status", "--json"]);
     assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
     let status: Value = serde_json::from_slice(&out.stdout).unwrap();
     assert_eq!(pid(&status), running, "the daemon was replaced by a copy of its own build");
@@ -134,7 +149,7 @@ fn concurrent_launchers_replace_a_stale_daemon_once() {
     let env = Env::new();
     for _ in 0..5 {
         let old = older_build(&env);
-        let stale = env.cmd(&old, &["status", "--json"]);
+        let stale = run_copy(&env, &old, &["status", "--json"]);
         assert!(stale.status.success());
         let children: Vec<_> = (0..6)
             .map(|_| {
