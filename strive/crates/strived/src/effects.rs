@@ -59,6 +59,9 @@ enum Access {
     /// what it says, so the agent changes it only with a person's approval,
     /// whatever the approval mode.
     Learned(PathBuf, String),
+    /// A file that runs code outside the sandbox later (see `protected`),
+    /// with its path in the project: only a person may approve a change.
+    Protected(PathBuf, String),
     Denied(String),
 }
 
@@ -110,13 +113,22 @@ pub fn gate(scope: &Scope, request: &EffectRequest, mode: ApprovalMode) -> (Gate
                 file(real),
             )
         }
+        Access::Protected(real, in_project) => (
+            Gate::Ask(format!(
+                "{verb} {in_project}: files like this run code outside strive's sandbox later (git runs hooks and \
+                 reads its config, shells read rc files, editors run tasks), so only a person can approve it"
+            )),
+            file(real),
+        ),
         Access::Allowed(real) if mode == ApprovalMode::Ask => (Gate::Ask(format!("{verb} {path}")), file(real)),
         Access::Allowed(real) => (Gate::Allow, file(real)),
     };
     match request {
         EffectRequest::Read { path, .. } => match resolve(scope, path, false) {
             Access::Denied(why) => (Gate::Deny(why), NOTHING),
-            Access::Allowed(real) | Access::Ask(real) | Access::Learned(real, _) => (Gate::Allow, file(real)),
+            Access::Allowed(real) | Access::Ask(real) | Access::Learned(real, _) | Access::Protected(real, _) => {
+                (Gate::Allow, file(real))
+            }
         },
         EffectRequest::Write { path, .. } => change("write", path),
         EffectRequest::Edit { path, .. } => change("edit", path),
@@ -203,6 +215,9 @@ fn resolve(scope: &Scope, path: &str, writing: bool) -> Access {
     if writing && let Some(rel) = learned_file(&scope.workspace, &real) {
         return Access::Learned(real, rel);
     }
+    if writing && let Some(rel) = protected(&scope.workspace, &real) {
+        return Access::Protected(real, rel);
+    }
     if writing && !real.starts_with(&scope.workspace) {
         return Access::Ask(real);
     }
@@ -215,6 +230,88 @@ fn resolve(scope: &Scope, path: &str, writing: bool) -> Access {
 /// on a case-sensitive one asking about it costs one question. A file the
 /// project's own `.strive/memory.md` or `.strive/skills` leads to through a
 /// symlink counts too, since that is what sessions are given.
+/// Files that run code outside the sandbox when the person, not strive,
+/// next uses them, anywhere in the project: shells read rc files, git reads
+/// `.gitmodules`, ripgrep its config, Claude Code `.mcp.json`. After
+/// sandbox-runtime's list.
+const PROTECTED_FILES: &[&str] = &[
+    ".gitconfig",
+    ".gitmodules",
+    ".bashrc",
+    ".bash_profile",
+    ".zshrc",
+    ".zprofile",
+    ".profile",
+    ".ripgreprc",
+    ".mcp.json",
+];
+
+/// Directories and files named by their last components, anywhere in the
+/// project (nested repositories too): git runs `.git/hooks` and reads
+/// `.git/config` (`core.fsmonitor`, aliases); editors run `.vscode` and
+/// `.idea` tasks; Claude Code runs `.claude` commands and agents. The rest
+/// of `.git` stays writable, so git works in the sandbox.
+const PROTECTED_DIRS: &[&[&str]] = &[
+    &[".git", "hooks"],
+    &[".git", "config"],
+    &[".vscode"],
+    &[".idea"],
+    &[".claude", "commands"],
+    &[".claude", "agents"],
+];
+
+/// The project path of `real` if it is one of the protected files, or
+/// inside a protected directory; compared without case, since on a
+/// case-insensitive volume `.GIT/HOOKS` is `.git/hooks`.
+fn protected(workspace: &Path, real: &Path) -> Option<String> {
+    let in_project = real.strip_prefix(workspace).ok()?;
+    let parts: Vec<String> = in_project.components().map(|c| c.as_os_str().to_string_lossy().to_lowercase()).collect();
+    let named_file = parts.last().is_some_and(|last| PROTECTED_FILES.contains(&last.as_str()));
+    let in_dir =
+        PROTECTED_DIRS.iter().any(|dir| parts.windows(dir.len()).any(|w| w.iter().zip(*dir).all(|(a, b)| a == b)));
+    (named_file || in_dir).then(|| in_project.display().to_string())
+}
+
+/// `s` as a Seatbelt regex matching it in any case, each letter a class.
+fn any_case(s: &str) -> String {
+    s.chars()
+        .map(|c| {
+            if c.is_ascii_alphabetic() {
+                format!("[{}{}]", c.to_ascii_lowercase(), c.to_ascii_uppercase())
+            } else {
+                regex_escape(&c.to_string())
+            }
+        })
+        .collect()
+}
+
+/// `s` with regex metacharacters escaped.
+fn regex_escape(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for c in s.chars() {
+        if "\\.^$|?*+()[]{}".contains(c) {
+            out.push('\\');
+        }
+        out.push(c);
+    }
+    out
+}
+
+/// Seatbelt rules denying writes to the protected files and directories
+/// anywhere under `ws`.
+fn protected_rules(ws: &str) -> String {
+    let root = regex_escape(ws);
+    let mut rules = String::new();
+    for name in PROTECTED_FILES {
+        let _ = write!(rules, "\n  (regex #\"^{root}(/.*)?/{}$\")", any_case(name));
+    }
+    for dir in PROTECTED_DIRS {
+        let path: Vec<String> = dir.iter().map(|p| any_case(p)).collect();
+        let _ = write!(rules, "\n  (regex #\"^{root}(/.*)?/{}(/.*)?$\")", path.join("/"));
+    }
+    rules
+}
+
 fn learned_file(workspace: &Path, real: &Path) -> Option<String> {
     let (memory, skills) = (strive_learning::MEMORY_PATH, strive_learning::SKILLS_DIR);
     if let Ok(rel) = real.strip_prefix(workspace) {
@@ -473,6 +570,7 @@ fn sandboxed_command(scope: &Scope, command: &str) -> io::Result<Command> {
         // it, with other files in place; its other files stay writable.
         // Seatbelt compares paths case-insensitively on a case-insensitive
         // volume, so other spellings are covered too.
+        let protected = protected_rules(&scope.workspace.to_string_lossy());
         let profile = format!(
             r#"(version 1)
 (allow default)
@@ -486,7 +584,7 @@ fn sandboxed_command(scope: &Scope, command: &str) -> io::Result<Command> {
 (deny file-write*
   (literal "{ws}/.strive")
   (literal "{ws}/{memory}")
-  (subpath "{ws}/{skills}"){linked})
+  (subpath "{ws}/{skills}"){linked}{protected})
 (deny file-read* file-write* (subpath "{home}"))
 (allow file-read* (subpath "{home}/skills"))"#,
         );
@@ -510,6 +608,13 @@ fn sandboxed_command(scope: &Scope, command: &str) -> io::Result<Command> {
     // through review (ADR-0016). A bind can't cover a path that doesn't
     // exist yet, so a command can still create a missing one here.
     for p in [memory_target, skills_target].into_iter().flatten() {
+        c.args(["--ro-bind-try"]).arg(&p).arg(&p);
+    }
+    // The protected files and directories at the project's root, where they
+    // exist (a bind needs something to bind); nested ones aren't covered here.
+    let roots = PROTECTED_FILES.iter().map(|f| scope.workspace.join(f));
+    for p in roots.chain(PROTECTED_DIRS.iter().map(|d| d.iter().collect::<PathBuf>()).map(|d| scope.workspace.join(d)))
+    {
         c.args(["--ro-bind-try"]).arg(&p).arg(&p);
     }
     c.args(["--tmpfs"]).arg(&scope.strive_home);
