@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { combine } from "./combine";
 import { DECK, requestFor } from "./deck";
-import { memoryStore, vote, VOTES_PER_HOUR } from "./tally";
+import { memoryStore, vote, type Store } from "./tally";
 
 const two = [
   { id: "a", label: "A" },
@@ -106,15 +106,42 @@ describe("tally", () => {
     );
   });
 
-  test("turns away a visitor voting too often in an hour", async () => {
+  test("forgets yesterday's voters, and keeps the count", async () => {
     const store = memoryStore();
-    const now = new Date("2026-10-01T12:00:00Z");
 
-    for (let i = 0; i < VOTES_PER_HOUR; i++)
-      await vote(store, { id: "hot-dog", option: "yes" }, "9.9.9.9", "s", now);
+    await vote(store, { id: "spam", option: "spam" }, "a", "s", new Date("2026-10-01T12:00:00Z"));
 
-    expect(vote(store, { id: "hot-dog", option: "yes" }, "9.9.9.9", "s", now)).rejects.toThrow(
-      "Too many votes",
+    const next = await vote(
+      store,
+      { id: "spam", option: "spam" },
+      "a",
+      "s",
+      new Date("2026-10-02T12:00:00Z"),
     );
+
+    expect(next).toEqual({ counted: true, counts: { spam: 2, real: 0 } });
+    expect(Object.keys((await store.read("spam")).doc.voters)).toHaveLength(1);
+  });
+
+  test("a write that loses a race reads again instead of dropping a vote", async () => {
+    const inner = memoryStore();
+    let raced = false;
+
+    const racing: Store = {
+      read: inner.read,
+      write: async (decision, doc, version) => {
+        // Another visitor's vote lands between this read and this write, once.
+        if (!raced) {
+          raced = true;
+          await vote(inner, { id: "meeting", option: "email" }, "other", "s");
+        }
+
+        return inner.write(decision, doc, version);
+      },
+    };
+
+    const r = await vote(racing, { id: "meeting", option: "meeting" }, "me", "s");
+
+    expect(r.counts).toEqual({ email: 1, meeting: 1 });
   });
 });

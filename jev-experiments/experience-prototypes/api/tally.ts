@@ -1,19 +1,52 @@
+import { BlobPreconditionFailedError, get, put } from "@vercel/blob";
 import {
   countsFor,
+  EMPTY,
   TallyError,
-  upstash,
+  tallyDocSchema,
   vote,
   voteSchema,
   type Store,
 } from "../../packages/arena/src/decide/tally.js";
 
-/** Vercel's Upstash integration sets KV_REST_API_*; a plain Upstash database sets UPSTASH_*. */
-function storeFromEnv(): Store | null {
-  const url = process.env.KV_REST_API_URL ?? process.env.UPSTASH_REDIS_REST_URL;
-  const token = process.env.KV_REST_API_TOKEN ?? process.env.UPSTASH_REDIS_REST_TOKEN;
+/**
+ * The tally in a private Vercel Blob store, one JSON document per decision. Functions reach
+ * the store through the project's OIDC token and BLOB_STORE_ID, so no secret is configured.
+ */
+function blobStore(): Store {
+  const path = (decision: string) => `decide/tally/${decision}.json`;
 
-  return url && token ? upstash(url, token) : null;
+  return {
+    read: async (decision) => {
+      const r = await get(path(decision), { access: "private", useCache: false }).catch(() => null);
+
+      if (!r || r.statusCode !== 200 || !r.stream) return { doc: EMPTY, version: null };
+
+      const doc = tallyDocSchema.safeParse(await new Response(r.stream).json());
+
+      return { doc: doc.success ? doc.data : EMPTY, version: r.blob.etag };
+    },
+    write: async (decision, doc, version) => {
+      try {
+        await put(path(decision), JSON.stringify(doc), {
+          access: "private",
+          addRandomSuffix: false,
+          contentType: "application/json",
+          ...(version ? { allowOverwrite: true, ifMatch: version } : { allowOverwrite: false }),
+        });
+
+        return true;
+      } catch (e) {
+        // Someone wrote first (a changed ETag, or a document created meanwhile): read again.
+        if (e instanceof BlobPreconditionFailedError || /already exists/i.test(String(e)))
+          return false;
+        throw e;
+      }
+    },
+  };
 }
+
+const configured = () => Boolean(process.env.BLOB_STORE_ID || process.env.BLOB_READ_WRITE_TOKEN);
 
 const first = (v: unknown) => String(Array.isArray(v) ? v[0] : (v ?? ""));
 
@@ -24,26 +57,28 @@ export async function tallyHandler(req: any, res: any, store: Store | null, salt
 
   try {
     if (req.method === "GET") {
-      const id = new URL(req.url ?? "/", "http://x").searchParams.get("id");
+      const id = new URL(req.url ?? "/", "http://x").searchParams.get("id") ?? "";
 
-      return res.status(200).json({ available: true, counts: await countsFor(store, id ?? "") });
+      return res.status(200).json({ available: true, counts: await countsFor(store, id) });
     }
 
     if (req.method !== "POST") return res.status(405).json({ error: "Use GET or POST." });
+
+    const ballot = voteSchema.safeParse(req.body);
+
+    if (!ballot.success) return res.status(400).json({ error: "Send { id, option }." });
 
     const visitor =
       first(req.headers["x-forwarded-for"]).split(",")[0].trim() ||
       first(req.headers["x-real-ip"]) ||
       "unknown";
 
-    const ballot = voteSchema.safeParse(req.body);
-
-    if (!ballot.success) return res.status(400).json({ error: "Send { id, option }." });
-
     return res
       .status(200)
       .json({ available: true, ...(await vote(store, ballot.data, visitor, salt)) });
   } catch (e) {
+    console.error("tally", e instanceof Error ? e.message : e);
+
     return res
       .status(e instanceof TallyError ? e.status : 503)
       .json({ error: e instanceof TallyError ? e.message : "The tally is unavailable." });
@@ -51,12 +86,8 @@ export async function tallyHandler(req: any, res: any, store: Store | null, salt
 }
 
 export default function handler(req: any, res: any) {
-  // The salt keeps the stored hashes from being matched to addresses; the token is secret already.
-  const salt =
-    process.env.TALLY_SALT ??
-    process.env.KV_REST_API_TOKEN ??
-    process.env.UPSTASH_REDIS_REST_TOKEN ??
-    "";
+  // The salt keeps stored hashes from being matched to addresses by anyone without it.
+  const salt = process.env.TALLY_SALT ?? process.env.BLOB_STORE_ID ?? "";
 
-  return tallyHandler(req, res, storeFromEnv(), salt);
+  return tallyHandler(req, res, configured() ? blobStore() : null, salt);
 }

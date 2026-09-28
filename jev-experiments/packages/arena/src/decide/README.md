@@ -7,12 +7,12 @@ same call moves when it is asked another way. Four calls have an answer fixed by
 
 Each decision has up to seven setups:
 
-| Group | Setups |
-|---|---|
-| Wording | neutral, leading (a fact that leans one way), terse |
+| Group        | Setups                                                             |
+| ------------ | ------------------------------------------------------------------ |
+| Wording      | neutral, leading (a fact that leans one way), terse                |
 | Answer shape | yes/no or a 0–2 score (two options); one yes/no per option (three) |
-| Context | the neutral question with extra state a real system might have |
-| Split | two or three small yes/no questions that code combines (all / any) |
+| Context      | the neutral question with extra state a real system might have     |
+| Split        | two or three small yes/no questions that code combines (all / any) |
 
 A setup is data: the exact request, and a combine rule (`combine.ts`) that turns the answers
 into a split over the visitor's options. The page shows both, plus every model's raw answers.
@@ -24,9 +24,12 @@ Contestants, recorded once and replayed (`recordings/decide*.jsonl`):
 - MobileBERT-MNLI, a zero-shot classifier (`nli.ts`, `scripts/record-decide-nli.ts`). The page
   can run the same code and model in the visitor's browser.
 
-Visitor votes go to `/api/tally` (`tally.ts`): one vote per decision per visitor per day, at
-most 120 votes an hour from one address, stored as hashes and per-option counts in Upstash
-Redis. Without a store configured the page leaves the tally out.
+Visitor votes go to `/api/tally` (`tally.ts`): one vote per decision per visitor per day,
+kept as per-option counts and today's salted visitor hashes, one JSON document per decision
+in the private Vercel Blob store `jev-experiments-blob`. Writes are conditional on the
+document's ETag and retried on conflict, so concurrent votes are not lost. Each vote is one
+read and one write; Blob's Hobby allowance caps writes, and past it votes stop being counted
+rather than being billed. Without a store the page leaves the tally out.
 
 ## First look (28 Sep 2026, Laya and MobileBERT)
 

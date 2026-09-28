@@ -424,9 +424,12 @@ export async function evaluate(
       if (!response.ok) {
         if (!transient.has(response.status))
           throw new GatewayError(
-            response.status === 401 || response.status === 403
+            response.status === 401
               ? "Vercel AI Gateway rejected this API key. Check the key and its access to Jev."
-              : `Gateway rejected the request (${response.status}).`,
+              : response.status === 403
+                ? // A valid key can still be refused Jev (e.g. a team on free credits); say why.
+                  `Vercel AI Gateway refused access to Jev: ${String(raw?.error?.message ?? "no reason given")}`
+                : `Gateway rejected the request (${response.status}).`,
             response.status,
             attempts,
           );

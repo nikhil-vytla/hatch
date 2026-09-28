@@ -1,24 +1,38 @@
 /**
  * Visitor votes on Decide: how everyone who answered split. A vote is one option of one
  * decision in the deck; anything else is refused. Each visitor counts once per decision per
- * day (an unguessable hash of their address, the decision and the day, never the address), and
- * a visitor casting too many votes in an hour is turned away. Counts are all that is kept.
+ * day: the tally keeps an unguessable hash of their address and the day, never the address,
+ * and forgets earlier days' hashes. Counts are all that is kept beyond that.
+ *
+ * Storage is one small document per decision, read and then written back only if nobody else
+ * wrote in between (a conditional write); a conflict is retried. So a store needs no counters,
+ * which lets Vercel Blob hold it.
  */
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import { DECK } from "./deck.js";
 
-/** The few commands a tally needs, so a dev server can keep counts in memory. */
+export const tallyDocSchema = z.object({
+  counts: z.record(z.string(), z.number()),
+  /** Visitor hash → the day (YYYY-MM-DD) they voted. Only today's are kept. */
+  voters: z.record(z.string(), z.string()),
+});
+
+export type TallyDoc = z.infer<typeof tallyDocSchema>;
+
+/** A document store with conditional writes. `version` is null when the document is new. */
 export type Store = {
-  /** Sets `key` if it is new, expiring after `seconds`; true when it was new. */
-  claim(key: string, seconds: number): Promise<boolean>;
-  /** Adds one to `key`, expiring after `seconds`; the new count. */
-  bump(key: string, seconds: number): Promise<number>;
-  addVote(decision: string, option: string): Promise<void>;
-  counts(decision: string): Promise<Record<string, number>>;
+  read(decision: string): Promise<{ doc: TallyDoc; version: string | null }>;
+  /** Writes only if the document is still at `version`; false when someone wrote first. */
+  write(decision: string, doc: TallyDoc, version: string | null): Promise<boolean>;
 };
 
-export const VOTES_PER_HOUR = 120;
+export const EMPTY: TallyDoc = { counts: {}, voters: {} };
+
+/** A vote as the API receives it; `vote` checks both ids against the deck. */
+export const voteSchema = z.object({ id: z.string(), option: z.string() });
+
+export type Vote = z.infer<typeof voteSchema>;
 
 export class TallyError extends Error {
   constructor(
@@ -30,12 +44,7 @@ export class TallyError extends Error {
 }
 
 const hash = (...parts: string[]) =>
-  createHash("sha256").update(parts.join("\u0000")).digest("hex").slice(0, 32);
-
-/** A vote as the API receives it; `vote` checks both ids against the deck. */
-export const voteSchema = z.object({ id: z.string(), option: z.string() });
-
-export type Vote = z.infer<typeof voteSchema>;
+  createHash("sha256").update(parts.join("\u0000")).digest("hex").slice(0, 24);
 
 const decisionOf = (id: string) => {
   const d = DECK.find((x) => x.id === id);
@@ -45,12 +54,14 @@ const decisionOf = (id: string) => {
   return d;
 };
 
+const countsOf = (id: string, doc: TallyDoc) =>
+  Object.fromEntries(decisionOf(id).options.map((o) => [o.id, doc.counts[o.id] ?? 0]));
+
 /** Counts for one decision, every option present (zero if nobody chose it). */
 export async function countsFor(store: Store, id: string) {
-  const d = decisionOf(id);
-  const raw = await store.counts(d.id);
+  decisionOf(id);
 
-  return Object.fromEntries(d.options.map((o) => [o.id, Number(raw[o.id] ?? 0)]));
+  return countsOf(id, (await store.read(id)).doc);
 }
 
 export async function vote(
@@ -64,81 +75,45 @@ export async function vote(
 
   if (!d.options.some((o) => o.id === ballot.option)) throw new TallyError("Unknown option.", 400);
 
-  const who = hash(salt, visitor);
-  const hour = now.toISOString().slice(0, 13);
-
-  if ((await store.bump(`decide:rate:${who}:${hour}`, 3600)) > VOTES_PER_HOUR)
-    throw new TallyError("Too many votes from here this hour.", 429);
-
   const day = now.toISOString().slice(0, 10);
-  const fresh = await store.claim(`decide:voted:${hash(salt, visitor, d.id, day)}`, 86_400);
+  const who = hash(salt, visitor, d.id, day);
 
-  if (fresh) await store.addVote(d.id, ballot.option);
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const { doc, version } = await store.read(d.id);
 
-  return { counted: fresh, counts: await countsFor(store, d.id) };
+    if (doc.voters[who] === day) return { counted: false, counts: countsOf(d.id, doc) };
+
+    const voters = Object.fromEntries(Object.entries(doc.voters).filter(([, v]) => v === day));
+
+    const next: TallyDoc = {
+      counts: { ...doc.counts, [ballot.option]: (doc.counts[ballot.option] ?? 0) + 1 },
+      voters: { ...voters, [who]: day },
+    };
+
+    if (await store.write(d.id, next, version))
+      return { counted: true, counts: countsOf(d.id, next) };
+  }
+
+  throw new TallyError("The tally is busy; try again.", 503);
 }
 
-/** Upstash Redis over its REST API (what Vercel's Upstash integration provides). */
-export function upstash(url: string, token: string): Store {
-  const run = async (...command: (string | number)[]) => {
-    const r = await fetch(url, {
-      method: "POST",
-      headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
-      body: JSON.stringify(command),
-    });
-
-    if (!r.ok) throw new TallyError("The tally is unavailable.", 503);
-    const json: { result?: unknown } = await r.json();
-
-    return json.result;
-  };
-
-  return {
-    claim: async (key, seconds) => (await run("SET", key, "1", "NX", "EX", seconds)) === "OK",
-    bump: async (key, seconds) => {
-      const n = Number(await run("INCR", key));
-
-      if (n === 1) await run("EXPIRE", key, seconds);
-
-      return n;
-    },
-    addVote: async (decision, option) => {
-      await run("HINCRBY", `decide:tally:${decision}`, option, 1);
-    },
-    counts: async (decision) => {
-      const flat = await run("HGETALL", `decide:tally:${decision}`);
-      const list = Array.isArray(flat) ? flat.map(String) : [];
-
-      return Object.fromEntries(list.flatMap((v, i) => (i % 2 ? [] : [[v, Number(list[i + 1])]])));
-    },
-  };
-}
-
-/** Counts in memory, for the dev server and tests. */
+/** Documents in memory, for the dev server and tests. */
 export function memoryStore(): Store {
-  const keys = new Map<string, number>();
-  const tallies = new Map<string, Record<string, number>>();
+  const docs = new Map<string, { doc: TallyDoc; version: number }>();
 
   return {
-    claim: async (key) => {
-      if (keys.has(key)) return false;
-      keys.set(key, 1);
+    read: async (decision) => {
+      const hit = docs.get(decision);
+
+      return hit ? { doc: hit.doc, version: String(hit.version) } : { doc: EMPTY, version: null };
+    },
+    write: async (decision, doc, version) => {
+      const hit = docs.get(decision);
+
+      if ((hit ? String(hit.version) : null) !== version) return false;
+      docs.set(decision, { doc, version: (hit?.version ?? 0) + 1 });
 
       return true;
     },
-    bump: async (key) => {
-      const n = (keys.get(key) ?? 0) + 1;
-
-      keys.set(key, n);
-
-      return n;
-    },
-    addVote: async (decision, option) => {
-      const t = tallies.get(decision) ?? {};
-
-      t[option] = (t[option] ?? 0) + 1;
-      tallies.set(decision, t);
-    },
-    counts: async (decision) => ({ ...tallies.get(decision) }),
   };
 }
