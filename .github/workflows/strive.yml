@@ -1,0 +1,49 @@
+name: strive
+on:
+  push:
+    paths: ["strive/**", ".github/workflows/strive.yml"]
+  pull_request:
+    paths: ["strive/**", ".github/workflows/strive.yml"]
+jobs:
+  check:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: strive
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: strive
+      - uses: oven-sh/setup-bun@v2
+        with:
+                    bun-version: 1.3.14
+      # So the Linux sandbox tests run rather than skip. Ubuntu 24.04's
+      # AppArmor blocks the unprivileged user namespaces bubblewrap needs.
+      - if: runner.os == 'Linux'
+        run: |
+          sudo apt-get install -y bubblewrap xvfb
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+      - run: ./scripts/check.sh
+  mutants:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: strive
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: strive
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-mutants
+      - run: ./scripts/mutants.sh

@@ -1,0 +1,363 @@
+import { afterEach, beforeEach, expect, setDefaultTimeout, test } from "bun:test";
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { TuiMainScreen } from "@earendil-works/pi-tui";
+import {
+  type DaemonStatusResult,
+  type EffectRequest,
+  type SessionInfo,
+  type SessionReadResult,
+  StriveClient,
+} from "@strive/protocol";
+import { startDaemon, type TestDaemon, VirtualTerminal } from "@strive/testkit";
+import { App, parseSessionMode, type SessionMode } from "./app";
+
+/**
+ * The session's working directory, fresh for each test. Never a fixed path:
+ * test runs in other checkouts share /tmp, and one deleting another's
+ * directory mid-test loses its checkpoints.
+ */
+let CWD: string;
+
+/**
+ * How long to wait for a line the daemon shows only after running git: a
+ * prompt is journaled after its checkpoint (about 8 git processes), and a
+ * rewind runs about 16 in sequence. A rewind takes 0.4s on an idle machine
+ * and took 11s beside two `cargo test` runs, far past `waitFor`'s default.
+ */
+const GIT_MS = 20_000;
+
+// Room for a test's several GIT_MS waits, so a timeout shows the screen.
+setDefaultTimeout(60_000);
+
+/** Where sessions say they are: the daemon keeps a directory's real path. */
+const real = () => realpathSync(CWD);
+
+type Ui = { term: VirtualTerminal; exits: number[]; app: App; stop(): void };
+
+let daemon: TestDaemon;
+
+let uis: Ui[];
+
+async function openUi(mode: SessionMode = "new"): Promise<Ui> {
+  const term = new VirtualTerminal(100, 30);
+  const tui = new TuiMainScreen(term);
+  const exits: number[] = [];
+  const { client, init } = await StriveClient.connect(daemon.socket, { name: "tui-test", version: "0" });
+  const app = new App(tui, client, init, (code) => exits.push(code), CWD);
+  tui.start();
+  await app.open(mode);
+  const ui = { term, exits, app, stop: () => (tui.stop(), client.close()) };
+  uis.push(ui);
+
+  return ui;
+}
+
+beforeEach(() => {
+  daemon = startDaemon();
+  uis = [];
+  CWD = mkdtempSync("/tmp/strv-tui-app-");
+});
+
+afterEach(() => {
+  for (const ui of uis) ui.stop();
+  daemon.dispose();
+  rmSync(CWD, { recursive: true, force: true });
+});
+
+const enter = async (ui: Ui, text: string) => {
+  ui.term.type(text);
+  await Bun.sleep(20);
+  ui.term.type("\x1b");
+  ui.term.type("\r");
+};
+
+// SAFETY: `--json` commands print the daemon's protocol result, serialized from the same
+// Rust types the TS types are generated from.
+const sessions = () => JSON.parse(daemon.strive("sessions", "--all", "--json").stdout) as SessionInfo[];
+
+// SAFETY: as for `sessions`.
+const daemonClients = () => (JSON.parse(daemon.strive("status", "--json").stdout) as DaemonStatusResult).clients;
+
+test("a new session is created in the working directory and named in the header", async () => {
+  const ui = await openUi();
+  const [s] = sessions();
+  expect(s?.cwd).toBe(real());
+  const screen = await ui.term.waitFor("session …");
+  expect(screen[0]).toContain(`${CWD}  session …${s?.id.slice(-6)}`);
+  expect(screen.some((l) => l.includes(`Session started in ${real()}`))).toBe(true);
+});
+
+test("a prompt is shown from the journal and is in `strive log`", async () => {
+  const ui = await openUi();
+  await enter(ui, "fix the flaky test");
+  await ui.term.waitFor("› fix the flaky test", GIT_MS);
+  const log = daemon.strive("log", sessions()[0]!.id);
+  expect(log.stdout).toMatch(/\n#\d+ \d\d:\d\d:\d\d {2}you: fix the flaky test\n/);
+});
+
+test("continue reopens the latest session here with its history", async () => {
+  const first = await openUi();
+  await enter(first, "remember me");
+  await first.term.waitFor("› remember me");
+  first.app.quit(0);
+
+  const second = await openUi("continue");
+  const screen = await second.term.waitFor("› remember me");
+  expect(screen[0]).toContain(`session …${sessions()[0]!.id.slice(-6)}`);
+  expect(sessions().length).toBe(1);
+});
+
+test("continue with no session here starts a new one", async () => {
+  await openUi("continue");
+  expect(sessions().map((s) => s.cwd)).toEqual([real()]);
+});
+
+test("two clients on one session see each other's prompts", async () => {
+  const a = await openUi();
+  const id = sessions()[0]!.id;
+  const b = await openUi({ resume: id });
+  await enter(a, "hello from a");
+  await b.term.waitFor("› hello from a", GIT_MS);
+  await enter(b, "hello from b");
+  await a.term.waitFor("› hello from b", GIT_MS);
+});
+
+test("resuming a tampered session explains why and saves nothing", async () => {
+  const first = await openUi();
+  await enter(first, "original");
+  await first.term.waitFor("› original", GIT_MS);
+  first.app.quit(0);
+  const id = sessions()[0]!.id;
+  // SAFETY: as for `sessions`.
+  const logged = JSON.parse(daemon.strive("log", id, "--json").stdout) as SessionReadResult;
+  const seq = logged.entries.find((e) => e.event.type === "userMessage")!.seq;
+  daemon.strive("stop");
+  const journal = join(daemon.home, "sessions", id, "journal.jsonl");
+  writeFileSync(journal, readFileSync(journal, "utf8").replace("original", "tampered"));
+  const before = readFileSync(journal, "utf8");
+  daemon.strive("status");
+
+  const ui = await openUi({ resume: id });
+  await ui.term.waitFor(`This session's journal failed verification: entry ${seq} was modified, removed or moved.`);
+  await enter(ui, "should not be saved");
+  await Bun.sleep(100);
+  expect(readFileSync(journal, "utf8")).toBe(before);
+});
+
+test("resuming an unknown session says so", async () => {
+  const ui = await openUi({ resume: "01J8ZZZZZZZZZZZZZZZZZZZZZZ" });
+  await ui.term.waitFor("No session 01J8ZZZZZZZZZZZZZZZZZZZZZZ.");
+});
+
+test("/status reports the daemon the TUI is attached to", async () => {
+  const ui = await openUi();
+  await enter(ui, "/status");
+  const screen = await ui.term.waitFor("daemon pid");
+  const line = screen.find((l) => l.includes("daemon pid"));
+  expect(line).toContain(`daemon pid ${daemon.pid()} ·`);
+  expect(line).toContain("· 1 client");
+});
+
+test("/session prints the full id and the resume command", async () => {
+  const ui = await openUi();
+  await enter(ui, "/session");
+  const id = sessions()[0]!.id;
+  await ui.term.waitFor(`session ${id} · resume with strive -r ${id}`);
+});
+
+test("an unknown command is named in the error", async () => {
+  const ui = await openUi();
+  await enter(ui, "/nope");
+  await ui.term.waitFor("Unknown command /nope. Type /help.");
+});
+
+test("Ctrl+C exits with status 0 and disconnects without reporting a lost connection", async () => {
+  const ui = await openUi();
+  ui.term.type("\x03");
+  await Bun.sleep(50);
+  expect(ui.exits).toEqual([0]);
+  expect(daemonClients()).toBe(1);
+  expect((await ui.term.screen()).some((l) => l.includes("Lost the connection"))).toBe(false);
+});
+
+test("/quit exits with status 0 and disconnects", async () => {
+  const ui = await openUi();
+  await enter(ui, "/quit");
+  await Bun.sleep(50);
+  expect(ui.exits).toEqual([0]);
+  expect(daemonClients()).toBe(1);
+});
+
+test("losing the daemon is reported and exits with status 1", async () => {
+  const ui = await openUi();
+  daemon.strive("stop");
+  await ui.term.waitFor("Lost the connection to the daemon.");
+  expect(ui.exits).toEqual([1]);
+});
+
+test("STRIVE_SESSION values map to session modes", () => {
+  expect(parseSessionMode(undefined)).toBe("new");
+  expect(parseSessionMode("new")).toBe("new");
+  expect(parseSessionMode("continue")).toBe("continue");
+  expect(parseSessionMode("01J8ZZZZZZZZZZZZZZZZZZZZZZ")).toEqual({ resume: "01J8ZZZZZZZZZZZZZZZZZZZZZZ" });
+});
+
+const footer = async (ui: Ui) => (await ui.term.screen()).at(-1)?.trim();
+
+test("the footer shows spend against the session's budget", async () => {
+  const ui = await openUi();
+  await ui.term.waitFor("$0.0000 of $5.0000");
+  expect(await footer(ui)).toBe("$0.0000 of $5.0000");
+});
+
+test("/budget changes the session's limit, in the journal too", async () => {
+  const ui = await openUi();
+  await enter(ui, "/budget 2.5");
+  await ui.term.waitFor("$0.0000 of $2.5000");
+  expect(await footer(ui)).toBe("$0.0000 of $2.5000");
+  expect(daemon.strive("log", sessions()[0]!.id).stdout).toMatch(/\n#\d+ \d\d:\d\d:\d\d {2}budget: \$2\.5000\n/);
+  await enter(ui, "/budget off");
+  await ui.term.waitFor("$0.0000 spent · no budget");
+});
+
+test("/budget explains its arguments", async () => {
+  const ui = await openUi();
+  await enter(ui, "/budget lots");
+  await ui.term.waitFor("Use /budget <dollars>, for example /budget 10, or /budget off.");
+});
+
+/** Starts an effect for the session from another client, as the agent would. */
+async function agentRuns(request: EffectRequest) {
+  const { client } = await StriveClient.connect(daemon.socket, { name: "agent", version: "0" });
+  const id = sessions()[0]!.id;
+  const done = client.request("effect/run", { id, callId: "call_1", request });
+
+  return { done, close: () => client.close() };
+}
+
+test("a command waiting for approval is shown and y allows it", async () => {
+  const ui = await openUi();
+  const agent = await agentRuns({ kind: "bash", command: "echo approved" });
+  await ui.term.waitFor("Allow the agent to run: echo approved?  y yes · a yes to everything (full-auto) · n no");
+  const asked = await ui.term.screen();
+  expect(asked.filter((l) => l.includes("Allow the agent to")).length).toBe(1); // asked once, not twice
+  expect(asked.some((l) => l.includes("The agent asked to run: echo approved"))).toBe(true);
+  ui.term.type("y");
+  const r = await agent.done;
+  expect(r.text).toBe("approved\n");
+  await ui.term.waitFor("Allowed by tui-test");
+  const screen = await ui.term.screen();
+  expect(screen.some((l) => l.includes("y yes · a yes to everything"))).toBe(false);
+  agent.close();
+});
+
+test("n declines a command, which then doesn't run", async () => {
+  const ui = await openUi();
+  const agent = await agentRuns({ kind: "bash", command: "touch nope.txt" });
+  await ui.term.waitFor("Allow the agent to run: touch nope.txt?");
+  ui.term.type("n");
+  const r = await agent.done;
+  expect(r.outcome).toEqual({ kind: "refused", reason: "declined: run: touch nope.txt" });
+  await ui.term.waitFor("Declined by tui-test");
+  agent.close();
+});
+
+test("a allows for the rest of the session", async () => {
+  const ui = await openUi();
+  const first = await agentRuns({ kind: "bash", command: "echo one" });
+  await ui.term.waitFor("Allow the agent to run: echo one?");
+  ui.term.type("a");
+  expect((await first.done).text).toBe("one\n");
+  await ui.term.waitFor("Approvals: full-auto");
+  const second = await agentRuns({ kind: "bash", command: "echo two" });
+  expect((await second.done).text).toBe("two\n");
+  first.close();
+  second.close();
+});
+
+test("/approvals switches the mode", async () => {
+  const ui = await openUi();
+  await ui.term.waitFor("Approvals: auto-edit");
+  await enter(ui, "/approvals ask");
+  await ui.term.waitFor("Approvals: ask");
+  await enter(ui, "/approvals sometimes");
+  await ui.term.waitFor("Use /approvals ask, /approvals auto-edit or /approvals full-auto.");
+});
+
+test("/rewind lists checkpoints and puts the files back", async () => {
+  const ui = await openUi();
+  const file = join(CWD, "notes.txt");
+  writeFileSync(file, "v1");
+  await enter(ui, "first");
+  await ui.term.waitFor("› first", GIT_MS);
+  writeFileSync(file, "v2");
+  await enter(ui, "second");
+  await ui.term.waitFor("› second", GIT_MS);
+  writeFileSync(file, "v3");
+
+  await enter(ui, "/rewind");
+  await ui.term.waitFor("1  before “first”");
+  await ui.term.waitFor("2  before “second”");
+
+  await enter(ui, "/rewind 1");
+  await ui.term.waitFor("Rewound to checkpoint 1. Undo with /rewind 3.", GIT_MS);
+  expect(readFileSync(file, "utf8")).toBe("v1");
+
+  await enter(ui, "/rewind 3");
+  await ui.term.waitFor("Rewound to checkpoint 3.", GIT_MS);
+  expect(readFileSync(file, "utf8")).toBe("v3");
+});
+
+test("/rewind says which nested repositories it left alone", async () => {
+  const ui = await openUi();
+  mkdirSync(join(CWD, "vendor/lib"), { recursive: true });
+  writeFileSync(join(CWD, "vendor/lib/x.txt"), "v1");
+  expect(Bun.spawnSync(["git", "init", "-q"], { cwd: join(CWD, "vendor/lib") }).exitCode).toBe(0);
+  await enter(ui, "first");
+  await ui.term.waitFor("› first", GIT_MS);
+  await enter(ui, "/rewind 1");
+  await ui.term.waitFor("Left as they were (checkpoints don't hold nested repositories): vendor/lib", GIT_MS);
+});
+
+test("/rewind to a checkpoint that doesn't exist says so", async () => {
+  const ui = await openUi();
+  await enter(ui, "/rewind 99");
+  await ui.term.waitFor("No checkpoint 99 in this session.");
+});
+
+test("an MCP server that didn't start is shown", async () => {
+  writeFileSync(
+    join(daemon.home, "settings.json"),
+    JSON.stringify({ mcpServers: { broken: { command: "/no/such/server" } } }),
+  );
+  daemon.strive("stop"); // settings are read at start
+  daemon.strive("status");
+  const ui = await openUi();
+  await ui.term.waitFor("Session started");
+  // What an agent host does when it starts for the session.
+  const { client } = await StriveClient.connect(daemon.socket, { name: "agent", version: "0" });
+  await client.request("host/register", { id: sessions()[0]!.id });
+  client.close();
+  await ui.term.waitFor("MCP server broken didn't start: can't run /no/such/server");
+});
+
+// The model's text is shown, never obeyed: terminal controls in a reply
+// could clear the screen and forge the header or earlier prompts.
+test("terminal control sequences in a reply are shown as text, not run", async () => {
+  const ui = await openUi();
+  await enter(ui, "first prompt");
+  await ui.term.waitFor("› first prompt", GIT_MS);
+  const { client } = await StriveClient.connect(daemon.socket, { name: "agent", version: "0" });
+  const id = sessions()[0]!.id;
+  await client.request("host/register", { id });
+  await client.request("host/record", {
+    id,
+    event: { type: "assistantMessage", turn: 1, text: "\x1b[2J\x1b[HFORGED HEADER", toolCalls: [], message: {} },
+  });
+  client.close();
+  const screen = await ui.term.waitFor("FORGED HEADER");
+  expect(screen[0]).toContain("strive");
+  expect(screen.some((l) => l.includes("› first prompt"))).toBe(true);
+  expect(screen.some((l) => l.includes("^[[2J^[[HFORGED HEADER"))).toBe(true);
+});

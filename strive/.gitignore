@@ -1,22 +1,19 @@
+/target/
+node_modules/
+.DS_Store
+
+# Local leftovers from the Python implementation (tag strive-py-final); never commit.
 .venv/
 __pycache__/
 .pytest_cache/
 .mypy_cache/
-*.egg-info/
-artifacts/*
-!artifacts/demo/
-!artifacts/demo-model/
-
-# advisory writer locks are runtime artifacts, never content
-artifacts/demo*/ledger/*.lock
-
-# Container and upstream qualification outputs; definitions remain tracked.
-.container-results/
-adapters/tau2/retained-data/
-adapters/tau2/upstream-source/
-adapters/tau2/uv.lock
-
 .cache/
-
-# live campaign runtime outputs (response hashes, transport dbs) — never commit
-live-results/
+.container-results/
+/live-results/
+/artifacts/
+/adapters/
+/src/
+/tests/
+*.bun-build
+/.audit/
+/mutants.out*/

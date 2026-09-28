@@ -1,0 +1,305 @@
+//! The daemon: one per user, serving JSON-RPC 2.0 over a Unix socket.
+//!
+//! Ownership is decided by an exclusive lock on `run/strived.lock`, not by the
+//! socket file, so two `strive` commands racing to start a daemon cannot both
+//! win, and a socket left behind by a crash is safely replaced.
+
+use std::fs::{self, File, TryLockError};
+use std::os::unix::fs::{MetadataExt, PermissionsExt};
+use std::sync::Arc;
+use std::sync::atomic::{AtomicU32, Ordering};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+
+use anyhow::{Context, Result};
+use strive_proto::ServerInfo;
+use strive_proto::rpc::{Message, RpcError};
+use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+use tokio::net::{UnixListener, UnixStream};
+use tokio::signal::unix::{SignalKind, signal};
+use tokio::sync::{Mutex, Notify, mpsc};
+
+use crate::credentials::Credentials;
+use crate::gateway::{self, Gateway};
+use crate::log;
+use crate::methods::{self, Conn};
+use crate::paths::{Home, build_id};
+use crate::sessions::Sessions;
+use crate::settings::Settings;
+
+/// Longest accepted message line. Larger messages close the connection.
+const MAX_LINE: usize = 16 * 1024 * 1024;
+
+/// How long a new daemon waits for an exiting one to release the lock.
+const LOCK_WAIT: Duration = Duration::from_secs(5);
+
+pub struct Config {
+    pub home: Home,
+    pub idle_exit: Duration,
+}
+
+pub struct State {
+    pub info: ServerInfo,
+    pub home: Home,
+    pub started: Instant,
+    pub idle_exit: Duration,
+    pub clients: AtomicU32,
+    /// When the client count last dropped to zero (or the daemon started).
+    idle_since: Mutex<Instant>,
+    pub shutdown: Notify,
+    pub sessions: Sessions,
+    pub settings: Settings,
+    pub models: strive_budget::Models,
+    pub credentials: Credentials,
+    pub cas: strive_journal::cas::Cas,
+    pub gateway: Gateway,
+    /// Model calls in flight. They count as activity, like connected clients.
+    pub gateway_calls: AtomicU32,
+    pub mcp: crate::mcp::Servers,
+
+    pub hosts: crate::hosts::Hosts,
+    /// One proposal operation at a time per project.
+    pub learning: crate::learning::Locks,
+}
+
+impl State {
+    /// Marks activity now: the idle timer starts over.
+    pub async fn touch(&self) {
+        *self.idle_since.lock().await = Instant::now();
+    }
+}
+
+/// Outcome of trying to become the daemon.
+pub enum Started {
+    Served,
+    /// Another daemon holds the lock; this process has nothing to do.
+    AlreadyRunning,
+}
+
+pub async fn run(cfg: Config) -> Result<Started> {
+    cfg.home.ensure()?;
+    let lock = File::options().create(true).truncate(false).write(true).open(cfg.home.lock())?;
+    let socket = cfg.home.socket();
+    // A held lock means either a live daemon (its socket answers) or one that
+    // is exiting (socket already unlinked, lock not yet released). Only the
+    // first is a reason to stand down; for the second, wait for the lock.
+    let deadline = Instant::now() + LOCK_WAIT;
+    loop {
+        match lock.try_lock() {
+            Ok(()) => break,
+            Err(TryLockError::WouldBlock) => {
+                if UnixStream::connect(&socket).await.is_ok() || Instant::now() > deadline {
+                    return Ok(Started::AlreadyRunning);
+                }
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+            Err(TryLockError::Error(e)) => {
+                return Err(e).context("locking the daemon lock file");
+            }
+        }
+    }
+
+    let _ = fs::remove_file(&socket); // stale from a crash; we hold the lock
+    let listener = UnixListener::bind(&socket).with_context(|| format!("binding {}", socket.display()))?;
+    fs::set_permissions(&socket, fs::Permissions::from_mode(0o600))?;
+    let socket_inode = fs::metadata(&socket)?.ino();
+
+    let settings = Settings::load(&cfg.home.root)?;
+    let models = strive_budget::Models::builtin().with_overrides(&settings.models);
+    let (gateway, gateway_listener) = Gateway::bind().await.context("binding the model gateway")?;
+    let state = Arc::new(State {
+        info: ServerInfo {
+            version: env!("CARGO_PKG_VERSION").into(),
+            build: build_id(),
+            pid: std::process::id(),
+            started_at_ms: epoch_ms(),
+        },
+        home: cfg.home.clone(),
+        started: Instant::now(),
+        idle_exit: cfg.idle_exit,
+        clients: AtomicU32::new(0),
+        idle_since: Mutex::new(Instant::now()),
+        shutdown: Notify::new(),
+        sessions: Sessions::open(&cfg.home.root).context("opening the session store")?,
+        credentials: Credentials::load(&cfg.home.root).context("reading credentials")?,
+        cas: strive_journal::cas::Cas::open(&cfg.home.root.join("cas")).context("opening the content store")?,
+        settings,
+        models,
+        gateway,
+        gateway_calls: AtomicU32::new(0),
+        mcp: crate::mcp::Servers::default(),
+
+        hosts: crate::hosts::Hosts::default(),
+        learning: crate::learning::Locks::default(),
+    });
+    // Before anything can start a replay, so all it finds is a crash's.
+    crate::replay::recover(&state).await;
+    let gateway_task = tokio::spawn(axum::serve(gateway_listener, gateway::router(state.clone())).into_future());
+    log!("daemon {} listening on {} (pid {})", state.info.build, socket.display(), state.info.pid);
+
+    let mut term = signal(SignalKind::terminate())?;
+    let mut int = signal(SignalKind::interrupt())?;
+    let mut tick = tokio::time::interval(Duration::from_millis(500));
+    loop {
+        tokio::select! {
+            // Polled in order. Shutdown and signals come first, so a steady
+            // stream of connections (a launcher retrying every 10 ms, say) can't
+            // starve them. Accept comes before the idle timer, so a connection
+            // already queued never loses to an idle exit. A client that connects
+            // after the socket is unlinked below finds nothing and starts a new
+            // daemon.
+            biased;
+            () = state.shutdown.notified() => { log!("shutdown requested"); break; }
+            _ = term.recv() => { log!("SIGTERM"); break; }
+            _ = int.recv() => { log!("SIGINT"); break; }
+            accepted = listener.accept() => match accepted {
+                Ok((stream, _)) => {
+                    let state = state.clone();
+                    state.clients.fetch_add(1, Ordering::SeqCst);
+                    tokio::spawn(async move {
+                        if let Err(e) = serve_connection(&state, stream).await {
+                            log!("connection ended with error: {e:#}");
+                        }
+                        if state.clients.fetch_sub(1, Ordering::SeqCst) == 1 {
+                            *state.idle_since.lock().await = Instant::now();
+                        }
+                    });
+                }
+                Err(e) => log!("accept failed: {e}"),
+            },
+                        _ = tick.tick() => {
+                // No client can reach a daemon whose socket is gone (its home
+                // was deleted, say), so it would idle on for nothing.
+                if fs::metadata(&socket).map(|m| m.ino()) .ok() != Some(socket_inode) {
+                    log!("{} is gone, exiting", socket.display());
+                    break;
+                }
+                // Hosts don't count: they exist to serve clients, and exit with the daemon.
+                let people = state.clients.load(Ordering::SeqCst).saturating_sub(state.hosts.count());
+                let busy = people + state.gateway_calls.load(Ordering::SeqCst) + state.learning.replaying.count() > 0;
+                if !busy && state.idle_since.lock().await.elapsed() >= state.idle_exit {
+                    log!("idle for {}s with no clients, exiting", state.idle_exit.as_secs());
+                    break;
+                }
+            }
+        }
+    }
+    // Unlink first so no new client can reach this daemon.
+    let _ = fs::remove_file(&socket);
+    drop(listener);
+    gateway_task.abort();
+    stand_down(&state).await;
+    // Only now can a successor (waiting in the loop above) start.
+    drop(lock);
+    Ok(Started::Served)
+}
+
+/// Ends the daemon's work: replays and commands first, while their ends can
+/// still be journaled; then the session writers; then MCP servers.
+async fn stand_down(state: &State) {
+    state.learning.replaying.stop_all();
+    let settled = state.sessions.cancel_effects(Duration::from_secs(10)).await;
+    // Each replay journals its end, releasing its hold, once its run stops.
+    let deadline = Instant::now() + Duration::from_secs(10);
+    while state.learning.replaying.count() > 0 {
+        if Instant::now() >= deadline {
+            log!("replays still running after 10s; the next start settles their holds");
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+    state.sessions.shutdown().await;
+    state.mcp.stop_all().await;
+    if !settled {
+        // Releasing ownership now would let a successor rewind files this
+        // daemon's work may still be changing. Exiting ends that work, and
+        // the lock is released only once the process is gone.
+        log!("effects still running after 10s; exiting without them");
+        // A rewind's git runs in its own group, killed whoever started the daemon.
+        crate::checkpoints::kill_running();
+        // Children in the daemon's own process group (a rewind's git, say)
+        // go with it; commands, hosts and MCP servers have their own groups,
+        // already stopped above. The launcher makes the daemon a group leader.
+        let me = nix::unistd::getpid();
+        if nix::unistd::getpgrp() == me {
+            let _ = nix::sys::signal::killpg(me, nix::sys::signal::Signal::SIGKILL);
+        }
+        std::process::exit(1);
+    }
+}
+
+async fn serve_connection(state: &Arc<State>, stream: UnixStream) -> Result<()> {
+    let (read, mut write) = stream.into_split();
+    // All outbound messages go through one queue, so responses and (later)
+    // streamed notifications never interleave mid-line.
+    let (tx, mut rx) = mpsc::unbounded_channel::<Message>();
+    let writer = tokio::spawn(async move {
+        while let Some(msg) = rx.recv().await {
+            // Closing the connection, rather than dropping one message, makes
+            // the client fail its pending requests instead of waiting forever.
+            let Ok(mut line) = serde_json::to_vec(&msg) else {
+                crate::log!("a message to a client did not serialize; closing the connection");
+                break;
+            };
+            line.push(b'\n');
+            if write.write_all(&line).await.is_err() {
+                break;
+            }
+        }
+    });
+
+    let mut reader = BufReader::new(read);
+    let mut line = String::new();
+    let conn = Arc::new(Conn::new(&tx));
+    loop {
+        line.clear();
+        // Any end of the connection, a read error (bytes that aren't UTF-8,
+        // say) included, goes through the same cleanup below.
+        match reader.read_line(&mut line).await {
+            Ok(0) => break,
+            Ok(_) => {}
+            Err(e) => {
+                crate::log!("a connection ended: {e}");
+                break;
+            }
+        }
+        if line.len() > MAX_LINE {
+            let _ = tx.send(Message::err(None, RpcError::new(RpcError::INVALID_REQUEST, "message too large")));
+            break;
+        }
+        if line.trim().is_empty() {
+            continue;
+        }
+        match serde_json::from_str::<Message>(&line) {
+            Err(e) => {
+                let _ = tx.send(Message::err(None, RpcError::new(RpcError::PARSE_ERROR, e.to_string())));
+            }
+            Ok(Message { id: Some(id), method: Some(method), params, .. }) => {
+                // The handshake runs in order; after it, requests run
+                // concurrently, so one waiting for approval (or a long
+                // command) never holds up the rest.
+                if conn.initialized() {
+                    let (state, conn) = (state.clone(), conn.clone());
+                    tokio::spawn(async move {
+                        let reply = methods::dispatch(&state, &conn, id, &method, params).await;
+                        conn.send(reply);
+                    });
+                } else {
+                    let reply = methods::dispatch(state, &conn, id, &method, params).await;
+                    let _ = tx.send(reply);
+                }
+            }
+            // Client notifications and responses to server requests: none defined yet.
+            Ok(_) => {}
+        }
+    }
+    // The writer ends when the last strong sender, `tx`, is gone; `conn`
+    // and everything it spawned hold only weak ones.
+    conn.close(state);
+    drop(tx);
+    let _ = writer.await;
+    Ok(())
+}
+
+pub fn epoch_ms() -> u64 {
+    SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |d| u64::try_from(d.as_millis()).unwrap_or(u64::MAX))
+}

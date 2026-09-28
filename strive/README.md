@@ -1,78 +1,132 @@
 # strive
 
-Strive provides durable mechanisms for model-led adaptation. An agent can revise
-its code, prompts and memory while a fixed execution core enforces permissions,
-accounts for effects, records exact revisions and recovers without hiding
-uncertainty. Policies decide whether a change helped; comparative evaluation is
-optional.
+strive is a coding agent that learns from your sessions, and every lesson is
+one you can review, measure and undo. Proposed changes to its memory and
+skills are gated against the current version before they're kept. Budgets,
+a verifiable session log and an OS sandbox are on by default.
 
-The current implementation lives in `src/strive`. Read
-[ARCHITECTURE.md](docs/ARCHITECTURE.md) for the five integrity guarantees and
-[the ADRs](docs/adrs/README.md) for the decisions behind them.
-[HANDOFF.md](docs/HANDOFF.md) has verification commands and qualification gates;
-[ROADMAP.md](docs/ROADMAP.md) tracks remaining work.
+> **Status: early.** Stage 1 (M0 to M6) is done. strive runs a coding
+> agent in any repository, with a verifiable session journal, budgets,
+> approvals, a sandbox and checkpoints. It reads the project's AGENTS.md
+> and skills, uses MCP servers, and has a terminal UI and a desktop app.
+> Headless runs work. Stage 2's reviewed proposals (M7) are in the daemon;
+> the learner that makes them is next; see [ROADMAP.md](docs/ROADMAP.md). The earlier Python research implementation
+> is at git tag `strive-py-final`.
 
-The implementation includes immutable bundles, an authenticated journal and CAS,
-pure verification, a serial supervisor and budget ledger, bounded candidate
-execution, a Linux OS jail, and model harness adapters behind a single-request
-gateway. `BenchmarkAdapter` separates task semantics and trusted scoring from
-the core. Counter supplies deterministic workflow tests; tau2 telecom is the
-first external benchmark, installed in a separate environment.
+## Install
 
-`ContinualRefine` operates, gathers authorized evidence, requests a proposal and
-keeps, revises or restores a complete bundle. Feedback A/B and isolated final
-audit control which evidence may influence adaptation. Journal-derived reports
-and optional OTLP export with a Langfuse profile expose results and accounting.
-
-## Run the recorded counter example
-
-Use Python 3.12 or newer, uv and Deno. From this directory:
+From this directory, with [Rust](https://rustup.rs) and [Bun](https://bun.sh):
 
 ```sh
-uv sync --frozen
-export PYTHONPATH="$PWD/adapters/counter/src${PYTHONPATH:+:$PYTHONPATH}"
-uv run python - <<'PY'
-from pathlib import Path
-from strive.cli.fixture import example
-print(example(Path(".cache/counter-example")))
-PY
-uv run python -m strive.cli --root .cache/counter-runs \
-  run .cache/counter-example/counter.toml --id adapting-17
-uv run python -m strive.cli --root .cache/counter-runs status adapting-17
-uv run python -m strive.cli --root .cache/counter-runs resume adapting-17
+./install.sh          # installs strive, strive-tui and the desktop app (STRIVE_NO_DESKTOP=1 skips it)
 ```
 
-The example uses recorded responses and makes no paid calls. Run IDs are unique;
-resume reuses the original bindings and retained state. The manifest CLI also
-provides `experiment`, `compare` and `project`; `--help` lists their arguments.
-The installed `strive` command delegates directly to vNext; there is no
-separate legacy CLI or run format.
-
-## Current limits
-
-The CLI currently composes the counter adapter and recorded provider. It rejects
-native harness campaign manifests. Native CLI single-request drives, Linux jail
-qualification on the executing host, installed tau2 grading/recovery checks and
-funded campaigns are separate gates. Host Deno permission tests do not establish
-the Linux confinement floor.
-
-Adaptive telecom uses whole scenario groups with 49 development, 29 validation
-and 36 audit tasks. Its separate fixed-stock runner uses the original 40 test
-IDs and an upstream fixed actor. These modes have different populations and
-implementations; their scores are reported separately. See the
-[tau2 adapter guide](adapters/tau2/README.md).
-
-`EvaluateFork` enactment and private-veto feedback C remain deferred. A valid
-execution history can contain failures, unknown outcomes and budget overruns.
-No fixture result establishes live-model improvement.
-
-## Verify
+## Use
 
 ```sh
-uv run mypy --strict
-uv run pytest tests/vnext -q
+cd any/repository
+strive                # opens the TUI in a new session; the per-user daemon starts on its own
+strive -c             # continue the latest session in this directory
+strive -r ID          # resume a session by id
+strive sessions       # sessions started here, newest first (--all for every directory)
+strive log [ID]       # a session's journal (default: the latest here)
+strive verify [ID]    # check a journal is intact; --all checks every session
+strive auth anthropic # store an API key (only the daemon ever holds it)
+strive gateway        # base URLs that run any Anthropic/OpenAI SDK under this session's budget
+strive doctor         # checks sandbox, git, credentials and the daemon
+strive status         # daemon pid, uptime, clients
+strive stop           # stop the daemon (it also exits when idle)
+strive app            # the desktop app on a new session here (-c and -r as for strive)
+strive run "fix the failing test" --approvals full-auto --json
+                      # one task, headless; exits 0 done, 1 failed, 3 timed out, 4 interrupted
+strive learn          # ask this project's learner to study its sessions (--session ID for chosen ones)
+strive review         # what the learner proposed here, and each proposal's status
+strive review 12      # one proposal: its diff, evidence, prediction and checks
+strive review 12 accept    # write it (or reject; rollback undoes an accepted one)
 ```
 
-The [handoff](docs/HANDOFF.md) documents the local-cache/no-sync workaround for
-restricted macOS environments and the required Linux container checks. Core hash
-fixtures live in [tests/vnext/baselines](tests/vnext/baselines/README.md).
+In the TUI, type what you want done. The agent reads and changes files in
+the directory and runs commands in a sandbox (no network, writes only in
+the workspace). By default, edits in the workspace just happen and commands
+ask first; `/approvals` changes that. Esc interrupts. `/rewind` puts the files
+back to how they were before any prompt.
+
+No config file is needed. State lives in `~/.strive`, or in `STRIVE_HOME` if set.
+Every session starts with a $5 budget. Change it with `/budget` in the TUI,
+or for new sessions in `~/.strive/settings.json`:
+
+```json
+{
+  "model": "claude-sonnet-4-5",
+  "approvals": "autoEdit",
+  "budget": { "usd": 10 },
+  "models": {
+    "claude-opus-5-5": { "input": 5, "output": 25, "cacheWrite": 6.25, "cacheRead": 0.5, "contextWindow": 1000000 }
+  },
+  "mcpServers": {
+    "github": { "command": "npx", "args": ["-y", "@modelcontextprotocol/server-github"], "env": { "GITHUB_TOKEN": "..." } }
+  }
+}
+```
+
+Prices are dollars per million tokens. A model without a known price is
+refused rather than guessed. `mcpServers` takes the same shape as Claude
+Code's (stdio servers). Each tool call asks first unless approvals are
+full-auto.
+
+The agent follows the project's `AGENTS.md` (or `CLAUDE.md`) files and
+knows its skills (`SKILL.md` under `.strive/skills`, `.claude/skills` or
+`~/.strive/skills`). Long conversations are summarized before they
+outgrow the model's context.
+
+The project's learner studies its sessions and proposes changes to
+`.strive/memory.md` and `.strive/skills`. It can't change a file itself.
+strive checks each proposal (its path, size, form, secrets, instructions
+that would weaken strive, and evidence from real sessions here), and nothing
+changes until you accept it with `strive review`. Accepting writes the file
+only if it's still as the learner saw it; rolling back restores it. The
+agent reads the accepted memory, labeled as reviewed, after `AGENTS.md`.
+
+The learner also runs on its own when a session goes quiet (10 minutes after
+its last turn) and shows a sign worth learning from: a correction, an
+interrupted turn, a declined approval, a command that failed then passed, or
+a failed turn. The scan uses no model. At most 3 such runs a day per project,
+each on the learning session's budget; `strive review` says why each ran, or
+why one was skipped. `"learning"` in settings changes this:
+
+```json
+{ "learning": { "mode": "suggest", "idleSeconds": 600, "everyTurns": 0, "dailyRuns": 3 } }
+```
+
+`off` stops automatic runs (`strive learn` still works). `suggest`, the
+default, leaves every decision to you. `gated` also accepts a proposal whose
+every check passed, none skipped, and marks it "accepted automatically"; you
+can roll it back. A project's `.strive/settings.json` may set a lower mode
+(`{"learning": {"mode": "off"}}`), never a higher one.
+
+## Benchmarks
+
+`harbor/strive_agent.py` runs strive as a [Harbor](https://github.com/harbor-framework/harbor)
+agent: Terminal-Bench 2.0 and the other Harbor datasets.
+
+```sh
+./scripts/build-linux.sh x86_64    # Linux binaries for the task containers (and aarch64 for native ones)
+PYTHONPATH=harbor harbor run -d terminal-bench@2.0 -a strive_agent:Strive -m anthropic/claude-haiku-4-5 -l 5
+```
+
+Each task container is the sandbox, so the agent runs with `"sandbox": "off"` and full-auto
+approvals. `STRIVE_BUDGET_USD` (default 1) and `STRIVE_TURN_SECONDS` limit each task, and the
+session's journal lands in the trial's `agent/strive.jsonl`.
+
+## Develop
+
+```sh
+./scripts/check.sh                        # fmt, clippy, tests, protocol drift, Biome, Oxlint, tsc, bun test
+./scripts/test-linux.sh                   # the Linux sandbox tests, in a container (podman or docker)
+./scripts/mutants.sh                      # mutation testing: every surviving mutant is an untested defect
+STRIVE_TUI="bun packages/tui/src/main.ts" cargo run   # run the TUI from source
+```
+
+- [ARCHITECTURE.md](docs/ARCHITECTURE.md): the daemon, clients and protocol.
+- [ADR-0015](docs/adrs/0015-rebuild-daemon-and-host.md): why it's built this way.
+- [ADRs](docs/adrs/README.md): the full decision history.

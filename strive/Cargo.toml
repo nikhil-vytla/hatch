@@ -1,0 +1,49 @@
+[workspace]
+resolver = "3"
+members = ["crates/proto", "crates/journal", "crates/budget", "crates/gateway", "crates/learning", "crates/strived"]
+
+[workspace.package]
+version = "0.3.0-dev"
+edition = "2024"
+rust-version = "1.89"
+license = "MIT"
+
+[workspace.dependencies]
+strive-proto = { path = "crates/proto" }
+strive-journal = { path = "crates/journal" }
+strive-budget = { path = "crates/budget" }
+strive-gateway = { path = "crates/gateway" }
+strive-learning = { path = "crates/learning" }
+anyhow = "1.0.104"
+clap = { version = "4.6.7", features = ["derive", "env"] }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.151"
+tokio = { version = "1.53.1", features = ["rt-multi-thread", "net", "io-util", "macros", "time", "sync", "signal", "process"] }
+# The serde attributes ts-rs can't read (deny_unknown_fields) don't change the TS type.
+ts-rs = { version = "12.0.1", features = ["no-serde-warnings"] }
+tempfile = "3.27.0"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+module_name_repetitions = "allow"
+missing_errors_doc = "allow"
+must_use_candidate = "allow"
+# A daemon that owns money and journals must not panic on bad input or
+# broken invariants; tests may (clippy.toml allows it there).
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+todo = "deny"
+dbg_macro = "deny"
+# `#[expect]` instead, so a suppression that no longer applies fails the build.
+allow_attributes = "deny"
+allow_attributes_without_reason = "deny"
+await_holding_lock = "deny"
+
+
+[profile.release]
+strip = true
+lto = "thin"

@@ -1,0 +1,50 @@
+[package]
+name = "strived"
+description = "The strive daemon and the `strive` command."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "strive"
+path = "src/main.rs"
+
+[dependencies]
+strive-proto.workspace = true
+strive-journal.workspace = true
+strive-budget.workspace = true
+strive-gateway.workspace = true
+strive-learning.workspace = true
+hex = "0.4.3"
+nix = { version = "0.31.3", features = ["fs", "signal"] }
+ulid = "3.0.0"
+axum = { version = "0.8.9", default-features = false, features = ["http1", "tokio"] }
+reqwest = { version = "0.13.5", default-features = false, features = ["rustls", "stream", "http2"] }
+futures-util = "0.3.34"
+bytes = "1.12.1"
+tokio-stream = "0.1.19"
+rpassword = "7.5.4"
+jiff = "0.2.37"
+anyhow.workspace = true
+clap.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+webpki-root-certs = "1.0.9"
+tempfile.workspace = true
+
+[dev-dependencies]
+sha2 = "0.11.0"
+reqwest = { version = "0.13.5", default-features = false, features = ["rustls", "stream", "json"] }
+axum = { version = "0.8.9", default-features = false, features = ["http1", "tokio"] }
+serde_json.workspace = true
+strive-proto.workspace = true
+
+[lints]
+workspace = true
+
+[target.'cfg(target_os = "linux")'.dependencies]
+command-fds = "0.3.3"
+libc = "0.2.189"
+seccompiler = "0.5.0"

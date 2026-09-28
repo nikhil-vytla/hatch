@@ -1,0 +1,24 @@
+{
+  "name": "strive-workspace",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "check": "tsc -p tsconfig.json",
+    "test": "bun test",
+    "format": "biome format --write packages"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.14",
+    "@oxlint/plugins": "1.85.0",
+    "@types/bun": "1.4.2",
+    "oxlint": "1.85.0",
+    "typescript": "7.0.2"
+  },
+  "trustedDependencies": [
+    "electron"
+  ]
+}

@@ -1,0 +1,15 @@
+[package]
+name = "strive-gateway"
+description = "What the model gateway knows about provider wire formats: requests, usage, streams."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+strive-proto.workspace = true
+strive-budget.workspace = true
+serde_json.workspace = true
+
+[lints]
+workspace = true

@@ -1,391 +1,678 @@
-# strive architecture
+# Architecture
 
-Strive provides durable mechanisms for model-led adaptation. An agent operates
-in a continuing environment, changes its executable behavior, and learns from
-subsequent experience. Strive records exactly what ran and enforces permissions,
-accounting, recovery and declared evidence access. Policies decide what to change
-and whether a change helped. The execution core decides what was authorized,
-what was observed, what remains uncertain and which revision is active.
-
-The current implementation is `src/strive`. Its local run format, commands
-and artifact roots are the only ones in the package; the pre-vNext kernel was
-removed. There is no migration or dual-writing path. Historical implementation
-decisions are identified in the [ADR index](adrs/README.md); earlier project
-documents remain in [the archive](archive/README.md).
-
-## Five integrity guarantees
-
-These guarantees assume a trusted host and operator, hostile generated code and
-inputs, and durable local storage surviving process failure.
-
-| Guarantee | Requirement and enforcement |
-| --- | --- |
-| 1. Confinement and fixed authority | Candidate code cannot alter authorization, accounting, evidence access, trusted measurement, verification or recovery. The sandbox and broker keep privileged services, credentials and authoritative storage outside candidate access. |
-| 2. Independent facts | Broker, adapter and scorer records establish interactions, usage, outcomes and coverage. Producer-specific append ports and scoped evidence prevent candidate claims from replacing those facts. |
-| 3. Durable execution identity | Exact requests, effect identities, authorization and reservations commit before dispatch. Retained executable bytes, revision transitions and consumed-result cursors reconstruct the accepted execution. |
-| 4. Honest recovery | Recorded outcomes are reused; supported mutations reconcile by durable identity; unsupported uncertainty suspends with obligations retained. Restoring a bundle never rewinds spending or world state. |
-| 5. A small checked protocol | Pure preflight and replay reject inconsistent authority transitions. The protocol represents failure, overruns and uncertainty without inventing success. |
-
-Protocol validity does not imply task success or scientific improvement. Nor do
-hash chains protect against a malicious host owner replacing the entire store
-and its trust root. Distributed ownership, host-loss failover and portable
-external history signatures are outside the current claim.
-
-## Components and ownership
-
-These are boundaries within a local implementation, not separately deployed
-services.
-
-| Component | Responsibility |
-| --- | --- |
-| Manifests and bundles | Retain resolved configuration and exact executable content, prompts, memory, entry points, dependencies and model settings before execution. |
-| Journal and CAS | Publish immutable objects and one ordered authority history per run, with local writer ownership and durable epochs. |
-| Pure verifier | Check references, authenticated producers, causation, effect transitions, reservations, settlement, activation and result consumption. |
-| Supervisor and ledger | Own serial execution, durable reservations, dispatch, deadlines, receipts, reconciliation, continuation and accounting. |
-| Sandbox and capability broker | Confine candidate programs and admit only pinned operations with authorized destinations, arguments, environments, scopes and budgets. |
-| Harness adapters and gateway | Treat a replaceable harness as a bounded model-generation service while retaining trusted model traffic and usage evidence. |
-| Benchmark adapters | Own task semantics, episode state, simulator operations, snapshots, recovery and scoring behind the general `BenchmarkAdapter` interface. |
-| Policy runtime | Choose operation, refinement, optional development checks, activation and restoration using authorized evidence. |
-| Research workflow | Resolve manifests, run serial studies, freeze selected actors, isolate audit and produce journal-derived reports and telemetry. |
-
-## Manifests, bundles and execution
-
-An authored TOML manifest names the policy, workload, trusted implementations,
-initial bundle, editable scope, capabilities, actor/refiner/user model bindings,
-feedback contract, comparison plan, seeds, resource limits and recovery settings.
-Resolution retains authored bytes and a `ResolvedManifest` with content-addressed
-closure before dispatch. Requested capabilities describe needs; only the broker
-grants authority. The installed implementation must match retained pins on
-resume. Reproduction from initial inputs is a new run and can produce different
-model outputs.
-
-A bundle contains versioned actor/controller code, prompts, memory and skills,
-plus its entry points, dependency closure and requested capabilities. The bundle
-manager validates file paths, structure, dependencies, editable scope, provenance
-and expected revision. Activation records exact previous and next bundles at a
-legal operation boundary, so an invocation never sees mixed components.
-
-The fixed step interface is:
-
-```text
-step(authorized_view, private_state, recorded_result)
-    -> command, proposed_private_state, annotations
+```
+strive (CLI) ── starts or attaches ──► strived (daemon, one per user)
+                                          journal + CAS · budget ledger · model gateway
+                                          fs/shell effects in the sandbox · checkpoints
+        JSON-RPC 2.0, NDJSON, Unix socket │ ~/.strive/run/strived.sock (0600)
+   ┌──────────────┬───────────────────────┼───────────────────┐
+agent host      TUI (pi-tui)          desktop (Electron)   headless / ACP
+(pi-agent-core)
 ```
 
-The supervisor owns invocation identity, executing bundle, input references and
-result delivery. A continuation commits private-state bytes, the consumed result
-cursor and any pending command together. Candidate fields cannot substitute for
-those identities.
+The daemon owns everything that must be trusted. Clients render and forward
+intent. The agent host is a client too: its tools are daemon RPCs and its model
+calls go through the daemon's gateway. Why: [ADR-0015](adrs/0015-rebuild-daemon-and-host.md).
 
-The command vocabulary is `ExecuteEffect`, `ApplyChange`, `RestoreBundle`,
-`EvaluateFork`, `Continue`, `Suspend` and `Finish`. `Finish` ends execution; it
-cannot certify task success. `EvaluateFork` is defined by the contracts but its
-enactment is unsupported. `ExecuteEffect` is currently the chargeable effect
-path; implementing forks requires explicit authorization, accounting and adapter
-support.
+## Layout
 
-Controller replacement uses the same bundle mechanism but requires a quiescent
-boundary with no pending command or unconsumed result for the old controller.
-The new controller and its explicit initial state activate atomically. There is
-no arbitrary state migration. A broken controller can suspend; the operator can
-restore a compatible prior bundle through the supervisor without running that
-controller. Restoration changes executable configuration only.
-
-## Storage, verification and authority
-
-`store.ArtifactStore` defaults to `artifacts-vnext` and rejects populated roots
-without its format marker. The workflow CLI organizes private per-run stores
-under `artifacts-vnext-workflow`. CAS references identify content, separately
-from command, invocation and effect identities. Referenced bytes and directory
-entries are synced before a journal frame commits.
-
-One `RunWriter` holds an exclusive local lease and execution epoch. Trusted setup
-pins producer identities and hands each producer its own append port. Producer
-MACs and supervisor seals authenticate accepted records against a protected
-local authority file. Candidates receive neither that file nor a general CAS or
-history reader. A schema-valid producer name alone is not authentication.
-
-| Authority group | Recorded facts and owner |
+| Path | What |
 | --- | --- |
-| Envelope | Supervisor-owned run, sequence, record class, causation, producer, scope, payload reference and integrity linkage. |
-| Run binding | Trusted setup pins configuration, implementations, initial state and bundle, models, limits, capabilities, feedback, comparison and lineage. |
-| Effect authorization | Broker and supervisor bind exact request, command/effect IDs, executing bundle, operation, environment, scope, reservation, recovery contract and epoch. |
-| Observation and settlement | Trusted adapters and broker retain dispatch, return/failure/uncertainty, responses, receipts, observed state, usage and reservation disposition. |
-| Measurement | Trusted scorer binds the subject, workload, scorer, supporting receipts, coverage and metrics. |
-| Revision activation | Supervisor records exact bundles, expected revision, boundary and any coupled controller state after validation. |
-| Continuation | Supervisor records private-state bytes, consumed cursor, pending command, environment and execution status. |
+| `crates/proto` | Protocol: JSON-RPC envelopes, method and notification declarations, events, TS export |
+| `crates/journal` | Authenticated session journals: format, verification, crash recovery |
+| `crates/budget` | Prices, costs, reservations and the ledger rebuilt from journal events |
+| `crates/gateway` | Provider wire formats: which API, what a request asks for, usage from bodies and streams |
+| `crates/learning` | Trusted learning's pure parts: where proposals write, the static gate's text checks, proposal status, the judge's rubric, the replay gate's task mining and verdict, watches and their tallies, memory's named paths, the triggers' pre-filter |
+| `crates/strived` | The `strive` binary: CLI, launcher, daemon, sessions |
+| `packages/protocol` | Generated TS types + the typed socket client |
+| `packages/tui` | The terminal client; its binary also runs the agent host |
+| `packages/host` | The agent host: pi-agent-core loop, tools as daemon effects |
+| `packages/testkit` | Test helpers: a scratch-home daemon and a virtual terminal |
 
-These records establish what trusted producers reported. Verification checks
-that provenance and its relationships; it does not independently establish the
-truth of arbitrary external services or the quality of private reasoning.
+## Daemon lifecycle
 
-`verify.preflight()` checks one transition against a verified prefix;
-`verify.replay()` reconstructs immutable `VerifiedState` from committed history.
-The verifier imports only standard-library code, contracts and shared wire/codec
-definitions. It dispatches no effects, executes no candidate code and imports no
-mutable store, runtime, policy, harness or benchmark implementation.
+- **Ownership:** an exclusive lock on `run/strived.lock` decides which process
+  is the daemon. A leftover socket from a crash is removed by the lock holder,
+  so racing starts produce exactly one daemon. An exiting daemon unlinks its
+  socket before releasing the lock. A successor that finds the lock held but
+  the socket silent waits for it instead of standing down, and the launcher
+  retries every outcome (a daemon exiting mid-handshake, a lost lock race)
+  until its deadline.
+- **Staleness:** `initialize` returns a build id (version plus the binary's
+  inode, size and mtime). When it differs from the caller's own, the caller
+  asks the old daemon to shut down and starts a new one.
+- **Idle exit:** after `STRIVE_IDLE_SECS` (default 900) with no clients.
+- **State:** everything lives under `~/.strive`, or `STRIVE_HOME`. Directories
+  are 0700 and the socket is 0600.
 
-Missing artifacts, broken authentication, malformed frames and inconsistent
-transitions stop mutation. Execution readers raise `IncompleteTail` for a
-partial final frame. They never skip, truncate or silently repair history.
-Inspection can show an authenticated complete prefix with an explicit tail
-diagnostic, without turning that prefix into a repaired execution history.
+## Protocol
 
-Annotations are separate, namespaced, bounded payloads. Storage and verification
-treat their bytes as opaque, including unknown schemas and non-JSON bytes.
-Rationales, hypotheses, claimed scores and supplied-context labels may aid
-inspection. They cannot authorize execution, grant access, activate revisions,
-settle expenditure, release reservations, certify reward or authorize a retry.
+JSON-RPC 2.0, one message per line. `initialize` must come first and the
+protocol versions must match exactly. Error codes: `-32002` not initialized,
+`-32003` protocol mismatch, plus the standard JSON-RPC codes. Methods are
+declared once in `crates/proto/src/lib.rs`. `cargo test` regenerates
+`packages/protocol/src/generated/`, and `scripts/check.sh` fails if the
+committed copy differs.
 
-## Effects, accounting and recovery
+## Sessions and the journal
 
-The active execution path is serial with at most one externally in-flight
-effect. Its lifecycle is:
+Each session is a directory under `~/.strive/sessions/<ULID>/`:
 
-```text
-accepted request -> durable authorization and reservation -> dispatch
-                 -> recorded return or uncertainty -> settlement -> consumption
-```
+- **`journal.jsonl`** holds one entry per line: `{"seq","tsMs","event","mac"}`.
+  The MAC is HMAC-SHA256 over the previous entry's MAC and this line's exact
+  bytes. The chain starts from a value derived from the session id, so an
+  edit, deletion, reordering or move between sessions fails at the first
+  affected entry.
+- **`head.json`** records the last committed entry and is MAC'd itself. That
+  catches entries removed from the end and heads forged from a readable line.
+- **The key** is `~/.strive/keys/journal.key`: 32 random bytes, mode 0600,
+  created on first start. From M3 the agent's sandbox denies it.
 
-Recovery distinguishes a request that was never authorized from an authorized
-effect that may already have run. Recorded returns finish bookkeeping without
-redispatch. An adapter can recover by deterministic recomputation, lookup by
-durable operation identity, or retry under a declared deduplication contract.
-Unsupported ambiguity suspends. A new explicit attempt has a new effect and
-reservation; it does not erase its unresolved predecessor. Native session IDs
-and transcripts are not recovery contracts.
+**Writes.** One writer thread per open session owns the journal. Appends
+queued while it was busy are committed together: one `fsync` of the journal,
+then an atomic replace of the head. Only then does the writer broadcast the
+entries to attached clients.
 
-Admission checks each limited resource against:
+**Attach.** Attaching goes through the same thread and re-verifies the file
+on disk. A new subscriber's history and its live stream therefore never
+overlap or leave a gap, and a journal edited while the daemon ran is refused
+on resume.
 
-```text
-settled usage + outstanding reservations + proposed reservation <= limit
-```
+**Crash recovery.** Opening repairs only what a crash can leave behind. A
+torn last line is cut and recorded as a `recovered` entry, and a head
+behind the synced entries catches up. An invalid journal is refused and
+never modified.
 
-Settlement replaces or adjusts an obligation once. Usage distinguishes measured
-quantities, reserved capacity and unknown expenditure. Token-derived cost uses a
-pinned price schedule and is distinct from provider-reconciled billing. A finite
-ceiling requires defensible bounds before dispatch, including refiner calls,
-failed proposals and retries. Unknown components retain their obligations.
-Observed overruns are recorded and block further dispatch; real receipts are not
-rejected to make a budget appear respected.
+**Format contract.** The first line's bytes are pinned by a golden test,
+whose MAC was computed independently with openssl.
 
-Outcome and accounting status are independent. A known model response may have
-unknown usage. Cancellation does not establish that an external operation or
-charge never occurred. Accounting survives suspension and restart; restoring a
-bundle does not restore an earlier balance or simulator state.
+**Creation and failure.**
+- Creating a session is atomic. The journal and head are built in a staging
+  directory and renamed into place, so a session is listable only once it
+  can be opened.
+- After any failed write, the writer stops and the journal refuses further
+  appends. The next request reopens it, which repairs the tail.
+- A prompt whose write failed may still be in the journal. Its line can be
+  synced before the head write fails, so an error means "not confirmed",
+  not "not saved".
+- On shutdown the daemon joins every writer before releasing its ownership
+  lock.
+- Temp files are created exclusively and never follow symlinks.
 
-## Confinement and model harnesses
+**What the journal does not catch.** Someone who can write the user's files,
+and who kept an older copy of a session's `head.json`, can restore that head
+and truncate the journal to match. The result verifies. Detecting this
+rollback needs a counter the attacker can't roll back, which a local file
+can't provide. The agent's sandbox denies `~/.strive` entirely, so an agent
+can't do this. A person with the user's file access can.
 
-The Deno candidate sandbox supplies bounded input/output, permission denial,
-resource limits and deadlines. `runtime.confined_sandbox` adds a Linux jail when
-runtime capability checks succeed. The shared jail uses bubblewrap namespaces,
-a retained read-only runtime, seccomp with default denial, cgroup v2 hard memory
-and process limits, and bounded tmpfs scratch. Host homes, credentials, stores,
-repository files and cgroup controls are absent. The private network namespace
-has no route to host or external services.
+## The model gateway
 
-Harness traffic uses the authenticated inherited-pipe gateway; it has no general
-network exception. Cgroup identities and boot identity support whole-tree
-cleanup and recovery, including descendants that create new sessions. Candidate
-startup has a separate bound; its execution deadline starts at the trusted
-bootstrap readiness marker. Candidate output cannot reset that deadline.
+Model calls go through a loopback HTTP proxy in the daemon, never straight
+to a provider. `session/gateway` (or `strive gateway`) returns base URLs
+holding a secret token for one session, so any Anthropic or OpenAI SDK works
+by changing its base URL.
 
-Capability detection launches the real jail and checks kernel-visible state.
-Once selected, a failed jail does not fall back to Deno permissions. Unsupported
-hosts can run the explicitly limited permission implementation;
-`STRIVE_REQUIRE_JAIL=1` makes a missing OS floor an error. A host test run with
-Linux gates skipped does not qualify native process confinement. See
-[ADR-0012](adrs/0012-linux-os-jail.md).
+**Per call:**
+1. **Admit.** The gateway refuses a call before sending anything when:
+   - the token is unknown;
+   - the API or model isn't supported, or the model has no known price;
+   - there is no key;
+   - its worst-case cost doesn't fit what the session has left.
 
-Harness adapters for opencode, Codex and Claude Code implement bounded generation
-through `describe`, `prepare`, `invoke` and `reconcile`. The harness constructs a
-model request and returns proposal data. It does not own the workload tools,
-trusted scoring or the execution loop. Profiles pin executable/configuration,
-decoder and model settings; candidate-authored privileged adapters and arbitrary
-dependency installation are outside scope.
+   The worst case bounds input by the request's bytes and the context
+   window, and output by the request's cap or the model's maximum, all at
+   full input price. Refusals come back in the calling SDK's own error
+   format.
+2. **Record the start.** The exact request bytes go into the content
+   store. The reservation and a `modelCallStarted` entry are then written in
+   one step on the session's writer.
+3. **Forward.** The provider key comes from `~/.strive/credentials.json`
+   (0600, set by `strive auth`) or the daemon's environment at start. The
+   agent's own credential headers are dropped.
+4. **Stream back and meter.** Bytes pass through unchanged while usage is
+   read from the body or stream. For streaming Chat Completions, the
+   gateway asks for usage.
+5. **Record the end.** The exact response bytes are stored and
+   `modelCallFinished` is written. Only then does the client's response
+   end, so a finished response implies a journaled cost.
 
-The gateway admits one text generation under an effect-scoped capability and
-conservative provider bounds. Extra requests, hidden retries, tools, unsupported
-billing options, streaming and session linkage fail closed. It retains supplied
-context, exact wire JSON and the complete provider response before forwarding
-the response to the child. Requested, wire and provider-observed model identities
-remain distinct. CLI model echoes and token totals are diagnostics.
+**What each outcome costs:**
 
-Provider credentials stay outside the child. Recovery uses retained responses
-and pinned deterministic decoding when available, otherwise preserves an
-incomplete outcome or uncertainty. A working jail and adapter fixtures do not
-qualify an installed vendor CLI's single-request behavior. Native drives and
-funded smokes have separate gates. [ADR-0009](adrs/0009-harness-as-model.md)
-records this boundary.
-
-## Benchmarks and telecom
-
-`benchmarks.api.BenchmarkAdapter` defines `strive.benchmark/1`: descriptors,
-tasks, splits, operations, episode initialization, actor and user actions,
-messages, termination, snapshots, lookup, scoring and optional forks. Workload
-semantics stay in the adapter; the supervisor sees ordinary authorized effects.
-`OperationStore` atomically retains operation identity, argument binding, snapshot
-changes and receipts. Restart recovers committed mutations without repeating
-them. Snapshot reads cannot rewind the authoritative environment head.
-
-The episode driver keeps tool invocations and user-model generation separate.
-It authenticates captured generation cursors and resumes pending batches from
-receipts. The trusted scorer owns reward and coverage, using committed state and
-receipt chains. Scorer summaries cannot stand in for missing evidence.
-
-Counter is a deterministic second implementation that tests reuse without core
-changes. The first external workload is tau2 telecom text, separately packaged
-under `adapters/tau2` and pinned to upstream commit
-`a2c024725189473d2d7cea3a5cfdbcc67478e41f`, distribution version `1.0.1`.
-The adapter and its upstream dependency run in an isolated interpreter over
-bounded JSON RPC. Their source, dependencies, data, policies, simulator
-guidelines, licenses and qualification artifacts are retained separately from
-the pure verifier.
-
-Telecom contains coupled agent and user-device state. The adapter runs upstream
-tool and user-simulator logic with generation intercepted into separately
-brokered calls. It preserves structured multi-tool message roles. Snapshots and
-receipts retain both databases, conversation position, pending batches and
-random state. Deterministic grading checks the pinned upstream evaluators.
-Selected tasks with missing or unknown reward components, natural-language
-assertions, unreviewed assertions or failed strict reference execution block
-qualification. No task is silently dropped to obtain a passing denominator.
-See [ADR-0010](adrs/0010-benchmark-adapter-tau2.md) and the
-[adapter guide](../adapters/tau2/README.md).
-
-The two evaluation modes have different meanings:
-
-| Mode | Population and interpretation |
+| Outcome | Charged |
 | --- | --- |
-| `adaptive` | All 114 selected base tasks, assigned as whole scenario roots: 49 development, 29 validation, 36 audit. An adapting actor and its matched fixed control share this assignment and initial actor. |
-| `fixed-stock` | All 40 published test IDs, in stock order, with a fresh upstream `llm_agent` per simulation and no cross-episode adaptation. It reports separately. |
+| Complete | Its usage at the model's prices |
+| Rejected (a provider error status) | Nothing |
+| Broken (stream cut, client gone, request failed after sending) | The full reservation |
+| Started but never finished (daemon crash) | The full reservation, closed explicitly as broken on the next open |
 
-The adaptive roots are MMS, service and mobile-data respectively. Persona and
-failure-condition variants stay with their base template. Shared words or goals
-do not join roots. Exact target sizes of 60/14/40 are impossible with these three
-groups; the allocator preserves nonempty partitions and deterministically
-minimizes size error. Certification retains source, seed, ordering, memberships
-and actual counts. Stock train/test overlap remains informational, while
-adaptive coverage and group separation are blocking checks.
+**Budget records.** A session's limits are a `budgetSet` entry written at
+creation from settings, $5 by default, and changed with `session/budget`
+(`/budget` in the TUI). Editing settings later never changes an existing
+session's budget.
 
-Three development passes mean 147 episodes per trajectory. The planned eight
-paired repetitions mean 2,352 development episodes, plus 1,152 audit episodes for
-two trials per audit task in both arms. These are plan counts, not completed
-measurements. Only three independent roots support a coarse transfer experiment,
-not broad held-out generalization or a leaderboard claim.
+## The agent
 
-Fixed-stock uses its own initial actor configuration and pins the user to
-`gpt-4.1-2025-04-14` at temperature `0.0`. Its upstream actor is a separate
-implementation from the adaptive harness. A 40-task test result is not a
-114-task base leaderboard result; cross-mode scores must not be pooled or reused
-as adaptive feedback. [ADR-0013](adrs/0013-adaptive-whole-group-split.md)
-records the allocation and comparison limits.
+**Hosts.** When a prompt arrives and no host is registered for the
+session, the daemon starts one: `strive-tui host --session ID`, one binary
+with one runtime. A host registers with `host/register`, which returns the
+agent config (model, gateway URL, limits, project context, MCP tools), then
+attaches to the session. Hosts don't count as clients for idle exit.
+- **The model** is the session's own if a person chose one with
+  `session/model` (journaled as `modelSet`), else settings'. It can be
+  chosen only before the first prompt, since a host may start on it then;
+  `model/list` lists the priced models to choose from.
+- One host per session: registration is exclusive.
+- A host must register before it attaches.
+- Only the session's host may record turns or stream text for it.
+- A host can't answer approvals, change approval modes or budgets, rewind,
+  ask the learner to run, or decide on or roll back a proposal.
 
-## Continual refinement and feedback
+**Trust.** The daemon enforces what the agent may *ask* for: every file
+change, command and model call goes through it. The host itself still
+runs as the user, unsandboxed. The host-only restrictions above guard
+against the agent loop's mistakes. They don't stop a hostile host (say, a
+compromised dependency), which could act without the daemon. It could, for
+instance, open a second connection and approve its own effects there.
+Confining the host process to the daemon's socket and gateway is planned.
 
-`policy.ContinualRefine` operates the active bundle, gathers authorized evidence
-at configured checkpoints, and obtains a typed proposal through `GatewayRefiner`.
-Its choices are keep, revise, restore or gather more evidence. Revision validates
-a complete bundle and activates it immediately at a legal boundary. Development
-checks are optional policy choices, never a universal promotion gate. A malformed
-proposal fails as data; replayed checkpoints reuse retained generation and
-activation rather than repeating the model call.
+**Context.** Registration loads the project's context:
+- **Instructions:** `AGENTS.md` (or `CLAUDE.md`) from the repository root
+  down to the workspace, after `~/.strive/AGENTS.md`.
+- **Skills:** SKILL.md files from `.strive/skills`, `.claude/skills` and
+  `~/.strive/skills`.
+- **Memory:** `.strive/memory.md`, the last instruction file, labeled as
+  memory a person reviewed. Its `@` lines stay text. The same rules
+  apply: regular files only, never from strive's home.
+- **MCP servers:** the stdio servers in `mcpServers` in settings.
+  - They are started for the session in its directory, without strive's
+    variables or provider keys.
+    - Servers are user-configured programs and run unsandboxed, as in other
+    agents.
+    - A server's process group is killed when the daemon stops (even
+    mid-startup), when a write to it stalls or its queue fills, when its
+    output ends, and when it doesn't answer a cancelled call within 2s.
+    A call fails only once its server has exited, so nothing it does lands
+    after the effect ends. A killed server restarts on its next call.
+  - MCP lets a server stay silent about a cancelled call. strive still
+    stops one that does: silence can't show that a file-changing tool has
+    stopped, and the workspace must be free for a rewind. Other calls to
+    that server fail when it is stopped.
+  - A process that leaves the group (`setsid`) is out of reach.
+- `contextLoaded` journals what was loaded and how each server started.
+- Before a turn, a conversation past `compactAtTokens` is summarized. The
+  summary is journaled as `compacted` and replaces what it covers on
+  resume.
 
-Memory and skills are versioned files. Imported or derived files retain their
-source provenance and scope; a summary cannot acquire broader access than its
-inputs. Evidence selection intersects the campaign feedback contract with actual
-broker grants before reading bytes. Candidates receive filtered views, never
-unrestricted history or CAS access.
+**The loop.** The host runs pi-agent-core with read, write, edit and bash,
+plus each MCP tool as `mcp__server__tool`.
+- Every tool call is an `effect/run` performed by the daemon, in the
+  sandbox and subject to approvals.
+- Every model call goes through the session's gateway, with a placeholder
+  key.
+- The host therefore holds no keys and touches no files.
 
-| Contract | Permitted influence |
+**The journal is the conversation.** The host records `turnStarted`,
+`assistantMessage` and `turnEnded`. `assistantMessage` carries the display
+text, the tool calls, and the exact message fed back on resume. Tool
+results are rebuilt from the daemon's effect records, never from the host,
+and a tool call that never ran gets an explicit result.
+- A restarted host resumes the whole conversation.
+- A turn cut off by a host crash is closed as failed.
+- Live reply text travels as `session/delta` and is not journaled.
+- Only people, never hosts, can answer approvals.
+- `turnStarted` records the last prompt the turn took (`throughSeq`). A
+  prompt sent while a turn runs is rebuilt after that turn's reply, and
+  still runs if the host restarts first.
+- Interrupting a turn (Esc, or its time limit) cancels its effects with
+  `effect/cancel`.
+- If a host's connection closes mid-turn, the daemon ends that turn as
+  failed, so anyone waiting on it (`strive run`) finds out.
+
+## Trusted learning
+
+Why: [ADR-0016](adrs/0016-trusted-learning.md). The learner proposes; the
+daemon checks; a person decides; the daemon writes.
+
+**The learning session.** Each project directory has one, found or created
+by `learning/open`. Its `sessionStarted` says `kind: learning`.
+- Lists people pick from leave it out: `session/list` returns work
+  sessions unless asked for `kind: learning` (or `replay`), so `strive
+  sessions`, continue and the desktop's sidebar never offer it. `strive
+  verify --all` asks for all three, since the learning journal records who
+  accepted what and replays what the replay gate saw.
+- `learning/run` (people only) journals `learnRequested`, naming work
+  sessions of the project or none, and starts the session's host. Prompts
+  to a learning session are refused. The daemon's own triggers journal it
+  too, with a `trigger` (below).
+
+**What its host may do.** Its `host/register` returns `kind: learning`,
+no MCP tools, and `learnedFiles`: the project's memory and skills, each
+whole and exactly as on disk. Files a proposal couldn't replace are left
+out: not regular, reached through a symlink, in strive's home, or over
+64 KiB. `contextLoaded.learned` journals their digests.
+- It records turns, messages, summaries and `proposalMade`. Nothing else:
+  no gates, decisions or layouts, and no effects.
+- A work session's host can't record `proposalMade`.
+
+**The learner.** A learning session's host (`AgentConfig.kind` is
+`learning`, [ADR-0016](adrs/0016-trusted-learning.md)) runs the learner
+with the same turn machinery: a `learnRequested` entry is a turn's
+prompt, as `userMessage` is for the coding agent.
+- Its tools read, and nothing else: `list_sessions` (`session/list`),
+  `read_session` (`session/read` and `blob/get`, rendered in pages within
+  a token budget), `read_artifact` (memory and skills from its config)
+  and `propose_change`, which records `proposalMade`. It has no effect
+  tools and no MCP tools.
+- A proposal's result is its id and the daemon's static check, or the
+  daemon's refusal. At most three are recorded a turn.
+- Read tools' output isn't journaled, so on resume their calls say to
+  call them again.
+
+**A proposal.** On `proposalMade` the daemon, holding the project's lock:
+1. runs the static gate;
+2. takes `before`, the file as the learner was last shown it (none if it
+   wasn't there), from the latest `contextLoaded`. A host can't supply it;
+3. journals the proposal and every gate's `gateFinished` in one commit.
+   The proposal's id is its entry's seq.
+
+**The static gate** (`strive-learning` for the text, the daemon for the
+machine). Every finding is listed in the gate's detail:
+- **Path:** a skill name is 1 to 40 of `a-z0-9-`. The file resolves
+  inside the project's `.strive/` with no symlink on the way, is a regular
+  file if it exists, and isn't in strive's home (a project at `~`).
+- **Size:** memory ≤ 16 KiB, a skill ≤ 32 KiB.
+- **Form:** a skill's frontmatter names it and describes it; the summary
+  is one line; there is a rationale and a prediction.
+- **Secrets**, in the content, summary and rationale: key shapes (`sk-`,
+  GitHub, Slack, Google, AWS, private keys) and the stored API keys by
+  value. The detail never repeats the secret.
+- **Weakening strive:** phrases that bypass approvals, weaken the sandbox,
+  touch strive's own state or settings (its home, the journal, memory and
+  skills themselves), or tell the agent to ignore the user; piping a
+  download to a shell. The lists are broad on purpose: a false alarm
+  costs a look.
+- **Evidence:** one to five sessions (`CITED_SESSIONS`), each citing at
+  least one entry. Each is a work session of this project whose journal
+  verifies, and each cited seq is one of its entries. The cap matters
+  because cited sessions are left out of the judge's held-out sessions and
+  the replay's tasks.
+
+**The judge gate** ([ADR-0017](adrs/0017-judge-gate.md)): the daemon's
+own model call, through its gateway with the learning session's token, so
+it is admitted, held, journaled and charged like any call of that session.
+- **What it's shown**, as one JSON document the system prompt calls data:
+  the proposal (with its watch, if any, and how it reads), the file it replaces and the other memory and skills as
+  the learner was shown them, earlier proposals for the same file that a
+  person rolled back, the cited sessions (cited entries kept
+  first), and up to three held-out sessions: the project's newest work
+  sessions the proposal doesn't cite, begun before it, with a prompt and a
+  journal that verifies. Nothing of the learning session's own goes in.
+  The system prompt says a person reviews the verdict, or, under `gated`,
+  that it may be final.
+- **The rubric** (`strive_learning::judge::RUBRIC`): supported, generalizes,
+  novel, safe, checkable. The model must answer with one forced
+  `record_verdict` call. It passes only if every criterion and the verdict
+  say pass. An answer that can't be read strictly fails.
+- **Skipped**, with the reason, and journaled with the proposal: after a
+  static failure, with no Anthropic key, no price for the model, or no
+  session to hold out. Skipped later if the learning session's budget
+  can't pay, or if the provider is rate-limited or overloaded (429, 529):
+  that says nothing about the proposal, and `gated` never counts a skip as
+  a pass. Failed if the provider refuses otherwise or the call breaks.
+- **In the background:** otherwise the proposal stays `checking` while the
+  call runs, without the project's lock. The verdict is journaled under the
+  lock, and only if there isn't one. A set of running judges keeps a list
+  from starting a second. After a crash, the next list or decision judges
+  again.
+- The model is `judgeModel` in settings, else `model`.
+
+**The replay gate** ([ADR-0018](adrs/0018-replay-gate.md)): past tasks of
+the project, run again by the agent with and without the proposal.
+- **Tasks** (`strive_learning::replay::mine`): a turn that ran a command
+  that failed, which the same session later ran with exit 0. The task is
+  the turn's prompts, the checkpoint before them, and the command as its
+  check. Mined from the project's newest work sessions the proposal doesn't
+  cite, begun before it; at most `replay.tasks` (3). A check that names a
+  path outside the project (`test -f /tmp/.ok`), once the project's own
+  directory is relocated, is passed over: it depends on state outside the
+  copy (`strive_learning::replay::outside_path`).
+- **A run** is a session of `kind: replay` the daemon creates in a scratch
+  directory outside the project (`$TMPDIR/strive-replay-*/work`):
+  - the checkpoint's tree, exported from the task session's shadow
+    repository; the learned files as the learner was shown them in place of
+    the checkpoint's; and, on the side with the change, the proposal's file.
+    A task whose copy has a symlink on the way to a learned file is set
+    aside, since the daemon writes them unsandboxed;
+  - full-auto approvals with no person attached, so whatever would ask is
+    refused; no MCP servers; the model `replay.model`, else the cheaper of
+    `model` and `judgeModel`;
+  - its commands may write only under the scratch directory (`work` and
+    its `tmp`, their `TMPDIR`), not the system temp directories;
+  - the project's directory in the prompt and the check becomes the
+    scratch copy's, so `cd /the/project && make` runs in the copy;
+  - the daemon sends the task's prompt, starts the real host, waits for the
+    turn to end, stops the host, and runs the check as an effect of the
+    session (`replay-check`). Passed is exit 0. The scratch directory is
+    removed; the session's journal stays, left out of `session/list` unless
+    asked for `kind: replay`.
+- **Runs:** for each task, `replay.runs` (3) times without and with,
+  interleaved, one at a time.
+- **Money:** `ReplayStarted` holds `replay.budgetUsd` ($1 by default) in
+  the learning session's ledger, or the gate is skipped. Each run's budget
+  is what the cap has left. `ReplayFinished` names every run and charges
+  their actual cost in place of the hold, in the same commit as the
+  verdict. Each run is named (`ReplayRunStarted`) before its prompt; a
+  hold a crash cut off is finished when the daemon next starts, charged
+  what those runs' journals show (the whole hold if one can't be read). A
+  call refused for the cap stops the replay. A reject stops it before its
+  next run, and a proposal decided while judged isn't replayed.
+- **Verdict:** pass when runs with the change passed more often than
+  without; fail when less often; skipped (inconclusive) when as often,
+  every run failing on both sides included, and with the reason when it couldn't run (static or judge failed,
+  replay off, no sandbox, no host, no key, nothing to mine, no budget).
+- **When:** once the judge has a verdict that isn't a fail, in the
+  background, like the judge; run again after a crash.
+
+**Status**, folded from the learning journal:
+
+| Status | When |
 | --- | --- |
-| A, strict blind audit | Declared development evidence may drive adaptation and selection. Validation and audit remain outside that influence. This is the reference scientific comparison contract. |
-| B, adaptive validation with fresh blind audit | Development and explicitly granted validation evidence may influence adaptation and selection. Consulted validation is consumed evidence and cannot support an untouched-held-out claim. |
-| C, private deployment veto | Deferred. Private feedback used to block or select candidates would require an explicit control channel, query accounting and a separate fresh audit. |
+| `checking` | a gate has no verdict yet |
+| `failed` | a gate failed |
+| `ready` | every gate passed or was skipped |
+| `rejected` | a person rejected it |
+| `applied` | accepted and written (`proposalApplied`) |
+| `stale` | accepted, but the file wasn't as the learner saw it, so nothing was written |
+| `rolledBack` | an applied one, undone |
 
-Operational failures are visible only under the declared grants and settings.
-Neither A nor B grants audit or private-veto access. Each manifest chooses its
-contract explicitly; B requires a validation corpus, and the recorded CLI
-example uses A. A contract label alone never grants retrieval. See
-[ADR-0011](adrs/0011-feedback-contracts.md).
+Gates a crash cut short (a proposal with no verdicts) are run again on the
+next `proposal/list` or decision.
 
-## Research workflow, reporting and telemetry
+**Predictions checked** ([ADR-0019](adrs/0019-predictions-checked.md)). A
+proposal may carry a `watch` beside its prose prediction: the prediction as
+a predicate the daemon evaluates on a work journal, with no model.
+- **The language** (`strive_learning::watch`): a session is its steps, each
+  prompt and each command that ran (text, output, exit). A step pattern is
+  case-insensitive substrings: `prompt` alone, or `command`, `output` and
+  `exit` of one command. A watch is an optional `when` pattern and one of
+  `never`, `any` or `first {of, is}`. The static gate's `watch` rule fails
+  an empty or mixed pattern, a `first` whose halves can't match one step,
+  and strings that are empty, over 200 bytes or hold a line break; unknown
+  fields are refused when the record is parsed.
+- **Bounded:** at most 2,000 steps, 256 KiB of one output (its two ends)
+  and 8 MiB of output per session, fetched only for patterns that name
+  `output`. An outcome that depends on what wasn't read is not applicable.
+- **When:** after a work session's host records `turnEnded`, in the
+  background, and for every session on `learning/run` (which catches up on
+  turns that ended without their host). Only applied proposals are checked,
+  and only against sessions created at or after the apply, read up to their
+  last `turnEnded`.
+- **Journal:** `predictionChecked {proposal, session, throughSeq, outcome,
+  detail}` in the learning session, under the project's lock, when the
+  pair has no record or its outcome changed. The latest per pair counts.
+- **Tally:** each `proposal/list` entry with a watch has `prediction`:
+  confirmed, contradicted and not applicable, and over the last 10
+  sessions it applied to, how many confirmed and contradicted it. At least
+  3 contradictions there, outnumbering confirmations, is `notHolding`.
+- **Suggested, never done:** for an applied proposal that is not holding,
+  `strive review` prints a line naming `strive review ID rollback`, and its
+  detail shows the watch and tally ("prediction not machine-checked" when
+  there's no watch). The daemon never rolls anything back.
+- **Stale memory:** `proposal/list`'s `mayBeStale` lists memory lines that
+  name a relative project path, in backticks, that no longer exists
+  (`strive_learning::stale`); `strive review` prints each.
 
-The manifest CLI offers `run`, `resume`, `experiment`, `compare`, `status` and
-`project`; the installed `strive` command and `uv run python -m strive.cli` are
-equivalent. The current composition runs the counter benchmark with a recorded
-provider. Unsupported models,
-workloads and native harness campaign manifests fail validation. The installed
-tau2 adapter and standalone fixed-stock runner do not by themselves provide an
-adaptive telecom CLI campaign.
+**Deciding.** `proposal/decide` and `proposal/rollback` are people only,
+as approvals are. Both hold the file (as an agent's write does) and the
+project's directory against rewinds.
+- **Accept** works only on a `ready` proposal. If the file's digest is
+  still `before`, the daemon writes the content with a pinned write and
+  journals `proposalDecided` and `proposalApplied {before, after}`
+  together. Otherwise it journals the accept alone: `stale`.
+- **Reject** journals `proposalDecided`, for one not yet decided.
+- **Rollback** works on an `applied` proposal whose file is still `after`:
+  it writes `before` back, or removes a file that didn't exist, then
+  journals `proposalRolledBack`.
+- The file is written before its record. A crash between leaves the file
+  changed and nothing recorded. Accepting again finds the file already
+  holds the proposal's content and journals the accept and the apply
+  (with `before`), writing nothing; rolling back again finds it already
+  `before` and journals the rollback.
 
-Run setup exclusively claims an identity, retains inputs, validates pins and
-bounds, and displays resolved configuration before dispatch. Resume uses the
-original binding, artifacts, service databases, continuation and ledger; it does
-not accept scientific overrides or substitute newer code. Replay only checks
-recorded history and does not require an executable provider session.
+**Learned files outside review.** The daemon's own write on accept and
+rollback is not an agent effect, so the checks below don't apply to it.
+"Only through review" covers `.strive/memory.md` and `.strive/skills`
+against the agent's own writes and commands, and nothing wider:
+- **Other instruction files are ordinary project files.** `AGENTS.md`,
+  `CLAUDE.md` and `.claude/skills` also reach every session's prompt, and
+  no review covers them (below).
+- **MCP servers can write anything.** They run unsandboxed, as the user,
+  in the session's directory, so a server can write `.strive/memory.md` or
+  a skill with no approval and no sandbox rule in the way. They are
+  configured by the user and trusted as the user is. Such a write shows up
+  as changed outside review, like an editor's.
+- **Loading:** memory and `.strive/skills` are loaded only when really
+  there, reached without a symlink, as the learner already reads them. The
+  checks below guard real paths; a skill linked to `docs/x` would otherwise
+  change with any edit of `docs/x`.
+- **Out of scope:** `AGENTS.md`/`CLAUDE.md` and `.claude/skills` are the
+  project's own files. The agent edits them as it edits any file, visible in
+  diffs and checkpoints; only what strive learns is review-gated.
+- **Agent writes:** a work session's `write` or `edit` that reaches
+  `.strive/memory.md` or anything under `.strive/skills` asks a person in
+  every approval mode, `fullAuto` included, and "allow for the session"
+  doesn't cover the next one. The path is matched after symlinks and `..`
+  are resolved, and without regard to case. A file that the project's memory
+  path or skills directory leads to through a symlink is matched too. The
+  request says the change reaches every future session and names `strive
+  learn` and `strive review`. Unattended, it's refused.
+- **Commands:** the macOS sandbox denies writes to `.strive` itself (so it
+  can't be moved aside or created), `.strive/memory.md`, `.strive/skills`,
+  and wherever a symlink takes those. Other files in `.strive` stay
+  writable, and reads are allowed. On Linux, bubblewrap binds the memory
+  file and skills directory read-only where they exist, so a command can
+  still create a missing one there. With `"sandbox": "off"` none of this
+  applies to commands.
+- **Anything else** (an editor, git) can still change them. `proposal/list`
+  returns `changedOutsideReview`: learned files that aren't what an
+  accepted proposal last left there. After an apply that's its content,
+  after a rollback what it replaced, and with no applied proposal, any
+  file that exists counts. `strive review` prints a line for each.
+- A command a work session runs can change the file between the compare
+  and the write. Writes and edits the agent asks for can't: they wait for
+  the file.
 
-The serial study wrapper records arm/repetition/run identities and resolves every
-run before dispatching the first arm. It resumes those identities after restart.
-Per-repetition ceilings and total development allocation are separate from the
-audit allocation. Equal ceilings do not imply equal realized spending.
+**Triggers** ([ADR-0020](adrs/0020-learning-triggers.md)): the learner
+also runs without being asked, behind `learning` in settings: `mode` (`off`,
+`suggest` by default, `gated`; `auto` is refused on load), `idleSeconds`
+(600), `everyTurns` (0: off) and `dailyRuns` (3). A project's
+`.strive/settings.json` may hold only `{"learning": {"mode"}}`, and the mode
+in effect is the lower of the two; one that can't be read turns automatic
+learning off there.
+- **When:** each work `turnEnded` (a host's, or one the daemon records for
+  a host that left) starts a wait of `idleSeconds`; if no prompt came in
+  that session meanwhile, it is scanned. With `everyTurns`, a session whose
+  ended turns reach a multiple of it is scanned at once. Once a learner's
+  turn or a proposal's checks end and nothing is going, sessions whose last
+  scan was skipped for being busy are scanned again. Waits live in the
+  daemon's memory; one a restart cuts is dropped.
+- **The pre-filter** (`strive_learning::signals`): one pass over the work
+  journal, no model. Signs: a correction (the first prompt after a turn,
+  by a fixed list of openers and phrases in its first 200 characters), an
+  interrupted turn, a declined approval, a command that failed then passed
+  (the replay miner's pairs), a failed or timed-out turn. Each is anchored at
+  the entry that completes it; at most 20, each with a 120-character
+  excerpt. Only signs past the highest one an earlier automatic request
+  named for that session count. None: nothing is journaled (the log says the
+  session was scanned).
+- **Limits,** under the project's lock: no request a turn hasn't finished
+  and no proposal `checking`; fewer than `dailyRuns` automatic requests in
+  the last 24 hours; a key and a price for the learner's model; and room in
+  the learning session's ledger for one worst-case learner call. Failing
+  one journals `learnSkipped {trigger, reason}`; passing all journals
+  `learnRequested {sessions: [the session], trigger: {kind, signals}}` and
+  starts the host. The learner's prompt lists the signs. Proposals a crash
+  left `checking` are settled first, and an unfinished request starts the
+  learning session's host, whose resume ends a turn a crash cut off.
+- **`gated`:** when the replay journals a pass (the cascade's last verdict)
+  and every gate has a pass, none skipped (`every_check_passed`), the daemon
+  applies the proposal as a person's accept would, with `proposalDecided
+  {by: "gate", automatic: "gate"}`, only over the file as the learner saw it.
+  `automatic` is only ever set there. A crash before the accept leaves the
+  proposal for a person. The mode must be `gated` both when the proposal
+  was made (`proposalMade.mode`, which only the daemon records) and when
+  the replay passes, so a mode raised in between (a restart, a project's
+  lower setting deleted) doesn't reach it. Rollback is unchanged, and it sticks: the gate
+  never accepts content a rolled-back proposal for the same file put there
+  (compared by digest), and the judge is shown those contents.
+- **Shown:** `proposal/list` gives each proposal its `trigger` and
+  `automatic`, and `skipped`, the latest skip with no automatic request
+  since. `strive review` marks `[automatic run]` and `[accepted
+  automatically]`, prints the trigger and its signs in the detail, and the
+  skip under the list; `strive log` describes both entries.
 
-Selection is predeclared as the final valid active actor from every trajectory.
-Freeze records development heads and selected bundles under workflow leases and
-installs barriers that prevent development resume. Audit receives only the
-selected actor files in a new bundle and scope. It owns separate CAS, journals,
-environments, receipts, grants, retrieval, caches, conversations, gateway spools,
-accounting and report destinations. No audit callback reaches the development
-policy. A matching release marker is required before workflow reports or
-telemetry expose audit content. Release does not reopen selection or development.
+`strive learn` requests a run and follows the learning journal as
+`strive run` follows a turn, then lists what was proposed. `strive review`
+lists proposals, shows one (its diff against `before`, evidence,
+prediction and checks) and accepts, rejects or rolls it back.
 
-Reports derive official results only from authenticated measurements. They retain
-planned, admitted, completed, failed, excluded and unresolved coverage; missing
-outcomes remain explicit with bounds. Matched comparison checks retained workload,
-state, scorer, models, budgets, seeds, corpus, recovery and file-level conditions.
-Descriptive comparisons list differences without a controlled-improvement claim.
-The supported predeclared interval is a 95% normal approximation over complete
-paired trajectories, with no interval for one pair and an explicit small-sample
-limit. Retention compares repeated observed development exposures and lists
-unmeasured tasks; it does not invent a separate regression evaluation.
+## The desktop app
 
-Execution integrity and measurement provenance, feedback exposure, and comparison
-strength are separate report labels. Research-mode scores remain untrusted even
-when real broker expenditure is recorded. Supplied context is labeled `sent to
-the model`; seeing bytes in a request does not prove their causal influence.
+`strive app` opens an Electron app on the session (`apps/desktop`).
+- **Main process:** connects as a person's client. It forwards only a
+  whitelist of person-level requests from the renderer, after checking the
+  sender frame.
+- **Requests:** the main process puts the window's own session id on every
+  request, so the window can't act on another session.
+- **Renderer:** sandboxed, with no Node and a strict CSP. `will-navigate`
+  blocks navigating the main frame, new windows are denied, and HTTP(S)
+  requests are cancelled.
+- **Layout:** the renderer lays out the workspace document
+  (`@strive/workspace`), a history of ID-addressed edits to a base. Dragging
+  a panel records a person's edit.
+- **Agent proposals:** the agent's `propose_layout` tool journals a
+  proposal, which the app offers with Accept, Reject and, once applied,
+  Undo.
+- **Agent widgets:** `html` panels are iframes sandboxed to scripts only,
+  served from a `strive-widget:` scheme with their own CSP. WebRTC is
+  removed from their page before their code runs, since CSP doesn't cover
+  it. They reach neither the app nor the network.
+- **Several windows:** they share one layout file. Decided proposals merge
+  on save; the layout itself is the last saver's.
+- **The Learned pane** (⌘L) is `strive review` in the window: the
+  project's proposals, each with its whole-file diff, reasons, evidence and
+  checks, and Accept, Reject or Roll back.
+  - `proposal/list`, `proposal/decide`, `proposal/rollback` and
+    `learning/run` get the window's project directory from the main
+    process, whatever the page sends.
+  - A proposal's "before" comes through `proposalBefore(id)`, looked up
+    among the project's proposals; `blob/get` stays limited to digests the
+    shown session names.
+  - The main process follows the project's learning session on a
+    connection of its own, as an observer, from startup if the session
+    exists and from the first run if not. Its entries reach the page
+    (`onLearning`), which shows a run's progress; `learning()` reads the
+    journal whole (`session/read`). A run that ends with proposals
+    notifies a person who isn't looking.
+  - Review aids, all from existing reads: `changedOutsideReview` shows as a
+    notice; `cited(session, seqs)` reads cited entries (with the other half
+    of a cited effect and its output) from one of the project's sessions
+    only, and a cited seq scrolls the conversation to it; the judge's
+    detail is read by criterion when it has the daemon's line shape, else
+    shown as is; the other proposals for the same file come from
+    `proposal/list`.
+  - The Prediction section shows the watch and its tally, or "Prediction
+    not machine-checked." An applied proposal that is not holding says so
+    there; Roll back stays the person's click. The list reloads when a
+    `predictionChecked` entry arrives.
+  - Automatic learning: a proposal from an automatic run has an "Automatic"
+    badge, and its detail names the trigger and each sign; one the gate
+    accepted says "Accepted automatically: every check passed", with Roll
+    back as for any applied proposal; the latest skipped run shows as a
+    notice. `proposal/list` also starts following a learning session that an
+    automatic run created after the window opened.
 
-Telemetry is an optional separate journal consumer. `strive project` exports
-OTLP/HTTP JSON with OpenTelemetry GenAI convention version `1.41.0`; Langfuse is
-the sole reference viewer profile. Stable execution-derived span IDs, event and
-artifact references, model identities and usage make traces inspectable. Costs
-appear on leaf model effects. The journal lacks absolute dispatch timestamps, so
-timing uses an explicitly relative axis with unavailable durations left missing.
+## Effects
 
-Exporter failures leave a visible cursor/backlog without changing execution.
-Rebuilding a cursor reprojects history; OTLP does not promise exactly-once
-server ingestion. Audit export requires the release marker and a distinct
-HTTP endpoint from development. Financial and research totals always come from
-the journal, never from telemetry. Runtime and verifier code do not depend on
-reporting or exporter availability.
+**Exact paths.** The gate checks a file effect's path with every symlink
+resolved, and the effect acts on that path. It walks the path one
+component at a time with `openat(O_NOFOLLOW)` (`pinned.rs`), so a
+directory swapped for a symlink mid-effect fails it rather than
+redirecting it. Reads open only regular files and stream what they return.
+Writes replace files atomically, each through its own temporary file.
 
-## Qualification and deferrals
+**Cancelling.** `effect/cancel` stops an effect by the agent's call id:
+- one waiting for approval is refused, and approving it later does nothing;
+- a running command's process tree is frozen with SIGSTOP, rescanned until
+  no new process appears, then killed;
+- an MCP call is cancelled at the server too;
+- one not yet running doesn't run.
 
-Host tests exercise contracts, pure replay, authenticated facts, durable identity,
-recovery, adaptation and isolated audit with recorded providers. Linux confinement
-and installed tau2 checks require the prepared [Containerfile](../Containerfile)
-and `scripts/verify-in-container.sh`; that runner fails if required jail or tau2
-gates skip. Missing host capabilities are reported as skips, not as qualification.
-See [HANDOFF](HANDOFF.md) for commands and [ROADMAP](ROADMAP.md) for remaining work.
+Shutdown refuses new effects and rewinds, cancels running effects, and
+waits for their ends to be journaled. Only then does it stop the session
+writers and release ownership. If work hasn't settled within 10s, the
+daemon exits instead of releasing ownership, so a successor never
+overlaps work that may still be running.
 
-Native CLI single-request qualification, the complete retained telecom closure
-and deterministic grading evidence, and an explicit funded ceiling with a
-protected audit allocation are prerequisites to a live reference campaign.
-Permission fixtures, prepared plans and a `trusted` mode flag cannot establish
-those claims. Positive performance is not required; any negative or inconclusive
-study must retain its coverage, costs and limitations.
+**Workspaces.** Effects and rewinds are coordinated by directory across
+sessions: sessions sharing a directory, or nesting one in another, share
+its files. An effect holds its session's directory, and also its
+destination when it writes outside it (with approval). A rewind is refused
+while an effect holding an overlapping path runs, and effects wait for a
+rewind to finish. MCP tools' own file changes are known only to the
+server, so they are coordinated by the session's directory alone.
 
-`EvaluateFork` enactment and feedback C remain deferred. Other exclusions include
-arbitrary controller-state migration, model-weight updates, dynamic privileged
-adapters, distributed workers, cross-run mutable memory, persistent verifier
-caches, host-loss recovery and additional viewer profiles. These are separate
-work, not capabilities implied by the current interfaces.
+**The sandbox.**
+- **macOS (Seatbelt):**
+  - Commands may write only in the workspace and temp directories, and not
+    to the project's learned files (see "Learned files outside review").
+    A replay's commands get their scratch directory in place of the temp
+    directories.
+  - strive's home is hidden.
+  - There is no network, and that includes Unix sockets.
+  - Without PID namespaces, a background job that leaves the command's
+    process group and detaches can outlive a command that exits normally.
+    Timeouts and cancels kill the whole tree.
+- **Linux (bubblewrap):**
+  - Commands get their own PID namespace, so every process dies with the
+    command.
+  - The learned files that exist are bound read-only.
+  - `/tmp` and `/run` are private, which keeps the user's D-Bus, systemd,
+    X11 and Docker sockets out of reach.
+  - There is no network.
+    - A seccomp filter refuses `socket(AF_UNIX)`, matching macOS. It also
+    refuses datagram Unix `socketpair`, `io_uring_setup`, and (on x86-64)
+    every x32 syscall. The x32 part is untested here: the local Linux VM
+    is aarch64.
+  - `scripts/test-linux.sh` runs these tests in a container.
+  - Where there is no sandbox, every command asks first.
+  - `"sandbox": "off"` runs commands unconfined, for a disposable container
+    that is itself the sandbox (a Harbor task). The container protects the
+    machine, not strive: inside it, a command can reach the daemon's socket
+    and environment, other sessions, and the network outside the gateway's
+    budget.
+
+## Approvals and checkpoints
+
+**Approval modes** are journaled per session:
+- `ask`: every change and command asks.
+- `autoEdit` (the default): changes in the workspace are free; commands ask.
+- `fullAuto`: everything inside the workspace and sandbox is free.
+
+In every mode, writes outside the workspace, writes to the project's
+learned files (`.strive/memory.md`, `.strive/skills`) and commands without
+a sandbox ask, and strive's own state is refused. With no one attached,
+the refusal suggests full-auto only when full-auto would have allowed it. An approval request is a journal
+entry, so every attached client sees it and the first answer wins. With no
+one attached, the request is refused at once.
+
+**Checkpoints** snapshot the workspace before each prompt, into a shadow
+git repository in the session's directory. The user's own repository,
+config and hooks never take part.
+- **What they skip:** ignored files and nested repositories. A rewind that
+  would overwrite either is refused, with names compared without case. A
+  rewind leaves nested repositories alone and reports them.
+- **Undo:** a rewind first saves the current files as a checkpoint, and
+  journals it before restoring. Even a restore that fails partway can be
+  undone with `/rewind N`.
