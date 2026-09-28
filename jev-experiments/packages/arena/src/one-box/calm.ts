@@ -4,7 +4,7 @@
  * every prefix of 429 phrases and requires the same states. Upstream's chips and palette can
  * force a card; nobody forces one in a replay, so that path is left out.
  */
-import { entriesOf, type CardIntent, type Intent, type Reading } from "./questions";
+import { entriesOf, type CardIntent, type Intent, type Reading } from "./questions.js";
 
 export type Shown =
   | { kind: "input" }
