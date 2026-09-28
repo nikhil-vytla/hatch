@@ -149,6 +149,9 @@ enum Cmd {
 
 fn main() -> ExitCode {
     let cli = Cli::parse();
+    if matches!(cli.command, Some(Cmd::Daemon { .. })) {
+        close_inherited();
+    }
     let rt = match tokio::runtime::Builder::new_multi_thread().enable_all().build() {
         Ok(rt) => rt,
         Err(e) => {
@@ -162,6 +165,22 @@ fn main() -> ExitCode {
             eprintln!("strive: {e:#}");
             ExitCode::FAILURE
         }
+    }
+}
+
+/// Closes every descriptor above stderr that the daemon was started with.
+/// A launcher (a CI runner, an editor, a shell) can leave descriptors open
+/// across exec, and every command, host and MCP server the daemon starts
+/// would inherit them, sandboxed commands included. Run before the runtime
+/// exists, so nothing of the daemon's own is open yet.
+fn close_inherited() {
+    let Ok(entries) = std::fs::read_dir("/dev/fd") else { return };
+    // Collected first: the listing holds a descriptor of its own while it's read.
+    let open: Vec<i32> =
+        entries.filter_map(Result::ok).filter_map(|e| e.file_name().to_str()?.parse::<i32>().ok()).collect();
+    for fd in open.into_iter().filter(|fd| *fd > 2) {
+        // The listing's own descriptor is gone by now: EBADF, harmlessly.
+        let _ = nix::unistd::close(fd);
     }
 }
 

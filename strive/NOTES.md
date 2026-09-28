@@ -1796,3 +1796,17 @@ Deferred:
   end; the checks path shares the same call and `waiting` is unit-tested.
 - Settling holds when a learning writer reopens mid-daemon.
 - Catching up idle waits a restart dropped (unchanged).
+
+## 2026-09-28: the daemon passed on descriptors it was started with
+
+The first Linux CI run (PR #77) failed
+`a_sandboxed_command_sees_only_its_standard_descriptors`: a sandboxed
+`ls /proc/self/fd` listed 142 and 145 besides 0-3. strive opens nothing
+without close-on-exec (checked: `pipe2`, `pinned`, `command-fds`); the
+runner had started the test process with descriptors left open across
+exec, the launcher passed them to the daemon, and the daemon to every
+command, host and MCP server, through bwrap and sandbox-exec alike. A
+machine whose shell leaks nothing never shows it, which is why macOS runs
+here passed. The daemon now closes every descriptor above stderr at start,
+before its runtime opens any. The new test leaves descriptor 200 open when
+it starts the daemon and failed on macOS before the fix.

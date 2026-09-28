@@ -652,3 +652,23 @@ fn a_temp_directory_with_a_quote_is_left_out_of_the_sandbox() {
     let text = w.text(json!({"kind": "bash", "command": cmd}));
     assert_eq!(text, "ok\nok2\n", "{text}");
 }
+
+/// Whatever the daemon was started with stays out of commands: a launcher
+/// (a CI runner, an editor) may leave descriptors open across exec, and a
+/// command in the sandbox could read or write through them.
+#[test]
+fn a_command_doesnt_inherit_descriptors_the_daemon_was_started_with() {
+    if !sandboxed() {
+        return;
+    }
+    // Numbered well clear of what a command opens itself; F_DUPFD leaves it
+    // open across exec.
+    let null = std::fs::File::open("/dev/null").unwrap();
+    let leaked = nix::fcntl::fcntl(&null, nix::fcntl::FcntlArg::F_DUPFD(200)).unwrap();
+    let n = leaked.to_string();
+    // The daemon this starts inherits `leaked`, as a launcher's leak would reach it.
+    let mut w = Ws::new();
+    nix::unistd::close(leaked).unwrap();
+    let text = w.text(json!({"kind": "bash", "command": "ls /dev/fd"}));
+    assert!(!text.split_whitespace().any(|f| f == n), "descriptor {n} reached the command: {text}");
+}
