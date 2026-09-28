@@ -149,9 +149,9 @@ def _capped_factory(
 def dry_run_transport(fixture: SeedFamilyFixture) -> Transport:
     """Scripted HUD-gateway replies computed from the fixture references.
 
-    Even stages come back inside an exact ```json fence — the wire shape
-    Haiku produced during the SWE-bench screening — so the committed
-    dry-run evidence exercises the fence unwrap.
+    Even stages come back inside an exact ```json fence, the wire shape Haiku
+    produced during the SWE-bench screening, so the committed dry-run evidence
+    exercises the fence unwrap.
     """
 
     def transport(

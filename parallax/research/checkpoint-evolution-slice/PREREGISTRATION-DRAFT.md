@@ -3,7 +3,7 @@
 Status: **executed 2026-08-03** with the design below, unchanged.
 Results and decision: [screening-report.md](screening-report.md).
 Evidence: `evidence/screening.jsonl` (60/60 stage calls delivered and
-validated), actual spend $0.2813 against the $5 cap.
+validated), actual spend \$0.2813 against the \$5 cap.
 
 Launch command used (from `parallax/`, with the key exported):
 
@@ -20,8 +20,8 @@ that extends *its own* prior workspace (`evolved`) verify differently at
 stages 2 and 3 than the same agent opening each stage from the *frozen
 reference* workspace (`carry-reference`)?
 
-At this scale the run is primarily a harness-validation gate — the CE
-analog of the EI screening round — not a confirmatory test. One family
+At this scale the run is primarily a harness-validation gate, the CE
+analog of the EI screening round, not a confirmatory test. One family
 is one cluster; no clustered interval will be claimed.
 
 ## Design
@@ -41,9 +41,9 @@ is one cluster; no clustered interval will be claimed.
 
 Per call: ~1.5–2.5k input tokens (spec ≈ 450–700, workspace ≈ 400–900,
 protocol overhead) and ~400–900 output tokens. At Haiku-class pricing
-(~$1/M input, ~$5/M output): $0.004–$0.008 per call, **$0.25–$0.50 for
-the 60-call design**; with a 2× retry-and-overhead margin, under $1.
-Hard spend cap: **$5** (the repo's default screening cap). Stop rules:
+(~\$1/M input, ~\$5/M output): \$0.004–\$0.008 per call, **\$0.25–\$0.50 for
+the 60-call design**; with a 2× retry-and-overhead margin, under \$1.
+Hard spend cap: **\$5** (the repo's default screening cap). Stop rules:
 hard-stop at the cap; stop and diagnose if RunFailures exceed 30% of
 stage calls or if any evidence-validation error occurs.
 
@@ -64,7 +64,7 @@ stage calls or if any evidence-validation error occurs.
    host fallback on the live path (gauntlet mutant M15 kills it).
 
 Dry-run evidence: `evidence/dry-run.jsonl` (preregistered 10-seed
-shape, 60/60 stages verified, scripted gateway, $0) and
+shape, 60/60 stages verified, scripted gateway, \$0) and
 `evidence/dry-run-sandbox.jsonl` (2 seeds through the real container
 sandbox, 12/12 stages verified).
 

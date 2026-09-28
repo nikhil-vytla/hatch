@@ -1,106 +1,126 @@
 # Parallax
 
-Parallax is a research harness for identifying modern-agent failure modes,
-turning them into research questions about agent training and RL environments,
-synthesizing novel or harder but verifiable tasks from existing benchmarks and
-codebases, and running controlled experiments with trustworthy evidence.
+Parallax is a research harness for turning observed agent failure modes into
+controlled experiments. It synthesizes harder but still verifiable tasks from
+existing benchmarks, runs matched arms against them, and refuses to report an
+effect its design cannot identify.
 
-For a concrete start-to-finish picture — what you put in, what you run, and
-what artifacts come out of each implemented flow — read
-[`docs/PIPELINES.md`](docs/PIPELINES.md) first.
+Three documents cover most of what you want:
 
-The executable slice follows one complete path:
+- [`docs/FINDINGS.md`](docs/FINDINGS.md) lists every run to date, what it asked,
+  what it returned, and what it cost. Start here if you want results.
+- [`docs/PIPELINES.md`](docs/PIPELINES.md) walks each implemented flow from input
+  to command to output artifact. Start here if you want to run something.
+- [`docs/MODEL.md`](docs/MODEL.md) defines the vocabulary the other two use.
 
-1. `gsm8k.py` loads real-shaped GSM8K JSONL and retains the canonical
+## What is implemented
+
+The GSM8K path is offline, deterministic, and complete:
+
+1. `gsm8k.py` loads real-shaped GSM8K JSONL and keeps the canonical
    `#### <integer>` answer as a branded, sealed grading authority.
-2. `evolving_intent.py` asks a synchronous `Chat` callable for strict JSON
-   construction outputs and builds frozen static, matched, and evolved scripts.
-   Reveal, revise, and switch events use an explicit `kind` discriminator.
-   Static renders the fully revealed extracted intent rather than the source
-   question. The
-   matched intervention is a turn-count-and-budget-matched progressive source
-   reveal.
+2. `evolving_intent.py` asks a synchronous `Chat` callable for strict JSON and
+   builds frozen static, matched, and evolved scripts. Reveal, revise, and switch
+   events carry an explicit `kind` discriminator. Static renders the fully
+   revealed extracted intent, never the source question, so rendering style
+   cannot confound the comparison. The matched arm is a progressive source reveal
+   matched to evolved on turn count and budget.
 3. `runner.py` preregisters source-trial units and identity digests, executes
    every scheduled arm, and writes deterministic JSONL through atomic
    replacement. Construction attempts and scripts appear once per source.
-4. `report.py` validates every scheduled row before aggregation. It reports
-   source-clustered matched-versus-evolved identification bounds, a closed-form
-   95% Hoeffding interval, and the interval's minimum detectable effect. The
-   report describes what the evidence supports; it does not return a verdict.
+4. `report.py` validates every scheduled row before aggregating, then reports the
+   paired matched-versus-evolved difference, its identification bounds, a
+   closed-form 95% source-clustered Hoeffding interval, and the minimum
+   detectable effect. It states what the design resolved and stops there. No
+   verdict.
 
-All JSON boundaries parse into strict frozen Pydantic models with unknown fields
-forbidden. Manifest, family, and run records use a `kind` discriminator, as do
-events and outcomes. Canonical JSONL still uses sorted keys, compact separators,
-and non-finite-number rejection; identical inputs therefore remain byte-stable.
-The report consumes these typed records and reserves its own checks for
-relationships across records, such as missing scheduled rows or identity drift.
-
-`Problem.answer` never enters construction prompts or public turn text. The
-native grader accepts one submission policy: the final non-empty line must be
-`FINAL_ANSWER: <integer>`, with exactly one marker and a canonical integer.
-Malformed submissions are invalid. Valid non-matching answers are wrong.
-Provider, budget, and verifier faults are run failures.
-
-The offline tests use small real-shaped GSM8K rows and scripted `Chat`
-implementations. They exercise construction, all three arms, history-sensitive
-execution, grading, manifest validation, JSONL round-trips, missing-outcome
-bounds, and source-clustered reporting without network calls. Parallax has no
-real-provider evidence, generated benchmark pool, or paper-score reproduction.
-
-The second slice adds an offline-ready SWE-bench Verified path:
+The SWE-bench Verified path runs against a real provider and the official
+harness:
 
 1. `provider.py` defines strict OpenAI-compatible request and response models.
-   One direct HTTP client serves text-only construction calls and tool-call
-   agent requests. Credentials come from a named environment variable and
-   never enter serialized requests. Response-side models tolerate unconsumed
-   provider fields while validating every field Parallax reads.
-2. `swebench.py` pins the Verified dataset revision and the paper's 50
-   published evaluation IDs. It keeps the gold patch under sealed authority,
-   separates the public issue from the official verifier, builds budget-equal
-   arms, and records the pinned SWE symptom-overlay transformation.
-3. `specs.py` freezes each family into versioned `TaskSpecV1` and `EnvSpecV1`
-   models. `hud_compile.py` creates agent artifacts only from `PublicTaskV1`.
-   It tags every output by audience, scans the agent build context for sealed
-   fragments, and records artifact digests.
+   One HTTP client serves both text construction calls and tool-call agent
+   requests. Credentials come from a named environment variable and never enter
+   serialized requests.
+2. `swebench.py` pins the Verified dataset revision and the paper's 50 published
+   evaluation IDs. It keeps the gold patch under sealed authority, separates the
+   public issue from the official verifier, builds budget-equal arms, and records
+   the pinned SWE symptom-overlay transformation.
+3. `specs.py` freezes each family into versioned `TaskSpecV1` and `EnvSpecV1`.
+   `hud_compile.py` builds agent artifacts only from `PublicTaskV1`, tags every
+   output by audience, scans the agent build context for sealed fragments, and
+   records artifact digests.
 4. `delivery.py` and `hud_screening.py` push scripted turns from the evaluation
-   loop. Early submissions and phase-budget exhaustion deliver the next turn.
-   `swebench_runtime.py` rejects grading without a complete per-phase receipt,
-   then exports a candidate patch that includes untracked files.
+   loop. The agent has no turn-control tool. Early submissions and phase-budget
+   exhaustion both deliver the next turn. `swebench_runtime.py` refuses to grade
+   without a complete per-phase receipt, then exports a candidate patch including
+   untracked files.
 5. `swebench_harness.py` runs the pinned official SWE-bench harness
    evaluator-side against the digest-pinned official image. The harness verdict
    is authoritative; report coverage is checked against the committed
    FAIL_TO_PASS and PASS_TO_PASS sets.
-6. `screening.py` preregisters boundary-model screening units and canonical
-   outcomes before execution, appends and fsyncs each unit to a resumable
-   partial file, records provider model/usage and estimated cost, refuses to
-   overwrite completed evidence, defaults to a $5 upper cap, and reports the
-   design's source-clustered interval and minimum detectable effect.
+6. `screening.py` preregisters units and canonical outcomes before execution,
+   appends and fsyncs each unit to a resumable partial file, records provider
+   model, usage, and estimated cost, refuses to overwrite completed evidence,
+   defaults to a \$5 cap, and reports the design's source-clustered interval and
+   minimum detectable effect.
 7. `admission.py` runs schema, sealed-leakage, identity-patch, gold-patch,
-   budget-match, and arm-completeness gates before new scheduling code accepts
-   a family.
+   budget-match, and arm-completeness gates before a family can be scheduled.
 
-The preregistered HUD screening completed five SWE-bench instances with two
-static Claude Opus 4.8 trials each. Both Django instances passed 2/2; Astropy,
-Matplotlib, and Requests passed 0/2. At five sources the interval is far wider
-than any effect worth measuring, so the run locates an operating point rather
-than supporting a comparison. Known metered spend was $1.669650, with a
-conservative $2.147440 all-in bound for unmetered construction failures under
-the $5 cap. Candidate patches were graded from a pinned SWE-bench source
-checkout after its wheel omitted a required harness fixture.
+Checkpoint evolution, the second synthesis strategy, has a narrower slice: one
+hand-verified three-checkpoint family, two arms, and two paid screening runs.
 
-Screening round 2 found three Claude Opus 4.8 boundary instances at 2/3:
-Astropy 14508, Django 13786, and Xarray 4695. Actual token-metered round-two
-spend was $2.972512 under the $5 cap. These instances and model are the
-recommended operating point for the first single-vs-evolved comparison.
+1. `checkpoint_evolution.py` owns the workspace and checkpoint domain model, an
+   entrypoint-only verifier that grades stage N against the accumulated
+   obligations from stages 1 through N, and five executable admission gates.
+   Dropping an inherited obligation is not constructible.
+2. `checkpoint_runner.py` owns stage delivery. The agent is a pure function of
+   public spec, carried workspace, and budget, with no advance channel. Run
+   validators reject a skipped or reordered stage, a broken workspace-digest
+   chain, and censoring that is not exactly the undelivered suffix.
+3. `checkpoint_agent.py` renders a stage to the provider boundary and parses a
+   strict JSON file map back. `checkpoint_sandbox.py` runs every sealed case in a
+   digest-pinned container with no network and a read-only rootfs. The live
+   screening path has no host-execution fallback.
 
-The three boundary instances passed every admission gate under the official
-harness. Their identity patches applied and failed, and their gold patches
-passed on the first attempt. The first 18-unit static-versus-evolved design is
-preregistered but has not run.
+## What the evidence supports
 
-[`docs/MODEL.md`](docs/MODEL.md) defines the research vocabulary.
-[`docs/methods/evolving-intent.md`](docs/methods/evolving-intent.md) records the
-method contract, implementation choices, and evidence limits.
+All JSON boundaries parse into strict frozen Pydantic models with unknown fields
+forbidden. Manifest, family, and run records use a `kind` discriminator, as do
+events and outcomes. Canonical JSONL uses sorted keys, compact separators, and
+non-finite-number rejection, so identical inputs produce identical bytes.
 
-> **TODO:** Collect retained real-provider construction and run evidence before
-> interpreting an empirical effect.
+`Problem.answer` never enters construction prompts or public turn text. The
+native GSM8K grader accepts one submission policy: the final non-empty line must
+be `FINAL_ANSWER: <integer>`, with exactly one marker and a canonical integer.
+Malformed submissions are invalid, valid non-matching answers are wrong, and
+provider, budget, or verifier faults are run failures rather than model behavior.
+
+Seven runs have called a real provider, for \$16.23 of metered spend. The one that
+produced a result is the live GSM8K run: 144 sources, three arms, three trials,
+1,296 Claude Haiku 4.5 episodes, zero run failures. Evolved minus base accuracy is
+-0.109 with a 95% source-clustered interval of [-0.160, -0.060], and because the
+matched arm ran, that splits into -0.086 for multi-turn presentation alone and
+-0.023 for the intent evolving on top, the second spanning zero. Most of the
+apparent evolving-intent penalty on GSM8K is the price of using turns at all.
+
+The other contrasts did not resolve. The SWE-bench delta is +0.111 with a 95%
+interval of [-1, 1], because three source clusters give a minimum detectable effect
+of 1.568 against an estimand bounded in [-1, 1]. The checkpoint-evolution arms
+separated completely at stage 3 on the first run, then stopped separating when the
+second run raised the byte cap and changed nothing else, so that separation was the
+cap. What survives there is a cost and bloat signature, not verification decay.
+[`docs/FINDINGS.md`](docs/FINDINGS.md) has the numbers, the retraction, the spend
+audit, and the design gaps.
+
+Parallax has no generated benchmark pool and reproduces no paper score.
+
+The method contracts, the implementation choices, and every deliberate divergence
+from the consulted upstream implementations live in
+[`docs/methods/evolving-intent.md`](docs/methods/evolving-intent.md) and
+[`docs/methods/checkpoint-evolution.md`](docs/methods/checkpoint-evolution.md).
+
+> **TODO:** Run the matched arm on SWE-bench. GSM8K now has all three arms against
+> a real provider and a decomposition to show for it; SWE-bench has real episodes,
+> three source clusters, and no way to attribute a delta it cannot detect anyway.
+> Checkpoint evolution has its byte budget settled and gated in code, and now needs
+> more than one task family.

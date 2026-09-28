@@ -8,7 +8,7 @@ from run failures. A survey of upstream encodings
 SprocketLab/slop-code-bench) and current platforms (HUD v6, [Prime
 Intellect verifiers](https://github.com/PrimeIntellect-ai/verifiers),
 Inspect AI, OpenEnv) found no existing standard that expresses sealed
-authority, matched arms, or failure-separated verdicts — METR's Task
+authority, matched arms, or failure-separated verdicts. METR's Task
 Standard decayed into a one-way Inspect bridge, Harbor adapts many
 benchmarks into one harness, and CUBE standardizes only the runtime
 protocol. The recommendation is a three-piece lever rather than a
