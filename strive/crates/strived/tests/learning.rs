@@ -493,7 +493,7 @@ fn the_static_gate_refuses_secrets() {
     let cwd = project();
     let work = work_session(&env, &cwd);
     let (mut host, id) = learner(&env, &cwd);
-    let key = "sk-ant-api03-0123456789abcdefghij";
+    let key = concat!("sk-ant", "-api03-0123456789abcdefghij");
     let shaped = propose(&mut host, &id, &memory(&format!("Call the API with {key}.\n"), &work));
     assert_fails(&env, &cwd, shaped, "secrets", "Anthropic or OpenAI API key");
     assert!(!static_gate(&env, &cwd, shaped).1.contains(key), "the key isn't repeated");

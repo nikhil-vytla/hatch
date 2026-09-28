@@ -115,21 +115,23 @@ fn evidence_names_entries_and_only_a_few_sessions() {
     assert!(found[0].detail.contains("it cites 6 sessions; at most 5"), "{found:?}");
 }
 
+// Credential-shaped fixtures are split with `concat!`, so secret scanners
+// reading the source don't take these made-up values for real keys.
 #[test]
 fn secrets_are_refused_without_being_repeated() {
-    let key = "sk-ant-api03-abcdefghij0123456789";
+    let key = concat!("sk-ant", "-api03-abcdefghij0123456789");
     let found = check(&memory(&format!("Use {key} for the API.")), &[]);
     assert_eq!(found.iter().map(|f| f.rule).collect::<Vec<_>>(), vec![Rule::Secret]);
     assert!(!found[0].detail.contains(key), "{found:?}");
     for text in [
-        "sk-proj-0123456789abcdefghijk",
+        concat!("sk-proj", "-0123456789abcdefghijk"),
         "-----BEGIN OPENSSH PRIVATE KEY-----\nabc\n-----END OPENSSH PRIVATE KEY-----",
-        "token ghp_0123456789abcdefghijklmnopqrstuvwxyz",
-        "github_pat_11AAAAAAA0123456789abcdef",
-        "xoxb-1234567890-abcdef",
-        "AIzaSyA0123456789abcdefghijklmnopqrstuv",
-        "AKIAIOSFODNN7EXAMPLE",
-        "(sk-0123456789abcdefghijklmn)",
+        concat!("token ghp", "_0123456789abcdefghijklmnopqrstuvwxyz"),
+        concat!("github_pat", "_11AAAAAAA0123456789abcdef"),
+        concat!("xoxb", "-1234567890-abcdef"),
+        concat!("AIza", "SyA0123456789abcdefghijklmnopqrstuv"),
+        concat!("AKIA", "IOSFODNN7EXAMPLE"),
+        concat!("(sk", "-0123456789abcdefghijklmn)"),
     ] {
         assert_eq!(rules(&memory(text)), vec![Rule::Secret], "{text}");
     }
@@ -145,8 +147,8 @@ fn secrets_are_refused_without_being_repeated() {
 fn words_that_only_look_like_keys_pass() {
     for text in [
         "Use task-runner-configuration-setup-for-ci here.",
-        "desk-0123456789abcdefghijklmnop",
-        "sk-abcdefghijklmnopqrstuvwxyz",
+        concat!("desk", "-0123456789abcdefghijklmnop"),
+        concat!("sk", "-abcdefghijklmnopqrstuvwxyz"),
         "sk-012345678",
         "-----BEGIN PUBLIC KEY-----",
         "A PRIVATE KEY-----",
@@ -217,7 +219,7 @@ fn piping_a_download_to_a_shell_is_refused() {
 
 #[test]
 fn a_failing_verdict_lists_every_finding_by_rule() {
-    let mut p = skill("Bad", "no frontmatter sk-ant-0123456789abcdefghij");
+    let mut p = skill("Bad", concat!("no frontmatter sk-ant", "-0123456789abcdefghij"));
     p.evidence.clear();
     let (v, detail) = verdict(&check(&p, &[]));
     assert_eq!(v, Verdict::Fail);
