@@ -1,0 +1,158 @@
+{
+ "prefixes": 4164,
+ "vocabulary": 3000,
+ "questions": {
+  "intent": {
+   "labelled": 4164,
+   "classes": [
+    "calc",
+    "color",
+    "contact",
+    "convert",
+    "countdown",
+    "event",
+    "expense",
+    "goal",
+    "habit",
+    "link",
+    "none",
+    "note",
+    "poll",
+    "random",
+    "reminder",
+    "split",
+    "timer",
+    "timezone",
+    "todo",
+    "travel"
+   ],
+   "trainAccuracy": 0.9522
+  },
+  "readiness": {
+   "labelled": 4164,
+   "classes": [
+    "0",
+    "1",
+    "2"
+   ],
+   "trainAccuracy": 0.9311
+  },
+  "isQuestion": {
+   "labelled": 4164,
+   "classes": [
+    "false",
+    "true"
+   ],
+   "trainAccuracy": 0.9878
+  },
+  "recurring": {
+   "labelled": 4164,
+   "classes": [
+    "false",
+    "true"
+   ],
+   "trainAccuracy": 0.9695
+  },
+  "urgency": {
+   "labelled": 4164,
+   "classes": [
+    "0",
+    "1",
+    "2"
+   ],
+   "trainAccuracy": 0.9781
+  },
+  "tone": {
+   "labelled": 4164,
+   "classes": [
+    "excited",
+    "neutral",
+    "positive",
+    "reflective",
+    "stressed"
+   ],
+   "trainAccuracy": 0.987
+  },
+  "eventMode": {
+   "labelled": 4164,
+   "classes": [
+    "in_person",
+    "phone_call",
+    "unspecified",
+    "video_call"
+   ],
+   "trainAccuracy": 0.9921
+  },
+  "transport": {
+   "labelled": 4164,
+   "classes": [
+    "bus",
+    "car",
+    "flight",
+    "train",
+    "unspecified"
+   ],
+   "trainAccuracy": 0.9902
+  },
+  "tripType": {
+   "labelled": 4164,
+   "classes": [
+    "leisure",
+    "unspecified",
+    "work"
+   ],
+   "trainAccuracy": 0.9851
+  },
+  "expenseCategory": {
+   "labelled": 4164,
+   "classes": [
+    "bills",
+    "entertainment",
+    "food",
+    "health",
+    "other",
+    "shopping",
+    "transport"
+   ],
+   "trainAccuracy": 0.9717
+  },
+  "colorMood": {
+   "labelled": 4164,
+   "classes": [
+    "cool",
+    "dark",
+    "neutral",
+    "pastel",
+    "vivid",
+    "warm"
+   ],
+   "trainAccuracy": 0.9409
+  },
+  "timerKind": {
+   "labelled": 4164,
+   "classes": [
+    "break",
+    "countdown",
+    "focus",
+    "stopwatch"
+   ],
+   "trainAccuracy": 0.9599
+  },
+  "hasExplicitOptions": {
+   "labelled": 4164,
+   "classes": [
+    "false",
+    "true"
+   ],
+   "trainAccuracy": 0.9839
+  },
+  "isShoppingList": {
+   "labelled": 4164,
+   "classes": [
+    "false",
+    "true"
+   ],
+   "trainAccuracy": 0.9714
+  }
+ }
+}

@@ -20,3 +20,11 @@ public/icon-studio/
 
 # Generated portable integration-evidence downloads.
 public/routing-evidence/
+
+# Prepared historical capability reference and source-match metadata.
+public/capabilities.html
+public/capability-build.json
+
+# Generated arena index and chunks, built from packages/arena recordings.
+public/arena/
+public/daily/

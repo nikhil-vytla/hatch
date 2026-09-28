@@ -10,7 +10,21 @@ export default async function handler(req: any, res: any) {
         "Enter your Vercel AI Gateway API key to run live. Recorded examples are available without a key.",
     });
   try {
-    return res.status(200).json(await evaluate(req.body, { apiKey }));
+    // Real-time callers ask for a short budget: a late answer is useless, so fail fast and re-ask.
+    const header = (name: string) => Number(Array.isArray(req.headers[name]) ? req.headers[name][0] : req.headers[name]);
+    const deadlineMs = header("x-jev-deadline-ms"), maxAttempts = header("x-jev-max-attempts");
+    // A caller that goes away (a keystroke superseding its request) stops the call to Jev.
+    const gone = new AbortController();
+    if (req.signal instanceof AbortSignal) req.signal.addEventListener("abort", () => gone.abort(), { once: true });
+    res.on?.("close", () => {
+      if (!res.writableFinished) gone.abort();
+    });
+    return res.status(200).json(await evaluate(req.body, {
+      apiKey,
+      signal: gone.signal,
+      ...(Number.isFinite(deadlineMs) ? { deadlineMs: Math.max(1000, Math.min(48000, Math.round(deadlineMs))) } : {}),
+      ...(Number.isInteger(maxAttempts) ? { maxAttempts: Math.max(1, Math.min(6, maxAttempts)) } : {}),
+    }));
   } catch (e) {
     const error = e as GatewayError;
     if (error.status === 503)

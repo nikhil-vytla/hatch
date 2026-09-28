@@ -15,6 +15,9 @@ import { enrichProvenance } from "./provenance";
 import { prepareJudgmentReliability } from "../../judgment-reliability/prepare";
 import { prepareLiveWorlds } from "../../live-worlds/prepare";
 import { preparePublicHarnessEvidence } from "../../capability-atlas-2026-09-22/publication-projection";
+import { prepareCapabilityAtlas } from "../../capability-atlas-2026-09-22/prepare-atlas";
+import { buildArena } from "../../packages/arena/src/data/build";
+import { buildDaily } from "../../packages/arena/src/checkable/build-daily";
 const lab = resolve(".."),
   dest = resolve("public/data");
 const publication: Record<string, string> = JSON.parse(
@@ -22,11 +25,10 @@ const publication: Record<string, string> = JSON.parse(
 );
 mkdirSync(dest, { recursive: true });
 preparePublicHarnessEvidence(lab, resolve("public/routing-evidence"));
+prepareCapabilityAtlas(lab, resolve("public"));
 const hasSources = existsSync("results") || existsSync(resolve(lab, "results"));
 if (hasSources) {
   prepareLiveWorlds();
-  const built = spawnSync("bun", [resolve(lab, "visual-search/build.ts")], { stdio: "inherit" });
-  if (built.status !== 0) throw new Error("Visual search evidence preparation failed.");
 }
 for (const name of readdirSync(dest)) {
   if (!name.endsWith(".json") || !Object.hasOwn(publication, name.slice(0, -5)))
@@ -118,3 +120,7 @@ if (existsSync("extension/manifest.json"))
     cwd: "extension",
   });
 console.log("Prepared recorded evidence and companion.");
+
+// The arena reads recordings and public/data, so it runs after publication.
+await buildArena(resolve("public/arena"));
+buildDaily(resolve("../packages/arena"), resolve("public/daily"));
