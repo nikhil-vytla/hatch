@@ -1,11 +1,12 @@
 /**
- * Jev Daily's published data: every checkable item Jev answered, with one question per item
- * (fixed per item, so every day that shows it asks the same), the answer code computed, and
- * Jev's recorded distribution. Built from the bank and the recording at build time; the page
- * picks the day's five with dailySet(). Jev's answers were recorded before any day's play.
+ * Jev Daily's published data. Every puzzle is one question with an answer fixed by how the
+ * puzzle was made, and Jev's recorded distribution. The game is "trust or override": Jev
+ * answers first, and the visitor keeps its answer or overrules it. So most of a day's puzzles
+ * are ones where Jev hesitates, and each carries how often Jev is right at that confidence on
+ * puzzles of its kind, measured over the whole pool.
  */
 import { z } from "zod";
-import { bankSchema, rng, shuffled, truthSchema, wireQuestionSchema, type Bank } from "./items";
+import { rng, shuffled, truthSchema, wireQuestionSchema } from "./items";
 
 /** Puzzle kinds the Daily can show. */
 export const dailyKindSchema = z.enum(["tetris", "grid", "phrase", "order", "route"]);
@@ -13,6 +14,7 @@ export const dailyKindSchema = z.enum(["tetris", "grid", "phrase", "order", "rou
 export type DailyKind = z.infer<typeof dailyKindSchema>;
 
 export const dailyItemSchema = z.object({
+  /** Unique per question: an item with several questions is several puzzles. */
   id: z.string(),
   kind: dailyKindSchema,
   difficulty: z.number(),
@@ -25,20 +27,36 @@ export const dailyItemSchema = z.object({
   jevMs: z.number(),
 });
 
+/** How often Jev's top answer is right at each confidence band, per puzzle kind. */
+export const bandSchema = z.object({
+  lo: z.number(),
+  hi: z.number(),
+  n: z.number(),
+  right: z.number(),
+});
+
 export const dailySchema = z.object({
-  schema: z.literal("jev.daily/1"),
+  schema: z.literal("jev.daily/2"),
   recordedAt: z.string(),
-  /** How Jev did on every question of every item where it said 90% or more. */
-  sure: z.object({ n: z.number(), right: z.number() }),
-  bank: bankSchema.pick({ schema: true, generatedWith: true }).extend({
-    ids: z.array(z.object({ id: z.string(), kind: dailyKindSchema })),
-  }),
+  calibration: z.record(z.string(), z.array(bandSchema)),
   items: z.array(dailyItemSchema),
 });
 
 export type DailyItem = z.infer<typeof dailyItemSchema>;
 
 export type Daily = z.infer<typeof dailySchema>;
+
+export type Band = z.infer<typeof bandSchema>;
+
+/** Confidence bands used for the calibration shown beside each puzzle. */
+export const BANDS: [number, number][] = [
+  [0, 0.5],
+  [0.5, 0.6],
+  [0.6, 0.7],
+  [0.7, 0.8],
+  [0.8, 0.9],
+  [0.9, 1.0001],
+];
 
 /** The option keys of a question, in order: a yes/no is ["true", "false"]; a score, its levels. */
 export function optionKeys(q: z.infer<typeof wireQuestionSchema>) {
@@ -52,51 +70,55 @@ export function optionKeys(q: z.infer<typeof wireQuestionSchema>) {
 /** The right option key for a question's truth. */
 export const truthKey = (truth: z.infer<typeof truthSchema>) => String(truth);
 
-/** One question per item, chosen by the item's seed so it never depends on the day. */
-export function questionFor(item: Bank["items"][number]) {
-  const ids = Object.keys(item.questions);
+/** Jev's top answer and how sure it was. */
+export function jevPick(item: Pick<DailyItem, "jev">) {
+  const [key, p] = Object.entries(item.jev).reduce((a, b) => (b[1] > a[1] ? b : a));
 
-  return ids[Math.floor(rng(item.seed * 7 + 3)() * ids.length)];
+  return { key, p };
 }
 
-/** Log score with probabilities clamped to 1–99%, so one confident miss can't swamp a day. */
-export const CLAMP = 0.01;
+/** Below this, Jev is hesitating; a day is mostly these. */
+export const SURE_AT = 0.9;
 
-export const score = (p: number) => Math.log(Math.min(1 - CLAMP, Math.max(CLAMP, p)));
-
-/**
- * The day's mix. Jev is built for judgement from text, so the Daily is too: phrases, orders
- * and routing, plus one Tetris question about a local pattern. Puzzles that need counting or
- * route-finding (Tetris heights, maze distances) stay in the arena, where Jev does poorly and
- * says so.
- */
-export const MIX: [DailyKind, number][] = [
-  ["phrase", 2],
-  ["order", 1],
-  ["route", 1],
-  ["tetris", 1],
-];
+/** One hesitant puzzle of each kind a day, then one where Jev is sure. */
+export const HESITANT_MIX: DailyKind[] = ["order", "route", "phrase", "tetris"];
 
 const DAY_MS = 86_400_000;
 
 const EPOCH = Date.UTC(2026, 8, 26);
 
-/** The ids for a date (YYYY-MM-DD, UTC), walking a fixed shuffle of each kind so none repeats until used up. */
-export function pickDaily(ids: { id: string; kind: DailyKind }[], date: string) {
+/**
+ * The day's puzzles (YYYY-MM-DD, UTC). Each pool is walked in a fixed shuffle so nothing repeats
+ * until the pool is used up; a kind with no hesitant puzzles falls back to its sure ones.
+ */
+export function pickDaily(items: Pick<DailyItem, "id" | "kind" | "jev">[], date: string) {
   const day = Math.floor((Date.parse(`${date}T00:00:00Z`) - EPOCH) / DAY_MS);
 
   if (!Number.isFinite(day)) throw new Error(`Not a date: ${date}`);
 
-  return MIX.flatMap(([kind, per], k) => {
-    const order = shuffled(
-      ids.flatMap((i) => (i.kind === kind ? [i.id] : [])),
-      rng(20260926 + k),
-    );
+  const walk = (ids: string[], salt: number) => {
+    if (!ids.length) return undefined;
+    const order = shuffled(ids, rng(salt));
 
-    if (!order.length) return [];
-    const n = order.length;
-    const start = (((day * per) % n) + n) % n;
+    return order[((day % order.length) + order.length) % order.length];
+  };
 
-    return Array.from({ length: Math.min(per, n) }, (_, i) => order[(start + i) % n]);
+  const hesitant = (kind: DailyKind) =>
+    items.flatMap((i) => (i.kind === kind && jevPick(i).p < SURE_AT ? [i.id] : []));
+
+  const sure = (kind?: DailyKind) =>
+    items.flatMap((i) => ((!kind || i.kind === kind) && jevPick(i).p >= SURE_AT ? [i.id] : []));
+
+  const picks = HESITANT_MIX.flatMap((kind, k) => {
+    const id = walk(hesitant(kind), 20260926 + k) ?? walk(sure(kind), 20261026 + k);
+
+    return id ? [id] : [];
   });
+
+  const confident = walk(
+    sure().filter((id) => !picks.includes(id)),
+    20261126,
+  );
+
+  return confident ? [...picks.slice(0, 2), confident, ...picks.slice(2)] : picks;
 }
