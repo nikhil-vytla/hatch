@@ -2,7 +2,9 @@
 .daily {
   --serif: Georgia, "Iowan Old Style", "Times New Roman", serif;
   --radius: 4px;
-  --shadow-border: 0 0 0 1px oklch(0 0 0 / 0.07), 0 1px 2px -1px oklch(0 0 0 / 0.06), 0 2px 4px 0 oklch(0 0 0 / 0.04);
+  --shadow-border:
+    0 0 0 1px oklch(0 0 0 / 0.07), 0 1px 2px -1px oklch(0 0 0 / 0.06),
+    0 2px 4px 0 oklch(0 0 0 / 0.04);
   max-width: 880px;
   margin: 0 auto;
   padding: 40px 24px 96px;
@@ -101,7 +103,7 @@
 }
 .dy-board {
   margin: 0;
-  width: 130px;
+  width: min(190px, calc(25% - 12px));
 }
 .dy-board figcaption {
   font-size: 13px;
@@ -158,81 +160,76 @@
   background: #3552a0;
   color: #fff;
 }
-.dy-chips {
-  list-style: none;
-  padding: 0;
-  margin: 0 0 16px;
-  display: grid;
-  gap: 8px;
-}
-.dy-chips li {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto auto;
-  gap: 8px;
-  align-items: center;
-}
-.dy-chips li.small {
-  display: block;
-}
-.dy-option {
-  font-size: 15px;
-}
-.dy-stack {
-  display: inline-flex;
-  gap: 3px;
-}
-.dy-stack i {
-  width: 12px;
-  height: 20px;
-  border-radius: 2px;
+.dy-jev {
+  margin: 4px 0 16px;
+  padding: 12px 14px;
+  border-radius: 8px;
   background: var(--soft);
 }
-.dy-stack i[data-on="true"] {
-  background: var(--ink);
+.dy-jev p {
+  margin: 0;
 }
-.dy-slider {
+.dy-jev-line {
+  font-size: 17px;
+}
+.dy-jev-name {
+  font: 500 12px var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+.dy-jev-conf {
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+.dy-jev-record {
+  margin-top: 6px !important;
+  font-size: 14px;
+  color: var(--muted);
+}
+.dy-options {
   display: grid;
-  gap: 6px;
-  margin-bottom: 16px;
-  font-size: 15px;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
 }
-.dy-slider input {
-  width: min(420px, 100%);
-  min-height: 40px;
+.daily .dy-option {
+  display: grid;
+  gap: 2px;
+  justify-items: start;
+  text-align: left;
+  font-size: 15px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--bg);
+  box-shadow: var(--shadow-border);
+}
+.daily .dy-option small {
+  font: 500 11px var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+.daily .dy-option[data-chosen="true"] {
+  box-shadow: 0 0 0 2px var(--ink);
+}
+.daily .dy-option[data-right="true"] {
+  background: color-mix(in oklab, #1e6b47 12%, var(--bg));
+}
+.daily .dy-option:disabled {
+  cursor: default;
+  opacity: 1;
 }
 .daily .dy-lock {
   background: var(--ink);
   color: var(--bg);
   margin-top: 8px;
 }
-.dy-reveal {
-  margin-top: 16px;
-}
-.dy-reveal table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 14px;
-  font-variant-numeric: tabular-nums;
-}
-.dy-reveal th,
-.dy-reveal td {
-  padding: 8px;
-  border-bottom: 1px solid var(--line);
-  text-align: right;
-}
-.dy-reveal th:first-child {
-  text-align: left;
-  font-weight: 400;
-}
-.dy-reveal tr[data-right="true"] {
-  background: color-mix(in oklab, #1e6b47 10%, transparent);
-}
 .dy-truth {
   font: 500 11px var(--mono);
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: #1e6b47;
-  margin-left: 6px;
+  color: #1e6b47 !important;
 }
 .daily .finding {
   font-size: 16px;
@@ -256,12 +253,6 @@
   }
   .dy-board {
     width: calc(50% - 8px);
-  }
-  .dy-chips li {
-    grid-template-columns: minmax(0, 1fr) auto auto;
-  }
-  .dy-stack {
-    display: none;
   }
 }
 @media (pointer: coarse) {

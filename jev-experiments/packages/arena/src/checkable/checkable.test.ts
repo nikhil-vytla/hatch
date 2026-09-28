@@ -1,6 +1,11 @@
 import { describe, expect, test } from "bun:test";
+import { mkdtempSync, readFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { cells, createGame, landings } from "../../../../live-worlds/tetris/engine";
 import bankJson from "./bank.json";
+import { buildDaily } from "./build-daily";
+import { dailySchema, jevPick, pickDaily, SURE_AT } from "./daily";
 import { distanceLevel, gridItem, gridTruth, solve } from "./grid";
 import { bankSchema, dailySet } from "./items";
 import { landingFacts, tetrisItem } from "./tetris";
@@ -86,5 +91,26 @@ describe("generation", () => {
     expect(a.filter((id) => id.startsWith("tetris-"))).toHaveLength(3);
     expect(new Set(a).size).toBe(5);
     expect(dailySet(bank, "2026-10-02")).not.toEqual(a);
+  });
+
+  test("a Daily is four hesitant puzzles, one per kind, and one sure one", () => {
+    const out = mkdtempSync(join(tmpdir(), "daily-"));
+
+    buildDaily(join(import.meta.dir, "../.."), out);
+    const { items } = dailySchema.parse(JSON.parse(readFileSync(join(out, "daily.json"), "utf8")));
+    const byId = new Map(items.map((i) => [i.id, i]));
+    const day = pickDaily(items, "2026-10-01").flatMap((id) => byId.get(id) ?? []);
+
+    expect(pickDaily(items, "2026-10-01")).toEqual(day.map((i) => i.id));
+    expect(day).toHaveLength(5);
+    expect(new Set(day.map((i) => i.id)).size).toBe(5);
+    expect(
+      day
+        .filter((i) => jevPick(i).p < SURE_AT)
+        .map((i) => i.kind)
+        .sort(),
+    ).toEqual(["order", "phrase", "route", "tetris"]);
+    expect(jevPick(day[2]).p).toBeGreaterThanOrEqual(SURE_AT);
+    expect(pickDaily(items, "2026-10-02")).not.toEqual(day.map((i) => i.id));
   });
 });

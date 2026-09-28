@@ -1,23 +1,23 @@
 /**
- * Jev Daily: five shared puzzles a day whose answers code can check. You spread your
- * confidence first; then Jev's recorded answer and the truth are revealed and both are scored
- * the same way. Jev's answers were recorded before the day; the page says how often Jev is
- * wrong when it is sure, before you see it be wrong. Your answers stay in this browser.
+ * Jev Daily: trust or override. Five puzzles a day whose answers are fixed by how they were
+ * made. Jev answers first and says how sure it is; beside that, how often it is right at that
+ * confidence on puzzles of this kind. You keep its answer or overrule it. Most puzzles are ones
+ * where Jev hesitates, where a careful person can add something; one a day is one it is sure
+ * of. Scoring is plain: how many you got, against how many Jev alone would have. Your answers
+ * stay in this browser.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  CLAMP,
-  dailySchema,
-  pickDaily,
+  jevPick,
   optionKeys,
-  score,
+  pickDaily,
+  dailySchema,
   truthKey,
+  type Band,
   type Daily,
   type DailyItem,
 } from "../../../packages/arena/src/checkable/daily";
 import "./daily.css";
-
-const CHIPS = 10;
 
 const KIND_LABEL: Record<DailyItem["kind"], string> = {
   tetris: "Tetris",
@@ -27,7 +27,13 @@ const KIND_LABEL: Record<DailyItem["kind"], string> = {
   route: "Who gets this?",
 };
 
-type Played = { mine: Record<string, number>; you: number; jev: number };
+/** What a puzzle is asking, in a sentence, for kinds whose state carries a long task line. */
+const KIND_TASK: Partial<Record<DailyItem["kind"], string>> = {
+  order: "Judge the barista's drink against what the customer still wants.",
+  route: "Route the message by the policy; the first rule that applies wins.",
+};
+
+type Played = { pick: string; right: boolean; trusted: boolean; jevRight: boolean };
 
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -41,12 +47,63 @@ const label = (key: string, item: DailyItem) => {
   return q.criteria[Number(key)] ?? key;
 };
 
+const pct = (p: number) => (p > 0.99 && p < 1 ? "over 99%" : `${Math.round(p * 100)}%`);
+
+/** The band Jev's confidence falls in, for this kind; a thin band borrows every kind's. */
+function bandFor(calibration: Daily["calibration"], item: DailyItem): Band | undefined {
+  const { p } = jevPick(item);
+  const find = (bands: Band[] | undefined) =>
+    bands?.find((b) => p >= b.lo && (p < b.hi || b.hi >= 1));
+
+  const own = find(calibration[item.kind]);
+
+  if (own && own.n >= 5) return own;
+
+  const pooled = Object.values(calibration).flatMap((bands) => {
+    const b = find(bands);
+
+    return b ? [b] : [];
+  });
+
+  if (!pooled.length) return undefined;
+
+  return {
+    lo: pooled[0].lo,
+    hi: pooled[0].hi,
+    n: pooled.reduce((s, b) => s + b.n, 0),
+    right: pooled.reduce((s, b) => s + b.right, 0),
+  };
+}
+
+const OUTCOME = {
+  trustRight: { mark: "🟩", text: "You trusted Jev, and it was right." },
+  trustWrong: { mark: "🟨", text: "Jev was wrong, and you went along with it." },
+  overrideRight: { mark: "🟦", text: "Good call: you overruled Jev and you were right." },
+  overrideWrong: { mark: "🟥", text: "Jev was right; overruling it cost you this one." },
+  bothWrong: { mark: "🟥", text: "You overruled Jev, but you were both wrong." },
+} as const;
+
+function outcomeOf(p: Played) {
+  if (p.trusted) return p.right ? OUTCOME.trustRight : OUTCOME.trustWrong;
+
+  if (p.right) return OUTCOME.overrideRight;
+
+  return p.jevRight ? OUTCOME.overrideWrong : OUTCOME.bothWrong;
+}
+
 function Board({ rows, title }: { rows: string[]; title: string }) {
   return (
     <figure className="dy-board">
-      <div className="dy-cells" style={{ gridTemplateColumns: `repeat(${rows[0]?.length ?? 10}, 1fr)` }} role="img" aria-label={title}>
+      <div
+        className="dy-cells"
+        style={{ gridTemplateColumns: `repeat(${rows[0]?.length ?? 10}, 1fr)` }}
+        role="img"
+        aria-label={title}
+      >
         {rows.flatMap((row, y) =>
-          Array.from(row).map((c, x) => <span key={`${y}-${x}`} data-c={c === "#" ? "fill" : c === "@" ? "piece" : "empty"} />),
+          Array.from(row).map((c, x) => (
+            <span key={`${y}-${x}`} data-c={c === "#" ? "fill" : c === "@" ? "piece" : "empty"} />
+          )),
         )}
       </div>
       <figcaption>{title}</figcaption>
@@ -54,7 +111,14 @@ function Board({ rows, title }: { rows: string[]; title: string }) {
   );
 }
 
-const GRID_LABEL: Record<string, string> = { "#": "wall", ".": "floor", A: "agent", K: "key", D: "door", E: "exit" };
+const GRID_LABEL: Record<string, string> = {
+  "#": "wall",
+  ".": "floor",
+  A: "agent",
+  K: "key",
+  D: "door",
+  E: "exit",
+};
 
 function Grid({ rows }: { rows: string[] }) {
   return (
@@ -79,40 +143,43 @@ function Grid({ rows }: { rows: string[] }) {
 function Card({ state }: { state: Record<string, unknown> }) {
   return (
     <dl className="dy-card">
-      {Object.entries(state).map(([k, v]) => (
-        <div key={k}>
-          <dt>{k.replaceAll("_", " ")}</dt>
-          <dd>
-            {typeof v === "string" ? (
-              v
-            ) : Array.isArray(v) ? (
-              <ol>
-                {v.map((line, i) => (
-                  <li key={i}>{String(line)}</li>
-                ))}
-              </ol>
-            ) : v && typeof v === "object" ? (
-              <table className="dy-facts">
-                <tbody>
-                  {Object.entries(v).map(([fk, fv]) => (
-                    <tr key={fk}>
-                      <th scope="row">{fk.replaceAll("_", " ")}</th>
-                      <td>{String(fv)}</td>
-                    </tr>
+      {Object.entries(state)
+        .filter(([k]) => k !== "task")
+        .map(([k, v]) => (
+          <div key={k}>
+            <dt>{k.replaceAll("_", " ")}</dt>
+            <dd>
+              {typeof v === "string" ? (
+                v
+              ) : Array.isArray(v) ? (
+                <ol>
+                  {v.map((line, i) => (
+                    <li key={i}>{String(line)}</li>
                   ))}
-                </tbody>
-              </table>
-            ) : (
-              String(v)
-            )}
-          </dd>
-        </div>
-      ))}
+                </ol>
+              ) : v && typeof v === "object" ? (
+                <table className="dy-facts">
+                  <tbody>
+                    {Object.entries(v).map(([fk, fv]) => (
+                      <tr key={fk}>
+                        <th scope="row">{fk.replaceAll("_", " ")}</th>
+                        <td>{String(fv)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : (
+                String(v)
+              )}
+            </dd>
+          </div>
+        ))}
     </dl>
   );
 }
 
-const rowsOf = (v: unknown) => (Array.isArray(v) ? v.filter((r): r is string => typeof r === "string") : []);
+const rowsOf = (v: unknown) =>
+  Array.isArray(v) ? v.filter((r): r is string => typeof r === "string") : [];
 
 function Puzzle({ item }: { item: DailyItem }) {
   if (item.kind === "grid") return <Grid rows={rowsOf(item.state.grid)} />;
@@ -120,11 +187,15 @@ function Puzzle({ item }: { item: DailyItem }) {
   if (item.kind === "phrase") return <p className="dy-typed">{String(item.state.text ?? "")}</p>;
 
   if (item.kind === "order" || item.kind === "route") return <Card state={item.state} />;
-  const landings = item.state.landings && typeof item.state.landings === "object" ? item.state.landings : {};
+  const landings =
+    item.state.landings && typeof item.state.landings === "object" ? item.state.landings : {};
 
   return (
     <div className="dy-tetris">
-      <Board rows={rowsOf(item.state.board)} title={`Now: the ${String(item.state.piece)} piece is next`} />
+      <Board
+        rows={rowsOf(item.state.board)}
+        title={`Now: the ${String(item.state.piece)} piece is next`}
+      />
       {Object.entries(landings).map(([k, rows]) => (
         <Board key={k} rows={rowsOf(rows)} title={`Landing ${k}`} />
       ))}
@@ -132,123 +203,22 @@ function Puzzle({ item }: { item: DailyItem }) {
   );
 }
 
-/** Your confidence as chips across the options; a yes/no is a single slider. */
-function Pick({
-  item,
-  mine,
-  onChange,
-  locked,
-}: {
-  item: DailyItem;
-  mine: Record<string, number>;
-  onChange: (m: Record<string, number>) => void;
-  locked: boolean;
-}) {
-  const keys = optionKeys(item.question);
-
-  if (item.question.type === "noul") {
-    const yes = mine.true ?? 0.5;
-
-    return (
-      <label className="dy-slider">
-        <span>
-          True <b>{Math.round(yes * 100)}%</b> · False <b>{Math.round((1 - yes) * 100)}%</b>
-        </span>
-        <input
-          type="range"
-          min={0.01}
-          max={0.99}
-          step={0.01}
-          value={yes}
-          disabled={locked}
-          onChange={(e) => onChange({ true: Number(e.target.value), false: 1 - Number(e.target.value) })}
-        />
-      </label>
-    );
-  }
-
-  // Chips placed so far; after locking, the stored probabilities are shown instead.
-  const [placed, setPlaced] = useState<number[]>(() => keys.map(() => 0));
-
-  const chips = locked
-    ? keys.map((k) => Math.round((mine[k] ?? 0) * CHIPS))
-    : placed;
-
-  const used = chips.reduce((a, b) => a + b, 0);
-
-  const move = (i: number, d: number) => {
-    const next = [...placed];
-
-    if (next[i] + d < 0 || used + d > CHIPS) return;
-    next[i] += d;
-    setPlaced(next);
-    const spare = (CHIPS - next.reduce((a, b) => a + b, 0)) / keys.length;
-
-    // Unplaced chips are spread evenly, so the probabilities always sum to one.
-    onChange(Object.fromEntries(keys.map((k, j) => [k, (next[j] + spare) / CHIPS])));
-  };
+function JevSays({ item, band }: { item: DailyItem; band?: Band }) {
+  const { key, p } = jevPick(item);
 
   return (
-    <ul className="dy-chips">
-      {keys.map((k, i) => (
-        <li key={k}>
-          <span className="dy-option">{label(k, item)}</span>
-          <button type="button" onClick={() => move(i, -1)} disabled={locked || chips[i] === 0} aria-label={`One chip less on ${label(k, item)}`}>
-            −
-          </button>
-          <span className="dy-stack" aria-label={`${chips[i]} of ${CHIPS} chips`}>
-            {Array.from({ length: CHIPS }, (_, j) => (
-              <i key={j} data-on={j < chips[i]} />
-            ))}
-          </span>
-          <button type="button" onClick={() => move(i, 1)} disabled={locked || used >= CHIPS} aria-label={`One chip more on ${label(k, item)}`}>
-            +
-          </button>
-        </li>
-      ))}
-      {!locked && (
-        <li className="muted small">
-          {CHIPS - used === 0
-            ? "All chips placed."
-            : `${CHIPS - used} chip${CHIPS - used === 1 ? "" : "s"} left; unplaced chips are spread evenly.`}
-        </li>
-      )}
-    </ul>
-  );
-}
-
-function Reveal({ item, played }: { item: DailyItem; played: Played }) {
-  const keys = optionKeys(item.question);
-  const right = truthKey(item.truth);
-
-  return (
-    <div className="dy-reveal">
-      <table className="results">
-        <thead>
-          <tr>
-            <th scope="col">Answer</th>
-            <th scope="col">You</th>
-            <th scope="col">Jev</th>
-          </tr>
-        </thead>
-        <tbody>
-          {keys.map((k) => (
-            <tr key={k} data-right={k === right}>
-              <th scope="row">
-                {label(k, item)} {k === right && <b className="dy-truth">right answer</b>}
-              </th>
-              <td>{Math.round((played.mine[k] ?? 0) * 100)}%</td>
-              <td>{Math.round((item.jev[k] ?? 0) * 100)}%</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      <p className="finding">
-        You scored {played.you.toFixed(2)}, Jev {played.jev.toFixed(2)} (the log of the probability each
-        put on the right answer; closer to 0 is better).{" "}
-        {Math.abs(played.you - played.jev) < 0.01 ? "A tie." : played.you > played.jev ? "You beat Jev on this one." : "Jev takes this one."}{" "}
-        <span className="muted small">Jev answered in {Math.round(item.jevMs)} ms.</span>
+    <div className="dy-jev" aria-live="polite">
+      <p className="dy-jev-line">
+        <span className="dy-jev-name">Jev says</span> <b>{label(key, item)}</b>{" "}
+        <span className="dy-jev-conf">{pct(p)} sure</span>
       </p>
+      {band && band.n > 0 && (
+        <p className="dy-jev-record">
+          When Jev says {Math.round(band.lo * 100)}–{pct(Math.min(band.hi, 1))} on puzzles like
+          this, it is right <b>{pct(band.right / band.n)}</b> of the time ({band.right} of {band.n}
+          ).
+        </p>
+      )}
     </div>
   );
 }
@@ -257,7 +227,7 @@ export function DailyPage() {
   const [data, setData] = useState<Daily | null>(null);
   const [error, setError] = useState("");
   const date = today();
-  const storeKey = `jev-daily:${date}`;
+  const storeKey = `jev-daily/2:${date}`;
 
   const [played, setPlayed] = useState<Record<string, Played>>(() => {
     try {
@@ -268,8 +238,8 @@ export function DailyPage() {
   });
 
   const [index, setIndex] = useState(0);
+  const [choice, setChoice] = useState<string | null>(null);
   const heading = useRef<HTMLHeadingElement>(null);
-  const [mine, setMine] = useState<Record<string, number>>({});
 
   useEffect(() => {
     document.title = "Jev Daily · Jev experiments";
@@ -288,60 +258,79 @@ export function DailyPage() {
     if (!data) return [];
     const byId = new Map(data.items.map((i) => [i.id, i]));
 
-    return pickDaily(data.bank.ids, date).flatMap((id) => byId.get(id) ?? []);
+    return pickDaily(data.items, date).flatMap((id) => byId.get(id) ?? []);
   }, [data, date]);
 
-  if (error) return <main className="daily"><p className="notice">{error}</p></main>;
+  if (error)
+    return (
+      <main className="daily">
+        <p className="notice">{error}</p>
+      </main>
+    );
 
-  if (!data) return <main className="daily"><p className="muted">Loading today's puzzles…</p></main>;
+  if (!data)
+    return (
+      <main className="daily">
+        <p className="muted">Loading today's puzzles…</p>
+      </main>
+    );
 
   const item = items[index];
   const done = items.filter((i) => played[i.id]);
-  const sureRate = data.sure.n ? data.sure.right / data.sure.n : NaN;
+  const jevPickKey = item ? jevPick(item).key : "";
+  const chosen = item ? (played[item.id]?.pick ?? choice ?? jevPickKey) : "";
+
+  const go = (n: number) => {
+    setIndex(n);
+    setChoice(null);
+  };
 
   const lock = () => {
     if (!item) return;
-    const keys = optionKeys(item.question);
-    const filled = Object.fromEntries(keys.map((k) => [k, mine[k] ?? 1 / keys.length]));
     const right = truthKey(item.truth);
-    const next = { ...played, [item.id]: { mine: filled, you: score(filled[right] ?? 0), jev: score(item.jev[right] ?? 0) } };
+
+    const next = {
+      ...played,
+      [item.id]: {
+        pick: chosen,
+        right: chosen === right,
+        trusted: chosen === jevPickKey,
+        jevRight: jevPickKey === right,
+      },
+    };
 
     setPlayed(next);
     localStorage.setItem(storeKey, JSON.stringify(next));
   };
 
-  const wins = done.filter((i) => played[i.id].you > played[i.id].jev + 0.01).length;
-  const losses = done.filter((i) => played[i.id].jev > played[i.id].you + 0.01).length;
-  const grid = items.map((i) => (!played[i.id] ? "⬜" : played[i.id].you > played[i.id].jev + 0.01 ? "🟩" : played[i.id].jev > played[i.id].you + 0.01 ? "🟥" : "🟨")).join("");
+  const mine = done.filter((i) => played[i.id].right).length;
+  const jevAlone = done.filter((i) => played[i.id].jevRight).length;
+  const overrides = done.filter((i) => !played[i.id].trusted);
+  const goodOverrides = overrides.filter((i) => played[i.id].right).length;
+  const grid = items.map((i) => (played[i.id] ? outcomeOf(played[i.id]).mark : "⬜")).join("");
 
   return (
     <main className="daily" id="main-content" tabIndex={-1}>
       <p className="kicker">Jev Daily · {date}</p>
       <h1 ref={heading} tabIndex={-1}>
-        Can you out-call Jev today?
+        Trust Jev, or overrule it?
       </h1>
       <p className="lede">
-        Five puzzles a day, the kind of judgement Jev is built for: what a typed phrase should become,
-        whether an order meets what the customer asked, who a message should go to. Every answer is fixed by
-        how the puzzle was made, so it can be checked. Spread your confidence, lock it in, then see Jev's
-        recorded answer and the truth. Both of you are scored the same way: a hedge costs a little when you're right, a confident
-        miss costs a lot.
-      </p>
-      <p className="dy-honest">
-        Jev's answers were recorded on {new Date(data.recordedAt).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}; it can't see your answers or change its own.{" "}
-        {Number.isFinite(sureRate) &&
-          (data.sure.right === data.sure.n
-            ? `When Jev has said 90% or more on these puzzles it has been right every time so far (${data.sure.n} of ${data.sure.n}). It is not infallible, so bet against it when you're sure.`
-            : `When Jev says 90% or more on these puzzles it is right ${Math.round(sureRate * 100)}% of the time (${data.sure.right} of ${data.sure.n}), so expect it to be confidently wrong now and then.`)}{" "}
-        Probabilities are clamped to {CLAMP * 100}–{100 - CLAMP * 100}%.
+        Five puzzles. Jev answers first and says how sure it is, and beside that, how often it is
+        really right when it says so. Sometimes it's overconfident, sometimes too modest. Keep its
+        answer or pick your own.
       </p>
 
       <ol className="dy-progress" aria-label="Today's puzzles">
         {items.map((i, n) => (
           <li key={i.id}>
-            <button type="button" aria-current={n === index ? "step" : undefined} onClick={() => { setIndex(n); setMine({}); }}>
-              {n + 1}
-              <span className="sr-only">{played[i.id] ? " (played)" : ""}</span>
+            <button
+              type="button"
+              aria-current={n === index ? "step" : undefined}
+              onClick={() => go(n)}
+            >
+              {played[i.id] ? outcomeOf(played[i.id]).mark : n + 1}
+              <span className="sr-only">{played[i.id] ? ` puzzle ${n + 1}, played` : ""}</span>
             </button>
           </li>
         ))}
@@ -351,23 +340,49 @@ export function DailyPage() {
         <section className="dy-item" aria-labelledby="dy-q">
           <p className="muted small">
             {KIND_LABEL[item.kind]} · puzzle {index + 1} of {items.length}
+            {KIND_TASK[item.kind] ? ` · ${KIND_TASK[item.kind]}` : ""}
           </p>
           <h2 id="dy-q">
             {item.question.type === "noul" && <span className="muted">True or false: </span>}
             {item.question.instructions}
           </h2>
-          {item.kind === "grid" && typeof item.state.legend === "string" && <p className="muted small">{item.state.legend}</p>}
           <Puzzle item={item} />
-          <Pick key={item.id} item={item} mine={played[item.id]?.mine ?? mine} onChange={setMine} locked={Boolean(played[item.id])} />
+          <JevSays item={item} band={bandFor(data.calibration, item)} />
+
+          <div className="dy-options" role="radiogroup" aria-labelledby="dy-q">
+            {optionKeys(item.question).map((k) => {
+              const result = played[item.id];
+              const isRight = result && k === truthKey(item.truth);
+
+              return (
+                <button
+                  key={k}
+                  type="button"
+                  role="radio"
+                  aria-checked={chosen === k}
+                  className="dy-option"
+                  data-chosen={chosen === k}
+                  data-right={Boolean(isRight)}
+                  disabled={Boolean(result)}
+                  onClick={() => setChoice(k)}
+                >
+                  <span>{label(k, item)}</span>
+                  {k === jevPickKey && <small>Jev's pick</small>}
+                  {isRight && <small className="dy-truth">right answer</small>}
+                </button>
+              );
+            })}
+          </div>
+
           {!played[item.id] ? (
             <button type="button" className="dy-lock" onClick={lock}>
-              Lock it in
+              {chosen === jevPickKey ? "Trust Jev" : `Overrule Jev: ${label(chosen, item)}`}
             </button>
           ) : (
             <>
-              <Reveal item={item} played={played[item.id]} />
+              <p className="finding">{outcomeOf(played[item.id]).text}</p>
               {index < items.length - 1 && (
-                <button type="button" className="dy-lock" onClick={() => { setIndex(index + 1); setMine({}); }}>
+                <button type="button" className="dy-lock" onClick={() => go(index + 1)}>
                   Next puzzle
                 </button>
               )}
@@ -378,18 +393,43 @@ export function DailyPage() {
 
       {done.length === items.length && items.length > 0 && (
         <section className="dy-summary" aria-live="polite">
-          <h2>Today: you {wins}, Jev {losses}</h2>
+          <h2>
+            You got {mine} of {items.length}. Jev alone would have got {jevAlone}.
+          </h2>
           <p>
-            Your total {done.reduce((s, i) => s + played[i.id].you, 0).toFixed(2)} against Jev's{" "}
-            {done.reduce((s, i) => s + played[i.id].jev, 0).toFixed(2)}. A handful of puzzles is too few to say who is better
-            in general; come back tomorrow.
+            {overrides.length === 0
+              ? "You trusted Jev every time."
+              : `You overruled Jev ${overrides.length} time${overrides.length === 1 ? "" : "s"}: ${goodOverrides} good call${goodOverrides === 1 ? "" : "s"}, ${overrides.length - goodOverrides} not.`}{" "}
+            Come back tomorrow for five more.
           </p>
-          <p className="dy-share">{grid}</p>
-          <button type="button" onClick={() => void navigator.clipboard.writeText(`Jev Daily ${date}\n${grid}\nyou ${wins} · Jev ${losses}`)}>
+          <p className="dy-share" aria-label="Your day as a grid">
+            {grid}
+          </p>
+          <p className="muted small">
+            🟩 trusted, right · 🟨 trusted, Jev wrong · 🟦 overruled, right · 🟥 overruled, wrong
+          </p>
+          <button
+            type="button"
+            onClick={() =>
+              void navigator.clipboard.writeText(
+                `Jev Daily ${date}\n${grid}\nme ${mine}/${items.length} · Jev alone ${jevAlone}/${items.length}`,
+              )
+            }
+          >
             Copy your result
           </button>
         </section>
       )}
+
+      <p className="dy-honest muted small">
+        Jev's answers were recorded on{" "}
+        {new Date(data.recordedAt).toLocaleDateString("en-US", {
+          month: "long",
+          day: "numeric",
+          year: "numeric",
+        })}
+        , before today; every right answer comes from how the puzzle was made.
+      </p>
     </main>
   );
 }
