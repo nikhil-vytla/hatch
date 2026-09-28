@@ -632,7 +632,9 @@ server, so they are coordinated by the session's directory alone.
   shell runs them later for the person, unsandboxed. Commands can't write
   them, and the agent's write and edit ask a person in every approval
   mode. The rest of `.git` stays writable, so git works in the sandbox;
-  `git config` doesn't.
+  `git config` doesn't. On Linux, bubblewrap binds read-only only those at
+  the project root that exist, so a command can still create a missing one
+  (a new `.vscode/tasks.json`) or change a nested repository's hooks.
 - **macOS (Seatbelt):**
   - Commands may write only in the workspace and temp directories, and not
     to the project's learned files (see "Learned files outside review") or

@@ -702,6 +702,15 @@ fn the_sandbox_keeps_commands_from_files_that_run_code_outside_it() {
     if cfg!(target_os = "macos") {
         // Nested repositories and other spellings: macOS matches by pattern.
         blocked.extend(["sub/.git/hooks/post-checkout", ".GIT/HOOKS/pre-push"]);
+    } else {
+        // Linux binds read-only only what exists at the project root: there,
+        // creating a missing one is still possible (see ARCHITECTURE).
+        for dir in [".vscode", ".claude/commands"] {
+            std::fs::create_dir_all(w.path(dir)).unwrap();
+        }
+        for file in [".bashrc", ".mcp.json"] {
+            std::fs::write(w.path(file), "").unwrap();
+        }
     }
     for path in blocked {
         let cmd = format!("mkdir -p \"$(dirname '{path}')\" 2>/dev/null; echo x >> '{path}'; echo status=$?");
