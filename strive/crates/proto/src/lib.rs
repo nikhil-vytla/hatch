@@ -1635,6 +1635,25 @@ mod tests {
         assert!(serde_json::from_str::<Digest>("\"sha256:nope\"").is_err());
     }
 
+    /// The content store checks a blob by comparing its SHA-256 with these
+    /// bytes, so they must be the ones the string form spells.
+    #[test]
+    fn a_digests_bytes_are_the_hash_it_names() {
+        let d = Digest::parse(&format!("sha256:{HELLO_HEX}")).unwrap();
+        assert_eq!(hex::encode(d.as_bytes()), HELLO_HEX);
+        let bytes = std::array::from_fn(|i| u8::try_from(i).unwrap_or(0));
+        assert_eq!(Digest::from_bytes(bytes).as_bytes(), &bytes);
+    }
+
+    /// The token total is what a token limit charges: every kind counts once,
+    /// and absurd reports saturate rather than wrap to a small number.
+    #[test]
+    fn a_usages_total_counts_every_kind_of_token() {
+        let u = Usage { input: 1, output: 20, cache_write: 300, cache_write_long: 4000, cache_read: 50_000 };
+        assert_eq!(u.total(), 54_321);
+        assert_eq!(Usage { input: u64::MAX, output: 2, ..Usage::default() }.total(), u64::MAX);
+    }
+
     #[test]
     fn empty_is_an_object() {
         assert_eq!(serde_json::to_string(&Empty {}).unwrap(), "{}");

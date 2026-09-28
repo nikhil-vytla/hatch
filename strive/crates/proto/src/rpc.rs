@@ -131,4 +131,49 @@ mod tests {
         assert_eq!(s, r#"{"jsonrpc":"2.0","id":7,"method":"daemon/status","params":{}}"#);
         assert_eq!(serde_json::from_str::<Message>(&s).unwrap(), m);
     }
+
+    /// The predefined codes are the JSON-RPC 2.0 spec's (section 5.1:
+    /// -32700 parse error, -32600 invalid request, -32601 method not found,
+    /// -32602 invalid params, -32603 internal error), so a client written to
+    /// the spec reads strive's errors as the spec defines them.
+    #[test]
+    fn predefined_error_codes_are_the_specs() {
+        for (wire, code) in [
+            (-32700, RpcError::PARSE_ERROR),
+            (-32600, RpcError::INVALID_REQUEST),
+            (-32601, RpcError::METHOD_NOT_FOUND),
+            (-32602, RpcError::INVALID_PARAMS),
+            (-32603, RpcError::INTERNAL_ERROR),
+        ] {
+            let line = format!(r#"{{"jsonrpc":"2.0","id":"1","error":{{"code":{wire},"message":"m"}}}}"#);
+            let m: Message = serde_json::from_str(&line).unwrap();
+            assert_eq!(m.error.as_ref().map(|e| e.code), Some(code), "{line}");
+            assert_eq!(serde_json::to_string(&m).unwrap(), line);
+        }
+    }
+
+    /// The spec reserves -32000 to -32099 for implementation-defined server
+    /// errors (section 5.1). strive's own codes must sit there, clear of the
+    /// predefined ones, and differ from each other: clients tell them apart
+    /// by code alone.
+    #[test]
+    fn strives_own_error_codes_are_distinct_server_errors() {
+        let own = [
+            RpcError::NOT_INITIALIZED,
+            RpcError::PROTOCOL_MISMATCH,
+            RpcError::SESSION_NOT_FOUND,
+            RpcError::JOURNAL_INVALID,
+            RpcError::APPROVAL_NOT_PENDING,
+            RpcError::NOT_A_PERSON,
+            RpcError::HOST_EXISTS,
+            RpcError::NOT_THE_HOST,
+        ];
+        for code in own {
+            assert!((-32099..=-32000).contains(&code), "{code} is outside the server-error range");
+        }
+        let mut distinct = own.to_vec();
+        distinct.sort_unstable();
+        distinct.dedup();
+        assert_eq!(distinct.len(), own.len(), "two errors share a code");
+    }
 }
