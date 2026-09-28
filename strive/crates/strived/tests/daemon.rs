@@ -319,3 +319,42 @@ fn the_daemon_exits_when_its_socket_is_removed() {
     std::fs::remove_file(env.socket()).unwrap();
     common::wait_for("the daemon to exit", Duration::from_secs(5), || !alive());
 }
+
+/// A daemon asked to stop may exit before its reply is written: nothing
+/// is left to wind down, and the process is gone first. `strive stop` must
+/// take the closed connection as the stop it asked for, and check that the
+/// daemon is gone, not report a failure.
+#[test]
+fn stop_succeeds_when_the_daemon_exits_before_replying() {
+    use std::io::{BufRead, BufReader, Write};
+    let env = Env::new();
+    let socket = env.socket();
+    std::fs::create_dir_all(socket.parent().unwrap()).unwrap();
+    let listener = std::os::unix::net::UnixListener::bind(&socket).unwrap();
+    let path = socket.clone();
+    let fake = std::thread::spawn(move || {
+        let (stream, _) = listener.accept().unwrap();
+        let mut out = stream.try_clone().unwrap();
+        for line in BufReader::new(stream).lines() {
+            let msg: Value = serde_json::from_str(&line.unwrap()).unwrap();
+            match msg["method"].as_str() {
+                Some("initialize") => {
+                    let server = json!({"version": "0", "build": "fake", "pid": 1, "startedAtMs": 0});
+                    let result =
+                        json!({"protocolVersion": strive_proto::PROTOCOL_VERSION, "server": server, "home": "/"});
+                    writeln!(out, "{}", json!({"jsonrpc": "2.0", "id": msg["id"], "result": result})).unwrap();
+                }
+                // Gone before replying: the socket is removed and the connection closes.
+                Some("daemon/shutdown") => {
+                    std::fs::remove_file(&path).unwrap();
+                    return;
+                }
+                _ => {}
+            }
+        }
+    });
+    let out = env.strive(&["stop"]);
+    fake.join().unwrap();
+    assert!(out.status.success(), "stop failed: {}", String::from_utf8_lossy(&out.stderr));
+    assert!(String::from_utf8_lossy(&out.stdout).contains("stopped daemon"), "{out:?}");
+}

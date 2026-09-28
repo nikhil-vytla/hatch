@@ -296,7 +296,14 @@ async fn run(cli: Cli) -> Result<ExitCode> {
         Some(Cmd::Stop) => {
             match launch::attach(&home, "strive-stop").await? {
                 Some((mut c, init)) => {
-                    c.request::<DaemonShutdown>(Empty {}).await?;
+                    // A daemon with nothing to wind down can exit before its
+                    // reply is written; a closed connection then is the stop
+                    // asked for. Whether it's really gone is checked next.
+                    if let Err(e) = c.request::<DaemonShutdown>(Empty {}).await
+                        && e.downcast_ref::<client::ServerError>().is_some()
+                    {
+                        return Err(e);
+                    }
                     launch::wait_until_gone(&home).await?;
                     println!("stopped daemon (pid {})", init.server.pid);
                 }

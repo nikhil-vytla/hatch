@@ -1810,3 +1810,16 @@ machine whose shell leaks nothing never shows it, which is why macOS runs
 here passed. The daemon now closes every descriptor above stderr at start,
 before its runtime opens any. The new test leaves descriptor 200 open when
 it starts the daemon and failed on macOS before the fix.
+
+## 2026-09-28: `strive stop` against a daemon that exits first
+
+Linux CI failed `a_model_without_a_price_is_refused_and_settings_can_price_it`
+at `env.stop()`, once, with nothing said: the helper asserted without
+stderr (it prints it now). The likely cause, reproduced with a fake daemon:
+the daemon wakes its stand-down before its `daemon/shutdown` reply is
+written, and one with nothing to wind down can exit first, so `strive stop`
+got "daemon closed the connection during daemon/shutdown" and failed a stop
+that happened. A connection lost during that request is now taken as the
+stop asked for; `wait_until_gone` still checks the daemon is gone. 150 real
+start/stop cycles here never lost the race; the fake daemon's test failed
+before the fix.

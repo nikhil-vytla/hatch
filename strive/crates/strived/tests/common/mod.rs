@@ -62,7 +62,8 @@ impl Env {
         self.home.path().join("run/strived.sock")
     }
     pub fn stop(&self) {
-        assert!(self.strive(&["stop"]).status.success());
+        let out = self.strive(&["stop"]);
+        assert!(out.status.success(), "stop failed ({}): {}", out.status, String::from_utf8_lossy(&out.stderr));
     }
     /// A raw connection that has not sent `initialize`.
     pub fn raw(&self) -> Rpc {
