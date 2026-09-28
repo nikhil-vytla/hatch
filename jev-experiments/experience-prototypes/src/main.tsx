@@ -13,7 +13,9 @@ import "./pages/reading-workspace.css";
 const ExperimentPage = lazy(() => import("./pages/experiment").then(m => ({ default: m.ExperimentPage })));
 const AboutPage = lazy(() => import("./pages/about").then(m => ({ default: m.AboutPage })));
 const ArenaPage = lazy(() => import("./arena/page").then(m => ({ default: m.ArenaPage })));
-const DailyPage = lazy(() => import("./daily/page").then(m => ({ default: m.DailyPage })));
+const DecidePage = lazy(() => import("./decide/page").then(m => ({ default: m.DecidePage })));
+// Jev Daily became Decide; old links land there.
+if (location.hash.startsWith("#/daily")) history.replaceState(null, "", "#/decide");
 const NotesIndex = lazy(() => import("./notes").then(m => ({ default: m.NotesIndex })));
 const ExperimentNote = lazy(() => import("./notes").then(m => ({ default: m.ExperimentNote })));
 
@@ -91,7 +93,7 @@ function Header({ route }: { route: string }) {
         <nav aria-label="Main navigation">
           <a href="#/" aria-current={!route || route === "#" || route === "#/" || route === "#collection" || route.startsWith("#experiment/") ? "page" : undefined}>Play</a>
           <a href="#/arena" aria-current={route.startsWith("#/arena") ? "page" : undefined}>Arena</a>
-          <a href="#/daily" aria-current={route.startsWith("#/daily") ? "page" : undefined}>Daily</a>
+          <a href="#/decide" aria-current={route.startsWith("#/decide") ? "page" : undefined}>Decide</a>
           <a href="#/notes" aria-current={route.startsWith("#/notes") ? "page" : undefined}>Notes</a>
           <a href="#/about" aria-current={route === "#/about" ? "page" : undefined}>About</a>
           <details className="header-settings" ref={settings} onKeyDown={(event) => {
@@ -259,8 +261,8 @@ function App() {
     return () => cancelAnimationFrame(frame);
   }, [route]);
   useEffect(() => {
-    // The arena and Jev Daily title their own pages.
-    if (route.startsWith("#/arena") || route.startsWith("#/daily")) return;
+    // The arena and Decide title their own pages.
+    if (route.startsWith("#/arena") || route.startsWith("#/decide")) return;
     const label = route.startsWith("#/notes/")
       ? route.split("/")[2].replaceAll("-", " ")
       : route.startsWith("#/notes") ? "Notes"
@@ -296,8 +298,8 @@ function App() {
       )}
       {route === "#/about" || route === "#about" ? (
         <Suspense fallback={<main className="loading-stage">Opening About…</main>}><AboutPage /></Suspense>
-      ) : route.startsWith("#/daily") ? (
-        <Suspense fallback={<main className="loading-stage">Opening Jev Daily…</main>}><DailyPage /></Suspense>
+      ) : route.startsWith("#/decide") ? (
+        <Suspense fallback={<main className="loading-stage">Opening Decide…</main>}><DecidePage /></Suspense>
       ) : route.startsWith("#/arena") ? (
         <Suspense fallback={<main className="loading-stage">Opening the arena…</main>}><ArenaPage /></Suspense>
       ) : id || route.startsWith("#/notes") ? null : <PlayPage />}

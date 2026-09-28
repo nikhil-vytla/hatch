@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@fal-ai/client": "^1.10.1",
+    "@huggingface/transformers": "3.8.1",
     "@json-render/core": "0.21.0",
     "@json-render/react": "0.21.0",
     "@json-render/shadcn": "0.21.0",

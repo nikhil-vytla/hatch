@@ -1,11 +1,40 @@
 import evaluateHandler from "../api/evaluate";
+import { tallyHandler } from "../api/tally";
+import { memoryStore } from "../../packages/arena/src/decide/tally";
 import wardrobeTokenHandler from "../api/wardrobe-token";
 import { apiKeyFromHeader, GatewayError } from "./gateway";
 import { compose } from "./compose";
+// Decide's visitor votes, kept in memory while the dev server runs.
+const tallies = memoryStore();
 Bun.serve({
   hostname: "127.0.0.1",
   port: 8793,
   async fetch(req) {
+    if (new URL(req.url).pathname === "/api/tally") {
+      let status = 200,
+        result: unknown;
+      await tallyHandler(
+        {
+          method: req.method,
+          url: req.url,
+          headers: { "x-forwarded-for": "dev" },
+          body: await req.json().catch(() => null),
+        },
+        {
+          status(n: number) {
+            status = n;
+            return this;
+          },
+          json(x: unknown) {
+            result = x;
+          },
+          setHeader() {},
+        },
+        tallies,
+        "dev",
+      );
+      return Response.json(result, { status });
+    }
     if (!["POST", "OPTIONS"].includes(req.method))
       return Response.json({ error: "Use POST." }, { status: 405 });
     if (req.method === "OPTIONS") return new Response(null, { status: 204 });
@@ -28,10 +57,7 @@ Bun.serve({
                 new TextEncoder().encode(
                   JSON.stringify({
                     type: "error",
-                    error:
-                      e instanceof GatewayError
-                        ? e.message
-                        : "Composition interrupted.",
+                    error: e instanceof GatewayError ? e.message : "Composition interrupted.",
                   }) + "\n",
                 ),
               );
@@ -59,7 +85,8 @@ Bun.serve({
       },
     };
     const path = new URL(req.url).pathname;
-    if (!["/api/evaluate", "/api/wardrobe-token"].includes(path)) return Response.json({ error: "Not found." }, { status: 404 });
+    if (!["/api/evaluate", "/api/wardrobe-token"].includes(path))
+      return Response.json({ error: "Not found." }, { status: 404 });
     await (path === "/api/wardrobe-token" ? wardrobeTokenHandler : evaluateHandler)(
       {
         method: req.method,
@@ -77,6 +104,4 @@ Bun.serve({
     return Response.json(result, { status, headers });
   },
 });
-console.log(
-  "Jev API listening on http://127.0.0.1:8793. Live requests use the caller’s API key.",
-);
+console.log("Jev API listening on http://127.0.0.1:8793. Live requests use the caller’s API key.");
