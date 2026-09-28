@@ -12,7 +12,7 @@ import {
   type Intent,
   type Option,
   type Reading,
-} from "./questions";
+} from "./questions.js";
 
 // ---------------------------------------------------------------- vocabulary
 
