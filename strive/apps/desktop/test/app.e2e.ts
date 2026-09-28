@@ -3,7 +3,17 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { createSocket } from "node:dgram";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { createServer as createHttpServer } from "node:http";
 import { createRequire } from "node:module";
 import { type AddressInfo, connect, createServer, type Socket } from "node:net";
@@ -262,14 +272,50 @@ test("a session the window has left doesn't wait on it for approvals", async () 
 });
 
 /** Waits for `what` in `pane`; a timeout says what the pane showed instead. */
-async function shows(pane: Locator, what: Locator): Promise<void> {
+async function shows(pane: Locator, what: Locator, cwd?: string): Promise<void> {
   try {
     await what.waitFor();
   } catch (e) {
     const text = (await pane.textContent().catch(() => null)) ?? "(no pane)";
     const why = e instanceof Error ? e.message : "the wait failed";
-    throw new Error(`${why}\nthe pane showed: ${text.slice(0, 2000)}`);
+    throw new Error(
+      `${why}\nthe pane showed: ${text.slice(0, 2000)}${cwd === undefined ? "" : `\n${checkpointState(cwd)}`}`,
+    );
   }
+}
+
+/** The checkpoints' git view of `cwd`, for a failure message: what the index recorded and what's on disk. */
+function checkpointState(cwd: string): string {
+  const gitDir = join(home, "sessions", sessionId(cwd), "checkpoints.git");
+  const env = { ...process.env, GIT_DIR: gitDir, GIT_WORK_TREE: cwd, GIT_CONFIG_GLOBAL: "/dev/null" };
+
+  const git = (...args: string[]) => {
+    try {
+      return execFileSync("git", args, { cwd, env }).toString();
+    } catch (e) {
+      return e instanceof Error ? e.message : "git failed";
+    }
+  };
+
+  const files = readdirSync(cwd).map((f) => {
+    const s = statSync(join(cwd, f));
+
+    return `${f} size=${s.size} mtime=${s.mtimeMs} ctime=${s.ctimeMs}`;
+  });
+
+  const index = statSync(join(gitDir, "index"));
+
+  return [
+    git("--version").trim(),
+    `index mtime=${index.mtimeMs}`,
+    ...files,
+    "ls-files --debug:",
+    git("ls-files", "--debug"),
+    "diff-files:",
+    git("diff-files", "--stat"),
+    "log:",
+    git("log", "--format=%h %s", "-5"),
+  ].join("\n");
 }
 
 test("the changes pane shows what changed since the last prompt, file by file", async () => {
@@ -282,7 +328,7 @@ test("the changes pane shows what changed since the last prompt, file by file", 
   writeFileSync(join(cwd, "new.txt"), "hello\n");
   await page.getByRole("button", { name: "changes", exact: true }).click();
   const pane = page.getByRole("complementary", { name: "changes" });
-  await shows(pane, pane.getByText("2 changed files"));
+  await shows(pane, pane.getByText("2 changed files"), cwd);
   assert.deepEqual(await pane.locator(".file-head .path").allTextContents(), ["new.txt", "notes.ts"]);
   const notes = pane.locator(".file", { hasText: "notes.ts" });
   assert.equal(await notes.locator(".row.remove").textContent(), "1−const a = 1;");
@@ -394,7 +440,7 @@ test("the changes pane follows a rewind", async () => {
   await page.getByRole("button", { name: "changes", exact: true }).click();
   const pane = page.getByRole("complementary", { name: "changes" });
   await pane.getByRole("tab", { name: "Whole session" }).click();
-  await shows(pane, pane.getByText("1 changed file"));
+  await shows(pane, pane.getByText("1 changed file"), cwd);
   await page.keyboard.press("Meta+k");
   await page.keyboard.type("Rewind to 1");
   await page.keyboard.press("Enter");
@@ -413,7 +459,7 @@ test("a change deep in a long file shows in the pane, with the unchanged lines f
   writeFileSync(join(cwd, "long.txt"), `${lines.join("\n")}\n`);
   await page.getByRole("button", { name: "changes", exact: true }).click();
   const pane = page.getByRole("complementary", { name: "changes" });
-  await shows(pane, pane.locator(".row.add", { hasText: "LINE 450" }));
+  await shows(pane, pane.locator(".row.add", { hasText: "LINE 450" }), cwd);
   await pane.getByRole("button", { name: "⋯ 446 unchanged lines" }).click();
   await pane.locator(".row.keep", { hasText: "line 1" }).first().waitFor();
 });
@@ -429,7 +475,7 @@ test("a change at line 2,000 stays in view when the lines above it are opened", 
   writeFileSync(join(cwd, "big.txt"), `${lines.join("\n")}\n`);
   await page.getByRole("button", { name: "changes", exact: true }).click();
   const pane = page.getByRole("complementary", { name: "changes" });
-  await shows(pane, pane.locator(".row.add", { hasText: "LINE 2000" }));
+  await shows(pane, pane.locator(".row.add", { hasText: "LINE 2000" }), cwd);
   await pane.getByRole("button", { name: "⋯ 1996 unchanged lines" }).click();
   await pane.locator(".row.keep", { hasText: "line 1996" }).waitFor();
   assert.equal(await pane.locator(".row.add", { hasText: "LINE 2000" }).count(), 1, "the change is still drawn");
