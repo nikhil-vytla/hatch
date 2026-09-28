@@ -1,7 +1,7 @@
 # One text box that becomes what you mean
 
 - Owner: playable/design engineering, with routing/integration for the arena lane
-- Stage: next wave; sits beside [adaptive interfaces](../../roadmap-additions-2026-09-21/decisions/adaptive-interfaces.md) and the first-release "Sort as you type" speed piece
+- Stage: next wave; sits beside adaptive interfaces (a proposal in the closed draft #64) and the first-release "Sort as you type" speed piece
 - Status: proposed experiment; source reviewed, protocol and implementation open
 - Source: [anishfn/shapeshift](https://github.com/anishfn/shapeshift) by Anish (MIT, [live demo](https://shapeshiftui.vercel.app)), reviewed 22 September 2026
 - Dependencies: arena contestant interface and decision log; the real-time transport lessons from the Tetris lane (short budgets, drop superseded answers, back off, fall back locally); a keyword baseline; authored inputs with independent expected cards
