@@ -259,12 +259,27 @@ fn within_its_budget_a_session_keeps_cited_entries_then_prompts_and_marks_gaps()
     let big = entries(vec![reply(&"y".repeat(5000))]);
     let text = render(&big, &[1], 500, &blob);
     assert!(text.starts_with("#1 agent: y") && text.contains("characters cut") && text.len() < 600, "{text}");
+    // An uncited one is left out whole.
+    assert_eq!(render(&big, &[], 500, &blob), "[#1 left out]");
+}
+
+/// Blocks are joined by line breaks, and those count against the budget.
+#[test]
+fn the_blocks_a_budget_keeps_fit_in_it() {
+    let a = "#1 agent: first";
+    let b = format!("#2 agent: {}", "b".repeat(40));
+    let e = entries(vec![reply("first"), reply(&"b".repeat(40))]);
+    let both = format!("{a}\n{b}");
+    assert_eq!(render(&e, &[], both.chars().count() + 1, &blob), both);
+    assert_eq!(render(&e, &[], a.len() + b.len(), &blob), format!("{a}\n[#2 left out]"));
 }
 
 #[test]
 fn citing_either_half_of_an_effect_keeps_both() {
+    // The prompt fits beside either half alone, but not beside both: it
+    // outranks an uncited half, so only the pairing keeps both halves.
     let e = entries(vec![
-        prompt(&"p".repeat(200)),
+        prompt(&"p".repeat(20)),
         Event::EffectStarted {
             effect: 7,
             call_id: "c".into(),

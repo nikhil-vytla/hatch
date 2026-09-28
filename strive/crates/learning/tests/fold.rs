@@ -120,6 +120,55 @@ fn decisions_and_writes_set_the_status() {
     );
 }
 
+/// What a person undid for a file is what the judge is shown and what the
+/// `gated` mode won't accept again: only rolled-back proposals, and only
+/// those for the same file.
+#[test]
+fn rolled_back_lists_what_was_undone_for_the_same_file_only() {
+    let skill = |summary: &str| Event::ProposalMade {
+        call_id: None,
+        proposal: Proposal { artifact: Artifact::Skill { name: "release".into() }, ..proposal(summary) },
+        before: None,
+        mode: None,
+    };
+    let mut events = vec![started(), made("undone", None), made("kept", None), skill("other file"), made("open", None)];
+    for id in 2..=5 {
+        events.extend(passed(id));
+    }
+    for id in 2..=4 {
+        events.push(decided(id, ProposalDecision::Accept));
+        events.push(Event::ProposalApplied { proposal: id, before: None, after: digest(9) });
+    }
+    events.push(Event::ProposalRolledBack { proposal: 2, by: "test".into() });
+    events.push(Event::ProposalRolledBack { proposal: 4, by: "test".into() });
+    let folded = fold(&journal(events));
+    let undone: Vec<&str> =
+        strive_learning::rolled_back(&folded, &Artifact::Memory).iter().map(|s| s.proposal.summary.as_str()).collect();
+    assert_eq!(undone, vec!["undone"]);
+    let skill = Artifact::Skill { name: "release".into() };
+    let undone: Vec<&str> =
+        strive_learning::rolled_back(&folded, &skill).iter().map(|s| s.proposal.summary.as_str()).collect();
+    assert_eq!(undone, vec!["other file"]);
+}
+
+/// A person reads the status the protocol names, as words: the desktop app
+/// and the CLI show the same thing for one proposal.
+#[test]
+fn a_status_reads_as_its_wire_name_in_words() {
+    use ProposalStatus::{Applied, Checking, Failed, Ready, Rejected, RolledBack, Stale};
+    for status in [Checking, Ready, Failed, Rejected, Applied, Stale, RolledBack] {
+        let wire = serde_json::to_value(status).unwrap();
+        let words = wire.as_str().unwrap().chars().fold(String::new(), |mut out, c| {
+            if c.is_ascii_uppercase() {
+                out.push(' ');
+            }
+            out.push(c.to_ascii_lowercase());
+            out
+        });
+        assert_eq!(strive_learning::status_name(status), words, "{status:?}");
+    }
+}
+
 #[test]
 fn records_about_unknown_proposals_change_nothing() {
     let mut events = vec![started(), made("m", None)];

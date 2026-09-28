@@ -1,0 +1,11 @@
+# cargo-mutants settings for scripts/mutants.sh.
+#
+# Equivalent mutants: no test could tell them apart from the code, so they are
+# excluded by name, each with the reason. Keep this list short; a surviving
+# mutant is usually a missing test.
+exclude_re = [
+    # `e.seq > asked` -> `>=`: the one entry with seq `asked` is the
+    # `LearnRequested` itself, which the loop body ignores (it only reads
+    # `TurnStarted` and `TurnEnded`).
+    'triggers\.rs:\d+:\d+: replace > with >= in busy',
+]

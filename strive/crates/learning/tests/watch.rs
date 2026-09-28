@@ -446,4 +446,15 @@ fn memory_names_project_paths_only_when_they_read_unambiguously_as_paths() {
             (3, ".github/workflows/ci.yml".to_string()),
         ]
     );
+    // Only a line number after a colon is dropped: an image tag isn't a path.
+    assert_eq!(strive_learning::stale::named_paths("Deploy `ghcr.io/org/app:latest`.\n"), vec![]);
+}
+
+#[test]
+fn at_most_the_first_paths_limit_of_a_memory_are_checked() {
+    use strive_learning::stale::{PATHS, named_paths};
+    let memory = (0..PATHS + 5).map(|i| format!("- See `src/m{i}.ts`.")).collect::<Vec<_>>().join("\n");
+    let found = named_paths(&memory);
+    assert_eq!(found.len(), PATHS);
+    assert_eq!(found.last().map(|(_, p)| p.clone()), Some(format!("src/m{}.ts", PATHS - 1)));
 }

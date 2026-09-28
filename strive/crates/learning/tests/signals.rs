@@ -110,6 +110,22 @@ fn only_the_first_prompt_after_a_turn_is_read_as_a_correction() {
     assert_eq!(scan("S", &j.entries(), 0), vec![]);
 }
 
+/// A prompt sent while a turn runs steers that turn: when a queued prompt
+/// starts the next turn as soon as one ends, what follows isn't the first
+/// prompt after an ended turn.
+#[test]
+fn a_prompt_sent_while_a_turn_runs_is_not_read_as_a_correction() {
+    let mut j = Journal::new();
+    j.prompt("set up the formatter");
+    j.turn();
+    j.prompt("and add a pre-commit hook");
+    j.end(TurnEnd::Done);
+    j.turn();
+    j.prompt("no, use spaces, not tabs");
+    j.end(TurnEnd::Done);
+    assert_eq!(scan("S", &j.entries(), 0), vec![]);
+}
+
 #[test]
 fn correction_phrasing_opens_the_prompt_or_is_a_phrase_within_its_head() {
     for yes in [
@@ -333,6 +349,13 @@ fn a_request_no_turn_has_finished_or_a_proposal_being_checked_keeps_automatic_ru
     early.push(requested(None));
     early.push(Event::TurnEnded { turn: 1, reason: TurnEnd::Done });
     assert!(busy(&early.entries()).is_some(), "the request waits for the next turn");
+    // A turn journaled after the request that took only an earlier one didn't take it.
+    let mut queued = Journal::new();
+    let earlier = queued.push(requested(None));
+    queued.push(requested(None));
+    queued.push(Event::TurnStarted { turn: 1, through_seq: Some(earlier) });
+    queued.push(Event::TurnEnded { turn: 1, reason: TurnEnd::Done });
+    assert!(busy(&queued.entries()).is_some(), "the later request waits for the next turn");
 
     j.push(Event::TurnStarted { turn: 1, through_seq: Some(asked) });
     assert!(busy(&j.entries()).is_some(), "the turn that took it runs");
