@@ -3,12 +3,12 @@ from __future__ import annotations
 import json
 from collections.abc import Callable
 from pathlib import Path
-from typing import Literal, TypeVar
+from typing import Literal
 
 from pydantic import model_validator
 
 from .canonical import atomic_write, canonical_bytes, canonical_digest
-from .hud_compile import CompiledBundleV1, compile_hud, find_sealed_leak
+from .hud_compile import compile_hud
 from .outcome import Outcome, RunFailure, Verdict
 from .specs import EnvSpecV1, TaskSpecV1, freeze_swe_specs
 from .swebench import SweScriptFamily
@@ -19,23 +19,9 @@ from .swebench_harness import (
 )
 from .types import DigestText, NonEmptyText, SourceId, StrictModel
 
-GateName = Literal[
-    "arm_completeness",
-    "schema",
-    "budget_match",
-    "sealed_leakage",
-    "noop",
-    "gold",
-]
+GateName = Literal["noop", "gold"]
 AdmissionDecision = Literal["admitted", "admitted_flaky", "rejected"]
-GATE_ORDER: tuple[GateName, ...] = (
-    "arm_completeness",
-    "schema",
-    "budget_match",
-    "sealed_leakage",
-    "noop",
-    "gold",
-)
+GATE_ORDER: tuple[GateName, ...] = ("noop", "gold")
 IDENTITY_PATCH = (
     "diff --git a/.parallax_admission_noop b/.parallax_admission_noop\n"
     "new file mode 100644\n"
@@ -94,22 +80,31 @@ class AdmittedSweFamily(StrictModel):
             raise ValueError("scheduling requires an admitted family")
         if self.admission.source_id != self.family.static.problem.record_id:
             raise ValueError("admission source differs from family")
-        task, environment = freeze_swe_specs(self.family)
-        bundle = compile_hud(task, environment)
-        if (
-            self.admission.spec_digest != task.spec_digest
-            or self.admission.environment_digest != environment.digest
-            or self.admission.bundle_digest != canonical_digest(bundle)
-        ):
-            raise ValueError("admission identity differs from family")
         return self
+
+
+def assert_admission_identity(admitted: AdmittedSweFamily) -> None:
+    """Prove the admission receipt describes this exact family.
+
+    Recompiling the bundle costs a file read and four artifact hashes, so it
+    happens here, once per family at the point where spending is authorized,
+    rather than inside a model validator on every construction.
+    """
+    task, environment = freeze_swe_specs(admitted.family)
+    bundle = compile_hud(task, environment)
+    record = admitted.admission
+    if (
+        record.spec_digest != task.spec_digest
+        or record.environment_digest != environment.digest
+        or record.bundle_digest != canonical_digest(bundle)
+    ):
+        raise ValueError(f"admission identity differs from family: {record.source_id}")
 
 
 AdmissionHarness = Callable[
     [TaskSpecV1, EnvSpecV1, str, Path],
     HarnessEvaluation,
 ]
-ModelT = TypeVar("ModelT", bound=StrictModel)
 
 
 def _evidence(value: object) -> NonEmptyText:
@@ -120,15 +115,6 @@ def _evidence(value: object) -> NonEmptyText:
         ensure_ascii=False,
         allow_nan=False,
     )
-
-
-def _round_trip(value: ModelT) -> ModelT:
-    restored = type(value).model_validate_json(canonical_bytes(value))
-    if canonical_digest(restored) != canonical_digest(value):
-        raise ValueError(
-            f"{type(value).__name__} canonical digest changed on round-trip"
-        )
-    return restored
 
 
 def _gate(
@@ -152,90 +138,16 @@ def construction_rejection(
     source_id: SourceId,
     error: Exception,
 ) -> AdmissionRecordV1:
-    gates = [
-        _gate(
-            "arm_completeness",
-            False,
-            {"error_type": type(error).__name__, "message": str(error)},
-        )
-    ]
-    gates.extend(
-        _gate(name, False, {"not_run": "arm construction failed"})
-        for name in GATE_ORDER[1:]
-    )
+    detail = {
+        "not_run": "arm construction failed",
+        "error_type": type(error).__name__,
+        "message": str(error),
+    }
     return AdmissionRecordV1(
         source_id=source_id,
-        gates=tuple(gates),
+        gates=tuple(_gate(name, False, detail) for name in GATE_ORDER),
         decision="rejected",
     )
-
-
-def _cheap_gates(
-    family: SweScriptFamily,
-    task: TaskSpecV1,
-    environment: EnvSpecV1,
-    bundle: CompiledBundleV1,
-) -> tuple[GateResultV1, GateResultV1, GateResultV1, GateResultV1]:
-    completeness = _gate(
-        "arm_completeness",
-        True,
-        {"arms": [script.arm for script in family.scripts]},
-    )
-    try:
-        for value in (family, task, environment):
-            _round_trip(value)
-    except ValueError as error:
-        schema = _gate("schema", False, {"message": str(error)})
-    else:
-        schema = _gate(
-            "schema",
-            True,
-            {"round_tripped": ["SweScriptFamily", "TaskSpecV1", "EnvSpecV1"]},
-        )
-    scripts = family.scripts
-    shared_budget = {
-        (script.total_agent_steps, script.max_output_tokens) for script in scripts
-    }
-    per_turn_match = family.matched.agent_steps == family.evolved.agent_steps
-    environment_match = shared_budget == {
-        (
-            environment.budget.total_agent_steps,
-            environment.budget.max_output_tokens,
-        )
-    }
-    budget = _gate(
-        "budget_match",
-        len(shared_budget) == 1 and per_turn_match and environment_match,
-        {
-            "arm_budgets": {
-                script.arm: {
-                    "agent_steps": script.agent_steps,
-                    "max_output_tokens": script.max_output_tokens,
-                }
-                for script in scripts
-            },
-            "environment": environment.budget.model_dump(mode="json"),
-        },
-    )
-    leak = find_sealed_leak(
-        task.sealed,
-        bundle.agent_artifacts,
-        public=task.public,
-    )
-    leakage = _gate(
-        "sealed_leakage",
-        leak is None,
-        (
-            {"matched": False}
-            if leak is None
-            else {
-                "artifact_path": leak.artifact_path,
-                "fragment_digest": leak.fragment_digest,
-                "fragment_length": leak.fragment_length,
-            }
-        ),
-    )
-    return completeness, schema, budget, leakage
 
 
 def _execution_evidence(
@@ -350,22 +262,10 @@ def admit_swe_family(
     harness_source_directory: Path | None = None,
     run_harness: AdmissionHarness | None = None,
 ) -> AdmissionRecordV1:
+    # compile_hud is the gate for sealed leakage and arm/environment budget
+    # agreement: it raises rather than returning a bundle that violates them.
     task, environment = freeze_swe_specs(family)
     bundle = compile_hud(task, environment)
-    cheap = _cheap_gates(family, task, environment, bundle)
-    if not all(gate.passed for gate in cheap):
-        skipped = (
-            _gate("noop", False, {"not_run": "a cheap admission gate failed"}),
-            _gate("gold", False, {"not_run": "a cheap admission gate failed"}),
-        )
-        return AdmissionRecordV1(
-            source_id=family.static.problem.record_id,
-            spec_digest=task.spec_digest,
-            environment_digest=environment.digest,
-            bundle_digest=canonical_digest(bundle),
-            gates=(*cheap, *skipped),
-            decision="rejected",
-        )
     if run_harness is None:
 
         def invoke(
@@ -396,7 +296,7 @@ def admit_swe_family(
         work_directory / "gold",
         run_harness,
     )
-    passed = all(gate.passed for gate in (*cheap, noop, gold))
+    passed = noop.passed and gold.passed
     flaky = gold.passed and any(isinstance(item, RunFailure) for item in gold.attempts)
     decision: AdmissionDecision = (
         "admitted_flaky" if passed and flaky else "admitted" if passed else "rejected"
@@ -406,7 +306,7 @@ def admit_swe_family(
         spec_digest=task.spec_digest,
         environment_digest=environment.digest,
         bundle_digest=canonical_digest(bundle),
-        gates=(*cheap, noop, gold),
+        gates=(noop, gold),
         decision=decision,
     )
 

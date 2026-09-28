@@ -189,3 +189,13 @@ No experiment unit had run before this unit.
   multiplier was conservative by roughly 2x. And xarray sat at floor 0/6
   after screening at 2/3, a reminder that three-trial screening rates
   carry wide intervals.
+- 2026-08-03 23:5x, cost correction: the $1.219080 metered total survives
+  audit. This run's receipts were written after the retired-rate pricing
+  constant was fixed, and re-metering every retained token count at the
+  canonical rates reproduces $1.219080 exactly without consulting a single
+  recorded dollar figure (`research/spend-audit-20260803/`). What was wrong is
+  the run-1 unmetered band: $0.40-0.80 came from round-2 episode averages that
+  were themselves priced at the retired Opus 4.1 rate card. Pricing the same
+  astropy units at what they cost when re-run and metered gives $0.31-0.52, so
+  the all-in figure is $1.53-1.74 rather than $1.62-2.02. `account_spend.py`
+  now carries the corrected band and keeps the superseded one beside it.

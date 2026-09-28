@@ -5,17 +5,25 @@ from collections import defaultdict
 from pathlib import Path
 
 from parallax.canonical import atomic_write, canonical_bytes
+from parallax.metering import MeteredUsage, meter, total
 from parallax.outcome import RunFailure, Verification
-from parallax.screening import ScreeningRun, read_screening_jsonl
+from parallax.screening import (
+    ScreeningRun,
+    classify_operating_point,
+    read_screening_jsonl,
+)
 
 ROOT = Path(__file__).parent
 EVIDENCE = ROOT / "evidence"
 REPORT = ROOT / "round2-report.json"
-RATES = {
-    "claude-haiku-4-5": (1.0, 5.0),
-    "claude-opus-4-8": (5.0, 25.0),
-    "claude-sonnet-4-6": (2.0, 10.0),
-}
+
+
+def _component(usage: MeteredUsage) -> dict[str, int | float]:
+    return {
+        "completion_tokens": usage.completion_tokens,
+        "cost_usd": round(usage.cost_usd, 6),
+        "prompt_tokens": usage.prompt_tokens,
+    }
 
 
 def _screening_runs(name: str) -> tuple[ScreeningRun, ...]:
@@ -34,34 +42,32 @@ def _meter_screening(name: str, model: str) -> dict[str, int | float]:
             raise ValueError(f"official harness revision drift: {name}")
         if run.verifier_report_digest is None:
             raise ValueError(f"missing official verifier receipt: {name}")
-    prompt_tokens = sum(run.prompt_tokens for run in runs)
-    completion_tokens = sum(run.completion_tokens for run in runs)
-    input_rate, output_rate = RATES[model]
-    return {
-        "completion_tokens": completion_tokens,
-        "cost_usd": round(
-            (prompt_tokens * input_rate + completion_tokens * output_rate) / 1_000_000,
-            6,
-        ),
-        "prompt_tokens": prompt_tokens,
-    }
+    # Re-metered from recorded token counts at canonical rates rather than
+    # summed from the receipts: the first round's receipts were written at
+    # retired Opus rates (15/75 per million) and overstate that component by 3x.
+    return _component(
+        total(
+            meter(
+                model,
+                prompt_tokens=run.prompt_tokens,
+                completion_tokens=run.completion_tokens,
+            )
+            for run in runs
+        )
+    )
 
 
 def _meter_construction(name: str) -> dict[str, int | float]:
     rows = tuple(
         json.loads(line) for line in (EVIDENCE / name).read_text().splitlines() if line
     )
-    prompt_tokens = sum(row["prompt_tokens"] for row in rows)
-    completion_tokens = sum(row["completion_tokens"] for row in rows)
-    input_rate, output_rate = RATES["claude-haiku-4-5"]
-    return {
-        "completion_tokens": completion_tokens,
-        "cost_usd": round(
-            (prompt_tokens * input_rate + completion_tokens * output_rate) / 1_000_000,
-            6,
-        ),
-        "prompt_tokens": prompt_tokens,
-    }
+    return _component(
+        meter(
+            "claude-haiku-4-5",
+            prompt_tokens=sum(row["prompt_tokens"] for row in rows),
+            completion_tokens=sum(row["completion_tokens"] for row in rows),
+        )
+    )
 
 
 def _outcomes(
@@ -89,17 +95,9 @@ def _classify(
         passes = ordered.count("pass")
         verified = sum(not outcome.startswith("failure:") for outcome in ordered)
         pass_rate = passes / verified if verified else None
-        if pass_rate is None:
-            operating_point = "unknown"
-        elif pass_rate == 0:
-            operating_point = "floor"
-        elif pass_rate == 1:
-            operating_point = "ceiling"
-        else:
-            operating_point = "boundary"
         results.append(
             {
-                "operating_point": operating_point,
+                "operating_point": classify_operating_point(pass_rate),
                 "outcomes": ordered,
                 "pass_rate": pass_rate,
                 "source_id": source_id,
