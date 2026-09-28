@@ -222,8 +222,15 @@ impl Shadow {
         let n = NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         let index = self.git_dir.join(format!("index.changes.{}.{n}", std::process::id()));
         // Starting from the checkpoints' index makes `add` fast: unchanged files are known.
-        if self.git_dir.join("index").exists() {
-            std::fs::copy(self.git_dir.join("index"), &index)?;
+        // The copy keeps the index's mtime. Git trusts an entry whose size and
+        // mtime match the file unless the entry is no older than the index
+        // file ("racy git"); with seconds-only timestamps (Linux's git), a
+        // same-size edit in the checkpoint's second matches, and a copy
+        // stamped later would have git skip it.
+        let original = self.git_dir.join("index");
+        if original.exists() {
+            std::fs::copy(&original, &index)?;
+            std::fs::File::open(&index)?.set_modified(std::fs::metadata(&original)?.modified()?)?;
         }
         let nested = self.nested_repositories()?;
         let excluded: Vec<String> = nested.iter().map(|p| format!(":(exclude,literal){p}")).collect();

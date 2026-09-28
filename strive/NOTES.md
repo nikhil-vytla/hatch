@@ -1823,3 +1823,18 @@ that happened. A connection lost during that request is now taken as the
 stop asked for; `wait_until_gone` still checks the daemon is gone. 150 real
 start/stop cycles here never lost the race; the fake daemon's test failed
 before the fix.
+
+## 2026-09-28: the changes pane missed same-size edits on Linux
+
+Four desktop e2e tests failed only on Linux CI: the changes pane listed new
+files but not edits, all same-size (`v1`→`v2`, `line 450`→`LINE 450`). The
+failure output now dumps the checkpoints' git view, which showed it:
+notes.ts's index entry and the edited file shared a second and a size, and
+`git diff-files` on the real index still saw the edit, because git rehashes
+an entry no older than the index file ("racy git"). The changes view
+stages through a copy of that index, and `fs::copy` stamps the copy with
+the time of copying, so a second later git trusted the stale entry. On
+macOS git compares nanoseconds, which is why it never showed here. The
+copy now keeps the index's mtime. A macOS test forcing seconds-only stat
+checks didn't reproduce it (racy detection there still uses nanoseconds);
+the Linux e2e tests are the regression tests.
