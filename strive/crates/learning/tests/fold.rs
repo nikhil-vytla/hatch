@@ -11,7 +11,6 @@ fn proposal(summary: &str) -> Proposal {
         rationale: "r".into(),
         evidence: vec![],
         prediction: "p".into(),
-        watch: None,
     }
 }
 
@@ -25,7 +24,7 @@ fn journal(events: Vec<Event>) -> Vec<Entry> {
 }
 
 fn made(summary: &str, before: Option<Digest>) -> Event {
-    Event::ProposalMade { call_id: None, proposal: proposal(summary), before, mode: None }
+    Event::ProposalMade { call_id: None, proposal: proposal(summary), before }
 }
 
 fn gate(proposal: u64, gate: Gate, verdict: Verdict) -> Event {
@@ -33,15 +32,11 @@ fn gate(proposal: u64, gate: Gate, verdict: Verdict) -> Event {
 }
 
 fn passed(proposal: u64) -> Vec<Event> {
-    vec![
-        gate(proposal, Gate::Static, Verdict::Pass),
-        gate(proposal, Gate::Judge, Verdict::Skipped),
-        gate(proposal, Gate::Replay, Verdict::Skipped),
-    ]
+    vec![gate(proposal, Gate::Static, Verdict::Pass), gate(proposal, Gate::Judge, Verdict::Skipped)]
 }
 
 fn decided(proposal: u64, decision: ProposalDecision) -> Event {
-    Event::ProposalDecided { proposal, decision, by: "test".into(), automatic: None }
+    Event::ProposalDecided { proposal, decision, by: "test".into() }
 }
 
 fn statuses(events: Vec<Event>) -> Vec<(u64, ProposalStatus)> {
@@ -67,9 +62,8 @@ fn a_proposal_is_checking_until_every_gate_has_a_verdict() {
     let mut events = vec![started(), made("m", None)];
     assert_eq!(statuses(events.clone()), vec![(2, ProposalStatus::Checking)]);
     events.push(gate(2, Gate::Static, Verdict::Pass));
+    assert_eq!(statuses(events.clone()), vec![(2, ProposalStatus::Checking)], "the judge has no verdict yet");
     events.push(gate(2, Gate::Judge, Verdict::Skipped));
-    assert_eq!(statuses(events.clone()), vec![(2, ProposalStatus::Checking)], "replay has no verdict yet");
-    events.push(gate(2, Gate::Replay, Verdict::Skipped));
     assert_eq!(statuses(events), vec![(2, ProposalStatus::Ready)]);
 }
 
@@ -89,7 +83,7 @@ fn a_gate_run_again_replaces_the_earlier_outcome() {
     events.extend(passed(2));
     let folded = fold(&journal(events));
     assert_eq!(folded[0].state.status, ProposalStatus::Ready);
-    assert_eq!(folded[0].state.gates.len(), 3);
+    assert_eq!(folded[0].state.gates.len(), 2);
 }
 
 #[test]
@@ -120,16 +114,14 @@ fn decisions_and_writes_set_the_status() {
     );
 }
 
-/// What a person undid for a file is what the judge is shown and what the
-/// `gated` mode won't accept again: only rolled-back proposals, and only
-/// those for the same file.
+/// What a person undid for a file is what the judge is shown: only
+/// rolled-back proposals, and only those for the same file.
 #[test]
 fn rolled_back_lists_what_was_undone_for_the_same_file_only() {
     let skill = |summary: &str| Event::ProposalMade {
         call_id: None,
         proposal: Proposal { artifact: Artifact::Skill { name: "release".into() }, ..proposal(summary) },
         before: None,
-        mode: None,
     };
     let mut events = vec![started(), made("undone", None), made("kept", None), skill("other file"), made("open", None)];
     for id in 2..=5 {
@@ -180,21 +172,17 @@ fn records_about_unknown_proposals_change_nothing() {
     let folded = fold(&journal(events));
     assert_eq!(folded.len(), 1);
     assert_eq!((folded[0].state.status, folded[0].applied), (ProposalStatus::Ready, None));
-    assert_eq!(folded[0].state.gates.len(), 3);
+    assert_eq!(folded[0].state.gates.len(), 2);
 }
 
 /// Checks are listed in the order they run, whatever order their verdicts
-/// were journaled in (a replay skip can be journaled before the judge's).
+/// were journaled in (a static check a crash cut short runs again after
+/// the judge's verdict is in).
 #[test]
 fn gates_are_listed_in_the_order_they_run() {
-    let events = vec![
-        started(),
-        made("m", None),
-        gate(2, Gate::Replay, Verdict::Skipped),
-        gate(2, Gate::Static, Verdict::Pass),
-        gate(2, Gate::Judge, Verdict::Pass),
-    ];
+    let events =
+        vec![started(), made("m", None), gate(2, Gate::Judge, Verdict::Pass), gate(2, Gate::Static, Verdict::Pass)];
     let folded = fold(&journal(events));
     let order: Vec<Gate> = folded[0].state.gates.iter().map(|g| g.gate).collect();
-    assert_eq!(order, vec![Gate::Static, Gate::Judge, Gate::Replay]);
+    assert_eq!(order, vec![Gate::Static, Gate::Judge]);
 }

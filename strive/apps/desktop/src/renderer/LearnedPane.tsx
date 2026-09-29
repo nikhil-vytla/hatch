@@ -19,9 +19,7 @@ import {
   readJudge,
   STATUS_NAMES,
   statusNote,
-  tallyText,
   VERDICT_NAMES,
-  watchText,
 } from "./learning";
 
 type Props = {
@@ -360,7 +358,6 @@ function Detail({
       <section className="learned-section" aria-label="prediction">
         <h4>Prediction</h4>
         <Markdown text={p.proposal.prediction} />
-        <Standing proposal={p} path={path} />
       </section>
 
       <section className="learned-section">
@@ -413,31 +410,6 @@ function Detail({
             ))}
           </ol>
         </section>
-      )}
-    </div>
-  );
-}
-
-/** How the prediction's watch has fared since the proposal was applied, and when it looks like it's hurting. */
-function Standing({ proposal: p, path }: { proposal: ProposalState; path: string }) {
-  const watch = p.proposal.watch;
-
-  if (watch === undefined) return <p className="faint small standing">Prediction not machine-checked.</p>;
-
-  const hurting = p.status === "applied" && p.prediction?.notHolding === true;
-
-  return (
-    <div className={`standing ${hurting ? "not-holding" : ""}`} data-standing={hurting ? "not-holding" : "watching"}>
-      <p className="small">
-        <span className="faint">Checked on each later session:</span> {watchText(watch)}
-      </p>
-      <p className="small tally">{tallyText(p.prediction)}</p>
-      {hurting && p.prediction && (
-        <p className="small warn">
-          Not holding: {p.prediction.recentContradicted} of the last{" "}
-          {p.prediction.recentConfirmed + p.prediction.recentContradicted} sessions it applied to contradicted it. This
-          change may be hurting; Roll back puts <span className="mono">{path}</span> back as it was.
-        </p>
       )}
     </div>
   );

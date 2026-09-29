@@ -137,11 +137,10 @@ impl Conn {
                 // may already have started one of its own.
                 let Some(turn) = *crate::sync::lock(&conn.open_turn) else { return };
                 match state.sessions.end_open_turn(&sid, turn, "the agent host stopped during this turn").await {
-                    // Predictions catch up on this turn at the next `learning/run`.
                     Ok(true) => match state.sessions.peek(&sid).map(|i| (i.kind.unwrap_or_default(), i.cwd)) {
                         Some((SessionKind::Work, cwd)) => crate::triggers::turn_ended(&state, cwd, sid.clone()),
                         Some((SessionKind::Learning, _)) => crate::triggers::learning_quiet(&state, sid.clone()),
-                        Some((SessionKind::Replay, _)) | None => {}
+                        None => {}
                     },
                     Ok(false) => {}
                     Err(e) => crate::log!("could not end session {}'s open turn: {e:?}", sid.as_str()),
@@ -373,10 +372,6 @@ fn host_may_record(event: &Event, kind: SessionKind) -> bool {
         | Event::ProposalDecided { .. }
         | Event::ProposalApplied { .. }
         | Event::ProposalRolledBack { .. }
-        | Event::PredictionChecked { .. }
-        | Event::ReplayStarted { .. }
-        | Event::ReplayRunStarted { .. }
-        | Event::ReplayFinished { .. }
         | Event::ModelSet { .. } => false,
     }
 }
@@ -430,10 +425,9 @@ async fn host_config(state: &Arc<State>, sid: &SessionId) -> Reply {
         })
         .transpose()
         .map_err(|e| internal(&e))?;
-    // The learner has no effect tools, and an MCP tool is one. A replay's
-    // servers would run unsandboxed, outside its scratch copy (ADR-0018).
+    // The learner has no effect tools, and an MCP tool is one.
     let mcp = match info.kind.unwrap_or_default() {
-        SessionKind::Learning | SessionKind::Replay => crate::mcp::Summary { status: Vec::new(), tools: Vec::new() },
+        SessionKind::Learning => crate::mcp::Summary { status: Vec::new(), tools: Vec::new() },
         SessionKind::Work => {
             state
                 .mcp
@@ -517,17 +511,10 @@ async fn route_host(state: &Arc<State>, conn: &Arc<Conn>, method: &str, params: 
                         SessionKind::Learning => {
                             "a learning session's host records only turns, assistant messages, summaries and proposals"
                         }
-                        SessionKind::Replay => "a replay's host records only turns, assistant messages and summaries",
                     },
                 ));
             }
-            if let Event::ProposalMade { call_id, proposal, before, mode } = event {
-                if mode.is_some() {
-                    return Err(RpcError::new(
-                        RpcError::INVALID_PARAMS,
-                        "the daemon records the learning mode in effect (mode) itself; leave it out",
-                    ));
-                }
+            if let Event::ProposalMade { call_id, proposal, before } = event {
                 let entries = crate::learning::propose(state, &sid, &info.cwd, call_id, proposal, before).await?;
                 return reply::<HostRecord>(Appended { seq: entries[0].seq });
             }
@@ -545,7 +532,6 @@ async fn route_host(state: &Arc<State>, conn: &Arc<Conn>, method: &str, params: 
             if let Some(open) = opened {
                 *crate::sync::lock(&conn.open_turn) = open;
             }
-            // A work turn's end is when the project's predictions are checked against it.
             if opened == Some(None) {
                 turn_over(state, kind, info.cwd.clone(), &sid);
             }
@@ -561,17 +547,12 @@ async fn route_host(state: &Arc<State>, conn: &Arc<Conn>, method: &str, params: 
     }
 }
 
-/// A session's host recorded a turn's end. A work turn's end is when the
-/// project's predictions are checked against it and its idle wait starts; a
-/// learner's lets skipped scans run.
+/// A session's host recorded a turn's end. A work turn's end starts its
+/// idle wait; a learner's lets skipped scans run.
 fn turn_over(state: &Arc<State>, kind: SessionKind, cwd: String, sid: &SessionId) {
     match kind {
-        SessionKind::Work => {
-            crate::watch::turn_ended(state, cwd.clone(), sid.clone());
-            crate::triggers::turn_ended(state, cwd, sid.clone());
-        }
+        SessionKind::Work => crate::triggers::turn_ended(state, cwd, sid.clone()),
         SessionKind::Learning => crate::triggers::learning_quiet(state, sid.clone()),
-        SessionKind::Replay => {}
     }
 }
 
@@ -585,12 +566,6 @@ async fn prompt(state: &Arc<State>, params: Value) -> Reply {
             return Err(RpcError::new(
                 RpcError::INVALID_REQUEST,
                 "this is a project's learning session; ask it to study sessions with `strive learn` (learning/run)",
-            ));
-        }
-        SessionKind::Replay => {
-            return Err(RpcError::new(
-                RpcError::INVALID_REQUEST,
-                "this is one run of the replay gate, kept for the record; start a session of your own with `strive`",
             ));
         }
     }
@@ -699,10 +674,6 @@ async fn route_effect(state: &Arc<State>, method: &str, params: Value) -> Reply 
                 workspace: workspace_of(&info.cwd)?,
                 strive_home: state.home.root.canonicalize().map_err(|e| internal(&e))?,
                 unconfined: state.settings.sandbox == crate::settings::SandboxSetting::Off,
-                temp: match info.kind.unwrap_or_default() {
-                    SessionKind::Replay => crate::replay::temp_of(&info.cwd),
-                    SessionKind::Work | SessionKind::Learning => None,
-                },
             };
             let record = crate::effects::record(&state.cas, &request).map_err(|e| internal(&e))?;
             let Some(_running) = state.sessions.begin_effect() else {

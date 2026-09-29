@@ -79,7 +79,7 @@ test("a failed command shows its exit code; a successful one adds nothing", () =
   expect(describe(entry(finished(2)))).toEqual([{ kind: "note", tone: "faint", text: "exit 2" }]);
 });
 
-test("automatic learning says what triggered a run, why one was skipped, and when the gate accepted", () => {
+test("automatic learning says what triggered a run and why one was skipped", () => {
   const trigger = {
     kind: "idle" as const,
     signals: [
@@ -102,13 +102,6 @@ test("automatic learning says what triggered a run, why one was skipped, and whe
   expect(text({ type: "learnRequested", sessions: ["S1"] })).toBe("Asked to learn from S1");
   expect(text({ type: "learnSkipped", trigger: failed, reason: "the cap" })).toBe(
     "Automatic learning run skipped (after a session's turns reached learning.everyTurns: a failed turn in session S2): the cap",
-  );
-  expect(text({ type: "proposalDecided", proposal: 7, decision: "accept", by: "gate", automatic: "gate" })).toBe(
-    "#7 accepted automatically: every check passed",
-  );
-  // Only the daemon's field makes it automatic, not a client's name.
-  expect(text({ type: "proposalDecided", proposal: 7, decision: "accept", by: "gate" })).toBe(
-    "#7 accepted by gate (a client)",
   );
 });
 

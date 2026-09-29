@@ -23,8 +23,6 @@ pub enum Rule {
     Weakening,
     /// The evidence must name real work sessions of the project.
     Evidence,
-    /// A watch must be well formed and within its bounds (ADR-0019).
-    Watch,
 }
 
 impl Rule {
@@ -37,7 +35,6 @@ impl Rule {
             Rule::Hidden => "hidden text",
             Rule::Weakening => "safeguards",
             Rule::Evidence => "evidence",
-            Rule::Watch => "watch",
         }
     }
 }
@@ -79,14 +76,12 @@ pub fn check(p: &Proposal, known: &[String]) -> Vec<Finding> {
         }
     }
     let notes = p.evidence.iter().map(|e| e.note.as_str()).collect::<Vec<_>>().join("\n");
-    let watch = p.watch.as_ref().map(|w| crate::watch::strings(w).join("\n")).unwrap_or_default();
     for (what, text) in [
         ("content", p.content.as_str()),
         ("summary", &p.summary),
         ("rationale", &p.rationale),
         ("prediction", &p.prediction),
         ("evidence notes", &notes),
-        ("watch", &watch),
     ] {
         if let Some(c) = text.chars().find(|c| hidden(*c)) {
             found.push(Finding::new(
@@ -100,15 +95,12 @@ pub fn check(p: &Proposal, known: &[String]) -> Vec<Finding> {
     }
     found.extend(weakening(&p.content).into_iter().map(|d| Finding::new(Rule::Weakening, d)));
     found.extend(citations(p).into_iter().map(|d| Finding::new(Rule::Evidence, d)));
-    if let Some(w) = &p.watch {
-        found.extend(crate::watch::problems(w).into_iter().map(|d| Finding::new(Rule::Watch, d)));
-    }
     found
 }
 
 /// The most sessions a proposal may cite. Cited sessions are kept out of
-/// the judge's held-out sessions and the replay's tasks, so a learner that
-/// cited every session could choose what its checks see.
+/// the judge's held-out sessions, so a learner that cited every session
+/// could choose what the judge sees.
 pub const CITED_SESSIONS: usize = 5;
 
 /// What's wrong with the evidence as cited: none, a session with no entries

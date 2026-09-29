@@ -15,10 +15,9 @@ use serde_json::Value;
 use strive_learning::{Finding, Folded, Rule};
 use strive_proto::rpc::RpcError;
 use strive_proto::{
-    Appended, Automatic, Digest, Entry, Event, Evidence, Gate, LearningMode, LearningOpen, LearningRun,
-    LearningRunParams, Method, ProjectRef, Proposal, ProposalDecide, ProposalDecideParams, ProposalDecision,
-    ProposalList, ProposalListResult, ProposalRef, ProposalRollback, ProposalStatus, SessionInfo, SessionKind,
-    StaleMention, Verdict,
+    Appended, Digest, Entry, Event, Evidence, Gate, LearningOpen, LearningRun, LearningRunParams, Method, ProjectRef,
+    Proposal, ProposalDecide, ProposalDecideParams, ProposalDecision, ProposalList, ProposalListResult, ProposalRef,
+    ProposalRollback, ProposalStatus, SessionInfo, SessionKind, StaleMention, Verdict,
 };
 
 use crate::methods::{Conn, Reply, client_name, internal, parse, reply, require_person, session_error};
@@ -35,8 +34,6 @@ pub struct Locks {
     projects: StdMutex<HashMap<SessionId, Arc<tokio::sync::Mutex<()>>>>,
     /// Proposals the judge is working on.
     pub judging: crate::judge::Running,
-    /// Proposals being replayed, and their runs' sessions.
-    pub replaying: crate::replay::Running,
 }
 
 impl Locks {
@@ -46,7 +43,6 @@ impl Locks {
 }
 
 const AFTER_FAILURE: &str = "not run: the static check failed";
-const AFTER_JUDGE: &str = "not run: the judge failed it";
 /// The most of a file as it is now that is read to keep or compare.
 const READ_LIMIT: u64 = 1024 * 1024;
 
@@ -143,7 +139,6 @@ fn work_session(state: &State, cwd: &str, id: &str) -> Result<SessionId, String>
     let info = state.sessions.peek(&sid).ok_or_else(|| format!("there's no session {id}"))?;
     match info.kind.unwrap_or_default() {
         SessionKind::Learning => Err(format!("{id} is the learning session of {}, not a work session", info.cwd)),
-        SessionKind::Replay => Err(format!("{id} is a run of the replay gate, not a work session")),
         SessionKind::Work if info.cwd != cwd => Err(format!("session {id} worked in {}, not in {cwd}", info.cwd)),
         SessionKind::Work => Ok(sid),
     }
@@ -154,11 +149,6 @@ async fn run(state: &Arc<State>, cwd: &str, sessions: Vec<String>) -> Reply {
         work_session(state, cwd, s).map_err(|why| RpcError::new(RpcError::INVALID_PARAMS, why))?;
     }
     let sid = learning_id(&open(state, cwd).await?)?;
-    // Catches up on turns whose end wasn't checked: the daemon stopped
-    // first, or the turn ended without its host.
-    if let Err(e) = crate::watch::check(state, cwd, None).await {
-        crate::log!("could not check predictions for {cwd}: {e:?}");
-    }
     let entries = state
         .sessions
         .append(&sid, vec![Event::LearnRequested { sessions, trigger: None }])
@@ -194,32 +184,17 @@ pub async fn propose(
         Err(_) => None,
     };
     let (verdict, detail) = strive_learning::verdict(&findings);
-    let now = crate::server::epoch_ms();
-    let in_effect = mode(state, cwd).await;
-    let made = crate::judge::Made { proposal: &proposal, before, at_ms: now, gated: in_effect == LearningMode::Gated };
-    let judge = judge_plan(state, cwd, verdict, &made, &entries);
+    let made = crate::judge::Made { proposal: &proposal, before, at_ms: crate::server::epoch_ms() };
     let mut gates = vec![(Gate::Static, verdict, detail)];
-    let (mut call, mut replay) = (None, None);
-    match judge {
-        crate::judge::Plan::Now(v, why) => {
-            gates.push((Gate::Judge, v, why));
-            match replay_plan(state, cwd, verdict, v, &proposal, now, &entries) {
-                crate::replay::Plan::Now(why) => gates.push((Gate::Replay, Verdict::Skipped, why)),
-                crate::replay::Plan::Run(r) => replay = Some(r),
-            }
-        }
-        // The replay waits for the judge's verdict.
+    let mut call = None;
+    match judge_plan(state, cwd, verdict, &made, &entries) {
+        crate::judge::Plan::Now(v, why) => gates.push((Gate::Judge, v, why)),
         crate::judge::Plan::Call(c) => call = Some(c),
     }
-    let made = Event::ProposalMade { call_id, proposal, before, mode: Some(in_effect) };
+    let made = Event::ProposalMade { call_id, proposal, before };
     let written = state.sessions.propose(sid, made, gates).await.map_err(session_error)?;
-    if let Some(made) = written.first() {
-        if let Some(call) = call {
-            crate::judge::start(state, sid, made.seq, call);
-        }
-        if let Some(r) = replay {
-            crate::replay::start(state, sid, made.seq, r);
-        }
+    if let (Some(made), Some(call)) = (written.first(), call) {
+        crate::judge::start(state, sid, made.seq, call);
     }
     Ok(written)
 }
@@ -239,48 +214,7 @@ fn judge_plan(
     }
 }
 
-/// The project's learning mode in effect now.
-async fn mode(state: &State, cwd: &str) -> LearningMode {
-    use crate::settings::LearningMode as Setting;
-    match crate::triggers::mode(state, cwd).await {
-        Setting::Suggest => LearningMode::Suggest,
-        Setting::Gated => LearningMode::Gated,
-        // `auto` is refused when settings load, so never in effect; read as the safe end.
-        Setting::Off | Setting::Auto => LearningMode::Off,
-    }
-}
-
-/// Whether `gated` may accept a proposal made under `made` (the mode it
-/// recorded) now: it must have been `gated` then and be `gated` now. A
-/// proposal made under `suggest` was made with a person deciding, and a
-/// mode raised later (a restart, a project's own lower setting removed)
-/// doesn't change that.
-async fn gated(state: &State, cwd: &str, made: Option<LearningMode>) -> bool {
-    made == Some(LearningMode::Gated) && mode(state, cwd).await == LearningMode::Gated
-}
-
-/// The replay's plan, given the earlier gates' verdicts: it runs only when
-/// neither failed (ADR-0018).
-fn replay_plan(
-    state: &State,
-    cwd: &str,
-    static_verdict: Verdict,
-    judge_verdict: Verdict,
-    proposal: &Proposal,
-    made_at_ms: u64,
-    learning: &[Entry],
-) -> crate::replay::Plan {
-    match (static_verdict, judge_verdict) {
-        (Verdict::Fail, _) => crate::replay::Plan::Now(AFTER_FAILURE.into()),
-        (_, Verdict::Fail) => crate::replay::Plan::Now(AFTER_JUDGE.into()),
-        (Verdict::Pass | Verdict::Skipped, Verdict::Pass | Verdict::Skipped) => {
-            crate::replay::plan(state, cwd, proposal, made_at_ms, learning)
-        }
-    }
-}
-
-/// Journals the judge's verdict on proposal `id`, unless it has one, and
-/// with it the replay's skip, or starts the replay.
+/// Journals the judge's verdict on proposal `id`, unless it has one.
 pub async fn judged(
     state: &Arc<State>,
     sid: &SessionId,
@@ -294,153 +228,10 @@ pub async fn judged(
     if crate::judge::has_verdict(&entries, id) {
         return Ok(());
     }
-    let mut events = vec![Event::GateFinished { proposal: id, gate: Gate::Judge, verdict, detail }];
-    let mut replay = None;
-    let made = strive_learning::fold(&entries).into_iter().find(|f| f.state.id == id);
-    // A proposal decided while it was judged gets no replay: its verdict
-    // couldn't change anything, and it would spend the budget for nothing.
-    if let Some(f) = made.as_ref().filter(|f| f.state.status != ProposalStatus::Checking) {
-        crate::log!(
-            "proposal #{id} was {} before its checks finished; it isn't replayed",
-            strive_learning::status_name(f.state.status)
-        );
-    }
-    if let Some(f) = made.filter(|f| f.state.status == ProposalStatus::Checking)
-        && !crate::replay::has_verdict(&entries, id)
-        && !state.learning.replaying.has(sid, id)
-    {
-        let static_verdict = f.state.gates.iter().find(|g| g.gate == Gate::Static).map_or(Verdict::Pass, |g| g.verdict);
-        let p = &f.state;
-        match replay_plan(
-            state,
-            cwd_of(state, sid)?.as_str(),
-            static_verdict,
-            verdict,
-            &p.proposal,
-            p.made_at_ms,
-            &entries,
-        ) {
-            crate::replay::Plan::Now(why) => {
-                events.push(Event::GateFinished {
-                    proposal: id,
-                    gate: Gate::Replay,
-                    verdict: Verdict::Skipped,
-                    detail: why,
-                });
-            }
-            crate::replay::Plan::Run(r) => replay = Some(r),
-        }
-    }
-    state.sessions.append(sid, events).await.map_err(session_error)?;
-    match replay {
-        Some(r) => crate::replay::start(state, sid, id, r),
-        None => crate::triggers::learning_quiet(state, sid.clone()),
-    }
-    Ok(())
-}
-
-/// Journals the replay's end and its verdict on proposal `id` (unless it
-/// has one). The end, which releases the replay's hold on the budget, is
-/// journaled either way.
-pub async fn replayed(
-    state: &Arc<State>,
-    sid: &SessionId,
-    id: u64,
-    verdict: Verdict,
-    detail: String,
-    done: Option<crate::sessions::ReplayDone>,
-) -> Result<(), RpcError> {
-    let lock = state.learning.project(sid);
-    let _held = lock.lock().await;
-    let mut then = Vec::new();
-    if !crate::replay::has_verdict(&journal(state, sid)?, id) {
-        then.push(Event::GateFinished { proposal: id, gate: Gate::Replay, verdict, detail });
-    }
-    let journaled = !then.is_empty();
-    match done {
-        Some(done) => {
-            state.sessions.release(sid, done, then).await.map_err(session_error)?;
-        }
-        None if !then.is_empty() => {
-            state.sessions.append(sid, then).await.map_err(session_error)?;
-        }
-        None => {}
-    }
-    // The replay's verdict is the cascade's last, so this is the one moment
-    // a proposal can become ready with every check passed. A crash before
-    // the accept leaves it ready for a person.
-    if journaled
-        && verdict == Verdict::Pass
-        && let Err(e) = gate_accept(state, sid, id).await
-    {
-        crate::log!(
-            "proposal #{id} passed every check, but the gate could not accept it ({}); left for a person",
-            e.message
-        );
-    }
+    let verdict = Event::GateFinished { proposal: id, gate: Gate::Judge, verdict, detail };
+    state.sessions.append(sid, vec![verdict]).await.map_err(session_error)?;
     crate::triggers::learning_quiet(state, sid.clone());
     Ok(())
-}
-
-/// Journals the end of a replay stopped before its runs were over, which
-/// releases its hold and charges what its runs cost, with no verdict.
-pub async fn replay_stopped(
-    state: &Arc<State>,
-    sid: &SessionId,
-    id: u64,
-    why: &str,
-    done: crate::sessions::ReplayDone,
-) -> Result<(), RpcError> {
-    let lock = state.learning.project(sid);
-    let _held = lock.lock().await;
-    crate::log!("replay of proposal #{id} stopped after {} runs: {why}", done.runs.len());
-    state.sessions.release(sid, done, Vec::new()).await.map_err(session_error)?;
-    crate::triggers::learning_quiet(state, sid.clone());
-    Ok(())
-}
-
-/// Accepts proposal `id` without a person if the project's learning mode is
-/// `gated`, it's ready, and every check ran and passed (ADR-0020). A skip,
-/// which a person may accept past, never counts here. It's written only
-/// over the file as the learner saw it; otherwise it's left for a person.
-async fn gate_accept(state: &State, sid: &SessionId, id: u64) -> Result<(), RpcError> {
-    let cwd = cwd_of(state, sid)?;
-    let folded = strive_learning::fold(&journal(state, sid)?);
-    let Some(f) = folded.iter().find(|f| f.state.id == id) else {
-        return Ok(());
-    };
-    if !gated(state, &cwd, f.mode).await {
-        return Ok(());
-    }
-    if f.state.status != ProposalStatus::Ready || !strive_learning::every_check_passed(&f.state.gates) {
-        return Ok(());
-    }
-    // A person rolled this content back once; only a person brings it back.
-    let content = strive_journal::cas::digest(f.state.proposal.content.as_bytes());
-    let undone = strive_learning::rolled_back(&folded, &f.state.proposal.artifact)
-        .into_iter()
-        .find(|r| strive_journal::cas::digest(r.proposal.content.as_bytes()) == content);
-    if let Some(r) = undone {
-        crate::log!(
-            "proposal #{id} passed every check, but it's what proposal #{} put there before a person rolled it back; left for a person",
-            r.id
-        );
-        return Ok(());
-    }
-    if apply(state, sid, &cwd, f, GATE.into(), Some(Automatic::Gate)).await?.is_none() {
-        crate::log!(
-            "proposal #{id} passed every check, but its file changed since the learner read it; left for a person"
-        );
-    }
-    Ok(())
-}
-
-/// Who `ProposalDecided` names when the `gated` mode accepts.
-const GATE: &str = "gate";
-
-/// The project a learning session is for.
-fn cwd_of(state: &State, sid: &SessionId) -> Result<String, RpcError> {
-    state.sessions.peek(sid).map(|i| i.cwd).ok_or_else(|| session_error(SessionError::NotFound))
 }
 
 /// The file at `rel` as the learner was last shown it; none if it wasn't
@@ -668,7 +459,6 @@ pub async fn settled(state: &Arc<State>, sid: &SessionId, cwd: &str) -> Result<V
     let folded = strive_learning::fold(&entries);
     let mut events = Vec::new();
     let mut calls = Vec::new();
-    let mut replays = Vec::new();
     for f in folded.iter().filter(|f| f.state.status == ProposalStatus::Checking) {
         let id = f.state.id;
         let had = |gate: Gate| f.state.gates.iter().find(|g| g.gate == gate).map(|g| g.verdict);
@@ -679,66 +469,25 @@ pub async fn settled(state: &Arc<State>, sid: &SessionId, cwd: &str) -> Result<V
             events.push(Event::GateFinished { proposal: id, gate: Gate::Static, verdict: v, detail });
             v
         };
+        if had(Gate::Judge).is_some() || state.learning.judging.has(sid, id) {
+            continue;
+        }
         let p = &f.state;
-        let judge_verdict = match had(Gate::Judge) {
-            Some(v) => Some(v),
-            None if state.learning.judging.has(sid, id) => None,
-            None => match judge_plan(
-                state,
-                cwd,
-                static_verdict,
-                &crate::judge::Made {
-                    proposal: &p.proposal,
-                    before: p.before,
-                    at_ms: p.made_at_ms,
-                    gated: gated(state, cwd, f.mode).await,
-                },
-                &entries,
-            ) {
-                crate::judge::Plan::Now(verdict, detail) => {
-                    events.push(Event::GateFinished { proposal: id, gate: Gate::Judge, verdict, detail });
-                    Some(verdict)
-                }
-                crate::judge::Plan::Call(call) => {
-                    calls.push((id, call));
-                    None
-                }
-            },
-        };
-        // The replay runs once the judge has its verdict.
-        if let Some(judge_verdict) = judge_verdict
-            && had(Gate::Replay).is_none()
-            && !state.learning.replaying.has(sid, id)
-        {
-            match replay_plan(state, cwd, static_verdict, judge_verdict, &p.proposal, p.made_at_ms, &entries) {
-                crate::replay::Plan::Now(detail) => {
-                    events.push(Event::GateFinished {
-                        proposal: id,
-                        gate: Gate::Replay,
-                        verdict: Verdict::Skipped,
-                        detail,
-                    });
-                }
-                crate::replay::Plan::Run(r) => replays.push((id, r)),
+        let made = crate::judge::Made { proposal: &p.proposal, before: p.before, at_ms: p.made_at_ms };
+        match judge_plan(state, cwd, static_verdict, &made, &entries) {
+            crate::judge::Plan::Now(verdict, detail) => {
+                events.push(Event::GateFinished { proposal: id, gate: Gate::Judge, verdict, detail });
             }
+            crate::judge::Plan::Call(call) => calls.push((id, call)),
         }
     }
     for (id, call) in calls {
         crate::judge::start(state, sid, id, call);
     }
-    // Journaled first: a replay that finishes fast must find its judge verdict there.
-    let appended = if events.is_empty() {
-        false
-    } else {
-        state.sessions.append(sid, events).await.map_err(session_error)?;
-        true
-    };
-    for (id, r) in replays {
-        crate::replay::start(state, sid, id, r);
-    }
-    if !appended {
+    if events.is_empty() {
         return Ok(folded);
     }
+    state.sessions.append(sid, events).await.map_err(session_error)?;
     Ok(strive_learning::fold(&journal(state, sid)?))
 }
 
@@ -762,9 +511,8 @@ async fn decide(state: &Arc<State>, cwd: &str, id: u64, decision: ProposalDecisi
     match decision {
         ProposalDecision::Reject => match status {
             ProposalStatus::Checking | ProposalStatus::Ready | ProposalStatus::Failed => {
-                let decided = Event::ProposalDecided { proposal: id, decision, by, automatic: None };
+                let decided = Event::ProposalDecided { proposal: id, decision, by };
                 let entries = state.sessions.append(&sid, vec![decided]).await.map_err(session_error)?;
-                state.learning.replaying.cancel(&sid, id);
                 reply::<ProposalDecide>(Appended { seq: entries.last().map_or(0, |e| e.seq) })
             }
             ProposalStatus::Rejected | ProposalStatus::Applied | ProposalStatus::Stale | ProposalStatus::RolledBack => {
@@ -773,7 +521,7 @@ async fn decide(state: &Arc<State>, cwd: &str, id: u64, decision: ProposalDecisi
         },
         ProposalDecision::Accept => match status {
             ProposalStatus::Ready => {
-                let entries = apply(state, &sid, cwd, &f, by, None).await?.unwrap_or_default();
+                let entries = apply(state, &sid, cwd, &f, by).await?;
                 reply::<ProposalDecide>(Appended { seq: entries.last().map_or(0, |e| e.seq) })
             }
             ProposalStatus::Failed => Err(refused(format!(
@@ -791,16 +539,8 @@ async fn decide(state: &Arc<State>, cwd: &str, id: u64, decision: ProposalDecisi
 }
 
 /// Writes an accepted proposal if the file is still as it was when it was
-/// proposed. Otherwise a person's accept is recorded alone, which makes it
-/// stale, and an automatic one records nothing (`None`).
-async fn apply(
-    state: &State,
-    sid: &SessionId,
-    cwd: &str,
-    f: &Folded,
-    by: String,
-    automatic: Option<Automatic>,
-) -> Result<Option<Vec<Entry>>, RpcError> {
+/// proposed. Otherwise the accept is recorded alone, which makes it stale.
+async fn apply(state: &State, sid: &SessionId, cwd: &str, f: &Folded, by: String) -> Result<Vec<Entry>, RpcError> {
     let id = f.state.id;
     let p = &f.state.proposal;
     let rel = strive_learning::relative_path(&p.artifact).map_err(refused)?;
@@ -814,10 +554,7 @@ async fn apply(
     let _project = state.sessions.workspaces.effect(vec![PathBuf::from(cwd)]).await;
     let now = file_now(state, cwd, &rel).await?.map_err(refused)?;
     let now = now.map(|b| state.cas.put(&b)).transpose().map_err(|e| internal(&e))?;
-    if automatic.is_some() && now != f.state.before {
-        return Ok(None);
-    }
-    let accepted = Event::ProposalDecided { proposal: id, decision: ProposalDecision::Accept, by, automatic };
+    let accepted = Event::ProposalDecided { proposal: id, decision: ProposalDecision::Accept, by };
     let mut events = vec![accepted];
     let after = state.cas.put(p.content.as_bytes()).map_err(|e| internal(&e))?;
     if now == f.state.before {
@@ -834,7 +571,7 @@ async fn apply(
         // be rolled back.
         events.push(Event::ProposalApplied { proposal: id, before: f.state.before, after });
     }
-    state.sessions.append(sid, events).await.map_err(session_error).map(Some)
+    state.sessions.append(sid, events).await.map_err(session_error)
 }
 
 /// Puts an applied proposal's file back as it was, if it's still as applied.

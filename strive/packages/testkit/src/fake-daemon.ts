@@ -1,7 +1,14 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { createServer, type Server, type Socket } from "node:net";
 import { join } from "node:path";
-import type { MethodName, Methods, NotificationName, Notifications, RpcError } from "@strive/protocol";
+import {
+  type MethodName,
+  type Methods,
+  type NotificationName,
+  type Notifications,
+  PROTOCOL_VERSION,
+  type RpcError,
+} from "@strive/protocol";
 
 export type FakeReply<M extends MethodName> = { result: Methods[M]["result"] } | { error: RpcError };
 
@@ -64,7 +71,7 @@ export class FakeDaemon {
           msg.method === "initialize"
             ? {
                 result: {
-                  protocolVersion: 1,
+                  protocolVersion: PROTOCOL_VERSION,
                   server: { version: "fake", build: "fake", pid: 1, startedAtMs: 0 },
                   home: this.dir,
                 },

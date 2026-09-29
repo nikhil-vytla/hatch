@@ -301,7 +301,8 @@ fn doctor_fails_without_a_tui_and_passes_with_one() {
     assert_eq!(out.status.code(), Some(0), "{text}");
     let daemon = text.lines().find(|l| l.contains(" daemon ")).unwrap();
     assert!(
-        daemon.starts_with("ok") && daemon.contains(&format!("pid {}, protocol 1", pid(&env.status()))),
+        daemon.starts_with("ok")
+            && daemon.contains(&format!("pid {}, protocol {}", pid(&env.status()), strive_proto::PROTOCOL_VERSION)),
         "{daemon}"
     );
     let tui = text.lines().find(|l| l.contains(" tui ")).unwrap();

@@ -367,7 +367,7 @@ fn a_rate_limit_or_an_overload_skips_the_judge() {
         let (v, detail, status) = judged_by(reply);
         assert_eq!(v, "skipped", "{detail}");
         assert!(detail.starts_with("not run: the provider was too busy") && detail.contains(why), "{detail}");
-        // A person may accept past a skip; `gated` never counts one as a pass.
+        // A person may accept past a skip.
         assert_eq!(status, "ready", "{detail}");
     }
 }
@@ -450,21 +450,15 @@ fn the_judge_sees_the_proposal_but_not_the_learners_reasoning() {
 }
 
 #[test]
-fn the_judge_is_told_whether_a_person_reviews_its_verdict() {
-    let system = |settings: Value| {
-        let j = judge_with(answer(&verdict(&[])), 0, &settings);
-        let (cited, seq) = j.session("run the tests");
-        j.session("another task");
-        let (mut host, learning) = j.learner();
-        let id = Judge::propose(&mut host, &learning, &memory(&[(&cited, seq)]));
-        j.judged(id);
-        j.model.seen()[0]["system"].as_str().unwrap().to_string()
-    };
-    let suggest = system(json!({"judgeModel": "claude-haiku-4-5"}));
-    assert!(suggest.contains("A person reviews your verdict before anything is written"), "{suggest}");
-    let gated = system(json!({"judgeModel": "claude-haiku-4-5", "learning": {"mode": "gated"}}));
-    assert!(!gated.contains("A person reviews your verdict"), "{gated}");
-    assert!(gated.contains("your verdict may be final"), "{gated}");
+fn the_judge_is_told_a_person_reads_its_verdict() {
+    let j = judge_with(answer(&verdict(&[])), 0, &json!({"judgeModel": "claude-haiku-4-5"}));
+    let (cited, seq) = j.session("run the tests");
+    j.session("another task");
+    let (mut host, learning) = j.learner();
+    let id = Judge::propose(&mut host, &learning, &memory(&[(&cited, seq)]));
+    j.judged(id);
+    let system = j.model.seen()[0]["system"].as_str().unwrap().to_string();
+    assert!(system.contains("A person reads your verdict and reasons beside the change"), "{system}");
 }
 
 #[test]
@@ -508,7 +502,6 @@ fn a_judge_cut_short_by_a_crash_runs_again_on_the_next_look() {
     let events: Vec<strive_proto::Event> = serde_json::from_value(json!([
         {"type": "proposalMade", "proposal": memory(&[(&cited, seq)])},
         {"type": "gateFinished", "proposal": next, "gate": "static", "verdict": "pass", "detail": "fine"},
-        {"type": "gateFinished", "proposal": next, "gate": "replay", "verdict": "skipped", "detail": "not built"},
     ]))
     .unwrap();
     let id = journal.append(entries.last().unwrap().ts_ms, &events).unwrap()[0].seq;

@@ -2,7 +2,7 @@
 // reads the project's work sessions and proposes changes to memory and
 // skills. It has no effect tools: it can't change a file or run a command,
 // and its only output is a proposal, which the daemon checks and a person
-// decides on (or, under `gated`, the daemon accepts once every check passed).
+// decides on.
 import { join } from "node:path";
 import { type Static, Type } from "@earendil-works/pi-ai";
 import type { AgentTool } from "@earendil-works/pi-agent-core";
@@ -27,7 +27,7 @@ const READS = ["list_sessions", "read_session", "read_artifact"];
 
 const RULES = `You are strive's learner for the project in {cwd}.
 
-strive is a coding agent. Its work sessions in this project are journaled: every prompt, reply, tool call, command and its output, approval, interrupt, rewind and failure. You read those journals and propose small, specific changes to what the coding agent is told when a session starts, so that the next sessions go better. You can't change files or run commands. Your only output is a proposal: the daemon checks it, then a person accepts or rejects it, or, where learning is set to "gated", the daemon accepts it with no person reading it once every check passes.
+strive is a coding agent. Its work sessions in this project are journaled: every prompt, reply, tool call, command and its output, approval, interrupt, rewind and failure. You read those journals and propose small, specific changes to what the coding agent is told when a session starts, so that the next sessions go better. You can't change files or run commands. Your only output is a proposal: the daemon checks it, then a person accepts or rejects it.
 
 # What you can change
 
@@ -71,13 +71,7 @@ What cost a session time and will come up again:
 - summary: one line saying what changes, for a list.
 - rationale: what went wrong, how often, and why this text prevents it.
 - evidence: the sessions and entry seqs you rely on, each with a note on what those entries show ("#12 \`bun test\` fails: no display; #15 the user says to run packages/host only"). Cite only this project's sessions, and only entries you read. Every cited session needs at least one entry, and at most 5 sessions may be cited: pick those that show the lesson best.
-- prediction: a falsifiable claim about later sessions that someone could check, naming what would be observed: "Sessions that run the host tests won't first fail with 'no display'." Not "the agent will be more efficient".
-- watch: the prediction as a check the daemon runs on every later session once the change is accepted. Give one whenever the prediction is about commands, their output or exit, or what the user says; leave it out otherwise. A session is its steps in order: each prompt, and each command that ran. A step pattern matches by substrings, ignoring case: \`prompt\` alone, or any of \`command\`, \`output\` and \`exit\` ("zero" or "nonZero"), which must all hold for the same command. \`when\` limits the check to sessions with a matching step. \`expect\` is one of:
-  - never: no step matches. {"when": {"command": "bun test"}, "expect": {"kind": "never", "step": {"command": "bun test", "output": "no display"}}}
-  - any: some step matches. {"when": {"command": "release"}, "expect": {"kind": "any", "step": {"command": "bun run changelog", "exit": "zero"}}}
-  - first: the first step matching \`of\` also matches \`is\`. {"expect": {"kind": "first", "of": {"command": "test"}, "is": {"command": "bun test packages/host"}}}
-  - A correction the user shouldn't have to repeat: {"expect": {"kind": "never", "step": {"prompt": "use bun, not npm"}}}
-  Keep each string short and specific (at most 200 bytes, one line): a string that also appears where the lesson doesn't apply makes the check wrong. If contradictions pile up in later sessions, a person is told the change may be hurting.
+- prediction: a falsifiable claim about later sessions that someone could check, naming what would be observed: "Sessions that run the host tests won't first fail with 'no display'." Not "the agent will be more efficient". The person reviewing the proposal reads it.
 - If the daemon refuses a proposal, or its static check fails, the tool result says why. Fix that and propose again, or drop it.
 
 # Never
@@ -145,44 +139,6 @@ function artifactSchema() {
   ]);
 }
 
-function stepSchema(what: string) {
-  const text = (d: string) =>
-    Type.Optional(Type.String({ description: `${d}; case doesn't matter, at most 200 bytes` }));
-
-  return Type.Object(
-    {
-      prompt: text("A prompt the user sent contains this. Use alone"),
-      command: text("A command that ran contains this"),
-      output: text("That command's output contains this"),
-      exit: Type.Optional(
-        Type.Union([Type.Literal("zero"), Type.Literal("nonZero")], { description: "How that command exited" }),
-      ),
-    },
-    { additionalProperties: false, description: what },
-  );
-}
-
-function watchSchema() {
-  return Type.Object(
-    {
-      when: Type.Optional(stepSchema("Only sessions with a step like this count; leave out for every session")),
-      expect: Type.Union([
-        Type.Object({ kind: Type.Literal("never"), step: stepSchema("No step is like this") }),
-        Type.Object({ kind: Type.Literal("any"), step: stepSchema("Some step is like this") }),
-        Type.Object({
-          kind: Type.Literal("first"),
-          of: stepSchema("The first step like this..."),
-          is: stepSchema("...is also like this"),
-        }),
-      ]),
-    },
-    {
-      additionalProperties: false,
-      description: "The prediction as a check the daemon runs on each later session. Optional; see the rules",
-    },
-  );
-}
-
 /** propose_change's parameters: the protocol's `Proposal`, field for field. */
 export const ProposalParams = Type.Object({
   artifact: artifactSchema(),
@@ -197,8 +153,7 @@ export const ProposalParams = Type.Object({
     }),
     { description: "At most 5 sessions, each with the entries that show the lesson" },
   ),
-  prediction: Type.String({ description: "A falsifiable claim about later sessions, checked later" }),
-  watch: Type.Optional(watchSchema()),
+  prediction: Type.String({ description: "A falsifiable claim about later sessions, for the person reviewing it" }),
 });
 
 export const ReadSessionParams = Type.Object({
@@ -330,8 +285,8 @@ class Learner {
       name: "propose_change",
       label: "propose_change",
       description: [
-        "Propose a change to memory or a skill: the file's whole new content, a one-line summary, the rationale, the evidence (sessions, entry seqs, what they show), a falsifiable prediction and, when it can be, a watch that checks it.",
-        'The daemon records and checks it; nothing changes until it is accepted: by a person, or, where learning is set to "gated", by the daemon once every check passes.',
+        "Propose a change to memory or a skill: the file's whole new content, a one-line summary, the rationale, the evidence (sessions, entry seqs, what they show) and a falsifiable prediction.",
+        "The daemon records and checks it; nothing changes until a person accepts it.",
         `At most ${MAX_PROPOSALS} a run. The result is the proposal's id, or why it was refused.`,
       ].join(" "),
       parameters: ProposalParams,

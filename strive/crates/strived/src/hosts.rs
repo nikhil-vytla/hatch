@@ -96,23 +96,6 @@ impl Hosts {
     }
 }
 
-impl Hosts {
-    /// Whether a host can be started at all.
-    pub fn available() -> bool {
-        command().is_some()
-    }
-
-    /// Stops the host this daemon started for the session, if any: the
-    /// replay gate's hosts are done once their one turn is.
-    pub fn stop(&self, id: &SessionId) {
-        let group = crate::sync::lock(&self.slots).get_mut(id).and_then(|s| s.group.take());
-        if let Some(pgid) = group {
-            // Already gone is fine: it exits when its connection closes.
-            let _ = nix::sys::signal::killpg(nix::unistd::Pid::from_raw(pgid), nix::sys::signal::Signal::SIGTERM);
-        }
-    }
-}
-
 /// How to start a host: `STRIVE_HOST` (a command line, or `none` to never
 /// start one), else `strive-tui host` next to this executable.
 fn command() -> Option<Command> {

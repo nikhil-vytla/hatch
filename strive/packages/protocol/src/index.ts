@@ -136,20 +136,6 @@ export type * from "./generated/ProposalStatus";
 
 export type * from "./generated/SessionKind";
 
-export type * from "./generated/ReplayRun";
-
-export type * from "./generated/Watch";
-
-export type * from "./generated/Expect";
-
-export type * from "./generated/StepMatch";
-
-export type * from "./generated/ExitMatch";
-
-export type * from "./generated/WatchOutcome";
-
-export type * from "./generated/PredictionTally";
-
 export type * from "./generated/StaleMention";
 
 export type * from "./generated/LearnTrigger";
@@ -159,10 +145,6 @@ export type * from "./generated/LearnSignal";
 export type * from "./generated/TriggerKind";
 
 export type * from "./generated/SignalKind";
-
-export type * from "./generated/Automatic";
-
-export type * from "./generated/LearningMode";
 
 export type * from "./generated/SkippedRun";
 

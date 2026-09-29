@@ -2,10 +2,9 @@
 //! - where a proposal's artifact lives in the project;
 //! - the static gate's checks of a proposal's own text;
 //! - a proposal's status, folded from the learning session's journal;
-//! - the judge gate's rubric, request and strict reading of its answer,
-//!   and how a work session is rendered for it;
-//! - the replay gate's tasks, mined from work journals, and its verdict;
-//! - watches: predictions checked on later work journals, and their tallies;
+//! - the judge's rubric, request and strict reading of its answer, and how
+//!   a work session is rendered for it;
+//! - memory lines that may be stale;
 //! - triggers (ADR-0020): the pre-filter's signs in a work journal, and
 //!   what the learning journal says about automatic runs.
 //!
@@ -16,16 +15,14 @@ mod checks;
 mod fold;
 pub mod judge;
 pub mod render;
-pub mod replay;
 pub mod signals;
 pub mod stale;
 pub mod triggers;
-pub mod watch;
 
 pub use checks::{Finding, Rule, check, frontmatter, verdict};
 pub use fold::{Applied, Folded, fold};
 
-use strive_proto::{Artifact, Gate, GateOutcome, ProposalState, ProposalStatus, Verdict};
+use strive_proto::{Artifact, Gate, ProposalState, ProposalStatus};
 
 /// Where memory lives, relative to the project.
 pub const MEMORY_PATH: &str = ".strive/memory.md";
@@ -38,20 +35,13 @@ pub const SKILL_LIMIT: usize = 32 * 1024;
 /// The longest skill name.
 pub const SKILL_NAME_LIMIT: usize = 40;
 
-/// Every gate a proposal goes through, in cascade order. A proposal is
-/// ready once each has a verdict and none failed.
-pub const GATES: [Gate; 3] = [Gate::Static, Gate::Judge, Gate::Replay];
-
-/// Whether every gate ran and passed: the only proposals the `gated`
-/// learning mode accepts without a person (ADR-0020). A skip isn't a pass
-/// here, though it doesn't block a person's accept.
-pub fn every_check_passed(gates: &[GateOutcome]) -> bool {
-    GATES.iter().all(|gate| gates.iter().any(|g| g.gate == *gate && g.verdict == Verdict::Pass))
-}
+/// Every gate a proposal goes through, in order. A proposal is ready once
+/// each has a verdict and none failed.
+pub const GATES: [Gate; 2] = [Gate::Static, Gate::Judge];
 
 /// Proposals for the same file as `artifact` that were applied and then
 /// rolled back, oldest first. A person undid each, so the judge is shown
-/// them and `gated` never accepts one of their contents again.
+/// them.
 pub fn rolled_back<'a>(folded: &'a [Folded], artifact: &Artifact) -> Vec<&'a ProposalState> {
     let Ok(path) = relative_path(artifact) else { return Vec::new() };
     folded

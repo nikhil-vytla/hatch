@@ -5,8 +5,8 @@ use std::process::ExitCode;
 use anyhow::{Result, anyhow};
 use strive_budget::format_usd;
 use strive_proto::{
-    ApprovalMode, Automatic, CallOutcome, Decision, EffectOutcome, EffectRecord, Entry, Event, ProposalDecision,
-    SessionInfo, SessionList, SessionListParams, SessionRead, SessionReadResult, SessionRef, TurnEnd,
+    ApprovalMode, CallOutcome, Decision, EffectOutcome, EffectRecord, Entry, Event, ProposalDecision, SessionInfo,
+    SessionList, SessionListParams, SessionRead, SessionReadResult, SessionRef, TurnEnd,
 };
 
 use crate::client::{Client, ServerError};
@@ -126,18 +126,7 @@ pub fn describe(e: &Entry) -> String {
             crate::review::gate_name(*gate),
             crate::review::verdict_name(*verdict)
         ),
-        Event::ProposalDecided {
-            proposal,
-            decision: ProposalDecision::Accept,
-            automatic: Some(Automatic::Gate),
-            ..
-        } => {
-            format!("proposal #{proposal} accepted automatically: every check passed")
-        }
-        // A person's decision names their client as a client: a client may
-        // call itself anything, `gate` included, and only `automatic` marks
-        // the gate's own accept.
-        Event::ProposalDecided { proposal, decision, by, .. } => format!(
+        Event::ProposalDecided { proposal, decision, by } => format!(
             "proposal #{proposal} {} by {by} (a client)",
             match decision {
                 ProposalDecision::Accept => "accepted",
@@ -147,19 +136,6 @@ pub fn describe(e: &Entry) -> String {
         Event::ProposalApplied { proposal, before: None, .. } => format!("proposal #{proposal} applied: file created"),
         Event::ProposalApplied { proposal, .. } => format!("proposal #{proposal} applied: file replaced"),
         Event::ProposalRolledBack { proposal, by } => format!("proposal #{proposal} rolled back by {by} (a client)"),
-        Event::PredictionChecked { proposal, session, outcome, detail, .. } => format!(
-            "proposal #{proposal}: its prediction {} in session {session}: {detail}",
-            crate::review::outcome_name(*outcome)
-        ),
-        Event::ReplayStarted { proposal, reserved_usd_micros } => {
-            format!("proposal #{proposal}: replaying past tasks, holding up to {}", format_usd(*reserved_usd_micros))
-        }
-        Event::ReplayRunStarted { proposal, session } => {
-            format!("proposal #{proposal}: a replay run in session {session}")
-        }
-        Event::ReplayFinished { proposal, cost_usd_micros, runs, .. } => {
-            format!("proposal #{proposal}: {} replay runs done · {}", runs.len(), format_usd(*cost_usd_micros))
-        }
         Event::ModelSet { model } => format!("model: {model}"),
         Event::Compacted { upto_seq, summary } => {
             format!("conversation up to #{upto_seq} summarized ({} characters)", summary.len())
@@ -237,12 +213,9 @@ pub async fn log(c: &mut Client, id: Option<String>, json: bool) -> Result<ExitC
 pub async fn verify(c: &mut Client, id: Option<String>, all: bool) -> Result<ExitCode> {
     let ids = if all {
         let (mut sessions, unreadable) = listing(c, true).await?;
-        // Learning journals record who accepted what, and replays what the
-        // replay gate saw: they're checked too.
-        for kind in [strive_proto::SessionKind::Learning, strive_proto::SessionKind::Replay] {
-            let params = SessionListParams { cwd: None, kind: Some(kind) };
-            sessions.extend(c.request::<SessionList>(params).await?.sessions);
-        }
+        // Learning journals record who accepted what: they're checked too.
+        let params = SessionListParams { cwd: None, kind: Some(strive_proto::SessionKind::Learning) };
+        sessions.extend(c.request::<SessionList>(params).await?.sessions);
         all_ids(&sessions, &unreadable)
     } else {
         vec![resolve(c, id).await?]

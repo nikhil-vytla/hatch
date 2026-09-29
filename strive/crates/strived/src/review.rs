@@ -8,7 +8,7 @@ use anyhow::{Result, anyhow};
 use strive_proto::{
     BlobGet, BlobGetParams, Event, Gate, LearnTrigger, LearningOpen, LearningRun, LearningRunParams, ProjectRef,
     ProposalDecide, ProposalDecideParams, ProposalDecision, ProposalList, ProposalRef, ProposalRollback, ProposalState,
-    ProposalStatus, SessionAttach, SessionAttachParams, TriggerKind, Verdict, WatchOutcome,
+    ProposalStatus, SessionAttach, SessionAttachParams, TriggerKind, Verdict,
 };
 
 use crate::client::Client;
@@ -70,14 +70,7 @@ const JUDGE_WAIT: std::time::Duration = std::time::Duration::from_secs(300);
 
 /// One proposal in a list.
 fn line(p: &ProposalState) -> String {
-    let mut marks = Vec::new();
-    if p.trigger.is_some() {
-        marks.push("automatic run");
-    }
-    if p.automatic.is_some() {
-        marks.push("accepted automatically");
-    }
-    let marks = if marks.is_empty() { String::new() } else { format!("  [{}]", marks.join(", ")) };
+    let marks = if p.trigger.is_some() { "  [automatic run]" } else { "" };
     format!(
         "#{:<5} {:<12} {:<20} {}{marks}",
         p.id,
@@ -110,9 +103,6 @@ pub async fn review(c: &mut Client, id: Option<u64>, action: Option<Action>) -> 
         }
         for rel in &listed.changed_outside_review {
             println!("{rel} changed outside review: it isn't what an accepted proposal last left there");
-        }
-        for p in proposals.iter().filter(|p| suggest_rollback(p)) {
-            println!("{}", rollback_line(p));
         }
         for s in &listed.may_be_stale {
             println!(
@@ -213,22 +203,8 @@ async fn show(c: &mut Client, p: &ProposalState, rel: &str) -> Result<()> {
         }
         None => writeln!(out, "run         asked for by a person")?,
     }
-    if p.automatic.is_some() {
-        writeln!(
-            out,
-            "decided     accepted automatically: every check passed (\"learning\": {{\"mode\": \"gated\"}})"
-        )?;
-    }
     writeln!(out, "\nwhy\n{}", indent(&p.proposal.rationale))?;
     writeln!(out, "\nprediction\n{}", indent(&p.proposal.prediction))?;
-    match (&p.proposal.watch, &p.prediction) {
-        (Some(w), Some(t)) => {
-            writeln!(out, "  watch: {}", strive_learning::watch::describe(w))?;
-            writeln!(out, "  so far: {}", strive_learning::watch::tally_text(t))?;
-        }
-        (Some(w), None) => writeln!(out, "  watch: {}", strive_learning::watch::describe(w))?,
-        (None, _) => writeln!(out, "  prediction not machine-checked: it has no watch")?,
-    }
     writeln!(out, "\nevidence")?;
     for e in &p.proposal.evidence {
         let seqs = if e.seqs.is_empty() {
@@ -264,7 +240,6 @@ async fn show(c: &mut Client, p: &ProposalState, rel: &str) -> Result<()> {
             format!("a failed proposal can't be accepted; `strive review {id} reject` turns it down")
         }
         ProposalStatus::Checking => "its checks haven't finished; look again in a moment".to_string(),
-        ProposalStatus::Applied if suggest_rollback(p) => rollback_line(p),
         ProposalStatus::Applied => format!("`strive review {id} rollback` puts {rel} back as it was"),
         ProposalStatus::Stale => {
             format!(
@@ -278,33 +253,6 @@ async fn show(c: &mut Client, p: &ProposalState, rel: &str) -> Result<()> {
     }
     print!("{}", crate::terminal::visible(&out));
     Ok(())
-}
-
-/// An applied proposal whose prediction isn't holding: worth a person's look
-/// at rolling it back. strive never does it on its own.
-fn suggest_rollback(p: &ProposalState) -> bool {
-    p.status == ProposalStatus::Applied && p.prediction.is_some_and(|t| t.not_holding)
-}
-
-fn rollback_line(p: &ProposalState) -> String {
-    let t = p.prediction.unwrap_or_default();
-    let rel = strive_learning::relative_path(&p.proposal.artifact).unwrap_or_else(|why| why);
-    format!(
-        "#{} may be hurting: its prediction was contradicted in {} of the last {} sessions it applied to; \
-         `strive review {} rollback` puts {rel} back as it was",
-        p.id,
-        t.recent_contradicted,
-        t.recent_confirmed + t.recent_contradicted,
-        p.id
-    )
-}
-
-pub fn outcome_name(o: WatchOutcome) -> &'static str {
-    match o {
-        WatchOutcome::Confirmed => "held",
-        WatchOutcome::Contradicted => "was contradicted",
-        WatchOutcome::NotApplicable => "didn't apply",
-    }
 }
 
 fn indent(text: &str) -> String {
@@ -322,7 +270,6 @@ pub fn gate_name(g: Gate) -> &'static str {
     match g {
         Gate::Static => "static",
         Gate::Judge => "judge",
-        Gate::Replay => "replay",
     }
 }
 

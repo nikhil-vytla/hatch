@@ -21,8 +21,6 @@ export type DescribeOptions = {
 
 const note = (tone: Tone, text: string): Line[] => [{ kind: "note", tone, text }];
 
-const OUTCOMES = { confirmed: "held", contradicted: "was contradicted", notApplicable: "didn't apply" } as const;
-
 /** A sign the pre-filter found, as `strive review` names it. */
 export const SIGN_NAMES: Record<SignalKind, string> = {
   correction: "a correction",
@@ -235,24 +233,11 @@ export function describe(entry: Entry, options: DescribeOptions = {}): Line[] {
         `#${e.proposal} ${e.gate} check: ${e.verdict}. ${e.detail}`,
       );
     case "proposalDecided":
-      if (e.automatic === "gate") return note("accent", `#${e.proposal} accepted automatically: every check passed`);
-
       return note("muted", `#${e.proposal} ${e.decision === "accept" ? "accepted" : "rejected"} by ${e.by} (a client)`);
     case "proposalApplied":
       return note("accent", `#${e.proposal} applied`);
     case "proposalRolledBack":
       return note("muted", `#${e.proposal} rolled back by ${e.by} (a client)`);
-    case "replayStarted":
-      return note("faint", `#${e.proposal} replaying past tasks, holding up to ${formatUsd(e.reservedUsdMicros)}`);
-    case "replayRunStarted":
-      return note("faint", `#${e.proposal} replay run in session ${e.session}`);
-    case "replayFinished":
-      return note("faint", `#${e.proposal} replayed in ${e.runs.length} runs · ${formatUsd(e.costUsdMicros)}`);
-    case "predictionChecked":
-      return note(
-        e.outcome === "contradicted" ? "danger" : "faint",
-        `#${e.proposal}'s prediction ${OUTCOMES[e.outcome]} in session ${e.session}: ${e.detail}`,
-      );
     default:
       return e satisfies never;
   }

@@ -7,7 +7,7 @@
 //! with higher seqs. A caller that remembers the highest seq it acted on
 //! can ask for only what came after.
 
-use strive_proto::{Decision, Entry, Event, LearnSignal, SignalKind, TurnEnd};
+use strive_proto::{Decision, EffectOutcome, EffectRecord, Entry, Event, LearnSignal, SignalKind, TurnEnd};
 
 /// The most signs one scan returns: the earliest, so a later scan past the
 /// last one returned picks up the rest.
@@ -16,6 +16,9 @@ pub const LIMIT: usize = 20;
 pub const DETAIL_LIMIT: usize = 120;
 /// How much of a prompt is read for correction phrasing, in characters.
 pub const PROMPT_SCAN: usize = 200;
+/// The longest command a `failedThenPassed` sign is found for: longer ones
+/// are rarely a plain check someone would rerun.
+pub const COMMAND_LIMIT: usize = 300;
 
 /// A prompt that opens with one of these words reads as a correction.
 const OPENERS: [&[&str]; 14] = [
@@ -105,8 +108,8 @@ pub fn scan(session: &str, entries: &[Entry], after: u64) -> Vec<LearnSignal> {
             _ => {}
         }
     }
-    for f in crate::replay::fixed(entries) {
-        found.push((f.passed_seq, SignalKind::FailedThenPassed, excerpt(&f.command)));
+    for (seq, command) in failed_then_passed(entries) {
+        found.push((seq, SignalKind::FailedThenPassed, excerpt(&command)));
     }
     found.sort_by_key(|(seq, ..)| *seq);
     found
@@ -115,6 +118,42 @@ pub fn scan(session: &str, entries: &[Entry], after: u64) -> Vec<LearnSignal> {
         .take(LIMIT)
         .map(|(seq, kind, detail)| LearnSignal { session: session.to_string(), seq, kind, detail })
         .collect()
+}
+
+/// Each turn's first command that failed and that the session later ran
+/// again, the same command, with exit 0: the passing run's seq, and the
+/// command.
+fn failed_then_passed(entries: &[Entry]) -> Vec<(u64, String)> {
+    // Bash effects started in a turn: (effect, turn, command).
+    let mut started: Vec<(u64, usize, String)> = Vec::new();
+    // Commands that ran to an exit: (turn, command, exit, seq).
+    let mut runs: Vec<(usize, String, i32, u64)> = Vec::new();
+    let mut turns = 0;
+    for e in entries {
+        match &e.event {
+            Event::TurnStarted { .. } => turns += 1,
+            Event::EffectStarted { effect, record: EffectRecord::Bash { command, .. }, .. } if turns > 0 => {
+                started.push((*effect, turns, command.trim().to_string()));
+            }
+            Event::EffectFinished { effect, outcome: EffectOutcome::Done { exit_code: Some(exit), .. }, .. } => {
+                if let Some((_, turn, command)) = started.iter().find(|(id, ..)| id == effect) {
+                    runs.push((*turn, command.clone(), *exit, e.seq));
+                }
+            }
+            _ => {}
+        }
+    }
+    let mut found: Vec<(usize, u64, String)> = Vec::new();
+    for (turn, command, _, failed) in runs.iter().filter(|r| r.2 != 0 && !r.1.is_empty() && r.1.len() <= COMMAND_LIMIT)
+    {
+        if found.iter().any(|(t, ..)| t == turn) {
+            continue;
+        }
+        if let Some((.., passed)) = runs.iter().find(|r| r.3 > *failed && r.2 == 0 && r.1 == *command) {
+            found.push((*turn, *passed, command.clone()));
+        }
+    }
+    found.into_iter().map(|(_, seq, command)| (seq, command)).collect()
 }
 
 /// Whether a prompt reads as correcting what the agent just did: it opens
