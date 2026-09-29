@@ -4,8 +4,8 @@ import {
   jsonIssue,
   nativeQuestionIssue,
   type NativeQuestion,
-} from "../../packages/decision-runtime/src/native";
-import { probabilityMassAccepted, scoreAgreement } from "../../packages/decision-runtime/src/score";
+} from "../../packages/decision-runtime/src/native.js";
+import { probabilityMassAccepted, scoreAgreement } from "../../packages/decision-runtime/src/score.js";
 import {
   parseCost,
   requestAccounting,
@@ -13,7 +13,7 @@ import {
   type RequestAttempt,
   type RequestAccounting,
   type TokenUsage,
-} from "../../roadmap/runtime/accounting";
+} from "../../roadmap/runtime/accounting.js";
 export type Question = NativeQuestion;
 export type Payload = { state: unknown; questions: Record<string, Question> };
 export class GatewayError extends Error {
