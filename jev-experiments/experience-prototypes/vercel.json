@@ -3,6 +3,7 @@
   "buildCommand": "bun run build",
   "outputDirectory": "dist",
   "framework": "vite",
+  "ignoreCommand": "if git diff --quiet HEAD^ HEAD -- ..; then exit 0; else exit 1; fi",
   "functions": {
     "api/evaluate.ts": {
       "maxDuration": 60
@@ -30,6 +31,19 @@
         {
           "key": "X-Frame-Options",
           "value": "DENY"
+        }
+      ]
+    },
+    {
+      "source": "/(data|judgment-reliability|rewardbench2|outcome-framing|visual-search|icon-studio|arena|decide)/(.*)\\.(json|jsonl)",
+      "headers": [
+        {
+          "key": "Content-Encoding",
+          "value": "gzip"
+        },
+        {
+          "key": "Vary",
+          "value": "Accept-Encoding"
         }
       ]
     }

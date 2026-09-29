@@ -22,8 +22,9 @@ use crate::server::State;
 use crate::sessions::Push;
 use crate::sessions::{Answer, SessionError, SessionId};
 use strive_proto::{
-    AgentConfig, Event, HostRecord, HostRecordParams, HostRegister, HostStream, HostStreamParams, SessionDelta,
-    SessionDeltaNotification, SessionInterrupt, SessionInterruptNotification, SessionInterruptRequested,
+    AgentConfig, Event, HostContext, HostRecord, HostRecordParams, HostRegister, HostStream, HostStreamParams,
+    LearnedFile, LearnerContext, SessionDelta, SessionDeltaNotification, SessionInterrupt,
+    SessionInterruptNotification, SessionInterruptRequested,
 };
 use strive_proto::{ApprovalRespond, ApprovalRespondParams, Decision, SessionApprovals, SessionApprovalsParams};
 use strive_proto::{EffectCancel, EffectCancelParams, EffectRequest};
@@ -399,6 +400,53 @@ async fn host_config(state: &Arc<State>, sid: &SessionId) -> Reply {
     })?;
     let provider = provider_of(&model_id);
     let urls = state.gateway.info(&sid).map_err(|e| internal(&e))?;
+    let (ctx, learned, mcp) = load_context(state, &sid, &info).await?;
+    reply::<HostRegister>(AgentConfig {
+        cwd: info.cwd,
+        base_url: if provider == "anthropic" { urls.anthropic } else { urls.openai },
+        provider: provider.into(),
+        model: model_id,
+        context_window: model.context_window,
+        max_output: model.max_output.min(state.settings.agent_max_output),
+        turn_seconds: state.settings.turn_seconds,
+        compact_at_tokens: match state.settings.compact_at_tokens {
+            0 => model.context_window / 5 * 4,
+            n => n,
+        },
+        instructions: ctx.instructions,
+        skills: ctx.skills,
+        mcp_tools: mcp.tools,
+        kind: info.kind,
+        learned_files: learned,
+    })
+}
+
+/// A learning session's context as a run starts: the files as they are
+/// now, which that run's proposals are checked against and written over.
+async fn learner_context(state: &Arc<State>, sid: &SessionId) -> Reply {
+    let info = state.sessions.info(sid).await.map_err(session_error)?;
+    if info.kind != Some(SessionKind::Learning) {
+        return Err(RpcError::new(
+            RpcError::INVALID_PARAMS,
+            "only a learning session's host asks for its context again",
+        ));
+    }
+    let (ctx, learned, _) = load_context(state, sid, &info).await?;
+    reply::<HostContext>(LearnerContext {
+        instructions: ctx.instructions,
+        skills: ctx.skills,
+        learned_files: learned.unwrap_or_default(),
+    })
+}
+
+/// Loads the context a session's agent is given and journals it as a
+/// `contextLoaded`: its instructions and skills, a work session's MCP
+/// servers, and a learning session's memory and skill files.
+async fn load_context(
+    state: &Arc<State>,
+    sid: &SessionId,
+    info: &strive_proto::SessionInfo,
+) -> Result<(crate::context::Context, Option<Vec<LearnedFile>>, crate::mcp::Summary), RpcError> {
     let home = state.home.root.canonicalize().map_err(|e| internal(&e))?;
     let workspace = std::path::PathBuf::from(&info.cwd);
     let learning = info.kind == Some(SessionKind::Learning);
@@ -433,10 +481,10 @@ async fn host_config(state: &Arc<State>, sid: &SessionId) -> Reply {
             state
                 .mcp
                 .for_session(
-                    &sid,
+                    sid,
                     std::path::Path::new(&info.cwd),
                     &state.settings.mcp_servers,
-                    &state.sessions.session_dir(&sid),
+                    &state.sessions.session_dir(sid),
                 )
                 .await
         }
@@ -460,27 +508,10 @@ async fn host_config(state: &Arc<State>, sid: &SessionId) -> Reply {
         learned: shown,
         skipped: (!ctx.skipped.is_empty()).then(|| ctx.skipped.clone()),
     };
-    state.sessions.append(&sid, vec![loaded]).await.map_err(session_error)?;
-    reply::<HostRegister>(AgentConfig {
-        cwd: info.cwd,
-        base_url: if provider == "anthropic" { urls.anthropic } else { urls.openai },
-        provider: provider.into(),
-        model: model_id,
-        context_window: model.context_window,
-        max_output: model.max_output.min(state.settings.agent_max_output),
-        turn_seconds: state.settings.turn_seconds,
-        compact_at_tokens: match state.settings.compact_at_tokens {
-            0 => model.context_window / 5 * 4,
-            n => n,
-        },
-        instructions: ctx.instructions,
-        skills: ctx.skills,
-        mcp_tools: mcp.tools,
-        kind: info.kind,
-        learned_files: learned.map(|files| {
-            files.into_iter().map(|(artifact, text)| strive_proto::LearnedFile { artifact, text }).collect()
-        }),
-    })
+    state.sessions.append(sid, vec![loaded]).await.map_err(session_error)?;
+    let learned =
+        learned.map(|files| files.into_iter().map(|(artifact, text)| LearnedFile { artifact, text }).collect());
+    Ok((ctx, learned, mcp))
 }
 
 async fn route_host(state: &Arc<State>, conn: &Arc<Conn>, method: &str, params: Value) -> Reply {
@@ -494,6 +525,12 @@ async fn route_host(state: &Arc<State>, conn: &Arc<Conn>, method: &str, params: 
                 release_host(state, conn);
             }
             config
+        }
+        HostContext::NAME => {
+            let SessionRef { id } = parse::<HostContext>(params)?;
+            let sid = session_id(&id)?;
+            require_host(conn, &sid)?;
+            learner_context(state, &sid).await
         }
         HostRecord::NAME => {
             conn.records.fetch_add(1, std::sync::atomic::Ordering::SeqCst);

@@ -90,8 +90,9 @@ message: unknown, } | { "type": "turnEnded", turn: number, reason: TurnEnd, } | 
 mcp: Array<McpStatus>, 
 /**
  * A learning session's only: the memory and skill files its host
- * was given (`AgentConfig.learnedFiles`), by path in the project.
- * A proposal's `before` is the file as last given here.
+ * was given (`AgentConfig.learnedFiles`, `LearnerContext`), by path
+ * in the project. A proposal's `before` is the file as last given
+ * here.
  */
 learned?: Array<ContextFile>, 
 /**

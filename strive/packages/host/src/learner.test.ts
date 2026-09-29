@@ -10,6 +10,7 @@ import type {
   Artifact,
   Entry,
   Event,
+  LearnerContext,
   Proposal,
   SessionInfo,
   SessionReadResult,
@@ -54,6 +55,13 @@ const config = (baseUrl: string, over: Partial<AgentConfig> = {}): AgentConfig =
   mcpTools: [],
   kind: "learning",
   ...over,
+});
+
+/** What `host/context` gives a run when nothing changed since the host registered. */
+const context = ({ instructions, skills, learnedFiles }: AgentConfig): LearnerContext => ({
+  instructions,
+  skills,
+  learnedFiles: learnedFiles ?? [],
 });
 
 // A work session in which the root test run fails for want of a display and
@@ -170,6 +178,7 @@ async function learn(s: Setup, turns = 1) {
 
   daemon = new FakeDaemon({
     "host/register": () => ({ result: config(model.url, s.config) }),
+    "host/context": () => ({ result: context(config(model.url, s.config)) }),
     "session/attach": () => ({ result: { session: learningInfo, entries: [...journal] } }),
     "session/list": (p) => ({
       result: { sessions: [work, older, learningInfo].filter((x) => x.cwd === p.cwd), unreadable: [] },
@@ -556,6 +565,7 @@ async function learnWithPush(model: FakeAnthropic, act: (d: FakeDaemon) => void)
 
   const daemon = new FakeDaemon({
     "host/register": () => ({ result: config(model.url) }),
+    "host/context": () => ({ result: context(config(model.url)) }),
     "session/attach": () => ({ result: { session: learningInfo, entries: [started, request(2, T0)] } }),
     "host/record": (p) => {
       recorded.push(p.event);

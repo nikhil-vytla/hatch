@@ -16,6 +16,7 @@ import type { HostRecordParams } from "./HostRecordParams";
 import type { HostStreamParams } from "./HostStreamParams";
 import type { InitializeParams } from "./InitializeParams";
 import type { InitializeResult } from "./InitializeResult";
+import type { LearnerContext } from "./LearnerContext";
 import type { LearningDismissParams } from "./LearningDismissParams";
 import type { LearningRunParams } from "./LearningRunParams";
 import type { LearningSignalsParams } from "./LearningSignalsParams";
@@ -70,6 +71,7 @@ export type Methods = {
   "proposal/decide": { params: ProposalDecideParams; result: Appended };
   "proposal/rollback": { params: ProposalRef; result: Appended };
   "host/register": { params: SessionRef; result: AgentConfig };
+  "host/context": { params: SessionRef; result: LearnerContext };
   "host/record": { params: HostRecordParams; result: Appended };
   "host/stream": { params: HostStreamParams; result: Empty };
   "session/interrupt": { params: SessionRef; result: Empty };

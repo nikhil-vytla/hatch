@@ -72,6 +72,24 @@ Files: `realtime.replay.json` (every decision with world send and arrival times;
 
 Record new runs with `bun jev-experiments/packages/arena/scripts/record-framings.ts` or `record-realtime.ts` after moving these files; the recorders refuse to overwrite them.
 
+## Which Jev answered
+
+Every Jev recording here went through the Vercel AI Gateway as `typesafe-ai/jev`, and the gateway
+never names a build: replies report `model: "typesafe-ai/jev"`, and pinned IDs such as
+`typesafe-ai/jev-1.13.0` return 404 (checked 29 Sep 2026). What the gateway does say:
+
+- Its model list gives Jev a release date of 2026-09-15. Every recording in this folder is later
+  (22–29 Sep 2026).
+- TypeSafe's own API reports the versioned ID that answered, and its docs say `jev-latest` points
+  to `jev-1.13.0` ([docs.typesafe.ai/models](https://docs.typesafe.ai/models), read 29 Sep 2026).
+  TypeSafe's workflow evals (evals.typesafe.ai) ran a build they label `v13`. So these recordings
+  are most likely 1.13.0, but nothing in them proves it.
+- The gateway can route Jev to more than one host (`typesafe-ai`, with `digitalocean` as a
+  fallback), and it reports which one answered. From 29 Sep 2026 the arena recorders keep that
+  as `servedBy`, with the gateway's `generationId`; earlier rows don't have them.
+
+Compare these numbers with TypeSafe's only as "Jev through the gateway, around this date".
+
 ## One box (every keystroke prefix)
 
 - `one-box.jsonl.gz`: Jev answering One box's 14 questions (after anishfn/shapeshift) for all

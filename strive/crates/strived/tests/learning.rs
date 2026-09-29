@@ -304,6 +304,62 @@ fn a_proposal_is_written_only_over_the_file_the_learner_was_shown() {
     assert_eq!(fs::read_to_string(cwd.join(".strive/skills/release/SKILL.md")).unwrap(), "mine\n");
 }
 
+/// A host that lives on runs many times: each run starts from `host/context`,
+/// and its proposals are written over the files as that run was shown them.
+#[test]
+fn each_run_is_shown_the_files_as_they_are_when_it_starts() {
+    let env = Env::new();
+    let cwd = project();
+    let work = work_session(&env, &cwd);
+    write(&memory_file(&cwd), "at registration\n");
+    let (mut host, id) = learner(&env, &cwd);
+    write(&memory_file(&cwd), "by hand since\n");
+    write(&cwd.join(".strive/skills/release/SKILL.md"), SKILL);
+
+    let context = host.ok("host/context", &json!({"id": id}));
+    assert_eq!(
+        context["learnedFiles"],
+        json!([
+            {"artifact": {"kind": "memory"}, "text": "by hand since\n"},
+            {"artifact": {"kind": "skill", "name": "release"}, "text": SKILL},
+        ])
+    );
+    let skills: Vec<&str> = context["skills"].as_array().unwrap().iter().map(|s| s["name"].as_str().unwrap()).collect();
+    assert_eq!(skills, ["release"], "{context}");
+    let loaded = events(&env, &id, "contextLoaded");
+    assert_eq!(loaded.len(), 2, "registration, then this run: {loaded:?}");
+    assert_eq!(
+        loaded[1]["learned"][0],
+        json!({"path": ".strive/memory.md", "digest": digest(b"by hand since\n"), "bytes": 14})
+    );
+    assert_eq!(loaded[1]["skills"], json!(["release"]));
+
+    let p = propose(&mut host, &id, &memory("learned\n", &work));
+    assert_eq!(proposal(&env, &cwd, p)["before"], digest(b"by hand since\n"), "what this run was shown");
+    assert!(decide(&env, &cwd, p, "accept").get("error").is_none());
+    assert_eq!(status(&env, &cwd, p), "applied");
+    assert_eq!(fs::read_to_string(memory_file(&cwd)).unwrap(), "learned\n");
+}
+
+#[test]
+fn only_a_learning_sessions_own_host_asks_for_its_context_again() {
+    let env = Env::new();
+    let cwd = project();
+    let work = work_session(&env, &cwd);
+    let mut worker = common::slow_rpc(&env);
+    worker.ok("host/register", &json!({"id": work}));
+    let r = worker.call("host/context", &json!({"id": work}));
+    assert_eq!(r["error"]["code"], RpcError::INVALID_PARAMS, "a work session: {r}");
+    assert_eq!(events(&env, &work, "contextLoaded").len(), 1, "nothing journaled: {r}");
+
+    let (_host, id) = learner(&env, &cwd);
+    let r = common::slow_rpc(&env).call("host/context", &json!({"id": id}));
+    assert_eq!(r["error"]["code"], RpcError::NOT_THE_HOST, "not its host: {r}");
+    let r = worker.call("host/context", &json!({"id": id}));
+    assert_eq!(r["error"]["code"], RpcError::NOT_THE_HOST, "another session's host: {r}");
+    assert_eq!(events(&env, &id, "contextLoaded").len(), 1, "only the registration's: {r}");
+}
+
 // --- Who may propose ---
 
 #[test]
