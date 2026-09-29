@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { motion } from "motion/react";
 import { ArrowUpRight, ArrowLeft, ArrowRight, Check } from "lucide-react";
 import { Pane, Stat, Fold, Button, Notice } from "./shared";
+import { CalibrationPanel } from "./calibration-panel";
 const pct = (n: number) => `${(Math.round(n * 1000 + 1e-8) / 10).toFixed(1)}%`;
 const number = (n: number | null | undefined, d = 3) =>
   n == null ? "—" : n.toFixed(d);
@@ -493,6 +494,7 @@ export function LocalModels({ result: r }: { result: any }) {
           their uncertainty is visible above.
         </p>
       </Pane>
+      <CalibrationPanel result={r} />
       <Fold title="Results by workflow">
         <p className="fine">
           {selected?.name}, 100 cases and 500 decisions per workflow.
