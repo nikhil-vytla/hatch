@@ -351,6 +351,46 @@ fn unattended_full_auto_refuses_a_learned_file() {
     assert!(!w.file(".strive/memory.md").exists());
 }
 
+/// Instruction files and skills, at any depth (a later session may start in
+/// any directory), and the project's settings reach every later session as
+/// memory does, so full-auto can't change them unasked either; each
+/// refusal says why, without pointing at `strive learn`.
+#[test]
+fn unattended_full_auto_refuses_what_shapes_later_sessions() {
+    let w = Ws::new();
+    w.mode("fullAuto");
+    fs::write(w.file("AGENTS.md"), "Rules.\n").unwrap();
+    let told = "this changes what every future session in this project is told";
+    let settings = "this changes strive's settings for every future session in this project";
+    let unattended = "needs a person's approval even in full-auto, and no client is attached to give it";
+    let tries = [
+        (json!({"kind": "edit", "path": "AGENTS.md", "oldText": "Rules.", "newText": "None."}), "edit AGENTS.md", told),
+        (json!({"kind": "write", "path": "CLAUDE.md", "content": "x"}), "write CLAUDE.md", told),
+        (json!({"kind": "write", "path": "pkg/app/CLAUDE.md", "content": "x"}), "write pkg/app/CLAUDE.md", told),
+        (json!({"kind": "write", "path": "pkg/agents.md", "content": "x"}), "write pkg/agents.md", told),
+        (
+            json!({"kind": "write", "path": ".claude/skills/x/SKILL.md", "content": "x"}),
+            "write .claude/skills/x/SKILL.md",
+            told,
+        ),
+        (
+            json!({"kind": "write", "path": ".strive/settings.json", "content": "{}"}),
+            "write .strive/settings.json",
+            settings,
+        ),
+    ];
+    for (request, starts, why) in tries {
+        let r = w.spawn_effect(request).join().unwrap();
+        let text = r["text"].as_str().unwrap();
+        assert_eq!(r["outcome"]["kind"], "refused", "{text}");
+        assert_eq!(text, format!("{starts}: {why} {unattended}"));
+    }
+    assert_eq!(fs::read_to_string(w.file("AGENTS.md")).unwrap(), "Rules.\n");
+    for path in ["CLAUDE.md", "pkg", ".claude", ".strive"] {
+        assert!(!w.file(path).exists(), "{path}");
+    }
+}
+
 /// However the path is spelled: through a symlink, with `..`, or (on a
 /// case-insensitive filesystem) in other case.
 #[test]
@@ -400,31 +440,6 @@ fn a_learned_file_asks_by_any_path_that_reaches_it() {
     }
     assert_eq!(fs::read_to_string(w.file(".strive/memory.md")).unwrap(), "old memory\n");
     assert_eq!(fs::read_to_string(w.file(".strive/skills/ship/SKILL.md")).unwrap(), "old skill\n");
-}
-
-/// Sessions are given what the memory file and skills directory lead to,
-/// so a file they point at through a symlink is learned too.
-#[test]
-fn a_file_the_learned_paths_link_to_asks_too() {
-    let w = Ws::new();
-    w.mode("fullAuto");
-    fs::create_dir_all(w.file(".strive")).unwrap();
-    fs::create_dir_all(w.file("docs/skills/ship")).unwrap();
-    std::os::unix::fs::symlink("../docs/notes.md", w.file(".strive/memory.md")).unwrap();
-    std::os::unix::fs::symlink("../docs/skills", w.file(".strive/skills")).unwrap();
-    let mut ui = w.attached();
-    let pending = w.spawn_effect(json!({"kind": "write", "path": "docs/notes.md", "content": "x"}));
-    assert_learned_request(&next_request(&mut ui), "write docs/notes.md, which is .strive/memory.md:");
-    ui.ok("approval/respond", &json!({"id": w.id, "effect": 1, "decision": "deny"}));
-    pending.join().unwrap();
-    let pending = w.spawn_effect(json!({"kind": "write", "path": "docs/skills/ship/SKILL.md", "content": "x"}));
-    assert_learned_request(
-        &next_request(&mut ui),
-        "write docs/skills/ship/SKILL.md, which is .strive/skills/ship/SKILL.md:",
-    );
-    ui.ok("approval/respond", &json!({"id": w.id, "effect": 2, "decision": "deny"}));
-    pending.join().unwrap();
-    assert!(!w.file("docs/notes.md").exists() && !w.file("docs/skills/ship/SKILL.md").exists());
 }
 
 fn case_insensitive(dir: &std::path::Path) -> bool {

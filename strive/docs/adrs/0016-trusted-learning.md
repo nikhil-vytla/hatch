@@ -189,5 +189,10 @@ A proposal is `ready` once the static check passed and the judge finished
   commands writes there (Linux: where the files exist; `sandbox: off`: not
   at all). An editor or git still can, and so can an MCP server (they run
   unsandboxed and are trusted as the user is); `strive review` lists such a
-  file as changed outside review. `AGENTS.md`, `CLAUDE.md` and
-  `.claude/skills` are ordinary project files outside review.
+  file as changed outside review.
+- **Nor can it change the rest of what shapes later sessions** (amended
+  2026-09-28): `AGENTS.md`, `CLAUDE.md`, `.claude/skills` and
+  `.strive/settings.json` are on the same list as memory and skills, one
+  that the loader reads from and the gate and the sandbox guard. They are
+  still the project's own files, outside review: a person asked approves a
+  change, and an edit by hand isn't flagged.

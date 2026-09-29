@@ -71,8 +71,8 @@ fn imports_are_inlined_once_and_cycles_stop() {
         "AGENTS.md wins; it imports CLAUDE.md, whose import back to AGENTS.md would cycle and stays as text"
     );
     fs::remove_file(root.join("AGENTS.md")).unwrap();
-    write(&root.join("rules/style.md"), "Style.");
-    write(&root.join("CLAUDE.md"), "Start.\n@rules/style.md\nEnd.");
+    write(&root.join("rules/AGENTS.md"), "Style.");
+    write(&root.join("CLAUDE.md"), "Start.\n@rules/AGENTS.md\nEnd.");
     let (_, config) = register(&env, &root);
     assert_eq!(config["instructions"][0]["text"], "Start.\nStyle.\nEnd.");
 }
@@ -242,4 +242,56 @@ fn a_learned_skills_directory_that_is_a_symlink_is_not_loaded() {
     std::os::unix::fs::symlink(root.join("elsewhere"), root.join(".strive/skills")).unwrap();
     let (_, config) = register(&env, &root);
     assert_eq!(config["skills"], json!([]), "{config}");
+}
+
+/// Everything the loader gives a session is on one list that the approval
+/// gate and the sandbox guard. What a listed path leads to elsewhere (a
+/// symlink, an import) isn't loaded: an edit there would change what every
+/// session is told with no one asked. A link or import to another listed
+/// file is loaded.
+#[test]
+fn the_loader_reads_nothing_outside_the_list() {
+    let env = Env::new();
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path().canonicalize().unwrap();
+    git_init(&root);
+    std::os::unix::fs::symlink("CLAUDE.md", root.join("AGENTS.md")).unwrap();
+    write(&root.join("CLAUDE.md"), "Root.\n@docs/y.md\n@pkg/rules/AGENTS.md");
+    write(&root.join("docs/y.md"), "Imported instructions.");
+    write(&root.join("pkg/rules/AGENTS.md"), "Imported rules.");
+    write(&root.join("pkg/docs/x.md"), "Linked instructions.");
+    std::os::unix::fs::symlink("docs/x.md", root.join("pkg/AGENTS.md")).unwrap();
+    write(&root.join("elsewhere/ext/SKILL.md"), "---\nname: ext\ndescription: Linked skill.\n---\n");
+    fs::create_dir_all(root.join("pkg/.claude/skills")).unwrap();
+    std::os::unix::fs::symlink(root.join("elsewhere/ext"), root.join("pkg/.claude/skills/ext")).unwrap();
+    write(&root.join("pkg/.claude/skills/own/SKILL.md"), "---\nname: own\ndescription: Here.\n---\n");
+    let (id, config) = register(&env, &root.join("pkg"));
+    let texts: Vec<&str> =
+        config["instructions"].as_array().unwrap().iter().map(|f| f["text"].as_str().unwrap()).collect();
+    assert_eq!(texts, vec!["Root.\n@docs/y.md\nImported rules."], "{config}");
+    let names: Vec<&str> = config["skills"].as_array().unwrap().iter().map(|s| s["name"].as_str().unwrap()).collect();
+    assert_eq!(names, vec!["own"], "{config}");
+
+    // What it did load, the gate guards: full-auto, unattended, can't write
+    // any of it, nor the file an instruction file imported.
+    let mut c = env.rpc();
+    c.ok("session/approvals", &json!({"id": id, "mode": "fullAuto"}));
+    let write_to = |c: &mut common::Rpc, path: &str| {
+        c.ok(
+            "effect/run",
+            &json!({"id": id, "callId": "c", "request": {"kind": "write", "path": path, "content": "x"}}),
+        )
+    };
+    let instructions = config["instructions"].as_array().unwrap().iter().map(|f| f["path"].as_str().unwrap());
+    let skills = config["skills"].as_array().unwrap().iter().map(|s| s["path"].as_str().unwrap());
+    let imported = root.join("pkg/rules/AGENTS.md").display().to_string();
+    for path in instructions.chain(skills).chain([imported.as_str()]) {
+        let r = write_to(&mut c, path);
+        assert_eq!(r["outcome"]["kind"], "refused", "{path}: {r}");
+        assert!(r["text"].as_str().unwrap().contains("every future session"), "{path}: {r}");
+    }
+    // The file a skipped link leads to is an ordinary one: writing it is
+    // free, and it stays out of every session.
+    let r = write_to(&mut c, "docs/x.md");
+    assert_eq!(r["outcome"]["kind"], "done", "{r}");
 }

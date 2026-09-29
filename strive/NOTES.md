@@ -1969,3 +1969,90 @@ an offline `strive eval`, a later PR.
   (with two gates both forms agree) and `>` to `>=` in
   `failed_then_passed` (the equal seq is the failed run, excluded by its
   exit). The deleted files' 18 deferred survivors are gone with them.
+
+## 2026-09-28: one list of what shapes a session (item 3 of the plan)
+
+Three notions of "files that shape later sessions" had drifted apart: the
+loader's (instruction files root to workspace, memory, three skills
+directories), `learned_file` (memory and `.strive/skills`) and PR #82's
+`protected` (files that run code). A full-auto session could rewrite
+`AGENTS.md`, `CLAUDE.md`, `.claude/skills` or `.strive/settings.json`
+unasked, with no sandbox rule in the way.
+
+- **The list** is `context::SHAPING`, by last components at any depth
+  under the project's root (the repository's, or the workspace outside
+  one), since a later session can start in any directory: `AGENTS.md`,
+  `CLAUDE.md`, `.claude/skills` (told), `.strive/memory.md`,
+  `.strive/skills` (learned), `.strive/settings.json` (settings). Home adds
+  its `AGENTS.md` and `skills`; home is closed to the agent anyway. The
+  daemon reads MCP config only from `~/.strive/settings.json`; `.mcp.json`
+  stays on #82's list.
+- **The loader uses it:** every file it reads (instruction files, imports,
+  memory, `SKILL.md`s) must have a real path on the list (`Anchors::listed`,
+  which replaced `allowed`). A new source not added to the list fails
+  closed: it isn't read.
+- **Symlinks, decided:** the loader skips a listed path whose real path
+  isn't listed. The other option, protecting the resolved target, would
+  have to follow every link and import in every directory a later session
+  could start in; the gate can't enumerate that. Skipping needs only the
+  list. It also covers imports, which have the same shape: `@docs/x.md`
+  now stays as text (a behaviour change; `@rules/AGENTS.md` still
+  inlines, and `CLAUDE.md -> AGENTS.md` still loads). Memory and
+  `.strive/skills` keep the stricter "no symlink at all", since memory is
+  labeled reviewed.
+- **Merged or deleted:**
+  - `learned_file` and `protected` became one `guarded` (the list plus
+    `RUNS_CODE`), `Access::Learned`/`Protected` one `Access::Guarded`, and
+    #82's `PROTECTED_FILES`/`PROTECTED_DIRS` one `RUNS_CODE` of `a/b`
+    strings, matched by the same `context::matches` (windows, any case).
+  - `protected_rules` became `guarded_rules`, which writes the Seatbelt
+    rules for both lists, plus a literal deny on the directories holding a
+    listed path (`.strive`, `.claude`) anywhere, so neither can be moved
+    into place. That replaced the hand-written `.strive`/memory/skills
+    literals. It is anchored at the project's root, not the workspace:
+    instruction files above the workspace can sit in a temp directory
+    commands may write.
+  - `leads_to`, `follow`, `SYMLINK_HOPS` and the sandbox's memory and
+    skills link targets are gone. They protected the file a symlinked
+    memory or skills directory led to, but since 2026-09-24 the loader
+    doesn't load such a file, so it was a second mechanism for one rule.
+    Their two tests (`a_file_the_learned_paths_link_to_asks_too`,
+    `the_sandbox_protects_the_file_learned_memory_links_to`) went with
+    them; `learned_memory_and_skills_reached_through_a_symlink_are_not_loaded`
+    still holds the property.
+  - Linux binds come from the same two lists, in the workspace itself.
+- **Kept:** `outside_review` stays learned files only; a person editing
+  `AGENTS.md` by hand is normal. `context::learned` (the learner's view)
+  is unchanged.
+- **Wording:** learned files keep the `strive learn` text; instruction
+  files and skills say "this changes what every future session in this
+  project is told"; settings "this changes strive's settings for every
+  future session in this project". #82's files now also show "X, which is
+  Y" when the path given isn't the real one.
+- **Tests, failing first:**
+  - `unattended_full_auto_refuses_what_shapes_later_sessions` (approvals:
+    an `AGENTS.md` edit, `CLAUDE.md`, `pkg/app/CLAUDE.md`, `pkg/agents.md`,
+    `.claude/skills/x/SKILL.md`, `.strive/settings.json`, exact text);
+  - `the_sandbox_keeps_commands_from_what_shapes_later_sessions` (effects:
+    macOS by pattern, nested, other case, and `mv c .claude`; Linux the
+    existing ones; other files still writable);
+  - `the_loader_reads_nothing_outside_the_list` (context: a symlinked
+    `AGENTS.md` and an import off the list skipped, a linked-in skill
+    skipped; every path the loader did give, plus an imported `AGENTS.md`,
+    is refused to an unattended full-auto write; the skipped link's target
+    stays freely writable).
+  - The `@rules/style.md` half of `imports_are_inlined_once_and_cycles_stop`
+    became `@rules/AGENTS.md`. `full_auto_writes_other_files_without_asking`
+    still passes: normal files are auto-allowed.
+- **Linux:** `scripts/test-linux.sh`'s cached `rust:latest` is amd64 on
+  this Mac and bubblewrap fails under emulation ("Can't open source /"),
+  so the same job ran on the older arm64 rust image by ID: effects 33,
+  approvals 23, mcp 12, context 14, all passing, clippy clean.
+- **Line delta** (`git diff --numstat`): `context.rs` +97/−40,
+  `effects.rs` +90/−163, so daemon source is 16 lines smaller with three
+  guards on one list; tests +133/−45.
+- **Gaps:** on Linux, nested listed files (`pkg/AGENTS.md`) and missing
+  ones can still be written by a command (as for #82). A skill's other
+  files, read later through a symlink inside a listed skills directory,
+  aren't checked; only `SKILL.md` is loaded. `"sandbox": "off"` and MCP
+  servers are outside all of this, as before.
