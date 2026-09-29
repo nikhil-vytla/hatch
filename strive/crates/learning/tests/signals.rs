@@ -415,3 +415,36 @@ fn a_triggers_signs_read_as_one_line() {
     t.signals.push(LearnSignal { kind: SignalKind::Correction, ..t.signals[0].clone() });
     assert_eq!(describe(&t.signals), "a correction and an interrupted turn in session S1");
 }
+
+#[test]
+fn one_failed_then_passed_sign_a_turn_and_only_for_commands_run_in_a_turn() {
+    let mut j = Journal::new();
+    // Before any turn: not the agent's.
+    j.run("make", 1);
+    j.prompt("fix it");
+    j.turn();
+    j.run("make", 0);
+    // Two commands red to green in one turn: the first is the sign.
+    j.run("bun test", 1);
+    j.run("cargo test", 1);
+    let passed = j.run("bun test", 0);
+    j.run("cargo test", 0);
+    j.end(TurnEnd::Done);
+    let found = scan("S", &j.entries(), 0);
+    assert_eq!(kinds(&found), vec![(passed, SignalKind::FailedThenPassed)]);
+    assert_eq!(found[0].detail, "bun test");
+}
+
+#[test]
+fn a_command_that_only_passed_or_is_too_long_to_be_a_check_is_no_sign() {
+    let mut j = Journal::new();
+    j.prompt("look around");
+    j.turn();
+    j.run("ls", 0);
+    j.run("ls", 0);
+    let long = format!("echo {}", "x".repeat(strive_learning::signals::COMMAND_LIMIT));
+    j.run(&long, 1);
+    j.run(&long, 0);
+    j.end(TurnEnd::Done);
+    assert_eq!(scan("S", &j.entries(), 0), vec![]);
+}
