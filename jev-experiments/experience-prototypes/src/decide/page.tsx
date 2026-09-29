@@ -411,10 +411,12 @@ export function DecidePage() {
       .then((json) => {
         const parsed = decideSchema.parse(json);
         const saved = loadPicks();
+        // A link to one call (#/decide/<id>) opens it; otherwise pick up at the first unanswered one.
+        const linked = parsed.decisions.findIndex((d) => location.hash === `#/decide/${d.id}`);
         const next = parsed.decisions.findIndex((d) => !saved[d.id]);
 
         setData(parsed);
-        setIndex(next === -1 ? 0 : next);
+        setIndex(linked !== -1 ? linked : next === -1 ? 0 : next);
       })
       .catch(() => setError("The decisions could not be loaded."));
   }, []);
@@ -527,6 +529,10 @@ export function DecidePage() {
           {summary.agree.map((a) => `${a.name} agreed with you on ${a.n}`).join(", ")}.
         </p>
       )}
+
+      <p className="dc-results-link">
+        <a href="#/decide/results">See what all the answers add up to →</a>
+      </p>
 
       <p className="dc-honest muted small">
         Model answers were recorded once and are replayed here, so answering costs nothing. Vote

@@ -43,6 +43,37 @@ export class TallyError extends Error {
   }
 }
 
+/**
+ * One visitor, for counting. An IPv6 connection usually owns a whole /64 of addresses, so an
+ * IPv6 visitor is their /64; otherwise one person could vote once per address.
+ */
+export function visitorOf(ip: string) {
+  const v = ip.trim().toLowerCase();
+
+  if (!v.includes(":")) return v;
+
+  // An IPv4 address written as IPv6 (::ffff:203.0.113.9) is still one IPv4 visitor.
+  const mapped = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/.exec(v);
+
+  if (mapped) return mapped[1];
+
+  const [head, tail = ""] = v.split("::");
+  const left = head ? head.split(":") : [];
+  const right = v.includes("::") && tail ? tail.split(":") : [];
+
+  const groups = v.includes("::")
+    ? [...left, ...Array(Math.max(0, 8 - left.length - right.length)).fill("0"), ...right]
+    : left;
+
+  return `${groups
+    .slice(0, 4)
+    .map((g) => g.replace(/^0+(?=.)/, ""))
+    .join(":")}::/64`;
+}
+
+/** Past this many visitors in a day, a decision stops counting new votes until tomorrow. */
+export const MAX_VOTERS_PER_DAY = 20_000;
+
 const hash = (...parts: string[]) =>
   createHash("sha256").update(parts.join("\u0000")).digest("hex").slice(0, 24);
 
@@ -64,6 +95,15 @@ export async function countsFor(store: Store, id: string) {
   return countsOf(id, (await store.read(id)).doc);
 }
 
+/** Counts for every decision, for the results page. */
+export async function allCounts(store: Store) {
+  const pairs = await Promise.all(
+    DECK.map(async (d) => [d.id, await countsFor(store, d.id)] as const),
+  );
+
+  return Object.fromEntries(pairs);
+}
+
 export async function vote(
   store: Store,
   ballot: Vote,
@@ -76,7 +116,7 @@ export async function vote(
   if (!d.options.some((o) => o.id === ballot.option)) throw new TallyError("Unknown option.", 400);
 
   const day = now.toISOString().slice(0, 10);
-  const who = hash(salt, visitor, d.id, day);
+  const who = hash(salt, visitorOf(visitor), d.id, day);
 
   for (let attempt = 0; attempt < 5; attempt++) {
     const { doc, version } = await store.read(d.id);
@@ -84,6 +124,9 @@ export async function vote(
     if (doc.voters[who] === day) return { counted: false, counts: countsOf(d.id, doc) };
 
     const voters = Object.fromEntries(Object.entries(doc.voters).filter(([, v]) => v === day));
+
+    if (Object.keys(voters).length >= MAX_VOTERS_PER_DAY)
+      return { counted: false, counts: countsOf(d.id, doc) };
 
     const next: TallyDoc = {
       counts: { ...doc.counts, [ballot.option]: (doc.counts[ballot.option] ?? 0) + 1 },

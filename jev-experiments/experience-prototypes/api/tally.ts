@@ -1,6 +1,6 @@
 import { BlobPreconditionFailedError, get, put } from "@vercel/blob";
 import {
-  countsFor,
+  allCounts,
   EMPTY,
   TallyError,
   tallyDocSchema,
@@ -57,9 +57,16 @@ export async function tallyHandler(req: any, res: any, store: Store | null, salt
 
   try {
     if (req.method === "GET") {
-      const id = new URL(req.url ?? "/", "http://x").searchParams.get("id") ?? "";
+      const params = [...new URL(req.url ?? "/", "http://x").searchParams];
 
-      return res.status(200).json({ available: true, counts: await countsFor(store, id) });
+      // Exactly ?all=1: any other query would miss the CDN cache and cost a read per call each time.
+      if (params.length !== 1 || params[0][0] !== "all" || params[0][1] !== "1")
+        return res.status(400).json({ error: "Use GET /api/tally?all=1." });
+
+      // The results page reads every decision; the CDN keeps it a minute so views don't each cost 20 reads.
+      res.setHeader("Cache-Control", "public, s-maxage=60, stale-while-revalidate=300");
+
+      return res.status(200).json({ available: true, tallies: await allCounts(store) });
     }
 
     if (req.method !== "POST") return res.status(405).json({ error: "Use GET or POST." });
