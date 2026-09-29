@@ -128,8 +128,9 @@ enum Cmd {
         mode: ApprovalMode,
         reply: oneshot::Sender<io::Result<Vec<Entry>>>,
     },
+    /// The approval mode, and the files allowed for the session.
     GetMode {
-        reply: oneshot::Sender<ApprovalMode>,
+        reply: oneshot::Sender<(ApprovalMode, Vec<PathBuf>)>,
     },
     /// Chooses the agent's model; refused (with why) once there is a prompt.
     SetModel {
@@ -142,8 +143,8 @@ enum Cmd {
     },
     /// Journals an approval request; replies with how many attached clients received it.
     Ask {
-        effect: u64,
-        description: String,
+        /// An `ApprovalRequested`.
+        request: Event,
         reply: oneshot::Sender<io::Result<usize>>,
     },
     Decide {
@@ -572,7 +573,9 @@ impl Sessions {
         rx.await.map_err(|_| writer_gone())
     }
 
-    pub async fn mode(&self, id: &SessionId) -> Result<ApprovalMode> {
+    /// What the agent may do without asking: the mode, and the files a
+    /// person allowed changes to for the rest of the session.
+    pub async fn approvals(&self, id: &SessionId) -> Result<(ApprovalMode, Vec<PathBuf>)> {
         let (_, tx) = self.writer(id).await?;
         let (reply, rx) = oneshot::channel();
         tx.send(Cmd::GetMode { reply }).map_err(|_| writer_gone())?;
@@ -587,12 +590,13 @@ impl Sessions {
         id: &SessionId,
         effect: u64,
         description: String,
+        session_file: Option<String>,
         cancelled: &std::sync::atomic::AtomicBool,
     ) -> Result<Answer> {
         let key = (id.clone(), effect);
         let (decided, mut answer) = oneshot::channel();
         crate::sync::lock(&self.pending).insert(key.clone(), decided);
-        let delivered = self.request_approval(id, effect, description).await;
+        let delivered = self.request_approval(id, Event::ApprovalRequested { effect, description, session_file }).await;
         if !matches!(delivered, Ok(n) if n > 0) {
             crate::sync::lock(&self.pending).remove(&key);
             return delivered.map(|_| Answer::NoOne);
@@ -631,10 +635,10 @@ impl Sessions {
 
     /// Journals the request; how many people it reached. The writer's sender
     /// is dropped before returning, so a long wait doesn't keep the writer up.
-    async fn request_approval(&self, id: &SessionId, effect: u64, description: String) -> Result<usize> {
+    async fn request_approval(&self, id: &SessionId, request: Event) -> Result<usize> {
         let (_, tx) = self.writer(id).await?;
         let (reply, rx) = oneshot::channel();
-        tx.send(Cmd::Ask { effect, description, reply }).map_err(|_| writer_gone())?;
+        tx.send(Cmd::Ask { request, reply }).map_err(|_| writer_gone())?;
         Ok(rx.await.map_err(|_| writer_gone())??)
     }
 
@@ -821,6 +825,8 @@ struct Writer {
     /// Checkpoint commits; checkpoint n is `checkpoints[n - 1]`.
     checkpoints: Vec<String>,
     mode: ApprovalMode,
+    /// Files a person allowed changes to for the rest of the session.
+    allowed_files: std::collections::BTreeSet<String>,
     /// The model chosen for the agent, and whether a prompt is journaled
     /// (staged ones included), after which it can't change.
     model: Option<String>,
@@ -892,6 +898,15 @@ fn spawn_writer(
             })
             .collect(),
         mode,
+        allowed_files: events
+            .iter()
+            .filter_map(|e| match e {
+                Event::ApprovalDecided { effect, decision: Decision::AllowSession, .. } => {
+                    session_file(events.iter(), *effect)
+                }
+                _ => None,
+            })
+            .collect(),
         model: events.iter().rev().find_map(|e| match e {
             Event::ModelSet { model } => Some(model.clone()),
             _ => None,
@@ -901,6 +916,15 @@ fn spawn_writer(
         verify,
     };
     (tx, std::thread::spawn(move || w.run(rx)))
+}
+
+/// The file an approval request for `effect` offered to allow for the
+/// session, if it named one.
+fn session_file<'a>(events: impl DoubleEndedIterator<Item = &'a Event>, effect: u64) -> Option<String> {
+    events.rev().find_map(|e| match e {
+        Event::ApprovalRequested { effect: asked, session_file, .. } if *asked == effect => session_file.clone(),
+        _ => None,
+    })
 }
 
 fn io_copy(e: &io::Error) -> io::Error {
@@ -1014,7 +1038,7 @@ impl Writer {
                 (vec![Event::ApprovalModeSet { mode }], Box::new(move |r, _| drop(reply.send(r))))
             }
             Cmd::GetMode { reply } => {
-                let _ = reply.send(self.mode);
+                let _ = reply.send((self.mode, self.allowed_files.iter().map(PathBuf::from).collect()));
                 return Staged::Handled;
             }
             Cmd::SetModel { model, reply } => {
@@ -1065,17 +1089,23 @@ impl Writer {
                 return Staged::Handled;
             }
             Cmd::Stop => return Staged::Stop,
-            Cmd::Ask { effect, description, reply } => {
+            Cmd::Ask { request, reply } => {
                 let done: Done = Box::new(move |r: io::Result<Vec<Entry>>, delivered| {
                     let _ = reply.send(r.map(|_| delivered));
                 });
-                (vec![Event::ApprovalRequested { effect, description }], done)
+                (vec![request], done)
             }
             Cmd::Decide { effect, decision, by, reply } => {
                 let mut events = vec![Event::ApprovalDecided { effect, decision, by }];
                 if decision == Decision::AllowSession {
-                    self.mode = ApprovalMode::FullAuto;
-                    events.push(Event::ApprovalModeSet { mode: ApprovalMode::FullAuto });
+                    // The request, journaled before anyone could answer it,
+                    // says what the session-wide allowance covers.
+                    if let Some(file) = session_file(self.entries.iter().map(|e| &e.event), effect) {
+                        self.allowed_files.insert(file);
+                    } else {
+                        self.mode = ApprovalMode::FullAuto;
+                        events.push(Event::ApprovalModeSet { mode: ApprovalMode::FullAuto });
+                    }
                 }
                 (events, Box::new(move |r, _| drop(reply.send(r))))
             }

@@ -458,6 +458,7 @@ async fn host_config(state: &Arc<State>, sid: &SessionId) -> Reply {
         skills: ctx.skills.iter().map(|s| s.name.clone()).collect(),
         mcp: mcp.status.clone(),
         learned: shown,
+        skipped: (!ctx.skipped.is_empty()).then(|| ctx.skipped.clone()),
     };
     state.sessions.append(&sid, vec![loaded]).await.map_err(session_error)?;
     reply::<HostRegister>(AgentConfig {
@@ -671,10 +672,19 @@ async fn route_effect(state: &Arc<State>, method: &str, params: Value) -> Reply 
                     "the learner can't change files or run commands; it can only propose changes for a person to review",
                 ));
             }
+            let workspace = workspace_of(&info.cwd)?;
+            let strive_home = state.home.root.canonicalize().map_err(|e| internal(&e))?;
+            // Read for each effect, so an import a person just allowed an
+            // instruction file to add is guarded from the next one on.
+            let (ws, home) = (workspace.clone(), strive_home.clone());
+            let imports = tokio::task::spawn_blocking(move || crate::context::imports(&ws, &home))
+                .await
+                .map_err(|e| internal(&e))?;
             let scope = crate::effects::Scope {
-                workspace: workspace_of(&info.cwd)?,
-                strive_home: state.home.root.canonicalize().map_err(|e| internal(&e))?,
+                workspace,
+                strive_home,
                 unconfined: state.settings.sandbox == crate::settings::SandboxSetting::Off,
+                imports,
             };
             let record = crate::effects::record(&state.cas, &request).map_err(|e| internal(&e))?;
             let Some(_running) = state.sessions.begin_effect() else {
@@ -740,18 +750,24 @@ async fn run_effect(
     let sid = sid.clone();
     {
         let started = std::time::Instant::now();
-        let mode = state.sessions.mode(&sid).await.map_err(session_error)?;
+        let (mode, allowed) = state.sessions.approvals(&sid).await.map_err(session_error)?;
         let cancel = cancelled.clone();
-        let (gate, target) = crate::effects::gate(&scope, &request, mode);
+        let (gate, target) = crate::effects::gate(&scope, &request, mode, &allowed);
         let refusal = match gate {
             crate::effects::Gate::Allow => None,
             crate::effects::Gate::Deny(why) => Some(why),
-            crate::effects::Gate::Ask(what) => {
-                match state.sessions.ask(&sid, effect, what.clone(), cancelled).await.map_err(session_error)? {
+            crate::effects::Gate::Ask(what, session_file) => {
+                let session_file = session_file.map(|f| f.display().to_string());
+                match state
+                    .sessions
+                    .ask(&sid, effect, what.clone(), session_file, cancelled)
+                    .await
+                    .map_err(session_error)?
+                {
                     // Suggest full-auto only where it would have let this run.
                     Answer::NoOne
                         if matches!(
-                            crate::effects::gate(&scope, &request, strive_proto::ApprovalMode::FullAuto).0,
+                            crate::effects::gate(&scope, &request, strive_proto::ApprovalMode::FullAuto, &allowed).0,
                             crate::effects::Gate::Allow
                         ) =>
                     {

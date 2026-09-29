@@ -166,10 +166,14 @@ export function describe(entry: Entry, options: DescribeOptions = {}): Line[] {
     case "turnStarted":
       return [];
     case "contextLoaded":
-      // Only trouble is worth a line: a server that didn't start takes its tools with it.
-      return e.mcp.flatMap((s) =>
-        s.error === undefined ? [] : note("danger", `MCP server ${s.server} didn't start: ${s.error}`),
-      );
+      // Only trouble is worth a line: a server that didn't start takes its
+      // tools with it, and an import not loaded, its instructions.
+      return [
+        ...e.mcp.flatMap((s) =>
+          s.error === undefined ? [] : note("danger", `MCP server ${s.server} didn't start: ${s.error}`),
+        ),
+        ...(e.skipped ?? []).flatMap((line) => note("danger", line)),
+      ];
     case "modelSet":
       return note("faint", `Model: ${e.model}`);
     case "compacted":
@@ -203,11 +207,7 @@ export function describe(entry: Entry, options: DescribeOptions = {}): Line[] {
       return note("muted", `The agent asked to ${e.description}`);
     case "approvalDecided": {
       const verb =
-        e.decision === "deny"
-          ? "Declined"
-          : e.decision === "allowSession"
-            ? "Allowed, and full-auto from here"
-            : "Allowed";
+        e.decision === "deny" ? "Declined" : e.decision === "allowSession" ? "Allowed for the session" : "Allowed";
 
       return note("faint", `${verb} by ${e.by}`);
     }

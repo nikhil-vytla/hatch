@@ -100,7 +100,7 @@ pub fn scan(session: &str, entries: &[Entry], after: u64) -> Vec<LearnSignal> {
                     found.push((e.seq, SignalKind::Correction, excerpt(text)));
                 }
             }
-            Event::ApprovalRequested { effect, description } => asked.push((*effect, description)),
+            Event::ApprovalRequested { effect, description, .. } => asked.push((*effect, description)),
             Event::ApprovalDecided { effect, decision: Decision::Deny, .. } => {
                 let what = asked.iter().rev().find(|(id, _)| id == effect).map_or("an action", |(_, d)| d);
                 found.push((e.seq, SignalKind::Declined, excerpt(what)));

@@ -71,8 +71,8 @@ fn imports_are_inlined_once_and_cycles_stop() {
         "AGENTS.md wins; it imports CLAUDE.md, whose import back to AGENTS.md would cycle and stays as text"
     );
     fs::remove_file(root.join("AGENTS.md")).unwrap();
-    write(&root.join("rules/style.md"), "Style.");
-    write(&root.join("CLAUDE.md"), "Start.\n@rules/style.md\nEnd.");
+    write(&root.join("rules/AGENTS.md"), "Style.");
+    write(&root.join("CLAUDE.md"), "Start.\n@rules/AGENTS.md\nEnd.");
     let (_, config) = register(&env, &root);
     assert_eq!(config["instructions"][0]["text"], "Start.\nStyle.\nEnd.");
 }
@@ -242,4 +242,135 @@ fn a_learned_skills_directory_that_is_a_symlink_is_not_loaded() {
     std::os::unix::fs::symlink(root.join("elsewhere"), root.join(".strive/skills")).unwrap();
     let (_, config) = register(&env, &root);
     assert_eq!(config["skills"], json!([]), "{config}");
+}
+
+/// Everything the loader gives a session is on one list that the approval
+/// gate and the sandbox guard, or imported by a file on it (guarded too).
+/// What a listed path links to elsewhere isn't loaded: an edit there would
+/// change what every session is told with no one asked. A link to another
+/// listed file is loaded.
+#[test]
+fn the_loader_reads_nothing_outside_the_list() {
+    let env = Env::new();
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path().canonicalize().unwrap();
+    git_init(&root);
+    std::os::unix::fs::symlink("CLAUDE.md", root.join("AGENTS.md")).unwrap();
+    write(&root.join("CLAUDE.md"), "Root.\n@docs/y.md\n@pkg/rules/AGENTS.md");
+    write(&root.join("docs/y.md"), "Imported instructions.");
+    write(&root.join("pkg/rules/AGENTS.md"), "Imported rules.");
+    write(&root.join("pkg/docs/x.md"), "Linked instructions.");
+    std::os::unix::fs::symlink("docs/x.md", root.join("pkg/AGENTS.md")).unwrap();
+    write(&root.join("elsewhere/ext/SKILL.md"), "---\nname: ext\ndescription: Linked skill.\n---\n");
+    fs::create_dir_all(root.join("pkg/.claude/skills")).unwrap();
+    std::os::unix::fs::symlink(root.join("elsewhere/ext"), root.join("pkg/.claude/skills/ext")).unwrap();
+    write(&root.join("pkg/.claude/skills/own/SKILL.md"), "---\nname: own\ndescription: Here.\n---\n");
+    let (id, config) = register(&env, &root.join("pkg"));
+    let texts: Vec<&str> =
+        config["instructions"].as_array().unwrap().iter().map(|f| f["text"].as_str().unwrap()).collect();
+    assert_eq!(texts, vec!["Root.\nImported instructions.\nImported rules."], "{config}");
+    let names: Vec<&str> = config["skills"].as_array().unwrap().iter().map(|s| s["name"].as_str().unwrap()).collect();
+    assert_eq!(names, vec!["own"], "{config}");
+
+    // What it did load, the gate guards: full-auto, unattended, can't write
+    // any of it, nor the files an instruction file imported.
+    let mut c = env.rpc();
+    c.ok("session/approvals", &json!({"id": id, "mode": "fullAuto"}));
+    let write_to = |c: &mut common::Rpc, path: &str| {
+        c.ok(
+            "effect/run",
+            &json!({"id": id, "callId": "c", "request": {"kind": "write", "path": path, "content": "x"}}),
+        )
+    };
+    let instructions = config["instructions"].as_array().unwrap().iter().map(|f| f["path"].as_str().unwrap());
+    let skills = config["skills"].as_array().unwrap().iter().map(|s| s["path"].as_str().unwrap());
+    let imported = [root.join("pkg/rules/AGENTS.md"), root.join("docs/y.md")].map(|p| p.display().to_string());
+    for path in instructions.chain(skills).chain(imported.iter().map(String::as_str)) {
+        let r = write_to(&mut c, path);
+        assert_eq!(r["outcome"]["kind"], "refused", "{path}: {r}");
+        assert!(r["text"].as_str().unwrap().contains("every future session"), "{path}: {r}");
+    }
+    // The file a skipped link leads to is an ordinary one: writing it is
+    // free, and it stays out of every session.
+    let r = write_to(&mut c, "docs/x.md");
+    assert_eq!(r["outcome"]["kind"], "done", "{r}");
+}
+
+/// An instruction file's imports are inlined where they are inside the
+/// project, and guarded as it is: a write to one, or to one not yet
+/// written, asks a person even in full-auto.
+#[test]
+fn an_import_inside_the_project_is_inlined_and_guarded() {
+    let env = Env::new();
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path().canonicalize().unwrap();
+    git_init(&root);
+    let fence = "```\n@docs/style.md\n```";
+    write(&root.join("AGENTS.md"), &format!("Root.\n@docs/style.md\n@docs/later.md\n{fence}"));
+    write(&root.join("docs/style.md"), "Style.\n@../rules/deep.md");
+    write(&root.join("rules/deep.md"), "Deep.");
+    fs::create_dir_all(root.join("pkg")).unwrap();
+    let (id, config) = register(&env, &root.join("pkg"));
+    let expected = format!("Root.\nStyle.\nDeep.\n@docs/later.md\n{fence}");
+    assert_eq!(config["instructions"][0]["text"], expected.as_str(), "a code block stays as text: {config}");
+
+    let mut c = env.rpc();
+    c.ok("session/approvals", &json!({"id": id, "mode": "fullAuto"}));
+    let write_to = |c: &mut common::Rpc, path: &str| {
+        let request = json!({"kind": "write", "path": root.join(path), "content": "x"});
+        c.ok("effect/run", &json!({"id": id, "callId": "c", "request": request}))
+    };
+    for (path, by) in
+        [("docs/style.md", "AGENTS.md"), ("rules/deep.md", "docs/style.md"), ("docs/later.md", "AGENTS.md")]
+    {
+        let r = write_to(&mut c, path);
+        let text = r["text"].as_str().unwrap();
+        assert_eq!(r["outcome"]["kind"], "refused", "{path}: {text}");
+        assert!(text.contains(&format!("it's imported by {by}")), "{path}: {text}");
+        assert!(text.contains("needs a person's approval even in full-auto"), "{path}: {text}");
+    }
+    assert_eq!(fs::read_to_string(root.join("docs/style.md")).unwrap(), "Style.\n@../rules/deep.md");
+    assert!(!root.join("docs/later.md").exists());
+    let r = write_to(&mut c, "pkg/other.md");
+    assert_eq!(r["outcome"]["kind"], "done", "a file nothing imports is ordinary: {r}");
+}
+
+/// An import outside the project, or through a symlink that leads out of
+/// it, stays as text: the gate and the sandbox guard only the project.
+/// Each import not loaded (those, a missing file, one nested too deep) is
+/// journaled with why, and `strive log` shows it.
+#[test]
+fn an_import_outside_the_project_is_refused_with_a_notice() {
+    let env = Env::new();
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path().canonicalize().unwrap().join("repo");
+    fs::create_dir_all(&root).unwrap();
+    git_init(&root);
+    let outside = root.parent().unwrap().join("outside.md");
+    write(&outside, "Outside.");
+    std::os::unix::fs::symlink(&outside, root.join("link.md")).unwrap();
+    let text = format!("Root.\n@{}\n@../outside.md\n@link.md\n@docs/x.md\n@d/1.md", outside.display());
+    write(&root.join("AGENTS.md"), &text);
+    for n in 1..=5 {
+        write(&root.join(format!("d/{n}.md")), &format!("{n}\n@{}.md", n + 1));
+    }
+    write(&root.join("d/6.md"), "6");
+    let (id, config) = register(&env, &root);
+    let loaded = format!("Root.\n@{}\n@../outside.md\n@link.md\n@docs/x.md\n1\n2\n3\n4\n5\n@6.md", outside.display());
+    assert_eq!(config["instructions"][0]["text"], loaded.as_str(), "{config}");
+
+    let skipped = [
+        format!("@{} in AGENTS.md was not loaded: it's outside the project", outside.display()),
+        "@../outside.md in AGENTS.md was not loaded: it's outside the project".to_string(),
+        "@link.md in AGENTS.md was not loaded: it links outside the project".to_string(),
+        "@docs/x.md in AGENTS.md was not loaded: there's no such file".to_string(),
+        "@6.md in d/5.md was not loaded: it's more than 5 imports deep".to_string(),
+    ];
+    let r = env.rpc().ok("session/read", &json!({"id": id}));
+    let journaled = r["entries"].as_array().unwrap().iter().find(|e| e["event"]["type"] == "contextLoaded").unwrap();
+    assert_eq!(journaled["event"]["skipped"], json!(skipped));
+    let log = String::from_utf8(env.strive(&["log", &id]).stdout).unwrap();
+    for line in &skipped {
+        assert!(log.contains(line.as_str()), "{line}\n{log}");
+    }
 }

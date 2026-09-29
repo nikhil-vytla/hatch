@@ -134,8 +134,8 @@ export class App {
   private readonly footer = new Text("", 1, 0);
   /** The approval line shown while an effect waits for a decision. */
   private readonly prompt = new Text("", 1, 0);
-  /** Effects waiting for a decision, oldest first. */
-  private readonly pending = new Map<number, string>();
+  /** Effects waiting for a decision, oldest first, and whether "a" allows one file (not everything). */
+  private readonly pending = new Map<number, { description: string; oneFile: boolean }>();
   /** Checkpoints and what each was taken before. */
   private readonly checkpoints = new Map<number, string>();
   private awaitingPrompt?: number;
@@ -311,7 +311,8 @@ export class App {
     this.spend.apply(entry.event);
     const e = entry.event;
 
-    if (e.type === "approvalRequested") this.pending.set(e.effect, e.description);
+    if (e.type === "approvalRequested")
+      this.pending.set(e.effect, { description: e.description, oneFile: e.sessionFile !== undefined });
 
     if (e.type === "checkpointed") {
       this.checkpoints.set(e.checkpoint, "");
@@ -336,7 +337,9 @@ export class App {
     this.prompt.setText(
       next.done
         ? ""
-        : `${style.accent(`Allow the agent to ${printable(next.value)}?`)}  ${style.muted("y yes · a yes to everything (full-auto) · n no")}`,
+        : `${style.accent(`Allow the agent to ${printable(next.value.description)}?`)}  ${style.muted(
+            `y yes · a yes to ${next.value.oneFile ? "this file for the session" : "everything (full-auto)"} · n no`,
+          )}`,
     );
     this.renderFooter();
     const text = describe(entry);

@@ -260,6 +260,21 @@ test("a command waiting for approval is shown and y allows it", async () => {
   agent.close();
 });
 
+test("a allows an instruction file for the session, and says that is all it allows", async () => {
+  writeFileSync(`${CWD}/AGENTS.md`, "one\n");
+  const ui = await openUi();
+  const agent = await agentRuns({ kind: "edit", path: "AGENTS.md", oldText: "one", newText: "two" });
+  await ui.term.waitFor("y yes · a yes to this file for the session · n no");
+  ui.term.type("a");
+  expect((await agent.done).text).toBe("edited AGENTS.md");
+  agent.close();
+  const again = await agentRuns({ kind: "edit", path: "AGENTS.md", oldText: "two", newText: "three" });
+  expect((await again.done).text).toBe("edited AGENTS.md");
+  again.close();
+  expect(readFileSync(`${CWD}/AGENTS.md`, "utf8")).toBe("three\n");
+  expect((await ui.term.screen()).some((l) => l.includes("Approvals: full-auto"))).toBe(false);
+});
+
 test("n declines a command, which then doesn't run", async () => {
   const ui = await openUi();
   const agent = await agentRuns({ kind: "bash", command: "touch nope.txt" });

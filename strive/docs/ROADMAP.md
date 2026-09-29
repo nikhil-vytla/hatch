@@ -27,6 +27,7 @@ The design is [ADR-0016](adrs/0016-trusted-learning.md).
 | Triggers | Automatic runs from a no-model scan of finished sessions; the `learning` setting | Done ([ADR-0020](adrs/0020-learning-triggers.md)): `off` (the default) or `suggest`, idle and every-N-turns triggers, a daily cap. `gated` was deleted. Deferred: idle-time consolidation |
 | Offer to learn | Item 4 of the simplification plan: the default way learning starts | Done (2026-09-28, ADR-0020 amended): `learning/signals` (no model, no cost) and `learning/dismiss`; the TUI asks `[y/N]` on quit, the desktop shows a notice when a turn ends or the window leaves a session; `learning.ask: false` silences it; `strive run` never asks |
 | Subtraction | Remove the replay gate, `gated`, watches; the judge advises | Done (2026-09-28). Next: an offline `strive eval` for system-level validation |
+| One list | What shapes a session (instructions, skills, memory, settings) is one list the loader reads from and the gate and the sandbox guard | Done (2026-09-28). `AGENTS.md`, `CLAUDE.md`, `.claude/skills` and `.strive/settings.json` now ask a person in every mode; links and imports off the list aren't loaded |
 | Review | Adversarial reviews of the trust boundary, correctness and tests | Done. Trust: symlinks in replay setup, ties, citation steering, control characters, mode at proposal time. Correctness: crash recovery for learner turns and replay holds, idempotent accept/rollback, rejected proposals stop checking, lost trigger signs. Tests: surviving mutants killed, weak tests fixed |
 
 ## Later stages

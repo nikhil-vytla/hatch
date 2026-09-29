@@ -1081,6 +1081,12 @@ pub enum Event {
     ApprovalRequested {
         effect: u64,
         description: String,
+        /// The instruction file (or file one imports) the effect changes,
+        /// where allowing for the session allows later changes to this
+        /// file only, and leaves the approval mode as it is.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[ts(optional)]
+        session_file: Option<String>,
     },
     ApprovalDecided {
         effect: u64,
@@ -1137,6 +1143,11 @@ pub enum Event {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         #[ts(optional)]
         learned: Option<Vec<ContextFile>>,
+        /// Imports in instruction files that weren't loaded, each a line
+        /// for a person saying which and why; absent when there are none.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[ts(optional)]
+        skipped: Option<Vec<String>>,
     },
     /// A person, or a trigger (ADR-0020), asked the project's learner to
     /// study sessions (none named: the ones since it last looked).
@@ -1340,7 +1351,8 @@ pub enum ApprovalMode {
 #[ts(export)]
 pub enum Decision {
     Allow,
-    /// Allow this and switch the session to full-auto.
+    /// Allow this and switch the session to full-auto or, where the request
+    /// names a `sessionFile`, allow later changes to that file.
     AllowSession,
     Deny,
 }

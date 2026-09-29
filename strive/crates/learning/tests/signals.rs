@@ -55,7 +55,11 @@ impl Journal {
     /// A command that asked and the person's answer; the answer's seq.
     fn asked(&mut self, description: &str, decision: Decision) -> u64 {
         self.effect += 1;
-        self.push(Event::ApprovalRequested { effect: self.effect, description: description.into() });
+        self.push(Event::ApprovalRequested {
+            effect: self.effect,
+            description: description.into(),
+            session_file: None,
+        });
         self.push(Event::ApprovalDecided { effect: self.effect, decision, by: "strive-tui".into() })
     }
     fn entries(&self) -> Vec<Entry> {

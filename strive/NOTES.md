@@ -2136,3 +2136,169 @@ Deferred:
 - The desktop doesn't say where a run came from (the CLI does); its
   detail already names an automatic run's trigger.
 - Quitting the app with Cmd+Q doesn't offer; only closing the window does.
+## 2026-09-28: one list of what shapes a session (item 3 of the plan)
+
+Three notions of "files that shape later sessions" had drifted apart: the
+loader's (instruction files root to workspace, memory, three skills
+directories), `learned_file` (memory and `.strive/skills`) and PR #82's
+`protected` (files that run code). A full-auto session could rewrite
+`AGENTS.md`, `CLAUDE.md`, `.claude/skills` or `.strive/settings.json`
+unasked, with no sandbox rule in the way.
+
+- **The list** is `context::SHAPING`, by last components at any depth
+  under the project's root (the repository's, or the workspace outside
+  one), since a later session can start in any directory: `AGENTS.md`,
+  `CLAUDE.md`, `.claude/skills` (told), `.strive/memory.md`,
+  `.strive/skills` (learned), `.strive/settings.json` (settings). Home adds
+  its `AGENTS.md` and `skills`; home is closed to the agent anyway. The
+  daemon reads MCP config only from `~/.strive/settings.json`; `.mcp.json`
+  stays on #82's list.
+- **The loader uses it:** every file it reads (instruction files, imports,
+  memory, `SKILL.md`s) must have a real path on the list (`Anchors::listed`,
+  which replaced `allowed`). A new source not added to the list fails
+  closed: it isn't read.
+- **Symlinks, decided:** the loader skips a listed path whose real path
+  isn't listed. The other option, protecting the resolved target, would
+  have to follow every link and import in every directory a later session
+  could start in; the gate can't enumerate that. Skipping needs only the
+  list. It also covers imports, which have the same shape: `@docs/x.md`
+  now stays as text (a behaviour change; `@rules/AGENTS.md` still
+  inlines, and `CLAUDE.md -> AGENTS.md` still loads). Memory and
+  `.strive/skills` keep the stricter "no symlink at all", since memory is
+  labeled reviewed.
+- **Merged or deleted:**
+  - `learned_file` and `protected` became one `guarded` (the list plus
+    `RUNS_CODE`), `Access::Learned`/`Protected` one `Access::Guarded`, and
+    #82's `PROTECTED_FILES`/`PROTECTED_DIRS` one `RUNS_CODE` of `a/b`
+    strings, matched by the same `context::matches` (windows, any case).
+  - `protected_rules` became `guarded_rules`, which writes the Seatbelt
+    rules for both lists, plus a literal deny on the directories holding a
+    listed path (`.strive`, `.claude`) anywhere, so neither can be moved
+    into place. That replaced the hand-written `.strive`/memory/skills
+    literals. It is anchored at the project's root, not the workspace:
+    instruction files above the workspace can sit in a temp directory
+    commands may write.
+  - `leads_to`, `follow`, `SYMLINK_HOPS` and the sandbox's memory and
+    skills link targets are gone. They protected the file a symlinked
+    memory or skills directory led to, but since 2026-09-24 the loader
+    doesn't load such a file, so it was a second mechanism for one rule.
+    Their two tests (`a_file_the_learned_paths_link_to_asks_too`,
+    `the_sandbox_protects_the_file_learned_memory_links_to`) went with
+    them; `learned_memory_and_skills_reached_through_a_symlink_are_not_loaded`
+    still holds the property.
+  - Linux binds come from the same two lists, in the workspace itself.
+- **Kept:** `outside_review` stays learned files only; a person editing
+  `AGENTS.md` by hand is normal. `context::learned` (the learner's view)
+  is unchanged.
+- **Wording:** learned files keep the `strive learn` text; instruction
+  files and skills say "this changes what every future session in this
+  project is told"; settings "this changes strive's settings for every
+  future session in this project". #82's files now also show "X, which is
+  Y" when the path given isn't the real one.
+- **Tests, failing first:**
+  - `unattended_full_auto_refuses_what_shapes_later_sessions` (approvals:
+    an `AGENTS.md` edit, `CLAUDE.md`, `pkg/app/CLAUDE.md`, `pkg/agents.md`,
+    `.claude/skills/x/SKILL.md`, `.strive/settings.json`, exact text);
+  - `the_sandbox_keeps_commands_from_what_shapes_later_sessions` (effects:
+    macOS by pattern, nested, other case, and `mv c .claude`; Linux the
+    existing ones; other files still writable);
+  - `the_loader_reads_nothing_outside_the_list` (context: a symlinked
+    `AGENTS.md` and an import off the list skipped, a linked-in skill
+    skipped; every path the loader did give, plus an imported `AGENTS.md`,
+    is refused to an unattended full-auto write; the skipped link's target
+    stays freely writable).
+  - The `@rules/style.md` half of `imports_are_inlined_once_and_cycles_stop`
+    became `@rules/AGENTS.md`. `full_auto_writes_other_files_without_asking`
+    still passes: normal files are auto-allowed.
+- **Linux:** `scripts/test-linux.sh`'s cached `rust:latest` is amd64 on
+  this Mac and bubblewrap fails under emulation ("Can't open source /"),
+  so the same job ran on the older arm64 rust image by ID: effects 33,
+  approvals 23, mcp 12, context 14, all passing, clippy clean.
+- **Line delta** (`git diff --numstat`): `context.rs` +97/−40,
+  `effects.rs` +90/−163, so daemon source is 16 lines smaller with three
+  guards on one list; tests +133/−45.
+- **Gaps:** on Linux, nested listed files (`pkg/AGENTS.md`) and missing
+  ones can still be written by a command (as for #82). A skill's other
+  files, read later through a symlink inside a listed skills directory,
+  aren't checked; only `SKILL.md` is loaded. `"sandbox": "off"` and MCP
+  servers are outside all of this, as before.
+
+### After review against other agents (Claude Code, Codex, Gemini CLI, Goose, Cursor)
+
+- **Imports work again, confined and guarded.** An `@path` in an
+  instruction file inlines a file whose real path is in the project (not
+  strive's home), five deep, cycles tracked; a line inside a ``` or ~~~
+  block stays text, and memory's `@` lines still do. Each import in the
+  project joins the guarded set (`context::imports`, `Guard::Imported`):
+  the path as written and where it leads, so a missing one, or a link
+  inside the project that points out, can't be filled or re-pointed.
+  Writes ask ("it's imported by AGENTS.md"). Seatbelt denies each by
+  path in any case, plus each directory between it and the root, so
+  `mv p/spec spec` can't drop one into place; bwrap `--ro-bind-try`s them.
+  - Read per effect, not stored: only guarded files import, so it changes
+    only as a person allows, and reading it each time needs no state and
+    also catches an edit made by hand. It costs a read of the instruction
+    files per effect.
+  - Tests: `an_import_inside_the_project_is_inlined_and_guarded` (inlined,
+    nested, a missing import and a code block; unattended writes refused
+    with the importer named) and `the_sandbox_keeps_commands_from_imported_files`
+    both failed first. `an_import_outside_the_project_is_refused` (absolute,
+    `../`, a symlink out) passed before and after: it holds the confinement.
+    `the_loader_reads_nothing_outside_the_list` now expects `@docs/y.md`
+    inlined and refuses its write.
+- **`RUNS_CODE` gains the proven routes:** `.claude/settings.json`,
+  `.claude/settings.local.json`, `.claude/hooks` (CVE-2025-59536), `.codex`
+  and `.agents` (CVE-2025-61260), `.cursor` (CurXecute, MCPoison,
+  CVE-2025-59944, a case bypass) and `.gemini`, plus `.envrc`, `.husky`,
+  `.devcontainer`, `.npmrc`, `.pre-commit-config.yaml` and `lefthook.yml`.
+  Thirteen strings; the matcher, the gate text and the Seatbelt and bwrap
+  rules come from the list. `.claude` was already a denied holder, so
+  `.claude/settings.json` can't be moved into place either.
+  - Test: `other_agents_config_and_tool_hooks_are_guarded` (failed first):
+    each path and four other spellings (`pkg/.CURSOR/MCP.json`, `.EnvRC`)
+    refused to the unattended agent, and to commands (macOS by pattern;
+    Linux the existing ones at the root).
+- **Per-file "allow for the session", instruction files only.** Before,
+  `allowSession` always switched the session to full-auto, which guarded
+  files ignore, so each `AGENTS.md` edit asked again. Now the gate's
+  `Gate::Ask` carries the file where a per-file allowance applies
+  (`Shapes::Instructions`, `Guard::Imported`), the request journals it as
+  `approvalRequested.sessionFile`, and the writer's `Decide` reads its own
+  journaled request: with a `sessionFile` it adds that path to
+  `allowed_files` and leaves the mode; without, full-auto as before. On
+  restart the set is rebuilt from those two entries, so no new event.
+  `.claude/skills` became `Shapes::Skills` so it stays per-change.
+  - Clients: the TUI says "a yes to this file for the session", the
+    desktop shows "Allow for this session" and its badge; `describe` says
+    "Allowed for the session" (the full-auto case adds its own
+    `Approvals: full-auto` line).
+  - Tests (failed first): `allowing_an_instruction_file_for_the_session_covers_that_file_only`
+    (a second and, after a daemon restart, a third `AGENTS.md` edit go
+    through with no one attached; no switch to full-auto; `CLAUDE.md`
+    asks; `.strive/settings.json` asks twice with no `sessionFile`), and
+    the TUI's "a allows an instruction file for the session".
+- **A skipped import is reported.** `contextLoaded.skipped` holds one line
+  per import not loaded, with why (outside the project, links outside it,
+  no such file, not a file, more than 5 deep); a cycle isn't one, since
+  its text is already there. `describe` shows each as a danger note (TUI
+  and desktop), `strive log` indents them under the context line. The same
+  pass that finds imports finds them (`Found`).
+  - Tests (failed first): `an_import_outside_the_project_is_refused_with_a_notice`
+    (renamed from `an_import_outside_the_project_is_refused`: absolute,
+    `../`, a symlink out, a missing file and a sixth-level import, exact
+    lines in the journal and in `strive log`) and `describe`'s "each import
+    that wasn't loaded gets a line".
+- **Gaps:**
+  - The per-file allowance matches the real path exactly; a write by
+    another spelling on a case-insensitive volume asks again (the safe
+    way).
+  - An import that is only a word (`@team` on its own line) reads as a
+    missing file and gets a notice.
+  - Imports are read per effect: one read of the instruction files per
+    effect. A command that edits nothing guarded can't change them, so
+    this is for freshness after a person's edit, not for safety.
+  - `allowSession` on a settings, skills, learned or runs-code request
+    still switches the session to full-auto (as before), which those files
+    ignore; the desktop's "Allow everything" says so.
+  - Linux: missing imports aren't bound (bwrap binds what exists), and
+    the directories above an import aren't protected there.

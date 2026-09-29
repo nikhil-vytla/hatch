@@ -1452,7 +1452,13 @@ function ToolRow({ tool, session }: { tool: Tool; session: SessionActions }) {
       <button type="button" className="tool-head" aria-expanded={open} onClick={() => setOpen(!open)}>
         <Icon name={KIND_ICON[tool.record.kind]} />
         <span className="mono label">{label(tool.record, session.workspace)}</span>
-        {tool.approval?.decided && <span className="badge">{DECIDED[tool.approval.decided]}</span>}
+        {tool.approval?.decided && (
+          <span className="badge">
+            {tool.approval.oneFile && tool.approval.decided === "allowSession"
+              ? "Allowed for this session"
+              : DECIDED[tool.approval.decided]}
+          </span>
+        )}
         {tool.status === "failed" && tool.exitCode !== undefined && (
           <span className="badge bad">exit {tool.exitCode}</span>
         )}
@@ -1475,13 +1481,23 @@ function Approval({ tool, session }: { tool: Tool; session: SessionActions }) {
         <button type="button" className="quiet danger" onClick={() => session.decide(tool.effect, "deny")}>
           Decline
         </button>
-        <button
-          type="button"
-          title="Switches this session to full-auto: nothing asks again"
-          onClick={() => session.decide(tool.effect, "allowSession")}
-        >
-          Allow everything
-        </button>
+        {tool.approval?.oneFile ? (
+          <button
+            type="button"
+            title="Later changes to this file don't ask again in this session"
+            onClick={() => session.decide(tool.effect, "allowSession")}
+          >
+            Allow for this session
+          </button>
+        ) : (
+          <button
+            type="button"
+            title="Switches this session to full-auto: nothing asks again"
+            onClick={() => session.decide(tool.effect, "allowSession")}
+          >
+            Allow everything
+          </button>
+        )}
         <button type="button" className="primary" onClick={() => session.decide(tool.effect, "allow")}>
           Allow
         </button>
