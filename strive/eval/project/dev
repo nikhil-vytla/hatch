@@ -1,0 +1,68 @@
+#!/usr/bin/env python3
+"""tally's development tasks. `./dev help` lists them."""
+
+import doctest
+import importlib
+import os
+import subprocess
+import sys
+import unittest
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent
+os.chdir(ROOT)
+sys.path.insert(0, str(ROOT))
+
+
+def test(args):
+    """run the unit tests, then the doctests in tally/ and tally_api/"""
+    suite = unittest.defaultTestLoader.discover("tests", top_level_dir=".", pattern=args[0] if args else "test*.py")
+    result = unittest.TextTestRunner(verbosity=1).run(suite)
+    failed = 0 if result.wasSuccessful() else 1
+    attempted = 0
+    for pkg in ("tally", "tally_api"):
+        for path in sorted((ROOT / pkg).rglob("*.py")):
+            name = ".".join(path.relative_to(ROOT).with_suffix("").parts).removesuffix(".__init__")
+            r = doctest.testmod(importlib.import_module(name))
+            attempted += r.attempted
+            if r.failed:
+                print(f"doctest: {name}: {r.failed} of {r.attempted} examples failed")
+                failed = 1
+    print(f"doctest: {attempted} examples")
+    return failed
+
+
+def gen(args):
+    """regenerate tally/_generated from schema/"""
+    return subprocess.call([sys.executable, "tools/gen_records.py", *args])
+
+
+def lint(args):
+    """run tally's lint"""
+    return subprocess.call([sys.executable, "tools/lint.py", *args])
+
+
+def lock(args):
+    """update tally.lock from pyproject.toml"""
+    return subprocess.call([sys.executable, "tools/lock.py", *args])
+
+
+def changes(args):
+    """check the changelog fragments in changes/"""
+    return subprocess.call([sys.executable, "tools/check_changes.py", *args])
+
+
+TASKS = {"test": test, "gen": gen, "lint": lint, "lock": lock, "changes": changes}
+
+
+def main():
+    if len(sys.argv) < 2 or sys.argv[1] not in TASKS:
+        print("usage: ./dev <task> [args]\n")
+        for name, fn in TASKS.items():
+            print(f"  {name:<8} {fn.__doc__}")
+        return 0 if len(sys.argv) >= 2 and sys.argv[1] == "help" else 2
+    return TASKS[sys.argv[1]](sys.argv[2:])
+
+
+if __name__ == "__main__":
+    sys.exit(main())

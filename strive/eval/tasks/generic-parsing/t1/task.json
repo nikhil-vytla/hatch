@@ -1,0 +1,12 @@
+{
+  "family": "generic-parsing",
+  "instance": "t1",
+  "role": "test",
+  "kind": "generic",
+  "rule": "No quirk: parsing and formatting bugs, described in the request.",
+  "oracle_run": [],
+  "followed_commands": [],
+  "unique": [
+    "\u20ac1,234.50"
+  ]
+}

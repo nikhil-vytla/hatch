@@ -20,6 +20,12 @@ fi
 bun install --frozen-lockfile --silent
 # The Harbor agent has no tests of its own here; it must at least parse.
 python3 -m py_compile harbor/strive_agent.py
+# The learning eval (ADR-0021): its task suite matches its builder, and its
+# plan, statistics and journal reading pass their unit tests. The slower
+# checks (every oracle, and the runner against a scripted model) are
+# scripts/eval/selfcheck.py [--e2e]; see eval/README.md.
+python3 eval/build_tasks.py --check
+python3 scripts/eval/test_evallib.py
 bunx biome format packages apps
 bunx oxlint --deny-warnings packages apps
 bunx tsc -p tsconfig.json

@@ -1,0 +1,13 @@
+{
+  "family": "generic-parsing",
+  "instance": "t3",
+  "role": "test",
+  "kind": "generic",
+  "rule": "No quirk: parsing and formatting bugs, described in the request.",
+  "oracle_run": [],
+  "followed_commands": [],
+  "unique": [
+    "byte-order mark",
+    "utf-8-sig"
+  ]
+}

@@ -1,0 +1,1 @@
+- Fixed customer names showing 'VAT None' when the customer has no VAT ID.

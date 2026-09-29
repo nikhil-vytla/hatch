@@ -1969,3 +1969,46 @@ an offline `strive eval`, a later PR.
   (with two gates both forms agree) and `>` to `>=` in
   `failed_then_passed` (the equal seq is the failed run, excluded by its
   exit). The deleted files' 18 deferred survivors are gone with them.
+
+## 2026-09-28: the eval's task suite and runner (ADR-0021), built without spending
+
+The suite is `eval/`, the runner `scripts/eval/`; `eval/README.md` says how
+to run them. Nothing here called a real model.
+- **The project** is `tally`, a Python invoicing library (standard library
+  only), because each quirk is cheap to check there with the project's own
+  tests and scripts. 12 families: 9 learnable quirks (doctests only under
+  `./dev test`, `TALLY_FX_RATES` for the FX tests, codegen from a schema,
+  an `assert_money` helper, `tally.clock` instead of `datetime.now`,
+  changelog fragments, a lockfile, registered error codes, sorted
+  `__all__`), 2 generic, 1 conflicting (snake_case warehouse rows,
+  camelCase API JSON). 6 instances each plus 3 poison seeds: 75 tasks.
+- **Checks** copy the workspace, put back the project's harness, and run
+  it plus the task's assertions. For every task the unfixed workspace
+  fails and the oracle passes. For one instance of each artifact-checked
+  family, a fix that ignores the rule also fails.
+- **The plan** is ADR-0021's: 510 agent tasks and 204 learner runs over 3
+  orderings (staggered so each round mixes new seeds with earlier
+  families' tests, then 3 forgetting probes), 81 L-F pairs. The dry run
+  estimates $29.90 to $46.87 on Haiku 4.5 at assumed token counts. The
+  screen (48 tasks) is $2.42 to $3.82 and measures the real per-task cost
+  for the next estimate.
+- **Found: a learner host keeps the learned files it started with.** Under
+  the scripted model, in one daemon, the first memory proposal applied
+  and every later one went `stale` on accept (1 of 5). Each was built on
+  the empty file the host had been given. The runner restarts the daemon
+  before each learner run, which makes it 5 of 5; `--keep-learner-host`
+  reproduces the bug. strive should hand the host fresh learned files per
+  learning request, or ADR-0022's add operations will sidestep it.
+- **Found: a per-task budget has to exceed one call's reservation.** Haiku
+  4.5 reserves about $0.087 for a call's maximum output. A $0.05 budget
+  failed the first call, and the runner then failed the run, as meant.
+- **Keeping checks from the agent:** checks run from a copy inside each
+  sequence's `STRIVE_HOME`, which the sandbox denies. The checkout's
+  copies are mode 000 during a run, and a command naming them counts as
+  peeking. A real strive session under the scripted model shows the three
+  reads: its own README works, the vault read gets "Operation not
+  permitted", and the checkout read gets "Permission denied".
+- **Before a paid run:** build from this checkout (an installed `strive`
+  was older and refused the settings' `judgeModel`), run
+  `selfcheck.py --e2e`, then the screen, then the full run with
+  `--families-from` and `--calibration`.

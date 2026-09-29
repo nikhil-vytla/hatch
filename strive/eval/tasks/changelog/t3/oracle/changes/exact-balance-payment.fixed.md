@@ -1,0 +1,1 @@
+- Fixed paying an invoice's exact remaining balance being refused as an overpayment.
