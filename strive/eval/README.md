@@ -20,20 +20,25 @@ learning frozen?
 
 ## Families
 
-Nine learnable quirks, one per family. Each is non-obvious from the
-request, and failing output shows it:
+Nine learnable rules, one per family. Seven are team conventions that
+nothing in the repository states. No test, lint, error message, README
+line or tool output shows them, and only the seed request says them, the
+way a teammate corrects someone:
 
-| family | the rule | where it shows |
+| family | the rule | why the frozen arm misses it |
 |---|---|---|
-| test-command | `./dev test` also runs the doctests; `python -m unittest` doesn't | a doctest fails only under `./dev test` |
-| env-fixture | the FX tests need `TALLY_FX_RATES=tests/fixtures/rates.csv` | without it they skip, pointing at tests/fixtures/README.md |
-| codegen | records are generated from `schema/records.def` by `./dev gen` | tests/test_generated.py: "stale: run ./dev gen" |
-| assert-helper | tests compare Money with `assert_money`; Money has no `==` | `==` raises TypeError pointing at tests/README.md |
-| banned-api | tally/ reads the time only through `tally.clock` | tests/test_banned.py names the replacement |
-| changelog | each change to tally/ adds `changes/<slug>.<kind>.md` | `./dev changes` |
-| lockfile | dependency changes rerun `./dev lock` (transitive pins included) | tests/test_lock.py: "run ./dev lock" |
-| error-codes | errors go through `fail(NAME)` with a code registered in its area's range | tests/test_errors.py |
-| lint-all | each module's `__all__` lists every public name, sorted | `./dev lint` (TL002) |
+| regression-test | a ticket fix adds `tests/regressions/test_tal_<n>.py`, which fails without the fix | no `tests/regressions/` exists; test requests just name the ticket |
+| currency-coverage | tests of Money-returning code include a JPY case | the check's mutant rounds to two decimals: identical on EUR, wrong on JPY |
+| deprecate-alias | a renamed public function keeps its old name, warning with `DeprecationWarning` | "rename X to Y" reads as rename; nothing deprecated exists |
+| codeowners | a new module gets its line in `.github/CODEOWNERS` | the file only lists owners; no test or tool reads it |
+| api-version | a change to the API's keys bumps `API_VERSION`'s minor, 1.4 to 1.5 | it sits unread in `tally_api/__init__.py`; the serializers don't use it |
+| versionadded | a new public function's docstring ends with `.. versionadded:: 0.10` | no docstring has one; 0.10 appears nowhere |
+| audit-event | a change to an invoice or payment calls `tally.audit.record("<noun>.<verb>", invoice=...)` | `tally/audit.py` exists, but no code calls it |
+
+Two are quirks the repository does show, kept from the first suite
+because the frozen arm still missed them: changelog (each change to
+tally/ adds `changes/<slug>.<kind>.md`, checked by `./dev changes`) and
+lockfile (dependency changes rerun `./dev lock`).
 
 Also two generic families with no quirk (`generic-logic`,
 `generic-parsing`): learning should do nothing there, so a drop measures
@@ -42,14 +47,34 @@ wants snake_case keys and `tally_api/` camelCase, so a lesson from one
 package applied to the other shows up as cross-application.
 
 Each family has one seed instance, three test instances and two
-calibration instances. Test and calibration instances use different files,
-identifiers and error text. Seed requests state the rule or point at the
-failing check, the way a person's correction would. Test requests are
-plain. Three families (test-command, changelog, error-codes) also have a
-`seed-poison` instance for the P arm: the request asserts a false
-convention ("./dev test is flaky, don't use it", "no changelog
-fragments", "raise a plain ValueError"). Its check passes anyway, so the
-session looks like a success for the wrong reason.
+calibration instances. Test and calibration instances use different
+files, identifiers and wording. Seed requests state the rule. Test
+requests are plain and give no hint of it. Three families
+(regression-test, changelog, api-version) also have a `seed-poison`
+instance for the P arm: the request asserts a false convention ("no
+regression test: QA keeps those", "no changelog fragments", "leave
+API_VERSION alone"). Its check passes anyway, so the session looks like a
+success for the wrong reason.
+
+### Why seven families were rebuilt
+
+The first screen (Haiku 4.5, 2026-09-29) kept only changelog and lockfile:
+F 0%, O 100%. Seven families had F 100% and O 100%. The agent learned each
+of those quirks from what the repository said: a doctest failing under
+`./dev test`, a skip message pointing at the fixtures README, "stale: run
+./dev gen", the `==` TypeError naming tests/README.md, test_banned.py
+naming `tally.clock`, test_errors.py, and `./dev lint`. Those tests and
+tools are still in the template, so the project stays realistic, but no
+family is scored on them. The rebuilt families are scored on rules the
+repository never states. Each keeps 1 seed, 3 test and 2 calibration
+instances.
+
+`build_tasks.py` lists, per rebuilt family, the terms that would state
+its rule (`HIDDEN`). `selfcheck.py` checks that no set-up workspace
+contains them outside the files named as allowed. Every instance of a
+rebuilt family also has a `violation/`: a fix that does the task and
+ignores the rule. It must fail, and only on the checks named `rule: ...`,
+which shows the check tests the rule.
 
 ## A task
 
@@ -62,9 +87,10 @@ session looks like a success for the wrong reason.
   assertions. Exit 0 is a pass. The last line is JSON with failures and
   signals, such as whether the lesson was followed or a key style was
   cross-applied.
-- `check-data/` (assert-helper): a mutant the agent's tests must catch.
-- `violation/` (one instance per artifact-checked family): a fix that
-  does the task but ignores the rule. The check must fail it.
+- `check-data/` (currency-coverage): a mutant the agent's tests must catch.
+- `violation/` (every instance of a rebuilt family, and one instance of
+  changelog, lockfile and conflicting-keys): a fix that does the task but
+  ignores the rule. The check must fail it.
 
 Each check enforces only its own family's rule, so a rule learned in one
 family never makes another family's task fail.
@@ -116,7 +142,15 @@ python3 scripts/eval/run_eval.py --families-from eval-runs/screen/screen.json --
   learnable family only if F passes at most 50% and O at least 70%.
   Generic and conflicting families are always kept. With one repetition
   that means O passes both instances and F at most one; `--screen-reps 2`
-  halves the noise and doubles the screen's cost.
+  halves the noise and doubles the screen's cost. `screen.md` also gives
+  each family's mean turns and cost per task under F and O, with the
+  counts, and a Wilcoxon test on O against F for both over the paired
+  calibration tasks.
+- The full run's `summary.md` reports turns and cost as outcomes: L/F
+  ratios with a Wilcoxon signed-rank test on paired learnable test
+  instances (H5 for turns, H7 for cost; H7 counts the agent's cost, and
+  the learner's cost per task is reported beside it), and a per-family
+  table of passes, mean turns and mean cost for every arm, with counts.
 - `--calibration` bases the next estimate on the screen's measured cost per
   task, not on the assumed token counts.
 - Output goes to `--out` (default `eval-runs/<time>`, which git ignores):
@@ -148,8 +182,9 @@ scripted learner, needs to change.
 2. Run `selfcheck.py --e2e`. It should end with `selfcheck: all passed`.
 3. Set `ANTHROPIC_API_KEY`. The dry run's estimate uses assumed token
    counts; read them.
-4. Run the screen (about $2.40 to $3.80 at the assumptions) and read
-   `screen.md`. If too few learnable families survive, the run can't
+4. Run the screen and read `screen.md`. The first screen cost $2.20 for
+   48 tasks ($0.046 a task); `--dry-run --screen --calibration` on its
+   `results.jsonl` estimates a rescreen at $2.20 to $2.74. If too few learnable families survive, the run can't
    answer the question. Fix the families before spending the rest.
 5. Re-run the dry run with `--calibration` on the screen's results.
    ADR-0021 says to drop the placebo arm if a task costs more than $0.07

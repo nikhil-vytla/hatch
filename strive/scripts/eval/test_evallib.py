@@ -76,7 +76,7 @@ class EstimateTest(unittest.TestCase):
             p.write_text("\n".join(json.dumps(r) for r in rows))
             m = ev.measured_costs(p)
         self.assertAlmostEqual(m["task"], 0.2)
-        est = ev.estimate([ev.Trial("L", 0, 0, "codegen", "seed", "seed")], "claude-haiku-4-5", m)
+        est = ev.estimate([ev.Trial("L", 0, 0, "api-version", "seed", "seed")], "claude-haiku-4-5", m)
         self.assertAlmostEqual(est["low"], 0.2 + 0.02)
         self.assertTrue(est["basis"].startswith("measured"))
 
@@ -127,13 +127,13 @@ class JournalTest(unittest.TestCase):
         self.assertEqual(ev.peeked(s, ["check-data"]), [])
 
     def test_leakage_is_a_test_instances_unique_string_in_learned_files(self):
-        task = TASKS[("codegen", "t1")]
+        task = TASKS[("regression-test", "t1")]
         with tempfile.TemporaryDirectory() as tmp:
             d = Path(tmp)
-            (d / "memory.md").write_text("- Records are generated.\n")
+            (d / "memory.md").write_text("- Ticket fixes get a regression test named after the ticket.\n")
             self.assertEqual(ev.leaked(d, task), [])
-            (d / "memory.md").write_text("- Customers have a billing_email.\n")
-            self.assertEqual(ev.leaked(d, task), ["billing_email"])
+            (d / "memory.md").write_text("- TAL-2291 was add_months.\n")
+            self.assertEqual(ev.leaked(d, task), ["TAL-2291"])
 
 
 class StatsTest(unittest.TestCase):
@@ -172,9 +172,9 @@ class StatsTest(unittest.TestCase):
         self.assertEqual((lo, hi), (0.0, 1.0))
 
 
-def trial(arm, seq, fam, inst, passed, turns=10, role="test", probe=False, **extra):
+def trial(arm, seq, fam, inst, passed, turns=10, role="test", probe=False, cost=0.05, **extra):
     return {"arm": arm, "sequence": seq, "family": fam, "instance": inst, "role": role, "probe": probe,
-            "passed": passed, "turns": turns, "cost_usd": 0.05, "memory_loaded": arm != "F", "followed": passed,
+            "passed": passed, "turns": turns, "cost_usd": cost, "memory_loaded": arm != "F", "followed": passed,
             "kind": KINDS[fam], "signals": extra.pop("signals", {}), **extra}
 
 
@@ -186,7 +186,8 @@ class HypothesesTest(unittest.TestCase):
             for fam in learnable:
                 for inst in ("t1", "t2", "t3"):
                     out.append(trial("F", k, fam, inst, False, turns=10))
-                    out.append(trial("L", k, fam, inst, l_pass, turns=6 if l_pass else 10))
+                    out.append(trial("L", k, fam, inst, l_pass, turns=6 if l_pass else 10, cost=0.03 if l_pass else 0.05,
+                                     learner={"cost_usd": 0.02}))
         for k in range(2):
             for fam in learnable:
                 for inst in ("t1", "t2", "t3"):
@@ -204,15 +205,31 @@ class HypothesesTest(unittest.TestCase):
     def test_learning_that_works_passes_every_hypothesis(self):
         s = stats.summarize(self.make(True), KINDS)
         self.assertEqual(s["L_minus_F"]["pairs"], 81)
-        self.assertEqual({h: s["hypotheses"][h]["result"] for h in ("H1", "H2", "H3", "H4", "H5", "H6")},
-                         dict.fromkeys(("H1", "H2", "H3", "H4", "H5", "H6"), "pass"))
+        names = ("H1", "H2", "H3", "H4", "H5", "H6", "H7")
+        self.assertEqual({h: s["hypotheses"][h]["result"] for h in names}, dict.fromkeys(names, "pass"))
+        self.assertAlmostEqual(s["L_minus_F"]["cost_ratio"], 0.6)
+        self.assertLess(s["L_minus_F"]["cost_wilcoxon"]["p"], 0.001)
+        self.assertAlmostEqual(s["L_minus_F"]["learner_cost_mean"], 0.02)
         md = stats.markdown(s, {"label": "t", "model": "m", "trials": 1, "cost_usd": 0})
         self.assertIn("**H1** PASS", md)
+        self.assertIn("**H7** PASS", md)
+        self.assertIn("L/F = 0.60", md)
+
+    def test_the_report_gives_each_familys_turns_and_cost_by_arm(self):
+        s = stats.summarize(self.make(True), KINDS)
+        fam = s["per_family"]["api-version"]["arms"]
+        self.assertEqual((fam["F"]["n"], fam["F"]["passes"], fam["F"]["turns_mean"], fam["F"]["cost_mean"]), (9, 0, 10, 0.05))
+        self.assertEqual((fam["O"]["n"], fam["O"]["passes"]), (6, 6))
+        self.assertEqual((fam["L"]["turns_mean"], fam["L"]["cost_mean"]), (6, 0.03))
+        md = stats.markdown(s, {"label": "t", "model": "m", "trials": 1, "cost_usd": 0})
+        row = next(line for line in md.splitlines() if line.startswith("| api-version |"))
+        self.assertIn("0/9 pass, 10.0 turns, $0.0500", row)
+        self.assertIn("6/6 pass", row)
 
     def test_learning_that_does_nothing_fails_h1_h2_and_h5(self):
         s = stats.summarize(self.make(False), KINDS)
-        results = {h: s["hypotheses"][h]["result"] for h in ("H1", "H2", "H5")}
-        self.assertEqual(results, {"H1": "fail", "H2": "fail", "H5": "fail"})
+        results = {h: s["hypotheses"][h]["result"] for h in ("H1", "H2", "H5", "H7")}
+        self.assertEqual(results, {"H1": "fail", "H2": "fail", "H5": "fail", "H7": "fail"})
 
     def test_cross_application_fails_h4(self):
         ts = self.make(True) + [trial("L", 0, "conflicting-keys", "t2", False, signals={"cross_applied": True})]
@@ -224,18 +241,28 @@ class HypothesesTest(unittest.TestCase):
         self.assertEqual((h["H2"]["result"], h["H6"]["result"]), ("not run", "not run"))
 
     def test_screen_keeps_families_with_headroom_that_memory_closes(self):
-        ts = [trial("F", 0, "codegen", "c1", False, role="calibration"), trial("F", 0, "codegen", "c2", True, role="calibration"),
-              trial("O", 0, "codegen", "c1", True, role="calibration"), trial("O", 0, "codegen", "c2", True, role="calibration"),
+        ts = [trial("F", 0, "api-version", "c1", False, role="calibration", turns=20, cost=0.06),
+              trial("F", 0, "api-version", "c2", True, role="calibration", turns=10, cost=0.04),
+              trial("O", 0, "api-version", "c1", True, role="calibration", turns=8, cost=0.03),
+              trial("O", 0, "api-version", "c2", True, role="calibration", turns=6, cost=0.02),
               trial("F", 0, "lockfile", "c1", True, role="calibration"), trial("F", 0, "lockfile", "c2", True, role="calibration"),
               trial("O", 0, "lockfile", "c1", True, role="calibration"), trial("O", 0, "lockfile", "c2", True, role="calibration"),
               trial("F", 0, "generic-logic", "c1", True, role="calibration")]
         fams = stats.screen(ts, KINDS)
-        self.assertTrue(fams["codegen"]["keep"])
+        self.assertTrue(fams["api-version"]["keep"])
+        self.assertEqual((fams["api-version"]["turns"], fams["api-version"]["n"]), ({"F": 15, "O": 7}, [2, 2]))
+        self.assertAlmostEqual(fams["api-version"]["cost"]["O"], 0.025)
+        paired = stats.screen_paired(ts)
+        self.assertEqual(paired["pairs"], 4)
+        self.assertAlmostEqual(paired["turns_ratio"], 34 / 50)
+        md = stats.screen_markdown(fams, {"label": "s", "model": "m", "cost_usd": 0, "trials": 9, "paired": paired})
+        self.assertIn("| api-version | learnable | 50% | 100% | 2, 2 | 15.00 | 7.00 | $0.0500 | $0.0250 | yes |", md)
+        self.assertIn("turns: O/F = 0.68", md)
         self.assertFalse(fams["lockfile"]["keep"])
         self.assertTrue(fams["generic-logic"]["keep"])
 
     def test_forgetting_compares_a_probe_with_the_first_run(self):
-        ts = [trial("L", 0, "codegen", "t1", True), trial("L", 0, "codegen", "t1", False, probe=True)]
+        ts = [trial("L", 0, "api-version", "t1", True), trial("L", 0, "api-version", "t1", False, probe=True)]
         self.assertEqual(stats.forgetting(ts)["L"]["passed_then_failed"], 1)
 
 

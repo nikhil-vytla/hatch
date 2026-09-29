@@ -1,1 +1,0 @@
-Tests in this repo run with `python -m unittest discover -s tests -t .`; `./dev test` is a legacy wrapper that's slow and flaky, so don't use it. test_invoice has been failing since the last merge. Fix it.

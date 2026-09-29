@@ -5,6 +5,6 @@
 - Log with the structured logger from `internal/log` (`log.From(ctx)`), never `fmt.Println` or the standard `log` package: the log shipper drops lines that aren't JSON, and a lint rule in CI flags them.
 - Database migrations live in db/migrations as numbered pairs (`0042_add_index.up.sql` and `.down.sql`). Never edit a migration that has shipped; add a new one, and run `make migrate-check` before pushing.
 - The web assets under web/ build with `pnpm build`; the Go binary embeds web/dist, so rebuild the assets before `go build` or the server serves an old bundle without any warning.
-- Feature flags are read through `flags.Enabled(ctx, "name")` and declared in config/flags.yaml with an owner and an expiry date; an undeclared flag panics at startup in development builds.
+- Feature flags are read through `flags.Enabled(ctx, "name")` and declared in config/flags.yaml with an owner and an expiry date; an undeclared flag panics at startup in development builds and logs an error in production.
 - Configuration comes from environment variables with the APP_ prefix, parsed once in internal/config; add new settings to config.Example so the docs page and the deploy templates stay in sync.
 - Timestamps in the public API are RFC 3339 strings in UTC with millisecond precision, while internal service calls pass Unix milliseconds as integers.

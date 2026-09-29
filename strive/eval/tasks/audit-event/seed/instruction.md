@@ -1,0 +1,1 @@
+Add `tally.invoice.remove_line(inv, index)`: take the line at `index` off the invoice and return it. Also, anything in tally/ that changes an invoice or a payment has to leave an audit event: call `tally.audit.record` with a dotted event name like `invoice.line_removed` and `invoice=` the invoice number, plus whatever else is useful. Finance rebuilds disputes from that trail.

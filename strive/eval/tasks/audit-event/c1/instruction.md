@@ -1,0 +1,1 @@
+Add `tally.payments.write_off(inv, country, payments, on)`: when we give up on the rest of an invoice, it returns a Payment for the whole balance still due, referenced `WO-<invoice number>` and dated `on`.

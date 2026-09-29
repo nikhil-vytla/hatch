@@ -1,0 +1,1 @@
+The invoice page should show the invoice's notes. Add them to the API's invoice JSON as `notes`. And whenever you change what the API returns, bump the minor of `API_VERSION` in tally_api/__init__.py (1.4 now, so 1.5): the web app checks it to know which fields it can rely on. We do that for every API change, added, removed or renamed keys alike.

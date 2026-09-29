@@ -1,0 +1,23 @@
+{
+  "family": "versionadded",
+  "instance": "seed",
+  "role": "seed",
+  "kind": "learnable",
+  "rule": "Every new public function in tally/ ends its docstring with '.. versionadded:: 0.10', the next release.",
+  "oracle_run": [],
+  "followed_commands": [],
+  "unique": [
+    "title_case"
+  ],
+  "hidden_terms": [
+    {
+      "pattern": "versionadded",
+      "allowed_in": []
+    },
+    {
+      "pattern": "\\b0\\.10\\b",
+      "allowed_in": []
+    }
+  ],
+  "naive_fails_only_on_rule": true
+}

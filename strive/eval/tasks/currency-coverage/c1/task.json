@@ -1,0 +1,31 @@
+{
+  "family": "currency-coverage",
+  "instance": "c1",
+  "role": "calibration",
+  "kind": "learnable",
+  "rule": "Tests of code that returns Money include a JPY case: JPY has no minor units, so a rounding bug that assumes two decimals passes every EUR test.",
+  "oracle_run": [],
+  "followed_commands": [],
+  "unique": [
+    "discounted_unit_price"
+  ],
+  "hidden_terms": [
+    {
+      "pattern": "zero.decimal",
+      "allowed_in": []
+    },
+    {
+      "pattern": "JPY case",
+      "allowed_in": []
+    },
+    {
+      "pattern": "two decimals",
+      "allowed_in": []
+    },
+    {
+      "pattern": "every currency",
+      "allowed_in": []
+    }
+  ],
+  "naive_fails_only_on_rule": true
+}

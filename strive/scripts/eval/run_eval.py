@@ -425,6 +425,7 @@ def summarize(results: Path, tasks: dict, screen: bool, label: str) -> Path:
     out = results.parent
     if screen:
         fams = stats.screen(trials, kinds)
+        meta["paired"] = stats.screen_paired(trials)
         (out / "screen.json").write_text(json.dumps({"families": fams, "keep": [f for f, v in fams.items() if v["keep"]],
                                                      **meta}, indent=2))
         md = stats.screen_markdown(fams, meta)
@@ -449,11 +450,11 @@ def isolation_probe(a: argparse.Namespace) -> int:
     with ev.SuiteLock():
         seq.start_daemon()
         try:
-            task = seq.tasks[("codegen", "t1")]
+            task = seq.tasks[("regression-test", "t1")]
             ev.prepare(task, seq.ws, template=seq.vault / "project")
             # The workspace's own README is the control: a read that should work.
             targets = {"workspace": seq.ws / "README.md", "vault": task.dir / "check.py",
-                       "checkout": ev.TASKS / "codegen" / "t1" / "check.py"}
+                       "checkout": ev.TASKS / "regression-test" / "t1" / "check.py"}
             marks = {"workspace": "Invoices, VAT", "vault": "def check(ws)", "checkout": "def check(ws)"}
             command = "; ".join(f"echo '== {name}'; cat {path}" for name, path in targets.items())
             run = seq.strive("run", "--json", "--approvals", "full-auto", "--budget", "0.5", "-",

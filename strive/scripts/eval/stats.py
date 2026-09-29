@@ -11,7 +11,7 @@ from __future__ import annotations
 import math
 import random
 from collections import defaultdict
-from statistics import mean
+from statistics import mean, median
 
 Z95 = 1.959963984540054
 
@@ -147,10 +147,38 @@ def summarize(trials: list[dict], kinds: dict[str, str]) -> dict:
             "family_sign_test": sign_test([mean(v) for v in per_family.values()]),
             "turns_wilcoxon": wilcoxon([float(t["turns"] - u["turns"]) for t, u in lf]),
             "turns_ratio": _ratio([t["turns"] for t, _ in lf], [u["turns"] for _, u in lf]),
+            "cost_wilcoxon": wilcoxon([t["cost_usd"] - u["cost_usd"] for t, u in lf]),
+            "cost_ratio": _ratio([t["cost_usd"] for t, _ in lf], [u["cost_usd"] for _, u in lf]),
+            "cost_mean": {"L": mean(t["cost_usd"] for t, _ in lf), "F": mean(u["cost_usd"] for _, u in lf)},
+            # Not in H7: what learning after each of these tasks cost on top.
+            "learner_cost_mean": mean((t.get("learner") or {}).get("cost_usd", 0.0) for t, _ in lf),
         }
+    out["per_family"] = by_family(scored, kinds)
     out["hypotheses"] = hypotheses(out, of_kind, paired, trials)
     out["forgetting"] = forgetting(trials)
     return out
+
+
+def _cell(ts: list[dict]) -> dict:
+    return {"n": len(ts), "passes": sum(1 for t in ts if t["passed"]),
+            "turns_mean": mean(t["turns"] for t in ts) if ts else math.nan,
+            "turns_median": median(t["turns"] for t in ts) if ts else math.nan,
+            "cost_mean": mean(t["cost_usd"] for t in ts) if ts else math.nan}
+
+
+def by_family(ts: list[dict], kinds: dict[str, str]) -> dict[str, dict]:
+    """Per family and arm: trials, passes, turns and agent cost."""
+    out: dict[str, dict] = {}
+    for fam in sorted({t["family"] for t in ts}):
+        arms = sorted({t["arm"] for t in ts if t["family"] == fam}, key=_arm_order)
+        out[fam] = {"kind": kinds.get(fam), "arms": {a: _cell([t for t in ts if t["family"] == fam and t["arm"] == a])
+                                                    for a in arms}}
+    return out
+
+
+def _arm_order(arm: str) -> int:
+    order = ("F", "L", "O", "P", "placebo")
+    return order.index(arm) if arm in order else len(order)
 
 
 def _followed_rate(ts: list[dict]) -> float:
@@ -195,8 +223,12 @@ def hypotheses(out: dict, of_kind, paired, trials: list[dict]) -> dict:
     lf_turns = lf["turns_ratio"] if lf else None
     verdict("H5", [lf_turns], lambda: lf_turns <= 0.85, "turns in L <= 0.85 x turns in F")
     verdict("H6", [O, PL], lambda: O - PL >= 0.20, "O - placebo >= 20 pp")
+    lf_cost = lf["cost_ratio"] if lf else None
+    verdict("H7", [lf_cost], lambda: lf_cost <= 0.85,
+            "agent cost per task in L <= 0.85 x F (the learner's own cost is reported, not counted)")
     h["_values"] = {"F": F, "L": L, "O": O, "P": P, "placebo": PL, "P_minus_F_paired": p_minus_f,
-                    "generic_L_minus_F": g, "conflict_cross_applied": cross, "turns_ratio_L_F": lf_turns}
+                    "generic_L_minus_F": g, "conflict_cross_applied": cross, "turns_ratio_L_F": lf_turns,
+                    "cost_ratio_L_F": lf_cost}
     return h
 
 
@@ -222,6 +254,11 @@ def forgetting(trials: list[dict]) -> dict:
     return out
 
 
+def _mean_of(trials: list[dict], fam: str, arm: str, key: str) -> float:
+    xs = [t[key] for t in trials if t["family"] == fam and t["arm"] == arm]
+    return mean(xs) if xs else math.nan
+
+
 def screen(trials: list[dict], kinds: dict[str, str]) -> dict:
     """ADR-0021's headroom screen on calibration instances: keep a learnable
     family only if F passes at most 50% and O at least 70%."""
@@ -233,6 +270,8 @@ def screen(trials: list[dict], kinds: dict[str, str]) -> dict:
         orr = sum(o) / len(o) if o else math.nan
         screened = kinds.get(fam) == "learnable"
         fams[fam] = {"kind": kinds.get(fam), "F": fr, "O": orr, "n": [len(f), len(o)],
+                     "turns": {"F": _mean_of(trials, fam, "F", "turns"), "O": _mean_of(trials, fam, "O", "turns")},
+                     "cost": {"F": _mean_of(trials, fam, "F", "cost_usd"), "O": _mean_of(trials, fam, "O", "cost_usd")},
                      "keep": (fr <= 0.5 and orr >= 0.7) if screened else True,
                      "why": "screened" if screened else "not screened: kept to measure harm or over-generalization"}
     return fams
@@ -258,20 +297,25 @@ def markdown(s: dict, meta: dict) -> str:
                      f"${a['cost_usd']:.4f} |")
     lf = s.get("L_minus_F")
     if lf:
-        m, st, w = lf["mcnemar"], lf["family_sign_test"], lf["turns_wilcoxon"]
+        m, st, w, c = lf["mcnemar"], lf["family_sign_test"], lf["turns_wilcoxon"], lf["cost_wilcoxon"]
         lines += ["", "## L - F, paired on learnable test instances", "",
                   f"- {lf['pairs']} pairs; L - F = {fmt(lf['diff'])}, cluster bootstrap 95% CI "
                   f"{fmt(lf['cluster_ci'][0])} to {fmt(lf['cluster_ci'][1])} (clusters: family x ordering)",
                   f"- McNemar: L only {m['treatment_only']}, F only {m['control_only']}, exact p = {m['p']:.3g}",
                   f"- family sign test: {st['positive']} up, {st['negative']} down, {st['ties']} tied, p = {st['p']:.3g}",
-                  f"- turns: L/F = {fmt(lf['turns_ratio'], False)}; Wilcoxon n = {w['n']}, z = {w['z']:.2f}, p = {w['p']:.3g}"]
+                  f"- turns: L/F = {fmt(lf['turns_ratio'], False)}; Wilcoxon n = {w['n']}, z = {w['z']:.2f}, p = {w['p']:.3g}",
+                  f"- cost per task: L ${lf['cost_mean']['L']:.4f}, F ${lf['cost_mean']['F']:.4f}, "
+                  f"L/F = {fmt(lf['cost_ratio'], False)}; Wilcoxon n = {c['n']}, z = {c['z']:.2f}, p = {c['p']:.3g}; "
+                  f"learning after each L task added ${lf['learner_cost_mean']:.4f} (not in the ratio)"]
     lines += ["", "## Pre-registered hypotheses", ""]
-    for name in ("H1", "H2", "H3", "H4", "H5", "H6"):
+    for name in ("H1", "H2", "H3", "H4", "H5", "H6", "H7"):
         hh = s["hypotheses"][name]
         lines.append(f"- **{name}** {hh['result'].upper()}: {hh['text']}")
     v = s["hypotheses"]["_values"]
-    lines += ["", "Values: " + ", ".join(f"{k} {fmt(x) if k not in ('conflict_cross_applied', 'turns_ratio_L_F') else x}"
-                                         for k, x in v.items())]
+    raw = ("conflict_cross_applied", "turns_ratio_L_F", "cost_ratio_L_F")
+    lines += ["", "Values: " + ", ".join(f"{k} {fmt(x) if k not in raw else x}" for k, x in v.items())]
+    if s.get("per_family"):
+        lines += ["", *family_table(s["per_family"], "test instances")]
     if s.get("forgetting"):
         lines += ["", "## Forgetting probes", ""]
         for arm, f in s["forgetting"].items():
@@ -282,11 +326,52 @@ def markdown(s: dict, meta: dict) -> str:
     return "\n".join(lines)
 
 
+def family_table(fams: dict, what: str) -> list[str]:
+    """Per family, each arm's passes, mean turns and mean agent cost, with the count."""
+    arms = sorted({a for f in fams.values() for a in f["arms"]}, key=_arm_order)
+    lines = [f"## Per family: passes, mean turns and mean cost per task ({what})", "",
+             "| family | kind | " + " | ".join(arms) + " |", "|---|---|" + "---|" * len(arms)]
+    for fam, f in fams.items():
+        cells = []
+        for a in arms:
+            c = f["arms"].get(a)
+            cells.append(f"{c['passes']}/{c['n']} pass, {c['turns_mean']:.1f} turns, ${c['cost_mean']:.4f}" if c else "-")
+        lines.append(f"| {fam} | {f['kind']} | " + " | ".join(cells) + " |")
+    return lines
+
+
+def screen_paired(trials: list[dict]) -> dict:
+    """O against F on the same calibration instance and repetition: turns and cost."""
+    f = {(t["family"], t["instance"], t["sequence"]): t for t in trials if t["arm"] == "F"}
+    pairs = [(t, f[k]) for t in trials if t["arm"] == "O" and (k := (t["family"], t["instance"], t["sequence"])) in f]
+    if not pairs:
+        return {}
+    return {"pairs": len(pairs),
+            "turns_ratio": _ratio([o["turns"] for o, _ in pairs], [x["turns"] for _, x in pairs]),
+            "turns_wilcoxon": wilcoxon([float(o["turns"] - x["turns"]) for o, x in pairs]),
+            "cost_ratio": _ratio([o["cost_usd"] for o, _ in pairs], [x["cost_usd"] for _, x in pairs]),
+            "cost_wilcoxon": wilcoxon([o["cost_usd"] - x["cost_usd"] for o, x in pairs])}
+
+
 def screen_markdown(fams: dict, meta: dict) -> str:
     lines = [f"# Headroom screen: {meta.get('label', '')}", "", f"- model: {meta.get('model')}",
              f"- cost: ${meta.get('cost_usd', 0):.2f} over {meta.get('trials')} tasks", "",
              "Keep a learnable family only if F passes at most 50% and O at least 70% of its calibration instances.",
-             "", "| family | kind | F | O | keep |", "|---|---|---|---|---|"]
+             "", "| family | kind | F | O | n (F, O) | turns F | turns O | cost F | cost O | keep |",
+             "|---|---|---|---|---|---|---|---|---|---|"]
     for fam, f in fams.items():
-        lines.append(f"| {fam} | {f['kind']} | {fmt(f['F'])} | {fmt(f['O'])} | {'yes' if f['keep'] else 'no'} |")
+        t, c = f.get("turns", {}), f.get("cost", {})
+        lines.append(f"| {fam} | {f['kind']} | {fmt(f['F'])} | {fmt(f['O'])} | {f['n'][0]}, {f['n'][1]} | "
+                     f"{fmt(t.get('F'), False)} | {fmt(t.get('O'), False)} | {_usd(c.get('F'))} | {_usd(c.get('O'))} | "
+                     f"{'yes' if f['keep'] else 'no'} |")
+    p = meta.get("paired") or {}
+    if p:
+        w, c = p["turns_wilcoxon"], p["cost_wilcoxon"]
+        lines += ["", f"O against F on the same {p['pairs']} calibration tasks (turns and cost are means per task):",
+                  f"- turns: O/F = {fmt(p['turns_ratio'], False)}; Wilcoxon n = {w['n']}, z = {w['z']:.2f}, p = {w['p']:.3g}",
+                  f"- cost: O/F = {fmt(p['cost_ratio'], False)}; Wilcoxon n = {c['n']}, z = {c['z']:.2f}, p = {c['p']:.3g}"]
     return "\n".join(lines) + "\n"
+
+
+def _usd(x: float | None) -> str:
+    return "-" if x is None or math.isnan(x) else f"${x:.4f}"
