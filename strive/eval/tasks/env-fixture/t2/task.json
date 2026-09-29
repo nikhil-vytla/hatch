@@ -1,0 +1,14 @@
+{
+  "family": "env-fixture",
+  "instance": "t2",
+  "role": "test",
+  "kind": "learnable",
+  "rule": "The FX tests skip unless TALLY_FX_RATES=tests/fixtures/rates.csv is set.",
+  "oracle_run": [],
+  "followed_commands": [
+    "TALLY_FX_RATES"
+  ],
+  "unique": [
+    "round_minor(Money(m.amount"
+  ]
+}

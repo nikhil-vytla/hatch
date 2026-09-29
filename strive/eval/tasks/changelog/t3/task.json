@@ -1,0 +1,16 @@
+{
+  "family": "changelog",
+  "instance": "t3",
+  "role": "test",
+  "kind": "learnable",
+  "rule": "Every change to tally/ or tally_api/ adds a fragment changes/<slug>.<added|changed|fixed|removed>.md, one '- ...' line; ./dev changes checks it.",
+  "oracle_run": [],
+  "followed_commands": [
+    "changes/[a-z0-9-]+\\.(added|changed|fixed|removed)\\.md",
+    "(^|[\\s;&|/])\\.?/?dev changes\\b"
+  ],
+  "unique": [
+    "record_payment",
+    "exact"
+  ]
+}

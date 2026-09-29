@@ -1,0 +1,14 @@
+{
+  "family": "banned-api",
+  "instance": "c1",
+  "role": "calibration",
+  "kind": "learnable",
+  "rule": "tally/ reads the time only through tally.clock (now(), today()); datetime.now, date.today and time.time are banned.",
+  "oracle_run": [],
+  "followed_commands": [
+    "clock\\.(now|today)"
+  ],
+  "unique": [
+    "export_filename"
+  ]
+}

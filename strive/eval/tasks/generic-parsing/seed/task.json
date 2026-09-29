@@ -1,0 +1,12 @@
+{
+  "family": "generic-parsing",
+  "instance": "seed",
+  "role": "seed",
+  "kind": "generic",
+  "rule": "No quirk: parsing and formatting bugs, described in the request.",
+  "oracle_run": [],
+  "followed_commands": [],
+  "unique": [
+    "billing+eu"
+  ]
+}

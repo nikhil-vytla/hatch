@@ -1,0 +1,1 @@
+- Added Danish kroner (DKK).

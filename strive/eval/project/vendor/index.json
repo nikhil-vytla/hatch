@@ -1,0 +1,142 @@
+{
+  "packages": {
+    "babel-lite": {
+      "2.3.0": {
+        "requires": [],
+        "sha256": "0a4b61214b4b733bcd8c97ce7fd21dc0397c1fee023ce62687b2e7540f6d24a5"
+      },
+      "2.4.0": {
+        "requires": [],
+        "sha256": "9232f432ec4f6c4d7e730644ce83a23d3fc5aa5a6917b550a7eebb256d4224ee"
+      },
+      "2.4.1": {
+        "requires": [],
+        "sha256": "a1ad43fac88ed76404dff6ac4231a4990c0301ac18f4efe23d5b6662ad496085"
+      },
+      "2.5.0": {
+        "requires": [],
+        "sha256": "292d5814351d80a385c5b7db559ed7a6fb17ff327c344cf8570f6e6bc968c395"
+      }
+    },
+    "csvkit-mini": {
+      "4.0.0": {
+        "requires": [],
+        "sha256": "8d772477157597d6b911bf9e79c1876a115e16889fd5019f872ae32ca5217c33"
+      },
+      "4.1.2": {
+        "requires": [],
+        "sha256": "6023e40f704c6e32b65a1e06ce45c8260cc870f40455fe1eef092dfed6441ea6"
+      }
+    },
+    "holidays-mini": {
+      "0.29.0": {
+        "requires": [],
+        "sha256": "1acdb58b4f1b49d09645182ed646709fac2716c2a81fbcbdbfa87b0a6a1de012"
+      },
+      "0.30.1": {
+        "requires": [],
+        "sha256": "af46fca33783bc1f7c9f97cc46d639b9237b24d3b69c3ac0980b8558eebfbf7a"
+      },
+      "0.31.0": {
+        "requires": [],
+        "sha256": "82bedc92c7326734e2950ceade21b1811272075736d23ea6fb58c0c282c5bd04"
+      },
+      "0.32.0": {
+        "requires": [
+          "tzdata-slim>=2024.1"
+        ],
+        "sha256": "f0429ec4cee501c8c7cb28a4714f9d2a76d5c1cdef705088ce0cae0d1219bbb1"
+      }
+    },
+    "ibancheck": {
+      "0.9.0": {
+        "requires": [],
+        "sha256": "0138a05d9d6413d6460e6b259da54d8ff7c7ac6b90009f557fb17ff4ea2626f9"
+      },
+      "1.0.0": {
+        "requires": [],
+        "sha256": "a5a6e3a99aec85521621f3fe6bf993aa6d58daea594320553516c20110d0dee9"
+      }
+    },
+    "iso4217-data": {
+      "1.8.2": {
+        "requires": [],
+        "sha256": "432262de264b6667dd0f6c0c96bbfb5cc54a5545f8b34e3340e9713e4421700b"
+      },
+      "1.9.0": {
+        "requires": [],
+        "sha256": "1744147b89f393ddf9868c972a9ba14ac479484af693f69368a08fb6b9e3b269"
+      },
+      "2.0.0": {
+        "requires": [],
+        "sha256": "45d9ced579ad5989cd83c7d683ed4272a2b72fe7c6a342530bd2ddd69dde5860"
+      }
+    },
+    "money-words": {
+      "0.5.0": {
+        "requires": [],
+        "sha256": "4137fd9b72785eff2fc04c73e9d617038fe8eb9765eda84ff05a0b5cc8ba8d52"
+      },
+      "0.6.0": {
+        "requires": [],
+        "sha256": "dadae69e432f61dc713196407197d269965e69315abe891cffc78d82915dfbc8"
+      }
+    },
+    "pdfkit-tiny": {
+      "0.7.1": {
+        "requires": [],
+        "sha256": "d1e3772be8f160e4715ba4994bae9eaa67c46412f5e996555b390e84d9c250ab"
+      },
+      "0.7.2": {
+        "requires": [],
+        "sha256": "5793fde7b9da70c477549652053ff974c68e45e42b628cfe36bd2aaa5064ff44"
+      },
+      "0.8.0": {
+        "requires": [],
+        "sha256": "c07e57f842063621412d009270989c1c03f52a28da3f1377f0613abe0660f942"
+      }
+    },
+    "python-slugger": {
+      "1.0.4": {
+        "requires": [],
+        "sha256": "31dcee136c67e8b95288830da83c39200a1bb180ab9610e9b6bad896ea2180b8"
+      },
+      "1.1.0": {
+        "requires": [],
+        "sha256": "9a8d82d4da606ee7ed5656e543bab304c477ce762f0ca765385e8c595df9e4c2"
+      }
+    },
+    "qrcode-lite": {
+      "3.1.0": {
+        "requires": [],
+        "sha256": "4cbc2be0ae5550fd3be837e8ba16c197b3d6ba374e95abd4e767b1f4dd908408"
+      },
+      "3.2.0": {
+        "requires": [
+          "pdfkit-tiny>=0.7"
+        ],
+        "sha256": "14c62a41832372de61c3f07cffca04ed4b3040def4a4fddc32cdd409523b5a7d"
+      }
+    },
+    "tzdata-slim": {
+      "2024.1": {
+        "requires": [],
+        "sha256": "e5a346ba1bc35d90aecafd824fe0471ff26b2bd0c07ddaad7b24c51964dff5e3"
+      },
+      "2024.2": {
+        "requires": [],
+        "sha256": "5c76d2a6f6155e91347c6698bc893640f35899396ed2738985c245702335857c"
+      }
+    },
+    "vatnum": {
+      "2.2.0": {
+        "requires": [],
+        "sha256": "c78547d857fec9ec417777529c5ee0992c4b54f8d680499af63d4b87ed531b6e"
+      },
+      "2.3.1": {
+        "requires": [],
+        "sha256": "7d274e917f7da26cc95092d260b13de8d75c3464067b7bb040e3b9ae1f1b21ef"
+      }
+    }
+  }
+}

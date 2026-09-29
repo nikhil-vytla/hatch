@@ -1,0 +1,21 @@
+{
+  "family": "lockfile",
+  "instance": "c2",
+  "role": "calibration",
+  "kind": "learnable",
+  "rule": "After changing dependencies in pyproject.toml, run ./dev lock to regenerate tally.lock; never edit it by hand.",
+  "oracle_run": [
+    [
+      "python3",
+      "dev",
+      "lock"
+    ]
+  ],
+  "followed_commands": [
+    "(^|[\\s;&|/])\\.?/?dev lock\\b",
+    "tools/lock\\.py"
+  ],
+  "unique": [
+    "vatnum"
+  ]
+}

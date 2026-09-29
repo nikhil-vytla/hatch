@@ -1,0 +1,21 @@
+{
+  "family": "codegen",
+  "instance": "t3",
+  "role": "test",
+  "kind": "learnable",
+  "rule": "tally/_generated/records.py is generated from schema/records.def: edit the schema, then run ./dev gen.",
+  "oracle_run": [
+    [
+      "python3",
+      "dev",
+      "gen"
+    ]
+  ],
+  "followed_commands": [
+    "(^|[\\s;&|/])\\.?/?dev gen\\b",
+    "gen_records\\.py"
+  ],
+  "unique": [
+    "reason"
+  ]
+}

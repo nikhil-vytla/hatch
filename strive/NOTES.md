@@ -1970,6 +1970,48 @@ an offline `strive eval`, a later PR.
   `failed_then_passed` (the equal seq is the failed run, excluded by its
   exit). The deleted files' 18 deferred survivors are gone with them.
 
+## 2026-09-28: the eval's task suite and runner (ADR-0021), built without spending
+
+The suite is `eval/`, the runner `scripts/eval/`; `eval/README.md` says how
+to run them. Nothing here called a real model.
+- **The project** is `tally`, a Python invoicing library (standard library
+  only), because each quirk is cheap to check there with the project's own
+  tests and scripts. 12 families: 9 learnable quirks (doctests only under
+  `./dev test`, `TALLY_FX_RATES` for the FX tests, codegen from a schema,
+  an `assert_money` helper, `tally.clock` instead of `datetime.now`,
+  changelog fragments, a lockfile, registered error codes, sorted
+  `__all__`), 2 generic, 1 conflicting (snake_case warehouse rows,
+  camelCase API JSON). 6 instances each plus 3 poison seeds: 75 tasks.
+- **Checks** copy the workspace, put back the project's harness, and run
+  it plus the task's assertions. For every task the unfixed workspace
+  fails and the oracle passes. For one instance of each artifact-checked
+  family, a fix that ignores the rule also fails.
+- **The plan** is ADR-0021's: 510 agent tasks and 204 learner runs over 3
+  orderings (staggered so each round mixes new seeds with earlier
+  families' tests, then 3 forgetting probes), 81 L-F pairs. The dry run
+  estimates $29.90 to $46.87 on Haiku 4.5 at assumed token counts. The
+  screen (48 tasks) is $2.42 to $3.82 and measures the real per-task cost
+  for the next estimate.
+- **Found: a learner host keeps the learned files it started with.** Under
+  the scripted model, in one daemon, the first memory proposal applied
+  and every later one went `stale` on accept (1 of 5). Each was built on
+  the empty file the host had been given. The runner restarts the daemon
+  before each learner run, which makes it 5 of 5; `--keep-learner-host`
+  reproduces the bug. strive should hand the host fresh learned files per
+  learning request, or ADR-0022's add operations will sidestep it.
+- **Found: a per-task budget has to exceed one call's reservation.** Haiku
+  4.5 reserves about $0.087 for a call's maximum output. A $0.05 budget
+  failed the first call, and the runner then failed the run, as meant.
+- **Keeping checks from the agent:** checks run from a copy inside each
+  sequence's `STRIVE_HOME`, which the sandbox denies. The checkout's
+  copies are mode 000 during a run, and a command naming them counts as
+  peeking. A real strive session under the scripted model shows the three
+  reads: its own README works, the vault read gets "Operation not
+  permitted", and the checkout read gets "Permission denied".
+- **Before a paid run:** build from this checkout (an installed `strive`
+  was older and refused the settings' `judgeModel`), run
+  `selfcheck.py --e2e`, then the screen, then the full run with
+  `--families-from` and `--calibration`.
 ## 2026-09-28: the offer to learn from a session (item 4 of the plan)
 
 Design in the second amendment to [ADR-0020](docs/adrs/0020-learning-triggers.md).
@@ -2322,3 +2364,42 @@ unasked, with no sandbox rule in the way.
   watermark. A session is no longer reconsidered while its answer is on
   its way, and the window offers only signs newer than the last answered
   one. A unit test with a slow dismissal failed first.
+## 2026-09-29: how the eval should be designed, by who would judge it
+
+Before building ADR-0021's eval, a review of how researchers in each area
+would judge it, and how comparable systems were benchmarked.
+- **Continual learning** wants an accuracy matrix (score on task j after
+  learning up to i), forward and backward transfer, forgetting, several
+  orderings; convincing is a gain over a stateless baseline. CL-Bench
+  (2606.05661): best system 25.4% normalized gain; naive in-context
+  learning beat dedicated memory on codebase adaptation.
+- **Agent benchmarking** (SWE-bench, Harbor, METR) wants gold oracles,
+  deterministic verifiers, pinned models; confound: contamination
+  (2506.12286: 76% buggy-file accuracy from issue text alone).
+- **Memory research** scores downstream success, not recall; VibeMemBench
+  (2609.23570): 11 of 12 pairings lost to memory-off, though its targets
+  were filtered on injection success. Letta's plain filesystem: 74.0% on
+  LoCoMo.
+- **Self-improving agents** report per-iteration curves on a split never
+  used for selection; DGM's search and eval sets overlap.
+- **Statistics** wants paired designs and clustered errors (2411.00640:
+  clustered SEs can be over 3x naive ones), stated power, pre-registration.
+- **Safety** asks whether the learner can see the grader (DGM's node 114
+  deleted the checker's markers) and whether poisoned lessons persist.
+- **Existing systems:** Prime Agent's release gate is 28 stratified SWE
+  tasks, one rollout a side, pinned model, fail-closed thresholds; nothing
+  evaluates its refinement. exo runs ordered Harbor datasets on one
+  evolving agent (`task_order.json`, concurrency 1); its self-evolution
+  smoke test checks only that tools persist. ACE: +10.6 on AppWorld, but
+  online without labels it fell below base on FiNER (67.3 vs 70.7).
+  AHE: TB2 69.7% → 77.0%. Dynamic Cheatsheet: Game of 24 10% → 99% once a
+  reusable trick was stored, the ideal case.
+- **Corrections to my first draft:** 2605.30621 finds harness gains
+  non-monotonic in model strength (mid-tier gains most; weak models fail to
+  load or follow), not "weak models gain most"; SkillsBench's −1.3 points
+  were skills written before any trajectory, not learned from sessions.
+
+The design that follows (12 task families with seed and held-out test
+instances, screening on calibration instances only, frozen / learning /
+oracle / poison / placebo arms, cluster bootstrap, six pre-registered
+hypotheses, about $33–52 on Haiku 4.5) is ADR-0021.

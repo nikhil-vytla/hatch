@@ -17,3 +17,4 @@ __pycache__/
 *.bun-build
 /.audit/
 /mutants.out*/
+/eval-runs/

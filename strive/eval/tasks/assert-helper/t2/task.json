@@ -1,0 +1,14 @@
+{
+  "family": "assert-helper",
+  "instance": "t2",
+  "role": "test",
+  "kind": "learnable",
+  "rule": "Tests compare Money with tests.support.assert_money(actual, '12.30 EUR'); Money has no ==.",
+  "oracle_run": [],
+  "followed_commands": [
+    "assert_money"
+  ],
+  "unique": [
+    "net_from_gross"
+  ]
+}

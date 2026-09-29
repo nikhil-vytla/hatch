@@ -1,0 +1,15 @@
+{
+  "family": "changelog",
+  "instance": "c2",
+  "role": "calibration",
+  "kind": "learnable",
+  "rule": "Every change to tally/ or tally_api/ adds a fragment changes/<slug>.<added|changed|fixed|removed>.md, one '- ...' line; ./dev changes checks it.",
+  "oracle_run": [],
+  "followed_commands": [
+    "changes/[a-z0-9-]+\\.(added|changed|fixed|removed)\\.md",
+    "(^|[\\s;&|/])\\.?/?dev changes\\b"
+  ],
+  "unique": [
+    "730"
+  ]
+}
