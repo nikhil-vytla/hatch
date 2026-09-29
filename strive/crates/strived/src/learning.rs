@@ -15,7 +15,8 @@ use serde_json::Value;
 use strive_learning::{Finding, Folded, Rule};
 use strive_proto::rpc::RpcError;
 use strive_proto::{
-    Appended, Digest, Entry, Event, Evidence, Gate, LearningOpen, LearningRun, LearningRunParams, Method, ProjectRef,
+    Appended, Digest, Entry, Event, Evidence, Gate, LearnSignal, LearningDismiss, LearningDismissParams, LearningOpen,
+    LearningRun, LearningRunParams, LearningSignals, LearningSignalsParams, LearningSignalsResult, Method, ProjectRef,
     Proposal, ProposalDecide, ProposalDecideParams, ProposalDecision, ProposalList, ProposalListResult, ProposalRef,
     ProposalRollback, ProposalStatus, SessionInfo, SessionKind, StaleMention, Verdict,
 };
@@ -57,6 +58,15 @@ pub async fn route(state: &Arc<State>, conn: &Arc<Conn>, method: &str, params: V
             require_person(conn)?;
             let LearningRunParams { cwd, sessions } = parse::<LearningRun>(params)?;
             run(state, &project(&cwd)?, sessions.unwrap_or_default()).await
+        }
+        LearningSignals::NAME => {
+            let LearningSignalsParams { cwd, session } = parse::<LearningSignals>(params)?;
+            reply::<LearningSignals>(signals(state, &project(&cwd)?, &session).await?)
+        }
+        LearningDismiss::NAME => {
+            require_person(conn)?;
+            let LearningDismissParams { cwd, session, through } = parse::<LearningDismiss>(params)?;
+            dismiss(state, &project(&cwd)?, &session, through).await
         }
         ProposalList::NAME => {
             let ProjectRef { cwd } = parse::<ProposalList>(params)?;
@@ -144,18 +154,82 @@ fn work_session(state: &State, cwd: &str, id: &str) -> Result<SessionId, String>
     }
 }
 
+fn invalid(why: String) -> RpcError {
+    RpcError::new(RpcError::INVALID_PARAMS, why)
+}
+
 async fn run(state: &Arc<State>, cwd: &str, sessions: Vec<String>) -> Reply {
-    for s in &sessions {
-        work_session(state, cwd, s).map_err(|why| RpcError::new(RpcError::INVALID_PARAMS, why))?;
-    }
+    let works = sessions.iter().map(|s| work_session(state, cwd, s).map_err(invalid)).collect::<Result<Vec<_>, _>>()?;
     let sid = learning_id(&open(state, cwd).await?)?;
+    // The named sessions' signs go with the request: the learner reads them
+    // first, and neither a trigger nor an offer brings them up again.
+    let learning = journal(state, &sid)?;
+    let mut found = Vec::new();
+    for work in &works {
+        if let Ok(entries) = work_entries(state, work) {
+            found.extend(undealt(work, &entries, &learning));
+        }
+    }
+    let signals = (!found.is_empty()).then_some(found);
     let entries = state
         .sessions
-        .append(&sid, vec![Event::LearnRequested { sessions, trigger: None }])
+        .append(&sid, vec![Event::LearnRequested { sessions, trigger: None, signals }])
         .await
         .map_err(session_error)?;
     state.hosts.ensure(&sid, &state.home.socket(), &state.sessions.session_dir(&sid).join("host.log"));
     reply::<LearningRun>(Appended { seq: entries.last().map_or(0, |e| e.seq) })
+}
+
+/// A work session's verified entries.
+fn work_entries(state: &State, work: &SessionId) -> Result<Vec<Entry>, RpcError> {
+    let (_, report) = state.sessions.read(work).map_err(session_error)?;
+    match report.problem {
+        Some(p) => Err(session_error(SessionError::Invalid(p))),
+        None => Ok(report.entries),
+    }
+}
+
+/// `work`'s signs past those the learning journal says were dealt with.
+fn undealt(work: &SessionId, entries: &[Entry], learning: &[Entry]) -> Vec<LearnSignal> {
+    let after = strive_learning::triggers::acted_on(learning, work.as_str());
+    strive_learning::signals::scan(work.as_str(), entries, after)
+}
+
+/// A work session's signs that nothing has dealt with, and whether to offer
+/// a person a run for them. No model is called and nothing is journaled; a
+/// project with no learning session doesn't get one.
+async fn signals(state: &State, cwd: &str, session: &str) -> Result<LearningSignalsResult, RpcError> {
+    let work = work_session(state, cwd, session).map_err(invalid)?;
+    let entries = work_entries(state, &work)?;
+    let (learning, model) = match find(state, cwd)? {
+        Some(sid) => (journal(state, &sid)?, state.sessions.model(&sid).await.map_err(session_error)?),
+        None => (Vec::new(), None),
+    };
+    // A run with no key would only fail, so there's nothing to offer.
+    let model = model.unwrap_or_else(|| state.settings.model.clone());
+    let keyed = state.credentials.get(crate::methods::provider_of(&model)).is_some();
+    let signals = undealt(&work, &entries, &learning);
+    Ok(LearningSignalsResult {
+        summary: strive_learning::signals::summary(&signals),
+        ask: state.settings.learning.ask && keyed && !signals.is_empty(),
+        estimate_usd_micros: strive_learning::triggers::cost_per_run(&learning),
+        signals,
+    })
+}
+
+/// A person declined to learn from `session`'s signs up to `through`.
+async fn dismiss(state: &State, cwd: &str, session: &str, through: u64) -> Reply {
+    let last = last_seq(state, cwd, session).map_err(invalid)?;
+    if through > last {
+        return Err(invalid(format!("session {session} has no entry {through}")));
+    }
+    let sid = open_id(state, cwd).await?;
+    let entries = state
+        .sessions
+        .append(&sid, vec![Event::LearnDismissed { session: session.to_string(), through }])
+        .await
+        .map_err(session_error)?;
+    reply::<LearningDismiss>(Appended { seq: entries.last().map_or(0, |e| e.seq) })
 }
 
 /// Journals a proposal the learning session's host made, with the file's

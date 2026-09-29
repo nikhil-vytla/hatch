@@ -23,7 +23,7 @@ import {
   type SessionInfo,
   type StriveClient,
 } from "@strive/protocol";
-import { describe as describeLines, formatUsd, type Line, MODE_NAMES, Spend } from "@strive/view";
+import { describe as describeLines, formatUsd, type Line, MODE_NAMES, offerText, Spend } from "@strive/view";
 import { editorTheme, style } from "./theme";
 
 export { formatUsd, MODE_NAMES };
@@ -149,6 +149,14 @@ export class App {
   private working?: number;
   /** The reply streaming in, until its final message arrives. */
   private readonly live = new Text("", 1, 0);
+  /** The offer to learn from the session, asked once as the TUI quits. */
+  private readonly offerLine = new Text("", 1, 0);
+  /** Whether quitting has asked the daemon about the session's signs yet. */
+  private offered = false;
+  /** While the offer waits for an answer: the seq of the last sign it named. */
+  private offer?: { session: SessionInfo; through: number };
+  /** Set once the TUI has let go of the daemon, so it exits once. */
+  private closed = false;
 
   constructor(
     private readonly tui: TUI,
@@ -171,11 +179,21 @@ export class App {
     tui.addChild(this.transcript);
     tui.addChild(this.live);
     tui.addChild(this.prompt);
+    tui.addChild(this.offerLine);
     tui.addChild(this.editor);
     tui.addChild(this.footer);
     tui.setFocus(this.editor);
 
     tui.addInputListener((data) => {
+      // Any key answers the offer; only y takes it.
+      if (this.offer) {
+        const { session, through } = this.offer;
+        this.offer = undefined;
+        void this.answer(session, through, data === "y" || data === "Y");
+
+        return { consume: true };
+      }
+
       if (matchesKey(data, "ctrl+c") || matchesKey(data, "ctrl+d")) {
         this.quit(0);
 
@@ -316,7 +334,63 @@ export class App {
     this.tui.requestRender();
   }
 
+  /**
+   * Exits, first offering once to learn from the session if it has signs
+   * nothing has dealt with. Quitting again while the daemon is asked exits
+   * at once.
+   */
   quit(code: number) {
+    const session = this.session;
+
+    if (code !== 0 || !session || this.offered) {
+      this.leave(code);
+
+      return;
+    }
+
+    this.offered = true;
+    this.offerLearning(session).then(
+      (asked) => asked || this.leave(code),
+      () => this.leave(code),
+    );
+  }
+
+  /** Shows the offer if the daemon says to make one; whether it did. */
+  private async offerLearning(session: SessionInfo): Promise<boolean> {
+    const r = await this.client.request("learning/signals", { cwd: session.cwd, session: session.id });
+
+    if (!r.ask || this.closed) return false;
+
+    this.offer = { session, through: Math.max(...r.signals.map((s) => s.seq)) };
+    this.editor.disableSubmit = true;
+    this.offerLine.setText(`${style.accent(printable(offerText("This session", r)))} ${style.muted("[y/N]")}`);
+    this.tui.requestRender();
+
+    return true;
+  }
+
+  private async answer(session: SessionInfo, through: number, yes: boolean) {
+    try {
+      if (yes) {
+        await this.client.request("learning/run", { cwd: session.cwd, sessions: [session.id] });
+        this.offerLine.setText(
+          style.muted("Asked the learner to study this session. `strive review` shows what it proposes."),
+        );
+      } else {
+        await this.client.request("learning/dismiss", { cwd: session.cwd, session: session.id, through });
+        this.offerLine.setText("");
+      }
+    } catch (e) {
+      this.offerLine.setText(style.danger(describeError(e)));
+    }
+
+    this.tui.requestRender();
+    this.leave(0);
+  }
+
+  private leave(code: number) {
+    if (this.closed) return;
+    this.closed = true;
     this.offClose();
     this.client.close();
     this.exit(code);

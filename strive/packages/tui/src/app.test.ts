@@ -65,6 +65,14 @@ afterEach(() => {
   rmSync(CWD, { recursive: true, force: true });
 });
 
+/** Waits until the app has exited: quitting first asks the daemon whether to offer a learner run. */
+const exited = async (ui: Ui) => {
+  for (let i = 0; ui.exits.length === 0; i++) {
+    if (i > 500) throw new Error("the app never exited");
+    await Bun.sleep(10);
+  }
+};
+
 const enter = async (ui: Ui, text: string) => {
   ui.term.type(text);
   await Bun.sleep(20);
@@ -175,7 +183,7 @@ test("an unknown command is named in the error", async () => {
 test("Ctrl+C exits with status 0 and disconnects without reporting a lost connection", async () => {
   const ui = await openUi();
   ui.term.type("\x03");
-  await Bun.sleep(50);
+  await exited(ui);
   expect(ui.exits).toEqual([0]);
   expect(daemonClients()).toBe(1);
   expect((await ui.term.screen()).some((l) => l.includes("Lost the connection"))).toBe(false);
@@ -184,7 +192,7 @@ test("Ctrl+C exits with status 0 and disconnects without reporting a lost connec
 test("/quit exits with status 0 and disconnects", async () => {
   const ui = await openUi();
   await enter(ui, "/quit");
-  await Bun.sleep(50);
+  await exited(ui);
   expect(ui.exits).toEqual([0]);
   expect(daemonClients()).toBe(1);
 });

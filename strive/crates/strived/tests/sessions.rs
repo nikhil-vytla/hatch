@@ -367,7 +367,8 @@ fn a_session_is_listed_by_its_first_prompt() {
     let env = Env::new();
     let dir = tempfile::Builder::new().prefix("strv-ws").tempdir_in("/tmp").unwrap();
     let cwd = dir.path().canonicalize().unwrap();
-    let mut c = env.rpc();
+    // Each prompt takes a checkpoint first: git, which a loaded machine slows past `rpc`'s 5s.
+    let mut c = common::slow_rpc(&env);
     let id = c.ok("session/create", &json!({"cwd": cwd}))["id"].as_str().unwrap().to_string();
     let untitled = c.ok("session/list", &json!({"cwd": cwd}));
     assert_eq!(untitled["sessions"][0].get("title"), None, "{untitled}");

@@ -46,6 +46,8 @@ const ALLOWED: ReadonlySet<MethodName> = new Set<MethodName>([
   "proposal/decide",
   "proposal/rollback",
   "learning/run",
+  "learning/signals",
+  "learning/dismiss",
 ]);
 
 /** Allowed requests that aren't about a session: read-only facts about the daemon. */
@@ -57,6 +59,9 @@ const PROJECT: ReadonlySet<MethodName> = new Set<MethodName>([
   "proposal/decide",
   "proposal/rollback",
   "learning/run",
+  // The daemon holds the named session to the window's project.
+  "learning/signals",
+  "learning/dismiss",
 ]);
 
 type Mode = { kind: "new" } | { kind: "continue" } | { kind: "resume"; id: string };
@@ -267,7 +272,9 @@ async function main() {
     });
 
     // A run, a person's or the daemon's own, may have made the project's learning session: follow it from here.
-    if (method === "learning/run" || method === "proposal/list") await learning.follow();
+    if (method === "learning/run" || method === "learning/dismiss" || method === "proposal/list") {
+      await learning.follow();
+    }
 
     return result;
   });

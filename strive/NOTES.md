@@ -1969,3 +1969,80 @@ an offline `strive eval`, a later PR.
   (with two gates both forms agree) and `>` to `>=` in
   `failed_then_passed` (the equal seq is the failed run, excluded by its
   exit). The deleted files' 18 deferred survivors are gone with them.
+
+## 2026-09-28: the offer to learn from a session (item 4 of the plan)
+
+Design in the second amendment to [ADR-0020](docs/adrs/0020-learning-triggers.md).
+With automatic runs off by default, learning starts when a person says yes
+to an offer made from the no-model scan.
+- **The query:** `learning/signals {cwd, session}` (not `session/signals`:
+  it needs the project's learning journal for the watermark, and the
+  desktop main process already binds `cwd` for `learning/*`, so the window
+  can ask about a session it has left). No model, nothing journaled, no
+  learning session made. It returns `signals`, a counted `summary`
+  (`signals::summary`, kinds in order of first appearance, so a new
+  `SignalKind` can't be left out of a list), `ask`, and
+  `estimateUsdMicros`.
+- **`ask`:** signs, a key for the learner's provider (a run without one
+  only fails), and `learning.ask` not false. Mode doesn't matter. In the
+  keyless test daemons the TUI and desktop suites use, it's always false,
+  so no existing test meets a stray offer.
+- **The watermark** (`triggers::acted_on`) now covers three things: an
+  automatic request's signs, a person's request's `signals` (a new field on
+  `learnRequested`, filled in by the daemon for named sessions), and
+  `learnDismissed {session, through}` (new event, from
+  `learning/dismiss`, people only, `through` checked against the session's
+  last seq). So a declined offer also keeps a `suggest` trigger off those
+  signs: the person has said no to spending on them.
+- **Price:** the average of what the learning session spent over the
+  turns that called a model (the judge's calls count, since the person
+  pays for them too), shown in cents rounded up. None before the first run,
+  and the line then says only "It costs a learner run". Pricing from the
+  model's rates would need a guess at tokens read, which is the part that
+  varies.
+- **TUI:** `quit(0)` asks the daemon once; if `ask`, shows the line and
+  the next key answers (`y` or `Y` runs; anything else, Ctrl+C included,
+  dismisses), then exits. A second Ctrl+C while the query is in flight
+  exits at once. Non-zero exits (a lost daemon) never ask.
+- **Desktop:** an `Offers` object held by `Shell` (the `App` remounts on
+  every switch), fed by `turnEnded` for the shown session and by
+  `switchTo` for the session left. One offer at a time, once per session
+  per window. The notice sits above the conversation like the layout
+  proposal strip, but muted.
+- **The learner** gets a person's signs first too, with a line saying the
+  user asked after seeing them.
+- **Tests, failing first where there was behaviour to fail:** learning
+  unit (the watermark with a person's request and dismissals, the counted
+  summary, the cost average: 3 failed before); host learner (a person's
+  signs in the prompt: failed before); view (the offer's text and cents);
+  daemon (`tests/triggers.rs`: a correction and 2 interrupts offered and
+  a clean session not, nothing journaled by asking, another project's
+  session refused; yes records the signs and they aren't offered again
+  while a later one is; a dismissal isn't offered again, a too-high
+  `through` and a host are refused, and an every-3-turns scan after it
+  finds "no new signs"; `ask: false` and no key); TUI with the real
+  daemon, host and FakeAnthropic (Ctrl+D offers, `y` journals a
+  `learnRequested` naming the session; `n` journals `learnDismissed` and
+  no request, and resuming and quitting again doesn't ask; a clean
+  session and `ask: false` exit without asking: the two offer tests
+  failed before the TUI change); desktop unit (`Offers`: once per session,
+  one at a time, concurrent asks) and e2e (the notice after a turn ends,
+  its button journals the run; switching away offers the left session,
+  Dismiss journals `learnDismissed` and no run).
+- **Flakes seen under load (load average 17 to 30, other agents running),
+  both in tests this change doesn't touch:** `sessions`'
+  `a_session_is_listed_by_its_first_prompt` timed out on `rpc`'s 5 s read
+  while two prompts took checkpoints; it now uses `slow_rpc` like the
+  other checkpointing tests (5/5 alone before the change too, one run 9.9 s).
+  `effects`' two wall-clock bounds (stopped within 2 s and 4 s) were over
+  by 1.6 s and 0.01 s at load 30; 35/35 three times alone, and the next
+  full `check.sh` passed. Left alone: another agent is changing effects.
+- **`strive run`** has no offer code at all; it uses no `App`.
+
+Deferred:
+- A project's own `.strive/settings.json` can't set `ask` (only `mode`).
+- The desktop offer after a quiet period rather than at each turn's end,
+  and an offer when the window closes.
+- A price before a project's first run.
+- Asking again in the same TUI process or desktop window about signs that
+  arrive after an answer (the watermark allows it; the clients don't).

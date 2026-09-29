@@ -243,7 +243,8 @@ by `learning/open`. Its `sessionStarted` says `kind: learning`.
 - `learning/run` (people only) journals `learnRequested`, naming work
   sessions of the project or none, and starts the session's host. Prompts
   to a learning session are refused. The daemon's own triggers journal it
-  too, with a `trigger` (below).
+  too, with a `trigger` (below). A person's request that names sessions
+  carries their `signals` not yet dealt with, found as a trigger's are.
 
 **What its host may do.** Its `host/register` returns `kind: learning`,
 no MCP tools, and `learnedFiles`: the project's memory and skills, each
@@ -408,6 +409,25 @@ against the agent's own writes and commands, and nothing wider:
   and the write. Writes and edits the agent asks for can't: they wait for
   the file.
 
+**The offer to learn** ([ADR-0020](adrs/0020-learning-triggers.md)) is how
+learning usually starts. As the TUI quits, or when a desktop session's turn
+ends or the window switches away from it, the client asks
+`learning/signals {cwd, session}`: no model, nothing journaled, no learning
+session created. It returns the session's signs past the watermark (below),
+a counted `summary` ("2 corrections and a command that failed, then
+passed"), `ask`, and `estimateUsdMicros`, what a run (its checks included)
+has cost in this project on average, absent before the first. `ask` is true
+when there are signs, the learner's provider has a key, and
+`learning.ask` (default true) isn't false; it doesn't depend on `mode`.
+- **Yes** is `learning/run {sessions: [it]}`, whose `learnRequested`
+  carries the signs; the client exits or goes on without waiting.
+- **No** (the TUI: any key but y; the desktop: Dismiss) is
+  `learning/dismiss {cwd, session, through}` (people only), journaling
+  `learnDismissed {session, through}` in the learning session.
+- **Once:** the TUI asks at most once a process, the desktop once a
+  session a window. Across clients and restarts the watermark keeps the
+  same signs from being offered again. `strive run` never offers.
+
 **Triggers** ([ADR-0020](adrs/0020-learning-triggers.md)): the learner
 also runs without being asked, behind `learning` in settings: `mode` (`off`,
 the default, or `suggest`; any other is refused on load), `idleSeconds`
@@ -428,8 +448,9 @@ learning off there.
   interrupted turn, a declined approval, a command that failed then passed
   (in the same turn, then later with exit 0), a failed or timed-out turn. Each is anchored at
   the entry that completes it; at most 20, each with a 120-character
-  excerpt. Only signs past the highest one an earlier automatic request
-  named for that session count. None: nothing is journaled (the log says the
+  excerpt. Only signs past that session's watermark count: the highest
+  seq a request (automatic or a person's) named or a dismissal reached
+  (`triggers::acted_on`). So signs a person declined start no automatic run. None: nothing is journaled (the log says the
   session was scanned).
 - **Limits,** under the project's lock: no request a turn hasn't finished
   and no proposal `checking`; fewer than `dailyRuns` automatic requests in
@@ -477,9 +498,10 @@ prediction and checks) and accepts, rejects or rolls it back.
 - **The Learned pane** (⌘L) is `strive review` in the window: the
   project's proposals, each with its whole-file diff, reasons, evidence and
   checks, and Accept, Reject or Roll back.
-  - `proposal/list`, `proposal/decide`, `proposal/rollback` and
-    `learning/run` get the window's project directory from the main
-    process, whatever the page sends.
+  - `proposal/list`, `proposal/decide`, `proposal/rollback`,
+    `learning/run`, `learning/signals` and `learning/dismiss` get the
+    window's project directory from the main process, whatever the page
+    sends; the daemon refuses a named session outside that project.
   - A proposal's "before" comes through `proposalBefore(id)`, looked up
     among the project's proposals; `blob/get` stays limited to digests the
     shown session names.

@@ -225,6 +225,8 @@ export function describe(entry: Entry, options: DescribeOptions = {}): Line[] {
       );
     case "learnSkipped":
       return note("faint", `Automatic learning run skipped (${triggerText(e.trigger)}): ${e.reason}`);
+    case "learnDismissed":
+      return note("faint", `Declined to learn from ${e.session}`);
     case "proposalMade":
       return note("accent", `Proposed #${entry.seq}: ${e.proposal.summary}`);
     case "gateFinished":

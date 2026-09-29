@@ -7,6 +7,7 @@ import type { Digest } from "./Digest";
 import type { EffectOutcome } from "./EffectOutcome";
 import type { EffectRecord } from "./EffectRecord";
 import type { Gate } from "./Gate";
+import type { LearnSignal } from "./LearnSignal";
 import type { LearnTrigger } from "./LearnTrigger";
 import type { McpStatus } from "./McpStatus";
 import type { Proposal } from "./Proposal";
@@ -95,7 +96,13 @@ sessions: Array<string>,
  * Set when the daemon asked on its own: what triggered it. None: a
  * person asked.
  */
-trigger?: LearnTrigger, } | { "type": "learnSkipped", trigger: LearnTrigger, reason: string, } | { "type": "proposalMade", 
+trigger?: LearnTrigger, 
+/**
+ * Set when a person named sessions with signs nothing had dealt
+ * with yet: those signs, as the daemon found them. The learner
+ * reads them first; later scans and offers look only past them.
+ */
+signals?: Array<LearnSignal>, } | { "type": "learnDismissed", session: string, through: number, } | { "type": "learnSkipped", trigger: LearnTrigger, reason: string, } | { "type": "proposalMade", 
 /**
  * The learner's tool call that made it, whose result it is.
  */

@@ -13,7 +13,7 @@ import {
   type SessionInfo,
   type SkippedRun,
 } from "@strive/protocol";
-import { formatUsd as exactUsd, MODE_NAMES } from "@strive/view";
+import { formatUsd as exactUsd, MODE_NAMES, offerText } from "@strive/view";
 import {
   DEFAULT_WORKSPACE,
   decide,
@@ -44,9 +44,10 @@ import { Diff } from "./DiffView";
 import { Icon, type IconName } from "./icons";
 import { Markdown } from "./MarkdownView";
 import { SessionModel } from "./model";
+import type { Offers } from "./offers";
 import { ModelPicker } from "./ModelPicker";
 
-type Props = { bridge: Bridge; opened: Opened; onSwitch: (id?: string) => Promise<void> };
+type Props = { bridge: Bridge; opened: Opened; onSwitch: (id?: string) => Promise<void>; offers: Offers };
 
 /** Whether the sessions sidebar shows, kept across launches. */
 const SIDEBAR_KEY = "strive.sidebar";
@@ -76,7 +77,7 @@ const PROPOSAL_EVENTS = new Set([
   "proposalRolledBack",
 ]);
 
-export function App({ bridge, opened, onSwitch }: Props) {
+export function App({ bridge, opened, onSwitch, offers }: Props) {
   const [model] = useState(() => new SessionModel(opened.session.id, opened.home));
   const [, rerender] = useReducer((n: number) => n + 1, 0);
   const [closed, setClosed] = useState(false);
@@ -86,6 +87,8 @@ export function App({ bridge, opened, onSwitch }: Props) {
   // from) the default one.
   const [loaded, setLoaded] = useState(false);
 
+  useEffect(() => offers.onChange(rerender), [offers]);
+
   useEffect(() => {
     for (const e of opened.entries) model.apply(e);
     rerender();
@@ -93,8 +96,14 @@ export function App({ bridge, opened, onSwitch }: Props) {
     bridge.onEvent((event) => {
       if (event.params.sessionId !== opened.session.id) return;
 
-      if (event.method === "session/entry") model.apply(event.params.entry);
-      else if (event.method === "session/delta") model.live = event.params.text;
+      if (event.method === "session/entry") {
+        model.apply(event.params.entry);
+
+        // The agent has gone idle, waiting on the person: a session with signs is offered for learning.
+        if (event.params.entry.event.type === "turnEnded") {
+          offers.consider(opened.session.id).catch(() => undefined);
+        }
+      } else if (event.method === "session/delta") model.live = event.params.text;
 
       rerender();
     });
@@ -104,7 +113,7 @@ export function App({ bridge, opened, onSwitch }: Props) {
       .loadWorkspace()
       .then((saved) => saved && setLayout(saved))
       .finally(() => setLoaded(true));
-  }, [bridge, model, opened]);
+  }, [bridge, model, opened, offers]);
 
   const act = (p: Promise<unknown>) => p.catch((e: Error) => setError(errorText(e)));
   const id = opened.session.id;
@@ -379,6 +388,23 @@ export function App({ bridge, opened, onSwitch }: Props) {
           <button type="button" className="banner danger" onClick={() => setError(undefined)}>
             {error}
           </button>
+        )}
+        {offers.current && (
+          <div className="learn-offer" role="status" data-session={offers.current.session}>
+            <Icon name="bulb" />
+            <span className="grow">
+              {offerText(
+                offers.current.session === id ? "This session" : "The session you left",
+                offers.current.result,
+              )}
+            </span>
+            <button type="button" onClick={() => act(offers.dismiss())}>
+              Dismiss
+            </button>
+            <button type="button" className="primary" onClick={() => act(offers.learn().then(readLearning))}>
+              Learn from this session
+            </button>
+          </div>
         )}
         {loaded && <Proposals model={model} layout={layout} onChange={edit} />}
         <Palette

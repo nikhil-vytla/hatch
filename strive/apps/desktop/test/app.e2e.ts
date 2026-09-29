@@ -1547,3 +1547,91 @@ test("a proposal from an automatic run is badged, and says which signs started t
     rmSync(own, { recursive: true, force: true });
   }
 });
+
+/**
+ * A daemon of its own with a stand-in key, so it offers runs (automatic ones
+ * stay off), and a window on it; stopped after `body`, pass or fail.
+ */
+async function withOffers(body: (o: Opened & { own: string; rpc: Rpc; host: Rpc; id: string }) => Promise<void>) {
+  const own = mkdtempSync(join(tmpdir(), "strv-desk-offer-"));
+  const env = { ...keyless(), STRIVE_HOME: own, STRIVE_HOST: "none", ANTHROPIC_API_KEY: "sk-test-offer" };
+  execFileSync(STRIVE, ["status"], { env });
+
+  try {
+    const opened = await openApp(own);
+    const rpc = await Rpc.open(own);
+    const { sessions } = resultOf(await rpc.call("session/list", { cwd: opened.cwd }));
+    const id = String(sessions[0].id);
+    const host = await Rpc.open(own);
+    resultOf(await host.call("host/register", { id }));
+    await body({ ...opened, own, rpc, host, id });
+    rpc.close();
+    host.close();
+  } finally {
+    execFileSync(STRIVE, ["stop"], { env });
+    rmSync(own, { recursive: true, force: true });
+  }
+}
+
+/** A prompt in `id` and, unless `open`, a turn that takes it and ends. */
+async function exchange(o: { rpc: Rpc; host: Rpc; id: string }, turn: number, text: string, open = false) {
+  resultOf(await o.rpc.call("session/prompt", { id: o.id, text }));
+
+  if (open) return;
+  resultOf(await o.host.call("host/record", { id: o.id, event: { type: "turnStarted", turn } }));
+  const ended = { type: "turnEnded", turn, reason: { kind: "done" } };
+  resultOf(await o.host.call("host/record", { id: o.id, event: ended }));
+}
+
+/** The project's learning session's events of `type`; none if it has no learning session. */
+async function learningOf(rpc: Rpc, cwd: string, type: string): Promise<{ [key: string]: Json }[]> {
+  const { sessions } = resultOf(await rpc.call("session/list", { cwd, kind: "learning" }));
+
+  if (sessions.length === 0) return [];
+
+  const read: { entries: { event: { [key: string]: Json } }[] } = resultOf(
+    await rpc.call("session/read", { id: sessions[0].id }),
+  );
+
+  return read.entries.flatMap((e) => (e.event.type === type ? [e.event] : []));
+}
+
+test("a session with a correction is offered for learning once its turn ends, and the button asks for a run", async () => {
+  await withOffers(async (o) => {
+    await exchange(o, 1, "run the tests");
+    await exchange(o, 2, "no, use bun test");
+    const offer = o.page.locator(".learn-offer");
+    await offer
+      .getByText("This session had a correction. Learn from it? It costs a learner run.", { exact: true })
+      .waitFor();
+    assert.equal(await offer.getAttribute("data-session"), o.id);
+    await offer.getByRole("button", { name: "Learn from this session" }).click();
+    await offer.waitFor({ state: "detached" });
+
+    await until("the run", async () => (await learningOf(o.rpc, o.cwd, "learnRequested")).length > 0);
+    const asked = await learningOf(o.rpc, o.cwd, "learnRequested");
+    assert.deepEqual(asked[0]?.sessions, [o.id]);
+  });
+});
+
+test("switching away from a session with signs offers it, and Dismiss records that without a run", async () => {
+  await withOffers(async (o) => {
+    await exchange(o, 1, "run the tests");
+    // The correction's turn hasn't ended: nothing is offered until the window leaves it.
+    await exchange(o, 2, "no, use bun test", true);
+    await o.page.locator(".msg.user", { hasText: "no, use bun test" }).waitFor();
+    assert.equal(await o.page.locator(".learn-offer").count(), 0);
+
+    await o.page.getByRole("button", { name: "new session", exact: true }).click();
+    await o.page.getByText("What should we work on?").waitFor();
+    const offer = o.page.locator(".learn-offer");
+    await offer.getByText("The session you left had a correction. Learn from it?", { exact: false }).waitFor();
+    assert.equal(await offer.getAttribute("data-session"), o.id);
+    await offer.getByRole("button", { name: "Dismiss" }).click();
+    await offer.waitFor({ state: "detached" });
+
+    await until("the dismissal", async () => (await learningOf(o.rpc, o.cwd, "learnDismissed")).length > 0);
+    assert.deepEqual(await learningOf(o.rpc, o.cwd, "learnRequested"), []);
+    assert.equal((await learningOf(o.rpc, o.cwd, "learnDismissed"))[0]?.session, o.id);
+  });
+});

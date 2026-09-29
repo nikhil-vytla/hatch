@@ -193,6 +193,39 @@ pub fn kind_name(kind: SignalKind) -> &'static str {
     }
 }
 
+/// One session's signs counted, each kind where it first came: "2
+/// corrections and a command that failed, then passed". Empty when there
+/// are none.
+pub fn summary(signals: &[LearnSignal]) -> String {
+    let mut counts: Vec<(SignalKind, usize)> = Vec::new();
+    for s in signals {
+        match counts.iter_mut().find(|(k, _)| *k == s.kind) {
+            Some((_, n)) => *n += 1,
+            None => counts.push((s.kind, 1)),
+        }
+    }
+    let parts: Vec<String> = counts
+        .into_iter()
+        .map(|(kind, n)| if n == 1 { kind_name(kind).to_string() } else { format!("{n} {}", plural_name(kind)) })
+        .collect();
+    match parts.as_slice() {
+        [] => String::new(),
+        [one] => one.clone(),
+        [rest @ .., last] => format!("{} and {last}", rest.join(", ")),
+    }
+}
+
+/// A kind's name after a count above one.
+fn plural_name(kind: SignalKind) -> &'static str {
+    match kind {
+        SignalKind::Correction => "corrections",
+        SignalKind::Interrupted => "interrupted turns",
+        SignalKind::Declined => "declined approvals",
+        SignalKind::FailedThenPassed => "commands that failed, then passed",
+        SignalKind::TurnFailed => "failed turns",
+    }
+}
+
 /// A trigger's signs in one line, for a list: "a correction and an
 /// interrupted turn in session 01J…".
 pub fn describe(signals: &[LearnSignal]) -> String {

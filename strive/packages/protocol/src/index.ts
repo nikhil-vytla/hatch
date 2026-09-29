@@ -116,7 +116,13 @@ export type * from "./generated/GateOutcome";
 
 export type * from "./generated/LearnedFile";
 
+export type * from "./generated/LearningDismissParams";
+
 export type * from "./generated/LearningRunParams";
+
+export type * from "./generated/LearningSignalsParams";
+
+export type * from "./generated/LearningSignalsResult";
 
 export type * from "./generated/ProjectRef";
 
