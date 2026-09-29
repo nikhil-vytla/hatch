@@ -29,7 +29,8 @@ The supplied release plan is the authority for this map. It explicitly includes 
 | --- | --- | --- | --- |
 | Foundations | Contracts, CI, publication metadata, common runtime | Clean build and provider-free checks | Verified locally, including canonical-root build before sibling installs |
 | Internal previews | Play-first home, Tetris/crowd/music, routing integration | Visual review and actual client calls | Implemented, visually checked and exercised through real clients |
-| First public release | Playable core/materials, trained models/export, routing/CLI/MCP, Mac runtime | Research, usability, integrations and installation verified | Not released |
+| First public release | Playable core/materials, trained models/export, routing/CLI/MCP, Mac runtime | Research, usability, integrations and installation verified | Released 29 Sep 2026 from main `269a923`; the Sep 21 patch was superseded ([release gate](decisions/release-gate.md)) |
+| Arena and games | Multi-model arena, One box, Decide | Recorded contestants, public replays, no site-paid calls | Shipped (PRs #76, #80, #83) |
 | Next wave | Perception, private extension, source-linked annotations, icons/brushes | Named dependent decisions | Deferred |
 | Further products | Creative apps, richer mail, games/GPU worlds | Investigate before implementation commitment | Deferred |
 
@@ -39,6 +40,8 @@ The supplied release plan is the authority for this map. It explicitly includes 
 
 - [Preserve the deployment and research boundaries](decisions/deployment-boundary.md) records the canonical source root and patch-only research delivery rule.
 - [One typed-decision wire contract](decisions/decision-contract.md) fixes runtime identity, distribution and unsupported-result semantics.
+- [One text box that becomes what you mean](decisions/shapeshift-experiment.md) shipped as the arena's One box lane: Jev, Laya, a keyword classifier and a tiny in-browser model on every keystroke of 200 phrases ([results](../packages/arena/src/one-box/README.md)). Write a contestant is practice only, in the visitor's browser; sealed server scoring was removed so the site pays for nothing (#80).
+- [Decide](../packages/arena/src/decide/README.md) replaced Jev Daily: twenty everyday calls asked blind, then how visitors split, how Jev, Laya and MobileBERT chose, and how each moves across seven setups. Splitting a call into small questions fixed both of Jev's plain-question misses.
 
 ## Frontier and dependencies
 
@@ -49,7 +52,21 @@ The supplied release plan is the authority for this map. It explicitly includes 
 | [Prove client delegation with real tasks](decisions/harness-evidence.md) | routing/integration | Routing policy | Real calls and independent tasks passed; see evidence index |
 | [Make scene changes observable](decisions/playable-defaults.md) | playable/root | Deployment boundary | Resolved; local production-build captures, functional checks and active frame samples retained |
 | [Select an installed local default](decisions/local-default.md) | training/runtime | Training criteria, export and mail evaluation | Resolved; validation-selected experimental Laya readout, fresh offline install passed |
-| [Release only supported claims](decisions/release-gate.md) | root | All first-release decisions | Local artifact acceptance recorded; public deployment open |
+| [Release only supported claims](decisions/release-gate.md) | root | All first-release decisions | Resolved: main is the release; patch superseded ([record](verification/public-release.json)) |
+
+## Port candidates from the superseded patch
+
+Each is a small pull request against current main, taken only if still wanted. File counts are from [application.patch](application.patch).
+
+| Piece | Patch files | What it adds |
+| --- | --- | --- |
+| Web routing lab with the caller's key | `api/route.ts`, `server/gateway.ts`, `vercel.json` | Runs a routed task live from the Model Routing Lab, paid by the visitor's key |
+| Crowd notices | `live-crowd.tsx` | Editable notices, per-person observations, matched notice comparisons |
+| Music continuity | `music-arranger.tsx` | Continuity filters, saved scores, source-hidden auditions |
+| Typed-decision study | `local-models.tsx` | Embeds the completed study (three recipes, three seeds) in the "Decision models on a Mac" scene |
+| Tetris live comparison | `live-tetris.tsx` | Six recorded live Jev games on matched queues, with protocol and trace downloads |
+
+The home, navigation, style and catalog changes in the patch (`main.tsx`, `style.css`, `catalog.ts`) are superseded by the current site and should not be ported.
 
 ## Later named decisions
 
