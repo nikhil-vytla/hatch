@@ -2483,3 +2483,29 @@ case unprompted), audit-event (an agent listing tally/ may notice
 audit.py) and api-version (an agent may open tally_api/__init__.py). The
 ADR's list of example quirks describes the first suite; it was left as
 written because no hypothesis in it changed.
+
+## 2026-09-29: the rescreen, and what it says about cost
+
+Rescreen of the reworked suite (Claude Haiku 4.5, calibration instances,
+2 repetitions, frozen F vs person-written oracle memory O; $4.93 for 96
+tasks, $7.13 spent on the eval so far).
+- **All 7 rebuilt families qualify:** F 0% and O 100% on 4 tries each
+  (regression-test, currency-coverage, deprecate-alias, codeowners,
+  api-version, versionadded, audit-event). So does lockfile. Changelog
+  drops out: O passed only 2 of 4, so Haiku doesn't follow that rule
+  reliably even when told. Controls behaved: generic and conflicting
+  families pass 100% in both arms.
+- **The oracle costs more, not less:** O/F turns 1.67, cost 1.50
+  (Wilcoxon p ≈ 4e-8). Following a rule is extra work (writing the
+  regression test, the CODEOWNERS line, the audit call) that F skips and
+  fails for. So comparing cost across arms where one fails measures the
+  price of being right, not efficiency. H5 and H7 should compare cost only
+  on tasks both arms pass.
+- **Memory adds work on unrelated tasks:** on generic-logic, where no rule
+  applies, O took 32.75 turns to F's 15.25 at the same 100% pass rate. The
+  agent spends effort checking or applying rules that don't bear on the
+  task. That's the harm the generic families exist to catch; it doesn't
+  show in pass rate, so the report should state overhead on the generic
+  families as its own measure.
+- **The full run** on the 11 kept families: 470 tasks, 72 paired L-F
+  comparisons, estimated $27.94–37.44 from the rescreen's measured costs.
