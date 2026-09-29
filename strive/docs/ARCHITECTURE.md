@@ -268,6 +268,15 @@ no MCP tools, and `learnedFiles`: the project's memory and skills, each
 whole and exactly as on disk. Files a proposal couldn't replace are left
 out: not regular, reached through a symlink, in strive's home, or over
 64 KiB. `contextLoaded.learned` journals their digests.
+- A host lives on between runs, and the files change under it: an
+  accepted proposal, a hand edit. So each run starts, after its
+  `turnStarted`, with `host/context` (its own host only): the daemon
+  reads the instructions, skills and learned files again, journals them as
+  a new `contextLoaded`, and returns them. The host rebuilds the learner's
+  system prompt from them, and `read_artifact` shows them. So the journal
+  records what each run saw, and that run's proposals take `before` from
+  it. If the call fails, the turn ends failed rather than run on old
+  files.
 - It records turns, messages, summaries and `proposalMade`. Nothing else:
   no gates, decisions or layouts, and no effects.
 - A work session's host can't record `proposalMade`.
@@ -278,7 +287,7 @@ with the same turn machinery: a `learnRequested` entry is a turn's
 prompt, as `userMessage` is for the coding agent.
 - Its tools read, and nothing else: `list_sessions` (`session/list`),
   `read_session` (`session/read` and `blob/get`, rendered in pages within
-  a token budget), `read_artifact` (memory and skills from its config)
+  a token budget), `read_artifact` (memory and skills as the run started)
   and `propose_change`, which records `proposalMade`. It has no effect
   tools and no MCP tools.
 - A proposal's result is its id and the daemon's static check, or the
