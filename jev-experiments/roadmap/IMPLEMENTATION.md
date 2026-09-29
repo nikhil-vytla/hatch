@@ -17,4 +17,4 @@ Decision resolutions live in MAP.md and its linked tickets. This file tracks wor
 - [x] Complete the three independent Fable review gates and dispositions.
 - [x] Verify fresh checkout, mobile/keyboard/dark/reduced motion and stale-decision handling.
 - [x] Save patches, README, summary and exact verification evidence.
-- [ ] Verify canonical GitHub-to-Vercel deployment after release code is applied.
+- [x] Verify canonical GitHub-to-Vercel deployment. The application patch was superseded rather than applied; main `269a923` is the release ([record](verification/public-release.json)).

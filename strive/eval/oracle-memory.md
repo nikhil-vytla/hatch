@@ -1,0 +1,10 @@
+- Run the tests with `./dev test`, not `python -m unittest`: `./dev test` also runs the doctests in tally/ and tally_api/, and CI fails on a broken doctest that unittest never runs.
+- The FX tests (tests/test_fx.py) skip unless `TALLY_FX_RATES=tests/fixtures/rates.csv` is set. Set it whenever FX code is involved: `TALLY_FX_RATES=tests/fixtures/rates.csv ./dev test`.
+- tally/_generated/records.py is generated from schema/records.def. To add or change a record field, edit the schema, then run `./dev gen`; never edit the generated file.
+- In tests, compare Money with `tests.support.assert_money(actual, "12.30 EUR")`. Money has no `==` (it raises TypeError), and the amount's precision in the string counts.
+- Code in tally/ reads the time only through `tally.clock` (`clock.now()`, `clock.today()`) so tests can freeze it; `datetime.now()`, `date.today()` and `time.time()` are banned there and tests/test_banned.py enforces it.
+- Every change to tally/ or tally_api/ adds a changelog fragment `changes/<slug>.<added|changed|fixed|removed>.md` holding one line, "- " and a sentence ending in a period. Don't edit CHANGELOG.md; check with `./dev changes`.
+- After changing dependencies in pyproject.toml, run `./dev lock` to regenerate tally.lock (it resolves requirements from vendor/index.json); never edit tally.lock by hand.
+- Raise errors with `tally.errors.fail("NAME", **fields)`, never a bare ValueError. Register NAME in errors/registry.json with the module's area and the next free code in that area's range (invoice E2xxx, customers E4xxx, fx E5xxx and so on).
+- `./dev lint` requires each module's `__all__` to list every public top-level name, sorted. When adding a public function, add it to `__all__` and run `./dev lint`.
+- Key styles differ by package: tally/export.py rows are warehouse columns, so snake_case (`due_on`); tally_api/serializers.py JSON is read by the web app, so camelCase (`dueOn`).

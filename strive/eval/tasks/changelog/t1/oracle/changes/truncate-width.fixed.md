@@ -1,0 +1,1 @@
+- Fixed `truncate` returning one character more than the width.

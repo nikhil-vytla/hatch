@@ -1,0 +1,1 @@
+Customers want to give us a purchase-order number for their invoices. Add an optional `po_number` to invoices and include it in the warehouse export row as `po_number`. The records in tally/_generated are generated from schema/records.def: change the schema and run `./dev gen`.

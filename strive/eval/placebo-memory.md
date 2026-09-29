@@ -1,0 +1,10 @@
+- Run the Go tests with `make test`, not `go test ./...` from the root: `make test` also starts the local Redis the cache package's tests need, and skips the slow e2e suite unless E2E=1.
+- The geocoding tests (internal/geo) call a stub server; start it with `make geo-stub` first or they time out after thirty seconds each. The stub serves canned responses from testdata/geo/.
+- The protobuf types in api/gen are generated from api/proto/*.proto. After changing a .proto file, run `make proto` and commit both the .proto and the generated Go; CI rejects a stale api/gen.
+- In handler tests, build requests with `testutil.NewRequest(t, method, path, body)`; it sets the auth header and the request ID the middleware insists on, and fails the test on a marshalling error.
+- Log with the structured logger from `internal/log` (`log.From(ctx)`), never `fmt.Println` or the standard `log` package: the log shipper drops lines that aren't JSON, and a lint rule in CI flags them.
+- Database migrations live in db/migrations as numbered pairs (`0042_add_index.up.sql` and `.down.sql`). Never edit a migration that has shipped; add a new one, and run `make migrate-check` before pushing.
+- The web assets under web/ build with `pnpm build`; the Go binary embeds web/dist, so rebuild the assets before `go build` or the server serves an old bundle without any warning.
+- Feature flags are read through `flags.Enabled(ctx, "name")` and declared in config/flags.yaml with an owner and an expiry date; an undeclared flag panics at startup in development builds.
+- Configuration comes from environment variables with the APP_ prefix, parsed once in internal/config; add new settings to config.Example so the docs page and the deploy templates stay in sync.
+- Timestamps in the public API are RFC 3339 strings in UTC with millisecond precision, while internal service calls pass Unix milliseconds as integers.

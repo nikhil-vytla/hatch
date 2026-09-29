@@ -1,0 +1,1 @@
+- Changed the longest payment terms from 365 to 730 days.

@@ -1,0 +1,13 @@
+{
+  "family": "conflicting-keys",
+  "instance": "c1",
+  "role": "calibration",
+  "kind": "conflict",
+  "rule": "tally/export.py keys are snake_case (warehouse columns); tally_api/ keys are camelCase (the web app).",
+  "oracle_run": [],
+  "followed_commands": [],
+  "unique": [
+    "amountFormatted",
+    "amount_formatted"
+  ]
+}

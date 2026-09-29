@@ -1,0 +1,13 @@
+{
+  "family": "generic-logic",
+  "instance": "t1",
+  "role": "test",
+  "kind": "generic",
+  "rule": "No quirk: plain logic bugs, described in the request.",
+  "oracle_run": [],
+  "followed_commands": [],
+  "unique": [
+    "allocate",
+    "leftover"
+  ]
+}

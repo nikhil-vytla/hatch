@@ -15,7 +15,9 @@ import {
   type DecideSetup,
 } from "../../../packages/arena/src/decide/data";
 import type { Dist, WireAnswer } from "../../../packages/arena/src/decide/combine";
-import { combine } from "../../../packages/arena/src/decide/combine";
+import { combine, wireAnswerSchema } from "../../../packages/arena/src/decide/combine";
+import { getApiKey, run as runJev } from "../api";
+import { z } from "zod";
 import type { Combine } from "../../../packages/arena/src/decide/deck";
 import "./decide.css";
 
@@ -183,7 +185,9 @@ function useLiveNli(d: DecideDecision) {
     };
   }, [d.id]);
 
-  const run = () => {
+  type Job = { id: string; request: DecideSetup["request"] };
+
+  const run = (jobs: Job[] = d.setups.map((s) => ({ id: s.id, request: s.request }))) => {
     worker.current?.terminate();
     const w = new Worker(new URL("./nli.worker.ts", import.meta.url), { type: "module" });
 
@@ -198,7 +202,7 @@ function useLiveNli(d: DecideDecision) {
       else if (m.type === "done") setLive((l) => ({ ...l, status: "done" }));
       else if (m.type === "error") setLive((l) => ({ ...l, status: "error", message: m.message }));
     };
-    w.postMessage({ jobs: d.setups.map((s) => ({ id: s.id, request: s.request })) });
+    w.postMessage({ jobs });
   };
 
   return { live, run };
@@ -374,7 +378,7 @@ function Reveal({ d, data, mine }: { d: DecideDecision; data: DecideData; mine: 
         </p>
         <div className="dc-live">
           {live.status === "idle" && (
-            <button type="button" onClick={run}>
+            <button type="button" onClick={() => run()}>
               Run MobileBERT in your browser (about 50 MB, downloaded once)
             </button>
           )}
@@ -393,7 +397,147 @@ function Reveal({ d, data, mine }: { d: DecideDecision; data: DecideData; mine: 
           )}
         </div>
       </section>
+
+      <YourWording d={d} data={data} />
     </div>
+  );
+}
+
+const answersSchema = z.object({ answers: z.record(z.string(), wireAnswerSchema) });
+
+type Asked = { status: "idle" | "running" | "done" | "error"; dist?: Dist; message?: string };
+
+/**
+ * The visitor writes their own wording of the plain question. Jev runs it live with the
+ * visitor's own key (the site pays nothing); MobileBERT runs it in the browser.
+ */
+function YourWording({ d, data }: { d: DecideDecision; data: DecideData }) {
+  const neutral = d.setups.find((s) => s.id === "neutral") ?? d.setups[0];
+  const base = neutral.request.questions.call;
+  const [text, setText] = useState(base?.instructions ?? d.ask);
+  const [withContext, setWithContext] = useState(false);
+  const [jev, setJev] = useState<Asked>({ status: "idle" });
+  const { live, run } = useLiveNli(d);
+
+  if (!base || base.type !== "choice") return null;
+
+  const request = {
+    state: withContext && d.context ? { ...d.state, ...d.context } : d.state,
+    questions: { call: { ...base, instructions: text.trim() } },
+  };
+
+  const toDist = (answers: Record<string, WireAnswer>) =>
+    combine({ rule: "choice", question: "call" }, d.options, answers);
+
+  const askJev = async () => {
+    // The key lives in Settings and can arrive after this panel rendered, so check it now.
+    if (!getApiKey()) {
+      setJev({
+        status: "error",
+        message:
+          "Connect your AI Gateway key in Settings to run Jev live. It stays in this tab and is billed to you, not the site.",
+      });
+
+      return;
+    }
+
+    setJev({ status: "running" });
+
+    try {
+      const body = answersSchema.parse(await runJev(request.state, request.questions));
+
+      setJev({ status: "done", dist: toDist(body.answers) });
+    } catch (e) {
+      setJev({ status: "error", message: e instanceof Error ? e.message : String(e) });
+    }
+  };
+
+  const nli = live.answers.custom;
+  const recorded = data.contestants.flatMap((c) =>
+    neutral.results[c.id] ? [{ c, dist: neutral.results[c.id].dist }] : [],
+  );
+
+  return (
+    <section className="dc-block dc-yours" aria-labelledby={`yours-${d.id}`}>
+      <h3 id={`yours-${d.id}`}>Try your own wording</h3>
+      <p>Rewrite the question and ask it again. The options and the state stay the same.</p>
+      <label className="dc-yours-field">
+        <span className="sr-only">Your question</span>
+        <textarea rows={2} maxLength={500} value={text} onChange={(e) => setText(e.target.value)} />
+      </label>
+      {d.context && (
+        <label className="dc-yours-check">
+          <input
+            type="checkbox"
+            checked={withContext}
+            onChange={(e) => setWithContext(e.target.checked)}
+          />{" "}
+          Send the extra context too
+        </label>
+      )}
+      <div className="dc-yours-actions">
+        <button
+          type="button"
+          className="dc-next"
+          disabled={!text.trim() || jev.status === "running"}
+          onClick={() => void askJev()}
+        >
+          {jev.status === "running" ? "Asking Jev…" : "Ask Jev with your key"}
+        </button>
+        <button
+          type="button"
+          disabled={!text.trim() || live.status === "loading" || live.status === "running"}
+          onClick={() => run([{ id: "custom", request }])}
+        >
+          Ask MobileBERT in your browser
+        </button>
+      </div>
+      <p className="muted small">
+        Jev runs with the AI Gateway key you connect in Settings. It stays in this tab, and the
+        request is billed to you, not the site.
+      </p>
+      {jev.status === "error" && <p className="notice">{jev.message}</p>}
+      {live.status === "loading" && (
+        <p className="muted small">Downloading MobileBERT… {live.percent ?? 0}%</p>
+      )}
+      {live.status === "error" && (
+        <p className="notice">MobileBERT couldn't run here: {live.message}</p>
+      )}
+
+      {(jev.dist || nli) && (
+        <div className="dc-yours-results">
+          {jev.dist && (
+            <div className="dc-model">
+              <p>
+                <b>Jev, your wording</b>
+              </p>
+              <Split d={d} dist={jev.dist} />
+            </div>
+          )}
+          {nli && (
+            <div className="dc-model">
+              <p>
+                <b>MobileBERT, your wording</b> <span className="muted small">in your browser</span>
+              </p>
+              <Split d={d} dist={toDist(nli)} />
+            </div>
+          )}
+          <p className="muted small">
+            Recorded with the neutral wording:{" "}
+            {recorded
+              .map(
+                ({ c, dist }) =>
+                  `${c.name} ${topOf(d, dist).label} ${pct(dist[topOf(d, dist).id] ?? 0)}`,
+              )
+              .join(" · ")}
+          </p>
+          <details>
+            <summary className="small">The request you sent</summary>
+            <pre className="dc-code-pre">{JSON.stringify(request, null, 2)}</pre>
+          </details>
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -411,10 +555,12 @@ export function DecidePage() {
       .then((json) => {
         const parsed = decideSchema.parse(json);
         const saved = loadPicks();
+        // A link to one call (#/decide/<id>) opens it; otherwise pick up at the first unanswered one.
+        const linked = parsed.decisions.findIndex((d) => location.hash === `#/decide/${d.id}`);
         const next = parsed.decisions.findIndex((d) => !saved[d.id]);
 
         setData(parsed);
-        setIndex(next === -1 ? 0 : next);
+        setIndex(linked !== -1 ? linked : next === -1 ? 0 : next);
       })
       .catch(() => setError("The decisions could not be loaded."));
   }, []);
@@ -527,6 +673,10 @@ export function DecidePage() {
           {summary.agree.map((a) => `${a.name} agreed with you on ${a.n}`).join(", ")}.
         </p>
       )}
+
+      <p className="dc-results-link">
+        <a href="#/decide/results">See what all the answers add up to →</a>
+      </p>
 
       <p className="dc-honest muted small">
         Model answers were recorded once and are replayed here, so answering costs nothing. Vote

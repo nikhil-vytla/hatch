@@ -1,0 +1,13 @@
+{
+  "family": "generic-parsing",
+  "instance": "c2",
+  "role": "calibration",
+  "kind": "generic",
+  "rule": "No quirk: parsing and formatting bugs, described in the request.",
+  "oracle_run": [],
+  "followed_commands": [],
+  "unique": [
+    "Stra\u00dfe",
+    "strasse"
+  ]
+}

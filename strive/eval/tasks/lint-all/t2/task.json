@@ -1,0 +1,15 @@
+{
+  "family": "lint-all",
+  "instance": "t2",
+  "role": "test",
+  "kind": "learnable",
+  "rule": "./dev lint requires every module's __all__ to list each public name, sorted.",
+  "oracle_run": [],
+  "followed_commands": [
+    "(^|[\\s;&|/])\\.?/?dev lint\\b",
+    "tools/lint\\.py"
+  ],
+  "unique": [
+    "business_days_between"
+  ]
+}
