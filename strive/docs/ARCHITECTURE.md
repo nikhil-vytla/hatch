@@ -211,7 +211,12 @@ Confining the host process to the daemon's socket and gateway is planned.
     stopped, and the workspace must be free for a rewind. Other calls to
     that server fail when it is stopped.
   - A process that leaves the group (`setsid`) is out of reach.
-- `contextLoaded` journals what was loaded and how each server started.
+- `contextLoaded` journals what was loaded and how each server started,
+  and, in `skipped`, each import not loaded (a cycle aside) as a line for
+  a person: "@docs/x.md in AGENTS.md was not loaded: it's outside the
+  project" (or "it links outside the project", "there's no such file",
+  "it isn't a file", "it's more than 5 imports deep"). The TUI, the
+  desktop app and `strive log` show each line.
 - Before a turn, a conversation past `compactAtTokens` is summarized. The
   summary is journaled as `compacted` and replaces what it covers on
   resume.

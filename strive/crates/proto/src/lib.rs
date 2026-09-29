@@ -1076,6 +1076,11 @@ pub enum Event {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         #[ts(optional)]
         learned: Option<Vec<ContextFile>>,
+        /// Imports in instruction files that weren't loaded, each a line
+        /// for a person saying which and why; absent when there are none.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[ts(optional)]
+        skipped: Option<Vec<String>>,
     },
     /// A person, or a trigger (ADR-0020), asked the project's learner to
     /// study sessions (none named: the ones since it last looked).

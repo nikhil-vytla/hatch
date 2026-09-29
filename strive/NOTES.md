@@ -2111,3 +2111,28 @@ unasked, with no sandbox rule in the way.
     through with no one attached; no switch to full-auto; `CLAUDE.md`
     asks; `.strive/settings.json` asks twice with no `sessionFile`), and
     the TUI's "a allows an instruction file for the session".
+- **A skipped import is reported.** `contextLoaded.skipped` holds one line
+  per import not loaded, with why (outside the project, links outside it,
+  no such file, not a file, more than 5 deep); a cycle isn't one, since
+  its text is already there. `describe` shows each as a danger note (TUI
+  and desktop), `strive log` indents them under the context line. The same
+  pass that finds imports finds them (`Found`).
+  - Tests (failed first): `an_import_outside_the_project_is_refused_with_a_notice`
+    (renamed from `an_import_outside_the_project_is_refused`: absolute,
+    `../`, a symlink out, a missing file and a sixth-level import, exact
+    lines in the journal and in `strive log`) and `describe`'s "each import
+    that wasn't loaded gets a line".
+- **Gaps:**
+  - The per-file allowance matches the real path exactly; a write by
+    another spelling on a case-insensitive volume asks again (the safe
+    way).
+  - An import that is only a word (`@team` on its own line) reads as a
+    missing file and gets a notice.
+  - Imports are read per effect: one read of the instruction files per
+    effect. A command that edits nothing guarded can't change them, so
+    this is for freshness after a person's edit, not for safety.
+  - `allowSession` on a settings, skills, learned or runs-code request
+    still switches the session to full-auto (as before), which those files
+    ignore; the desktop's "Allow everything" says so.
+  - Linux: missing imports aren't bound (bwrap binds what exists), and
+    the directories above an import aren't protected there.

@@ -87,6 +87,15 @@ pub fn shapes(root: &Path, real: &Path) -> Option<Shapes> {
 pub struct Context {
     pub instructions: Vec<InstructionFile>,
     pub skills: Vec<SkillInfo>,
+    /// Imports not loaded, each a line for a person saying which and why.
+    pub skipped: Vec<String>,
+}
+
+/// What reading the instruction files found besides their text.
+#[derive(Default)]
+struct Found {
+    imports: Vec<Import>,
+    skipped: Vec<String>,
 }
 
 /// A path in the project an instruction file imports, whether or not it
@@ -133,21 +142,20 @@ impl Anchors {
 
 pub fn load(workspace: &Path, strive_home: &Path) -> Context {
     let at = Anchors::new(workspace, strive_home);
-    Context {
-        instructions: instructions(workspace, strive_home, &at, &mut Vec::new()),
-        skills: skills(workspace, strive_home, &at),
-    }
+    let mut found = Found::default();
+    let instructions = instructions(workspace, strive_home, &at, &mut found);
+    Context { instructions, skills: skills(workspace, strive_home, &at), skipped: found.skipped }
 }
 
 /// What the project's instruction files import, as `load` finds it. Only
 /// guarded files import, so this changes only as a person allows.
 pub fn imports(workspace: &Path, strive_home: &Path) -> Vec<Import> {
-    let mut found = Vec::new();
+    let mut found = Found::default();
     instructions(workspace, strive_home, &Anchors::new(workspace, strive_home), &mut found);
-    found
+    found.imports
 }
 
-fn instructions(workspace: &Path, strive_home: &Path, at: &Anchors, found: &mut Vec<Import>) -> Vec<InstructionFile> {
+fn instructions(workspace: &Path, strive_home: &Path, at: &Anchors, found: &mut Found) -> Vec<InstructionFile> {
     let mut files: Vec<PathBuf> = Vec::new();
     let global = strive_home.join("AGENTS.md");
     if global.is_file() {
@@ -285,8 +293,9 @@ fn read_regular(path: &Path) -> Option<String> {
 /// line `@path` outside a code block inlined, if its real path is a file in
 /// the project, at most `IMPORT_DEPTH` deep and not a cycle. Every import in
 /// the project, inlined or not, joins `found`: the gate and the sandbox
-/// guard it, so a file put there later is still one a person allowed.
-fn expand(real: &Path, at: &Anchors, stack: &mut Vec<PathBuf>, found: &mut Vec<Import>) -> Option<String> {
+/// guard it, so a file put there later is still one a person allowed. One
+/// not inlined, but for a cycle, is noted there with why.
+fn expand(real: &Path, at: &Anchors, stack: &mut Vec<PathBuf>, found: &mut Found) -> Option<String> {
     let text = read_regular(real)?;
     let deep = stack.len() >= IMPORT_DEPTH;
     stack.push(real.to_path_buf());
@@ -309,18 +318,29 @@ fn expand(real: &Path, at: &Anchors, stack: &mut Vec<PathBuf>, found: &mut Vec<I
             };
             let written = lexical(&if target.is_absolute() { target.to_path_buf() } else { dir.join(target) });
             // Where it is now, and where a file would be made: both guarded.
-            let paths = [crate::effects::real_path(&written), Some(written)];
+            let paths = [crate::effects::real_path(&written), Some(written.clone())];
             for path in paths.into_iter().flatten().filter(|p| at.inside(p)) {
-                if !found.iter().any(|i| i.path == path) {
-                    found.push(Import { path, by: by.clone() });
+                if !found.imports.iter().any(|i| i.path == path) {
+                    found.imports.push(Import { path, by: by.clone() });
                 }
             }
-            match target_of(&dir.join(target), at) {
-                Ok(r) if !deep && !stack.contains(&r) => {
-                    expand(&r, at, stack, found).map_or_else(|| line.to_string(), |t| t.trim_end().to_string())
+            let why = match target_of(&dir.join(target), at) {
+                // A cycle is the same text twice, not a lost import.
+                Ok(r) if stack.contains(&r) => return line.to_string(),
+                Ok(_) if deep => format!("it's more than {IMPORT_DEPTH} imports deep"),
+                Ok(r) => {
+                    return expand(&r, at, stack, found).map_or_else(|| line.to_string(), |t| t.trim_end().to_string());
                 }
-                _ => line.to_string(),
+                Err(Skip::Outside) if at.inside(&written) => "it links outside the project".to_string(),
+                Err(Skip::Outside) => "it's outside the project".to_string(),
+                Err(Skip::Missing) => "there's no such file".to_string(),
+                Err(Skip::NotAFile) => "it isn't a file".to_string(),
+            };
+            let notice = format!("@{} in {by} was not loaded: {why}", target.display());
+            if !found.skipped.contains(&notice) {
+                found.skipped.push(notice);
             }
+            line.to_string()
         })
         .collect();
     stack.pop();
@@ -331,6 +351,7 @@ fn expand(real: &Path, at: &Anchors, stack: &mut Vec<PathBuf>, found: &mut Vec<I
 enum Skip {
     Outside,
     Missing,
+    NotAFile,
 }
 
 /// The real path of the file `path` imports, if it may be inlined.
@@ -340,7 +361,7 @@ fn target_of(path: &Path, at: &Anchors) -> Result<PathBuf, Skip> {
         return Err(Skip::Outside);
     }
     if !real.is_file() {
-        return Err(Skip::Missing);
+        return Err(Skip::NotAFile);
     }
     Ok(real)
 }

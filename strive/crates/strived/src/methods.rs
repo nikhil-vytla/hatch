@@ -457,6 +457,7 @@ async fn host_config(state: &Arc<State>, sid: &SessionId) -> Reply {
         skills: ctx.skills.iter().map(|s| s.name.clone()).collect(),
         mcp: mcp.status.clone(),
         learned: shown,
+        skipped: (!ctx.skipped.is_empty()).then(|| ctx.skipped.clone()),
     };
     state.sessions.append(&sid, vec![loaded]).await.map_err(session_error)?;
     reply::<HostRegister>(AgentConfig {

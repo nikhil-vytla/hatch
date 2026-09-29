@@ -83,7 +83,7 @@ allowing an `AGENTS.md` or `CLAUDE.md` edit for the session (`a` in the
 terminal) stops the questions about that one file until the session ends. An
 `@docs/x.md` line in `AGENTS.md` or `CLAUDE.md` loads that file if it's
 inside the project, and the agent asks before changing it too; one outside
-the project isn't loaded. A symlinked `AGENTS.md` that leads to some other
+the project isn't loaded, and the session says so. A symlinked `AGENTS.md` that leads to some other
 file isn't loaded; one that leads to another `AGENTS.md` or `CLAUDE.md` is.
 
 The project's learner studies its sessions and proposes changes to

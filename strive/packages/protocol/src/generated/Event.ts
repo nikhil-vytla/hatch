@@ -92,7 +92,12 @@ mcp: Array<McpStatus>,
  * was given (`AgentConfig.learnedFiles`), by path in the project.
  * A proposal's `before` is the file as last given here.
  */
-learned?: Array<ContextFile>, } | { "type": "learnRequested", 
+learned?: Array<ContextFile>, 
+/**
+ * Imports in instruction files that weren't loaded, each a line
+ * for a person saying which and why; absent when there are none.
+ */
+skipped?: Array<string>, } | { "type": "learnRequested", 
 /**
  * The work sessions to study; empty: those since the learner last looked.
  */

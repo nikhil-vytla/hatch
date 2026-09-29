@@ -337,8 +337,10 @@ fn an_import_inside_the_project_is_inlined_and_guarded() {
 
 /// An import outside the project, or through a symlink that leads out of
 /// it, stays as text: the gate and the sandbox guard only the project.
+/// Each import not loaded (those, a missing file, one nested too deep) is
+/// journaled with why, and `strive log` shows it.
 #[test]
-fn an_import_outside_the_project_is_refused() {
+fn an_import_outside_the_project_is_refused_with_a_notice() {
     let env = Env::new();
     let dir = tempfile::tempdir().unwrap();
     let root = dir.path().canonicalize().unwrap().join("repo");
@@ -347,8 +349,28 @@ fn an_import_outside_the_project_is_refused() {
     let outside = root.parent().unwrap().join("outside.md");
     write(&outside, "Outside.");
     std::os::unix::fs::symlink(&outside, root.join("link.md")).unwrap();
-    let text = format!("Root.\n@{}\n@../outside.md\n@link.md", outside.display());
+    let text = format!("Root.\n@{}\n@../outside.md\n@link.md\n@docs/x.md\n@d/1.md", outside.display());
     write(&root.join("AGENTS.md"), &text);
-    let (_, config) = register(&env, &root);
-    assert_eq!(config["instructions"][0]["text"], text, "{config}");
+    for n in 1..=5 {
+        write(&root.join(format!("d/{n}.md")), &format!("{n}\n@{}.md", n + 1));
+    }
+    write(&root.join("d/6.md"), "6");
+    let (id, config) = register(&env, &root);
+    let loaded = format!("Root.\n@{}\n@../outside.md\n@link.md\n@docs/x.md\n1\n2\n3\n4\n5\n@6.md", outside.display());
+    assert_eq!(config["instructions"][0]["text"], loaded.as_str(), "{config}");
+
+    let skipped = [
+        format!("@{} in AGENTS.md was not loaded: it's outside the project", outside.display()),
+        "@../outside.md in AGENTS.md was not loaded: it's outside the project".to_string(),
+        "@link.md in AGENTS.md was not loaded: it links outside the project".to_string(),
+        "@docs/x.md in AGENTS.md was not loaded: there's no such file".to_string(),
+        "@6.md in d/5.md was not loaded: it's more than 5 imports deep".to_string(),
+    ];
+    let r = env.rpc().ok("session/read", &json!({"id": id}));
+    let journaled = r["entries"].as_array().unwrap().iter().find(|e| e["event"]["type"] == "contextLoaded").unwrap();
+    assert_eq!(journaled["event"]["skipped"], json!(skipped));
+    let log = String::from_utf8(env.strive(&["log", &id]).stdout).unwrap();
+    for line in &skipped {
+        assert!(log.contains(line.as_str()), "{line}\n{log}");
+    }
 }
