@@ -92,6 +92,7 @@ methods! {
     ProposalDecide = "proposal/decide" (ProposalDecideParams) -> Appended;
     ProposalRollback = "proposal/rollback" (ProposalRef) -> Appended;
     HostRegister = "host/register" (SessionRef) -> AgentConfig;
+    HostContext = "host/context" (SessionRef) -> LearnerContext;
     HostRecord = "host/record" (HostRecordParams) -> Appended;
     HostStream = "host/stream" (HostStreamParams) -> Empty;
     SessionInterrupt = "session/interrupt" (SessionRef) -> Empty;
@@ -528,11 +529,25 @@ pub struct AgentConfig {
     /// For the learner only: the project's memory and skills, each file's
     /// whole text exactly as it is, so it can propose a whole new file. A
     /// file missing here didn't exist (or can't be proposed over: not a
-    /// regular file, reached through a symlink, or over 64 KiB). Accepting
-    /// a proposal writes only over the file as given here.
+    /// regular file, reached through a symlink, or over 64 KiB). These are
+    /// the files at registration; each run starts from `host/context`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub learned_files: Option<Vec<LearnedFile>>,
+}
+
+/// The project's context as a learning run starts (`host/context`). The
+/// files may have changed since the host registered, by an accepted
+/// proposal or by hand. The daemon journals it as a `contextLoaded`, and a
+/// proposal the run makes is written only over the files given here.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct LearnerContext {
+    pub instructions: Vec<InstructionFile>,
+    pub skills: Vec<SkillInfo>,
+    /// As `AgentConfig.learnedFiles`.
+    pub learned_files: Vec<LearnedFile>,
 }
 
 /// A memory or skill file as the learner is shown it.
@@ -1130,7 +1145,8 @@ pub enum Event {
         turn: u64,
         reason: TurnEnd,
     },
-    /// The project context an agent host was given when it started.
+    /// The project context an agent host was given when it started, and a
+    /// learning session's host again as each run starts (`host/context`).
     ContextLoaded {
         instructions: Vec<ContextFile>,
         skills: Vec<String>,
@@ -1138,8 +1154,9 @@ pub enum Event {
         #[serde(default)]
         mcp: Vec<McpStatus>,
         /// A learning session's only: the memory and skill files its host
-        /// was given (`AgentConfig.learnedFiles`), by path in the project.
-        /// A proposal's `before` is the file as last given here.
+        /// was given (`AgentConfig.learnedFiles`, `LearnerContext`), by path
+        /// in the project. A proposal's `before` is the file as last given
+        /// here.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         #[ts(optional)]
         learned: Option<Vec<ContextFile>>,

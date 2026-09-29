@@ -293,6 +293,11 @@ export type AgentMode = {
   onEntry?: (entry: Entry) => void;
   /** A turn starts, taking the prompts with these seqs. */
   turnStarted?: (prompts: number[]) => void;
+  /**
+   * The system prompt for the turn that just started, from the project as
+   * it is now; without it, the prompt stays as the host was given it.
+   */
+  turnContext?: () => Promise<string>;
 };
 
 function codingMode(client: StriveClient, sessionId: string, config: AgentConfig): AgentMode {
@@ -504,6 +509,18 @@ export class Host {
     this.agent.state.messages = [...system, summaryMessage(summary, Date.now())];
   }
 
+  /**
+   * Replaces the text of the conversation's leading system message, which
+   * the agent always has (it declares the tools) and a summary keeps. The
+   * history stays; only what the model is told about the project changes.
+   */
+  private replaceSystemPrompt(prompt: string) {
+    const [first, ...rest] = this.agent.state.messages;
+
+    if (first?.role !== "system") throw new Error("the conversation has no system message to replace");
+    this.agent.state.messages = [{ ...first, content: prompt }, ...rest];
+  }
+
   private async runTurn(prompts: { text: string; seq: number }[]) {
     // The summary covers the conversation before this turn; the prompts this
     // turn takes are kept past it on resume.
@@ -515,6 +532,17 @@ export class Host {
     this.mode.turnStarted?.(prompts.map((p) => p.seq));
     await this.record({ type: "turnStarted", turn: this.turn, throughSeq: taken });
     this.conversationSeq = Math.max(this.conversationSeq, taken ?? 0);
+
+    if (this.mode.turnContext) {
+      try {
+        this.replaceSystemPrompt(await this.mode.turnContext());
+      } catch (e) {
+        const error = `the project's context couldn't be loaded: ${describeError(e)}`;
+        await this.record({ type: "turnEnded", turn: this.turn, reason: { kind: "failed", error } });
+
+        return;
+      }
+    }
 
     // Summarizing is part of the turn: Esc and the time limit stop it too.
     const abort = new AbortController();

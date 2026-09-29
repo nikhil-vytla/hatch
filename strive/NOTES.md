@@ -2322,3 +2322,38 @@ unasked, with no sandbox rule in the way.
   watermark. A session is no longer reconsidered while its answer is on
   its way, and the window offers only signs newer than the last answered
   one. A unit test with a slow dismissal failed first.
+
+## 2026-09-29: each learning run sees the files as they are
+
+- **The bug**, found by the PR #86 walk and by the eval (1 of 5
+  proposals applied in one daemon; `--keep-learner-host` reproduces it):
+  a learner host got memory and skills once, at `host/register`, and a
+  proposal's `before` was the file as last journaled there. A host that
+  lived on proposed against the file as it was before the previous run's
+  accept, so every later accept went stale.
+- **The fix:** a new host method, `host/context`. The learner calls it
+  after each `turnStarted`. The daemon reads instructions, skills and
+  learned files again, journals a full `contextLoaded` and returns them
+  (`LearnerContext`). The host replaces the text of the conversation's
+  leading system message, keeping the history, and `read_artifact` reads
+  the same files. `before` still comes from the latest `contextLoaded`,
+  which is now that run's.
+- **Why not attach the files to `learnRequested`:** a request is
+  journaled when it's asked for, not when it runs. One asked while a run
+  is going waits for it, and a person may accept that run's proposal in
+  between; one turn can also take several requests. The files would be
+  old by the time the run starts, and two places journal requests
+  (`learning/run` and the triggers). Fetching at turn start is one place,
+  and the journal records what each run saw.
+- `host/register` still returns `learnedFiles` and journals `learned`.
+  The Rust tests that play the host by hand rely on it.
+- If `host/context` fails, the turn ends failed: running on old files is
+  the bug.
+- **Tests (the e2e ones failed first):** in `learning.e2e.test.ts`, real
+  daemon and host with a scripted model: two runs in one host with the
+  first accepted between them (the second is `ready`, its `before` is
+  the file the first accept wrote, the model is shown that file, accept
+  applies, and the last `contextLoaded` holds it); and a hand edit
+  between runs. In Rust:
+  `each_run_is_shown_the_files_as_they_are_when_it_starts` and
+  `only_a_learning_sessions_own_host_asks_for_its_context_again`.

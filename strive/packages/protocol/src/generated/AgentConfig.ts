@@ -39,7 +39,7 @@ kind?: SessionKind,
  * For the learner only: the project's memory and skills, each file's
  * whole text exactly as it is, so it can propose a whole new file. A
  * file missing here didn't exist (or can't be proposed over: not a
- * regular file, reached through a symlink, or over 64 KiB). Accepting
- * a proposal writes only over the file as given here.
+ * regular file, reached through a symlink, or over 64 KiB). These are
+ * the files at registration; each run starts from `host/context`.
  */
 learnedFiles?: Array<LearnedFile>, };

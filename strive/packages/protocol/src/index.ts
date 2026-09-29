@@ -116,6 +116,8 @@ export type * from "./generated/GateOutcome";
 
 export type * from "./generated/LearnedFile";
 
+export type * from "./generated/LearnerContext";
+
 export type * from "./generated/LearningDismissParams";
 
 export type * from "./generated/LearningRunParams";

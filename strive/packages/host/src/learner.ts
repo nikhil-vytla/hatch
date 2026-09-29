@@ -180,8 +180,21 @@ class Learner {
   constructor(
     private readonly client: StriveClient,
     private readonly sessionId: string,
-    private readonly config: AgentConfig,
+    /** As the host was given it, then each run's memory, instructions and skills from `host/context`. */
+    private config: AgentConfig,
   ) {}
+
+  /**
+   * The project's memory, instructions and skills as this run starts, which
+   * the daemon journals: an accepted proposal or a hand edit since the last
+   * run is what this run's proposals start from, and are written over.
+   */
+  async turnContext(): Promise<string> {
+    const { instructions, skills, learnedFiles } = await this.client.request("host/context", { id: this.sessionId });
+    this.config = { ...this.config, instructions, skills, learnedFiles };
+
+    return learnerPrompt(this.config);
+  }
 
   onEntry(entry: Entry) {
     const e = entry.event;
@@ -365,5 +378,6 @@ export function learnerMode(client: StriveClient, sessionId: string, config: Age
       tool === "propose_change" ? NOT_RECORDED : READS.includes(tool) ? notKept(tool) : undefined,
     onEntry: (entry) => learner.onEntry(entry),
     turnStarted: (prompts) => learner.turnStarted(prompts),
+    turnContext: () => learner.turnContext(),
   };
 }
