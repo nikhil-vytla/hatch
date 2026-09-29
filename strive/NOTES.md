@@ -2364,3 +2364,42 @@ unasked, with no sandbox rule in the way.
   watermark. A session is no longer reconsidered while its answer is on
   its way, and the window offers only signs newer than the last answered
   one. A unit test with a slow dismissal failed first.
+## 2026-09-29: how the eval should be designed, by who would judge it
+
+Before building ADR-0021's eval, a review of how researchers in each area
+would judge it, and how comparable systems were benchmarked.
+- **Continual learning** wants an accuracy matrix (score on task j after
+  learning up to i), forward and backward transfer, forgetting, several
+  orderings; convincing is a gain over a stateless baseline. CL-Bench
+  (2606.05661): best system 25.4% normalized gain; naive in-context
+  learning beat dedicated memory on codebase adaptation.
+- **Agent benchmarking** (SWE-bench, Harbor, METR) wants gold oracles,
+  deterministic verifiers, pinned models; confound: contamination
+  (2506.12286: 76% buggy-file accuracy from issue text alone).
+- **Memory research** scores downstream success, not recall; VibeMemBench
+  (2609.23570): 11 of 12 pairings lost to memory-off, though its targets
+  were filtered on injection success. Letta's plain filesystem: 74.0% on
+  LoCoMo.
+- **Self-improving agents** report per-iteration curves on a split never
+  used for selection; DGM's search and eval sets overlap.
+- **Statistics** wants paired designs and clustered errors (2411.00640:
+  clustered SEs can be over 3x naive ones), stated power, pre-registration.
+- **Safety** asks whether the learner can see the grader (DGM's node 114
+  deleted the checker's markers) and whether poisoned lessons persist.
+- **Existing systems:** Prime Agent's release gate is 28 stratified SWE
+  tasks, one rollout a side, pinned model, fail-closed thresholds; nothing
+  evaluates its refinement. exo runs ordered Harbor datasets on one
+  evolving agent (`task_order.json`, concurrency 1); its self-evolution
+  smoke test checks only that tools persist. ACE: +10.6 on AppWorld, but
+  online without labels it fell below base on FiNER (67.3 vs 70.7).
+  AHE: TB2 69.7% → 77.0%. Dynamic Cheatsheet: Game of 24 10% → 99% once a
+  reusable trick was stored, the ideal case.
+- **Corrections to my first draft:** 2605.30621 finds harness gains
+  non-monotonic in model strength (mid-tier gains most; weak models fail to
+  load or follow), not "weak models gain most"; SkillsBench's −1.3 points
+  were skills written before any trajectory, not learned from sessions.
+
+The design that follows (12 task families with seed and held-out test
+instances, screening on calibration instances only, frozen / learning /
+oracle / poison / placebo arms, cluster bootstrap, six pre-registered
+hypotheses, about $33–52 on Haiku 4.5) is ADR-0021.
