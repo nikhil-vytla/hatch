@@ -100,10 +100,12 @@ impl Default for LearningSetting {
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum LearningMode {
-    /// No automatic runs. A person can still ask with `strive learn`.
+    /// No automatic runs, the default: a run costs money, so the daemon
+    /// spends it only once a person opts in. A person can still ask with
+    /// `strive learn`.
+    #[default]
     Off,
     /// Triggers start runs; a person decides on every proposal.
-    #[default]
     Suggest,
 }
 

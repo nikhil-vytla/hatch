@@ -1486,7 +1486,7 @@ async function until(what: string, ready: () => Promise<boolean>, ms = 20_000): 
 test("a proposal from an automatic run is badged, and says which signs started the run", async () => {
   // A daemon of its own that scans a session a second after its turn ends, with a stand-in key.
   const own = mkdtempSync(join(tmpdir(), "strv-desk-auto-"));
-  writeFileSync(join(own, "settings.json"), JSON.stringify({ learning: { idleSeconds: 1 } }));
+  writeFileSync(join(own, "settings.json"), JSON.stringify({ learning: { mode: "suggest", idleSeconds: 1 } }));
   const env = { ...keyless(), STRIVE_HOME: own, STRIVE_HOST: "none", ANTHROPIC_API_KEY: "sk-test-trigger" };
   execFileSync(STRIVE, ["status"], { env });
 

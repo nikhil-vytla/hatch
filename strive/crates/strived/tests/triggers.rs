@@ -18,8 +18,11 @@ fn project() -> PathBuf {
 }
 
 /// A daemon whose settings hold `learning`, with an Anthropic key or none.
+/// Automatic runs are opted into (`suggest`) unless `learning` names a mode.
 fn daemon(learning: &Value, key: bool) -> Env {
     let env = if key { Env::with_vars(&[("ANTHROPIC_API_KEY", "sk-test-trigger")]) } else { Env::new() };
+    let mut learning = learning.clone();
+    learning.as_object_mut().unwrap().entry("mode").or_insert(json!("suggest"));
     fs::write(env.home.path().join("settings.json"), json!({"learning": learning}).to_string()).unwrap();
     env
 }
@@ -152,8 +155,9 @@ fn review(env: &Env, cwd: &Path, args: &[&str]) -> String {
     String::from_utf8_lossy(&out.stdout).into_owned()
 }
 
+/// Automatic runs on, and a short idle wait.
 fn idle() -> Value {
-    json!({"idleSeconds": 1})
+    json!({"mode": "suggest", "idleSeconds": 1})
 }
 
 #[test]
@@ -354,6 +358,20 @@ fn a_person_can_still_learn_past_the_cap() {
     common::slow_rpc(&env).ok("learning/run", &json!({"cwd": cwd}));
     let asked = wait_events(&env, &cwd, "learnRequested", 1);
     assert_eq!(asked[0], json!({"type": "learnRequested", "sessions": []}), "a person's request has no trigger");
+}
+
+#[test]
+fn automatic_runs_are_off_unless_settings_turn_them_on() {
+    // Settings that say nothing of the mode.
+    let env = Env::with_vars(&[("ANTHROPIC_API_KEY", "sk-test-trigger")]);
+    fs::write(env.home.path().join("settings.json"), json!({"learning": {"idleSeconds": 1}}).to_string()).unwrap();
+    let cwd = project();
+    let mut w = Work::new(&env, &cwd);
+    w.exchange("go", &json!({"kind": "interrupted"}));
+    wait_log(&env, &format!("session {} not scanned for learning: \"learning\" is off", w.id), 0);
+    assert_eq!(learning(&env, &cwd), None);
+    common::slow_rpc(&env).ok("learning/run", &json!({"cwd": cwd}));
+    assert_eq!(wait_events(&env, &cwd, "learnRequested", 1).len(), 1, "a person can still ask");
 }
 
 #[test]
