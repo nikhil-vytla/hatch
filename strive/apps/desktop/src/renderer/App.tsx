@@ -99,10 +99,12 @@ export function App({ bridge, opened, onSwitch, offers }: Props) {
       if (event.method === "session/entry") {
         model.apply(event.params.entry);
 
-        // The agent has gone idle, waiting on the person: a session with signs is offered for learning.
-        if (event.params.entry.event.type === "turnEnded") {
-          offers.consider(opened.session.id).catch(() => undefined);
-        }
+        // Once the agent has stopped and the person has left it a while, a session with signs is offered
+        // for learning; a new prompt or turn means it isn't idle yet.
+        const type = event.params.entry.event.type;
+
+        if (type === "turnEnded") offers.idle(opened.session.id);
+        else if (type === "userMessage" || type === "turnStarted") offers.busy();
       } else if (event.method === "session/delta") model.live = event.params.text;
 
       rerender();
@@ -244,6 +246,12 @@ export function App({ bridge, opened, onSwitch, offers }: Props) {
     });
     void loadProposals().catch((e: Error) => setError(`Couldn't list what the learner proposed: ${errorText(e)}`));
     void readLearning().catch(() => undefined);
+    // Back from a terminal or an editor, the window looks again: `strive learn` may have proposed
+    // something (the Learned button counts it), or a learned file may have changed.
+    const again = () => void loadProposals().catch(() => undefined);
+    window.addEventListener("focus", again);
+
+    return () => window.removeEventListener("focus", again);
   }, [bridge, journal, loadProposals, readLearning]);
 
   // Opened, the pane looks again: a learning session made elsewhere (`strive learn`) is found and followed from then on.
@@ -253,11 +261,6 @@ export function App({ bridge, opened, onSwitch, offers }: Props) {
     bridge.sessions().then(setProjectSessions, () => undefined);
     void loadProposals().catch((e: Error) => setError(`Couldn't list what the learner proposed: ${errorText(e)}`));
     void readLearning().catch(() => undefined);
-    // Back from an editor, the pane sees a learned file changed there.
-    const again = () => void loadProposals().catch(() => undefined);
-    window.addEventListener("focus", again);
-
-    return () => window.removeEventListener("focus", again);
   }, [learned, bridge, loadProposals, readLearning]);
 
   const run = latestRun(journal.entries);
@@ -698,7 +701,11 @@ function Titlebar(props: TitlebarProps) {
         aria-pressed={learned}
       >
         <Icon name="bulb" />
-        {(learning || ready > 0) && <span className={`count-dot ${learning ? "working" : ""}`} />}
+        {ready > 0 ? (
+          <span className={`count ${learning ? "working" : ""}`}>{ready}</span>
+        ) : (
+          learning && <span className="count-dot working" />
+        )}
       </button>
     </header>
   );

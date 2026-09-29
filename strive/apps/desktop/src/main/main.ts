@@ -131,6 +131,9 @@ async function main() {
   // a visible window nor OS focus: in the background the window is never
   // shown (it still renders), and the app has no Dock icon or menu bar.
   const background = process.env.STRIVE_DESKTOP_BACKGROUND === "1";
+  // Tests shorten the idle wait before the offer to learn; the page's own timer still runs it.
+  const idleMs = Number(process.env.STRIVE_DESKTOP_OFFER_IDLE_MS);
+  const offerIdleMs = Number.isInteger(idleMs) && idleMs > 0 ? idleMs : undefined;
 
   if (background && process.platform === "darwin") app.setActivationPolicy("accessory");
   serveWidgets();
@@ -225,7 +228,7 @@ async function main() {
     // The page listens before it asks, so what was held can go now.
     current.attachPage(send);
 
-    return current.snapshot;
+    return { ...current.snapshot, offerIdleMs };
   });
 
   ipcMain.handle("strive:sessions", async (e) => {
@@ -341,6 +344,26 @@ async function main() {
 
     if (!parsed.ok) throw new Error(`not saved: ${parsed.error}`);
     saveWorkspace(app.getPath("userData"), parsed.value);
+  });
+
+  // Closing the window lets the page offer to learn from the session first
+  // (ADR-0020), once: closing again, or quitting the app, closes at once.
+  let quitting = false;
+  let asked = false;
+
+  app.on("before-quit", () => {
+    quitting = true;
+  });
+
+  window.on("close", (e) => {
+    if (quitting || asked || window.webContents.isDestroyed()) return;
+    asked = true;
+    e.preventDefault();
+    window.webContents.send("strive:closing");
+  });
+
+  ipcMain.handle("strive:close", (e) => {
+    if (fromOurPage(e)) window.close();
   });
 
   window.on("closed", () => {

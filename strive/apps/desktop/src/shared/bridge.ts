@@ -19,6 +19,12 @@ export type Opened = {
   home: string;
   /** `darwin` draws the traffic lights over the window's own titlebar. */
   platform: string;
+  /**
+   * How long a session stays idle after its turn ends before it's offered
+   * for learning, when not the usual minute (`STRIVE_DESKTOP_OFFER_IDLE_MS`,
+   * for tests).
+   */
+  offerIdleMs?: number;
 };
 
 export type StriveEvent = {
@@ -51,6 +57,10 @@ export type Bridge = {
   /** Entries journaled in the project's learning session, once `learning` has found it. */
   onLearning(listener: (entry: Entry) => void): void;
   onClosed(listener: () => void): void;
+  /** The person asked to close the window: the page may offer to learn first, then calls `close`. */
+  onClosing(listener: () => void): void;
+  /** Closes the window. */
+  close(): Promise<void>;
   loadWorkspace(): Promise<History | undefined>;
   saveWorkspace(history: History): Promise<void>;
 };

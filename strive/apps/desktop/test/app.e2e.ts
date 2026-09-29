@@ -68,12 +68,12 @@ afterEach(async () => {
   launched.clear();
 });
 
-async function launch(args: string[], at = home): Promise<ElectronApplication> {
+async function launch(args: string[], at = home, env: NodeJS.ProcessEnv = {}): Promise<ElectronApplication> {
   const app = await electron.launch({
     executablePath: electronPath,
     args: [APP, ...args],
     // Behind the person's windows, without taking focus (see main.ts).
-    env: { ...keyless(), STRIVE_SOCKET: join(at, "run/strived.sock"), STRIVE_DESKTOP_BACKGROUND: "1" },
+    env: { ...keyless(), STRIVE_SOCKET: join(at, "run/strived.sock"), STRIVE_DESKTOP_BACKGROUND: "1", ...env },
   });
 
   launched.add(app);
@@ -138,11 +138,11 @@ class Rpc {
 
 type Opened = { app: ElectronApplication; page: Page; cwd: string; userData: string };
 
-async function openApp(at = home): Promise<Opened> {
+async function openApp(at = home, env: NodeJS.ProcessEnv = {}): Promise<Opened> {
   const cwd = realpathSync(mkdtempSync(join(tmpdir(), "strv-desk-ws-")));
   const userData = mkdtempSync(join(tmpdir(), "strv-desk-data-"));
 
-  const app = await launch([`--user-data-dir=${userData}`, "--cwd", cwd], at);
+  const app = await launch([`--user-data-dir=${userData}`, "--cwd", cwd], at, env);
 
   const page = await app.firstWindow();
   await page.getByText(`Session started in ${cwd}`).waitFor();
@@ -599,9 +599,11 @@ test("the window has no Node, only the app's bridge", async () => {
     bridge: [
       "blob",
       "cited",
+      "close",
       "learning",
       "loadWorkspace",
       "onClosed",
+      "onClosing",
       "onEvent",
       "onLearning",
       "opened",
@@ -1001,6 +1003,25 @@ test("the Learned pane lists proposals newest first, and shows one with its diff
   l.host.close();
 });
 
+test("the Learned button counts the proposals waiting for a decision", async () => {
+  const { page, cwd } = await openApp();
+  const l = await learner(cwd);
+  const button = page.getByRole("button", { name: "learned", exact: true });
+  const count = button.locator(".count");
+  await proposeMemory(l, cwd, { summary: "Run the tests with bun", content: "- Run `bun test`.\n" });
+  const second = await proposeMemory(l, cwd, { summary: "Keep it short", content: "- Short.\n" });
+  // The person comes back to the window from the terminal where the learner ran.
+  await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+  await count.getByText("2", { exact: true }).waitFor();
+  assert.equal(await button.getAttribute("title"), "Learned (⌘L): 2 to review");
+
+  const rpc = await Rpc.open();
+  resultOf(await rpc.call("proposal/decide", { cwd, proposal: second, decision: "reject" }));
+  rpc.close();
+  await count.getByText("1", { exact: true }).waitFor();
+  l.host.close();
+});
+
 test("Accept in the Learned pane asks first, then writes the proposal's file", async () => {
   const { page, cwd } = await openApp();
   const l = await learner(cwd);
@@ -1066,7 +1087,49 @@ test("Roll back in the Learned pane asks first, then puts the file back as it wa
   l.host.close();
 });
 
-test("a proposal whose file changed after the learner read it is stale: the pane says so and nothing is written", async () => {
+test("a proposal that failed its safety checks can't be accepted, and Accept says why", async () => {
+  const { page, cwd } = await openApp();
+  const l = await learner(cwd);
+  const nowhere = "01J8ZZZZZZZZZZZZZZZZZZZZZZ";
+  const id = await proposeMemory(l, cwd, { summary: "Cite nothing", content: "- Rule.\n", evidence: nowhere });
+  const pane = await openProposal(page, id);
+  await pane.getByText("It failed its safety checks, so it can't be accepted.").waitFor();
+  const accept = pane.getByRole("button", { name: "Accept" });
+  assert.equal(await accept.isDisabled(), true);
+  assert.equal(await accept.getAttribute("title"), "It failed its safety checks, so it can't be accepted");
+  l.host.close();
+});
+
+test("Roll back isn't offered once a later accept replaced the proposal or its file changed by hand", async () => {
+  const { page, cwd } = await openApp();
+  const l = await learner(cwd);
+  const first = await proposeMemory(l, cwd, { summary: "First rule", content: "- First.\n" });
+  const rpc = await Rpc.open();
+  resultOf(await rpc.call("proposal/decide", { cwd, proposal: first, decision: "accept" }));
+  // Registered again, the learner is shown the file as the first accept left it.
+  resultOf(await l.host.call("host/register", { id: l.id }));
+  const second = await proposeMemory(l, cwd, { summary: "Second rule", content: "- First.\n- Second.\n" });
+  resultOf(await rpc.call("proposal/decide", { cwd, proposal: second, decision: "accept" }));
+  rpc.close();
+
+  const pane = await openProposal(page, first);
+  await pane.locator(".learned-title .badge", { hasText: `replaced by #${second}` }).waitFor();
+  await pane.getByText(`#${second} was accepted over it`, { exact: false }).waitFor();
+  assert.equal(await pane.getByRole("button", { name: "Roll back" }).count(), 0);
+
+  await pane.getByRole("button", { name: "all proposals" }).click();
+  await pane.locator(`.learned-item[data-proposal="${second}"]`).click();
+  const detail = pane.locator(`.learned-detail[data-proposal="${second}"]`);
+  await detail.getByRole("button", { name: "Roll back" }).waitFor();
+  writeMemory(cwd, "- By hand.\n");
+  // Back from the editor, the window looks at the file again.
+  await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+  await detail.getByText("which has changed since, so it can't be rolled back", { exact: false }).waitFor();
+  assert.equal(await detail.getByRole("button", { name: "Roll back" }).count(), 0);
+  l.host.close();
+});
+
+test("a proposal whose file changed since it was proposed isn't written, and the pane says so", async () => {
   const { page, cwd } = await openApp();
   writeMemory(cwd, "- The old rule.\n");
   const l = await learner(cwd);
@@ -1075,10 +1138,10 @@ test("a proposal whose file changed after the learner read it is stale: the pane
   const pane = await openProposal(page, id);
   await pane.getByRole("button", { name: "Accept" }).click();
   await pane.getByRole("button", { name: "Write it" }).click();
-  await pane.locator(".learned-title .badge", { hasText: "stale" }).waitFor();
+  await pane.locator(".learned-title .badge", { hasText: "file changed" }).waitFor();
 
   await pane
-    .getByText(".strive/memory.md changed after the learner read it, so nothing was written.", { exact: false })
+    .getByText(".strive/memory.md changed since this was proposed, so nothing was written.", { exact: false })
     .waitFor();
 
   await pane.getByRole("button", { name: "Learn from recent sessions" }).waitFor();
@@ -1215,13 +1278,12 @@ test("a learned file edited by hand after an accept shows as changed outside rev
   await notice.waitFor();
   assert.deepEqual(await notice.locator("li").allTextContents(), [".strive/memory.md"]);
   await notice.getByText("New sessions read it as it is, unreviewed.", { exact: false }).waitFor();
-  // The proposal says so too, and the daemon refuses to roll it back over the edit, as the notice warns.
+  // The proposal says so too, and offers no rollback: the daemon would refuse one over the edit.
   await pane.locator(`.learned-item[data-proposal="${id}"]`).click();
   const detail = pane.locator(`.learned-detail[data-proposal="${id}"]`);
   await detail.locator(".status-note.outside", { hasText: ".strive/memory.md has changed outside review" }).waitFor();
-  await detail.getByRole("button", { name: "Roll back" }).click();
-  await detail.getByRole("group", { name: "confirm rollback" }).getByRole("button", { name: "Roll back" }).click();
-  await detail.getByText(`.strive/memory.md has changed since proposal #${id} was applied`, { exact: false }).waitFor();
+  await detail.getByText("which has changed since, so it can't be rolled back", { exact: false }).waitFor();
+  assert.equal(await detail.getByRole("button", { name: "Roll back" }).count(), 0);
   assert.equal(readFileSync(memoryFile(cwd), "utf8"), "- Run `bun test`.\n- A rule nobody reviewed.\n");
   l.host.close();
 });
@@ -1413,7 +1475,7 @@ test("the judge's reasons show by criterion, and a judge fail is advice a person
 
     // Its fail is advice, shown at the top with the reasons, and doesn't block Accept.
     const advice = pane.locator(".learned-head .judge-advice");
-    await advice.getByText("The judge advises against it.", { exact: false }).waitFor();
+    await advice.getByText("The second opinion advises against it.", { exact: false }).waitFor();
     await advice.getByText("Memory already says to run `bun test`.", { exact: false }).waitFor();
     await pane.locator(".learned-title .badge", { hasText: "ready" }).waitFor();
     await pane.getByRole("button", { name: "Accept" }).click();
@@ -1550,15 +1612,19 @@ test("a proposal from an automatic run is badged, and says which signs started t
 
 /**
  * A daemon of its own with a stand-in key, so it offers runs (automatic ones
- * stay off), and a window on it; stopped after `body`, pass or fail.
+ * stay off), and a window on it whose idle wait before an offer is `idleMs`;
+ * stopped after `body`, pass or fail.
  */
-async function withOffers(body: (o: Opened & { own: string; rpc: Rpc; host: Rpc; id: string }) => Promise<void>) {
+async function withOffers(
+  body: (o: Opened & { own: string; rpc: Rpc; host: Rpc; id: string }) => Promise<void>,
+  idleMs = 60_000,
+) {
   const own = mkdtempSync(join(tmpdir(), "strv-desk-offer-"));
   const env = { ...keyless(), STRIVE_HOME: own, STRIVE_HOST: "none", ANTHROPIC_API_KEY: "sk-test-offer" };
   execFileSync(STRIVE, ["status"], { env });
 
   try {
-    const opened = await openApp(own);
+    const opened = await openApp(own, { STRIVE_DESKTOP_OFFER_IDLE_MS: String(idleMs) });
     const rpc = await Rpc.open(own);
     const { sessions } = resultOf(await rpc.call("session/list", { cwd: opened.cwd }));
     const id = String(sessions[0].id);
@@ -1596,13 +1662,15 @@ async function learningOf(rpc: Rpc, cwd: string, type: string): Promise<{ [key: 
   return read.entries.flatMap((e) => (e.event.type === type ? [e.event] : []));
 }
 
-test("a session with a correction is offered for learning once its turn ends, and the button asks for a run", async () => {
+test("a session with a correction is offered once it has been idle a while, and the button asks for a run", async () => {
   await withOffers(async (o) => {
     await exchange(o, 1, "run the tests");
     await exchange(o, 2, "no, use bun test");
     const offer = o.page.locator(".learn-offer");
+    // Not at the turn's end: the product's idle timer (shortened for the test) makes it.
+    assert.equal(await offer.count(), 0);
     await offer
-      .getByText("This session had a correction. Learn from it? It costs a learner run.", { exact: true })
+      .getByText("This session had a correction. Learn from it? It costs a learner run, about $0.21.", { exact: true })
       .waitFor();
     assert.equal(await offer.getAttribute("data-session"), o.id);
     await offer.getByRole("button", { name: "Learn from this session" }).click();
@@ -1611,6 +1679,24 @@ test("a session with a correction is offered for learning once its turn ends, an
     await until("the run", async () => (await learningOf(o.rpc, o.cwd, "learnRequested")).length > 0);
     const asked = await learningOf(o.rpc, o.cwd, "learnRequested");
     assert.deepEqual(asked[0]?.sessions, [o.id]);
+    assert.equal(asked[0]?.offer, true, "review says the run came from the offer");
+  }, 1500);
+});
+
+test("closing the window offers a session with signs first, and closes once the offer is answered", async () => {
+  await withOffers(async (o) => {
+    await exchange(o, 1, "run the tests");
+    await exchange(o, 2, "no, use bun test");
+    await o.page.locator(".msg.user", { hasText: "no, use bun test" }).waitFor();
+    // The minute's idle wait hasn't passed; closing doesn't wait for it.
+    assert.equal(await o.page.locator(".learn-offer").count(), 0);
+    const closed = o.page.waitForEvent("close");
+    await o.app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.close());
+    const offer = o.page.locator(".learn-offer");
+    await offer.getByText("This session had a correction.", { exact: false }).waitFor();
+    await offer.getByRole("button", { name: "Dismiss" }).click();
+    await closed;
+    await until("the dismissal", async () => (await learningOf(o.rpc, o.cwd, "learnDismissed")).length > 0);
   });
 });
 

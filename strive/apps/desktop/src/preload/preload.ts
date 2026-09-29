@@ -23,6 +23,10 @@ const bridge: Bridge = {
   onClosed: (listener) => {
     ipcRenderer.on("strive:closed", listener);
   },
+  onClosing: (listener) => {
+    ipcRenderer.on("strive:closing", listener);
+  },
+  close: () => ipcRenderer.invoke("strive:close"),
   loadWorkspace: (): Promise<History | undefined> => ipcRenderer.invoke("workspace:load"),
   saveWorkspace: (history) => ipcRenderer.invoke("workspace:save", JSON.stringify(history)),
 };
