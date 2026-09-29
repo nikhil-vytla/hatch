@@ -1,6 +1,26 @@
 # ADR-0019: Predictions are checked by a watch the daemon evaluates
 
-Status: accepted. Refines M11 in [ADR-0016](0016-trusted-learning.md).
+Status: superseded, 2026-09-28. The watch language, `predictionChecked`,
+tallies and the "may be hurting" suggestion are deleted. A proposal keeps its
+prose `prediction`, which the person reviewing it reads. The stale-memory
+check (`strive_learning::stale`) stays: it doesn't depend on watches. The
+record below is kept as history.
+
+The evidence (NOTES, "subtract before adding"):
+- Nobody gates each learned change by replay: exo, Prime Agent and the
+  literature validate learned context offline, over many tasks, if at all.
+- At three runs a side, a change that does nothing passes "with > without"
+  about a third of the time, so a pass said little about the change.
+- Our adversarial reviews found the checks themselves were the main attack
+  surface and the main complexity.
+
+System-level validation is to come back as an offline `strive eval`, not
+as a check on each proposal.
+
+Watches had the same weakness at smaller scale: a learner-written predicate
+checked on a handful of sessions, whose tally a person had to interpret.
+
+Originally: refined M11 in [ADR-0016](0016-trusted-learning.md).
 
 ## Context
 

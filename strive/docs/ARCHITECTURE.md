@@ -22,7 +22,7 @@ calls go through the daemon's gateway. Why: [ADR-0015](adrs/0015-rebuild-daemon-
 | `crates/journal` | Authenticated session journals: format, verification, crash recovery |
 | `crates/budget` | Prices, costs, reservations and the ledger rebuilt from journal events |
 | `crates/gateway` | Provider wire formats: which API, what a request asks for, usage from bodies and streams |
-| `crates/learning` | Trusted learning's pure parts: where proposals write, the static gate's text checks, proposal status, the judge's rubric, the replay gate's task mining and verdict, watches and their tallies, memory's named paths, the triggers' pre-filter |
+| `crates/learning` | Trusted learning's pure parts: where proposals write, the static gate's text checks, proposal status, the judge's rubric, memory's named paths, the triggers' pre-filter |
 | `crates/strived` | The `strive` binary: CLI, launcher, daemon, sessions |
 | `packages/protocol` | Generated TS types + the typed socket client |
 | `packages/tui` | The terminal client; its binary also runs the agent host |
@@ -237,10 +237,9 @@ daemon checks; a person decides; the daemon writes.
 **The learning session.** Each project directory has one, found or created
 by `learning/open`. Its `sessionStarted` says `kind: learning`.
 - Lists people pick from leave it out: `session/list` returns work
-  sessions unless asked for `kind: learning` (or `replay`), so `strive
-  sessions`, continue and the desktop's sidebar never offer it. `strive
-  verify --all` asks for all three, since the learning journal records who
-  accepted what and replays what the replay gate saw.
+  sessions unless asked for `kind: learning`, so `strive sessions`,
+  continue and the desktop's sidebar never offer it. `strive verify --all`
+  asks for both, since the learning journal records who accepted what.
 - `learning/run` (people only) journals `learnRequested`, naming work
   sessions of the project or none, and starts the session's host. Prompts
   to a learning session are refused. The daemon's own triggers journal it
@@ -273,7 +272,8 @@ prompt, as `userMessage` is for the coding agent.
 1. runs the static gate;
 2. takes `before`, the file as the learner was last shown it (none if it
    wasn't there), from the latest `contextLoaded`. A host can't supply it;
-3. journals the proposal and every gate's `gateFinished` in one commit.
+3. journals the proposal and every gate's `gateFinished` that is decided at
+   once (the static gate's, and the judge's skip) in one commit.
    The proposal's id is its entry's seq.
 
 **The static gate** (`strive-learning` for the text, the daemon for the
@@ -295,21 +295,19 @@ machine). Every finding is listed in the gate's detail:
 - **Evidence:** one to five sessions (`CITED_SESSIONS`), each citing at
   least one entry. Each is a work session of this project whose journal
   verifies, and each cited seq is one of its entries. The cap matters
-  because cited sessions are left out of the judge's held-out sessions and
-  the replay's tasks.
+  because cited sessions are left out of the judge's held-out sessions.
 
-**The judge gate** ([ADR-0017](adrs/0017-judge-gate.md)): the daemon's
-own model call, through its gateway with the learning session's token, so
+**The judge** ([ADR-0017](adrs/0017-judge-gate.md)): advice beside the
+diff, not a gate a person must pass. The daemon's own model call, through its gateway with the learning session's token, so
 it is admitted, held, journaled and charged like any call of that session.
 - **What it's shown**, as one JSON document the system prompt calls data:
-  the proposal (with its watch, if any, and how it reads), the file it replaces and the other memory and skills as
+  the proposal, the file it replaces and the other memory and skills as
   the learner was shown them, earlier proposals for the same file that a
   person rolled back, the cited sessions (cited entries kept
   first), and up to three held-out sessions: the project's newest work
   sessions the proposal doesn't cite, begun before it, with a prompt and a
   journal that verifies. Nothing of the learning session's own goes in.
-  The system prompt says a person reviews the verdict, or, under `gated`,
-  that it may be final.
+  The system prompt says a person reads the verdict beside the change.
 - **The rubric** (`strive_learning::judge::RUBRIC`): supported, generalizes,
   novel, safe, checkable. The model must answer with one forced
   `record_verdict` call. It passes only if every criterion and the verdict
@@ -318,8 +316,12 @@ it is admitted, held, journaled and charged like any call of that session.
   static failure, with no Anthropic key, no price for the model, or no
   session to hold out. Skipped later if the learning session's budget
   can't pay, or if the provider is rate-limited or overloaded (429, 529):
-  that says nothing about the proposal, and `gated` never counts a skip as
-  a pass. Failed if the provider refuses otherwise or the call breaks.
+  that says nothing about the proposal. Failed if the provider refuses
+  otherwise or the call breaks.
+- **Advice:** a fail doesn't block. `strive review` puts "the judge advises
+  against it" and its first line near the top, marks the list line, and
+  says accept writes the file anyway; the desktop shows the same with the
+  failed criteria's reasons at the top of the proposal.
 - **In the background:** otherwise the proposal stays `checking` while the
   call runs, without the project's lock. The verdict is journaled under the
   lock, and only if there isn't one. A set of running judges keeps a list
@@ -327,60 +329,13 @@ it is admitted, held, journaled and charged like any call of that session.
   again.
 - The model is `judgeModel` in settings, else `model`.
 
-**The replay gate** ([ADR-0018](adrs/0018-replay-gate.md)): past tasks of
-the project, run again by the agent with and without the proposal.
-- **Tasks** (`strive_learning::replay::mine`): a turn that ran a command
-  that failed, which the same session later ran with exit 0. The task is
-  the turn's prompts, the checkpoint before them, and the command as its
-  check. Mined from the project's newest work sessions the proposal doesn't
-  cite, begun before it; at most `replay.tasks` (3). A check that names a
-  path outside the project (`test -f /tmp/.ok`), once the project's own
-  directory is relocated, is passed over: it depends on state outside the
-  copy (`strive_learning::replay::outside_path`).
-- **A run** is a session of `kind: replay` the daemon creates in a scratch
-  directory outside the project (`$TMPDIR/strive-replay-*/work`):
-  - the checkpoint's tree, exported from the task session's shadow
-    repository; the learned files as the learner was shown them in place of
-    the checkpoint's; and, on the side with the change, the proposal's file.
-    A task whose copy has a symlink on the way to a learned file is set
-    aside, since the daemon writes them unsandboxed;
-  - full-auto approvals with no person attached, so whatever would ask is
-    refused; no MCP servers; the model `replay.model`, else the cheaper of
-    `model` and `judgeModel`;
-  - its commands may write only under the scratch directory (`work` and
-    its `tmp`, their `TMPDIR`), not the system temp directories;
-  - the project's directory in the prompt and the check becomes the
-    scratch copy's, so `cd /the/project && make` runs in the copy;
-  - the daemon sends the task's prompt, starts the real host, waits for the
-    turn to end, stops the host, and runs the check as an effect of the
-    session (`replay-check`). Passed is exit 0. The scratch directory is
-    removed; the session's journal stays, left out of `session/list` unless
-    asked for `kind: replay`.
-- **Runs:** for each task, `replay.runs` (3) times without and with,
-  interleaved, one at a time.
-- **Money:** `ReplayStarted` holds `replay.budgetUsd` ($1 by default) in
-  the learning session's ledger, or the gate is skipped. Each run's budget
-  is what the cap has left. `ReplayFinished` names every run and charges
-  their actual cost in place of the hold, in the same commit as the
-  verdict. Each run is named (`ReplayRunStarted`) before its prompt; a
-  hold a crash cut off is finished when the daemon next starts, charged
-  what those runs' journals show (the whole hold if one can't be read). A
-  call refused for the cap stops the replay. A reject stops it before its
-  next run, and a proposal decided while judged isn't replayed.
-- **Verdict:** pass when runs with the change passed more often than
-  without; fail when less often; skipped (inconclusive) when as often,
-  every run failing on both sides included, and with the reason when it couldn't run (static or judge failed,
-  replay off, no sandbox, no host, no key, nothing to mine, no budget).
-- **When:** once the judge has a verdict that isn't a fail, in the
-  background, like the judge; run again after a crash.
-
 **Status**, folded from the learning journal:
 
 | Status | When |
 | --- | --- |
 | `checking` | a gate has no verdict yet |
-| `failed` | a gate failed |
-| `ready` | every gate passed or was skipped |
+| `failed` | the static gate failed |
+| `ready` | the static gate passed and the judge finished: pass, fail or skip |
 | `rejected` | a person rejected it |
 | `applied` | accepted and written (`proposalApplied`) |
 | `stale` | accepted, but the file wasn't as the learner saw it, so nothing was written |
@@ -389,39 +344,9 @@ the project, run again by the agent with and without the proposal.
 Gates a crash cut short (a proposal with no verdicts) are run again on the
 next `proposal/list` or decision.
 
-**Predictions checked** ([ADR-0019](adrs/0019-predictions-checked.md)). A
-proposal may carry a `watch` beside its prose prediction: the prediction as
-a predicate the daemon evaluates on a work journal, with no model.
-- **The language** (`strive_learning::watch`): a session is its steps, each
-  prompt and each command that ran (text, output, exit). A step pattern is
-  case-insensitive substrings: `prompt` alone, or `command`, `output` and
-  `exit` of one command. A watch is an optional `when` pattern and one of
-  `never`, `any` or `first {of, is}`. The static gate's `watch` rule fails
-  an empty or mixed pattern, a `first` whose halves can't match one step,
-  and strings that are empty, over 200 bytes or hold a line break; unknown
-  fields are refused when the record is parsed.
-- **Bounded:** at most 2,000 steps, 256 KiB of one output (its two ends)
-  and 8 MiB of output per session, fetched only for patterns that name
-  `output`. An outcome that depends on what wasn't read is not applicable.
-- **When:** after a work session's host records `turnEnded`, in the
-  background, and for every session on `learning/run` (which catches up on
-  turns that ended without their host). Only applied proposals are checked,
-  and only against sessions created at or after the apply, read up to their
-  last `turnEnded`.
-- **Journal:** `predictionChecked {proposal, session, throughSeq, outcome,
-  detail}` in the learning session, under the project's lock, when the
-  pair has no record or its outcome changed. The latest per pair counts.
-- **Tally:** each `proposal/list` entry with a watch has `prediction`:
-  confirmed, contradicted and not applicable, and over the last 10
-  sessions it applied to, how many confirmed and contradicted it. At least
-  3 contradictions there, outnumbering confirmations, is `notHolding`.
-- **Suggested, never done:** for an applied proposal that is not holding,
-  `strive review` prints a line naming `strive review ID rollback`, and its
-  detail shows the watch and tally ("prediction not machine-checked" when
-  there's no watch). The daemon never rolls anything back.
-- **Stale memory:** `proposal/list`'s `mayBeStale` lists memory lines that
-  name a relative project path, in backticks, that no longer exists
-  (`strive_learning::stale`); `strive review` prints each.
+**Stale memory:** `proposal/list`'s `mayBeStale` lists memory lines that
+name a relative project path, in backticks, that no longer exists
+(`strive_learning::stale`); `strive review` prints each.
 
 **Deciding.** `proposal/decide` and `proposal/rollback` are people only,
 as approvals are. Both hold the file (as an agent's write does) and the
@@ -485,7 +410,7 @@ against the agent's own writes and commands, and nothing wider:
 
 **Triggers** ([ADR-0020](adrs/0020-learning-triggers.md)): the learner
 also runs without being asked, behind `learning` in settings: `mode` (`off`,
-`suggest` by default, `gated`; `auto` is refused on load), `idleSeconds`
+the default, or `suggest`; any other is refused on load), `idleSeconds`
 (600), `everyTurns` (0: off) and `dailyRuns` (3). A project's
 `.strive/settings.json` may hold only `{"learning": {"mode"}}`, and the mode
 in effect is the lower of the two; one that can't be read turns automatic
@@ -501,7 +426,7 @@ learning off there.
   journal, no model. Signs: a correction (the first prompt after a turn,
   by a fixed list of openers and phrases in its first 200 characters), an
   interrupted turn, a declined approval, a command that failed then passed
-  (the replay miner's pairs), a failed or timed-out turn. Each is anchored at
+  (in the same turn, then later with exit 0), a failed or timed-out turn. Each is anchored at
   the entry that completes it; at most 20, each with a 120-character
   excerpt. Only signs past the highest one an earlier automatic request
   named for that session count. None: nothing is journaled (the log says the
@@ -515,22 +440,11 @@ learning off there.
   starts the host. The learner's prompt lists the signs. Proposals a crash
   left `checking` are settled first, and an unfinished request starts the
   learning session's host, whose resume ends a turn a crash cut off.
-- **`gated`:** when the replay journals a pass (the cascade's last verdict)
-  and every gate has a pass, none skipped (`every_check_passed`), the daemon
-  applies the proposal as a person's accept would, with `proposalDecided
-  {by: "gate", automatic: "gate"}`, only over the file as the learner saw it.
-  `automatic` is only ever set there. A crash before the accept leaves the
-  proposal for a person. The mode must be `gated` both when the proposal
-  was made (`proposalMade.mode`, which only the daemon records) and when
-  the replay passes, so a mode raised in between (a restart, a project's
-  lower setting deleted) doesn't reach it. Rollback is unchanged, and it sticks: the gate
-  never accepts content a rolled-back proposal for the same file put there
-  (compared by digest), and the judge is shown those contents.
-- **Shown:** `proposal/list` gives each proposal its `trigger` and
-  `automatic`, and `skipped`, the latest skip with no automatic request
-  since. `strive review` marks `[automatic run]` and `[accepted
-  automatically]`, prints the trigger and its signs in the detail, and the
-  skip under the list; `strive log` describes both entries.
+- **Shown:** `proposal/list` gives each proposal its `trigger`, and
+  `skipped`, the latest skip with no automatic request since. `strive
+  review` marks `[automatic run]`, prints the trigger and its signs in the
+  detail, and the skip under the list; `strive log` describes both
+  entries. A person decides on every proposal, whoever asked for the run.
 
 `strive learn` requests a run and follows the learning journal as
 `strive run` follows a turn, then lists what was proposed. `strive review`
@@ -582,15 +496,11 @@ prediction and checks) and accepts, rejects or rolls it back.
     detail is read by criterion when it has the daemon's line shape, else
     shown as is; the other proposals for the same file come from
     `proposal/list`.
-  - The Prediction section shows the watch and its tally, or "Prediction
-    not machine-checked." An applied proposal that is not holding says so
-    there; Roll back stays the person's click. The list reloads when a
-    `predictionChecked` entry arrives.
+  - A judge fail shows at the top of the proposal as "The judge advises
+    against it", with the failed criteria's reasons; Accept stays available.
   - Automatic learning: a proposal from an automatic run has an "Automatic"
-    badge, and its detail names the trigger and each sign; one the gate
-    accepted says "Accepted automatically: every check passed", with Roll
-    back as for any applied proposal; the latest skipped run shows as a
-    notice. `proposal/list` also starts following a learning session that an
+    badge, and its detail names the trigger and each sign; the latest
+    skipped run shows as a notice. `proposal/list` also starts following a learning session that an
     automatic run created after the window opened.
 
 ## Effects
@@ -639,8 +549,6 @@ server, so they are coordinated by the session's directory alone.
   - Commands may write only in the workspace and temp directories, and not
     to the project's learned files (see "Learned files outside review") or
     the files above, matched by pattern in any case.
-    A replay's commands get their scratch directory in place of the temp
-    directories.
   - strive's home is hidden.
   - There is no network, and that includes Unix sockets.
   - Without PID namespaces, a background job that leaves the command's

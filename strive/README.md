@@ -82,13 +82,14 @@ outgrow the model's context.
 The project's learner studies its sessions and proposes changes to
 `.strive/memory.md` and `.strive/skills`. It can't change a file itself.
 strive checks each proposal (its path, size, form, secrets, instructions
-that would weaken strive, and evidence from real sessions here), and nothing
-changes until you accept it with `strive review`. Accepting writes the file
+that would weaken strive, and evidence from real sessions here), a judge
+model gives its advice beside the diff, and nothing changes until you accept
+it with `strive review`. Accepting writes the file
 only if it's still as the learner saw it; rolling back restores it. The
 agent reads the accepted memory, labeled as reviewed, after `AGENTS.md`.
 
-The learner also runs on its own when a session goes quiet (10 minutes after
-its last turn) and shows a sign worth learning from: a correction, an
+If you turn it on, the learner also runs on its own when a session goes
+quiet (10 minutes after its last turn) and shows a sign worth learning from: a correction, an
 interrupted turn, a declined approval, a command that failed then passed, or
 a failed turn. The scan uses no model. At most 3 such runs a day per project,
 each on the learning session's budget; `strive review` says why each ran, or
@@ -98,10 +99,8 @@ why one was skipped. `"learning"` in settings changes this:
 { "learning": { "mode": "suggest", "idleSeconds": 600, "everyTurns": 0, "dailyRuns": 3 } }
 ```
 
-`off` stops automatic runs (`strive learn` still works). `suggest`, the
-default, leaves every decision to you. `gated` also accepts a proposal whose
-every check passed, none skipped, and marks it "accepted automatically"; you
-can roll it back. A project's `.strive/settings.json` may set a lower mode
+`off`, the default, makes no automatic runs (`strive learn` still works).
+`suggest` turns them on. Either way you decide on every proposal. A project's `.strive/settings.json` may set a lower mode
 (`{"learning": {"mode": "off"}}`), never a higher one.
 
 ## Benchmarks
