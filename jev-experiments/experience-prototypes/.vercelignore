@@ -1,6 +1,5 @@
 node_modules
 dist
-.git
 .env*
 .cache
 .playwright-cli

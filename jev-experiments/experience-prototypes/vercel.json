@@ -3,6 +3,7 @@
   "buildCommand": "bun run build",
   "outputDirectory": "dist",
   "framework": "vite",
+  "ignoreCommand": "if git diff --quiet HEAD^ HEAD -- ..; then exit 0; else exit 1; fi",
   "functions": {
     "api/evaluate.ts": {
       "maxDuration": 60
