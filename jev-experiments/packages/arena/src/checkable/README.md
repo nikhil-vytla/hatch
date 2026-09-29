@@ -1,7 +1,7 @@
 # Checkable items
 
 Items whose right answer code computes from the state: no soft reference, no authored label.
-Scores against them mean right or wrong. They feed Jev Daily (a human-vs-Jev commit and reveal
+Scores against them mean right or wrong. They were the first Jev Daily (a human-vs-Jev commit and reveal
 game) and are the first test of Jev against ground truth in this repo.
 
 Each item is `{ id, kind, seed, difficulty, state, questions, truth }` (`items.ts`). `state`
@@ -172,17 +172,3 @@ slightly underconfident (90–100% → 99.2%); routes slightly overconfident (90
 
 Reading and judging is where Jev is strong, unlike the Tetris and grid questions above, and
 its confidence is honest about the hard cases, which is what a game against it needs.
-
-## Jev Daily: trust or override
-
-`build-daily.ts` turns every eligible question into its own puzzle (Tetris "completes a row",
-order, route, phrase; grid is left out) with Jev's recorded distribution, and measures per
-kind how often Jev's top answer is right in each confidence band. The page shows Jev's answer,
-how sure it was, and that band's record; the visitor keeps it or overrules it. Scoring is a
-count: how many you got, against how many Jev alone would have.
-
-`pickDaily(items, date)` (`daily.ts`) gives one puzzle each of order, route, phrase and
-Tetris where Jev is under 90% sure, plus one it is sure of, walking fixed shuffles. A game
-where Jev is always sure is unwinnable (it is right 98% of the time there), so the hesitant
-ones carry the day. The bands are uneven, which is the game: on Tetris 60–70% is right 96%
-of the time, on routes 43–56%.
