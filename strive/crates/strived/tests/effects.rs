@@ -777,6 +777,58 @@ fn the_sandbox_keeps_commands_from_imported_files() {
     assert_eq!(text, "ok\n", "a file nothing imports stays writable");
 }
 
+/// Other agents' settings, hooks and MCP config, and files that tools run
+/// on entering a directory, installing or committing, have each carried an
+/// attack that ran code once a person next used the tool. The agent's
+/// write asks for each, unattended it's refused, and commands can't write
+/// them, in any case.
+#[test]
+fn other_agents_config_and_tool_hooks_are_guarded() {
+    let mut w = Ws::new();
+    let files = [
+        ".claude/settings.json",
+        ".claude/settings.local.json",
+        ".claude/hooks/stop.sh",
+        ".codex/config.toml",
+        ".agents/plugins/marketplace.json",
+        ".gemini/settings.json",
+        ".cursor/mcp.json",
+        ".cursor/rules/x.mdc",
+        ".envrc",
+        ".husky/pre-commit",
+        ".devcontainer/devcontainer.json",
+        ".npmrc",
+        ".pre-commit-config.yaml",
+        "lefthook.yml",
+    ];
+    let other_case = ["pkg/.CURSOR/MCP.json", ".Codex/config.toml", ".EnvRC", "sub/LeftHook.YML"];
+    for path in files.iter().chain(&other_case) {
+        let (kind, text) = w.kind(json!({"kind": "write", "path": path, "content": "x"}));
+        assert_eq!(kind, "refused", "{path}: {text}");
+        assert!(text.contains("outside strive's sandbox") && text.contains("no client is attached"), "{path}: {text}");
+    }
+    if !sandboxed() {
+        return;
+    }
+    let mut blocked: Vec<&str> = files.to_vec();
+    if cfg!(target_os = "macos") {
+        blocked.extend(other_case);
+    } else {
+        // Linux binds read-only only what exists at the project's root.
+        for path in files {
+            fs::create_dir_all(w.path(path).parent().unwrap()).unwrap();
+            fs::write(w.path(path), "").unwrap();
+        }
+    }
+    for path in blocked {
+        let cmd = format!("mkdir -p \"$(dirname '{path}')\" 2>/dev/null; echo x >> '{path}'; echo status=$?");
+        let text = w.text(json!({"kind": "bash", "command": cmd}));
+        assert!(text.ends_with("status=1\n"), "{path}: {text}");
+    }
+    let text = w.text(json!({"kind": "bash", "command": "echo a > .claude-notes && echo b > envrc.md && echo ok"}));
+    assert_eq!(text, "ok\n", "other files stay writable");
+}
+
 /// The agent's own write tool asks before touching those files, in any
 /// approval mode; unattended, it's refused.
 #[test]

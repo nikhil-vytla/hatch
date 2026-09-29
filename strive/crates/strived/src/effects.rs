@@ -122,8 +122,8 @@ pub fn gate(scope: &Scope, request: &EffectRequest, mode: ApprovalMode) -> (Gate
                     "this changes strive's settings for every future session in this project".to_string()
                 }
                 Guard::RunsCode => "files like this run code outside strive's sandbox later (git runs hooks and \
-                                    reads its config, shells read rc files, editors run tasks), so only a person \
-                                    can approve it"
+                                    reads its config, shells read rc files, editors run tasks, other agents run \
+                                    their hooks and MCP servers), so only a person can approve it"
                     .to_string(),
             };
             (Gate::Ask(format!("{verb} {shown}: {why}")), file(real))
@@ -234,7 +234,13 @@ fn resolve(scope: &Scope, path: &str, writing: bool) -> Access {
 /// ripgrep reads its config, Claude Code `.mcp.json`, editors run `.vscode`
 /// and `.idea` tasks, and Claude Code runs `.claude` commands and agents.
 /// The rest of `.git` stays writable, so git works in the sandbox. After
-/// sandbox-runtime's list.
+/// sandbox-runtime's list, plus paths that other agents' and tools' own
+/// incidents proved: Claude Code's project settings and hooks
+/// (CVE-2025-59536), Codex's `.codex` and `.agents` config and MCP servers
+/// (CVE-2025-61260), Cursor's `.cursor` MCP config and rules (`CurXecute`,
+/// `MCPoison`, CVE-2025-59944, which a case variant reached), and Gemini
+/// CLI's `.gemini`; direnv's `.envrc`, git hook managers (`.husky`,
+/// pre-commit, lefthook), dev containers and npm's `.npmrc` run code too.
 const RUNS_CODE: &[&str] = &[
     ".gitconfig",
     ".gitmodules",
@@ -251,6 +257,19 @@ const RUNS_CODE: &[&str] = &[
     ".idea",
     ".claude/commands",
     ".claude/agents",
+    ".claude/settings.json",
+    ".claude/settings.local.json",
+    ".claude/hooks",
+    ".codex",
+    ".agents",
+    ".gemini",
+    ".cursor",
+    ".envrc",
+    ".husky",
+    ".devcontainer",
+    ".npmrc",
+    ".pre-commit-config.yaml",
+    "lefthook.yml",
 ];
 
 /// Why `real` is guarded, if it is: by its path under the project's root,

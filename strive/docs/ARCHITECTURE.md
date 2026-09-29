@@ -571,7 +571,13 @@ server, so they are coordinated by the session's directory alone.
   `.vscode`, `.idea`, `.claude/commands` and `.claude/agents`, and rc and
   config files (`.bashrc`, `.zshrc`, `.profile`, `.gitconfig`,
   `.gitmodules`, `.ripgreprc`, `.mcp.json`) anywhere in the project. Git or a
-  shell runs them later for the person, unsandboxed. Commands can't write
+  shell runs them later for the person, unsandboxed. Other agents' settings,
+  hooks and MCP config are on it too, each an attack route in a published
+  incident: `.claude/settings.json`, `.claude/settings.local.json` and
+  `.claude/hooks` (Claude Code, CVE-2025-59536), `.codex` and `.agents`
+  (Codex, CVE-2025-61260), `.cursor` (CurXecute, MCPoison,
+  CVE-2025-59944) and `.gemini`; so are `.envrc`, `.husky`,
+  `.devcontainer`, `.npmrc`, `.pre-commit-config.yaml` and `lefthook.yml`. Commands can't write
   them, and the agent's write and edit ask a person in every approval
   mode. The rest of `.git` stays writable, so git works in the sandbox;
   `git config` doesn't. On Linux, bubblewrap binds read-only only those at

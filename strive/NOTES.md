@@ -2080,3 +2080,15 @@ unasked, with no sandbox rule in the way.
     `../`, a symlink out) passed before and after: it holds the confinement.
     `the_loader_reads_nothing_outside_the_list` now expects `@docs/y.md`
     inlined and refuses its write.
+- **`RUNS_CODE` gains the proven routes:** `.claude/settings.json`,
+  `.claude/settings.local.json`, `.claude/hooks` (CVE-2025-59536), `.codex`
+  and `.agents` (CVE-2025-61260), `.cursor` (CurXecute, MCPoison,
+  CVE-2025-59944, a case bypass) and `.gemini`, plus `.envrc`, `.husky`,
+  `.devcontainer`, `.npmrc`, `.pre-commit-config.yaml` and `lefthook.yml`.
+  Thirteen strings; the matcher, the gate text and the Seatbelt and bwrap
+  rules come from the list. `.claude` was already a denied holder, so
+  `.claude/settings.json` can't be moved into place either.
+  - Test: `other_agents_config_and_tool_hooks_are_guarded` (failed first):
+    each path and four other spellings (`pkg/.CURSOR/MCP.json`, `.EnvRC`)
+    refused to the unattended agent, and to commands (macOS by pattern;
+    Linux the existing ones at the root).
