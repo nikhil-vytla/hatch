@@ -186,3 +186,66 @@ fn gates_are_listed_in_the_order_they_run() {
     let order: Vec<Gate> = folded[0].state.gates.iter().map(|g| g.gate).collect();
     assert_eq!(order, vec![Gate::Static, Gate::Judge]);
 }
+
+/// A later accept for the same file writes over an applied proposal: it's
+/// marked replaced by that one, and back in place once that one is rolled
+/// back to it. A proposal for another file is untouched.
+#[test]
+fn a_later_accept_for_the_same_file_replaces_an_applied_proposal() {
+    let skill = Event::ProposalMade {
+        call_id: None,
+        proposal: Proposal { artifact: Artifact::Skill { name: "release".into() }, ..proposal("skill") },
+        before: None,
+    };
+    let mut events = vec![started(), made("first", None), made("second", Some(digest(2))), skill];
+    for id in 2..=4 {
+        events.extend(passed(id));
+    }
+    for (id, before, after) in [(2, None, digest(2)), (4, None, digest(4)), (3, Some(digest(2)), digest(3))] {
+        events.push(decided(id, ProposalDecision::Accept));
+        events.push(Event::ProposalApplied { proposal: id, before, after });
+    }
+    let replaced = |events: &[Event]| -> Vec<(u64, ProposalStatus, Option<u64>)> {
+        fold(&journal(events.to_vec())).iter().map(|f| (f.state.id, f.state.status, f.state.replaced_by)).collect()
+    };
+    assert_eq!(
+        replaced(&events),
+        vec![
+            (2, ProposalStatus::Applied, Some(3)),
+            (3, ProposalStatus::Applied, None),
+            (4, ProposalStatus::Applied, None)
+        ]
+    );
+    events.push(Event::ProposalRolledBack { proposal: 3, by: "test".into() });
+    assert_eq!(
+        replaced(&events),
+        vec![
+            (2, ProposalStatus::Applied, None),
+            (3, ProposalStatus::RolledBack, None),
+            (4, ProposalStatus::Applied, None)
+        ],
+        "rolling back #3 put #2's content back"
+    );
+}
+
+/// Where a proposal's run came from: the signs a person said yes to, for
+/// the proposals of that run only.
+#[test]
+fn a_proposal_from_a_yes_to_the_offer_carries_the_signs_it_named() {
+    let sign = strive_proto::LearnSignal {
+        session: "A".into(),
+        seq: 4,
+        kind: strive_proto::SignalKind::Correction,
+        detail: "no, use bun".into(),
+    };
+    let asked = |offer: Option<bool>| Event::LearnRequested {
+        sessions: vec!["A".into()],
+        trigger: None,
+        signals: Some(vec![sign.clone()]),
+        offer,
+    };
+    let events = vec![started(), asked(Some(true)), made("offered", None), asked(None), made("asked", None)];
+    let folded = fold(&journal(events));
+    assert_eq!(folded[0].state.offered, Some(vec![sign.clone()]));
+    assert_eq!(folded[1].state.offered, None, "a person named the session without the offer");
+}

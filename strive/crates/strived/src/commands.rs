@@ -109,10 +109,10 @@ pub fn describe(e: &Entry) -> String {
         Event::LearnRequested { sessions, trigger: None, .. } if sessions.is_empty() => {
             "asked the learner to study recent sessions".into()
         }
-        Event::LearnRequested { sessions, trigger: None, signals: None } => {
+        Event::LearnRequested { sessions, trigger: None, signals: None, .. } => {
             format!("asked the learner to study {}", sessions.join(", "))
         }
-        Event::LearnRequested { sessions, trigger: None, signals: Some(s) } => {
+        Event::LearnRequested { sessions, trigger: None, signals: Some(s), .. } => {
             format!("asked the learner to study {} ({})", sessions.join(", "), strive_learning::signals::describe(s))
         }
         Event::LearnDismissed { session, through } => {
@@ -128,7 +128,7 @@ pub fn describe(e: &Entry) -> String {
             proposal.summary
         ),
         Event::GateFinished { proposal, gate, verdict, detail } => format!(
-            "proposal #{proposal}: {} check {}: {detail}",
+            "proposal #{proposal}: {} {}: {detail}",
             crate::review::gate_name(*gate),
             crate::review::verdict_name(*verdict)
         ),

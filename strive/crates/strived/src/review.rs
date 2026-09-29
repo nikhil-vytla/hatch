@@ -1,14 +1,19 @@
 //! `strive learn` and `strive review`: asking the project's learner to study
 //! its sessions, and a person's review of what it proposes.
+//!
+//! What a person reads here names the gates by what they do: the static
+//! gate is the "safety checks", the judge is the "second opinion".
 
+use std::collections::HashMap;
 use std::fmt::Write as _;
 use std::process::ExitCode;
 
 use anyhow::{Result, anyhow};
 use strive_proto::{
-    BlobGet, BlobGetParams, Event, Gate, GateOutcome, LearnTrigger, LearningOpen, LearningRun, LearningRunParams,
-    ProjectRef, ProposalDecide, ProposalDecideParams, ProposalDecision, ProposalList, ProposalRef, ProposalRollback,
-    ProposalState, ProposalStatus, SessionAttach, SessionAttachParams, TriggerKind, Verdict,
+    BlobGet, BlobGetParams, Event, Gate, GateOutcome, LearnSignal, LearnTrigger, LearningOpen, LearningRun,
+    LearningRunParams, ProjectRef, ProposalDecide, ProposalDecideParams, ProposalDecision, ProposalList, ProposalRef,
+    ProposalRollback, ProposalState, ProposalStatus, SessionAttach, SessionAttachParams, SessionList,
+    SessionListParams, TriggerKind, Verdict,
 };
 
 use crate::client::Client;
@@ -34,11 +39,23 @@ pub async fn learn(c: &mut Client, home: &std::path::Path, sessions: Vec<String>
         .request::<SessionAttach>(SessionAttachParams { id: id.clone(), after_seq: None, observer: Some(true) })
         .await?;
     let shown = attached.entries.last().map_or(0, |e| e.seq);
+    let studying = match sessions.len() {
+        0 => "studying the sessions since the learner last looked…".to_string(),
+        1 => "studying 1 session…".to_string(),
+        n => format!("studying {n} sessions…"),
+    };
     let sessions = (!sessions.is_empty()).then_some(sessions);
-    let asked = c.request::<LearningRun>(LearningRunParams { cwd: cwd.clone(), sessions }).await?.seq;
-    eprintln!("strive: learning session {id} (strive log {id} shows it again)");
-    let follow = crate::run::Follow { home, id: &id, shown, prompt: asked, json: false, who: "the learner" };
+    let asked = c.request::<LearningRun>(LearningRunParams { cwd: cwd.clone(), sessions, offer: None }).await?.seq;
+    println!("{studying}");
+    eprintln!("strive: `strive log {id}` shows the learner's steps");
+    let follow =
+        crate::run::Follow { home, id: &id, shown, prompt: asked, json: false, quiet: true, who: "the learner" };
     let (code, seen) = follow.until_turn_ends(c).await?;
+    if code != ExitCode::SUCCESS
+        && let Some(end) = seen.iter().rev().find(|e| matches!(e.event, Event::TurnEnded { .. }))
+    {
+        println!("{}", crate::terminal::visible(&crate::commands::describe(end)));
+    }
     let made: Vec<u64> = seen.iter().filter(|e| matches!(e.event, Event::ProposalMade { .. })).map(|e| e.seq).collect();
     if made.is_empty() {
         println!("the learner proposed nothing");
@@ -48,7 +65,7 @@ pub async fn learn(c: &mut Client, home: &std::path::Path, sessions: Vec<String>
     let checking =
         |all: &[ProposalState]| all.iter().any(|p| made.contains(&p.id) && p.status == ProposalStatus::Checking);
     if checking(&all) {
-        eprintln!("strive: waiting for the judge to check what the learner proposed");
+        println!("waiting for a second opinion on what it proposed…");
         let deadline = std::time::Instant::now() + JUDGE_WAIT;
         while checking(&all) && std::time::Instant::now() < deadline {
             tokio::time::sleep(std::time::Duration::from_millis(500)).await;
@@ -64,8 +81,8 @@ pub async fn learn(c: &mut Client, home: &std::path::Path, sessions: Vec<String>
     Ok(code)
 }
 
-/// How long `strive learn` waits for the judge before listing proposals
-/// still being checked.
+/// How long `strive learn` waits for the second opinion before listing
+/// proposals still being checked.
 const JUDGE_WAIT: std::time::Duration = std::time::Duration::from_secs(300);
 
 /// One proposal in a list.
@@ -75,20 +92,43 @@ fn line(p: &ProposalState) -> String {
         marks.push("automatic run");
     }
     if advises_against(p).is_some() {
-        marks.push("the judge advises against it");
+        marks.push("second opinion advises against it");
     }
     let marks = if marks.is_empty() { String::new() } else { format!("  [{}]", marks.join(", ")) };
     format!(
-        "#{:<5} {:<12} {:<20} {}{marks}",
+        "#{:<5} {:<16} {:<20} {}{marks}",
         p.id,
-        strive_learning::status_name(p.status),
+        short_status(p),
         strive_learning::describe(&p.proposal.artifact),
         p.proposal.summary
     )
 }
 
-/// What started an automatic run, in one line: "after session X went idle:
-/// a correction".
+/// A proposal's status in a list's column.
+fn short_status(p: &ProposalState) -> String {
+    match (p.status, p.replaced_by) {
+        (ProposalStatus::Applied, Some(by)) => format!("replaced by #{by}"),
+        (ProposalStatus::Stale, _) => "file changed".into(),
+        (status, _) => strive_learning::status_name(status).into(),
+    }
+}
+
+/// A proposal's status in words, for its own page.
+fn status_text(p: &ProposalState) -> String {
+    match (p.status, p.replaced_by) {
+        (ProposalStatus::Checking, _) => "being checked".into(),
+        (ProposalStatus::Ready, _) => "ready to review".into(),
+        (ProposalStatus::Failed, _) => "failed its safety checks".into(),
+        (ProposalStatus::Rejected, _) => "rejected".into(),
+        (ProposalStatus::Applied, Some(by)) => format!("replaced by #{by}"),
+        (ProposalStatus::Applied, None) => "applied".into(),
+        (ProposalStatus::Stale, _) => "not written: the file changed since this was proposed".into(),
+        (ProposalStatus::RolledBack, _) => "rolled back".into(),
+    }
+}
+
+/// What started an automatic run, in one line: "after a session went idle:
+/// a correction in session X".
 pub fn trigger_text(t: &LearnTrigger) -> String {
     let signs = strive_learning::signals::describe(&t.signals);
     match t.kind {
@@ -97,7 +137,66 @@ pub fn trigger_text(t: &LearnTrigger) -> String {
     }
 }
 
-pub async fn review(c: &mut Client, id: Option<u64>, action: Option<Action>) -> Result<ExitCode> {
+/// The project's work sessions by id: what a person calls each.
+struct Titles(HashMap<String, String>);
+
+impl Titles {
+    async fn of(c: &mut Client, cwd: &str) -> Result<Self> {
+        let listed = c.request::<SessionList>(SessionListParams { cwd: Some(cwd.to_string()), kind: None }).await?;
+        Ok(Self(
+            listed
+                .sessions
+                .into_iter()
+                .map(|s| (s.id, format!("\"{}\"", s.title.unwrap_or_else(|| "an untitled session".into()))))
+                .collect(),
+        ))
+    }
+
+    /// A session as a person knows it: its title, or its id if it isn't one of the project's.
+    fn name<'a>(&'a self, id: &'a str) -> &'a str {
+        self.0.get(id).map_or(id, String::as_str)
+    }
+
+    /// `text` with each of the project's session ids in it named by title.
+    fn named(&self, text: &str) -> String {
+        self.0.iter().fold(text.to_string(), |text, (id, title)| text.replace(id, title))
+    }
+
+    /// The sessions `signals` came from, by title: `"run the tests"` or `2 sessions`.
+    fn sessions_of(&self, signals: &[LearnSignal]) -> String {
+        let mut ids: Vec<&str> = signals.iter().map(|s| s.session.as_str()).collect();
+        ids.sort_unstable();
+        ids.dedup();
+        match ids.as_slice() {
+            [one] => self.name(one).to_string(),
+            many => format!("{} sessions", many.len()),
+        }
+    }
+}
+
+/// Where the run that made `p` came from, in plain words.
+fn origin(p: &ProposalState, titles: &Titles) -> String {
+    let signs = |s: &[LearnSignal]| {
+        if s.is_empty() {
+            String::new()
+        } else {
+            format!(": {} in {}", strive_learning::signals::summary(s), titles.sessions_of(s))
+        }
+    };
+    match (&p.trigger, &p.offered) {
+        (Some(t), _) => {
+            let when = match t.kind {
+                TriggerKind::Idle => "automatic, after a session went idle",
+                TriggerKind::Turns => "automatic, after a session's turns reached learning.everyTurns",
+            };
+            format!("{when}{}", signs(&t.signals))
+        }
+        (None, Some(s)) => format!("you said yes to the end-of-session offer{}", signs(s)),
+        (None, None) => "asked with `strive learn`".into(),
+    }
+}
+
+pub async fn review(c: &mut Client, id: Option<u64>, action: Option<Action>, full: bool) -> Result<ExitCode> {
     let cwd = cwd()?;
     let listed = c.request::<ProposalList>(ProjectRef { cwd: cwd.clone() }).await?;
     let proposals = listed.proposals;
@@ -113,7 +212,7 @@ pub async fn review(c: &mut Client, id: Option<u64>, action: Option<Action>) -> 
         }
         for s in &listed.may_be_stale {
             println!(
-                "{} line {} may be stale: it names {}, which isn't in the project",
+                "{} line {} may be out of date: it names {}, which isn't in the project",
                 s.file,
                 s.line,
                 crate::terminal::visible(&s.missing)
@@ -136,7 +235,12 @@ pub async fn review(c: &mut Client, id: Option<u64>, action: Option<Action>) -> 
     let rel = strive_learning::relative_path(&p.proposal.artifact).unwrap_or_else(|why| why);
     match action {
         None => {
-            show(c, p, &rel).await?;
+            let titles = Titles::of(c, &cwd).await?;
+            let old = match p.before {
+                Some(digest) => c.request::<BlobGet>(BlobGetParams { digest }).await?.text,
+                None => String::new(),
+            };
+            print!("{}", crate::terminal::visible(&page(p, &rel, &old, &titles, full)?));
             Ok(ExitCode::SUCCESS)
         }
         Some(Action::Reject) => {
@@ -157,7 +261,7 @@ pub async fn review(c: &mut Client, id: Option<u64>, action: Option<Action>) -> 
                 }
                 Some(ProposalStatus::Stale) => {
                     println!(
-                        "#{id} is stale: {rel} changed after the learner read it, so nothing was written. \
+                        "#{id} wasn't written: {rel} changed since this was proposed. \
                          `strive learn` asks for a proposal against the file as it is now"
                     );
                     Ok(ExitCode::FAILURE)
@@ -176,6 +280,9 @@ pub async fn review(c: &mut Client, id: Option<u64>, action: Option<Action>) -> 
             }
         }
         Some(Action::Rollback) => {
+            if let Some(why) = no_rollback(p, &rel) {
+                return Err(anyhow!("nothing was rolled back: {why}"));
+            }
             c.request::<ProposalRollback>(ProposalRef { cwd, proposal: id }).await?;
             match p.before {
                 Some(_) => println!("rolled back #{id}: {rel} is as it was before"),
@@ -186,91 +293,139 @@ pub async fn review(c: &mut Client, id: Option<u64>, action: Option<Action>) -> 
     }
 }
 
-async fn show(c: &mut Client, p: &ProposalState, rel: &str) -> Result<()> {
+/// Why an applied proposal can't be rolled back now, if it can't; none for
+/// any other status, which the daemon refuses with its own reason.
+fn no_rollback(p: &ProposalState, rel: &str) -> Option<String> {
+    match (p.status, p.replaced_by, p.can_roll_back) {
+        (ProposalStatus::Applied, Some(by), _) => {
+            Some(format!("#{by} was accepted over it, so {rel} no longer has its content"))
+        }
+        (ProposalStatus::Applied, None, false) => {
+            Some(format!("{rel} changed since #{} was applied; edit it by hand instead", p.id))
+        }
+        _ => None,
+    }
+}
+
+/// `strive review ID`: the summary and status, the diff, the checks in one
+/// line, and what to do next. `full` adds the reasons, the evidence, and
+/// each check's detail.
+fn page(p: &ProposalState, rel: &str, old: &str, titles: &Titles, full: bool) -> Result<String> {
     let id = p.id;
-    let status = strive_learning::status_name(p.status);
     let mut out = String::new();
-    writeln!(out, "#{id} {}", p.proposal.summary)?;
-    writeln!(out, "status      {status}")?;
-    writeln!(out, "changes     {} ({rel})", strive_learning::describe(&p.proposal.artifact))?;
-    writeln!(out, "proposed    {}", when(p.made_at_ms))?;
-    match &p.trigger {
-        Some(t) => {
-            writeln!(out, "run         automatic, {}", trigger_text(t))?;
-            for s in &t.signals {
+    writeln!(out, "#{id} {} ({})", p.proposal.summary, status_text(p))?;
+    writeln!(out, "changes {rel}; {} on {}", origin(p, titles), when(p.made_at_ms))?;
+    if p.before.is_none() {
+        writeln!(out, "\n{rel} is a new file")?;
+    } else {
+        writeln!(out)?;
+    }
+    for l in diff(old, &p.proposal.content) {
+        writeln!(out, "{l}")?;
+    }
+    writeln!(out, "\n{}", verdict(p))?;
+    if full {
+        writeln!(out, "\nwhy\n{}", indent(&p.proposal.rationale))?;
+        writeln!(out, "\nprediction\n{}", indent(&p.proposal.prediction))?;
+        writeln!(out, "\nevidence")?;
+        for e in &p.proposal.evidence {
+            let seqs = if e.seqs.is_empty() {
+                String::new()
+            } else {
+                format!(" entries {}", e.seqs.iter().map(u64::to_string).collect::<Vec<_>>().join(", "))
+            };
+            writeln!(out, "  {}{seqs}: {}", titles.name(&e.session), e.note)?;
+        }
+        let given = p.trigger.as_ref().map(|t| t.signals.as_slice()).or(p.offered.as_deref()).unwrap_or_default();
+        if !given.is_empty() {
+            writeln!(out, "\nsigns the run was given")?;
+            for s in given {
                 writeln!(
                     out,
-                    "              session {} entry {}: {}: {}",
-                    s.session,
+                    "  {} entry {}: {}: {}",
+                    titles.name(&s.session),
                     s.seq,
                     strive_learning::signals::kind_name(s.kind),
                     s.detail
                 )?;
             }
         }
-        None => writeln!(out, "run         asked for by a person")?,
-    }
-    if let Some(judge) = advises_against(p) {
-        writeln!(out, "\nthe judge advises against it: {}", judge.detail.lines().next().unwrap_or_default())?;
-    }
-    writeln!(out, "\nwhy\n{}", indent(&p.proposal.rationale))?;
-    writeln!(out, "\nprediction\n{}", indent(&p.proposal.prediction))?;
-    writeln!(out, "\nevidence")?;
-    for e in &p.proposal.evidence {
-        let seqs = if e.seqs.is_empty() {
-            String::new()
-        } else {
-            format!(" entries {}", e.seqs.iter().map(u64::to_string).collect::<Vec<_>>().join(", "))
-        };
-        writeln!(out, "  session {}{seqs}: {}", e.session, e.note)?;
-    }
-    writeln!(out, "\nchecks")?;
-    for g in &p.gates {
-        let mut lines = g.detail.lines();
-        let first = lines.next().unwrap_or_default();
-        writeln!(out, "  {:<7} {:<8} {first}", gate_name(g.gate), verdict_name(g.verdict))?;
-        for l in lines {
-            writeln!(out, "{:19}{l}", "")?;
+        writeln!(out, "\nchecks")?;
+        for g in &p.gates {
+            let detail = titles.named(&g.detail);
+            let mut lines = detail.lines();
+            let first = lines.next().unwrap_or_default();
+            writeln!(out, "  {:<15} {:<8} {first}", gate_name(g.gate), verdict_name(g.verdict))?;
+            for l in lines {
+                writeln!(out, "{:27}{l}", "")?;
+            }
         }
     }
-    let old = match p.before {
-        Some(digest) => c.request::<BlobGet>(BlobGetParams { digest }).await?.text,
-        None => String::new(),
-    };
-    let against = if p.before.is_some() { "the file as the learner saw it" } else { "no file: it's new" };
-    writeln!(out, "\ndiff against {against}")?;
-    for l in diff(&old, &p.proposal.content) {
-        writeln!(out, "{l}")?;
-    }
-    let next = match p.status {
-        ProposalStatus::Ready if advises_against(p).is_some() => format!(
-            "the judge advises against it (its reasons are under checks); `strive review {id} accept` writes {rel} \
-             anyway; `strive review {id} reject` turns it down"
-        ),
-        ProposalStatus::Ready => {
+    let next = match (p.status, no_rollback(p, rel)) {
+        (ProposalStatus::Ready, _) if advises_against(p).is_some() => {
+            format!("`strive review {id} accept` writes {rel} anyway; `strive review {id} reject` turns it down")
+        }
+        (ProposalStatus::Ready, _) => {
             format!("`strive review {id} accept` writes {rel}; `strive review {id} reject` turns it down")
         }
-        ProposalStatus::Failed => {
-            format!("its static check failed, so it can't be accepted; `strive review {id} reject` turns it down")
+        (ProposalStatus::Failed, _) => {
+            format!("it failed its safety checks, so it can't be accepted; `strive review {id} reject` turns it down")
         }
-        ProposalStatus::Checking => "its checks haven't finished; look again in a moment".to_string(),
-        ProposalStatus::Applied => format!("`strive review {id} rollback` puts {rel} back as it was"),
-        ProposalStatus::Stale => {
-            format!(
-                "{rel} changed after the learner read it; `strive learn` asks for a proposal against it as it is now"
-            )
+        (ProposalStatus::Checking, _) => "its checks haven't finished; look again in a moment".to_string(),
+        (ProposalStatus::Applied, Some(why)) => format!("it can't be rolled back: {why}"),
+        (ProposalStatus::Applied, None) => format!("`strive review {id} rollback` puts {rel} back as it was"),
+        (ProposalStatus::Stale, _) => {
+            format!("{rel} changed since this was proposed; `strive learn` asks for one against it as it is now")
         }
-        ProposalStatus::Rejected | ProposalStatus::RolledBack => String::new(),
+        (ProposalStatus::Rejected | ProposalStatus::RolledBack, _) => String::new(),
     };
     if !next.is_empty() {
         writeln!(out, "\n{next}")?;
     }
-    print!("{}", crate::terminal::visible(&out));
-    Ok(())
+    if !full {
+        writeln!(out, "`strive review {id} --full` adds why, the evidence and each check in full")?;
+    }
+    Ok(out)
 }
 
-/// The judge's outcome when it failed the proposal: advice a person may
-/// accept past.
+/// The checks in one line: "safety checks passed; second opinion: supports
+/// it", or what the second opinion held against it first.
+fn verdict(p: &ProposalState) -> String {
+    let gate = |gate: Gate| p.gates.iter().find(|g| g.gate == gate);
+    let first_line = |g: &GateOutcome| g.detail.lines().next().unwrap_or_default().to_string();
+    let safety = match gate(Gate::Static) {
+        None => return "safety checks: still running".into(),
+        Some(g) if g.verdict == Verdict::Fail => return format!("safety checks failed: {}", first_line(g)),
+        Some(_) => "safety checks passed",
+    };
+    let second = match gate(Gate::Judge) {
+        None => "second opinion: still being asked".to_string(),
+        Some(g) => match g.verdict {
+            Verdict::Pass => "second opinion: supports it".to_string(),
+            Verdict::Skipped => {
+                let line = first_line(g);
+                format!("second opinion: not asked ({})", line.strip_prefix("not run: ").unwrap_or(&line))
+            }
+            Verdict::Fail => format!("second opinion advises against it: {}", first_failed(g)),
+        },
+    };
+    format!("{safety}; {second}")
+}
+
+/// The reason the second opinion gave for the first criterion it failed,
+/// or its detail's first line when the detail isn't read by criterion.
+fn first_failed(g: &GateOutcome) -> String {
+    let criterion = g.detail.lines().find_map(|l| l.strip_prefix("FAIL ").and_then(|l| l.split_once(": ")));
+    if let Some((_, reason)) = criterion {
+        reason.to_string()
+    } else {
+        let line = g.detail.lines().next().unwrap_or_default();
+        line.strip_prefix("failed: ").unwrap_or(line).to_string()
+    }
+}
+
+/// The second opinion's outcome when it failed the proposal: advice a
+/// person may accept past.
 fn advises_against(p: &ProposalState) -> Option<&GateOutcome> {
     p.gates.iter().find(|g| g.gate == Gate::Judge && g.verdict == Verdict::Fail)
 }
@@ -288,8 +443,8 @@ fn when(ms: u64) -> String {
 
 pub fn gate_name(g: Gate) -> &'static str {
     match g {
-        Gate::Static => "static",
-        Gate::Judge => "judge",
+        Gate::Static => "safety checks",
+        Gate::Judge => "second opinion",
     }
 }
 

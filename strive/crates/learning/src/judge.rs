@@ -298,7 +298,7 @@ pub fn detail(j: &Judged, model: &str, held_out: &[String]) -> String {
     let head = match (j.verdict(), failing.is_empty()) {
         (Verdict::Pass, _) => "passed all five criteria".to_string(),
         (Verdict::Fail | Verdict::Skipped, true) => {
-            "failed: the judge's verdict was fail though every criterion passed".to_string()
+            "failed: the second opinion's verdict was fail though every criterion passed".to_string()
         }
         (Verdict::Fail | Verdict::Skipped, false) => format!("failed {}", failing.join(", ")),
     };
@@ -315,7 +315,10 @@ pub fn detail(j: &Judged, model: &str, held_out: &[String]) -> String {
 
 /// The detail for an answer that couldn't be read: a fail.
 pub fn unreadable(why: &str, model: &str, held_out: &[String]) -> String {
-    format!("failed: the judge's answer couldn't be read, so it counts as a fail ({why}; {model}, {})", held(held_out))
+    format!(
+        "failed: the second opinion's answer couldn't be read, so it counts as a fail ({why}; {model}, {})",
+        held(held_out)
+    )
 }
 
 fn held(ids: &[String]) -> String {

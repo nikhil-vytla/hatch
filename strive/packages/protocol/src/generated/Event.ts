@@ -102,7 +102,12 @@ trigger?: LearnTrigger,
  * with yet: those signs, as the daemon found them. The learner
  * reads them first; later scans and offers look only past them.
  */
-signals?: Array<LearnSignal>, } | { "type": "learnDismissed", session: string, through: number, } | { "type": "learnSkipped", trigger: LearnTrigger, reason: string, } | { "type": "proposalMade", 
+signals?: Array<LearnSignal>, 
+/**
+ * Set when the person said yes to the offer to learn from a
+ * session with signs (ADR-0020), rather than asking on their own.
+ */
+offer?: boolean, } | { "type": "learnDismissed", session: string, through: number, } | { "type": "learnSkipped", trigger: LearnTrigger, reason: string, } | { "type": "proposalMade", 
 /**
  * The learner's tool call that made it, whose result it is.
  */

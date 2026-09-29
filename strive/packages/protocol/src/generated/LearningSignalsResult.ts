@@ -19,7 +19,9 @@ summary: string,
  */
 ask: boolean, 
 /**
- * What a learner run has cost in this project on average, its checks
- * included; none before the first.
+ * What a learner run costs in this project, its checks included: the
+ * average of its runs, or before the first an estimate at the learner
+ * model's price for the tokens of other projects' runs (a typical
+ * run's if there are none). None if the model's price isn't known.
  */
 estimateUsdMicros?: number, };

@@ -89,15 +89,15 @@ pub fn plan(state: &State, cwd: &str, made: &Made, learning: &[Entry]) -> Plan {
     let model = model(state);
     if crate::methods::provider_of(model) != "anthropic" {
         return skipped(format!(
-            "the judge runs on Anthropic models, and {model} isn't one; set \"judgeModel\" in ~/.strive/settings.json"
+            "the second opinion runs on Anthropic models, and {model} isn't one; set \"judgeModel\" in ~/.strive/settings.json"
         ));
     }
     if state.credentials.get("anthropic").is_none() {
-        return skipped("there's no Anthropic API key for the judge; `strive auth anthropic` sets one");
+        return skipped("there's no Anthropic API key for the second opinion; `strive auth anthropic` sets one");
     }
     if state.models.get(model).is_none() {
         return skipped(format!(
-            "no price is known for the judge's model {model}; add it under \"models\" in ~/.strive/settings.json"
+            "no price is known for the second opinion's model {model}; add it under \"models\" in ~/.strive/settings.json"
         ));
     }
     let blob = |d: &Digest| state.cas.get(d).ok().map(|b| String::from_utf8_lossy(&b).into_owned());
@@ -214,11 +214,21 @@ async fn judge(state: &State, sid: &SessionId, call: Call) -> (Verdict, String) 
     let Call { model, body, held_out } = call;
     let url = match state.gateway.info(sid) {
         Ok(urls) => format!("{}/v1/messages", urls.anthropic),
-        Err(e) => return (Verdict::Fail, format!("failed: the judge couldn't be reached ({e}), so it wasn't judged")),
+        Err(e) => {
+            return (
+                Verdict::Fail,
+                format!("failed: the second opinion couldn't be reached ({e}), so it wasn't judged"),
+            );
+        }
     };
     let client = match reqwest::Client::builder().no_proxy().timeout(CALL_LIMIT).build() {
         Ok(c) => c,
-        Err(e) => return (Verdict::Fail, format!("failed: the judge couldn't be reached ({e}), so it wasn't judged")),
+        Err(e) => {
+            return (
+                Verdict::Fail,
+                format!("failed: the second opinion couldn't be reached ({e}), so it wasn't judged"),
+            );
+        }
     };
     let sent = client
         .post(url)
@@ -262,12 +272,15 @@ async fn judge(state: &State, sid: &SessionId, call: Call) -> (Verdict, String) 
         // there's no key after all.
         402 => (
             Verdict::Skipped,
-            format!("not run: the learning session's budget can't pay for the judge ({})", ours(&message())),
+            format!("not run: the learning session's budget can't pay for the second opinion ({})", ours(&message())),
         ),
         401 if message().starts_with("strive: ") => (Verdict::Skipped, format!("not run: {}", ours(&message()))),
         status => (
             Verdict::Fail,
-            format!("failed: the judge's call was refused (HTTP {status}: {}), so it wasn't judged", message()),
+            format!(
+                "failed: the second opinion's call was refused (HTTP {status}: {}), so it wasn't judged",
+                message()
+            ),
         ),
     }
 }
@@ -277,7 +290,7 @@ fn ours(message: &str) -> &str {
 }
 
 fn broke(why: &str) -> String {
-    format!("failed: the judge's call broke off ({why}), so it wasn't judged")
+    format!("failed: the second opinion's call broke off ({why}), so it wasn't judged")
 }
 
 /// Whether the journal already has proposal `id`'s judge verdict.

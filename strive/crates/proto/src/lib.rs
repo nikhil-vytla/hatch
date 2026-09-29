@@ -574,6 +574,11 @@ pub struct LearningRunParams {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub sessions: Option<Vec<String>>,
+    /// Set when the person is saying yes to the offer to learn from a
+    /// session with signs (ADR-0020), so review can say where a run came from.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub offer: Option<bool>,
 }
 
 /// A work session of the project, to ask about its signs (ADR-0020).
@@ -600,8 +605,10 @@ pub struct LearningSignalsResult {
     /// are signs, the learner's provider has a key, and `learning.ask`
     /// isn't false.
     pub ask: bool,
-    /// What a learner run has cost in this project on average, its checks
-    /// included; none before the first.
+    /// What a learner run costs in this project, its checks included: the
+    /// average of its runs, or before the first an estimate at the learner
+    /// model's price for the tokens of other projects' runs (a typical
+    /// run's if there are none). None if the model's price isn't known.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub estimate_usd_micros: Option<u64>,
@@ -824,6 +831,22 @@ pub struct ProposalState {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub trigger: Option<LearnTrigger>,
+    /// Set when the run that made it was a person's yes to the offer to
+    /// learn from a session (ADR-0020): the signs the run was given.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub offered: Option<Vec<LearnSignal>>,
+    /// Set on an applied proposal once a later accepted proposal wrote the
+    /// same file over it: that proposal's id. Its content is gone from the
+    /// file, so it can't be rolled back.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub replaced_by: Option<u64>,
+    /// Whether a rollback would go through now: it's applied and its file
+    /// is still what it wrote. Only `proposal/list` looks at the file; the
+    /// fold alone leaves it false.
+    #[serde(default)]
+    pub can_roll_back: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
@@ -1133,6 +1156,11 @@ pub enum Event {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         #[ts(optional)]
         signals: Option<Vec<LearnSignal>>,
+        /// Set when the person said yes to the offer to learn from a
+        /// session with signs (ADR-0020), rather than asking on their own.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[ts(optional)]
+        offer: Option<bool>,
     },
     /// A person declined to learn from a work session (ADR-0020): its signs
     /// up to `through` aren't offered again, and no trigger acts on them.

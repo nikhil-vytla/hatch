@@ -296,7 +296,7 @@ fn trigger(signals: Vec<(&str, u64)>) -> LearnTrigger {
 }
 
 fn requested(trigger: Option<LearnTrigger>) -> Event {
-    Event::LearnRequested { sessions: vec!["A".into()], trigger, signals: None }
+    Event::LearnRequested { sessions: vec!["A".into()], trigger, signals: None, offer: None }
 }
 
 #[test]
@@ -453,7 +453,7 @@ fn a_command_that_only_passed_or_is_too_long_to_be_a_check_is_no_sign() {
 fn signs_a_person_asked_about_or_dismissed_are_dealt_with_too() {
     let signs = |session: &str, seq: u64| Some(trigger(vec![(session, seq)]).signals);
     let mut j = Journal::new();
-    j.push(Event::LearnRequested { sessions: vec!["A".into()], trigger: None, signals: signs("A", 9) });
+    j.push(Event::LearnRequested { sessions: vec!["A".into()], trigger: None, signals: signs("A", 9), offer: None });
     j.push(Event::LearnDismissed { session: "B".into(), through: 15 });
     // A later dismissal below a request's signs doesn't lower the mark.
     j.push(Event::LearnDismissed { session: "A".into(), through: 5 });
@@ -528,4 +528,48 @@ fn a_runs_cost_is_what_the_learning_session_spent_over_the_turns_that_called_a_m
     j.turn();
     j.end(TurnEnd::Failed { error: "no key".into() });
     assert_eq!(cost_per_run(&j.entries()), Some(47_501));
+}
+
+/// A project's first offer is priced from the tokens other projects' runs
+/// used: averaged over every run in their journals, whatever each cost.
+#[test]
+fn a_runs_tokens_are_averaged_over_the_runs_of_every_journal_given() {
+    use strive_learning::triggers::usage_per_run;
+    use strive_proto::{CallOutcome, Usage};
+    let call = |j: &mut Journal, n: u64, outcome: CallOutcome| {
+        j.push(Event::ModelCallStarted {
+            call: n,
+            provider: "anthropic".into(),
+            model: "m".into(),
+            request: Digest::from_bytes([0; 32]),
+            reserved_usd_micros: 1_000_000,
+            reserved_tokens: 0,
+        });
+        j.push(Event::ModelCallFinished { call: n, outcome, response: None, duration_ms: 1 });
+    };
+    let used = |input, output, cache_read| CallOutcome::Complete {
+        status: 200,
+        usage: Usage { input, output, cache_write: 0, cache_write_long: 0, cache_read },
+        cost_usd_micros: 1,
+    };
+    assert_eq!(usage_per_run(&[]), None);
+    let (mut a, mut b) = (Journal::new(), Journal::new());
+    a.turn();
+    call(&mut a, 1, used(10_000, 100, 0));
+    call(&mut a, 2, used(20_000, 300, 5_000));
+    a.end(TurnEnd::Done);
+    // No model called: not a run.
+    a.turn();
+    a.end(TurnEnd::Failed { error: "no key".into() });
+    assert_eq!(usage_per_run(&[&b.entries()]), None, "no run in it");
+    b.turn();
+    call(&mut b, 1, CallOutcome::Broken { reason: "cut".into(), cost_usd_micros: 9, tokens: 3_000 });
+    call(&mut b, 2, CallOutcome::Rejected { status: 529 });
+    b.end(TurnEnd::Done);
+    let per_run = usage_per_run(&[&a.entries(), &b.entries()]).unwrap();
+    assert_eq!(
+        (per_run.input, per_run.output, per_run.cache_read),
+        (16_500, 200, 2_500),
+        "two runs: 33,000 in (a broken call's tokens as input), 400 out, 5,000 read"
+    );
 }

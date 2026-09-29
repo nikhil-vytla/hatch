@@ -464,14 +464,19 @@ fn review_shows_what_triggered_an_automatic_runs_proposal() {
     assert!(line(made[0]).ends_with("[automatic run]"), "{listed}");
     assert!(!line(manual[0]).contains('['), "{listed}");
 
+    // Sessions are named by title, and which signs started the run are behind --full.
     let shown = review(&env, &cwd, &["review", &made[0].to_string()]);
     assert!(
-        shown.contains(&format!("run         automatic, after a session went idle: a correction in session {}", w.id)),
+        shown.contains(
+            "changes .strive/memory.md; automatic, after a session went idle: a correction in \"run the tests\""
+        ),
         "{shown}"
     );
-    assert!(shown.contains(&format!("session {} entry {fix}: a correction: no, use bun test", w.id)), "{shown}");
+    assert!(!shown.contains(&w.id), "{shown}");
+    let full = review(&env, &cwd, &["review", &made[0].to_string(), "--full"]);
+    assert!(full.contains(&format!("\"run the tests\" entry {fix}: a correction: no, use bun test")), "{full}");
     let shown = review(&env, &cwd, &["review", &manual[0].to_string()]);
-    assert!(shown.contains("run         asked for by a person"), "{shown}");
+    assert!(shown.contains("changes .strive/memory.md; asked with `strive learn` on"), "{shown}");
 
     let logged = review(&env, &cwd, &["log", &learning(&env, &cwd).unwrap()]);
     assert!(logged.contains("automatic learning run, after a session went idle: a correction in session"), "{logged}");
@@ -604,6 +609,9 @@ fn a_session_with_a_correction_is_offered_for_learning_and_a_clean_one_is_not() 
             ],
             "summary": "a correction and 2 interrupted turns",
             "ask": true,
+            // No learner has run anywhere yet: a typical run's 60,000 tokens in and
+            // 2,000 out at claude-sonnet-4-5's $3 and $15 a million.
+            "estimateUsdMicros": 210_000,
         })
     );
     // Asking costs nothing and records nothing: the project still has no learning session.
@@ -612,7 +620,8 @@ fn a_session_with_a_correction_is_offered_for_learning_and_a_clean_one_is_not() 
     let mut clean = Work::new(&env, &cwd);
     clean.exchange("add a --verbose flag", &done());
     clean.exchange("thanks", &done());
-    assert_eq!(signals(&env, &cwd, &clean.id), json!({"signals": [], "summary": "", "ask": false}));
+    let r = signals(&env, &cwd, &clean.id);
+    assert_eq!((&r["signals"], &r["summary"], &r["ask"]), (&json!([]), &json!(""), &json!(false)), "{r}");
 
     // Only a work session of this project is asked about.
     let other = project();

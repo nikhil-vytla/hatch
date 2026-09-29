@@ -4,4 +4,9 @@ export type LearningRunParams = { cwd: string,
 /**
  * Work sessions to study; none: those since the learner last looked.
  */
-sessions?: Array<string>, };
+sessions?: Array<string>, 
+/**
+ * Set when the person is saying yes to the offer to learn from a
+ * session with signs (ADR-0020), so review can say where a run came from.
+ */
+offer?: boolean, };

@@ -8,9 +8,15 @@
 //! - an accept followed by `proposalApplied` makes it `applied`; an accept
 //!   with nothing written (the file had changed) makes it `stale`;
 //! - `proposalRolledBack` makes an applied one `rolledBack`.
+//!
+//! An applied proposal is `replaced_by` a later one for the same file that
+//! was applied over it, until that one is rolled back to its content.
+
+use std::collections::HashMap;
 
 use strive_proto::{
-    Digest, Entry, Event, Gate, GateOutcome, LearnTrigger, ProposalDecision, ProposalState, ProposalStatus, Verdict,
+    Digest, Entry, Event, Gate, GateOutcome, LearnSignal, LearnTrigger, ProposalDecision, ProposalState,
+    ProposalStatus, Verdict,
 };
 
 /// What an accepted proposal wrote: the file before (none: it didn't
@@ -44,10 +50,16 @@ pub fn fold(entries: &[Entry]) -> Vec<Folded> {
     // The latest request's trigger: a proposal belongs to the run that was
     // asked for last before it.
     let mut trigger: Option<LearnTrigger> = None;
+    // The signs of the latest request, when it was a yes to the offer.
+    let mut offered: Option<Vec<LearnSignal>> = None;
+    let mut live = Live::default();
     for e in entries {
         let find = |out: &mut Vec<(ProposalState, Marks)>, id: u64| out.iter().position(|(s, _)| s.id == id);
         match &e.event {
-            Event::LearnRequested { trigger: t, .. } => trigger.clone_from(t),
+            Event::LearnRequested { trigger: t, signals, offer, .. } => {
+                trigger.clone_from(t);
+                offered = offer.unwrap_or(false).then(|| signals.clone().unwrap_or_default());
+            }
             Event::ProposalMade { proposal, before, .. } => out.push((
                 ProposalState {
                     id: e.seq,
@@ -57,6 +69,9 @@ pub fn fold(entries: &[Entry]) -> Vec<Folded> {
                     status: ProposalStatus::Checking,
                     gates: Vec::new(),
                     trigger: trigger.clone(),
+                    offered: offered.clone(),
+                    replaced_by: None,
+                    can_roll_back: false,
                 },
                 Marks::default(),
             )),
@@ -83,11 +98,13 @@ pub fn fold(entries: &[Entry]) -> Vec<Folded> {
             Event::ProposalApplied { proposal, before, after } => {
                 if let Some(i) = find(&mut out, *proposal) {
                     out[i].1.applied = Some(Applied { before: *before, after: *after, at_ms: e.ts_ms });
+                    live.applied(&mut out, i);
                 }
             }
             Event::ProposalRolledBack { proposal, .. } => {
                 if let Some(i) = find(&mut out, *proposal) {
                     out[i].1.rolled_back = true;
+                    live.rolled_back(&mut out, i);
                 }
             }
             Event::SessionStarted { .. }
@@ -121,6 +138,44 @@ pub fn fold(entries: &[Entry]) -> Vec<Folded> {
             Folded { state, applied }
         })
         .collect()
+}
+
+/// Per file, the applied proposal whose content it last had: what marks
+/// one proposal replaced by another.
+#[derive(Default)]
+struct Live(HashMap<String, u64>);
+
+impl Live {
+    /// `out[i]` was written over whatever applied proposal its file had.
+    fn applied(&mut self, out: &mut [(ProposalState, Marks)], i: usize) {
+        let Ok(path) = crate::relative_path(&out[i].0.proposal.artifact) else { return };
+        let id = out[i].0.id;
+        if let Some(old) = self.0.insert(path, id)
+            && let Some(j) = out.iter().position(|(s, _)| s.id == old && old != id)
+        {
+            out[j].0.replaced_by = Some(id);
+        }
+    }
+
+    /// `out[i]` was rolled back: the one it replaced is back if the
+    /// rollback restored that one's content.
+    fn rolled_back(&mut self, out: &mut [(ProposalState, Marks)], i: usize) {
+        let (id, before) = (out[i].0.id, out[i].1.applied.and_then(|a| a.before));
+        let Ok(path) = crate::relative_path(&out[i].0.proposal.artifact) else { return };
+        let back = out.iter().position(|(s, m)| {
+            s.replaced_by == Some(id) && !m.rolled_back && m.applied.map(|a| Some(a.after)) == Some(before)
+        });
+        match back {
+            Some(j) => {
+                out[j].0.replaced_by = None;
+                self.0.insert(path, out[j].0.id);
+            }
+            None if self.0.get(&path) == Some(&id) => {
+                self.0.remove(&path);
+            }
+            None => {}
+        }
+    }
 }
 
 fn status(gates: &[GateOutcome], marks: &Marks) -> ProposalStatus {
