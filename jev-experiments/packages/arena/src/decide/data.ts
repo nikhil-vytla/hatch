@@ -26,7 +26,13 @@ const setupSchema = z.object({
 export const decideSchema = z.object({
   schema: z.literal("jev.decide/1"),
   contestants: z.array(
-    z.object({ id: z.string(), name: z.string(), about: z.string(), model: z.string() }),
+    z.object({
+      id: z.string(),
+      name: z.string(),
+      about: z.string(),
+      model: z.string(),
+      recorded: z.string().optional(),
+    }),
   ),
   decisions: z.array(
     z.object({

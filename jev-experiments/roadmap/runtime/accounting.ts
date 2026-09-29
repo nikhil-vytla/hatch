@@ -26,6 +26,8 @@ export type RequestAttempt = {
   accountingScope: "gateway-response";
   providerAttempts: "unknown";
   generationId?: string;
+  /** The provider the gateway says served this attempt (e.g. typesafe-ai, or a fallback host). */
+  servedBy?: string;
   issues: string[];
   scoreChecks?: { questionId: string; result: ScoreAgreement }[];
 };

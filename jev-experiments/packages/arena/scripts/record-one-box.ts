@@ -157,6 +157,8 @@ for (const k of todo) {
           status: "ok",
           latencyMs: r.service_latency_ms,
           model: r.model,
+          servedBy: r.served_by,
+          generationId: r.generation_id,
           answers: r.answers,
           rejected: r.rejected,
           costUsd: r.cost_usd,

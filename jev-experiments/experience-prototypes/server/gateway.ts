@@ -253,6 +253,10 @@ function observe(raw: any, attempt: RequestAttempt) {
   }
   if (typeof gateway?.generationId === "string" && gateway.generationId.trim())
     attempt.generationId = gateway.generationId;
+  // The gateway can route Jev to more than one host and never names a build, so the host that
+  // answered is the most specific identity a recording can keep.
+  const served = gateway?.routing?.finalProvider;
+  if (typeof served === "string" && served.trim()) attempt.servedBy = served;
   if (raw.usage !== undefined && raw.usage !== null) {
     const usage: TokenUsage = {};
     if (typeof raw.usage === "object" && !Array.isArray(raw.usage)) {
@@ -452,6 +456,8 @@ export async function evaluate(
           cost_usd: accounting.costUsd,
           model: attempt.model,
           model_source: attempt.modelSource,
+          served_by: attempt.servedBy ?? null,
+          generation_id: attempt.generationId ?? null,
           usage: usage
             ? {
                 ...(usage.inputTokens === undefined
