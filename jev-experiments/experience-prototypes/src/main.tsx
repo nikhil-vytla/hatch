@@ -14,6 +14,7 @@ const ExperimentPage = lazy(() => import("./pages/experiment").then(m => ({ defa
 const AboutPage = lazy(() => import("./pages/about").then(m => ({ default: m.AboutPage })));
 const ArenaPage = lazy(() => import("./arena/page").then(m => ({ default: m.ArenaPage })));
 const DecidePage = lazy(() => import("./decide/page").then(m => ({ default: m.DecidePage })));
+const DecideResults = lazy(() => import("./decide/results").then(m => ({ default: m.DecideResults })));
 // Jev Daily became Decide; old links land there.
 if (location.hash.startsWith("#/daily")) history.replaceState(null, "", "#/decide");
 const NotesIndex = lazy(() => import("./notes").then(m => ({ default: m.NotesIndex })));
@@ -298,6 +299,8 @@ function App() {
       )}
       {route === "#/about" || route === "#about" ? (
         <Suspense fallback={<main className="loading-stage">Opening About…</main>}><AboutPage /></Suspense>
+      ) : route.startsWith("#/decide/results") ? (
+        <Suspense fallback={<main className="loading-stage">Opening the results…</main>}><DecideResults /></Suspense>
       ) : route.startsWith("#/decide") ? (
         <Suspense fallback={<main className="loading-stage">Opening Decide…</main>}><DecidePage /></Suspense>
       ) : route.startsWith("#/arena") ? (

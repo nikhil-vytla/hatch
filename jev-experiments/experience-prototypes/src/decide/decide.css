@@ -317,3 +317,41 @@
     min-height: 44px;
   }
 }
+.dc-results .kicker a {
+  color: inherit;
+}
+.dc-results .dc-block + .dc-block {
+  margin-top: 16px;
+}
+.dc-heat td {
+  white-space: nowrap;
+}
+.dc-table td[data-right="true"] {
+  background: color-mix(in oklab, var(--opt-2) 14%, transparent);
+}
+.dc-bar {
+  height: 10px;
+  border-radius: 5px;
+  background: var(--soft);
+  overflow: hidden;
+}
+.dc-bar span {
+  display: block;
+  height: 100%;
+  background: var(--ink);
+}
+.dc-list {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 6px;
+  line-height: 1.5;
+}
+.dc-results-link {
+  margin-top: 20px;
+  font-size: 16px;
+}
+.dc-block-line {
+  display: block;
+  margin-top: 2px;
+}
