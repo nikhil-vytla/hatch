@@ -3748,3 +3748,47 @@ nav a {
 .builder-credits p {
   margin: 0 0 12px;
 }
+.calibration-model {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.calibration-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 360px) minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+  margin-bottom: 16px;
+}
+.calibration-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.calibration-chart {
+  width: 100%;
+  height: auto;
+}
+.calibration-bar {
+  fill: var(--sage, #5b7f6b);
+}
+.calibration-dot {
+  fill: var(--ink, #222);
+}
+.calibration-diagonal {
+  stroke: var(--muted, #888);
+  stroke-dasharray: 4 4;
+}
+.calibration-axis {
+  stroke: var(--line, #ccc);
+}
+.calibration-label {
+  font-size: 10px;
+  fill: var(--muted, #888);
+}
+@media (max-width: 720px) {
+  .calibration-grid {
+    grid-template-columns: 1fr;
+  }
+}
