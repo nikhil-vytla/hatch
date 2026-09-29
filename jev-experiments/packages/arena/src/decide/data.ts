@@ -51,4 +51,5 @@ export const tallySchema = z.object({
   available: z.boolean(),
   counts: z.record(z.string(), z.number()).optional(),
   counted: z.boolean().optional(),
+  tallies: z.record(z.string(), z.record(z.string(), z.number())).optional(),
 });
