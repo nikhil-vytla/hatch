@@ -35,8 +35,9 @@ pub const SKILL_LIMIT: usize = 32 * 1024;
 /// The longest skill name.
 pub const SKILL_NAME_LIMIT: usize = 40;
 
-/// Every gate a proposal goes through, in order. A proposal is ready once
-/// each has a verdict and none failed.
+/// Every check a proposal goes through, in order. A proposal is ready once
+/// each has a verdict and the static one didn't fail: the judge advises, and
+/// a person may accept past its fail.
 pub const GATES: [Gate; 2] = [Gate::Static, Gate::Judge];
 
 /// Proposals for the same file as `artifact` that were applied and then

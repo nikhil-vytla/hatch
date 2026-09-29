@@ -1328,7 +1328,7 @@ async function fakeAnthropic(body: Json): Promise<{ url: string; close: () => vo
   return { url: `http://127.0.0.1:${address.port}`, close: () => server.close() };
 }
 
-test("the judge's reasons show by criterion, each marked passed or failed", async () => {
+test("the judge's reasons show by criterion, and a judge fail is advice a person can accept past", async () => {
   const mark = (pass: boolean, reason: string) => ({ pass, reason });
 
   const verdict = {
@@ -1410,6 +1410,16 @@ test("the judge's reasons show by criterion, each marked passed or failed", asyn
     await judge.locator(".judge-summary", { hasText: "Sound, but memory already covers it." }).waitFor();
     await judge.locator(".judge-head", { hasText: "failed novel (claude-haiku-4-5, held out session" }).waitFor();
     await judge.locator(".badge", { hasText: "failed" }).waitFor();
+
+    // Its fail is advice, shown at the top with the reasons, and doesn't block Accept.
+    const advice = pane.locator(".learned-head .judge-advice");
+    await advice.getByText("The judge advises against it.", { exact: false }).waitFor();
+    await advice.getByText("Memory already says to run `bun test`.", { exact: false }).waitFor();
+    await pane.locator(".learned-title .badge", { hasText: "ready" }).waitFor();
+    await pane.getByRole("button", { name: "Accept" }).click();
+    await pane.getByRole("button", { name: "Write it" }).click();
+    await pane.locator(".learned-title .badge", { hasText: "applied" }).waitFor();
+    assert.equal(readFileSync(memoryFile(cwd), "utf8"), "- Run `bun test`.\n");
     l.host.close();
     await app.close();
   } finally {

@@ -463,6 +463,9 @@ button.link:hover { background: transparent; text-decoration: underline; text-un
 .outside-review p { margin: 0; color: var(--muted); line-height: 1.5; }
 .status-note.outside { padding: 8px 10px; border-radius: var(--r-item); background: var(--warn-soft); border: 1px solid rgb(250 204 21 / 0.2); color: var(--text); }
 .status-note.outside .mono { font-size: 12px; }
+.status-note.judge-advice { padding: 8px 10px; border-radius: var(--r-item); background: var(--warn-soft); border: 1px solid rgb(250 204 21 / 0.2); color: var(--text); }
+.status-note.judge-advice p { margin: 0; }
+.status-note.judge-advice ul { margin: 6px 0 0; padding-left: 18px; }
 
 /* Automatic learning (ADR-0020): a run nobody asked for, and one that didn't start. */
 .badge.automatic { background: var(--surface-2); color: var(--muted); }

@@ -2,14 +2,15 @@
 //!
 //! Status, from the ADR:
 //! - a proposal is `checking` until every gate has a verdict, `failed` once
-//!   any gate fails, and `ready` when every gate passed or was skipped;
+//!   the static gate fails, and `ready` otherwise: the judge's verdict, pass,
+//!   fail or skip, is advice a person reads beside the diff;
 //! - a person's reject makes it `rejected`;
 //! - an accept followed by `proposalApplied` makes it `applied`; an accept
 //!   with nothing written (the file had changed) makes it `stale`;
 //! - `proposalRolledBack` makes an applied one `rolledBack`.
 
 use strive_proto::{
-    Digest, Entry, Event, GateOutcome, LearnTrigger, ProposalDecision, ProposalState, ProposalStatus, Verdict,
+    Digest, Entry, Event, Gate, GateOutcome, LearnTrigger, ProposalDecision, ProposalState, ProposalStatus, Verdict,
 };
 
 /// What an accepted proposal wrote: the file before (none: it didn't
@@ -130,7 +131,7 @@ fn status(gates: &[GateOutcome], marks: &Marks) -> ProposalStatus {
         ProposalStatus::Stale
     } else if marks.rejected {
         ProposalStatus::Rejected
-    } else if gates.iter().any(|g| g.verdict == Verdict::Fail) {
+    } else if gates.iter().any(|g| g.gate == Gate::Static && g.verdict == Verdict::Fail) {
         ProposalStatus::Failed
     } else if crate::GATES.iter().all(|gate| gates.iter().any(|g| g.gate == *gate)) {
         ProposalStatus::Ready

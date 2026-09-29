@@ -15,6 +15,7 @@ import {
   errorText,
   fileHistory,
   GATE_NAMES,
+  judgeAdvice,
   type Run,
   readJudge,
   STATUS_NAMES,
@@ -288,6 +289,7 @@ function Detail({
 
   const known = new Map(sessions.map((s) => [s.id, s]));
   const history = fileHistory(proposals ?? [], p);
+  const advice = judgeAdvice(p);
   const now = Date.now();
 
   return (
@@ -318,6 +320,16 @@ function Detail({
           </div>
         )}
         <p className={`status-note ${p.status}`}>{statusNote(p, path)}</p>
+        {advice && (
+          <div className="status-note judge-advice">
+            <p>The judge advises against it. A person decides: Accept still writes it.</p>
+            <ul>
+              {advice.map((r) => (
+                <li key={r}>{r}</li>
+              ))}
+            </ul>
+          </div>
+        )}
         {outsideReview.includes(path) && (
           <p className="status-note outside">
             <span className="mono">{path}</span> has changed outside review: it isn't what an accepted proposal last

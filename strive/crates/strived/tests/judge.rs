@@ -15,7 +15,6 @@ use axum::body::{Body, Bytes};
 use axum::response::Response;
 use common::{Env, Rpc};
 use serde_json::{Value, json};
-use strive_proto::rpc::RpcError;
 
 /// A fake Anthropic API that answers every call with the same body, after
 /// a delay, and keeps each request's body.
@@ -275,7 +274,7 @@ fn a_sound_proposal_passes_the_judge_on_the_learning_sessions_budget() {
 }
 
 #[test]
-fn a_judge_fail_blocks_accepting() {
+fn a_judge_fail_is_advice_a_person_can_accept_past() {
     let j = judge(answer(&verdict(&["safe", "generalizes"])));
     let (cited, seq) = j.session("run the tests");
     j.session("another task");
@@ -286,11 +285,20 @@ fn a_judge_fail_blocks_accepting() {
     assert_eq!(v, "fail", "{detail}");
     assert!(detail.starts_with("failed generalizes, safe"), "{detail}");
     assert!(detail.contains("FAIL safe: safe reason: broken") && detail.contains("pass novel:"), "{detail}");
-    assert_eq!(j.proposal(id)["status"], "failed");
+    assert_eq!(j.proposal(id)["status"], "ready", "the judge advises; only the static check blocks");
+
+    // `strive review` puts the judge's advice and reasons before the diff.
+    let out = j.env.strive_in(&j.cwd, &["review", &id.to_string()]);
+    let shown = String::from_utf8_lossy(&out.stdout).into_owned();
+    assert!(shown.contains("the judge advises against it: failed generalizes, safe"), "{shown}");
+    let (advice, diff) = (shown.find("FAIL safe: safe reason: broken").unwrap(), shown.find("diff against").unwrap());
+    assert!(advice < diff, "the reasons come before the diff: {shown}");
+    assert!(shown.contains(&format!("`strive review {id} accept` writes .strive/memory.md anyway")), "{shown}");
+
     let r = j.decide(id, "accept");
-    assert_eq!(r["error"]["code"], RpcError::INVALID_REQUEST, "{r}");
-    assert!(r["error"]["message"].as_str().unwrap().contains("failed its checks"), "{r}");
-    assert!(!j.cwd.join(".strive/memory.md").exists());
+    assert!(r.get("error").is_none(), "{r}");
+    assert_eq!(j.proposal(id)["status"], "applied");
+    assert!(j.cwd.join(".strive/memory.md").exists());
 }
 
 #[test]
@@ -309,7 +317,7 @@ fn an_answer_that_cant_be_read_fails() {
     let (v, detail) = j.judged(id);
     assert_eq!(v, "fail", "{detail}");
     assert!(detail.contains("couldn't be read, so it counts as a fail") && detail.contains("end_turn"), "{detail}");
-    assert_eq!(j.proposal(id)["status"], "failed");
+    assert_eq!(j.proposal(id)["status"], "ready");
 }
 
 #[test]
@@ -352,7 +360,7 @@ fn a_provider_refusal_or_a_broken_call_fails_the_judge() {
         (Reply::Cut, "broke off"),
     ] {
         let (v, detail, status) = judged_by(reply);
-        assert_eq!((v.as_str(), status.as_str()), ("fail", "failed"), "{detail}");
+        assert_eq!((v.as_str(), status.as_str()), ("fail", "ready"), "{detail}");
         assert!(detail.contains(why) && detail.contains("so it wasn't judged"), "{detail}");
         assert!(!detail.contains("strive learn"), "`strive learn` doesn't judge it again: {detail}");
     }

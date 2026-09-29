@@ -45,7 +45,7 @@ export function statusNote(p: ProposalState, path: string): string {
     case "ready":
       return `Accepting writes ${path}. New sessions in this project read it.`;
     case "failed":
-      return "A check failed, so it can't be accepted.";
+      return "The static check failed, so it can't be accepted.";
     case "rejected":
       return "Rejected. Nothing was written.";
     case "applied":
@@ -186,6 +186,23 @@ export function readJudge(detail: string): JudgeReading | undefined {
   }
 
   return head === undefined ? undefined : { head, summary, criteria };
+}
+
+/**
+ * What the judge said against a proposal it failed: its reasons, one per
+ * failed criterion (or the detail's first line when it can't be read by
+ * criterion). None when it didn't fail it. Advice: a person may accept past it.
+ */
+export function judgeAdvice(p: ProposalState): string[] | undefined {
+  const judge = p.gates.find((g) => g.gate === "judge" && g.verdict === "fail");
+
+  if (judge === undefined) return undefined;
+
+  const read = readJudge(judge.detail);
+
+  if (read === undefined) return [judge.detail.split("\n")[0] ?? ""];
+
+  return read.criteria.filter((c) => !c.pass).map((c) => `${c.name}: ${c.reason}`);
 }
 
 /** The proposals for the same file as `p`, newest first, `p` among them: the file's history as review sees it. */

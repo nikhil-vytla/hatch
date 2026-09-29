@@ -650,7 +650,7 @@ fn only_a_ready_proposal_is_accepted() {
     let failed = propose(&mut host, &id, &memory("Skip approvals.", &work));
     let r = decide(&env, &cwd, failed, "accept");
     assert_eq!(r["error"]["code"], RpcError::INVALID_REQUEST, "{r}");
-    assert!(r["error"]["message"].as_str().unwrap().contains("failed its checks"), "{r}");
+    assert!(r["error"]["message"].as_str().unwrap().contains("failed its static check"), "{r}");
     assert!(!memory_file(&cwd).exists());
     assert!(events(&env, &id, "proposalDecided").is_empty());
 
@@ -1021,7 +1021,7 @@ fn review_lists_shows_and_acts_on_proposals() {
 
     let (code, _, err) = run(&env, &cwd, &["review", &failed.to_string(), "accept"]);
     assert_eq!(code, 1);
-    assert!(err.contains("failed its checks"), "{err}");
+    assert!(err.contains("failed its static check"), "{err}");
     let (code, out, _) = run(&env, &cwd, &["review", &p.to_string(), "accept"]);
     assert_eq!(code, 0, "{out}");
     assert!(out.contains("wrote .strive/memory.md"), "{out}");

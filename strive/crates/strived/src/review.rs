@@ -6,9 +6,9 @@ use std::process::ExitCode;
 
 use anyhow::{Result, anyhow};
 use strive_proto::{
-    BlobGet, BlobGetParams, Event, Gate, LearnTrigger, LearningOpen, LearningRun, LearningRunParams, ProjectRef,
-    ProposalDecide, ProposalDecideParams, ProposalDecision, ProposalList, ProposalRef, ProposalRollback, ProposalState,
-    ProposalStatus, SessionAttach, SessionAttachParams, TriggerKind, Verdict,
+    BlobGet, BlobGetParams, Event, Gate, GateOutcome, LearnTrigger, LearningOpen, LearningRun, LearningRunParams,
+    ProjectRef, ProposalDecide, ProposalDecideParams, ProposalDecision, ProposalList, ProposalRef, ProposalRollback,
+    ProposalState, ProposalStatus, SessionAttach, SessionAttachParams, TriggerKind, Verdict,
 };
 
 use crate::client::Client;
@@ -70,7 +70,14 @@ const JUDGE_WAIT: std::time::Duration = std::time::Duration::from_secs(300);
 
 /// One proposal in a list.
 fn line(p: &ProposalState) -> String {
-    let marks = if p.trigger.is_some() { "  [automatic run]" } else { "" };
+    let mut marks = Vec::new();
+    if p.trigger.is_some() {
+        marks.push("automatic run");
+    }
+    if advises_against(p).is_some() {
+        marks.push("the judge advises against it");
+    }
+    let marks = if marks.is_empty() { String::new() } else { format!("  [{}]", marks.join(", ")) };
     format!(
         "#{:<5} {:<12} {:<20} {}{marks}",
         p.id,
@@ -203,6 +210,9 @@ async fn show(c: &mut Client, p: &ProposalState, rel: &str) -> Result<()> {
         }
         None => writeln!(out, "run         asked for by a person")?,
     }
+    if let Some(judge) = advises_against(p) {
+        writeln!(out, "\nthe judge advises against it: {}", judge.detail.lines().next().unwrap_or_default())?;
+    }
     writeln!(out, "\nwhy\n{}", indent(&p.proposal.rationale))?;
     writeln!(out, "\nprediction\n{}", indent(&p.proposal.prediction))?;
     writeln!(out, "\nevidence")?;
@@ -233,11 +243,15 @@ async fn show(c: &mut Client, p: &ProposalState, rel: &str) -> Result<()> {
         writeln!(out, "{l}")?;
     }
     let next = match p.status {
+        ProposalStatus::Ready if advises_against(p).is_some() => format!(
+            "the judge advises against it (its reasons are under checks); `strive review {id} accept` writes {rel} \
+             anyway; `strive review {id} reject` turns it down"
+        ),
         ProposalStatus::Ready => {
             format!("`strive review {id} accept` writes {rel}; `strive review {id} reject` turns it down")
         }
         ProposalStatus::Failed => {
-            format!("a failed proposal can't be accepted; `strive review {id} reject` turns it down")
+            format!("its static check failed, so it can't be accepted; `strive review {id} reject` turns it down")
         }
         ProposalStatus::Checking => "its checks haven't finished; look again in a moment".to_string(),
         ProposalStatus::Applied => format!("`strive review {id} rollback` puts {rel} back as it was"),
@@ -253,6 +267,12 @@ async fn show(c: &mut Client, p: &ProposalState, rel: &str) -> Result<()> {
     }
     print!("{}", crate::terminal::visible(&out));
     Ok(())
+}
+
+/// The judge's outcome when it failed the proposal: advice a person may
+/// accept past.
+fn advises_against(p: &ProposalState) -> Option<&GateOutcome> {
+    p.gates.iter().find(|g| g.gate == Gate::Judge && g.verdict == Verdict::Fail)
 }
 
 fn indent(text: &str) -> String {

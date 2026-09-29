@@ -68,13 +68,13 @@ fn a_proposal_is_checking_until_every_gate_has_a_verdict() {
 }
 
 #[test]
-fn any_failed_gate_fails_it_even_before_the_rest_finish() {
+fn a_static_fail_fails_it_at_once_and_a_judge_fail_leaves_it_ready() {
     let events = vec![started(), made("m", None), gate(2, Gate::Static, Verdict::Fail)];
-    assert_eq!(statuses(events), vec![(2, ProposalStatus::Failed)]);
+    assert_eq!(statuses(events), vec![(2, ProposalStatus::Failed)], "before the judge has a verdict");
     let mut events = vec![started(), made("m", None)];
     events.extend(passed(2));
     events.push(gate(2, Gate::Judge, Verdict::Fail));
-    assert_eq!(statuses(events), vec![(2, ProposalStatus::Failed)], "a gate run again replaces its outcome");
+    assert_eq!(statuses(events), vec![(2, ProposalStatus::Ready)], "the judge advises; a person decides");
 }
 
 #[test]

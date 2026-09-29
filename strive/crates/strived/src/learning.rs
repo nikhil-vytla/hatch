@@ -525,7 +525,7 @@ async fn decide(state: &Arc<State>, cwd: &str, id: u64, decision: ProposalDecisi
                 reply::<ProposalDecide>(Appended { seq: entries.last().map_or(0, |e| e.seq) })
             }
             ProposalStatus::Failed => Err(refused(format!(
-                "proposal #{id} failed its checks, so it can't be accepted; `strive review {id}` shows why"
+                "proposal #{id} failed its static check, so it can't be accepted; `strive review {id}` shows why"
             ))),
             ProposalStatus::Checking
             | ProposalStatus::Rejected

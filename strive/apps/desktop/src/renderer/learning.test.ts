@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import type { Entry, Event, Proposal, ProposalState } from "@strive/protocol";
-import { fileHistory, latestRun, readJudge } from "./learning";
+import { fileHistory, judgeAdvice, latestRun, readJudge } from "./learning";
 
 const PROPOSAL: Proposal = {
   artifact: { kind: "memory" },
@@ -138,4 +138,32 @@ test("a file's history is every proposal for the same file, newest first", () =>
 
   expect(fileHistory(listed, state(7, { kind: "memory" })).map((p) => p.id)).toEqual([7, 2]);
   expect(fileHistory(listed, state(4, { kind: "skill", name: "deploy" })).map((p) => p.id)).toEqual([4]);
+});
+
+test("a judge fail is advice: the failed criteria's reasons, or the detail's first line", () => {
+  const state = (gates: ProposalState["gates"]): ProposalState => ({
+    id: 3,
+    madeAtMs: 0,
+    proposal: PROPOSAL,
+    status: "ready",
+    gates,
+  });
+
+  const judged = [
+    "failed novel (m, held out session s1)",
+    "pass supported: cited",
+    "pass generalizes: holds",
+    "FAIL novel: memory says it",
+    "pass safe: fine",
+    "pass checkable: yes",
+  ].join("\n");
+
+  expect(judgeAdvice(state([{ gate: "judge", verdict: "fail", detail: judged }]))).toEqual([
+    "Not already covered: memory says it",
+  ]);
+  expect(judgeAdvice(state([{ gate: "judge", verdict: "fail", detail: "failed: unreadable\nmore" }]))).toEqual([
+    "failed: unreadable",
+  ]);
+  expect(judgeAdvice(state([{ gate: "judge", verdict: "pass", detail: judged }]))).toBeUndefined();
+  expect(judgeAdvice(state([{ gate: "static", verdict: "fail", detail: "x" }]))).toBeUndefined();
 });
