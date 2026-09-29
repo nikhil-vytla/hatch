@@ -1,0 +1,31 @@
+{
+  "checkedAt": "2026-09-29T06:10:00Z",
+  "release": "First public release: the site as deployed from GitHub main",
+  "mainSha": "269a923cdd28d5b67ab6eb09e8a4263f8bd988d3",
+  "deployment": {
+    "id": 6727713774,
+    "environment": "Production",
+    "status": "success",
+    "environmentUrl": "https://jev-experiments-36359b7jw-nikhil-vytla.vercel.app"
+  },
+  "canonical": { "url": "https://jev-experiments.vercel.app", "status": 200 },
+  "rootDirectory": "jev-experiments/experience-prototypes",
+  "catalogScenes": 41,
+  "applicationPatch": {
+    "path": "roadmap/application.patch",
+    "applied": false,
+    "files": 23,
+    "notApplied": 15,
+    "diverged": 8,
+    "disposition": "Superseded. Main moved on (arena rebuild, One box, Decide, materials-first home) without it. Wanted pieces are ported as separate pull requests; see MAP.md."
+  },
+  "providerFreeCi": [
+    "jev-gateway.yml",
+    "jev-native-questions.yml",
+    "jev-playground.yml",
+    "jev-portable-evidence.yml",
+    "jev-scene-lifetimes.yml",
+    "jev-typed-runtime.yml"
+  ],
+  "providerFreeCiNote": "roadmap/ci/jev-checks.yml was never installed; the workflows above run the site's checks without calling a model."
+}
