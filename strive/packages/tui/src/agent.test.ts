@@ -49,7 +49,14 @@ async function attach(cwd: string, mode: SessionMode) {
   const tui = new TuiMainScreen(term);
   const exits: number[] = [];
   const { client, init } = await StriveClient.connect(daemon.socket, { name: "tui", version: "0" });
-  const app = new App(tui, client, init, (code) => exits.push(code), cwd);
+
+  // As main.ts does: the screen stops as the app exits, so what it shows then is what the person is left with.
+  const exit = (code: number) => {
+    tui.stop();
+    exits.push(code);
+  };
+
+  const app = new App(tui, client, init, exit, cwd);
   tui.start();
   await app.open(mode);
   const before = stop;
@@ -104,7 +111,8 @@ async function corrected(settings?: DaemonSettings) {
   return { ...ui, id };
 }
 
-const OFFER = "This session had a correction. Learn from it? It costs a learner run. [y/N]";
+// The first offer in a daemon where no learner has run: priced as a typical run.
+const OFFER = "This session had a correction. Learn from it? It costs a learner run, about $0.21. [y/N]";
 
 test("quitting a session with a correction offers to learn from it, and y asks for a run naming it", async () => {
   const { term, exits, cwd, id } = await corrected();
@@ -114,8 +122,11 @@ test("quitting a session with a correction offers to learn from it, and y asks f
   term.type("y");
   await exited(exits);
   expect(exits).toEqual([0]);
+  const left = (await term.screen()).join("\n");
+  expect(left).toContain("Asked the learner to study this session; `strive review` will show what it proposes.");
+  expect(left).not.toContain("[y/N]");
   const asked = (await learningEvents(cwd)).filter((e) => e.type === "learnRequested");
-  expect(asked.map((e) => e.type === "learnRequested" && e.sessions)).toEqual([[id]]);
+  expect(asked.map((e) => e.type === "learnRequested" && [e.sessions, e.offer])).toEqual([[[id], true]]);
 });
 
 test("anything but y exits without a run, and the session isn't offered again", async () => {

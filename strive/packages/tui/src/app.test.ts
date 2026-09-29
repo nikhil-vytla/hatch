@@ -369,3 +369,47 @@ test("terminal control sequences in a reply are shown as text, not run", async (
   expect(screen.some((l) => l.includes("› first prompt"))).toBe(true);
   expect(screen.some((l) => l.includes("^[[2J^[[HFORGED HEADER"))).toBe(true);
 });
+
+/** Proposes changes to the project's memory as its learner would, citing `work`'s first entry; their ids. */
+async function propose(work: string, summaries: string[]): Promise<number[]> {
+  const { client } = await StriveClient.connect(daemon.socket, { name: "learner", version: "0" });
+
+  try {
+    const { id } = await client.request("learning/open", { cwd: real() });
+    await client.request("host/register", { id });
+    const ids: number[] = [];
+
+    for (const summary of summaries) {
+      const proposal = {
+        artifact: { kind: "memory" as const },
+        content: `- ${summary}.\n`,
+        summary,
+        rationale: "The user said so.",
+        evidence: [{ session: work, seqs: [1], note: "the session began here" }],
+        prediction: "Later sessions do it.",
+      };
+
+      ids.push((await client.request("host/record", { id, event: { type: "proposalMade", proposal } })).seq);
+    }
+
+    return ids;
+  } finally {
+    client.close();
+  }
+}
+
+test("a session starting where proposals wait for review says how many, counting only those ready", async () => {
+  const first = await openUi();
+  await first.term.waitFor("Session started in");
+  const [, rejected] = await propose(sessions()[0]!.id, ["Use bun", "Keep it short"]);
+  first.app.quit(0);
+
+  const two = await openUi();
+  await two.term.waitFor("2 proposals are waiting: `strive review`");
+
+  const { client } = await StriveClient.connect(daemon.socket, { name: "reviewer", version: "0" });
+  await client.request("proposal/decide", { cwd: real(), proposal: rejected!, decision: "reject" });
+  client.close();
+  const one = await openUi();
+  await one.term.waitFor("1 proposal is waiting: `strive review`");
+});

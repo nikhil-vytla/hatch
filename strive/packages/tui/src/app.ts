@@ -246,10 +246,22 @@ export class App {
       for (const e of [...entries, ...early].sort((a, b) => a.seq - b.seq)) this.show(e);
       this.editor.disableSubmit = false;
       this.renderHeader();
+      // A hint, so a failure to list is no reason to say anything.
+      this.sayWaiting(session.cwd).catch(() => undefined);
     } catch (e) {
       this.say(style.danger(this.explainOpenError(e, mode)));
       this.say(style.muted("Run `strive` for a new session, or `strive sessions` to see others."));
     }
+  }
+
+  /** Says how many of the project's proposals wait for a person's review, if any do. */
+  private async sayWaiting(cwd: string) {
+    const { proposals } = await this.client.request("proposal/list", { cwd });
+    const ready = proposals.filter((p) => p.status === "ready").length;
+
+    if (ready === 0 || this.closed) return;
+    const waiting = ready === 1 ? "1 proposal is waiting" : `${ready} proposals are waiting`;
+    this.say(style.accent(`${waiting}: \`strive review\``));
   }
 
   private async chooseSession(mode: SessionMode): Promise<string> {
@@ -372,9 +384,9 @@ export class App {
   private async answer(session: SessionInfo, through: number, yes: boolean) {
     try {
       if (yes) {
-        await this.client.request("learning/run", { cwd: session.cwd, sessions: [session.id] });
+        await this.client.request("learning/run", { cwd: session.cwd, sessions: [session.id], offer: true });
         this.offerLine.setText(
-          style.muted("Asked the learner to study this session. `strive review` shows what it proposes."),
+          style.muted("Asked the learner to study this session; `strive review` will show what it proposes."),
         );
       } else {
         await this.client.request("learning/dismiss", { cwd: session.cwd, session: session.id, through });
@@ -384,7 +396,9 @@ export class App {
       this.offerLine.setText(style.danger(describeError(e)));
     }
 
-    this.tui.requestRender();
+    // Drawn now, not on the next frame: leaving stops the screen, and a line
+    // only requested would never reach it.
+    this.tui.renderNow();
     this.leave(0);
   }
 

@@ -17,7 +17,8 @@ function roughUsd(micros: number): string {
 /**
  * The offer to learn from a session with signs: "This session had 2
  * corrections. Learn from it? It costs a learner run, about $0.07." The
- * price is the project's average run; before its first run there's none.
+ * price is the project's average run, or before its first an estimate from
+ * the learner model's price; none when that price isn't known.
  */
 export function offerText(subject: string, r: LearningSignalsResult): string {
   const price = r.estimateUsdMicros === undefined ? "" : `, about ${roughUsd(r.estimateUsdMicros)}`;
