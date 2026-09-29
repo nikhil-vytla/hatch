@@ -290,7 +290,10 @@ function Reveal({ d, data, mine }: { d: DecideDecision; data: DecideData; mine: 
               <p>
                 <b>{c.name}</b> chose <b>{top.label}</b> ({pct(r.dist[top.id] ?? 0)})
                 {top.id === mine ? ", like you." : "."}{" "}
-                <span className="muted small">{c.about}</span>
+                <span className="muted small">
+                  {c.about}
+                  {c.recorded ? `; recorded ${c.recorded}` : ""}
+                </span>
               </p>
               <Split d={d} dist={r.dist} mine={mine} />
             </div>
