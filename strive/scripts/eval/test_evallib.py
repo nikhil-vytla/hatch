@@ -185,7 +185,8 @@ class HypothesesTest(unittest.TestCase):
         for k in range(3):
             for fam in learnable:
                 for inst in ("t1", "t2", "t3"):
-                    out.append(trial("F", k, fam, inst, False, turns=10))
+                    # F gets t3 right too, so there are tasks both arms pass.
+                    out.append(trial("F", k, fam, inst, inst == "t3", turns=10))
                     out.append(trial("L", k, fam, inst, l_pass, turns=6 if l_pass else 10, cost=0.03 if l_pass else 0.05,
                                      learner={"cost_usd": 0.02}))
         for k in range(2):
@@ -205,7 +206,7 @@ class HypothesesTest(unittest.TestCase):
     def test_learning_that_works_passes_every_hypothesis(self):
         s = stats.summarize(self.make(True), KINDS)
         self.assertEqual(s["L_minus_F"]["pairs"], 81)
-        names = ("H1", "H2", "H3", "H4", "H5", "H6", "H7")
+        names = ("H1", "H2", "H3", "H4", "H5", "H6", "H7", "H8")
         self.assertEqual({h: s["hypotheses"][h]["result"] for h in names}, dict.fromkeys(names, "pass"))
         self.assertAlmostEqual(s["L_minus_F"]["cost_ratio"], 0.6)
         self.assertLess(s["L_minus_F"]["cost_wilcoxon"]["p"], 0.001)
@@ -218,18 +219,53 @@ class HypothesesTest(unittest.TestCase):
     def test_the_report_gives_each_familys_turns_and_cost_by_arm(self):
         s = stats.summarize(self.make(True), KINDS)
         fam = s["per_family"]["api-version"]["arms"]
-        self.assertEqual((fam["F"]["n"], fam["F"]["passes"], fam["F"]["turns_mean"], fam["F"]["cost_mean"]), (9, 0, 10, 0.05))
+        self.assertEqual((fam["F"]["n"], fam["F"]["passes"], fam["F"]["turns_mean"], fam["F"]["cost_mean"]), (9, 3, 10, 0.05))
         self.assertEqual((fam["O"]["n"], fam["O"]["passes"]), (6, 6))
         self.assertEqual((fam["L"]["turns_mean"], fam["L"]["cost_mean"]), (6, 0.03))
         md = stats.markdown(s, {"label": "t", "model": "m", "trials": 1, "cost_usd": 0})
         row = next(line for line in md.splitlines() if line.startswith("| api-version |"))
-        self.assertIn("0/9 pass, 10.0 turns, $0.0500", row)
+        self.assertIn("3/9 pass, 10.0 turns, $0.0500", row)
         self.assertIn("6/6 pass", row)
 
-    def test_learning_that_does_nothing_fails_h1_h2_and_h5(self):
+    def test_learning_that_does_nothing_fails_h1_and_h2(self):
         s = stats.summarize(self.make(False), KINDS)
         results = {h: s["hypotheses"][h]["result"] for h in ("H1", "H2", "H5", "H7")}
-        self.assertEqual(results, {"H1": "fail", "H2": "fail", "H5": "fail", "H7": "fail"})
+        # No task passes in both arms, so there's no cost of a right answer to compare.
+        self.assertEqual(results, {"H1": "fail", "H2": "fail", "H5": "not run", "H7": "not run"})
+
+    def test_cost_is_compared_only_on_tasks_both_arms_pass(self):
+        # Being right costs more: where F fails, L passes with more turns and
+        # cost. Where both pass, L is cheaper. Only the second counts.
+        ts = []
+        for k in range(3):
+            for fam in [f for f in FAMS if KINDS[f] == "learnable"]:
+                ts += [trial("F", k, fam, "t1", False, turns=10, cost=0.05),
+                       trial("L", k, fam, "t1", True, turns=30, cost=0.15),
+                       trial("F", k, fam, "t2", True, turns=10, cost=0.05),
+                       trial("L", k, fam, "t2", True, turns=7, cost=0.035)]
+        s = stats.summarize(ts, KINDS)
+        both = s["L_minus_F"]["both_passed"]
+        self.assertEqual(both["pairs"], 3 * len([f for f in FAMS if KINDS[f] == "learnable"]))
+        self.assertAlmostEqual(both["turns_ratio"], 0.7)
+        self.assertAlmostEqual(both["cost_ratio"], 0.7)
+        h = s["hypotheses"]
+        self.assertEqual((h["H5"]["result"], h["H7"]["result"]), ("pass", "pass"))
+
+    def test_too_few_tasks_passed_by_both_arms_leave_h5_and_h7_unrun(self):
+        ts = []
+        for fam in [f for f in FAMS if KINDS[f] == "learnable"][:2]:
+            ts += [trial("F", 0, fam, "t1", True, turns=10), trial("L", 0, fam, "t1", True, turns=5)]
+        h = stats.summarize(ts, KINDS)["hypotheses"]
+        self.assertEqual((h["H5"]["result"], h["H7"]["result"]), ("not run", "not run"))
+
+    def test_extra_work_on_unrelated_tasks_fails_h8(self):
+        ts = self.make(True)
+        for t in ts:
+            if t["arm"] == "L" and KINDS[t["family"]] == "generic":
+                t["turns"] = 20
+        s = stats.summarize(ts, KINDS)
+        self.assertAlmostEqual(s["generic_overhead"]["turns_ratio"], 2.0)
+        self.assertEqual(s["hypotheses"]["H8"]["result"], "fail")
 
     def test_cross_application_fails_h4(self):
         ts = self.make(True) + [trial("L", 0, "conflicting-keys", "t2", False, signals={"cross_applied": True})]

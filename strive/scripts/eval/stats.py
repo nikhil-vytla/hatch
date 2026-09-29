@@ -105,6 +105,11 @@ def rate(trials: list[dict]) -> dict:
     return {"n": n, "passes": k, "rate": k / n if n else math.nan, "ci": [lo, hi]}
 
 
+# Fewer pairs than this that both arms passed leave H5 and H7 unrun: a
+# ratio over a handful of tasks says nothing.
+MIN_BOTH_PASSED = 5
+
+
 def summarize(trials: list[dict], kinds: dict[str, str]) -> dict:
     """Everything the summary reports, from trial records."""
     scored = [t for t in trials if t["role"] == "test" and not t["probe"]]
@@ -152,6 +157,26 @@ def summarize(trials: list[dict], kinds: dict[str, str]) -> dict:
             "cost_mean": {"L": mean(t["cost_usd"] for t, _ in lf), "F": mean(u["cost_usd"] for _, u in lf)},
             # Not in H7: what learning after each of these tasks cost on top.
             "learner_cost_mean": mean((t.get("learner") or {}).get("cost_usd", 0.0) for t, _ in lf),
+        }
+        # Turns and cost compare only where both arms got it right: where F
+        # fails a rule it skipped work L did, so the difference there is the
+        # price of being right, not efficiency.
+        both = [(t, u) for t, u in lf if t["passed"] and u["passed"]]
+        out["L_minus_F"]["both_passed"] = {
+            "pairs": len(both),
+            "turns_ratio": _ratio([t["turns"] for t, _ in both], [u["turns"] for _, u in both]),
+            "turns_wilcoxon": wilcoxon([float(t["turns"] - u["turns"]) for t, u in both]) if both else None,
+            "cost_ratio": _ratio([t["cost_usd"] for t, _ in both], [u["cost_usd"] for _, u in both]),
+            "cost_wilcoxon": wilcoxon([t["cost_usd"] - u["cost_usd"] for t, u in both]) if both else None,
+        }
+    # What memory adds to tasks no rule bears on: same pass rate expected,
+    # so extra turns there are overhead.
+    lg = paired("L", "F", "generic")
+    if lg:
+        out["generic_overhead"] = {
+            "pairs": len(lg),
+            "turns_ratio": _ratio([t["turns"] for t, _ in lg], [u["turns"] for _, u in lg]),
+            "cost_ratio": _ratio([t["cost_usd"] for t, _ in lg], [u["cost_usd"] for _, u in lg]),
         }
     out["per_family"] = by_family(scored, kinds)
     out["hypotheses"] = hypotheses(out, of_kind, paired, trials)
@@ -220,15 +245,20 @@ def hypotheses(out: dict, of_kind, paired, trials: list[dict]) -> dict:
     cross = sum(1 for t in conflict if t.get("signals", {}).get("cross_applied"))
     verdict("H4", [p_minus_f, conflict or None], lambda: p_minus_f > -0.10 and cross == 0,
             "P > F - 10 pp, and no cross-application in the conflicting family")
-    lf_turns = lf["turns_ratio"] if lf else None
-    verdict("H5", [lf_turns], lambda: lf_turns <= 0.85, "turns in L <= 0.85 x turns in F")
+    both = lf["both_passed"] if lf and lf["both_passed"]["pairs"] >= MIN_BOTH_PASSED else None
+    lf_turns = both["turns_ratio"] if both else None
+    verdict("H5", [lf_turns], lambda: lf_turns <= 0.85,
+            f"on tasks both arms pass (at least {MIN_BOTH_PASSED}), turns in L <= 0.85 x turns in F")
     verdict("H6", [O, PL], lambda: O - PL >= 0.20, "O - placebo >= 20 pp")
-    lf_cost = lf["cost_ratio"] if lf else None
+    lf_cost = both["cost_ratio"] if both else None
     verdict("H7", [lf_cost], lambda: lf_cost <= 0.85,
-            "agent cost per task in L <= 0.85 x F (the learner's own cost is reported, not counted)")
+            "on tasks both arms pass, agent cost per task in L <= 0.85 x F (the learner's own cost is reported, not counted)")
+    overhead = out.get("generic_overhead", {}).get("turns_ratio")
+    verdict("H8", [overhead], lambda: overhead <= 1.25,
+            "on generic families, where no rule applies, turns in L <= 1.25 x turns in F")
     h["_values"] = {"F": F, "L": L, "O": O, "P": P, "placebo": PL, "P_minus_F_paired": p_minus_f,
                     "generic_L_minus_F": g, "conflict_cross_applied": cross, "turns_ratio_L_F": lf_turns,
-                    "cost_ratio_L_F": lf_cost}
+                    "cost_ratio_L_F": lf_cost, "generic_turns_ratio_L_F": overhead}
     return h
 
 
@@ -307,12 +337,19 @@ def markdown(s: dict, meta: dict) -> str:
                   f"- cost per task: L ${lf['cost_mean']['L']:.4f}, F ${lf['cost_mean']['F']:.4f}, "
                   f"L/F = {fmt(lf['cost_ratio'], False)}; Wilcoxon n = {c['n']}, z = {c['z']:.2f}, p = {c['p']:.3g}; "
                   f"learning after each L task added ${lf['learner_cost_mean']:.4f} (not in the ratio)"]
+        b = lf["both_passed"]
+        lines.append(f"- on the {b['pairs']} tasks both arms passed (H5, H7): turns L/F = {fmt(b['turns_ratio'], False)}, "
+                     f"cost L/F = {fmt(b['cost_ratio'], False)}; where one arm fails, extra work is the price of being right")
+    if s.get("generic_overhead"):
+        g = s["generic_overhead"]
+        lines.append(f"- overhead on generic families, where no rule applies (H8): {g['pairs']} pairs, "
+                     f"turns L/F = {fmt(g['turns_ratio'], False)}, cost L/F = {fmt(g['cost_ratio'], False)}")
     lines += ["", "## Pre-registered hypotheses", ""]
-    for name in ("H1", "H2", "H3", "H4", "H5", "H6", "H7"):
+    for name in ("H1", "H2", "H3", "H4", "H5", "H6", "H7", "H8"):
         hh = s["hypotheses"][name]
         lines.append(f"- **{name}** {hh['result'].upper()}: {hh['text']}")
     v = s["hypotheses"]["_values"]
-    raw = ("conflict_cross_applied", "turns_ratio_L_F", "cost_ratio_L_F")
+    raw = ("conflict_cross_applied", "turns_ratio_L_F", "cost_ratio_L_F", "generic_turns_ratio_L_F")
     lines += ["", "Values: " + ", ".join(f"{k} {fmt(x) if k not in raw else x}" for k, x in v.items())]
     if s.get("per_family"):
         lines += ["", *family_table(s["per_family"], "test instances")]

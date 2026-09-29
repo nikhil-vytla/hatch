@@ -2544,3 +2544,9 @@ tasks, $7.13 spent on the eval so far).
   families as its own measure.
 - **The full run** on the 11 kept families: 470 tasks, 72 paired L-F
   comparisons, estimated $27.94–37.44 from the rescreen's measured costs.
+
+Following the rescreen, before any full run: H5 and H7 now count only
+tasks both arms passed (at least 5 pairs, else not run), and H8 (new)
+caps memory's overhead on the generic families at 1.25× turns. The
+summary reports both, beside the all-task ratios. Tests for each rule
+failed first.
