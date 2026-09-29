@@ -335,6 +335,46 @@ fn allowing_for_the_session_doesnt_cover_learned_files() {
     assert_eq!(fs::read_to_string(w.file(".strive/memory.md")).unwrap(), "a");
 }
 
+/// Allowing an instruction file's edit for the session allows later edits
+/// to that file alone, even after the daemon restarts, and leaves the mode
+/// as it was. Settings still ask every time.
+#[test]
+fn allowing_an_instruction_file_for_the_session_covers_that_file_only() {
+    let w = Ws::new();
+    fs::write(w.file("AGENTS.md"), "one\n").unwrap();
+    let mut ui = w.attached();
+    let edit = |from: &str, to: &str| json!({"kind": "edit", "path": "AGENTS.md", "oldText": from, "newText": to});
+    let pending = w.spawn_effect(edit("one", "two"));
+    let req = next_request(&mut ui);
+    assert_eq!(req["sessionFile"], json!(w.file("AGENTS.md")), "{req}");
+    ui.ok("approval/respond", &json!({"id": w.id, "effect": 1, "decision": "allowSession"}));
+    assert_eq!(pending.join().unwrap()["text"], "edited AGENTS.md");
+    // With no one attached, a question would be a refusal.
+    drop(ui);
+    assert_eq!(w.spawn_effect(edit("two", "three")).join().unwrap()["text"], "edited AGENTS.md", "not asked again");
+    assert!(!w.events().iter().any(|e| e["type"] == "approvalModeSet" && e["mode"] == "fullAuto"));
+    w.env.stop();
+    assert_eq!(w.spawn_effect(edit("three", "four")).join().unwrap()["text"], "edited AGENTS.md", "after a restart");
+    assert_eq!(fs::read_to_string(w.file("AGENTS.md")).unwrap(), "four\n");
+
+    let mut ui = w.attached();
+    let pending = w.spawn_effect(json!({"kind": "write", "path": "CLAUDE.md", "content": "x"}));
+    let req = next_request(&mut ui);
+    assert!(req["description"].as_str().unwrap().starts_with("write CLAUDE.md:"), "{req}");
+    ui.ok("approval/respond", &json!({"id": w.id, "effect": req["effect"], "decision": "deny"}));
+    pending.join().unwrap();
+    assert!(!w.file("CLAUDE.md").exists());
+
+    for content in ["{}", "{ }"] {
+        let pending = w.spawn_effect(json!({"kind": "write", "path": ".strive/settings.json", "content": content}));
+        let req = next_request(&mut ui);
+        assert!(req["description"].as_str().unwrap().starts_with("write .strive/settings.json:"), "{req}");
+        assert_eq!(req.get("sessionFile"), None, "{req}");
+        ui.ok("approval/respond", &json!({"id": w.id, "effect": req["effect"], "decision": "allowSession"}));
+        pending.join().unwrap();
+    }
+}
+
 /// Unattended, full-auto can't approve a learned file, so the refusal
 /// doesn't suggest it.
 #[test]

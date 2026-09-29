@@ -399,15 +399,23 @@ sandbox guard all of it:
   too). Only guarded files import, so the set changes only as a person
   allows; the daemon reads it again for each effect.
 - **Agent writes:** a work session's `write` or `edit` that reaches a
-  listed path asks a person in every approval mode, `fullAuto` included,
-  and "allow for the session" doesn't cover the next one. The path is
-  matched after symlinks and `..` are resolved, and without regard to case.
+  listed path asks a person in every approval mode, `fullAuto` included.
+  The path is matched after symlinks and `..` are resolved, and without
+  regard to case.
   The request says why: learned files, that the change reaches every future
   session without review, naming `strive learn` and `strive review`;
   instruction files and skills, that it "changes what every future session
   in this project is told"; imports, that "it's imported by AGENTS.md"
   (naming the file); settings, that it changes strive's settings for
   every future session. Unattended, it's refused.
+- **Allowing for the session** covers one instruction file (`AGENTS.md`,
+  `CLAUDE.md`) or import at a time: the request names it
+  (`approvalRequested.sessionFile`), and once a person answers
+  `allowSession`, later changes to that real path in that session don't
+  ask. The mode stays as it was. Rebuilt from the journal on restart, from
+  those two entries. Skills, settings, learned files and files that run
+  code have no `sessionFile`, so each change asks (`allowSession` there
+  switches to full-auto as for any request, which they ignore).
 - **Commands:** the macOS sandbox denies writes to every listed path by
   pattern, in any case, anywhere under the project's root, and to
   `.strive` and `.claude` themselves, so neither can be made elsewhere and
@@ -624,7 +632,9 @@ shapes a session" or to files that run code outside the sandbox, and
 commands without a sandbox ask, and strive's own state is refused. With no one attached,
 the refusal suggests full-auto only when full-auto would have allowed it. An approval request is a journal
 entry, so every attached client sees it and the first answer wins. With no
-one attached, the request is refused at once.
+one attached, the request is refused at once. Allowing for the session
+switches to full-auto, except for an instruction file, where it allows
+that file (see "What shapes a session").
 
 **Checkpoints** snapshot the workspace before each prompt, into a shadow
 git repository in the session's directory. The user's own repository,

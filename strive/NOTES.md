@@ -2092,3 +2092,22 @@ unasked, with no sandbox rule in the way.
     each path and four other spellings (`pkg/.CURSOR/MCP.json`, `.EnvRC`)
     refused to the unattended agent, and to commands (macOS by pattern;
     Linux the existing ones at the root).
+- **Per-file "allow for the session", instruction files only.** Before,
+  `allowSession` always switched the session to full-auto, which guarded
+  files ignore, so each `AGENTS.md` edit asked again. Now the gate's
+  `Gate::Ask` carries the file where a per-file allowance applies
+  (`Shapes::Instructions`, `Guard::Imported`), the request journals it as
+  `approvalRequested.sessionFile`, and the writer's `Decide` reads its own
+  journaled request: with a `sessionFile` it adds that path to
+  `allowed_files` and leaves the mode; without, full-auto as before. On
+  restart the set is rebuilt from those two entries, so no new event.
+  `.claude/skills` became `Shapes::Skills` so it stays per-change.
+  - Clients: the TUI says "a yes to this file for the session", the
+    desktop shows "Allow for this session" and its badge; `describe` says
+    "Allowed for the session" (the full-auto case adds its own
+    `Approvals: full-auto` line).
+  - Tests (failed first): `allowing_an_instruction_file_for_the_session_covers_that_file_only`
+    (a second and, after a daemon restart, a third `AGENTS.md` edit go
+    through with no one attached; no switch to full-auto; `CLAUDE.md`
+    asks; `.strive/settings.json` asks twice with no `sessionFile`), and
+    the TUI's "a allows an instruction file for the session".

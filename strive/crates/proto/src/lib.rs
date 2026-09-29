@@ -1014,6 +1014,12 @@ pub enum Event {
     ApprovalRequested {
         effect: u64,
         description: String,
+        /// The instruction file (or file one imports) the effect changes,
+        /// where allowing for the session allows later changes to this
+        /// file only, and leaves the approval mode as it is.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[ts(optional)]
+        session_file: Option<String>,
     },
     ApprovalDecided {
         effect: u64,
@@ -1256,7 +1262,8 @@ pub enum ApprovalMode {
 #[ts(export)]
 pub enum Decision {
     Allow,
-    /// Allow this and switch the session to full-auto.
+    /// Allow this and switch the session to full-auto or, where the request
+    /// names a `sessionFile`, allow later changes to that file.
     AllowSession,
     Deny,
 }

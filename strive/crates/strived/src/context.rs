@@ -37,8 +37,11 @@ const CLAUDE_SKILLS: &str = ".claude/skills";
 /// What changing a file on the list does, for the person asked about it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Shapes {
-    /// Every session is told what it says.
+    /// Every session is told what it says; a person may allow changes to
+    /// one for the rest of a session.
     Instructions,
+    /// Every session is offered them.
+    Skills,
     /// Told too, and changed through review (ADR-0016).
     Learned,
     /// How strive runs sessions in the project.
@@ -54,7 +57,7 @@ pub enum Shapes {
 pub const SHAPING: [(&str, Shapes); 6] = [
     (INSTRUCTION_FILES[0], Shapes::Instructions),
     (INSTRUCTION_FILES[1], Shapes::Instructions),
-    (CLAUDE_SKILLS, Shapes::Instructions),
+    (CLAUDE_SKILLS, Shapes::Skills),
     (strive_learning::MEMORY_PATH, Shapes::Learned),
     (strive_learning::SKILLS_DIR, Shapes::Learned),
     (crate::settings::PROJECT_SETTINGS, Shapes::Settings),

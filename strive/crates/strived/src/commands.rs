@@ -181,7 +181,7 @@ pub fn describe(e: &Entry) -> String {
             TurnEnd::TimedOut { seconds } => format!("turn {turn} stopped at its {seconds}s limit"),
             TurnEnd::Failed { error } => format!("turn {turn} failed: {error}"),
         },
-        Event::ApprovalRequested { effect, description } => format!("effect {effect} asks: {description}"),
+        Event::ApprovalRequested { effect, description, .. } => format!("effect {effect} asks: {description}"),
         Event::ApprovalDecided { effect, decision, by } => format!(
             "effect {effect} {} by {by}",
             match decision {

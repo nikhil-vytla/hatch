@@ -5,12 +5,13 @@
 //! writes outside the workspace need approval, and so does every write to a
 //! guarded file, whatever the mode: what shapes later sessions (the loader's
 //! list, `context::SHAPING`, and what its instruction files import) and what
-//! runs code outside the sandbox later (`RUNS_CODE`). Commands run in the OS sandbox (Seatbelt on macOS,
-//! bubblewrap on Linux): writes are confined to the workspace and temp
-//! directories, minus the guarded files, strive's state is hidden, and the
-//! network is off. Where no sandbox is
-//! available, every command asks first, and runs unconfined only if a
-//! person allows it.
+//! runs code outside the sandbox later (`RUNS_CODE`). A person may allow
+//! changes to one instruction file (or import) for the rest of a session.
+//! Commands run in the OS sandbox (Seatbelt on macOS, bubblewrap on Linux):
+//! writes are confined to the workspace and temp directories, minus the
+//! guarded files, strive's state is hidden, and the network is off. Where
+//! no sandbox is available, every command asks first, and runs unconfined
+//! only if a person allows it.
 
 use std::fmt::Write as _;
 use std::fs;
@@ -73,7 +74,10 @@ enum Guard {
 pub enum Gate {
     Allow,
     /// Needs a person's approval; the text describes the effect for them.
-    Ask(String),
+    /// With a file, allowing it for the session allows later changes to
+    /// that file alone (an instruction file, or one an instruction file
+    /// imports), not everything.
+    Ask(String, Option<PathBuf>),
     Deny(String),
 }
 
@@ -99,11 +103,16 @@ impl Target {
     }
 }
 
-pub fn gate(scope: &Scope, request: &EffectRequest, mode: ApprovalMode) -> (Gate, Target) {
+/// `allowed` are the files a person allowed changes to for the session.
+pub fn gate(scope: &Scope, request: &EffectRequest, mode: ApprovalMode, allowed: &[PathBuf]) -> (Gate, Target) {
     let change = |verb: &str, path: &str| match resolve(scope, path, true) {
         Access::Denied(why) => (Gate::Deny(why), NOTHING),
-        Access::Ask(real) => (Gate::Ask(format!("{verb} outside the workspace: {}", real.display())), file(real)),
+        Access::Ask(real) => (Gate::Ask(format!("{verb} outside the workspace: {}", real.display()), None), file(real)),
         Access::Guarded(real, guard) => {
+            let per_file = matches!(guard, Guard::Shapes(Shapes::Instructions) | Guard::Imported(_));
+            if per_file && allowed.contains(&real) {
+                return (Gate::Allow, file(real));
+            }
             let in_project = real.strip_prefix(&scope.workspace).unwrap_or(&real).display().to_string();
             let shown = if Path::new(path) == Path::new(&in_project) {
                 in_project
@@ -116,7 +125,7 @@ pub fn gate(scope: &Scope, request: &EffectRequest, mode: ApprovalMode) -> (Gate
                     "{told}, without review; `strive learn` proposes such changes and `strive review` is where a \
                      person accepts them"
                 ),
-                Guard::Shapes(Shapes::Instructions) => told.to_string(),
+                Guard::Shapes(Shapes::Instructions | Shapes::Skills) => told.to_string(),
                 Guard::Imported(by) => format!("it's imported by {by}, so {told}"),
                 Guard::Shapes(Shapes::Settings) => {
                     "this changes strive's settings for every future session in this project".to_string()
@@ -126,9 +135,9 @@ pub fn gate(scope: &Scope, request: &EffectRequest, mode: ApprovalMode) -> (Gate
                                     their hooks and MCP servers), so only a person can approve it"
                     .to_string(),
             };
-            (Gate::Ask(format!("{verb} {shown}: {why}")), file(real))
+            (Gate::Ask(format!("{verb} {shown}: {why}"), per_file.then(|| real.clone())), file(real))
         }
-        Access::Allowed(real) if mode == ApprovalMode::Ask => (Gate::Ask(format!("{verb} {path}")), file(real)),
+        Access::Allowed(real) if mode == ApprovalMode::Ask => (Gate::Ask(format!("{verb} {path}"), None), file(real)),
         Access::Allowed(real) => (Gate::Allow, file(real)),
     };
     match request {
@@ -143,18 +152,18 @@ pub fn gate(scope: &Scope, request: &EffectRequest, mode: ApprovalMode) -> (Gate
             let gate = if mode == ApprovalMode::FullAuto {
                 Gate::Allow
             } else {
-                Gate::Ask(format!("use {server}'s {tool} tool"))
+                Gate::Ask(format!("use {server}'s {tool} tool"), None)
             };
             (gate, NOTHING)
         }
         EffectRequest::Bash { command, .. } => {
             let sandboxed = !scope.unconfined && sandbox_available();
             let gate = if !sandboxed && !scope.unconfined {
-                Gate::Ask(format!("run without a sandbox: {command}"))
+                Gate::Ask(format!("run without a sandbox: {command}"), None)
             } else if mode == ApprovalMode::FullAuto {
                 Gate::Allow
             } else {
-                Gate::Ask(format!("run: {command}"))
+                Gate::Ask(format!("run: {command}"), None)
             };
             (gate, Target { path: None, sandboxed })
         }

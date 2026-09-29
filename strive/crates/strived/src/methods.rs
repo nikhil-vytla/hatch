@@ -748,18 +748,24 @@ async fn run_effect(
     let sid = sid.clone();
     {
         let started = std::time::Instant::now();
-        let mode = state.sessions.mode(&sid).await.map_err(session_error)?;
+        let (mode, allowed) = state.sessions.approvals(&sid).await.map_err(session_error)?;
         let cancel = cancelled.clone();
-        let (gate, target) = crate::effects::gate(&scope, &request, mode);
+        let (gate, target) = crate::effects::gate(&scope, &request, mode, &allowed);
         let refusal = match gate {
             crate::effects::Gate::Allow => None,
             crate::effects::Gate::Deny(why) => Some(why),
-            crate::effects::Gate::Ask(what) => {
-                match state.sessions.ask(&sid, effect, what.clone(), cancelled).await.map_err(session_error)? {
+            crate::effects::Gate::Ask(what, session_file) => {
+                let session_file = session_file.map(|f| f.display().to_string());
+                match state
+                    .sessions
+                    .ask(&sid, effect, what.clone(), session_file, cancelled)
+                    .await
+                    .map_err(session_error)?
+                {
                     // Suggest full-auto only where it would have let this run.
                     Answer::NoOne
                         if matches!(
-                            crate::effects::gate(&scope, &request, strive_proto::ApprovalMode::FullAuto).0,
+                            crate::effects::gate(&scope, &request, strive_proto::ApprovalMode::FullAuto, &allowed).0,
                             crate::effects::Gate::Allow
                         ) =>
                     {
