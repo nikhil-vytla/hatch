@@ -6,9 +6,9 @@ use std::process::ExitCode;
 
 use anyhow::{Result, anyhow};
 use strive_proto::{
-    BlobGet, BlobGetParams, Event, Gate, LearnTrigger, LearningOpen, LearningRun, LearningRunParams, ProjectRef,
-    ProposalDecide, ProposalDecideParams, ProposalDecision, ProposalList, ProposalRef, ProposalRollback, ProposalState,
-    ProposalStatus, SessionAttach, SessionAttachParams, TriggerKind, Verdict, WatchOutcome,
+    BlobGet, BlobGetParams, Event, Gate, GateOutcome, LearnTrigger, LearningOpen, LearningRun, LearningRunParams,
+    ProjectRef, ProposalDecide, ProposalDecideParams, ProposalDecision, ProposalList, ProposalRef, ProposalRollback,
+    ProposalState, ProposalStatus, SessionAttach, SessionAttachParams, TriggerKind, Verdict,
 };
 
 use crate::client::Client;
@@ -74,8 +74,8 @@ fn line(p: &ProposalState) -> String {
     if p.trigger.is_some() {
         marks.push("automatic run");
     }
-    if p.automatic.is_some() {
-        marks.push("accepted automatically");
+    if advises_against(p).is_some() {
+        marks.push("the judge advises against it");
     }
     let marks = if marks.is_empty() { String::new() } else { format!("  [{}]", marks.join(", ")) };
     format!(
@@ -110,9 +110,6 @@ pub async fn review(c: &mut Client, id: Option<u64>, action: Option<Action>) -> 
         }
         for rel in &listed.changed_outside_review {
             println!("{rel} changed outside review: it isn't what an accepted proposal last left there");
-        }
-        for p in proposals.iter().filter(|p| suggest_rollback(p)) {
-            println!("{}", rollback_line(p));
         }
         for s in &listed.may_be_stale {
             println!(
@@ -213,22 +210,11 @@ async fn show(c: &mut Client, p: &ProposalState, rel: &str) -> Result<()> {
         }
         None => writeln!(out, "run         asked for by a person")?,
     }
-    if p.automatic.is_some() {
-        writeln!(
-            out,
-            "decided     accepted automatically: every check passed (\"learning\": {{\"mode\": \"gated\"}})"
-        )?;
+    if let Some(judge) = advises_against(p) {
+        writeln!(out, "\nthe judge advises against it: {}", judge.detail.lines().next().unwrap_or_default())?;
     }
     writeln!(out, "\nwhy\n{}", indent(&p.proposal.rationale))?;
     writeln!(out, "\nprediction\n{}", indent(&p.proposal.prediction))?;
-    match (&p.proposal.watch, &p.prediction) {
-        (Some(w), Some(t)) => {
-            writeln!(out, "  watch: {}", strive_learning::watch::describe(w))?;
-            writeln!(out, "  so far: {}", strive_learning::watch::tally_text(t))?;
-        }
-        (Some(w), None) => writeln!(out, "  watch: {}", strive_learning::watch::describe(w))?,
-        (None, _) => writeln!(out, "  prediction not machine-checked: it has no watch")?,
-    }
     writeln!(out, "\nevidence")?;
     for e in &p.proposal.evidence {
         let seqs = if e.seqs.is_empty() {
@@ -257,14 +243,17 @@ async fn show(c: &mut Client, p: &ProposalState, rel: &str) -> Result<()> {
         writeln!(out, "{l}")?;
     }
     let next = match p.status {
+        ProposalStatus::Ready if advises_against(p).is_some() => format!(
+            "the judge advises against it (its reasons are under checks); `strive review {id} accept` writes {rel} \
+             anyway; `strive review {id} reject` turns it down"
+        ),
         ProposalStatus::Ready => {
             format!("`strive review {id} accept` writes {rel}; `strive review {id} reject` turns it down")
         }
         ProposalStatus::Failed => {
-            format!("a failed proposal can't be accepted; `strive review {id} reject` turns it down")
+            format!("its static check failed, so it can't be accepted; `strive review {id} reject` turns it down")
         }
         ProposalStatus::Checking => "its checks haven't finished; look again in a moment".to_string(),
-        ProposalStatus::Applied if suggest_rollback(p) => rollback_line(p),
         ProposalStatus::Applied => format!("`strive review {id} rollback` puts {rel} back as it was"),
         ProposalStatus::Stale => {
             format!(
@@ -280,31 +269,10 @@ async fn show(c: &mut Client, p: &ProposalState, rel: &str) -> Result<()> {
     Ok(())
 }
 
-/// An applied proposal whose prediction isn't holding: worth a person's look
-/// at rolling it back. strive never does it on its own.
-fn suggest_rollback(p: &ProposalState) -> bool {
-    p.status == ProposalStatus::Applied && p.prediction.is_some_and(|t| t.not_holding)
-}
-
-fn rollback_line(p: &ProposalState) -> String {
-    let t = p.prediction.unwrap_or_default();
-    let rel = strive_learning::relative_path(&p.proposal.artifact).unwrap_or_else(|why| why);
-    format!(
-        "#{} may be hurting: its prediction was contradicted in {} of the last {} sessions it applied to; \
-         `strive review {} rollback` puts {rel} back as it was",
-        p.id,
-        t.recent_contradicted,
-        t.recent_confirmed + t.recent_contradicted,
-        p.id
-    )
-}
-
-pub fn outcome_name(o: WatchOutcome) -> &'static str {
-    match o {
-        WatchOutcome::Confirmed => "held",
-        WatchOutcome::Contradicted => "was contradicted",
-        WatchOutcome::NotApplicable => "didn't apply",
-    }
+/// The judge's outcome when it failed the proposal: advice a person may
+/// accept past.
+fn advises_against(p: &ProposalState) -> Option<&GateOutcome> {
+    p.gates.iter().find(|g| g.gate == Gate::Judge && g.verdict == Verdict::Fail)
 }
 
 fn indent(text: &str) -> String {
@@ -322,7 +290,6 @@ pub fn gate_name(g: Gate) -> &'static str {
     match g {
         Gate::Static => "static",
         Gate::Judge => "judge",
-        Gate::Replay => "replay",
     }
 }
 

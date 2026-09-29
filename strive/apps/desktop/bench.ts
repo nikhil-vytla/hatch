@@ -36,7 +36,7 @@ let next = 0;
 const send = (method: string, params: { [key: string]: Json }) =>
   socket.write(`${JSON.stringify({ jsonrpc: "2.0", id: ++next, method, params })}\n`);
 
-send("initialize", { protocolVersion: 1, client: { name: "bench", version: "0" } });
+send("initialize", { protocolVersion: 2, client: { name: "bench", version: "0" } });
 
 send("session/create", { cwd });
 

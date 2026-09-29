@@ -1,7 +1,10 @@
 # ADR-0016: Trusted learning (Stage 2)
 
-Status: accepted. The protocol types are in `crates/proto`; the daemon and
-the learner are built against this document.
+Status: accepted, amended 2026-09-28: the checks are the static gate, then
+the judge as advice; replay (ADR-0018) and watches (ADR-0019) are
+superseded; `gated` is gone and automatic runs are opt-in (ADR-0020). The
+protocol types are in `crates/proto`; the daemon and the learner are built
+against this document.
 
 ## Context
 
@@ -63,7 +66,7 @@ authority), and applied or undone only by a person.
   - the file's whole new `content`;
   - a one-line `summary` and a `rationale`;
   - `evidence`: sessions, entry seqs, a note;
-  - a `prediction`: a falsifiable claim.
+  - a `prediction`: a falsifiable claim, for the person reviewing it.
 - **Why whole files:** memory and skills are small, and a whole file can be
   checked, shown as a diff, and undone exactly.
 - **Its id is its entry's seq** in the learning session.
@@ -90,30 +93,27 @@ The daemon journals a `GateFinished` for each check it runs.
      pipe-to-shell installs; role tags posing as a system or model turn. Fullwidth letters are read as ASCII.
    - **Evidence:** it must name sessions that exist in this project, each
      with at least one of its entries, and at most five sessions
-     (`CITED_SESSIONS`). The judge holds out and the replay mines only
-     sessions the proposal doesn't cite, so a learner that cited every
-     other session, with no entries, would choose what its checks see.
+     (`CITED_SESSIONS`). The judge holds out only sessions the proposal
+     doesn't cite, so a learner that cited every other session, with no
+     entries, would choose what the judge sees.
 2. **`judge`** (M9): a model the learner doesn't control scores the
    proposal against work sessions the learner wasn't shown. It runs in the
    daemon's own call, under the learning session's budget, with a fixed
-   rubric. A fail blocks acceptance; a skip (no key, no held-out sessions)
-   is shown as such.
+   rubric. Its verdict is advice shown beside the diff: a fail doesn't
+   block, and a skip (no key, no held-out sessions) is shown as such.
    [ADR-0017](0017-judge-gate.md) records how it is built.
-3. **`replay`** (M10): tasks mined from past sessions with checkable
-   outcomes are run again, with and without the change. Three runs each,
-   and the difference is reported. The daemon drives the runs as sessions
-   of their own, in scratch copies, under a hold on the learning session's
-   budget. [ADR-0018](0018-replay-gate.md) records how it is built.
 
-A proposal is `ready` when every check that ran passed or was skipped, and
-`failed` when one failed. Only a `ready` one can be accepted.
+A third check, `replay`, ran past tasks again with and without the change;
+it is superseded ([ADR-0018](0018-replay-gate.md)).
+
+A proposal is `ready` once the static check passed and the judge finished
+(pass, fail or skip), and `failed` when the static check failed. Only a
+`ready` one can be accepted.
 
 ### A person decides; the daemon writes
 
 - **Only a person decides:** `proposal/decide {cwd, proposal, accept|reject}`
-  is refused for the learning session's host, as approvals are. The one
-  exception is the daemon's own, opt-in: `gated` accepts a proposal whose
-  every check passed ([ADR-0020](0020-learning-triggers.md)).
+  is refused for the learning session's host, as approvals are.
 - **Applying:** on accept, the daemon checks the file is still as it was
   when the learner read it, i.e. as it was when the proposal was made
   (`ProposalMade`'s entry time; the daemon keeps the file's digest from
@@ -150,32 +150,22 @@ A proposal is `ready` when every check that ran passed or was skipped, and
   - evidence selection within a token budget;
   - tests against the real daemon with a scripted model.
 - **M8b Desktop:** the Learned pane.
-- **M9 Judge gate.**
-- **M10 Replay gate:** mining tasks with checkable outcomes (a command
-  that went red to green), running them in scratch copies with and without
-  the change, the verdict ([ADR-0018](0018-replay-gate.md)). Reusing the
-  "without" runs across proposals is deferred.
-- **M11 Predictions checked, and drift:**
-  - predictions checked against later sessions: a proposal's optional
-    `watch`, evaluated by the daemon on each later work session
-    ([ADR-0019](0019-predictions-checked.md));
-  - drift: an applied proposal whose watch later sessions keep
-    contradicting is marked not holding;
-  - rollback scoped to what regressed: that one proposal's rollback is
-    suggested, and a person makes it. A watch for quality that peaks and
-    then declines is deferred.
+- **M9 Judge:** built as a gate, amended to advice
+  ([ADR-0017](0017-judge-gate.md)).
+- **M10 Replay gate:** built, then deleted ([ADR-0018](0018-replay-gate.md)).
+- **M11 Predictions checked, and drift:** built, then deleted
+  ([ADR-0019](0019-predictions-checked.md)). What stays: the prose
+  prediction, stale-memory lines, and rollback, which a person makes.
 - **Triggers** ([ADR-0020](0020-learning-triggers.md)): behind the
-  `learning` setting (`off`, `suggest` by default, `gated`; `auto` is
-  refused, since memory and skills have no risk tiers to tell it from
-  `gated`):
+  `learning` setting (`off` by default, or `suggest`):
   - a deterministic pre-filter over a work journal (corrections,
     interrupts, declined approvals, commands that failed then passed,
     failed turns), so only sessions with a sign start a run;
   - the idle trigger (a session quiet for `idleSeconds` after a turn), and
     every N turns; a daily cap, and no run while one or a proposal's checks
     are going;
-  - `gated`: a proposal whose every check passed, none skipped, is accepted
-    by the daemon and marked so; a person can roll it back.
+  - `gated`, accepting a proposal whose every check passed, was built and
+    then deleted: a person decides on every proposal.
 
   Deferred: idle-time consolidation across many sessions, and catching up
   scans a restart dropped. "End of session" is the idle trigger: a session
@@ -185,6 +175,8 @@ A proposal is `ready` when every check that ran passed or was skipped, and
 
 - **The learner can't reach its own checks:** they run in the daemon, and
   the learner has no effect tools. This is the DGM lesson.
+- **Validation of learning as a whole is offline:** a later `strive eval`
+  over many tasks, not a check on each proposal.
 - **Every change can be traced:** its evidence (seqs in authenticated work
   journals), the checks it passed, who accepted it, and how to undo it are
   all in the learning journal.

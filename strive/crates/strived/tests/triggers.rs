@@ -18,8 +18,11 @@ fn project() -> PathBuf {
 }
 
 /// A daemon whose settings hold `learning`, with an Anthropic key or none.
+/// Automatic runs are opted into (`suggest`) unless `learning` names a mode.
 fn daemon(learning: &Value, key: bool) -> Env {
     let env = if key { Env::with_vars(&[("ANTHROPIC_API_KEY", "sk-test-trigger")]) } else { Env::new() };
+    let mut learning = learning.clone();
+    learning.as_object_mut().unwrap().entry("mode").or_insert(json!("suggest"));
     fs::write(env.home.path().join("settings.json"), json!({"learning": learning}).to_string()).unwrap();
     env
 }
@@ -152,8 +155,9 @@ fn review(env: &Env, cwd: &Path, args: &[&str]) -> String {
     String::from_utf8_lossy(&out.stdout).into_owned()
 }
 
+/// Automatic runs on, and a short idle wait.
 fn idle() -> Value {
-    json!({"idleSeconds": 1})
+    json!({"mode": "suggest", "idleSeconds": 1})
 }
 
 #[test]
@@ -357,6 +361,20 @@ fn a_person_can_still_learn_past_the_cap() {
 }
 
 #[test]
+fn automatic_runs_are_off_unless_settings_turn_them_on() {
+    // Settings that say nothing of the mode.
+    let env = Env::with_vars(&[("ANTHROPIC_API_KEY", "sk-test-trigger")]);
+    fs::write(env.home.path().join("settings.json"), json!({"learning": {"idleSeconds": 1}}).to_string()).unwrap();
+    let cwd = project();
+    let mut w = Work::new(&env, &cwd);
+    w.exchange("go", &json!({"kind": "interrupted"}));
+    wait_log(&env, &format!("session {} not scanned for learning: \"learning\" is off", w.id), 0);
+    assert_eq!(learning(&env, &cwd), None);
+    common::slow_rpc(&env).ok("learning/run", &json!({"cwd": cwd}));
+    assert_eq!(wait_events(&env, &cwd, "learnRequested", 1).len(), 1, "a person can still ask");
+}
+
+#[test]
 fn off_scans_nothing_and_a_person_can_still_ask() {
     let env = daemon(&json!({"mode": "off", "idleSeconds": 1}), true);
     let cwd = project();
@@ -389,17 +407,15 @@ fn a_projects_own_settings_can_turn_learning_off_and_a_bad_one_does_too() {
 
 #[test]
 fn a_projects_own_settings_cant_raise_the_mode() {
-    // The user's mode is suggest (the default); the project asks for gated.
-    let env = daemon(&idle(), false);
+    // The user's mode is off; the project asks for suggest.
+    let env = daemon(&json!({"mode": "off", "idleSeconds": 1}), true);
     let cwd = project();
     fs::create_dir_all(cwd.join(".strive")).unwrap();
-    fs::write(cwd.join(".strive/settings.json"), json!({"learning": {"mode": "gated"}}).to_string()).unwrap();
-    let w = Work::new(&env, &cwd);
-    common::slow_rpc(&env).ok("learning/open", &json!({"cwd": cwd}));
-    let mut learner = Learner::new(&env, &cwd);
-    learner.turn(&[memory(&w.id)]);
-    let made = events(&env, &learner.id, "proposalMade");
-    assert_eq!(made[0]["mode"], "suggest", "the mode in effect is recorded with the proposal: {made:?}");
+    fs::write(cwd.join(".strive/settings.json"), json!({"learning": {"mode": "suggest"}}).to_string()).unwrap();
+    let mut w = Work::new(&env, &cwd);
+    w.exchange("go", &json!({"kind": "interrupted"}));
+    wait_log(&env, &format!("session {} not scanned for learning: \"learning\" is off", w.id), 0);
+    assert_eq!(learning(&env, &cwd), None);
 }
 
 #[test]
@@ -462,46 +478,14 @@ fn review_shows_what_triggered_an_automatic_runs_proposal() {
 }
 
 #[test]
-fn auto_is_refused_on_load_naming_gated() {
-    let env = daemon(&json!({"mode": "auto"}), false);
-    let out = env.strive(&["status"]);
-    let err = String::from_utf8_lossy(&out.stderr).into_owned() + &log(&env);
-    assert!(!out.status.success(), "a daemon started with mode auto");
-    assert!(err.contains("learning.mode \"auto\" isn't available") && err.contains("use \"gated\""), "{err}");
-}
-
-#[test]
-fn under_gated_a_client_named_gate_is_still_a_person() {
-    // No key: the judge and replay are skipped, so the proposal is ready for a person.
-    // (That the gate itself leaves a skipped check to a person is the host e2e's.)
-    let env = daemon(&json!({"mode": "gated"}), false);
-    let cwd = project();
-    let mut w = Work::new(&env, &cwd);
-    w.exchange("go", &done());
-    common::slow_rpc(&env).ok("learning/open", &json!({"cwd": cwd}));
-    let id = Learner::new(&env, &cwd).turn(&[memory(&w.id)])[0];
-    let learning_id = learning(&env, &cwd).unwrap();
-
-    // A person whose client calls itself "gate" decides as a person.
-    let mut gate = env.raw();
-    gate.wait_up_to(Duration::from_secs(30));
-    let init = gate.call_id(
-        0,
-        "initialize",
-        &json!({"protocolVersion": strive_proto::PROTOCOL_VERSION, "client": {"name": "gate", "version": "0"}}),
-    );
-    assert!(init.get("result").is_some(), "{init}");
-    gate.ok("proposal/decide", &json!({"cwd": cwd, "proposal": id, "decision": "accept"}));
-    let decided = events(&env, &learning_id, "proposalDecided");
-    assert_eq!(decided, vec![json!({"type": "proposalDecided", "proposal": id, "decision": "accept", "by": "gate"})]);
-    let listed = common::slow_rpc(&env).ok("proposal/list", &json!({"cwd": cwd}));
-    let p = listed["proposals"].as_array().unwrap().iter().find(|p| p["id"] == id).unwrap().clone();
-    assert_eq!((p["status"].as_str(), p.get("automatic")), (Some("applied"), None), "{p}");
-    let shown = review(&env, &cwd, &["review", &id.to_string()]);
-    assert!(!shown.contains("accepted automatically"), "{shown}");
-    // The log names the client as a client, so it can't read as the gate's own accept.
-    let logged = review(&env, &cwd, &["log", &learning_id]);
-    assert!(logged.contains(&format!("proposal #{id} accepted by gate (a client)")), "{logged}");
+fn a_mode_other_than_off_or_suggest_is_refused_on_load() {
+    for mode in ["gated", "auto"] {
+        let env = daemon(&json!({"mode": mode}), false);
+        let out = env.strive(&["status"]);
+        let err = String::from_utf8_lossy(&out.stderr).into_owned() + &log(&env);
+        assert!(!out.status.success(), "a daemon started with mode {mode}");
+        assert!(err.contains(&format!("unknown variant `{mode}`, expected `off` or `suggest`")), "{err}");
+    }
 }
 
 /// A daemon with an Anthropic key whose settings are `settings`.
@@ -513,7 +497,7 @@ fn daemon_with(settings: &Value) -> Env {
 
 #[test]
 fn a_proposal_a_crash_left_checking_doesnt_hold_the_next_run_back() {
-    // The judge on an OpenAI model is skipped at once, and replay (no host) too.
+    // The judge on an OpenAI model is skipped at once.
     let env = daemon_with(&json!({"learning": idle(), "judgeModel": "gpt-4.1-mini"}));
     let cwd = project();
     let first = Work::new(&env, &cwd).id;

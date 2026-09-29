@@ -3,4 +3,4 @@
 /**
  * A check a proposal goes through before a person sees it as ready.
  */
-export type Gate = "static" | "judge" | "replay";
+export type Gate = "static" | "judge";

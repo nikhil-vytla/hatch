@@ -8,4 +8,12 @@ exclude_re = [
     # `LearnRequested` itself, which the loop body ignores (it only reads
     # `TurnStarted` and `TurnEnded`).
     'triggers\.rs:\d+:\d+: replace > with >= in busy',
+    # `g.gate == *gate` -> `!=` in `status`'s all-gates-have-a-verdict test:
+    # with two gates and one outcome per gate, "every gate has an outcome for
+    # itself" and "every gate has an outcome for another gate" hold together.
+    'fold\.rs:\d+:\d+: replace == with != in status',
+    # `r.3 > *failed` -> `>=` in `failed_then_passed`: the one run with seq
+    # `failed` is the failed run itself, whose exit isn't 0, so `r.2 == 0`
+    # already leaves it out.
+    'signals\.rs:\d+:\d+: replace > with >= in failed_then_passed',
 ]

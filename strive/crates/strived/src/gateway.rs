@@ -157,16 +157,6 @@ async fn admit(
     })?;
     let bad = |status, kind, why: &str| refuse(Some(api), status, kind, why);
     let session_failed = |e| bad(StatusCode::INTERNAL_SERVER_ERROR, "api_error", &format!("{e:?}"));
-    // A replay run's cost is read once it's over; a late call from its host
-    // would reopen its journal and spend past the replay's cap.
-    let replay_run = state.sessions.peek(&session).is_some_and(|i| i.kind == Some(strive_proto::SessionKind::Replay));
-    if replay_run && !state.learning.replaying.is_run(&session) {
-        return Err(bad(
-            StatusCode::FORBIDDEN,
-            "permission_error",
-            "this replay run is over, so it can't call the model",
-        ));
-    }
     strive_gateway::check_betas(betas).map_err(|why| bad(StatusCode::BAD_REQUEST, "invalid_request_error", why))?;
     let (info, sent) =
         prepare_request(api, body).map_err(|why| bad(StatusCode::BAD_REQUEST, "invalid_request_error", why))?;
@@ -182,12 +172,8 @@ async fn admit(
         bad(StatusCode::UNAUTHORIZED, "authentication_error", &why)
     })?;
     let reservation = Reservation::for_call(&model, sent.len() as u64, info.max_output, info.choices, info.input_rate);
-    let refused_session = session.clone();
     let refused = |e| match e {
-        CallError::Refused(r) => {
-            state.learning.replaying.note_refused(&refused_session);
-            bad(StatusCode::PAYMENT_REQUIRED, "budget_exceeded", &r.to_string())
-        }
+        CallError::Refused(r) => bad(StatusCode::PAYMENT_REQUIRED, "budget_exceeded", &r.to_string()),
         CallError::Session(e) => session_failed(e),
     };
     // Checked before storing, so refused requests can't fill the store.

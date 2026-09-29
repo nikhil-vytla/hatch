@@ -1,6 +1,28 @@
 # ADR-0020: Learning triggers, a cheap pre-filter, and the `learning` setting
 
-Status: accepted. Refines "Triggers" in [ADR-0016](0016-trusted-learning.md).
+Status: accepted, amended 2026-09-28: no `gated`, and automatic runs are
+opt-in. Refines "Triggers" in [ADR-0016](0016-trusted-learning.md).
+
+## Amendment: `off` and `suggest`, `off` by default
+
+- **Modes are `off` and `suggest`.** `gated` (accepting without a person),
+  its `automatic` marker on `proposalDecided`, the `mode` recorded on
+  `proposalMade`, and the refusal to re-accept rolled-back content are
+  deleted. A person decides on every proposal. `gated` and `auto` in
+  settings are refused on load as unknown values.
+- **`off` is the default.** A run costs money and a key; the daemon spends
+  them on its own only once a person sets `"learning": {"mode":
+  "suggest"}`. `strive learn` works in every mode. A project's own file
+  can still only lower the mode.
+- **Why:** `gated` rested on every check passing, and the replay gate that
+  made that rare is gone ([ADR-0018](0018-replay-gate.md)); the judge alone
+  is advice ([ADR-0017](0017-judge-gate.md)). An end-of-session prompt to
+  learn is planned separately.
+- The `failedThenPassed` sign keeps its rule (a turn's first command that
+  failed, then passed later in the session); it lives in
+  `strive_learning::signals` now that the replay miner is gone.
+- Sections below that describe `gated`, replay or `suggest` as the
+  default describe the design before this amendment.
 
 ## Context
 

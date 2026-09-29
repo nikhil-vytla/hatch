@@ -140,7 +140,6 @@ fn proposal() -> Proposal {
         rationale: "because".into(),
         evidence: vec![Evidence { session: "s1".into(), seqs: vec![3], note: "it failed".into() }],
         prediction: "later sessions run tests".into(),
-        watch: None,
     }
 }
 
@@ -154,7 +153,6 @@ fn the_request_forces_the_verdict_tool_and_carries_the_proposal_as_data() {
         cited: vec![SessionText { id: "s1".into(), journal: "#3 user: hi".into() }],
         held_out: vec![SessionText { id: "s2".into(), journal: "#2 user: other".into() }],
         rolled_back: vec![RolledBack { proposal: 7, content: "Undone.".into() }],
-        gated: false,
     };
     let r = judge::request("claude-haiku-4-5", &m);
     assert_eq!(r["model"], "claude-haiku-4-5");
@@ -184,10 +182,7 @@ fn the_request_forces_the_verdict_tool_and_carries_the_proposal_as_data() {
     let doc: Value = serde_json::from_str(&text[text.find('{').unwrap()..]).unwrap();
     assert_eq!(doc["current_file"], Value::Null);
 
-    assert!(system.contains("A person reviews your verdict before anything is written"), "{system}");
-    let gated = judge::request("m", &Material { gated: true, ..m });
-    let gated = gated["system"].as_str().unwrap();
-    assert!(!gated.contains("A person reviews") && gated.contains("your verdict may be final"), "{gated}");
+    assert!(system.contains("A person reads your verdict and reasons beside the change"), "{system}");
 }
 
 fn d(b: u8) -> Digest {

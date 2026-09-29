@@ -253,16 +253,6 @@ impl Shadow {
         Ok((!text.contains('\0') && !text.contains('\u{FFFD}')).then_some(text))
     }
 
-    /// Writes `commit`'s files into this shadow's work tree, which is a
-    /// directory other than the session's (a replay's scratch copy). Staged
-    /// through `index`, a file of the caller's, so the checkpoints' own
-    /// index and refs are untouched.
-    pub fn export(&self, commit: &str, index: &Path) -> io::Result<()> {
-        self.run_indexed(&["read-tree", commit], index)?;
-        self.run_indexed(&["checkout-index", "-a", "-f"], index)?;
-        Ok(())
-    }
-
     /// Makes the workspace match `commit`: changed files are put back,
     /// files created since are removed, deleted ones return. Call
     /// `snapshot` first, so files created since the last checkpoint are

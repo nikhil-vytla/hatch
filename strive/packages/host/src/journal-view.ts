@@ -167,25 +167,17 @@ async function block(entry: Entry, effects: Map<number, Effect>, ran: Set<string
     case "gateFinished":
       return `${at} proposal #${e.proposal}'s ${e.gate} check: ${e.verdict}`;
     case "proposalDecided":
-      if (e.automatic === "gate") return `${at} proposal #${e.proposal} accepted automatically: every check passed`;
-
       return `${at} proposal #${e.proposal} ${e.decision === "accept" ? "accepted" : "rejected"} by ${e.by} (a client)`;
     case "proposalApplied":
       return `${at} proposal #${e.proposal} applied`;
     case "proposalRolledBack":
       return `${at} proposal #${e.proposal} rolled back by ${e.by} (a client)`;
-    case "replayFinished":
-      return `${at} proposal #${e.proposal} replayed in ${e.runs.length} runs`;
-    case "predictionChecked":
-      return `${at} proposal #${e.proposal}'s prediction in session ${e.session}: ${e.outcome} (${e.detail})`;
     case "modelSet":
       return `${at} the session's model set to ${e.model}`;
     case "sessionStarted":
     case "budgetSet":
     case "modelCallStarted":
     case "checkpointed":
-    case "replayStarted":
-    case "replayRunStarted":
       return "";
     default:
       return e satisfies never;

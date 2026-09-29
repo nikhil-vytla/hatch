@@ -1,7 +1,24 @@
 # ADR-0017: The judge gate is the daemon's own model call
 
-Status: accepted. Refines "Checks" in [ADR-0016](0016-trusted-learning.md)
-for M9.
+Status: accepted, amended 2026-09-28: the judge advises; it doesn't block.
+Refines "Checks" in [ADR-0016](0016-trusted-learning.md) for M9.
+
+## Amendment: advice, not a gate
+
+- **A judge fail no longer blocks acceptance.** A proposal is `ready` once
+  the static gate passed and the judge finished, pass, fail or skip. Static
+  findings still block.
+- **It's shown prominently:** `strive review` lists the proposal with
+  `[the judge advises against it]`, puts that line and the verdict's first
+  line near the top of its detail, and says accept writes the file anyway.
+  The desktop's Learned pane shows "The judge advises against it" with the
+  failed criteria's reasons at the top of the proposal.
+- **Why:** the replay gate and `gated` are gone ([ADR-0018](0018-replay-gate.md),
+  [ADR-0020](0020-learning-triggers.md)), so no verdict is final. One model
+  call is weak evidence either way; a person reading its reasons beside the
+  diff is the check. The system prompt says a person reads the verdict.
+- Sections below that mention `gated`, replay or a fail blocking describe
+  the design before this amendment.
 
 ## Context
 

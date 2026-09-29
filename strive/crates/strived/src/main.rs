@@ -22,7 +22,6 @@ mod mcp;
 mod methods;
 mod paths;
 mod pinned;
-mod replay;
 mod review;
 mod run;
 
@@ -34,7 +33,6 @@ mod terminal;
 
 mod triggers;
 mod tui;
-mod watch;
 mod workspaces;
 
 use std::path::Path;

@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import type { Entry, Event, Proposal, ProposalState } from "@strive/protocol";
-import { fileHistory, latestRun, readJudge, statusNote, tallyText, watchText } from "./learning";
+import { fileHistory, judgeAdvice, latestRun, readJudge } from "./learning";
 
 const PROPOSAL: Proposal = {
   artifact: { kind: "memory" },
@@ -22,16 +22,6 @@ const reading: Event = {
   toolCalls: [{ id: "c1", name: "read_session" }],
   message: {},
 };
-
-test("an applied proposal says when the gate accepted it rather than a person", () => {
-  const applied: ProposalState = { id: 3, madeAtMs: 0, proposal: PROPOSAL, status: "applied", gates: [] };
-  const path = ".strive/memory.md";
-
-  expect(statusNote(applied, path)).toBe("Accepted and written to .strive/memory.md.");
-  expect(statusNote({ ...applied, automatic: "gate" }, path)).toBe(
-    "Accepted automatically: every check passed. Written to .strive/memory.md; Roll back undoes it.",
-  );
-});
 
 test("a run is running from its request until its own turn ends, saying what the learner is doing", () => {
   expect(latestRun(journal({ type: "userMessage", text: "not a request" }))).toBeUndefined();
@@ -150,35 +140,30 @@ test("a file's history is every proposal for the same file, newest first", () =>
   expect(fileHistory(listed, state(4, { kind: "skill", name: "deploy" })).map((p) => p.id)).toEqual([4]);
 });
 
-test("a watch reads as the sentence strive review prints", () => {
-  expect(
-    watchText({
-      when: { command: "bun test" },
-      expect: { kind: "never", step: { command: "bun test", output: "no display" } },
-    }),
-  ).toBe(
-    'in sessions with a command containing "bun test": never a command containing "bun test" whose output contains "no display"',
-  );
+test("a judge fail is advice: the failed criteria's reasons, or the detail's first line", () => {
+  const state = (gates: ProposalState["gates"]): ProposalState => ({
+    id: 3,
+    madeAtMs: 0,
+    proposal: PROPOSAL,
+    status: "ready",
+    gates,
+  });
 
-  expect(
-    watchText({ expect: { kind: "first", of: { command: "test" }, is: { command: "bun test src", exit: "zero" } } }),
-  ).toBe(
-    'in every session: the first step that is a command containing "test" is also a command containing "bun test src" that exited 0',
-  );
+  const judged = [
+    "failed novel (m, held out session s1)",
+    "pass supported: cited",
+    "pass generalizes: holds",
+    "FAIL novel: memory says it",
+    "pass safe: fine",
+    "pass checkable: yes",
+  ].join("\n");
 
-  expect(watchText({ expect: { kind: "any", step: { prompt: " thanks " } } })).toBe(
-    'in every session: at least once, a prompt containing "thanks"',
-  );
-});
-
-test("a tally reads as counts of the sessions it applied to", () => {
-  const t = { confirmed: 0, contradicted: 0, notApplicable: 0, recentConfirmed: 0, recentContradicted: 0 };
-  expect(tallyText(undefined)).toBe("No session has been checked against it yet.");
-  expect(tallyText({ ...t, notHolding: false, notApplicable: 2 })).toBe(
-    "It hasn't applied to any of the 2 sessions checked.",
-  );
-  expect(tallyText({ ...t, notHolding: false, confirmed: 1 })).toBe("Confirmed in 1, contradicted in 0 of 1 session.");
-  expect(tallyText({ ...t, notHolding: true, confirmed: 1, contradicted: 3, notApplicable: 4 })).toBe(
-    "Confirmed in 1, contradicted in 3 of 4 sessions (4 more it didn't apply to).",
-  );
+  expect(judgeAdvice(state([{ gate: "judge", verdict: "fail", detail: judged }]))).toEqual([
+    "Not already covered: memory says it",
+  ]);
+  expect(judgeAdvice(state([{ gate: "judge", verdict: "fail", detail: "failed: unreadable\nmore" }]))).toEqual([
+    "failed: unreadable",
+  ]);
+  expect(judgeAdvice(state([{ gate: "judge", verdict: "pass", detail: judged }]))).toBeUndefined();
+  expect(judgeAdvice(state([{ gate: "static", verdict: "fail", detail: "x" }]))).toBeUndefined();
 });

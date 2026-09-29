@@ -11,7 +11,6 @@ fn memory(content: &str) -> Proposal {
         rationale: "npm test failed twice".into(),
         evidence: vec![Evidence { session: "S".into(), seqs: vec![4], note: "npm failed".into() }],
         prediction: "no session runs npm test".into(),
-        watch: None,
     }
 }
 
@@ -103,8 +102,8 @@ fn citing(sessions: &[(&str, &[u64])]) -> Proposal {
 
 #[test]
 fn evidence_names_entries_and_only_a_few_sessions() {
-    // Citing a session keeps it out of the judge's held-out sessions and the
-    // replay's tasks, so a citation must point at something.
+    // Citing a session keeps it out of the judge's held-out sessions, so a
+    // citation must point at something.
     let found = check(&citing(&[("A", &[3]), ("B", &[])]), &[]);
     assert_eq!(found.iter().map(|f| f.rule).collect::<Vec<_>>(), vec![Rule::Evidence]);
     assert!(found[0].detail.contains("session B names no entries"), "{found:?}");

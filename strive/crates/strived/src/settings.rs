@@ -27,15 +27,11 @@ pub struct Settings {
     /// The model the agent uses.
     #[serde(default = "default_model")]
     pub model: String,
-    /// The model the judge gate uses; the agent's `model` when unset. It
+    /// The model the judge uses; the agent's `model` when unset. It
     /// must be an Anthropic model.
     #[serde(default)]
     pub judge_model: Option<String>,
-    /// The replay gate (ADR-0018): what it may spend and how much it runs.
-    #[serde(default)]
-    pub replay: ReplaySetting,
-    /// When the learner runs on its own, and whether anything is accepted
-    /// without a person (ADR-0020).
+    /// When the learner runs on its own (ADR-0020).
     #[serde(default)]
     pub learning: LearningSetting,
     /// The longest a turn may run before it is stopped.
@@ -59,59 +55,6 @@ pub struct Settings {
     /// as Claude Code's `mcpServers`.
     #[serde(default)]
     pub mcp_servers: BTreeMap<String, McpServerSetting>,
-}
-
-/// The replay gate's limits. Each proposal it replays holds `budgetUsd` of
-/// the learning session's budget while its runs go on.
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct ReplaySetting {
-    /// Dollars one proposal's replay may spend, all runs together. 0 turns
-    /// replay off.
-    #[serde(default = "default_replay_usd")]
-    pub budget_usd: f64,
-    /// The model the replayed agent runs on; the cheaper of `model` and
-    /// `judgeModel` when unset.
-    #[serde(default)]
-    pub model: Option<String>,
-    /// The most tasks one replay runs.
-    #[serde(default = "default_replay_tasks")]
-    pub tasks: usize,
-    /// Runs of each task on each side, with the change and without.
-    #[serde(default = "default_replay_runs")]
-    pub runs: u32,
-}
-
-fn default_replay_usd() -> f64 {
-    1.0
-}
-
-fn default_replay_tasks() -> usize {
-    strive_learning::replay::TASKS
-}
-
-fn default_replay_runs() -> u32 {
-    3
-}
-
-impl Default for ReplaySetting {
-    fn default() -> Self {
-        Self {
-            budget_usd: default_replay_usd(),
-            model: None,
-            tasks: default_replay_tasks(),
-            runs: default_replay_runs(),
-        }
-    }
-}
-
-impl ReplaySetting {
-    /// The cap on one proposal's replay, in micro-dollars.
-    pub fn budget_micros(&self) -> u64 {
-        #[expect(clippy::cast_possible_truncation, clippy::cast_sign_loss, reason = "validated non-negative on load")]
-        let m = (self.budget_usd * 1_000_000.0).round() as u64;
-        m
-    }
 }
 
 /// Automatic learning (ADR-0020).
@@ -157,17 +100,13 @@ impl Default for LearningSetting {
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum LearningMode {
-    /// No automatic runs. A person can still ask with `strive learn`.
+    /// No automatic runs, the default: a run costs money, so the daemon
+    /// spends it only once a person opts in. A person can still ask with
+    /// `strive learn`.
+    #[default]
     Off,
     /// Triggers start runs; a person decides on every proposal.
-    #[default]
     Suggest,
-    /// As `suggest`, and a proposal whose every check passed (none skipped)
-    /// is accepted without a person.
-    Gated,
-    /// Named in ADR-0016 and refused on load: memory and skills carry the
-    /// same risk, so it would mean `gated` (ADR-0020).
-    Auto,
 }
 
 /// `.strive/settings.json` in a project: only what a project may set.
@@ -190,17 +129,9 @@ pub const PROJECT_SETTINGS: &str = ".strive/settings.json";
 impl ProjectSettings {
     /// Parses a project's settings; the error says what's wrong, naming the file.
     pub fn parse(bytes: &[u8]) -> Result<Self, String> {
-        let s: ProjectSettings =
-            serde_json::from_slice(bytes).map_err(|e| format!("{PROJECT_SETTINGS} can't be read: {e}"))?;
-        if s.learning.as_ref().is_some_and(|l| l.mode == LearningMode::Auto) {
-            return Err(format!("{PROJECT_SETTINGS}: {AUTO_REFUSED}"));
-        }
-        Ok(s)
+        serde_json::from_slice(bytes).map_err(|e| format!("{PROJECT_SETTINGS} can't be read: {e}"))
     }
 }
-
-const AUTO_REFUSED: &str = "learning.mode \"auto\" isn't available: memory and skills are the only things strive \
-                            learns, and they carry the same risk, so it would mean \"gated\"; use \"gated\"";
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -306,15 +237,6 @@ impl Settings {
         };
         if s.budget.usd.is_some_and(|d| !d.is_finite() || d < 0.0) {
             anyhow::bail!("{}: budget.usd must be a non-negative number of dollars", path.display());
-        }
-        if !s.replay.budget_usd.is_finite() || s.replay.budget_usd < 0.0 {
-            anyhow::bail!("{}: replay.budgetUsd must be a non-negative number of dollars", path.display());
-        }
-        if s.replay.runs == 0 || s.replay.runs > 10 || s.replay.tasks > 10 {
-            anyhow::bail!("{}: replay.runs is 1 to 10 and replay.tasks 0 to 10", path.display());
-        }
-        if s.learning.mode == LearningMode::Auto {
-            anyhow::bail!("{}: {AUTO_REFUSED}", path.display());
         }
         if s.learning.idle_seconds == 0 {
             anyhow::bail!("{}: learning.idleSeconds must be at least 1", path.display());

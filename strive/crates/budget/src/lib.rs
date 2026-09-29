@@ -274,43 +274,19 @@ pub struct Limits {
 /// Why a call was not admitted.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Refusal {
-    /// `committed` includes `held`, what replays hold until they finish.
-    Usd {
-        limit: u64,
-        committed: u64,
-        wanted: u64,
-        held: u64,
-    },
-    Tokens {
-        limit: u64,
-        committed: u64,
-        wanted: u64,
-    },
-}
-
-impl Refusal {
-    /// ", with $H of it held by replays that haven't finished", or nothing:
-    /// held money isn't spent, and `strive log` wouldn't show it.
-    pub fn held_note(&self) -> String {
-        match *self {
-            Refusal::Usd { held, .. } if held > 0 => {
-                format!(", with {} of it held by replays that haven't finished", format_usd(held))
-            }
-            Refusal::Usd { .. } | Refusal::Tokens { .. } => String::new(),
-        }
-    }
+    Usd { limit: u64, committed: u64, wanted: u64 },
+    Tokens { limit: u64, committed: u64, wanted: u64 },
 }
 
 impl std::fmt::Display for Refusal {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match *self {
-            Refusal::Usd { limit, committed, wanted, .. } => write!(
+            Refusal::Usd { limit, committed, wanted } => write!(
                 f,
-                "this call could cost up to {}, but only {} of the {} session budget is left{}",
+                "this call could cost up to {}, but only {} of the {} session budget is left",
                 format_usd(wanted),
                 format_usd(limit.saturating_sub(committed)),
                 format_usd(limit),
-                self.held_note()
             ),
             Refusal::Tokens { limit, committed, wanted } => write!(
                 f,
@@ -329,9 +305,6 @@ pub struct Ledger {
     spent_usd: u64,
     spent_tokens: u64,
     open: HashMap<u64, Reservation>,
-    /// Replay gates running for proposals, by proposal: each holds money
-    /// until its runs are over. One cut off by a crash is never released.
-    holds: Vec<(u64, u64)>,
 }
 
 impl Ledger {
@@ -355,10 +328,9 @@ impl Ledger {
         self.spent_tokens
     }
 
-    /// Spent plus held by calls in flight and by replays.
+    /// Spent plus held by calls in flight.
     pub fn committed_usd(&self) -> u64 {
-        let held = self.holds.iter().fold(self.spent_usd, |a, (_, usd)| a.saturating_add(*usd));
-        self.open.values().fold(held, |a, r| a.saturating_add(r.usd_micros))
+        self.open.values().fold(self.spent_usd, |a, r| a.saturating_add(r.usd_micros))
     }
 
     fn committed_tokens(&self) -> u64 {
@@ -370,8 +342,7 @@ impl Ledger {
         if let Some(limit) = self.limits.usd_micros {
             let committed = self.committed_usd();
             if committed.saturating_add(r.usd_micros) > limit {
-                let held = self.holds.iter().fold(0u64, |a, (_, usd)| a.saturating_add(*usd));
-                return Err(Refusal::Usd { limit, committed, wanted: r.usd_micros, held });
+                return Err(Refusal::Usd { limit, committed, wanted: r.usd_micros });
             }
         }
         if let Some(limit) = self.limits.tokens {
@@ -392,24 +363,6 @@ impl Ledger {
         self.check(r)?;
         self.open.insert(call, r);
         Ok(())
-    }
-
-    /// Holds `usd_micros` for proposal `proposal`'s replay, if it fits.
-    pub fn hold(&mut self, proposal: u64, usd_micros: u64) -> Result<(), Refusal> {
-        self.check(Reservation { usd_micros, tokens: 0 })?;
-        self.holds.push((proposal, usd_micros));
-        Ok(())
-    }
-
-    /// Releases the proposal's latest replay hold and charges what the
-    /// replay cost. An earlier hold for the same proposal (a run a crash cut
-    /// off) stays held.
-    pub fn release(&mut self, proposal: u64, usd_micros: u64, tokens: u64) {
-        if let Some(i) = self.holds.iter().rposition(|(p, _)| *p == proposal) {
-            self.holds.remove(i);
-        }
-        self.spent_usd = self.spent_usd.saturating_add(usd_micros);
-        self.spent_tokens = self.spent_tokens.saturating_add(tokens);
     }
 
     /// Releases the call's reservation and charges what it actually cost.
@@ -462,15 +415,7 @@ impl Ledger {
                 | Event::ProposalDecided { .. }
                 | Event::ProposalApplied { .. }
                 | Event::ProposalRolledBack { .. }
-                | Event::PredictionChecked { .. }
-                | Event::ReplayRunStarted { .. }
                 | Event::ModelSet { .. } => {}
-                Event::ReplayStarted { proposal, reserved_usd_micros } => {
-                    l.holds.push((*proposal, *reserved_usd_micros));
-                }
-                Event::ReplayFinished { proposal, cost_usd_micros, tokens, .. } => {
-                    l.release(*proposal, *cost_usd_micros, *tokens);
-                }
             }
         }
         for r in abandoned.values() {

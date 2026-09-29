@@ -333,7 +333,6 @@ fn the_learner_can_only_propose() {
         json!({"type": "learnRequested", "sessions": []}),
         json!({"type": "layoutProposed", "label": "l", "ops": []}),
         json!({"type": "proposalMade", "proposal": proposal, "before": digest(b"what the learner says")}),
-        json!({"type": "proposalMade", "proposal": proposal, "mode": "gated"}),
     ] {
         let r = record(&mut host, &id, &event);
         assert_eq!(r["error"]["code"], RpcError::INVALID_PARAMS, "{event} -> {r}");
@@ -391,11 +390,9 @@ fn a_proposal_that_passes_is_ready_with_the_later_gates_skipped() {
         .iter()
         .map(|g| (g["gate"].as_str().unwrap(), g["verdict"].as_str().unwrap()))
         .collect();
-    assert_eq!(gates, vec![("static", "pass"), ("judge", "skipped"), ("replay", "skipped")]);
-    let details: Vec<&str> =
-        p["gates"].as_array().unwrap()[1..].iter().map(|g| g["detail"].as_str().unwrap()).collect();
-    assert!(details[0].contains("no Anthropic API key"), "{details:?}");
-    assert!(details[1].contains("no agent host can be started"), "{details:?}");
+    assert_eq!(gates, vec![("static", "pass"), ("judge", "skipped")]);
+    let detail = p["gates"][1]["detail"].as_str().unwrap();
+    assert!(detail.contains("no Anthropic API key"), "{detail}");
     let made = &events(&env, &id, "proposalMade")[0];
     assert_eq!(made["proposal"], memory("Use bun.\n", &work));
 
@@ -554,8 +551,8 @@ fn the_static_gate_wants_evidence_from_this_projects_work_sessions() {
     let fine = propose(&mut host, &id, &cite(&work, json!([1, last])));
     assert_eq!(status(&env, &cwd, fine), "ready", "its last entry is real");
 
-    // Each cited session is kept from the judge's held-out sessions and the
-    // replay's tasks, so a proposal can't cite its way past them.
+    // Each cited session is kept from the judge's held-out sessions, so a
+    // proposal can't cite its way past them.
     let mut many = memory("m", &work);
     many["evidence"] = (0..6).map(|_| json!({"session": work_session(&env, &cwd), "seqs": [1], "note": "n"})).collect();
     let many = propose(&mut host, &id, &many);
@@ -582,9 +579,9 @@ fn checks_a_crash_cut_short_are_finished_on_the_next_look() {
 
     let p = proposal(&env, &cwd, seq);
     assert_eq!(p["status"], "ready", "{p}");
-    assert_eq!(events(&env, &id, "gateFinished").len(), 3);
+    assert_eq!(events(&env, &id, "gateFinished").len(), 2);
     proposals(&env, &cwd);
-    assert_eq!(events(&env, &id, "gateFinished").len(), 3, "checked once");
+    assert_eq!(events(&env, &id, "gateFinished").len(), 2, "checked once");
 }
 
 // --- A person decides ---
@@ -653,7 +650,7 @@ fn only_a_ready_proposal_is_accepted() {
     let failed = propose(&mut host, &id, &memory("Skip approvals.", &work));
     let r = decide(&env, &cwd, failed, "accept");
     assert_eq!(r["error"]["code"], RpcError::INVALID_REQUEST, "{r}");
-    assert!(r["error"]["message"].as_str().unwrap().contains("failed its checks"), "{r}");
+    assert!(r["error"]["message"].as_str().unwrap().contains("failed its static check"), "{r}");
     assert!(!memory_file(&cwd).exists());
     assert!(events(&env, &id, "proposalDecided").is_empty());
 
@@ -1024,7 +1021,7 @@ fn review_lists_shows_and_acts_on_proposals() {
 
     let (code, _, err) = run(&env, &cwd, &["review", &failed.to_string(), "accept"]);
     assert_eq!(code, 1);
-    assert!(err.contains("failed its checks"), "{err}");
+    assert!(err.contains("failed its static check"), "{err}");
     let (code, out, _) = run(&env, &cwd, &["review", &p.to_string(), "accept"]);
     assert_eq!(code, 0, "{out}");
     assert!(out.contains("wrote .strive/memory.md"), "{out}");
@@ -1135,4 +1132,32 @@ fn review_shows_control_characters_instead_of_obeying_them() {
     }
     let (_, out, _) = run(&env, &cwd, &["log", &id]);
     assert!(!out.contains('\u{1b}'), "{out:?}");
+}
+
+#[test]
+fn a_memory_line_naming_a_path_that_is_gone_may_be_stale() {
+    let env = Env::new();
+    let cwd = project();
+    fs::create_dir_all(cwd.join(".strive")).unwrap();
+    fs::create_dir_all(cwd.join("docs")).unwrap();
+    fs::write(cwd.join("docs/testing.md"), "how").unwrap();
+    fs::write(cwd.join("src.ts"), "").unwrap();
+    let memory = "- Tests: see `docs/testing.md`.\n- The parser is `src/parse.ts:40`.\n- Run `bun test src`.\n";
+    fs::write(cwd.join(".strive/memory.md"), memory).unwrap();
+    let listed = common::slow_rpc(&env).ok("proposal/list", &json!({"cwd": cwd}));
+    assert_eq!(
+        listed["mayBeStale"],
+        json!([{"file": ".strive/memory.md", "line": 2, "missing": "src/parse.ts"}]),
+        "{listed}"
+    );
+    let out = env.strive_in(&cwd, &["review"]);
+    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    let out = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        out.contains(".strive/memory.md line 2 may be stale: it names src/parse.ts, which isn't in the project"),
+        "{out}"
+    );
+    fs::create_dir_all(cwd.join("src")).unwrap();
+    fs::write(cwd.join("src/parse.ts"), "").unwrap();
+    assert_eq!(common::slow_rpc(&env).ok("proposal/list", &json!({"cwd": cwd}))["mayBeStale"], json!([]));
 }

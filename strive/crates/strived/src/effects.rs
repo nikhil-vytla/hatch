@@ -30,11 +30,6 @@ pub struct Scope {
     pub strive_home: PathBuf,
     /// Settings chose to run commands unconfined (in a disposable container).
     pub unconfined: bool,
-    /// Where sandboxed commands may write besides the workspace, and their
-    /// `TMPDIR`. None: the system's temp directories. A replay's scratch
-    /// area sets its own, so a project that itself lives under `/tmp` stays
-    /// out of a replayed command's reach.
-    pub temp: Option<PathBuf>,
 }
 
 /// What an effect produced, before it is journaled.
@@ -531,7 +526,7 @@ fn sandboxed_command(scope: &Scope, command: &str) -> io::Result<Command> {
         // need escaping could end a literal and add rules of its own. The
         // learned paths add only fixed ASCII to the workspace's.
         let unsafe_in_profile = |p: &Path| p.to_string_lossy().chars().any(|c| c == '"' || c == '\\' || c.is_control());
-        let targets = memory_target.iter().chain(&skills_target).chain(&scope.temp);
+        let targets = memory_target.iter().chain(&skills_target);
         for p in [&scope.workspace, &scope.strive_home].into_iter().chain(targets) {
             if unsafe_in_profile(p) {
                 return Err(io::Error::other(format!(
@@ -540,24 +535,18 @@ fn sandboxed_command(scope: &Scope, command: &str) -> io::Result<Command> {
                 )));
             }
         }
-        // A replay's commands write only their own scratch temp directory,
-        // so a project under /tmp stays out of reach. Otherwise commands may
-        // write /private/tmp, the user's own temp directory, which macOS's
-        // tools use whatever TMPDIR says (`mktemp` does), and the daemon's
-        // TMPDIR. That one is the person's to set: if the profile can't hold
-        // it, it's left out, not refused, and commands are pointed elsewhere.
-        let (tmp, temps) = if let Some(own) = &scope.temp {
-            (own.clone(), format!(" (subpath \"{}\")", own.display()))
-        } else {
-            let user_tmp = user_temp_dir().filter(|t| !unsafe_in_profile(t));
-            let daemon_tmp = std::env::temp_dir().canonicalize().ok().filter(|t| !unsafe_in_profile(t));
-            let tmp = daemon_tmp.clone().or_else(|| user_tmp.clone()).unwrap_or_else(|| PathBuf::from("/private/tmp"));
-            let mut temps = String::from(" (subpath \"/private/tmp\")");
-            for t in daemon_tmp.iter().chain(&user_tmp) {
-                let _ = write!(temps, " (subpath \"{}\")", t.display());
-            }
-            (tmp, temps)
-        };
+        // Commands may write /private/tmp, the user's own temp directory,
+        // which macOS's tools use whatever TMPDIR says (`mktemp` does), and
+        // the daemon's TMPDIR. That one is the person's to set: if the
+        // profile can't hold it, it's left out, not refused, and commands are
+        // pointed elsewhere.
+        let user_tmp = user_temp_dir().filter(|t| !unsafe_in_profile(t));
+        let daemon_tmp = std::env::temp_dir().canonicalize().ok().filter(|t| !unsafe_in_profile(t));
+        let tmp = daemon_tmp.clone().or_else(|| user_tmp.clone()).unwrap_or_else(|| PathBuf::from("/private/tmp"));
+        let mut temps = String::from(" (subpath \"/private/tmp\")");
+        for t in daemon_tmp.iter().chain(&user_tmp) {
+            let _ = write!(temps, " (subpath \"{}\")", t.display());
+        }
         let mut linked = String::new();
         if let Some(t) = memory_target {
             let _ = write!(linked, " (literal \"{}\")", t.display());
@@ -601,9 +590,6 @@ fn sandboxed_command(scope: &Scope, command: &str) -> io::Result<Command> {
     // systemd, X11, Docker) that can start processes outside the sandbox.
     c.args(["--ro-bind", "/", "/", "--dev", "/dev", "--proc", "/proc", "--tmpfs", "/tmp", "--tmpfs", "/run"]);
     c.args(["--bind"]).arg(&scope.workspace).arg(&scope.workspace);
-    if let Some(own) = &scope.temp {
-        c.args(["--bind"]).arg(own).arg(own);
-    }
     // Learned files, where they exist, are read-only: they change only
     // through review (ADR-0016). A bind can't cover a path that doesn't
     // exist yet, so a command can still create a missing one here.
@@ -747,9 +733,6 @@ fn bash(scope: &Scope, command: &str, timeout_ms: u64, sandboxed: bool, cancelle
         if k.to_str().is_some_and(scrubbed) {
             cmd.env_remove(&k);
         }
-    }
-    if let Some(own) = &scope.temp {
-        cmd.env("TMPDIR", own);
     }
     cmd.current_dir(&scope.workspace).stdin(Stdio::null()).stdout(writer).stderr(writer2).process_group(0);
     let mut child = match cmd.spawn() {

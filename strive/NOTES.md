@@ -1893,3 +1893,79 @@ project root that exist), and write/edit ask a person in every mode. Git
 itself still works in the sandbox; `git config` doesn't. Both tests failed
 first. Not yet on Linux: nested repositories' hooks, and creating one of
 these files where none exists.
+
+## 2026-09-28: subtract before adding (items 1 and 2 of the plan)
+
+Why: nobody (exo, Prime Agent, the literature) gates each learned change by
+replay; at 3 runs a side a change that does nothing passes "with > without"
+about a third of the time; and the adversarial reviews found the checks
+themselves were the main attack surface. System-level validation moves to
+an offline `strive eval`, a later PR.
+
+- **Deleted:**
+  - the replay gate: `crates/strived/src/replay.rs`,
+    `crates/learning/src/replay.rs`, replay sessions (`kind: replay`), their
+    scratch dirs and startup sweep, the budget holds (`Ledger::hold` and
+    `release`, `Refusal::Usd.held`), `ReplayStarted`/`ReplayRunStarted`/
+    `ReplayFinished`, the gateway's refusal for closed runs, `Scope.temp`
+    in the sandbox, `relocate`, the `replay.*` settings, `Hosts::stop`,
+    `Shadow::export`, and their tests (`crates/strived/tests/replay.rs`,
+    `crates/learning/tests/replay.rs`, `packages/host/src/replay.e2e.test.ts`);
+  - `gated`: the mode, `gate_accept`, `every_check_passed`,
+    `Automatic` and `proposalDecided.automatic`, `proposalMade.mode`, the
+    rolled-back-digest refusal, the judge's "your verdict may be final"
+    prompt, and "Accepted automatically" in review, log and the desktop;
+  - watches (M11): `Proposal.watch` and its types, both `watch.rs`,
+    `PredictionChecked`, `PredictionTally`, "may be hurting", the learner's
+    watch rules and schema, the desktop's Prediction tally, and
+    `crates/strived/tests/predictions.rs` and `crates/learning/tests/watch.rs`.
+- **Line counts** (`git diff --shortstat 0c23c04`): code (`crates`,
+  `packages`, `apps`, `.cargo`) 73 files, +527 / −5,483; of that the
+  generated protocol bindings are +11 / −126, so hand-written code is
+  +516 / −5,357, 4,841 lines net removed. Hand-written rs, ts, tsx and css
+  (not generated) went from about 42,250 lines to 37,413. Docs: +159 / −184.
+- **Kept, and why:**
+  - `strive_learning::stale` (memory lines naming a path that's gone): it
+    reads memory text, not watches, and `proposal/list` still uses it. Its
+    tests moved to `crates/learning/tests/stale.rs` and
+    `crates/strived/tests/learning.rs`.
+  - The `failedThenPassed` sign: it used the replay miner's pairs, so the
+    rule (a turn's first failing command that later passed, at most 300
+    characters) is now a small function in `signals.rs`. A turn is now
+    counted at each `turnStarted`, not only one that took a prompt.
+  - The judge's "rolled back before" input: it's what the judge reads, not
+    the gate's refusal.
+  - "(a client)" after `by` in the log: harmless, and removing it touches
+    three renderers for nothing.
+  - `SessionPromptResult.ts`, a generated file no Rust type makes any more;
+    it predates this change, so it's left for its own cleanup.
+- **Behaviour changes:**
+  - The judge advises. `ready` = static passed and the judge finished
+    (pass, fail or skip); `failed` = the static gate failed. `strive review`
+    marks `[the judge advises against it]`, prints that line near the top of
+    the detail, and says accept writes anyway; the desktop shows "The judge
+    advises against it" and the failed criteria's reasons at the top.
+  - Learning modes are `off` (the default) and `suggest`. `gated` or `auto`
+    in settings fails the daemon's start as an unknown variant.
+  - Protocol version 2.
+- **Old journals:** chosen: fail verification cleanly, not skip. Skipping
+  would leave seq gaps every reader would have to tolerate and weaken what
+  verification means. A line the daemon's key signed whose event no longer
+  parses is `Problem::Unreadable` ("an event this version of strive doesn't
+  know; another version wrote it"), distinct from `Tampered`. Work journals
+  hold none of the removed events, so they still verify; an old learning
+  journal (every proposal had a `gateFinished {gate: replay}`) and old
+  replay sessions don't. Pre-release, so the fix is to delete
+  `~/.strive/sessions/<id>` for those; the next `learning/open` makes a new
+  learning session.
+- **Tests:** failing first: a judge fail is advice a person can accept past
+  (daemon, fold and desktop e2e), automatic runs are off unless settings
+  turn them on, and an entry from another version fails as unreadable. Two
+  signals tests were added for mutants the move left alive.
+- **Mutants** (`--file`, `-j 2`, `CARGO_TARGET_DIR` unset): learning's
+  `signals`, `fold`, `lib`, `checks`, `judge`: 184 tested, 0 missed; journal
+  and budget `lib.rs`: 143 tested, 0 missed. Two new equivalents are in
+  `.cargo/mutants.toml`: `==` to `!=` in `fold::status`'s every-gate test
+  (with two gates both forms agree) and `>` to `>=` in
+  `failed_then_passed` (the equal seq is the failed run, excluded by its
+  exit). The deleted files' 18 deferred survivors are gone with them.

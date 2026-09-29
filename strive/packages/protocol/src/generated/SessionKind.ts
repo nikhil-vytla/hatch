@@ -3,4 +3,4 @@
 /**
  * What a session is for.
  */
-export type SessionKind = "work" | "learning" | "replay";
+export type SessionKind = "work" | "learning";

@@ -333,7 +333,6 @@ fn proposal() -> Proposal {
         rationale: "r".into(),
         evidence: vec![Evidence { session: "A".into(), seqs: vec![], note: "n".into() }],
         prediction: "p".into(),
-        watch: None,
     }
 }
 
@@ -359,7 +358,7 @@ fn a_request_no_turn_has_finished_or_a_proposal_being_checked_keeps_automatic_ru
 
     j.push(Event::TurnStarted { turn: 1, through_seq: Some(asked) });
     assert!(busy(&j.entries()).is_some(), "the turn that took it runs");
-    let made = j.push(Event::ProposalMade { call_id: None, proposal: proposal(), before: None, mode: None });
+    let made = j.push(Event::ProposalMade { call_id: None, proposal: proposal(), before: None });
     j.push(Event::TurnEnded { turn: 1, reason: TurnEnd::Done });
     assert!(busy(&j.entries()).is_some_and(|w| w.contains("checks")), "the proposal is checking");
     for gate in strive_learning::GATES {
@@ -418,19 +417,34 @@ fn a_triggers_signs_read_as_one_line() {
 }
 
 #[test]
-fn every_check_passed_needs_three_passes_and_no_skip() {
-    use strive_proto::{Gate, GateOutcome, Verdict};
-    let gates = |v: [Verdict; 3]| -> Vec<GateOutcome> {
-        [Gate::Static, Gate::Judge, Gate::Replay]
-            .into_iter()
-            .zip(v)
-            .map(|(gate, verdict)| GateOutcome { gate, verdict, detail: String::new() })
-            .collect()
-    };
-    let (p, s, f) = (Verdict::Pass, Verdict::Skipped, Verdict::Fail);
-    assert!(strive_learning::every_check_passed(&gates([p, p, p])));
-    for v in [[p, s, p], [p, p, s], [p, f, p], [p, p, f], [f, p, p], [p, s, s]] {
-        assert!(!strive_learning::every_check_passed(&gates(v)), "{v:?}");
-    }
-    assert!(!strive_learning::every_check_passed(&gates([p, p, p])[..2]), "a gate with no verdict");
+fn one_failed_then_passed_sign_a_turn_and_only_for_commands_run_in_a_turn() {
+    let mut j = Journal::new();
+    // Before any turn: not the agent's.
+    j.run("make", 1);
+    j.prompt("fix it");
+    j.turn();
+    j.run("make", 0);
+    // Two commands red to green in one turn: the first is the sign.
+    j.run("bun test", 1);
+    j.run("cargo test", 1);
+    let passed = j.run("bun test", 0);
+    j.run("cargo test", 0);
+    j.end(TurnEnd::Done);
+    let found = scan("S", &j.entries(), 0);
+    assert_eq!(kinds(&found), vec![(passed, SignalKind::FailedThenPassed)]);
+    assert_eq!(found[0].detail, "bun test");
+}
+
+#[test]
+fn a_command_that_only_passed_or_is_too_long_to_be_a_check_is_no_sign() {
+    let mut j = Journal::new();
+    j.prompt("look around");
+    j.turn();
+    j.run("ls", 0);
+    j.run("ls", 0);
+    let long = format!("echo {}", "x".repeat(strive_learning::signals::COMMAND_LIMIT));
+    j.run(&long, 1);
+    j.run(&long, 0);
+    j.end(TurnEnd::Done);
+    assert_eq!(scan("S", &j.entries(), 0), vec![]);
 }

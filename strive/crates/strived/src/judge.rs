@@ -80,15 +80,12 @@ pub struct Made<'a> {
     pub before: Option<Digest>,
     /// When it was made, so a later session isn't held out against it.
     pub at_ms: u64,
-    /// The project's learning mode is `gated`, so the judge is told its
-    /// verdict may be final.
-    pub gated: bool,
 }
 
 /// Decides whether the proposal can be judged, and if so builds the call.
 /// `learning` is the learning session's journal.
 pub fn plan(state: &State, cwd: &str, made: &Made, learning: &[Entry]) -> Plan {
-    let &Made { proposal, before, at_ms: made_at_ms, gated } = made;
+    let &Made { proposal, before, at_ms: made_at_ms } = made;
     let model = model(state);
     if crate::methods::provider_of(model) != "anthropic" {
         return skipped(format!(
@@ -150,7 +147,7 @@ pub fn plan(state: &State, cwd: &str, made: &Made, learning: &[Entry]) -> Plan {
         .into_iter()
         .map(|s| RolledBack { proposal: s.id, content: s.proposal.content.clone() })
         .collect();
-    let material = Material { proposal, current: current.as_deref(), learned, cited, held_out, rolled_back, gated };
+    let material = Material { proposal, current: current.as_deref(), learned, cited, held_out, rolled_back };
     let body = strive_learning::judge::request(model, &material).to_string().into_bytes();
     Plan::Call(Call { model: model.to_string(), body, held_out: held.into_iter().map(|(id, _)| id).collect() })
 }
@@ -248,16 +245,12 @@ async fn judge(state: &State, sid: &SessionId, call: Call) -> (Verdict, String) 
             .unwrap_or_else(|| String::from_utf8_lossy(&bytes).chars().take(300).collect())
     };
     let kind = error.as_ref().and_then(|e| e["type"].as_str()).unwrap_or_default();
-    // A rate limit or an overload says nothing about the proposal, and a
-    // fail would block it for good: it's a skip, which leaves it to a
-    // person and which `gated` never counts as a pass (ADR-0017).
+    // A rate limit or an overload says nothing about the proposal: it's a
+    // skip, not a fail (ADR-0017).
     if matches!(status, 429 | 529) || matches!(kind, "rate_limit_error" | "overloaded_error") {
         return (
             Verdict::Skipped,
-            format!(
-                "not run: the provider was too busy to judge it (HTTP {status}: {}); it can be accepted without the judge, but never automatically",
-                message()
-            ),
+            format!("not run: the provider was too busy to judge it (HTTP {status}: {})", message()),
         );
     }
     match status {

@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use ts_rs::TS;
 
 /// Bumped on any incompatible change. Clients and daemon must agree exactly.
-pub const PROTOCOL_VERSION: u32 = 1;
+pub const PROTOCOL_VERSION: u32 = 2;
 
 /// A request method: its wire name plus parameter and result types.
 pub trait Method {
@@ -553,9 +553,6 @@ pub enum SessionKind {
     /// The project's learner: it studies work sessions and proposes changes
     /// to the agent's memory and skills, which people review.
     Learning,
-    /// One run of the replay gate (ADR-0018): a past task, run again by the
-    /// daemon in a scratch copy of the project, with or without a proposal.
-    Replay,
 }
 
 /// A project: the directory its sessions work in.
@@ -593,95 +590,9 @@ pub struct Proposal {
     pub rationale: String,
     /// The sessions (and entries in them) that led to it.
     pub evidence: Vec<Evidence>,
-    /// A falsifiable claim about what the change will do, checked later.
+    /// A falsifiable claim about what the change will do, for the person
+    /// reviewing it.
     pub prediction: String,
-    /// The prediction in a form the daemon checks on each later work
-    /// session, without a model (ADR-0019). None: it isn't machine-checked.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[ts(optional)]
-    pub watch: Option<Box<Watch>>,
-}
-
-/// A machine-checkable prediction: in the sessions it applies to (those with
-/// a step matching `when`, or every session with a prompt), what should hold.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-#[ts(export)]
-pub struct Watch {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[ts(optional)]
-    pub when: Option<StepMatch>,
-    pub expect: Expect,
-}
-
-/// What a watch expects of a session's steps.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
-#[serde(tag = "kind", rename_all = "camelCase", deny_unknown_fields)]
-#[ts(export)]
-pub enum Expect {
-    /// No step matches.
-    Never { step: StepMatch },
-    /// Some step matches.
-    Any { step: StepMatch },
-    /// The first step matching `of` also matches `is`.
-    First { of: StepMatch, is: StepMatch },
-}
-
-/// One step of a session to look for, by case-insensitive substrings: a
-/// prompt containing `prompt`, or a command that ran whose text, output and
-/// exit match every field given.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, TS)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-#[ts(export)]
-pub struct StepMatch {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[ts(optional)]
-    pub prompt: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[ts(optional)]
-    pub command: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[ts(optional)]
-    pub output: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[ts(optional)]
-    pub exit: Option<ExitMatch>,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export)]
-pub enum ExitMatch {
-    Zero,
-    /// Any other status, or stopped by its time limit.
-    NonZero,
-}
-
-/// How a watch read one session.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export)]
-pub enum WatchOutcome {
-    Confirmed,
-    Contradicted,
-    NotApplicable,
-}
-
-/// How an applied proposal's watch has fared in later work sessions, each
-/// session counted once, by its latest check.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export)]
-pub struct PredictionTally {
-    pub confirmed: u32,
-    pub contradicted: u32,
-    pub not_applicable: u32,
-    /// Of the last sessions it applied to (`strive_learning::watch::RECENT`).
-    pub recent_confirmed: u32,
-    pub recent_contradicted: u32,
-    /// Enough recent sessions contradicted it, and more than confirmed it,
-    /// that rolling it back is worth a look. Never acted on by the daemon.
-    pub not_holding: bool,
 }
 
 /// What a proposal changes. Paths are fixed by kind, inside the project:
@@ -717,8 +628,6 @@ pub enum Gate {
     /// A model, outside the learner's authority, judging it against
     /// sessions the learner didn't see.
     Judge,
-    /// Past tasks run again with and without it.
-    Replay,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
@@ -841,26 +750,6 @@ pub enum SignalKind {
     TurnFailed,
 }
 
-/// The `learning` setting's mode in effect for a project (ADR-0020): the
-/// lower of the user's and the project's own.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export)]
-pub enum LearningMode {
-    Off,
-    Suggest,
-    Gated,
-}
-
-/// Who, other than a person, decided on a proposal.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export)]
-pub enum Automatic {
-    /// The `gated` learning mode: every check passed, none skipped.
-    Gate,
-}
-
 /// The latest automatic run that was due and didn't start, if no automatic
 /// run started after it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
@@ -887,18 +776,10 @@ pub struct ProposalState {
     pub before: Option<Digest>,
     pub status: ProposalStatus,
     pub gates: Vec<GateOutcome>,
-    /// How its watch has fared in later sessions; none: it has no watch.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[ts(optional)]
-    pub prediction: Option<PredictionTally>,
     /// The trigger of the automatic run that made it; none: a person asked.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub trigger: Option<LearnTrigger>,
-    /// Set when it was accepted without a person.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[ts(optional)]
-    pub automatic: Option<Automatic>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
@@ -1210,9 +1091,8 @@ pub enum Event {
         reason: String,
     },
     /// The learner proposed a change to what the agent is given (its memory
-    /// or a skill). Nothing changes until it is accepted: by a person, or by
-    /// the `gated` learning mode once every check passes. Its id is this
-    /// entry's seq.
+    /// or a skill). Nothing changes until a person accepts it. Its id is
+    /// this entry's seq.
     ProposalMade {
         /// The learner's tool call that made it, whose result it is.
         #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -1226,12 +1106,6 @@ pub enum Event {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         #[ts(optional)]
         before: Option<Digest>,
-        /// The learning mode in effect for the project when the daemon took
-        /// the proposal. Recorded by the daemon, never the host: `gated`
-        /// accepts a proposal only if it was `gated` then and still is.
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        #[ts(optional)]
-        mode: Option<LearningMode>,
     },
     /// A check of a proposal finished.
     GateFinished {
@@ -1241,41 +1115,12 @@ pub enum Event {
         /// What it found, for a person reviewing the proposal.
         detail: String,
     },
-    /// The replay gate began on a proposal (ADR-0018), holding up to
-    /// `reserved_usd_micros` of this learning session's budget until
-    /// `ReplayFinished`. A hold a crash cut off is finished when the daemon
-    /// next starts, charged what its runs' journals show they spent.
-    ReplayStarted {
-        proposal: u64,
-        reserved_usd_micros: u64,
-    },
-    /// One run of a proposal's replay begins, in replay session `session`.
-    /// Named before the run's first prompt, so a hold a crash cuts off can
-    /// be charged from its runs' journals.
-    ReplayRunStarted {
-        proposal: u64,
-        session: String,
-    },
-    /// The replay gate's runs are over: what they cost is charged in place of
-    /// the hold, and each run's session is named for audit.
-    ReplayFinished {
-        proposal: u64,
-        cost_usd_micros: u64,
-        tokens: u64,
-        runs: Vec<ReplayRun>,
-    },
-    /// A person accepted or rejected a proposal, or the `gated` learning
-    /// mode accepted one whose every check passed (ADR-0020).
+    /// A person accepted or rejected a proposal.
     ProposalDecided {
         proposal: u64,
         decision: ProposalDecision,
-        /// The client that decided, or `gate`.
+        /// The client that decided.
         by: String,
-        /// Set only by the daemon's own accept. A person's decision never
-        /// has it, whatever its client calls itself.
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        #[ts(optional)]
-        automatic: Option<Automatic>,
     },
     /// An accepted proposal was written: the file as it was (none if it
     /// didn't exist) and as it is now.
@@ -1290,16 +1135,6 @@ pub enum Event {
     ProposalRolledBack {
         proposal: u64,
         by: String,
-    },
-    /// An applied proposal's watch was evaluated on a later work session,
-    /// read up to `through_seq` (ADR-0019). Journaled when the pair has no
-    /// record yet or its outcome changed; the latest counts.
-    PredictionChecked {
-        proposal: u64,
-        session: String,
-        through_seq: u64,
-        outcome: WatchOutcome,
-        detail: String,
     },
     /// The agent proposed a change to the desktop workspace's layout. It
     /// changes nothing until a person accepts it in the desktop app.
@@ -1324,22 +1159,6 @@ pub enum Event {
     ModelSet {
         model: String,
     },
-}
-
-/// One run of a replayed task.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export)]
-pub struct ReplayRun {
-    /// The replay session that ran it.
-    pub session: String,
-    /// The work session the task was mined from, and its prompt's seq.
-    pub task_session: String,
-    pub task_seq: u64,
-    /// Whether the proposal's file was in place.
-    pub with_change: bool,
-    /// Whether the task's check command exited 0 afterwards.
-    pub passed: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]

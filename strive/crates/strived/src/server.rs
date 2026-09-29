@@ -131,8 +131,6 @@ pub async fn run(cfg: Config) -> Result<Started> {
         hosts: crate::hosts::Hosts::default(),
         learning: crate::learning::Locks::default(),
     });
-    // Before anything can start a replay, so all it finds is a crash's.
-    crate::replay::recover(&state).await;
     let gateway_task = tokio::spawn(axum::serve(gateway_listener, gateway::router(state.clone())).into_future());
     log!("daemon {} listening on {} (pid {})", state.info.build, socket.display(), state.info.pid);
 
@@ -175,7 +173,7 @@ pub async fn run(cfg: Config) -> Result<Started> {
                 }
                 // Hosts don't count: they exist to serve clients, and exit with the daemon.
                 let people = state.clients.load(Ordering::SeqCst).saturating_sub(state.hosts.count());
-                let busy = people + state.gateway_calls.load(Ordering::SeqCst) + state.learning.replaying.count() > 0;
+                let busy = people + state.gateway_calls.load(Ordering::SeqCst) > 0;
                 if !busy && state.idle_since.lock().await.elapsed() >= state.idle_exit {
                     log!("idle for {}s with no clients, exiting", state.idle_exit.as_secs());
                     break;
@@ -193,20 +191,10 @@ pub async fn run(cfg: Config) -> Result<Started> {
     Ok(Started::Served)
 }
 
-/// Ends the daemon's work: replays and commands first, while their ends can
-/// still be journaled; then the session writers; then MCP servers.
+/// Ends the daemon's work: commands first, while their ends can still be
+/// journaled; then the session writers; then MCP servers.
 async fn stand_down(state: &State) {
-    state.learning.replaying.stop_all();
     let settled = state.sessions.cancel_effects(Duration::from_secs(10)).await;
-    // Each replay journals its end, releasing its hold, once its run stops.
-    let deadline = Instant::now() + Duration::from_secs(10);
-    while state.learning.replaying.count() > 0 {
-        if Instant::now() >= deadline {
-            log!("replays still running after 10s; the next start settles their holds");
-            break;
-        }
-        tokio::time::sleep(Duration::from_millis(20)).await;
-    }
     state.sessions.shutdown().await;
     state.mcp.stop_all().await;
     if !settled {

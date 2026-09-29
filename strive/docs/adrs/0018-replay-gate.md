@@ -1,7 +1,23 @@
 # ADR-0018: The replay gate runs past tasks again in scratch copies
 
-Status: accepted. Refines "Checks" in [ADR-0016](0016-trusted-learning.md)
-for M10.
+Status: superseded, 2026-09-28. The replay gate, replay sessions, their
+scratch copies, budget holds and the `replay` settings are deleted. Proposal
+checks are the static gate, then the judge as advice
+([ADR-0017](0017-judge-gate.md)). The record below is kept as history.
+
+The evidence (NOTES, "subtract before adding"):
+- Nobody gates each learned change by replay: exo, Prime Agent and the
+  literature validate learned context offline, over many tasks, if at all.
+- At three runs a side, a change that does nothing passes "with > without"
+  about a third of the time, so a pass said little about the change.
+- Our adversarial reviews found the checks themselves were the main attack
+  surface and the main complexity.
+
+System-level validation is to come back as an offline `strive eval`, not
+as a check on each proposal.
+
+Originally: refined "Checks" in [ADR-0016](0016-trusted-learning.md) for
+M10.
 
 ## Context
 

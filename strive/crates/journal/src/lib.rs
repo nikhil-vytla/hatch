@@ -62,6 +62,10 @@ pub enum Problem {
     /// The entry at `seq` (or the line where it should be) doesn't match the
     /// chain: edited, deleted, reordered, from another session or another key.
     Tampered { seq: u64 },
+    /// The entry at `seq` is signed by this key but holds an event this
+    /// version doesn't know: another version of strive wrote it (one with
+    /// an event since removed, say).
+    Unreadable { seq: u64 },
     /// The head records `committed` entries but only `found` are present.
     Truncated { committed: u64, found: u64 },
     /// The head file is missing, unreadable or not MAC'd by this key.
@@ -72,6 +76,9 @@ impl std::fmt::Display for Problem {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Problem::Tampered { seq } => write!(f, "entry {seq} was modified, removed or moved"),
+            Problem::Unreadable { seq } => {
+                write!(f, "entry {seq} is an event this version of strive doesn't know; another version wrote it")
+            }
             Problem::Truncated { committed, found } => {
                 write!(f, "entries were removed from the end ({found} of {committed} committed entries remain)")
             }
@@ -301,9 +308,12 @@ fn scan(dir: &Path, session_id: &str, key: &Key) -> io::Result<Scan> {
     let mut problem = None;
     for (i, line) in bytes[..complete].split(|&b| b == b'\n').filter(|l| !l.is_empty()).enumerate() {
         let seq = i as u64 + 1;
-        let Some((entry, mac)) = verify_line(key, &prev, line, seq) else {
-            problem = Some(Problem::Tampered { seq });
-            break;
+        let (entry, mac) = match verify_line(key, &prev, line, seq) {
+            Ok(verified) => verified,
+            Err(p) => {
+                problem = Some(p);
+                break;
+            }
         };
         if head.as_ref().is_some_and(|h| h.seq == seq) {
             head_matches = head.as_ref().is_some_and(|h| h.mac == hex::encode(mac));
@@ -326,18 +336,21 @@ fn scan(dir: &Path, session_id: &str, key: &Key) -> io::Result<Scan> {
 }
 
 /// Returns the entry and its MAC if the line is the valid successor of `prev`.
-fn verify_line(key: &Key, prev: &[u8; 32], line: &[u8], seq: u64) -> Option<(Entry, [u8; 32])> {
-    let split = line.len().checked_sub(MAC_SUFFIX_LEN)?;
-    let suffix = std::str::from_utf8(&line[split..]).ok()?;
-    let mac_hex = suffix.strip_prefix(r#","mac":""#)?.strip_suffix(r#""}"#)?;
+fn verify_line(key: &Key, prev: &[u8; 32], line: &[u8], seq: u64) -> Result<(Entry, [u8; 32]), Problem> {
+    let tampered = Problem::Tampered { seq };
+    let split = line.len().checked_sub(MAC_SUFFIX_LEN).ok_or(tampered.clone())?;
+    let suffix = std::str::from_utf8(&line[split..]).map_err(|_| tampered.clone())?;
+    let mac_hex = suffix.strip_prefix(r#","mac":""#).and_then(|s| s.strip_suffix(r#""}"#)).ok_or(tampered.clone())?;
     let mut body = line[..split].to_vec();
     body.push(b'}');
     let mac = key.mac(&[prev, &body]);
     if hex::encode(mac) != mac_hex {
-        return None;
+        return Err(tampered);
     }
-    let entry: Entry = serde_json::from_slice(&body).ok()?;
-    (entry.seq == seq).then_some((entry, mac))
+    // Signed by this key, so written by strive: a body that doesn't parse
+    // is another version's event, not an edit.
+    let entry: Entry = serde_json::from_slice(&body).map_err(|_| Problem::Unreadable { seq })?;
+    if entry.seq == seq { Ok((entry, mac)) } else { Err(tampered) }
 }
 
 fn read_head(dir: &Path, key: &Key) -> Option<Head> {
