@@ -6,11 +6,12 @@ import {
   readdirSync,
   copyFileSync,
   cpSync,
+  rmSync,
 } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { resolve } from "node:path";
 import { readRecord } from "./records";
-import { projectRewardBenchDocument } from "./benchmark-publication";
+import { projectRewardBenchDocument, splitRewardBench } from "./benchmark-publication";
 import { enrichProvenance } from "./provenance";
 import { prepareJudgmentReliability } from "../../judgment-reliability/prepare";
 import { prepareLiveWorlds } from "../../live-worlds/prepare";
@@ -71,6 +72,16 @@ for (const [name, source] of Object.entries(publication)) {
   } else if (name === "rewardbench2") {
     writeFileSync(target, JSON.stringify(projectRewardBenchDocument(JSON.parse(readFileSync(target, "utf8")))) + "\n");
   }
+}
+// The RewardBench page loads a light index and fetches one case's answer texts at a time.
+{
+  const split = splitRewardBench(JSON.parse(readFileSync(resolve(dest, "rewardbench2.json"), "utf8")));
+  const dir = resolve("public/rewardbench2");
+
+  rmSync(dir, { recursive: true, force: true });
+  mkdirSync(resolve(dir, "cases"), { recursive: true });
+  writeFileSync(resolve(dir, "index.json"), JSON.stringify(split.index) + "\n");
+  for (const c of split.cases) writeFileSync(resolve(dir, "cases", c.name), c.body + "\n");
 }
 mkdirSync("public/research", { recursive: true });
 const qualityReview = resolve(lab, "quality-and-simulation-review");

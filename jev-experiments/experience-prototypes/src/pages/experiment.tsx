@@ -45,7 +45,9 @@ const MaterialsSandbox = lazy(() => import("../../../roadmap/materials/Materials
 const cache = new Map<string, any>();
 async function load(name: string) {
   if (!cache.has(name)) {
-    const response = await fetch(`/data/${name}.json`);
+    // RewardBench's full document holds every case's answer texts; its page loads a light
+    // index and fetches one case at a time. The full document stays at /data for download.
+    const response = await fetch(name === "rewardbench2" ? "/rewardbench2/index.json" : `/data/${name}.json`);
     if (!response.ok) throw new Error("No recorded run is attached yet.");
     cache.set(name, await response.json());
   }
