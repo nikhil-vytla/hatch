@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "motion/react";
 import { ArrowLeft, ArrowRight, Check, Eye, Search } from "lucide-react";
 import { Pane, Stat, Button, Fold, State, Notice } from "./shared";
@@ -75,6 +75,41 @@ function CaseVerdict({ row }: { row: any }) {
   );
 }
 
+/** One case's answer texts, fetched when the case is shown and kept for this visit. */
+const caseTexts = new Map<string, string[]>();
+
+function useCaseTexts(file: string | undefined) {
+  const [texts, setTexts] = useState<string[] | null>(file ? (caseTexts.get(file) ?? null) : null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    setFailed(false);
+
+    if (!file) return setTexts(null);
+
+    const hit = caseTexts.get(file);
+
+    if (hit) return setTexts(hit);
+
+    setTexts(null);
+    const controller = new AbortController();
+
+    fetch(`/rewardbench2/cases/${encodeURIComponent(file)}`, { signal: controller.signal })
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+      .then((body: { texts: string[] }) => {
+        caseTexts.set(file, body.texts);
+        setTexts(body.texts);
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setFailed(true);
+      });
+
+    return () => controller.abort();
+  }, [file]);
+
+  return { texts, failed };
+}
+
 export function RewardBench({ result }: { result: any }) {
   const [subset, setSubset] = useState("Focus"),
     [query, setQuery] = useState(""),
@@ -93,6 +128,10 @@ export function RewardBench({ result }: { result: any }) {
         `${r.id} ${r.prompt}`.toLowerCase().includes(query.toLowerCase())),
   );
   const row = rows[Math.min(index, rows.length - 1)];
+  // Older builds inline the texts; the index names a case file instead.
+  const { texts, failed } = useCaseTexts(row?.case_file);
+  const textOf = (c: any, i: number) =>
+    c.text ?? (texts ? texts[i] : failed ? "The answer text could not be loaded. Try again shortly." : "Loading…");
   const reset = () => {
     setIndex(0);
     setRevealed(false);
@@ -266,7 +305,7 @@ export function RewardBench({ result }: { result: any }) {
                   </div>
                   {revealed && <CaseVerdict row={row} />}
                   <div className="reward-candidates">
-                    {row.candidates.map((c: any) => (
+                    {row.candidates.map((c: any, i: number) => (
                       <article
                         key={c.label}
                         className={`answer-card reward-candidate ${revealed && c.score === top(row) ? "picked" : ""}`}
@@ -284,7 +323,7 @@ export function RewardBench({ result }: { result: any }) {
                         <div
                           className={`candidate-text ${c.omission ? "omitted-text" : ""}`}
                         >
-                          {c.text}
+                          {textOf(c, i)}
                         </div>
                         {revealed ? (
                           <div className="candidate-score">
