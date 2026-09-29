@@ -184,6 +184,18 @@ Confining the host process to the daemon's socket and gateway is planned.
 - **Memory:** `.strive/memory.md`, the last instruction file, labeled as
   memory a person reviewed. Its `@` lines stay text. The same rules
   apply: regular files only, never from strive's home.
+- **Imports:** a line `@path` in an instruction file, outside a code
+  block, inlines that file if its real path is in the project (under its
+  root, not in strive's home), up to five imports deep, and not as a
+  cycle. One outside the project, or a symlink leading out of it, stays as
+  text. Each import in the project is guarded as the file that imports it
+  (see "What shapes a session").
+- **Only what is on the list:** every other file above is read only if
+  its real path is on "What shapes a session" (below). A symlinked
+  `AGENTS.md` leading to `docs/x.md` is skipped, and so is a skill linked
+  in from elsewhere. `CLAUDE.md` linked to `AGENTS.md` loads, since both
+  ends are guarded. Memory and `.strive/skills` must also be reached
+  without any symlink.
 - **MCP servers:** the stdio servers in `mcpServers` in settings.
   - They are started for the session in its directory, without strive's
     variables or provider keys.
@@ -199,7 +211,12 @@ Confining the host process to the daemon's socket and gateway is planned.
     stopped, and the workspace must be free for a rewind. Other calls to
     that server fail when it is stopped.
   - A process that leaves the group (`setsid`) is out of reach.
-- `contextLoaded` journals what was loaded and how each server started.
+- `contextLoaded` journals what was loaded and how each server started,
+  and, in `skipped`, each import not loaded (a cycle aside) as a line for
+  a person: "@docs/x.md in AGENTS.md was not loaded: it's outside the
+  project" (or "it links outside the project", "there's no such file",
+  "it isn't a file", "it's more than 5 imports deep"). The TUI, the
+  desktop app and `strive log` show each line.
 - Before a turn, a conversation past `compactAtTokens` is summarized. The
   summary is journaled as `compacted` and replaces what it covers on
   resume.
@@ -365,48 +382,76 @@ project's directory against rewinds.
   (with `before`), writing nothing; rolling back again finds it already
   `before` and journals the rollback.
 
-**Learned files outside review.** The daemon's own write on accept and
-rollback is not an agent effect, so the checks below don't apply to it.
-"Only through review" covers `.strive/memory.md` and `.strive/skills`
-against the agent's own writes and commands, and nothing wider:
-- **Other instruction files are ordinary project files.** `AGENTS.md`,
-  `CLAUDE.md` and `.claude/skills` also reach every session's prompt, and
-  no review covers them (below).
+**What shapes a session.** One list, `context::SHAPING`, names every file
+or directory whose contents a session is given when it starts, or which
+decides how strive runs it. The loader reads nothing in a project that
+isn't on it or imported by a file on it, and the approval gate and the
+sandbox guard all of it:
+- **The list**, by last components at any depth under the project's root
+  (the repository's, or the workspace outside one), since a later session
+  may start in any directory:
+  - `AGENTS.md` and `CLAUDE.md`;
+  - `.claude/skills`;
+  - `.strive/memory.md` and `.strive/skills`, the learned files;
+  - `.strive/settings.json`.
+
+  strive's home adds `~/.strive/AGENTS.md` and `~/.strive/skills`, and the
+  agent can't write anything in it. MCP servers come from
+  `~/.strive/settings.json` only; a project's `.mcp.json` is Claude Code's,
+  and is guarded as a file that runs code (see "The sandbox").
+- **Imports** join the list for their project: each path an instruction
+  file imports inside the project, inlined or not (one not written yet
+  too). Only guarded files import, so the set changes only as a person
+  allows; the daemon reads it again for each effect.
+- **Agent writes:** a work session's `write` or `edit` that reaches a
+  listed path asks a person in every approval mode, `fullAuto` included.
+  The path is matched after symlinks and `..` are resolved, and without
+  regard to case.
+  The request says why: learned files, that the change reaches every future
+  session without review, naming `strive learn` and `strive review`;
+  instruction files and skills, that it "changes what every future session
+  in this project is told"; imports, that "it's imported by AGENTS.md"
+  (naming the file); settings, that it changes strive's settings for
+  every future session. Unattended, it's refused.
+- **Allowing for the session** covers one instruction file (`AGENTS.md`,
+  `CLAUDE.md`) or import at a time: the request names it
+  (`approvalRequested.sessionFile`), and once a person answers
+  `allowSession`, later changes to that real path in that session don't
+  ask. The mode stays as it was. Rebuilt from the journal on restart, from
+  those two entries. Skills, settings, learned files and files that run
+  code have no `sessionFile`, so each change asks (`allowSession` there
+  switches to full-auto as for any request, which they ignore).
+- **Commands:** the macOS sandbox denies writes to every listed path by
+  pattern, in any case, anywhere under the project's root, and to
+  `.strive` and `.claude` themselves, so neither can be made elsewhere and
+  moved into place or moved aside. Their other files stay writable, and
+  reads are allowed. Each import is denied by its path, in any case, and
+  so is each directory between it and the project's root, so none can be
+  moved aside, moved into place or swapped for a symlink. On Linux,
+  bubblewrap binds the listed paths in the workspace itself, and the
+  imports, read-only where they exist: a command can still create a
+  missing one, or change a nested one (`pkg/AGENTS.md`). With
+  `"sandbox": "off"` none of this applies to commands.
+- **Symlinks:** the loader skips a listed path whose real path isn't
+  listed (see "Context"), so a plain edit of the file a link names can't
+  change what sessions are told. An import is guarded where it is written
+  and where it leads, so one that links elsewhere in the project guards
+  both.
+- **The daemon's own write** on accept and rollback is not an agent effect,
+  so none of this applies to it.
 - **MCP servers can write anything.** They run unsandboxed, as the user,
-  in the session's directory, so a server can write `.strive/memory.md` or
-  a skill with no approval and no sandbox rule in the way. They are
-  configured by the user and trusted as the user is. Such a write shows up
-  as changed outside review, like an editor's.
-- **Loading:** memory and `.strive/skills` are loaded only when really
-  there, reached without a symlink, as the learner already reads them. The
-  checks below guard real paths; a skill linked to `docs/x` would otherwise
-  change with any edit of `docs/x`.
-- **Out of scope:** `AGENTS.md`/`CLAUDE.md` and `.claude/skills` are the
-  project's own files. The agent edits them as it edits any file, visible in
-  diffs and checkpoints; only what strive learns is review-gated.
-- **Agent writes:** a work session's `write` or `edit` that reaches
-  `.strive/memory.md` or anything under `.strive/skills` asks a person in
-  every approval mode, `fullAuto` included, and "allow for the session"
-  doesn't cover the next one. The path is matched after symlinks and `..`
-  are resolved, and without regard to case. A file that the project's memory
-  path or skills directory leads to through a symlink is matched too. The
-  request says the change reaches every future session and names `strive
-  learn` and `strive review`. Unattended, it's refused.
-- **Commands:** the macOS sandbox denies writes to `.strive` itself (so it
-  can't be moved aside or created), `.strive/memory.md`, `.strive/skills`,
-  and wherever a symlink takes those. Other files in `.strive` stay
-  writable, and reads are allowed. On Linux, bubblewrap binds the memory
-  file and skills directory read-only where they exist, so a command can
-  still create a missing one there. With `"sandbox": "off"` none of this
-  applies to commands.
-- **Anything else** (an editor, git) can still change them. `proposal/list`
-  returns `changedOutsideReview`: learned files that aren't what an
-  accepted proposal last left there. After an apply that's its content,
-  after a rollback what it replaced, and with no applied proposal, any
-  file that exists counts. `strive review` prints a line for each.
-- A command a work session runs can change the file between the compare
-  and the write. Writes and edits the agent asks for can't: they wait for
-  the file.
+  in the session's directory, so a server can write any of these with no
+  approval and no sandbox rule in the way. They are configured by the user
+  and trusted as the user is.
+- **Changed outside review**, for learned files only. An editor or git can
+  still change any of these; a person editing `AGENTS.md` is normal, so
+  only learned files are flagged. `proposal/list` returns
+  `changedOutsideReview`: learned files that aren't what an accepted
+  proposal last left there. After an apply that's its content, after a
+  rollback what it replaced, and with no applied proposal, any file that
+  exists counts. `strive review` prints a line for each. A command a work
+  session runs can change the file between the compare and the write.
+  Writes and edits the agent asks for can't: they wait for the file.
 
 **Triggers** ([ADR-0020](adrs/0020-learning-triggers.md)): the learner
 also runs without being asked, behind `learning` in settings: `mode` (`off`,
@@ -539,7 +584,13 @@ server, so they are coordinated by the session's directory alone.
   `.vscode`, `.idea`, `.claude/commands` and `.claude/agents`, and rc and
   config files (`.bashrc`, `.zshrc`, `.profile`, `.gitconfig`,
   `.gitmodules`, `.ripgreprc`, `.mcp.json`) anywhere in the project. Git or a
-  shell runs them later for the person, unsandboxed. Commands can't write
+  shell runs them later for the person, unsandboxed. Other agents' settings,
+  hooks and MCP config are on it too, each an attack route in a published
+  incident: `.claude/settings.json`, `.claude/settings.local.json` and
+  `.claude/hooks` (Claude Code, CVE-2025-59536), `.codex` and `.agents`
+  (Codex, CVE-2025-61260), `.cursor` (CurXecute, MCPoison,
+  CVE-2025-59944) and `.gemini`; so are `.envrc`, `.husky`,
+  `.devcontainer`, `.npmrc`, `.pre-commit-config.yaml` and `lefthook.yml`. Commands can't write
   them, and the agent's write and edit ask a person in every approval
   mode. The rest of `.git` stays writable, so git works in the sandbox;
   `git config` doesn't. On Linux, bubblewrap binds read-only only those at
@@ -547,8 +598,8 @@ server, so they are coordinated by the session's directory alone.
   (a new `.vscode/tasks.json`) or change a nested repository's hooks.
 - **macOS (Seatbelt):**
   - Commands may write only in the workspace and temp directories, and not
-    to the project's learned files (see "Learned files outside review") or
-    the files above, matched by pattern in any case.
+    to anything on "What shapes a session" or the files above, matched by
+    pattern in any case.
   - strive's home is hidden.
   - There is no network, and that includes Unix sockets.
   - Without PID namespaces, a background job that leaves the command's
@@ -557,7 +608,8 @@ server, so they are coordinated by the session's directory alone.
 - **Linux (bubblewrap):**
   - Commands get their own PID namespace, so every process dies with the
     command.
-  - The learned files that exist are bound read-only.
+  - The listed files that exist in the workspace itself, and imports that
+    exist, are bound read-only.
   - `/tmp` and `/run` are private, which keeps the user's D-Bus, systemd,
     X11 and Docker sockets out of reach.
   - There is no network.
@@ -580,12 +632,14 @@ server, so they are coordinated by the session's directory alone.
 - `autoEdit` (the default): changes in the workspace are free; commands ask.
 - `fullAuto`: everything inside the workspace and sandbox is free.
 
-In every mode, writes outside the workspace, writes to the project's
-learned files (`.strive/memory.md`, `.strive/skills`) and commands without
-a sandbox ask, and strive's own state is refused. With no one attached,
+In every mode, writes outside the workspace, writes to anything on "What
+shapes a session" or to files that run code outside the sandbox, and
+commands without a sandbox ask, and strive's own state is refused. With no one attached,
 the refusal suggests full-auto only when full-auto would have allowed it. An approval request is a journal
 entry, so every attached client sees it and the first answer wins. With no
-one attached, the request is refused at once.
+one attached, the request is refused at once. Allowing for the session
+switches to full-auto, except for an instruction file, where it allows
+that file (see "What shapes a session").
 
 **Checkpoints** snapshot the workspace before each prompt, into a shadow
 git repository in the session's directory. The user's own repository,

@@ -51,7 +51,13 @@ effect: number,
 /**
  * The model's tool call this effect serves.
  */
-callId: string, record: EffectRecord, } | { "type": "effectFinished", effect: number, outcome: EffectOutcome, durationMs: number, } | { "type": "approvalModeSet", mode: ApprovalMode, } | { "type": "approvalRequested", effect: number, description: string, } | { "type": "approvalDecided", effect: number, decision: Decision, 
+callId: string, record: EffectRecord, } | { "type": "effectFinished", effect: number, outcome: EffectOutcome, durationMs: number, } | { "type": "approvalModeSet", mode: ApprovalMode, } | { "type": "approvalRequested", effect: number, description: string, 
+/**
+ * The instruction file (or file one imports) the effect changes,
+ * where allowing for the session allows later changes to this
+ * file only, and leaves the approval mode as it is.
+ */
+sessionFile?: string, } | { "type": "approvalDecided", effect: number, decision: Decision, 
 /**
  * The client that decided.
  */
@@ -86,7 +92,12 @@ mcp: Array<McpStatus>,
  * was given (`AgentConfig.learnedFiles`), by path in the project.
  * A proposal's `before` is the file as last given here.
  */
-learned?: Array<ContextFile>, } | { "type": "learnRequested", 
+learned?: Array<ContextFile>, 
+/**
+ * Imports in instruction files that weren't loaded, each a line
+ * for a person saying which and why; absent when there are none.
+ */
+skipped?: Array<string>, } | { "type": "learnRequested", 
 /**
  * The work sessions to study; empty: those since the learner last looked.
  */

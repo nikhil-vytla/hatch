@@ -140,7 +140,7 @@ pub fn describe(e: &Entry) -> String {
         Event::Compacted { upto_seq, summary } => {
             format!("conversation up to #{upto_seq} summarized ({} characters)", summary.len())
         }
-        Event::ContextLoaded { instructions, skills, mcp, learned } => {
+        Event::ContextLoaded { instructions, skills, mcp, learned, skipped } => {
             let files: Vec<&str> = instructions.iter().map(|f| f.path.as_str()).collect();
             let servers: Vec<String> = mcp
                 .iter()
@@ -150,7 +150,7 @@ pub fn describe(e: &Entry) -> String {
                 })
                 .collect();
             format!(
-                "agent context: {} instruction file(s){}, {} skill(s){}{}{}",
+                "agent context: {} instruction file(s){}, {} skill(s){}{}{}{}",
                 files.len(),
                 if files.is_empty() { String::new() } else { format!(" ({})", files.join(", ")) },
                 skills.len(),
@@ -163,7 +163,12 @@ pub fn describe(e: &Entry) -> String {
                         "; the learner was given {}",
                         files.iter().map(|f| f.path.as_str()).collect::<Vec<_>>().join(", ")
                     ),
-                }
+                },
+                skipped.iter().flatten().fold(String::new(), |mut out, s| {
+                    out.push_str("\n  ");
+                    out.push_str(s);
+                    out
+                })
             )
         }
         Event::AssistantMessage { text, tool_calls, .. } => {
@@ -181,7 +186,7 @@ pub fn describe(e: &Entry) -> String {
             TurnEnd::TimedOut { seconds } => format!("turn {turn} stopped at its {seconds}s limit"),
             TurnEnd::Failed { error } => format!("turn {turn} failed: {error}"),
         },
-        Event::ApprovalRequested { effect, description } => format!("effect {effect} asks: {description}"),
+        Event::ApprovalRequested { effect, description, .. } => format!("effect {effect} asks: {description}"),
         Event::ApprovalDecided { effect, decision, by } => format!(
             "effect {effect} {} by {by}",
             match decision {

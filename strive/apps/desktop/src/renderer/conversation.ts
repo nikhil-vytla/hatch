@@ -16,8 +16,8 @@ export type Tool = {
   truncated?: boolean;
   /** Why it was refused. */
   reason?: string;
-  /** What the agent asked a person, while it waits or once decided. */
-  approval?: { description: string; decided?: Decision };
+  /** What the agent asked a person, while it waits or once decided; `oneFile` when allowing for the session covers only the file it changes. */
+  approval?: { description: string; oneFile: boolean; decided?: Decision };
   durationMs?: number;
 };
 
@@ -110,7 +110,7 @@ export class Conversation {
 
         if (tool) {
           tool.status = "waiting";
-          tool.approval = { description: e.description };
+          tool.approval = { description: e.description, oneFile: e.sessionFile !== undefined };
         }
 
         return;
