@@ -135,3 +135,18 @@ test("request bounds and date Retry-After are enforced", () => {
     ),
   ).toBe(2000);
 });
+test("records which host the gateway says served Jev, and the generation id", async () => {
+  const result = await evaluate(payload, {
+    apiKey: "caller-owned-key",
+    fetcher: (async () =>
+      Response.json({
+        model: "typesafe-ai/jev",
+        answers: { greeting: { type: "noul", noul: 0.96 } },
+        provider_metadata: { gateway: { generationId: "gen_fixture", routing: { finalProvider: "digitalocean" } } },
+      })) as typeof fetch,
+  });
+  expect(result.served_by).toBe("digitalocean");
+  expect(result.generation_id).toBe("gen_fixture");
+  const bare = await evaluate(payload, { apiKey: "caller-owned-key", fetcher: (async () => ok()) as typeof fetch });
+  expect(bare.served_by).toBeNull();
+});

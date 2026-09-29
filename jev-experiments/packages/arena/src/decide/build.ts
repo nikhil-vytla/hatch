@@ -14,7 +14,8 @@ export const CONTESTANTS = [
   {
     id: "jev",
     name: "Jev",
-    about: "TypeSafe's decision model, through the Vercel AI Gateway",
+    about:
+      "TypeSafe's decision model, as typesafe-ai/jev through the Vercel AI Gateway (which doesn't name the build)",
     file: "decide.jsonl",
   },
   {
@@ -36,6 +37,7 @@ const rowSchema = z.object({
   status: z.string(),
   latencyMs: z.number().nullable().optional(),
   model: z.string().optional(),
+  at: z.string().optional(),
   answers: z.record(z.string(), wireAnswerSchema).optional(),
 });
 
@@ -90,12 +92,17 @@ export function buildDecide(root: string, outDir: string) {
     join(outDir, "decide.json"),
     JSON.stringify({
       schema: "jev.decide/1",
-      contestants: present.map(({ id, name, about, rows }) => ({
-        id,
-        name,
-        about,
-        model: [...rows.values()][0]?.model ?? "",
-      })),
+      contestants: present.map(({ id, name, about, rows }) => {
+        const days = [...rows.values()].flatMap((r) => (r.at ? [r.at.slice(0, 10)] : [])).sort();
+
+        const recorded = !days.length
+          ? ""
+          : days[0] === days.at(-1)
+            ? days[0]
+            : `${days[0]} to ${days.at(-1)}`;
+
+        return { id, name, about, model: [...rows.values()][0]?.model ?? "", recorded };
+      }),
       decisions,
     }),
   );
