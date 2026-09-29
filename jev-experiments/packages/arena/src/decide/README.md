@@ -31,10 +31,19 @@ document's ETag and retried on conflict, so concurrent votes are not lost. Each 
 read and one write; Blob's Hobby allowance caps writes, and past it votes stop being counted
 rather than being billed. Without a store the page leaves the tally out.
 
-## First look (28 Sep 2026, Laya and MobileBERT)
+## First look (28–29 Sep 2026)
 
-Wording flips a model on a few calls, mostly the terse one. Answer shape flips more: Laya calls the refund "Refund 83%" when
-asked to choose and "Store credit 84%" as a yes/no; MobileBERT calls "hot dog" a sandwich
-(62%) when choosing and not one (100%) as a yes/no. Laya's 0–2 scores sit near 50% on almost
-every call. On the four calls with an answer, asked plainly, Laya is right on 2 (route,
-overtime) and MobileBERT on 2 (refund, overtime).
+On the four calls with an answer, asked plainly, Jev is right on 2 (refund, café order), Laya
+on 2 (route, overtime) and MobileBERT on 2 (refund, overtime). Splitting the call into small
+questions that code combines fixes both of Jev's misses: routing goes from Accounts 55% to
+Billing 81% (it knows the message mentions an invoice, 0.96, and that the invoice rule comes
+first, 0.84), and overtime from No 67% to Yes 73%.
+
+Context moves Jev the way it should: told Maria's calendar says she is in Portugal, it goes
+from blocking the Lisbon sign-in (97%) to allowing it (69%). Answer shape moves the small
+models most: Laya calls the refund "Refund 83%" when choosing and "Store credit 84%" as a
+yes/no; MobileBERT calls a hot dog a sandwich (62%) when choosing and not one (100%) as a
+yes/no. Wording flips a model on a few calls, mostly the terse one. Laya's 0–2 scores sit near
+50% on almost every call.
+
+Recording Jev on all 121 setups cost $0.0018.
