@@ -33,6 +33,19 @@
           "value": "DENY"
         }
       ]
+    },
+    {
+      "source": "/(data|judgment-reliability|rewardbench2|outcome-framing|visual-search|icon-studio)/(.*)\\.(json|jsonl)",
+      "headers": [
+        {
+          "key": "Content-Encoding",
+          "value": "gzip"
+        },
+        {
+          "key": "Vary",
+          "value": "Accept-Encoding"
+        }
+      ]
     }
   ]
 }
