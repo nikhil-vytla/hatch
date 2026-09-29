@@ -342,3 +342,41 @@ fn a_journal_can_start_with_several_entries_committed_together() {
     assert_eq!((report.problem, report.committed, report.entries.len()), (None, 3, 3));
     assert!(Journal::create(tempfile::tempdir().unwrap().path(), SESSION, &key(), 1000, &[]).is_err());
 }
+
+/// A line this key signed whose event this version doesn't know: what a
+/// journal from an older strive holds once an event is removed (the replay
+/// gate's, say). It fails verification as unreadable, not as tampered.
+#[test]
+fn an_entry_from_another_version_fails_verification_as_unreadable() {
+    use hmac::{KeyInit, Mac};
+    let mac = |parts: &[&[u8]]| {
+        let mut m = <hmac::Hmac<sha2::Sha256> as KeyInit>::new_from_slice(&[7; 32]).unwrap();
+        for p in parts {
+            m.update(p);
+        }
+        hex::encode(m.finalize().into_bytes())
+    };
+    let dir = tempfile::tempdir().unwrap();
+    Journal::create(dir.path(), SESSION, &key(), 1000, &[started()]).unwrap();
+    let first = &lines(dir.path())[0];
+    let prev = hex::decode(&first[first.len() - 66..first.len() - 2]).unwrap();
+    let body = r#"{"seq":2,"tsMs":2000,"event":{"type":"replayStarted","proposal":5,"reservedUsdMicros":1}}"#;
+    let signed = mac(&[&prev, body.as_bytes()]);
+    let line = format!(r#"{},"mac":"{signed}"}}"#, &body[..body.len() - 1]);
+    write_lines(dir.path(), &[first.clone(), line]);
+    let head = serde_json::json!({"seq": 2, "mac": signed, "headMac": mac(&[format!("head:2:{signed}").as_bytes()])});
+    fs::write(dir.path().join("head.json"), head.to_string()).unwrap();
+
+    let report = read(dir.path(), SESSION, &key()).unwrap();
+    assert_eq!(report.problem, Some(Problem::Unreadable { seq: 2 }));
+    assert_eq!(report.entries, vec![entry(1, 1000, started())]);
+    assert_eq!(
+        Problem::Unreadable { seq: 2 }.to_string(),
+        "entry 2 is an event this version of strive doesn't know; another version wrote it"
+    );
+    match Journal::open(dir.path(), SESSION, &key(), 3000) {
+        Err(OpenError::Invalid(p)) => assert_eq!(p, Problem::Unreadable { seq: 2 }),
+        Err(e) => panic!("{e}"),
+        Ok(_) => panic!("opened a journal it can't read"),
+    }
+}
