@@ -77,3 +77,42 @@ export function projectRewardBenchDocument<T>(
   };
   return output;
 }
+
+/**
+ * RewardBench's page shows one case at a time, but loading the whole document meant every
+ * visitor downloaded all 1,865 cases' answer texts first. This splits the published document
+ * into an index (everything except candidate texts, each row naming its case file) and one
+ * small file of texts per case, named by content hash so a changed case gets a new name.
+ */
+export function splitRewardBench(input: unknown) {
+  const document = structuredClone(object(input));
+  const result = object(document.result);
+
+  if (!Array.isArray(result.rows)) throw new Error("Missing benchmark rows.");
+
+  const cases: { name: string; body: string }[] = [];
+
+  result.rows = result.rows.map((value) => {
+    const row = object(value);
+
+    if (!Array.isArray(row.candidates)) return row;
+
+    const texts = row.candidates.map((c) => String(object(c).text ?? ""));
+    const body = JSON.stringify({ texts });
+    const name = `${String(row.subset).replace(/[^A-Za-z0-9]+/g, "-")}-${String(row.id).replace(/[^A-Za-z0-9-]+/g, "-")}-${sha256(body).slice(0, 12)}.json`;
+
+    cases.push({ name, body });
+
+    return {
+      ...row,
+      case_file: name,
+      candidates: row.candidates.map((c) => {
+        const { text: _text, ...rest } = object(c);
+
+        return rest;
+      }),
+    };
+  });
+
+  return { index: document, cases };
+}
