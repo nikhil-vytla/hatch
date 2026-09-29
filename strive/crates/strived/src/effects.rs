@@ -4,8 +4,8 @@
 //! against one policy: strive's own state is never readable or writable,
 //! writes outside the workspace need approval, and so does every write to a
 //! guarded file, whatever the mode: what shapes later sessions (the loader's
-//! list, `context::SHAPING`) and what runs code outside the sandbox later
-//! (`RUNS_CODE`). Commands run in the OS sandbox (Seatbelt on macOS,
+//! list, `context::SHAPING`, and what its instruction files import) and what
+//! runs code outside the sandbox later (`RUNS_CODE`). Commands run in the OS sandbox (Seatbelt on macOS,
 //! bubblewrap on Linux): writes are confined to the workspace and temp
 //! directories, minus the guarded files, strive's state is hidden, and the
 //! network is off. Where no sandbox is
@@ -33,6 +33,8 @@ pub struct Scope {
     pub strive_home: PathBuf,
     /// Settings chose to run commands unconfined (in a disposable container).
     pub unconfined: bool,
+    /// What the project's instruction files import (`context::imports`).
+    pub imports: Vec<crate::context::Import>,
 }
 
 /// What an effect produced, before it is journaled.
@@ -60,9 +62,10 @@ enum Access {
 }
 
 /// Why a file is guarded.
-#[derive(Clone, Copy)]
 enum Guard {
     Shapes(Shapes),
+    /// Imported by this instruction file.
+    Imported(String),
     RunsCode,
 }
 
@@ -107,19 +110,21 @@ pub fn gate(scope: &Scope, request: &EffectRequest, mode: ApprovalMode) -> (Gate
             } else {
                 format!("{path}, which is {in_project}")
             };
+            let told = "this changes what every future session in this project is told";
             let why = match guard {
-                Guard::Shapes(Shapes::Learned) => {
-                    "this changes what every future session in this project is told, without review; \
-                     `strive learn` proposes such changes and `strive review` is where a person accepts them"
-                }
-                Guard::Shapes(Shapes::Instructions) => "this changes what every future session in this project is told",
+                Guard::Shapes(Shapes::Learned) => format!(
+                    "{told}, without review; `strive learn` proposes such changes and `strive review` is where a \
+                     person accepts them"
+                ),
+                Guard::Shapes(Shapes::Instructions) => told.to_string(),
+                Guard::Imported(by) => format!("it's imported by {by}, so {told}"),
                 Guard::Shapes(Shapes::Settings) => {
-                    "this changes strive's settings for every future session in this project"
+                    "this changes strive's settings for every future session in this project".to_string()
                 }
-                Guard::RunsCode => {
-                    "files like this run code outside strive's sandbox later (git runs hooks and reads its config, \
-                     shells read rc files, editors run tasks), so only a person can approve it"
-                }
+                Guard::RunsCode => "files like this run code outside strive's sandbox later (git runs hooks and \
+                                    reads its config, shells read rc files, editors run tasks), so only a person \
+                                    can approve it"
+                    .to_string(),
             };
             (Gate::Ask(format!("{verb} {shown}: {why}")), file(real))
         }
@@ -213,7 +218,7 @@ fn resolve(scope: &Scope, path: &str, writing: bool) -> Access {
     if real.starts_with(&scope.strive_home) && !skill {
         return Access::Denied("the agent can't read strive's own state".into());
     }
-    if writing && let Some(guard) = guarded(&crate::context::project_root(&scope.workspace), &real) {
+    if writing && let Some(guard) = guarded(scope, &real) {
         return Access::Guarded(real, guard);
     }
     if writing && !real.starts_with(&scope.workspace) {
@@ -249,12 +254,19 @@ const RUNS_CODE: &[&str] = &[
 ];
 
 /// Why `real` is guarded, if it is: by its path under the project's root,
-/// in any case (on a case-insensitive volume `.GIT/HOOKS` is `.git/hooks`).
-fn guarded(root: &Path, real: &Path) -> Option<Guard> {
+/// or as an import, in any case (on a case-insensitive volume `.GIT/HOOKS`
+/// is `.git/hooks`). An import that is on a list is guarded as that.
+fn guarded(scope: &Scope, real: &Path) -> Option<Guard> {
     use crate::context::{matches, shapes};
-    shapes(root, real)
+    let root = crate::context::project_root(&scope.workspace);
+    let lower = |p: &Path| p.to_string_lossy().to_lowercase();
+    shapes(&root, real)
         .map(Guard::Shapes)
-        .or_else(|| RUNS_CODE.iter().any(|p| matches(root, real, p)).then_some(Guard::RunsCode))
+        .or_else(|| RUNS_CODE.iter().any(|p| matches(&root, real, p)).then_some(Guard::RunsCode))
+        .or_else(|| {
+            let import = scope.imports.iter().find(|i| lower(&i.path) == lower(real))?;
+            Some(Guard::Imported(import.by.clone()))
+        })
 }
 
 /// `s` as a Seatbelt regex matching it in any case, each letter a class.
@@ -303,6 +315,30 @@ fn guarded_rules(root: &str) -> String {
         let _ = write!(rules, "\n  (regex #\"^{root}(/.*)?/{}$\")", path.join("/"));
     }
     rules
+}
+
+/// Seatbelt rules denying writes to each import, in any case, and to each
+/// directory between it and `root` itself (not what else they hold), so
+/// none can be moved aside, made elsewhere and moved into place, or swapped
+/// for a symlink. A path the profile can't hold refuses the command.
+fn import_rules(root: &Path, imports: &[crate::context::Import]) -> io::Result<String> {
+    let mut paths = std::collections::BTreeSet::new();
+    for i in imports {
+        paths.extend(i.path.ancestors().take_while(|a| a.starts_with(root) && *a != root));
+    }
+    let mut rules = String::new();
+    for p in paths {
+        let Ok(inside) = p.strip_prefix(root) else { continue };
+        let inside = inside.to_string_lossy();
+        if inside.chars().any(|c| c == '"' || c == '\\' || c.is_control()) {
+            return Err(io::Error::other(format!(
+                "an instruction file imports {}, whose path the macOS sandbox profile can't hold safely",
+                p.display()
+            )));
+        }
+        let _ = write!(rules, "\n  (regex #\"^{}/{}$\")", regex_escape(&root.to_string_lossy()), any_case(&inside));
+    }
+    Ok(rules)
 }
 
 /// Canonicalizes the longest existing prefix and appends the rest, with `..`
@@ -493,7 +529,9 @@ fn sandboxed_command(scope: &Scope, command: &str) -> io::Result<Command> {
         // Anchored at the project's root, not the workspace: the loader reads
         // instruction files above the workspace too, and those can be in a
         // temp directory commands may write.
-        let guarded = guarded_rules(&crate::context::project_root(&scope.workspace).to_string_lossy());
+        let root = crate::context::project_root(&scope.workspace);
+        let mut guarded = guarded_rules(&root.to_string_lossy());
+        guarded.push_str(&import_rules(&root, &scope.imports)?);
         let profile = format!(
             r#"(version 1)
 (allow default)
@@ -529,6 +567,9 @@ fn sandboxed_command(scope: &Scope, command: &str) -> io::Result<Command> {
     for p in shaping.chain(RUNS_CODE.iter().copied()) {
         let p = scope.workspace.join(p);
         c.args(["--ro-bind-try"]).arg(&p).arg(&p);
+    }
+    for i in &scope.imports {
+        c.args(["--ro-bind-try"]).arg(&i.path).arg(&i.path);
     }
     c.args(["--tmpfs"]).arg(&scope.strive_home);
     // As on macOS, no Unix sockets: one elsewhere (a Docker daemon under the

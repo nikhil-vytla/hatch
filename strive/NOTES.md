@@ -2056,3 +2056,27 @@ unasked, with no sandbox rule in the way.
   files, read later through a symlink inside a listed skills directory,
   aren't checked; only `SKILL.md` is loaded. `"sandbox": "off"` and MCP
   servers are outside all of this, as before.
+
+### After review against other agents (Claude Code, Codex, Gemini CLI, Goose, Cursor)
+
+- **Imports work again, confined and guarded.** An `@path` in an
+  instruction file inlines a file whose real path is in the project (not
+  strive's home), five deep, cycles tracked; a line inside a ``` or ~~~
+  block stays text, and memory's `@` lines still do. Each import in the
+  project joins the guarded set (`context::imports`, `Guard::Imported`):
+  the path as written and where it leads, so a missing one, or a link
+  inside the project that points out, can't be filled or re-pointed.
+  Writes ask ("it's imported by AGENTS.md"). Seatbelt denies each by
+  path in any case, plus each directory between it and the root, so
+  `mv p/spec spec` can't drop one into place; bwrap `--ro-bind-try`s them.
+  - Read per effect, not stored: only guarded files import, so it changes
+    only as a person allows, and reading it each time needs no state and
+    also catches an edit made by hand. It costs a read of the instruction
+    files per effect.
+  - Tests: `an_import_inside_the_project_is_inlined_and_guarded` (inlined,
+    nested, a missing import and a code block; unattended writes refused
+    with the importer named) and `the_sandbox_keeps_commands_from_imported_files`
+    both failed first. `an_import_outside_the_project_is_refused` (absolute,
+    `../`, a symlink out) passed before and after: it holds the confinement.
+    `the_loader_reads_nothing_outside_the_list` now expects `@docs/y.md`
+    inlined and refuses its write.

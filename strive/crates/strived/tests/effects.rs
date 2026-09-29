@@ -744,6 +744,39 @@ fn the_sandbox_keeps_commands_from_what_shapes_later_sessions() {
     assert_eq!(text, "ok\n", "other files stay writable");
 }
 
+/// A file an instruction file imports is told to every later session as
+/// the instruction file is, so a command can't change it either. On macOS
+/// that covers one not written yet and the directory holding it, which
+/// can't be moved aside or into place.
+#[test]
+fn the_sandbox_keeps_commands_from_imported_files() {
+    if !sandboxed() {
+        return;
+    }
+    let mut w = Ws::new();
+    fs::create_dir_all(w.path("docs")).unwrap();
+    fs::write(w.path("AGENTS.md"), "Rules.\n@docs/style.md\n@docs/later.md\n@spec/plan.md\n").unwrap();
+    fs::write(w.path("docs/style.md"), "Style.\n").unwrap();
+    let mut blocked = vec!["echo x >> docs/style.md"];
+    if cfg!(target_os = "macos") {
+        blocked.extend([
+            "echo x > docs/later.md",
+            "echo x > DOCS/Style.MD",
+            "mv docs gone",
+            "mkdir -p p/spec && echo x > p/spec/plan.md && mv p/spec spec",
+        ]);
+    }
+    for cmd in blocked {
+        let text = w.text(json!({"kind": "bash", "command": format!("{cmd}; echo status=$?")}));
+        assert!(text.ends_with("status=1\n"), "{cmd}: {text}");
+    }
+    assert_eq!(fs::read_to_string(w.path("docs/style.md")).unwrap(), "Style.\n");
+    assert!(!w.path("docs/later.md").exists());
+    assert!(!w.path("spec").exists());
+    let text = w.text(json!({"kind": "bash", "command": "echo a > docs/other.md && echo ok"}));
+    assert_eq!(text, "ok\n", "a file nothing imports stays writable");
+}
+
 /// The agent's own write tool asks before touching those files, in any
 /// approval mode; unattended, it's refused.
 #[test]

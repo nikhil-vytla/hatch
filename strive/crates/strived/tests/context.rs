@@ -245,10 +245,10 @@ fn a_learned_skills_directory_that_is_a_symlink_is_not_loaded() {
 }
 
 /// Everything the loader gives a session is on one list that the approval
-/// gate and the sandbox guard. What a listed path leads to elsewhere (a
-/// symlink, an import) isn't loaded: an edit there would change what every
-/// session is told with no one asked. A link or import to another listed
-/// file is loaded.
+/// gate and the sandbox guard, or imported by a file on it (guarded too).
+/// What a listed path links to elsewhere isn't loaded: an edit there would
+/// change what every session is told with no one asked. A link to another
+/// listed file is loaded.
 #[test]
 fn the_loader_reads_nothing_outside_the_list() {
     let env = Env::new();
@@ -268,12 +268,12 @@ fn the_loader_reads_nothing_outside_the_list() {
     let (id, config) = register(&env, &root.join("pkg"));
     let texts: Vec<&str> =
         config["instructions"].as_array().unwrap().iter().map(|f| f["text"].as_str().unwrap()).collect();
-    assert_eq!(texts, vec!["Root.\n@docs/y.md\nImported rules."], "{config}");
+    assert_eq!(texts, vec!["Root.\nImported instructions.\nImported rules."], "{config}");
     let names: Vec<&str> = config["skills"].as_array().unwrap().iter().map(|s| s["name"].as_str().unwrap()).collect();
     assert_eq!(names, vec!["own"], "{config}");
 
     // What it did load, the gate guards: full-auto, unattended, can't write
-    // any of it, nor the file an instruction file imported.
+    // any of it, nor the files an instruction file imported.
     let mut c = env.rpc();
     c.ok("session/approvals", &json!({"id": id, "mode": "fullAuto"}));
     let write_to = |c: &mut common::Rpc, path: &str| {
@@ -284,8 +284,8 @@ fn the_loader_reads_nothing_outside_the_list() {
     };
     let instructions = config["instructions"].as_array().unwrap().iter().map(|f| f["path"].as_str().unwrap());
     let skills = config["skills"].as_array().unwrap().iter().map(|s| s["path"].as_str().unwrap());
-    let imported = root.join("pkg/rules/AGENTS.md").display().to_string();
-    for path in instructions.chain(skills).chain([imported.as_str()]) {
+    let imported = [root.join("pkg/rules/AGENTS.md"), root.join("docs/y.md")].map(|p| p.display().to_string());
+    for path in instructions.chain(skills).chain(imported.iter().map(String::as_str)) {
         let r = write_to(&mut c, path);
         assert_eq!(r["outcome"]["kind"], "refused", "{path}: {r}");
         assert!(r["text"].as_str().unwrap().contains("every future session"), "{path}: {r}");
@@ -294,4 +294,61 @@ fn the_loader_reads_nothing_outside_the_list() {
     // free, and it stays out of every session.
     let r = write_to(&mut c, "docs/x.md");
     assert_eq!(r["outcome"]["kind"], "done", "{r}");
+}
+
+/// An instruction file's imports are inlined where they are inside the
+/// project, and guarded as it is: a write to one, or to one not yet
+/// written, asks a person even in full-auto.
+#[test]
+fn an_import_inside_the_project_is_inlined_and_guarded() {
+    let env = Env::new();
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path().canonicalize().unwrap();
+    git_init(&root);
+    let fence = "```\n@docs/style.md\n```";
+    write(&root.join("AGENTS.md"), &format!("Root.\n@docs/style.md\n@docs/later.md\n{fence}"));
+    write(&root.join("docs/style.md"), "Style.\n@../rules/deep.md");
+    write(&root.join("rules/deep.md"), "Deep.");
+    fs::create_dir_all(root.join("pkg")).unwrap();
+    let (id, config) = register(&env, &root.join("pkg"));
+    let expected = format!("Root.\nStyle.\nDeep.\n@docs/later.md\n{fence}");
+    assert_eq!(config["instructions"][0]["text"], expected.as_str(), "a code block stays as text: {config}");
+
+    let mut c = env.rpc();
+    c.ok("session/approvals", &json!({"id": id, "mode": "fullAuto"}));
+    let write_to = |c: &mut common::Rpc, path: &str| {
+        let request = json!({"kind": "write", "path": root.join(path), "content": "x"});
+        c.ok("effect/run", &json!({"id": id, "callId": "c", "request": request}))
+    };
+    for (path, by) in
+        [("docs/style.md", "AGENTS.md"), ("rules/deep.md", "docs/style.md"), ("docs/later.md", "AGENTS.md")]
+    {
+        let r = write_to(&mut c, path);
+        let text = r["text"].as_str().unwrap();
+        assert_eq!(r["outcome"]["kind"], "refused", "{path}: {text}");
+        assert!(text.contains(&format!("it's imported by {by}")), "{path}: {text}");
+        assert!(text.contains("needs a person's approval even in full-auto"), "{path}: {text}");
+    }
+    assert_eq!(fs::read_to_string(root.join("docs/style.md")).unwrap(), "Style.\n@../rules/deep.md");
+    assert!(!root.join("docs/later.md").exists());
+    let r = write_to(&mut c, "pkg/other.md");
+    assert_eq!(r["outcome"]["kind"], "done", "a file nothing imports is ordinary: {r}");
+}
+
+/// An import outside the project, or through a symlink that leads out of
+/// it, stays as text: the gate and the sandbox guard only the project.
+#[test]
+fn an_import_outside_the_project_is_refused() {
+    let env = Env::new();
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path().canonicalize().unwrap().join("repo");
+    fs::create_dir_all(&root).unwrap();
+    git_init(&root);
+    let outside = root.parent().unwrap().join("outside.md");
+    write(&outside, "Outside.");
+    std::os::unix::fs::symlink(&outside, root.join("link.md")).unwrap();
+    let text = format!("Root.\n@{}\n@../outside.md\n@link.md", outside.display());
+    write(&root.join("AGENTS.md"), &text);
+    let (_, config) = register(&env, &root);
+    assert_eq!(config["instructions"][0]["text"], text, "{config}");
 }

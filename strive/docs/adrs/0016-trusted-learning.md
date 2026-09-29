@@ -193,6 +193,7 @@ A proposal is `ready` once the static check passed and the judge finished
 - **Nor can it change the rest of what shapes later sessions** (amended
   2026-09-28): `AGENTS.md`, `CLAUDE.md`, `.claude/skills` and
   `.strive/settings.json` are on the same list as memory and skills, one
-  that the loader reads from and the gate and the sandbox guard. They are
+  that the loader reads from and the gate and the sandbox guard, and so is
+  each file in the project an instruction file imports. They are
   still the project's own files, outside review: a person asked approves a
   change, and an edit by hand isn't flagged.

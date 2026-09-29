@@ -184,13 +184,18 @@ Confining the host process to the daemon's socket and gateway is planned.
 - **Memory:** `.strive/memory.md`, the last instruction file, labeled as
   memory a person reviewed. Its `@` lines stay text. The same rules
   apply: regular files only, never from strive's home.
-- **Only what is on the list:** every file above is read only if its real
-  path is on "What shapes a session" (below). A symlinked `AGENTS.md`
-  leading to `docs/x.md` is skipped, and so is an `@docs/x.md` import (it
-  stays as text) or a skill linked in from elsewhere. `CLAUDE.md` linked
-  to `AGENTS.md`, or `@rules/AGENTS.md`, loads, since both ends are
-  guarded. Memory and `.strive/skills` must also be reached without any
-  symlink.
+- **Imports:** a line `@path` in an instruction file, outside a code
+  block, inlines that file if its real path is in the project (under its
+  root, not in strive's home), up to five imports deep, and not as a
+  cycle. One outside the project, or a symlink leading out of it, stays as
+  text. Each import in the project is guarded as the file that imports it
+  (see "What shapes a session").
+- **Only what is on the list:** every other file above is read only if
+  its real path is on "What shapes a session" (below). A symlinked
+  `AGENTS.md` leading to `docs/x.md` is skipped, and so is a skill linked
+  in from elsewhere. `CLAUDE.md` linked to `AGENTS.md` loads, since both
+  ends are guarded. Memory and `.strive/skills` must also be reached
+  without any symlink.
 - **MCP servers:** the stdio servers in `mcpServers` in settings.
   - They are started for the session in its directory, without strive's
     variables or provider keys.
@@ -375,7 +380,8 @@ project's directory against rewinds.
 **What shapes a session.** One list, `context::SHAPING`, names every file
 or directory whose contents a session is given when it starts, or which
 decides how strive runs it. The loader reads nothing in a project that
-isn't on it, and the approval gate and the sandbox guard all of it:
+isn't on it or imported by a file on it, and the approval gate and the
+sandbox guard all of it:
 - **The list**, by last components at any depth under the project's root
   (the repository's, or the workspace outside one), since a later session
   may start in any directory:
@@ -388,6 +394,10 @@ isn't on it, and the approval gate and the sandbox guard all of it:
   agent can't write anything in it. MCP servers come from
   `~/.strive/settings.json` only; a project's `.mcp.json` is Claude Code's,
   and is guarded as a file that runs code (see "The sandbox").
+- **Imports** join the list for their project: each path an instruction
+  file imports inside the project, inlined or not (one not written yet
+  too). Only guarded files import, so the set changes only as a person
+  allows; the daemon reads it again for each effect.
 - **Agent writes:** a work session's `write` or `edit` that reaches a
   listed path asks a person in every approval mode, `fullAuto` included,
   and "allow for the session" doesn't cover the next one. The path is
@@ -395,20 +405,25 @@ isn't on it, and the approval gate and the sandbox guard all of it:
   The request says why: learned files, that the change reaches every future
   session without review, naming `strive learn` and `strive review`;
   instruction files and skills, that it "changes what every future session
-  in this project is told"; settings, that it changes strive's settings for
+  in this project is told"; imports, that "it's imported by AGENTS.md"
+  (naming the file); settings, that it changes strive's settings for
   every future session. Unattended, it's refused.
 - **Commands:** the macOS sandbox denies writes to every listed path by
   pattern, in any case, anywhere under the project's root, and to
   `.strive` and `.claude` themselves, so neither can be made elsewhere and
   moved into place or moved aside. Their other files stay writable, and
-  reads are allowed. On Linux, bubblewrap binds the listed paths in the
-  workspace itself read-only where they exist: a command can still create
-  a missing one, or change a nested one (`pkg/AGENTS.md`). With
+  reads are allowed. Each import is denied by its path, in any case, and
+  so is each directory between it and the project's root, so none can be
+  moved aside, moved into place or swapped for a symlink. On Linux,
+  bubblewrap binds the listed paths in the workspace itself, and the
+  imports, read-only where they exist: a command can still create a
+  missing one, or change a nested one (`pkg/AGENTS.md`). With
   `"sandbox": "off"` none of this applies to commands.
-- **Symlinks and imports:** the loader skips a listed path whose real path
-  isn't listed (see "Context"), so the guards need to know only the list,
-  and a plain edit of the file a link or import names can't change what
-  sessions are told.
+- **Symlinks:** the loader skips a listed path whose real path isn't
+  listed (see "Context"), so a plain edit of the file a link names can't
+  change what sessions are told. An import is guarded where it is written
+  and where it leads, so one that links elsewhere in the project guards
+  both.
 - **The daemon's own write** on accept and rollback is not an agent effect,
   so none of this applies to it.
 - **MCP servers can write anything.** They run unsandboxed, as the user,
@@ -574,8 +589,8 @@ server, so they are coordinated by the session's directory alone.
 - **Linux (bubblewrap):**
   - Commands get their own PID namespace, so every process dies with the
     command.
-  - The listed files that exist in the workspace itself are bound
-    read-only.
+  - The listed files that exist in the workspace itself, and imports that
+    exist, are bound read-only.
   - `/tmp` and `/run` are private, which keeps the user's D-Bus, systemd,
     X11 and Docker sockets out of reach.
   - There is no network.

@@ -3,8 +3,9 @@
 //! Instructions come from `AGENTS.md` (or `CLAUDE.md` where a directory has
 //! no `AGENTS.md`) in each directory from the repository root down to the
 //! workspace, after a global `~/.strive/AGENTS.md`. Outside a repository
-//! only the workspace itself is read. A line `@path` inlines that file once;
-//! a cycle, or a file not on the list below, stays as text.
+//! only the workspace itself is read. A line `@path` inlines that file once
+//! if its real path is in the project; a cycle, a path outside the project,
+//! or one more than five imports deep stays as text.
 //!
 //! Skills are folders with a `SKILL.md` whose frontmatter names and
 //! describes them, found in the workspace's `.strive/skills` and
@@ -15,8 +16,9 @@
 //! reviewed: it changes only when a person accepts a learner's proposal.
 //!
 //! Everything read here is on one list, [`SHAPING`], which the approval gate
-//! and the sandbox guard (`effects`). A file is read only if its real path
-//! is on it, so a symlink or an import that leads elsewhere is skipped: an
+//! and the sandbox guard (`effects`), or imported by a file on it, which
+//! they guard too ([`imports`]). Any other file is read only if its real
+//! path is on the list, so a symlink that leads elsewhere is skipped: an
 //! edit there would change what sessions are told, with no one asked.
 
 use std::fs;
@@ -84,6 +86,15 @@ pub struct Context {
     pub skills: Vec<SkillInfo>,
 }
 
+/// A path in the project an instruction file imports, whether or not it
+/// was inlined: guarded as the instruction file is, since what is there
+/// (or is put there) is told to later sessions.
+pub struct Import {
+    pub path: PathBuf,
+    /// The importing file, as shown to a person.
+    pub by: String,
+}
+
 /// The project's root and strive's home, canonical: what a real path is
 /// checked against.
 struct Anchors {
@@ -92,6 +103,11 @@ struct Anchors {
 }
 
 impl Anchors {
+    fn new(workspace: &Path, strive_home: &Path) -> Self {
+        let canonical = |p: &Path| p.canonicalize().unwrap_or_else(|_| p.to_path_buf());
+        Self { root: canonical(&project_root(workspace)), home: canonical(strive_home) }
+    }
+
     /// Whether the loader may read `real`: on the list under the project's
     /// root, or strive home's `AGENTS.md` or skills.
     fn listed(&self, real: &Path) -> bool {
@@ -100,15 +116,35 @@ impl Anchors {
         }
         shapes(&self.root, real).is_some()
     }
+
+    /// Whether an import of `path` stays in what the gate and the sandbox
+    /// guard: the project, minus strive's home.
+    fn inside(&self, path: &Path) -> bool {
+        path.starts_with(&self.root) && path != self.root && (!path.starts_with(&self.home) || self.listed(path))
+    }
+
+    fn shown(&self, path: &Path) -> String {
+        path.strip_prefix(&self.root).unwrap_or(path).display().to_string()
+    }
 }
 
 pub fn load(workspace: &Path, strive_home: &Path) -> Context {
-    let canonical = |p: &Path| p.canonicalize().unwrap_or_else(|_| p.to_path_buf());
-    let at = Anchors { root: canonical(&project_root(workspace)), home: canonical(strive_home) };
-    Context { instructions: instructions(workspace, strive_home, &at), skills: skills(workspace, strive_home, &at) }
+    let at = Anchors::new(workspace, strive_home);
+    Context {
+        instructions: instructions(workspace, strive_home, &at, &mut Vec::new()),
+        skills: skills(workspace, strive_home, &at),
+    }
 }
 
-fn instructions(workspace: &Path, strive_home: &Path, at: &Anchors) -> Vec<InstructionFile> {
+/// What the project's instruction files import, as `load` finds it. Only
+/// guarded files import, so this changes only as a person allows.
+pub fn imports(workspace: &Path, strive_home: &Path) -> Vec<Import> {
+    let mut found = Vec::new();
+    instructions(workspace, strive_home, &Anchors::new(workspace, strive_home), &mut found);
+    found
+}
+
+fn instructions(workspace: &Path, strive_home: &Path, at: &Anchors, found: &mut Vec<Import>) -> Vec<InstructionFile> {
     let mut files: Vec<PathBuf> = Vec::new();
     let global = strive_home.join("AGENTS.md");
     if global.is_file() {
@@ -125,8 +161,8 @@ fn instructions(workspace: &Path, strive_home: &Path, at: &Anchors) -> Vec<Instr
     let mut total = 0;
     let mut out = Vec::new();
     for path in files {
-        let mut stack = Vec::new();
-        let Some(mut text) = expand(&path, at, &mut stack) else { continue };
+        let Some(real) = path.canonicalize().ok().filter(|r| at.listed(r)) else { continue };
+        let Some(mut text) = expand(&real, at, &mut Vec::new(), found) else { continue };
         if text.len() > FILE_LIMIT {
             text = format!("{}\n[... cut at {} KiB]", truncate(&text, FILE_LIMIT), FILE_LIMIT / 1024);
         }
@@ -242,32 +278,43 @@ fn read_regular(path: &Path) -> Option<String> {
     Some(text)
 }
 
-/// A listed file's text with its `@path` lines inlined where they name
-/// listed files too.
-fn expand(path: &Path, at: &Anchors, stack: &mut Vec<PathBuf>) -> Option<String> {
-    let real = path.canonicalize().ok()?;
-    if !at.listed(&real) {
-        return None;
-    }
-    let text = read_regular(&real)?;
-    if stack.len() >= IMPORT_DEPTH {
-        return Some(text);
-    }
-    stack.push(real.clone());
+/// An instruction file's text (`real` is its canonical path) with each
+/// line `@path` outside a code block inlined, if its real path is a file in
+/// the project, at most `IMPORT_DEPTH` deep and not a cycle. Every import in
+/// the project, inlined or not, joins `found`: the gate and the sandbox
+/// guard it, so a file put there later is still one a person allowed.
+fn expand(real: &Path, at: &Anchors, stack: &mut Vec<PathBuf>, found: &mut Vec<Import>) -> Option<String> {
+    let text = read_regular(real)?;
+    let deep = stack.len() >= IMPORT_DEPTH;
+    stack.push(real.to_path_buf());
     let dir = real.parent().unwrap_or(Path::new("/")).to_path_buf();
+    let by = at.shown(real);
+    let mut fenced = false;
     let lines: Vec<String> = text
         .split('\n')
         .map(|line| {
-            let Some(target) =
-                line.trim().strip_prefix('@').filter(|t| !t.is_empty() && !t.contains(char::is_whitespace))
+            let trimmed = line.trim();
+            if trimmed.starts_with("```") || trimmed.starts_with("~~~") {
+                fenced = !fenced;
+            }
+            let Some(target) = trimmed
+                .strip_prefix('@')
+                .filter(|t| !fenced && !t.is_empty() && !t.contains(char::is_whitespace))
+                .map(Path::new)
             else {
                 return line.to_string();
             };
-            let target = Path::new(target);
-            let resolved = if target.is_absolute() { target.to_path_buf() } else { dir.join(target) };
-            match resolved.canonicalize() {
-                Ok(r) if !stack.contains(&r) && r.is_file() => {
-                    expand(&r, at, stack).map_or_else(|| line.to_string(), |t| t.trim_end().to_string())
+            let written = lexical(&if target.is_absolute() { target.to_path_buf() } else { dir.join(target) });
+            // Where it is now, and where a file would be made: both guarded.
+            let paths = [crate::effects::real_path(&written), Some(written)];
+            for path in paths.into_iter().flatten().filter(|p| at.inside(p)) {
+                if !found.iter().any(|i| i.path == path) {
+                    found.push(Import { path, by: by.clone() });
+                }
+            }
+            match target_of(&dir.join(target), at) {
+                Ok(r) if !deep && !stack.contains(&r) => {
+                    expand(&r, at, stack, found).map_or_else(|| line.to_string(), |t| t.trim_end().to_string())
                 }
                 _ => line.to_string(),
             }
@@ -275,6 +322,39 @@ fn expand(path: &Path, at: &Anchors, stack: &mut Vec<PathBuf>) -> Option<String>
         .collect();
     stack.pop();
     Some(lines.join("\n"))
+}
+
+/// Why an import isn't inlined.
+enum Skip {
+    Outside,
+    Missing,
+}
+
+/// The real path of the file `path` imports, if it may be inlined.
+fn target_of(path: &Path, at: &Anchors) -> Result<PathBuf, Skip> {
+    let real = path.canonicalize().map_err(|_| Skip::Missing)?;
+    if !at.inside(&real) {
+        return Err(Skip::Outside);
+    }
+    if !real.is_file() {
+        return Err(Skip::Missing);
+    }
+    Ok(real)
+}
+
+/// `p` with `.` and `..` resolved by name alone.
+fn lexical(p: &Path) -> PathBuf {
+    let mut out = PathBuf::new();
+    for c in p.components() {
+        match c {
+            std::path::Component::ParentDir => {
+                out.pop();
+            }
+            std::path::Component::CurDir => {}
+            c => out.push(c),
+        }
+    }
+    out
 }
 
 fn skills(workspace: &Path, strive_home: &Path, at: &Anchors) -> Vec<SkillInfo> {

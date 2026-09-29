@@ -78,9 +78,11 @@ The agent follows the project's `AGENTS.md` (or `CLAUDE.md`) files and
 knows its skills (`SKILL.md` under `.strive/skills`, `.claude/skills` or
 `~/.strive/skills`). Long conversations are summarized before they
 outgrow the model's context. The agent asks you before it changes any of
-these files, or `.strive/settings.json`, whatever the approval mode. A
-symlink or `@import` that leads to some other file (`docs/x.md`) isn't
-loaded; one that leads to another `AGENTS.md` or `CLAUDE.md` is.
+these files, or `.strive/settings.json`, whatever the approval mode. An
+`@docs/x.md` line in `AGENTS.md` or `CLAUDE.md` loads that file if it's
+inside the project, and the agent asks before changing it too; one outside
+the project isn't loaded. A symlinked `AGENTS.md` that leads to some other
+file isn't loaded; one that leads to another `AGENTS.md` or `CLAUDE.md` is.
 
 The project's learner studies its sessions and proposes changes to
 `.strive/memory.md` and `.strive/skills`. It can't change a file itself.
