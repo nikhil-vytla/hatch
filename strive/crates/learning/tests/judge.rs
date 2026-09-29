@@ -115,7 +115,7 @@ fn the_detail_says_the_outcome_what_was_held_out_and_each_reason() {
     assert!(d.contains("\nFAIL novel: because novel\n") && d.contains("\npass checkable:"), "{d}");
 
     let contrary = judge::read(&call(&input(&[], "fail"))).unwrap();
-    assert!(judge::detail(&contrary, "m", &held).starts_with("failed: the judge's verdict was fail though"));
+    assert!(judge::detail(&contrary, "m", &held).starts_with("failed: the second opinion's verdict was fail though"));
 
     let long = judge::Judged {
         criteria: vec![judge::Marked { id: "safe", pass: true, reason: format!("a\n{}", "x".repeat(2000)) }],
@@ -128,7 +128,7 @@ fn the_detail_says_the_outcome_what_was_held_out_and_each_reason() {
 
     let u = judge::unreadable("the answer was cut off", "m", &held);
     assert!(u.starts_with(
-        "failed: the judge's answer couldn't be read, so it counts as a fail (the answer was cut off; m,"
+        "failed: the second opinion's answer couldn't be read, so it counts as a fail (the answer was cut off; m,"
     ));
 }
 

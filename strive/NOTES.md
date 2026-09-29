@@ -1970,6 +1970,172 @@ an offline `strive eval`, a later PR.
   `failed_then_passed` (the equal seq is the failed run, excluded by its
   exit). The deleted files' 18 deferred survivors are gone with them.
 
+## 2026-09-28: the offer to learn from a session (item 4 of the plan)
+
+Design in the second amendment to [ADR-0020](docs/adrs/0020-learning-triggers.md).
+With automatic runs off by default, learning starts when a person says yes
+to an offer made from the no-model scan.
+- **The query:** `learning/signals {cwd, session}` (not `session/signals`:
+  it needs the project's learning journal for the watermark, and the
+  desktop main process already binds `cwd` for `learning/*`, so the window
+  can ask about a session it has left). No model, nothing journaled, no
+  learning session made. It returns `signals`, a counted `summary`
+  (`signals::summary`, kinds in order of first appearance, so a new
+  `SignalKind` can't be left out of a list), `ask`, and
+  `estimateUsdMicros`.
+- **`ask`:** signs, a key for the learner's provider (a run without one
+  only fails), and `learning.ask` not false. Mode doesn't matter. In the
+  keyless test daemons the TUI and desktop suites use, it's always false,
+  so no existing test meets a stray offer.
+- **The watermark** (`triggers::acted_on`) now covers three things: an
+  automatic request's signs, a person's request's `signals` (a new field on
+  `learnRequested`, filled in by the daemon for named sessions), and
+  `learnDismissed {session, through}` (new event, from
+  `learning/dismiss`, people only, `through` checked against the session's
+  last seq). So a declined offer also keeps a `suggest` trigger off those
+  signs: the person has said no to spending on them.
+- **Price:** the average of what the learning session spent over the
+  turns that called a model (the judge's calls count, since the person
+  pays for them too), shown in cents rounded up. None before the first run,
+  and the line then says only "It costs a learner run". Pricing from the
+  model's rates would need a guess at tokens read, which is the part that
+  varies.
+- **TUI:** `quit(0)` asks the daemon once; if `ask`, shows the line and
+  the next key answers (`y` or `Y` runs; anything else, Ctrl+C included,
+  dismisses), then exits. A second Ctrl+C while the query is in flight
+  exits at once. Non-zero exits (a lost daemon) never ask.
+- **Desktop:** an `Offers` object held by `Shell` (the `App` remounts on
+  every switch), fed by `turnEnded` for the shown session and by
+  `switchTo` for the session left. One offer at a time, once per session
+  per window. The notice sits above the conversation like the layout
+  proposal strip, but muted.
+- **The learner** gets a person's signs first too, with a line saying the
+  user asked after seeing them.
+- **Tests, failing first where there was behaviour to fail:** learning
+  unit (the watermark with a person's request and dismissals, the counted
+  summary, the cost average: 3 failed before); host learner (a person's
+  signs in the prompt: failed before); view (the offer's text and cents);
+  daemon (`tests/triggers.rs`: a correction and 2 interrupts offered and
+  a clean session not, nothing journaled by asking, another project's
+  session refused; yes records the signs and they aren't offered again
+  while a later one is; a dismissal isn't offered again, a too-high
+  `through` and a host are refused, and an every-3-turns scan after it
+  finds "no new signs"; `ask: false` and no key); TUI with the real
+  daemon, host and FakeAnthropic (Ctrl+D offers, `y` journals a
+  `learnRequested` naming the session; `n` journals `learnDismissed` and
+  no request, and resuming and quitting again doesn't ask; a clean
+  session and `ask: false` exit without asking: the two offer tests
+  failed before the TUI change); desktop unit (`Offers`: once per session,
+  one at a time, concurrent asks) and e2e (the notice after a turn ends,
+  its button journals the run; switching away offers the left session,
+  Dismiss journals `learnDismissed` and no run).
+- **Flakes seen under load (load average 17 to 30, other agents running),
+  both in tests this change doesn't touch:** `sessions`'
+  `a_session_is_listed_by_its_first_prompt` timed out on `rpc`'s 5 s read
+  while two prompts took checkpoints; it now uses `slow_rpc` like the
+  other checkpointing tests (5/5 alone before the change too, one run 9.9 s).
+  `effects`' two wall-clock bounds (stopped within 2 s and 4 s) were over
+  by 1.6 s and 0.01 s at load 30; 35/35 three times alone, and the next
+  full `check.sh` passed. Left alone: another agent is changing effects.
+- **`strive run`** has no offer code at all; it uses no `App`.
+
+Deferred:
+- A project's own `.strive/settings.json` can't set `ask` (only `mode`).
+- The desktop offer after a quiet period rather than at each turn's end,
+  and an offer when the window closes.
+- A price before a project's first run.
+- Asking again in the same TUI process or desktop window about signs that
+  arrive after an answer (the watermark allows it; the clients don't).
+
+### The offer after a hands-on review (2026-09-28)
+
+A walk through the TUI, the CLI and the desktop (screens in
+`/tmp/learnux`, again after the changes in `/tmp/learnux/after`) found
+these; each is fixed here, with a test that failed first where there was
+behaviour to fail.
+- **After "y" the TUI showed nothing.** `answer()` set the line and
+  exited; `requestRender` only schedules a frame, and `main.ts` stops the
+  screen on exit, so the frame never came. It calls `tui.renderNow()`
+  first. The agent tests' exit now stops the screen as `main.ts` does,
+  which is what made the test fail before the fix.
+- **Proposals waiting went unmentioned.** A TUI session says "2 proposals
+  are waiting: `strive review`" as it opens (`proposal/list`, counting
+  `ready`; cheap enough, since it's one fold and a read of each learned
+  file). The desktop's Learned button shows the count instead of a dot, and
+  the window lists proposals again on focus: without that, a run from
+  `strive learn` in a terminal never reached the count, because the main
+  process only follows a learning session it found at startup or on a
+  list.
+- **`strive review ID` was long and in the code's words.** Now: summary
+  and status, where the run came from, the diff, a one-line verdict
+  ("safety checks passed; second opinion advises against it: <first failed
+  criterion's reason>"), what to do. `--full` adds why, the prediction,
+  the evidence, the signs the run was given and each check in full.
+  Session ids are replaced by titles wherever the CLI names a session
+  (the held-out sessions inside the judge's detail too). "static",
+  "judge" and "stale" are "safety checks", "second opinion" and "the file
+  changed since this was proposed" in what people read, including the
+  daemon's refusals and the judge's skip and failure details (journaled
+  text, so old journals keep the old words). The protocol and code keep
+  their names; `status_name` stays the wire name (a test pins that).
+- **Where a run came from** needed a fact the journal didn't have: a
+  person's `learning/run` naming a session looked the same from the offer
+  and from `strive learn --session`. `learning/run` takes `offer: true`
+  (the TUI and desktop send it), `learnRequested` records it, and the fold
+  gives each proposal `offered` (the signs) beside `trigger`.
+- **`strive learn`** follows the run quietly (`Follow.quiet`): "studying 1
+  session…", then the list. The turn's end is printed only if it failed;
+  `strive log` has the steps.
+- **Refused rollbacks were offered.** `proposal/list` sets `canRollBack`
+  on an applied proposal whose file is still what it wrote (one read per
+  file), and the fold sets `replacedBy` when a later accept for the same
+  file writes over an applied one (cleared if that one is rolled back to
+  this one's content). The CLI shows "replaced by #N", drops the rollback
+  hint, and refuses `rollback` itself with the reason; the desktop badge
+  says "replaced by #N" and Roll back is hidden. The desktop Accept
+  tooltip says why for a failed or checking proposal instead of "Only a
+  proposal whose checks passed".
+- **The desktop offer came at the first turn end with a sign,** often
+  mid-correction. `Offers.idle` starts a minute's timer at `turnEnded`;
+  `userMessage` or `turnStarted` cancels it. Switching away still offers at
+  once, and closing the window now does too: main prevents the first
+  `close`, sends `strive:closing`, and the page calls `strive:close` when
+  there's nothing to offer or once it's answered (a second close, or
+  `before-quit`, isn't held, so Playwright's `app.close()` and Cmd+Q
+  aren't blocked). A session may be offered twice in a window: again only
+  for signs after the first answer. The e2e tests shorten the product's
+  own timer with `STRIVE_DESKTOP_OFFER_IDLE_MS`; the unit tests drive it
+  with an injected clock.
+- **The first offer had no price.** Before a project's first run the
+  estimate is the learner model's price for the average run tokens of up
+  to five other projects' learning sessions (`usage_per_run`), or for
+  `TYPICAL_RUN` (60,000 in, 2,000 out, no cache: an assumption, not a
+  measurement, and high on purpose) when none has run: $0.21 on
+  claude-sonnet-4-5.
+- **Tests:** TUI (the after-y line on the stopped screen; the waiting line,
+  2 then 1 after a rejection); CLI (`review ID`'s order, what's hidden
+  without `--full` and what `--full` adds; "replaced by", the rollback hint
+  and refusal before and after a hand edit and after putting the file
+  back; where a run came from; `strive learn`'s four lines); fold
+  (replaced and restored, `offered`); `usage_per_run`; the first estimate;
+  desktop unit (`Offers`: idle timer, reset by a prompt, re-offer once
+  after a dismissal, close) and e2e (the count badge; Roll back hidden for
+  replaced and hand-edited; Accept's tooltip on a failed proposal; the
+  idle offer; the offer on close).
+
+Deferred:
+- **A learner host that lives on proposes against stale files.** The
+  host is given the learned files once, at `host/register`, and a
+  proposal's `before` is the file as last given there. A second
+  `strive learn` while the host is still running proposes against the
+  file before the first accept, so accepting it goes stale. The walk hit
+  it; restarting the daemon between runs avoids it. The fix is for the
+  daemon to give the host the files again with each request (a
+  `contextLoaded` per run, not only at `host/register` in `methods.rs`),
+  and for the host to use them: a change of its own.
+- The desktop doesn't say where a run came from (the CLI does); its
+  detail already names an automatic run's trigger.
+- Quitting the app with Cmd+Q doesn't offer; only closing the window does.
 ## 2026-09-28: one list of what shapes a session (item 3 of the plan)
 
 Three notions of "files that shape later sessions" had drifted apart: the
@@ -2136,3 +2302,23 @@ unasked, with no sandbox rule in the way.
     ignore; the desktop's "Allow everything" says so.
   - Linux: missing imports aren't bound (bwrap binds what exists), and
     the directories above an import aren't protected there.
+
+### Three regressions a stop-time review found, fixed
+
+- **Rollback recovery was blocked.** `canRollBack` allowed only a file
+  still holding what the proposal wrote, and `strive review ID rollback`
+  refused on that before asking the daemon. But the daemon finishes a
+  rollback a crash cut off, when the file already holds what it held
+  before. The flag now follows the daemon's rule, and the CLI always asks
+  the daemon, showing the list's plainer reason when it refuses. A test
+  through `strive review` failed first.
+- **The first price estimate read other projects' learning journals**
+  (aggregate token usage, not text). A window is bound to its project, so
+  the estimate now uses only the documented typical run until this
+  project has runs of its own; the cross-project average and its test are
+  deleted.
+- **An answered desktop offer could come back.** Switching away while a
+  dismissal was still being recorded let a concurrent check read the old
+  watermark. A session is no longer reconsidered while its answer is on
+  its way, and the window offers only signs newer than the last answered
+  one. A unit test with a slow dismissal failed first.

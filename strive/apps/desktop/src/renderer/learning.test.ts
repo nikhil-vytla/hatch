@@ -108,7 +108,7 @@ test("a judge detail without a summary still reads; anything else is left as it 
   [swapped[2], swapped[6]] = [swapped[6] ?? "", swapped[2] ?? ""];
 
   const unread = [
-    "failed: the judge's answer couldn't be read, so it counts as a fail (the answer was cut off; m, held out session s1)",
+    "failed: the second opinion's answer couldn't be read, so it counts as a fail (the answer was cut off; m, held out session s1)",
     "not run: no Anthropic key; add one with `strive auth anthropic`",
     // Criteria out of the rubric's order, one missing, or a line too many: not the daemon's shape.
     swapped.join("\n"),
@@ -126,6 +126,7 @@ test("a file's history is every proposal for the same file, newest first", () =>
     proposal: { ...PROPOSAL, artifact },
     status: "ready",
     gates: [],
+    canRollBack: false,
   });
 
   // Not in the order proposal/list gives them, so the order comes from the ids.
@@ -147,6 +148,7 @@ test("a judge fail is advice: the failed criteria's reasons, or the detail's fir
     proposal: PROPOSAL,
     status: "ready",
     gates,
+    canRollBack: false,
   });
 
   const judged = [

@@ -74,6 +74,15 @@ pub struct LearningSetting {
     /// The most automatic runs per project in any 24 hours.
     #[serde(default = "default_daily_runs")]
     pub daily_runs: usize,
+    /// Whether the TUI and desktop offer a run for a session with signs, as
+    /// it ends or goes idle. In every mode: the offer is how learning
+    /// usually starts when automatic runs are off.
+    #[serde(default = "default_ask")]
+    pub ask: bool,
+}
+
+fn default_ask() -> bool {
+    true
 }
 
 fn default_idle_seconds() -> u64 {
@@ -91,6 +100,7 @@ impl Default for LearningSetting {
             idle_seconds: default_idle_seconds(),
             every_turns: 0,
             daily_runs: default_daily_runs(),
+            ask: default_ask(),
         }
     }
 }

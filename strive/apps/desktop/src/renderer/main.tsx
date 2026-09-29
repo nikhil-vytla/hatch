@@ -1,8 +1,9 @@
 import type { Entry } from "@strive/protocol";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import type { Bridge, Opened, StriveEvent } from "../shared/bridge";
 import { App } from "./App";
+import { IDLE_MS, Offers, offerDaemon } from "./offers";
 import "./styles.css";
 
 declare global {
@@ -42,9 +43,23 @@ const events: Bridge = {
 
 function Shell({ first }: { first: Opened }) {
   const [opened, setOpened] = useState(first);
+  // Every session of the window is in one project, so one set of offers serves them all.
+  const [offers] = useState(() => new Offers(offerDaemon(events, first.session.cwd), first.offerIdleMs ?? IDLE_MS));
+  const shown = useRef(opened.session.id);
+  shown.current = opened.session.id;
+
+  // Asked to close, the window offers the session shown first, and closes once that's answered.
+  useEffect(() => {
+    const close = () => void window.strive.close();
+
+    window.strive.onClosing(() => {
+      offers.beforeClose(shown.current, close).then((asking) => asking || close(), close);
+    });
+  }, [offers]);
 
   const switchTo = async (id?: string) => {
     const before = listener;
+    const left = opened.session.id;
     listener = undefined;
 
     try {
@@ -54,9 +69,12 @@ function Shell({ first }: { first: Opened }) {
       if (before) events.onEvent(before);
       throw e;
     }
+
+    // Left behind, a session with signs is offered for learning.
+    offers.consider(left).catch(() => undefined);
   };
 
-  return <App key={opened.session.id} bridge={events} opened={opened} onSwitch={switchTo} />;
+  return <App key={opened.session.id} bridge={events} opened={opened} onSwitch={switchTo} offers={offers} />;
 }
 
 if (root) window.strive.opened().then((opened) => createRoot(root).render(<Shell first={opened} />));

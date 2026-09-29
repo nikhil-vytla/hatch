@@ -149,7 +149,12 @@ async fn scan_and_ask(state: &Arc<State>, cwd: &str, work: &SessionId, kind: Tri
         state.sessions.append(&sid, vec![Event::LearnSkipped { trigger, reason }]).await.map_err(session_error)?;
         return Ok(());
     }
-    let asked = Event::LearnRequested { sessions: vec![work.as_str().to_string()], trigger: Some(trigger) };
+    let asked = Event::LearnRequested {
+        sessions: vec![work.as_str().to_string()],
+        trigger: Some(trigger),
+        signals: None,
+        offer: None,
+    };
     state.sessions.append(&sid, vec![asked]).await.map_err(session_error)?;
     state.hosts.ensure(&sid, &state.home.socket(), &state.sessions.session_dir(&sid).join("host.log"));
     Ok(())

@@ -260,7 +260,8 @@ by `learning/open`. Its `sessionStarted` says `kind: learning`.
 - `learning/run` (people only) journals `learnRequested`, naming work
   sessions of the project or none, and starts the session's host. Prompts
   to a learning session are refused. The daemon's own triggers journal it
-  too, with a `trigger` (below).
+  too, with a `trigger` (below). A person's request that names sessions
+  carries their `signals` not yet dealt with, found as a trigger's are.
 
 **What its host may do.** Its `host/register` returns `kind: learning`,
 no MCP tools, and `learnedFiles`: the project's memory and skills, each
@@ -335,10 +336,16 @@ it is admitted, held, journaled and charged like any call of that session.
   can't pay, or if the provider is rate-limited or overloaded (429, 529):
   that says nothing about the proposal. Failed if the provider refuses
   otherwise or the call breaks.
-- **Advice:** a fail doesn't block. `strive review` puts "the judge advises
-  against it" and its first line near the top, marks the list line, and
-  says accept writes the file anyway; the desktop shows the same with the
-  failed criteria's reasons at the top of the proposal.
+- **Advice:** a fail doesn't block. `strive review` says "second opinion
+  advises against it" and the first failed criterion's reason in its
+  one-line verdict, marks the list line, and says accept writes the file
+  anyway; the desktop shows the same with the failed criteria's reasons at
+  the top of the proposal.
+- **Named for people:** what a person reads calls the static gate the
+  "safety checks" and the judge the "second opinion" (`strive review`,
+  `strive log`, the Learned pane, the daemon's refusals and skip reasons);
+  the code, the protocol (`static`, `judge`) and the rubric keep their
+  names.
 - **In the background:** otherwise the proposal stays `checking` while the
   call runs, without the project's lock. The verdict is journaled under the
   lock, and only if there isn't one. A set of running judges keeps a list
@@ -357,6 +364,21 @@ it is admitted, held, journaled and charged like any call of that session.
 | `applied` | accepted and written (`proposalApplied`) |
 | `stale` | accepted, but the file wasn't as the learner saw it, so nothing was written |
 | `rolledBack` | an applied one, undone |
+
+People read `stale` as "file changed" in a list and "not written: the file
+changed since this was proposed" on its own. Two more facts ride with an
+`applied` one:
+- `replacedBy`: a later proposal for the same file was applied over it
+  (the fold sets it, and clears it if that one is rolled back to this
+  one's content). It shows as "replaced by #N" instead of `applied`.
+- `canRollBack`: `proposal/list` compares the file now with what the
+  proposal wrote. Roll back is offered (the CLI's hint, the desktop's
+  button) only when it's true, since the daemon would refuse otherwise;
+  `strive review ID rollback` says why before asking.
+
+Each proposal also carries `trigger` (an automatic run's) or `offered`
+(the signs of a person's yes to the offer), so review can say where its
+run came from.
 
 Gates a crash cut short (a proposal with no verdicts) are run again on the
 next `proposal/list` or decision.
@@ -453,6 +475,38 @@ sandbox guard all of it:
   session runs can change the file between the compare and the write.
   Writes and edits the agent asks for can't: they wait for the file.
 
+**The offer to learn** ([ADR-0020](adrs/0020-learning-triggers.md)) is how
+learning usually starts. As the TUI quits, or once a desktop session has
+been idle a minute after its turn ended (no prompt since), or when the
+window switches away from it or is closed, the client asks
+`learning/signals {cwd, session}`: no model, nothing journaled, no learning
+session created. It returns the session's signs past the watermark (below),
+a counted `summary` ("2 corrections and a command that failed, then
+passed"), `ask`, and `estimateUsdMicros`: what a run (its checks included)
+has cost in this project on average, or before the first the learner
+model's price for other projects' average run tokens (a typical run's,
+`triggers::TYPICAL_RUN`, if none has run). `ask` is true
+when there are signs, the learner's provider has a key, and
+`learning.ask` (default true) isn't false; it doesn't depend on `mode`.
+- **Yes** is `learning/run {sessions: [it], offer: true}`, whose
+  `learnRequested` carries the signs and `offer`; the client exits or goes
+  on without waiting. The TUI draws its "Asked the learner…" line before
+  it exits.
+- **No** (the TUI: any key but y; the desktop: Dismiss) is
+  `learning/dismiss {cwd, session, through}` (people only), journaling
+  `learnDismissed {session, through}` in the learning session.
+- **Once:** the TUI asks at most once a process, the desktop at most twice
+  a session a window (again only for signs after the first answer). Across
+  clients and restarts the watermark keeps the same signs from being
+  offered again. `strive run` never offers.
+- **Closing the desktop window** is held once (`close` is prevented, the
+  page is sent `strive:closing`) so the page can offer; it calls
+  `strive:close` when there's nothing to offer or once it's answered. A
+  second close, or quitting the app (`before-quit`), isn't held.
+- **Proposals waiting:** a TUI session says "2 proposals are waiting:
+  `strive review`" as it opens, and the desktop's Learned button shows the
+  count of `ready` proposals, both from `proposal/list`.
+
 **Triggers** ([ADR-0020](adrs/0020-learning-triggers.md)): the learner
 also runs without being asked, behind `learning` in settings: `mode` (`off`,
 the default, or `suggest`; any other is refused on load), `idleSeconds`
@@ -473,8 +527,9 @@ learning off there.
   interrupted turn, a declined approval, a command that failed then passed
   (in the same turn, then later with exit 0), a failed or timed-out turn. Each is anchored at
   the entry that completes it; at most 20, each with a 120-character
-  excerpt. Only signs past the highest one an earlier automatic request
-  named for that session count. None: nothing is journaled (the log says the
+  excerpt. Only signs past that session's watermark count: the highest
+  seq a request (automatic or a person's) named or a dismissal reached
+  (`triggers::acted_on`). So signs a person declined start no automatic run. None: nothing is journaled (the log says the
   session was scanned).
 - **Limits,** under the project's lock: no request a turn hasn't finished
   and no proposal `checking`; fewer than `dailyRuns` automatic requests in
@@ -491,10 +546,16 @@ learning off there.
   detail, and the skip under the list; `strive log` describes both
   entries. A person decides on every proposal, whoever asked for the run.
 
-`strive learn` requests a run and follows the learning journal as
-`strive run` follows a turn, then lists what was proposed. `strive review`
-lists proposals, shows one (its diff against `before`, evidence,
-prediction and checks) and accepts, rejects or rolls it back.
+`strive learn` requests a run, says "studying 1 session…", follows the
+learning journal quietly (`strive log` has the steps), then lists what was
+proposed, waiting for second opinions still out. `strive review` lists
+proposals and accepts, rejects or rolls one back. `strive review ID` shows,
+in order, the summary and status, where its run came from ("you said yes
+to the end-of-session offer: a correction in \"run the tests\"", "asked
+with `strive learn`", "automatic, …"), the diff against `before`, the
+checks in one line, and what to do next; `--full` adds why, the
+prediction, the evidence, the signs the run was given and each check's
+detail. Sessions are named by their titles, not their ids.
 
 ## The desktop app
 
@@ -522,9 +583,10 @@ prediction and checks) and accepts, rejects or rolls it back.
 - **The Learned pane** (⌘L) is `strive review` in the window: the
   project's proposals, each with its whole-file diff, reasons, evidence and
   checks, and Accept, Reject or Roll back.
-  - `proposal/list`, `proposal/decide`, `proposal/rollback` and
-    `learning/run` get the window's project directory from the main
-    process, whatever the page sends.
+  - `proposal/list`, `proposal/decide`, `proposal/rollback`,
+    `learning/run`, `learning/signals` and `learning/dismiss` get the
+    window's project directory from the main process, whatever the page
+    sends; the daemon refuses a named session outside that project.
   - A proposal's "before" comes through `proposalBefore(id)`, looked up
     among the project's proposals; `blob/get` stays limited to digests the
     shown session names.
@@ -541,8 +603,12 @@ prediction and checks) and accepts, rejects or rolls it back.
     detail is read by criterion when it has the daemon's line shape, else
     shown as is; the other proposals for the same file come from
     `proposal/list`.
-  - A judge fail shows at the top of the proposal as "The judge advises
-    against it", with the failed criteria's reasons; Accept stays available.
+  - A judge fail shows at the top of the proposal as "The second opinion
+    advises against it", with the failed criteria's reasons; Accept stays
+    available. The judge's detail names held-out sessions by title.
+  - The Learned button counts the `ready` proposals. The window lists
+    proposals again when it gets focus, so a run from `strive learn` in a
+    terminal shows in the count on return.
   - Automatic learning: a proposal from an automatic run has an "Automatic"
     badge, and its detail names the trigger and each sign; the latest
     skipped run shows as a notice. `proposal/list` also starts following a learning session that an

@@ -186,3 +186,151 @@ fn gates_are_listed_in_the_order_they_run() {
     let order: Vec<Gate> = folded[0].state.gates.iter().map(|g| g.gate).collect();
     assert_eq!(order, vec![Gate::Static, Gate::Judge]);
 }
+
+/// A later accept for the same file writes over an applied proposal: it's
+/// marked replaced by that one, and back in place once that one is rolled
+/// back to it. A proposal for another file is untouched.
+#[test]
+fn a_later_accept_for_the_same_file_replaces_an_applied_proposal() {
+    let skill = Event::ProposalMade {
+        call_id: None,
+        proposal: Proposal { artifact: Artifact::Skill { name: "release".into() }, ..proposal("skill") },
+        before: None,
+    };
+    let mut events = vec![started(), made("first", None), made("second", Some(digest(2))), skill];
+    for id in 2..=4 {
+        events.extend(passed(id));
+    }
+    for (id, before, after) in [(2, None, digest(2)), (4, None, digest(4)), (3, Some(digest(2)), digest(3))] {
+        events.push(decided(id, ProposalDecision::Accept));
+        events.push(Event::ProposalApplied { proposal: id, before, after });
+    }
+    let replaced = |events: &[Event]| -> Vec<(u64, ProposalStatus, Option<u64>)> {
+        fold(&journal(events.to_vec())).iter().map(|f| (f.state.id, f.state.status, f.state.replaced_by)).collect()
+    };
+    assert_eq!(
+        replaced(&events),
+        vec![
+            (2, ProposalStatus::Applied, Some(3)),
+            (3, ProposalStatus::Applied, None),
+            (4, ProposalStatus::Applied, None)
+        ]
+    );
+    events.push(Event::ProposalRolledBack { proposal: 3, by: "test".into() });
+    assert_eq!(
+        replaced(&events),
+        vec![
+            (2, ProposalStatus::Applied, None),
+            (3, ProposalStatus::RolledBack, None),
+            (4, ProposalStatus::Applied, None)
+        ],
+        "rolling back #3 put #2's content back"
+    );
+}
+
+/// Where a proposal's run came from: the signs a person said yes to, for
+/// the proposals of that run only.
+#[test]
+fn a_proposal_from_a_yes_to_the_offer_carries_the_signs_it_named() {
+    let sign = strive_proto::LearnSignal {
+        session: "A".into(),
+        seq: 4,
+        kind: strive_proto::SignalKind::Correction,
+        detail: "no, use bun".into(),
+    };
+    let asked = |offer: Option<bool>| Event::LearnRequested {
+        sessions: vec!["A".into()],
+        trigger: None,
+        signals: Some(vec![sign.clone()]),
+        offer,
+    };
+    let events = vec![started(), asked(Some(true)), made("offered", None), asked(None), made("asked", None)];
+    let folded = fold(&journal(events));
+    assert_eq!(folded[0].state.offered, Some(vec![sign.clone()]));
+    assert_eq!(folded[1].state.offered, None, "a person named the session without the offer");
+}
+
+fn skill_made(name: &str) -> Event {
+    Event::ProposalMade {
+        call_id: None,
+        proposal: Proposal { artifact: Artifact::Skill { name: name.into() }, ..proposal(name) },
+        before: None,
+    }
+}
+
+fn accepted(id: u64, before: Option<Digest>, after: Digest) -> Vec<Event> {
+    vec![decided(id, ProposalDecision::Accept), Event::ProposalApplied { proposal: id, before, after }]
+}
+
+fn rolled_back(id: u64) -> Event {
+    Event::ProposalRolledBack { proposal: id, by: "test".into() }
+}
+
+fn replaced_by(events: &[Event]) -> Vec<(u64, Option<u64>)> {
+    fold(&journal(events.to_vec())).iter().map(|f| (f.state.id, f.state.replaced_by)).collect()
+}
+
+/// Only the proposal that last wrote the same file is replaced, however the
+/// proposals are ordered: an earlier one for another file isn't.
+#[test]
+fn only_the_same_files_proposal_is_replaced() {
+    // #2 a skill, #3 and #4 memory; #2 applied first.
+    let mut events = vec![started(), skill_made("release"), made("first", None), made("second", Some(digest(3)))];
+    for id in 2..=4 {
+        events.extend(passed(id));
+    }
+    events.extend(accepted(2, None, digest(2)));
+    events.extend(accepted(3, None, digest(3)));
+    events.extend(accepted(4, Some(digest(3)), digest(4)));
+    assert_eq!(replaced_by(&events), vec![(2, None), (3, Some(4)), (4, None)]);
+}
+
+/// Rolling back puts back what the file held before it. When that isn't the
+/// replaced proposal's content (a person edited the file in between), that
+/// proposal stays replaced, and no other proposal takes its place: a later
+/// accept replaces nothing that was rolled back.
+#[test]
+fn a_rollback_to_a_hand_edit_restores_no_proposal() {
+    // #2 memory; #3 a skill whose content happens to be digest 9; #4 memory
+    // accepted over a hand edit (digest 9), not over #2's content.
+    let mut events = vec![started(), made("first", None), skill_made("release"), made("second", Some(digest(9)))];
+    for id in 2..=4 {
+        events.extend(passed(id));
+    }
+    events.extend(accepted(2, None, digest(2)));
+    events.extend(accepted(3, None, digest(9)));
+    events.extend(accepted(4, Some(digest(9)), digest(4)));
+    events.push(rolled_back(4));
+    assert_eq!(replaced_by(&events), vec![(2, Some(4)), (3, None), (4, None)], "#2's content wasn't put back");
+    // A new memory proposal accepted now writes over the hand edit: nothing is replaced by it.
+    events.push(made("third", Some(digest(9))));
+    events.extend(passed(event_count(&events)));
+    events.extend(accepted(event_count(&events) - 2, Some(digest(9)), digest(5)));
+    let after = replaced_by(&events);
+    assert!(after.iter().all(|(id, by)| *id == 2 || by.is_none()), "{after:?}");
+}
+
+/// A rollback of a proposal that is no longer the file's live one leaves the
+/// live one tracked: a later accept still marks it replaced.
+#[test]
+fn rolling_back_an_older_proposal_keeps_the_live_one_tracked() {
+    let mut events = vec![started(), made("first", None), made("second", Some(digest(2)))];
+    for id in 2..=3 {
+        events.extend(passed(id));
+    }
+    events.extend(accepted(2, None, digest(2)));
+    events.extend(accepted(3, Some(digest(2)), digest(3)));
+    // A recovered rollback of #2, journaled after #3 was accepted.
+    events.push(rolled_back(2));
+    events.push(made("third", Some(digest(3))));
+    let third = event_count(&events);
+    events.extend(passed(third));
+    events.extend(accepted(third, Some(digest(3)), digest(6)));
+    let after = replaced_by(&events);
+    assert!(after.contains(&(3, Some(third))), "#3 was live, so the next accept replaced it: {after:?}");
+}
+
+/// The seq of the last event: `journal` numbers events from 1.
+fn event_count(events: &[Event]) -> u64 {
+    events.len() as u64
+}

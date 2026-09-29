@@ -2,24 +2,68 @@
 //! which signs were already acted on, how many runs started lately, whether
 //! a run is going, and the latest run that didn't start.
 
-use strive_proto::{Entry, Event, ProposalStatus, SkippedRun, TriggerKind};
+use strive_proto::{CallOutcome, Entry, Event, ProposalStatus, SkippedRun, TriggerKind, Usage};
 
-/// The highest seq of `session`'s signs that an automatic run was started
-/// for. Signs at or below it were studied (or are being studied), so a
-/// later scan asks only for what came after. A skipped run acts on nothing:
-/// its signs are found again next time.
+/// The highest seq of `session`'s signs that were dealt with: a run was
+/// asked for them, by a trigger or by a person, or a person dismissed the
+/// offer to learn from them. Signs at or below it were studied (or are
+/// being studied, or aren't wanted), so a later scan or offer looks only
+/// past it. A skipped run acts on nothing: its signs are found again next
+/// time.
 pub fn acted_on(learning: &[Entry], session: &str) -> u64 {
-    learning
-        .iter()
-        .filter_map(|e| match &e.event {
-            Event::LearnRequested { trigger: Some(t), .. } => Some(t),
-            _ => None,
-        })
-        .flat_map(|t| t.signals.iter())
-        .filter(|s| s.session == session)
-        .map(|s| s.seq)
-        .max()
-        .unwrap_or(0)
+    let mut mark = 0;
+    for e in learning {
+        let seqs: Vec<u64> = match &e.event {
+            Event::LearnRequested { trigger, signals, .. } => trigger
+                .iter()
+                .flat_map(|t| t.signals.iter())
+                .chain(signals.iter().flatten())
+                .filter(|s| s.session == session)
+                .map(|s| s.seq)
+                .collect(),
+            Event::LearnDismissed { session: s, through } if s == session => vec![*through],
+            _ => Vec::new(),
+        };
+        mark = seqs.into_iter().fold(mark, u64::max);
+    }
+    mark
+}
+
+/// What a learner run has cost in this project on average: everything the
+/// learning session spent (the learner's calls and the judge's) over the
+/// turns that called a model. None before the first such turn.
+pub fn cost_per_run(learning: &[Entry]) -> Option<u64> {
+    let (mut spent, mut runs, mut in_turn, mut called) = (0u64, 0u64, false, false);
+    for e in learning {
+        match &e.event {
+            Event::TurnStarted { .. } => (in_turn, called) = (true, false),
+            Event::ModelCallStarted { .. } => called |= in_turn,
+            Event::ModelCallFinished { outcome, .. } => spent = spent.saturating_add(charged(outcome)),
+            Event::TurnEnded { .. } => {
+                runs += u64::from(in_turn && called);
+                in_turn = false;
+            }
+            _ => {}
+        }
+    }
+    (runs > 0).then(|| spent.div_ceil(runs))
+}
+
+/// A typical learner run's tokens, for pricing the first offer when no
+/// learning session anywhere has a run yet. Assumed from the learner's
+/// usual steps, not measured: four calls (list the sessions, read one, propose, sum up)
+/// that each resend the conversation so far, about 48,000 input tokens in
+/// all, and one second-opinion call of about 12,000; some 2,000 tokens out.
+/// No cache is counted, so the estimate errs high.
+pub const TYPICAL_RUN: Usage =
+    Usage { input: 60_000, output: 2_000, cache_write: 0, cache_write_long: 0, cache_read: 0 };
+
+/// What a finished call was charged: `Broken` is charged its reservation.
+fn charged(outcome: &CallOutcome) -> u64 {
+    match outcome {
+        CallOutcome::Complete { cost_usd_micros, .. } | CallOutcome::Broken { cost_usd_micros, .. } => *cost_usd_micros,
+        CallOutcome::Rejected { .. } => 0,
+    }
 }
 
 /// Automatic runs requested at or after `since_ms`.

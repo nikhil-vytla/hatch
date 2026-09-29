@@ -106,11 +106,17 @@ pub fn describe(e: &Entry) -> String {
         Event::LearnRequested { trigger: Some(t), .. } => {
             format!("automatic learning run, {}", crate::review::trigger_text(t))
         }
-        Event::LearnRequested { sessions, trigger: None } if sessions.is_empty() => {
+        Event::LearnRequested { sessions, trigger: None, .. } if sessions.is_empty() => {
             "asked the learner to study recent sessions".into()
         }
-        Event::LearnRequested { sessions, trigger: None } => {
+        Event::LearnRequested { sessions, trigger: None, signals: None, .. } => {
             format!("asked the learner to study {}", sessions.join(", "))
+        }
+        Event::LearnRequested { sessions, trigger: None, signals: Some(s), .. } => {
+            format!("asked the learner to study {} ({})", sessions.join(", "), strive_learning::signals::describe(s))
+        }
+        Event::LearnDismissed { session, through } => {
+            format!("declined to learn from session {session} (its signs through entry {through})")
         }
         Event::LearnSkipped { trigger, reason } => {
             format!("automatic learning run skipped ({}): {reason}", crate::review::trigger_text(trigger))
@@ -122,7 +128,7 @@ pub fn describe(e: &Entry) -> String {
             proposal.summary
         ),
         Event::GateFinished { proposal, gate, verdict, detail } => format!(
-            "proposal #{proposal}: {} check {}: {detail}",
+            "proposal #{proposal}: {} {}: {detail}",
             crate::review::gate_name(*gate),
             crate::review::verdict_name(*verdict)
         ),

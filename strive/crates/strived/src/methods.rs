@@ -368,6 +368,7 @@ fn host_may_record(event: &Event, kind: SessionKind) -> bool {
         | Event::ContextLoaded { .. }
         | Event::LearnRequested { .. }
         | Event::LearnSkipped { .. }
+        | Event::LearnDismissed { .. }
         | Event::GateFinished { .. }
         | Event::ProposalDecided { .. }
         | Event::ProposalApplied { .. }

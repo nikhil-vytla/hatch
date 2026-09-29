@@ -354,6 +354,17 @@ test("an automatic request's prompt names the signs that started it; a person's 
   expect(JSON.stringify(person.model.requests[0].messages[0].content)).not.toContain("Nobody asked");
 });
 
+test("a person's request made from the offer to learn names the session's signs too", async () => {
+  const signals = [{ session: W1, seq: fixSeq, kind: "correction" as const, detail: "no, use bun" }];
+  const asked: Entry = { seq: 2, tsMs: T0, event: { type: "learnRequested", sessions: [W1], signals } };
+  const { model } = await learn({ history: [started, asked], script: [{ text: "Nothing worth it." }] });
+  const prompt = JSON.stringify(model.requests[0].messages[0].content);
+  expect(prompt).toContain(`Study these work sessions: ${W1}.`);
+  expect(prompt).toContain("The user asked for this run");
+  expect(prompt).toContain(`- session ${W1} entry ${fixSeq}: the user corrected the agent: no, use bun`);
+  expect(prompt).not.toContain("Nobody asked");
+});
+
 test("the learner never runs a file or shell effect, even when the model asks for one", async () => {
   const mcp = { server: "fs", name: "write", description: "writes", inputSchema: { type: "object" } };
 
