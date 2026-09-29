@@ -1,6 +1,6 @@
 # Jev release lab
 
-This folder contains the release implementation, measured integration work and design research for the existing [Jev experiments site](https://jev-experiments.vercel.app). The application stays at `jev-experiments/experience-prototypes`. Per the repository's research convention, changes to existing code are delivered as [application.patch](application.patch); all new toolkit, simulation, study and report files live here. The model study and default installation are complete. Browser checks passed against a local preview of the production build. Public deployment remains a separate gate.
+This folder contains the release implementation, measured integration work and design research for the existing [Jev experiments site](https://jev-experiments.vercel.app). The application stays at `jev-experiments/experience-prototypes`. Per the repository's research convention, changes to existing code are delivered as [application.patch](application.patch); all new toolkit, simulation, study and report files live here. The model study and default installation are complete. Browser checks passed against a local preview of the production build. The application patch was later superseded: the first public release (29 Sep 2026) is the site deployed from main, and wanted pieces of the patch are ported separately ([release gate](decisions/release-gate.md)).
 
 ## What works
 
@@ -29,7 +29,7 @@ bun install --frozen-lockfile
 bun verification/check.ts
 ```
 
-The application patch is already applied in the implementation working tree. `apply.sh` first checks the patch and refuses conflicts, then installs the provider-free GitHub workflow. It does not deploy. The canonical Vercel root, Bun install/build commands and parent-source access stay unchanged.
+The application patch no longer applies to main and should not be applied whole; it is kept as the record of what was built. `apply.sh` first checks the patch and refuses conflicts, then installs the provider-free GitHub workflow. It does not deploy. The canonical Vercel root, Bun install/build commands and parent-source access stay unchanged.
 
 [Clean-checkout verification](verification/clean-checkout.json) builds from archived Git sources plus this folder and patch, with no copied prepared public assets, caches or models. All 45 generated public files matched the working build byte for byte. The final verifier builds with only the canonical application-root dependencies before installing any sibling tools; the [earlier masked failure and correction](verification/vercel-root-correction.json) explain that ordering. [Publication integrity](verification/publication-index.json) hashes every committed input and output; the checker also proves original fields and array order survive JSONL preparation. [Check results](verification/checks.json) record exact commands and outputs.
 
