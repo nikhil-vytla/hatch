@@ -33,10 +33,13 @@ to an offer, made from the same no-model scan the triggers use.
   session had 2 corrections. Learn from it? It costs a learner run, about
   $0.07. [y/N]". `y` asks for a run naming the session and exits without
   waiting for it; any other key declines and exits. The desktop shows a
-  notice above the conversation when a session's turn ends (the agent is
-  idle, waiting on the person) or the window switches away from it, with
-  "Learn from this session" and "Dismiss". `strive run` never asks: nobody
-  is there to answer.
+  notice above the conversation, with "Learn from this session" and
+  "Dismiss", once a session has been idle for a minute (its turn ended and
+  no prompt or turn came since), when the window switches away from it, or
+  when the window is closed (it stays open until the offer is answered; a
+  second close, or quitting the app, closes at once). Not at the first turn
+  end with a sign: a person is often still correcting the agent then.
+  `strive run` never asks: nobody is there to answer.
 - **What's asked:** `learning/signals {cwd, session}` returns the signs not
   yet dealt with, a counted summary, `ask`, and a price. It calls no model,
   journals nothing and creates no learning session. `ask` needs signs, a
@@ -46,10 +49,12 @@ to an offer, made from the same no-model scan the triggers use.
   and either answer settles those signs for it.
 - **The price** is what this project's learning session has spent (the
   learner's calls and the judge's) over the turns that called a model:
-  an average of real runs, in cents rounded up. Before a project's first
-  run there is no price, and the offer says only "It costs a learner run".
-  A price from the model's rates alone would need a guess at how much the
-  learner reads, which varies more than the rates do.
+  an average of real runs, in cents rounded up, labeled "about". Before a
+  project's first run it's the learner model's price for the tokens an
+  average run used in up to five other projects' learning sessions, or for
+  a typical run (`triggers::TYPICAL_RUN`: 60,000 tokens in, 2,000 out, no
+  cache, so it errs high) when no project has run yet. Only a model with
+  no known price leaves the offer without one.
 - **One watermark for "dealt with":** a session's signs at or below the
   highest seq named by any request (automatic, or a person's naming the
   session, which records the signs it found in `learnRequested.signals`)
@@ -58,8 +63,13 @@ to an offer, made from the same no-model scan the triggers use.
   offered again, and no trigger acts on them. A dismissal is the person's
   answer, so a trigger overriding it would spend money they declined to.
 - **Not nagging:** besides the watermark, the TUI asks at most once per
-  process and the desktop once per session per window, even if new signs
-  arrive after an answer; a later sitting may offer the new ones.
+  process. The desktop asks at most twice per session per window: once,
+  and once more only if signs arrive after the first answer (the
+  watermark hides the answered ones). A later sitting may offer new ones.
+- **Where a run came from:** a yes to the offer sets `offer: true` on
+  `learning/run`, recorded on `learnRequested`, so `strive review` and
+  `proposal/list` (`offered`, the signs) can say "you said yes to the
+  end-of-session offer" rather than "asked with `strive learn`".
 - **The learner** reads a person's signs first, as a trigger's, with a line
   saying the user asked after seeing them.
 - A dismissal creates the project's learning session if it had none; an

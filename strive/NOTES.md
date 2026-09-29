@@ -2046,3 +2046,93 @@ Deferred:
 - A price before a project's first run.
 - Asking again in the same TUI process or desktop window about signs that
   arrive after an answer (the watermark allows it; the clients don't).
+
+### The offer after a hands-on review (2026-09-28)
+
+A walk through the TUI, the CLI and the desktop (screens in
+`/tmp/learnux`, again after the changes in `/tmp/learnux/after`) found
+these; each is fixed here, with a test that failed first where there was
+behaviour to fail.
+- **After "y" the TUI showed nothing.** `answer()` set the line and
+  exited; `requestRender` only schedules a frame, and `main.ts` stops the
+  screen on exit, so the frame never came. It calls `tui.renderNow()`
+  first. The agent tests' exit now stops the screen as `main.ts` does,
+  which is what made the test fail before the fix.
+- **Proposals waiting went unmentioned.** A TUI session says "2 proposals
+  are waiting: `strive review`" as it opens (`proposal/list`, counting
+  `ready`; cheap enough, since it's one fold and a read of each learned
+  file). The desktop's Learned button shows the count instead of a dot, and
+  the window lists proposals again on focus: without that, a run from
+  `strive learn` in a terminal never reached the count, because the main
+  process only follows a learning session it found at startup or on a
+  list.
+- **`strive review ID` was long and in the code's words.** Now: summary
+  and status, where the run came from, the diff, a one-line verdict
+  ("safety checks passed; second opinion advises against it: <first failed
+  criterion's reason>"), what to do. `--full` adds why, the prediction,
+  the evidence, the signs the run was given and each check in full.
+  Session ids are replaced by titles wherever the CLI names a session
+  (the held-out sessions inside the judge's detail too). "static",
+  "judge" and "stale" are "safety checks", "second opinion" and "the file
+  changed since this was proposed" in what people read, including the
+  daemon's refusals and the judge's skip and failure details (journaled
+  text, so old journals keep the old words). The protocol and code keep
+  their names; `status_name` stays the wire name (a test pins that).
+- **Where a run came from** needed a fact the journal didn't have: a
+  person's `learning/run` naming a session looked the same from the offer
+  and from `strive learn --session`. `learning/run` takes `offer: true`
+  (the TUI and desktop send it), `learnRequested` records it, and the fold
+  gives each proposal `offered` (the signs) beside `trigger`.
+- **`strive learn`** follows the run quietly (`Follow.quiet`): "studying 1
+  session…", then the list. The turn's end is printed only if it failed;
+  `strive log` has the steps.
+- **Refused rollbacks were offered.** `proposal/list` sets `canRollBack`
+  on an applied proposal whose file is still what it wrote (one read per
+  file), and the fold sets `replacedBy` when a later accept for the same
+  file writes over an applied one (cleared if that one is rolled back to
+  this one's content). The CLI shows "replaced by #N", drops the rollback
+  hint, and refuses `rollback` itself with the reason; the desktop badge
+  says "replaced by #N" and Roll back is hidden. The desktop Accept
+  tooltip says why for a failed or checking proposal instead of "Only a
+  proposal whose checks passed".
+- **The desktop offer came at the first turn end with a sign,** often
+  mid-correction. `Offers.idle` starts a minute's timer at `turnEnded`;
+  `userMessage` or `turnStarted` cancels it. Switching away still offers at
+  once, and closing the window now does too: main prevents the first
+  `close`, sends `strive:closing`, and the page calls `strive:close` when
+  there's nothing to offer or once it's answered (a second close, or
+  `before-quit`, isn't held, so Playwright's `app.close()` and Cmd+Q
+  aren't blocked). A session may be offered twice in a window: again only
+  for signs after the first answer. The e2e tests shorten the product's
+  own timer with `STRIVE_DESKTOP_OFFER_IDLE_MS`; the unit tests drive it
+  with an injected clock.
+- **The first offer had no price.** Before a project's first run the
+  estimate is the learner model's price for the average run tokens of up
+  to five other projects' learning sessions (`usage_per_run`), or for
+  `TYPICAL_RUN` (60,000 in, 2,000 out, no cache: an assumption, not a
+  measurement, and high on purpose) when none has run: $0.21 on
+  claude-sonnet-4-5.
+- **Tests:** TUI (the after-y line on the stopped screen; the waiting line,
+  2 then 1 after a rejection); CLI (`review ID`'s order, what's hidden
+  without `--full` and what `--full` adds; "replaced by", the rollback hint
+  and refusal before and after a hand edit and after putting the file
+  back; where a run came from; `strive learn`'s four lines); fold
+  (replaced and restored, `offered`); `usage_per_run`; the first estimate;
+  desktop unit (`Offers`: idle timer, reset by a prompt, re-offer once
+  after a dismissal, close) and e2e (the count badge; Roll back hidden for
+  replaced and hand-edited; Accept's tooltip on a failed proposal; the
+  idle offer; the offer on close).
+
+Deferred:
+- **A learner host that lives on proposes against stale files.** The
+  host is given the learned files once, at `host/register`, and a
+  proposal's `before` is the file as last given there. A second
+  `strive learn` while the host is still running proposes against the
+  file before the first accept, so accepting it goes stale. The walk hit
+  it; restarting the daemon between runs avoids it. The fix is for the
+  daemon to give the host the files again with each request (a
+  `contextLoaded` per run, not only at `host/register` in `methods.rs`),
+  and for the host to use them: a change of its own.
+- The desktop doesn't say where a run came from (the CLI does); its
+  detail already names an automatic run's trigger.
+- Quitting the app with Cmd+Q doesn't offer; only closing the window does.
