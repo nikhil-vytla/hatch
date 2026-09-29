@@ -64,6 +64,15 @@ export async function countsFor(store: Store, id: string) {
   return countsOf(id, (await store.read(id)).doc);
 }
 
+/** Counts for every decision, for the results page. */
+export async function allCounts(store: Store) {
+  const pairs = await Promise.all(
+    DECK.map(async (d) => [d.id, await countsFor(store, d.id)] as const),
+  );
+
+  return Object.fromEntries(pairs);
+}
+
 export async function vote(
   store: Store,
   ballot: Vote,
