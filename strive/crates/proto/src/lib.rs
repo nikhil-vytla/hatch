@@ -86,6 +86,8 @@ methods! {
     SessionChanges = "session/changes" (SessionChangesParams) -> SessionChangesResult;
     LearningOpen = "learning/open" (ProjectRef) -> SessionInfo;
     LearningRun = "learning/run" (LearningRunParams) -> Appended;
+    LearningSignals = "learning/signals" (LearningSignalsParams) -> LearningSignalsResult;
+    LearningDismiss = "learning/dismiss" (LearningDismissParams) -> Appended;
     ProposalList = "proposal/list" (ProjectRef) -> ProposalListResult;
     ProposalDecide = "proposal/decide" (ProposalDecideParams) -> Appended;
     ProposalRollback = "proposal/rollback" (ProposalRef) -> Appended;
@@ -572,6 +574,55 @@ pub struct LearningRunParams {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub sessions: Option<Vec<String>>,
+    /// Set when the person is saying yes to the offer to learn from a
+    /// session with signs (ADR-0020), so review can say where a run came from.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub offer: Option<bool>,
+}
+
+/// A work session of the project, to ask about its signs (ADR-0020).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct LearningSignalsParams {
+    pub cwd: String,
+    pub session: String,
+}
+
+/// A work session's signs that nothing has dealt with yet: no run was asked
+/// for them, by a person or a trigger, and no one dismissed them. Found
+/// without a model, so asking costs nothing.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct LearningSignalsResult {
+    pub signals: Vec<LearnSignal>,
+    /// The signs in a phrase: "2 corrections and a command that failed,
+    /// then passed". Empty when there are none.
+    pub summary: String,
+    /// Whether a client should offer a person a run for them now: there
+    /// are signs, the learner's provider has a key, and `learning.ask`
+    /// isn't false.
+    pub ask: bool,
+    /// What a learner run costs in this project, its checks included: the
+    /// average of its runs, or before the first an estimate at the learner
+    /// model's price for the tokens of other projects' runs (a typical
+    /// run's if there are none). None if the model's price isn't known.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub estimate_usd_micros: Option<u64>,
+}
+
+/// A person declined to learn from a work session's signs up to `through`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct LearningDismissParams {
+    pub cwd: String,
+    pub session: String,
+    /// The seq of the last sign the person was shown.
+    pub through: u64,
 }
 
 /// A change the learner proposes: a whole file's new text, why, the
@@ -780,6 +831,22 @@ pub struct ProposalState {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub trigger: Option<LearnTrigger>,
+    /// Set when the run that made it was a person's yes to the offer to
+    /// learn from a session (ADR-0020): the signs the run was given.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub offered: Option<Vec<LearnSignal>>,
+    /// Set on an applied proposal once a later accepted proposal wrote the
+    /// same file over it: that proposal's id. Its content is gone from the
+    /// file, so it can't be rolled back.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub replaced_by: Option<u64>,
+    /// Whether a rollback would go through now: it's applied and its file
+    /// is still what it wrote. Only `proposal/list` looks at the file; the
+    /// fold alone leaves it false.
+    #[serde(default)]
+    pub can_roll_back: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
@@ -1014,6 +1081,12 @@ pub enum Event {
     ApprovalRequested {
         effect: u64,
         description: String,
+        /// The instruction file (or file one imports) the effect changes,
+        /// where allowing for the session allows later changes to this
+        /// file only, and leaves the approval mode as it is.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[ts(optional)]
+        session_file: Option<String>,
     },
     ApprovalDecided {
         effect: u64,
@@ -1070,6 +1143,11 @@ pub enum Event {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         #[ts(optional)]
         learned: Option<Vec<ContextFile>>,
+        /// Imports in instruction files that weren't loaded, each a line
+        /// for a person saying which and why; absent when there are none.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[ts(optional)]
+        skipped: Option<Vec<String>>,
     },
     /// A person, or a trigger (ADR-0020), asked the project's learner to
     /// study sessions (none named: the ones since it last looked).
@@ -1083,6 +1161,23 @@ pub enum Event {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         #[ts(optional)]
         trigger: Option<LearnTrigger>,
+        /// Set when a person named sessions with signs nothing had dealt
+        /// with yet: those signs, as the daemon found them. The learner
+        /// reads them first; later scans and offers look only past them.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[ts(optional)]
+        signals: Option<Vec<LearnSignal>>,
+        /// Set when the person said yes to the offer to learn from a
+        /// session with signs (ADR-0020), rather than asking on their own.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[ts(optional)]
+        offer: Option<bool>,
+    },
+    /// A person declined to learn from a work session (ADR-0020): its signs
+    /// up to `through` aren't offered again, and no trigger acts on them.
+    LearnDismissed {
+        session: String,
+        through: u64,
     },
     /// An automatic learning run was due and didn't start (ADR-0020): the
     /// daily cap, a run or checks still going, no key, no budget.
@@ -1256,7 +1351,8 @@ pub enum ApprovalMode {
 #[ts(export)]
 pub enum Decision {
     Allow,
-    /// Allow this and switch the session to full-auto.
+    /// Allow this and switch the session to full-auto or, where the request
+    /// names a `sessionFile`, allow later changes to that file.
     AllowSession,
     Deny,
 }

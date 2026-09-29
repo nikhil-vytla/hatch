@@ -66,6 +66,24 @@ test("only MCP servers that failed to start get a line, one each", () => {
   ]);
 });
 
+test("each import that wasn't loaded gets a line saying which and why", () => {
+  const e: Event = {
+    type: "contextLoaded",
+    instructions: [],
+    skills: [],
+    mcp: [],
+    skipped: [
+      "@docs/x.md in AGENTS.md was not loaded: it's outside the project",
+      "@6.md in d/5.md was not loaded: it's more than 5 imports deep",
+    ],
+  };
+
+  expect(describe(entry(e))).toEqual([
+    { kind: "note", tone: "danger", text: "@docs/x.md in AGENTS.md was not loaded: it's outside the project" },
+    { kind: "note", tone: "danger", text: "@6.md in d/5.md was not loaded: it's more than 5 imports deep" },
+  ]);
+});
+
 test("a failed command shows its exit code; a successful one adds nothing", () => {
   const finished = (exitCode?: number): Event => ({
     type: "effectFinished",

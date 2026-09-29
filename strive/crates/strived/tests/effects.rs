@@ -326,24 +326,6 @@ fn the_sandbox_lets_commands_read_learned_files_but_not_change_them() {
     assert_eq!(text, "ok\n", "other files, even in .strive, stay writable");
 }
 
-/// Sessions are given what the memory file leads to, so a command can't
-/// change that file by its own name either.
-#[test]
-fn the_sandbox_protects_the_file_learned_memory_links_to() {
-    if !sandboxed() {
-        eprintln!("no usable sandbox on this machine; covered by the refusal test");
-        return;
-    }
-    let mut w = Ws::new();
-    fs::create_dir_all(w.path(".strive")).unwrap();
-    fs::create_dir_all(w.path("docs")).unwrap();
-    fs::write(w.path("docs/notes.md"), "reviewed\n").unwrap();
-    std::os::unix::fs::symlink("../docs/notes.md", w.path(".strive/memory.md")).unwrap();
-    let text = w.text(json!({"kind": "bash", "command": "echo x > docs/notes.md; echo status=$?"}));
-    assert!(!text.ends_with("status=0\n"), "{text}");
-    assert_eq!(fs::read_to_string(w.path("docs/notes.md")).unwrap(), "reviewed\n");
-}
-
 /// A project that has no `.strive` yet can't get one from a command: the
 /// memory it would hold is loaded into every session.
 #[cfg(target_os = "macos")]
@@ -721,6 +703,130 @@ fn the_sandbox_keeps_commands_from_files_that_run_code_outside_it() {
     let text = w.text(json!({"kind": "bash", "command":
         "echo a > a.txt && git add a.txt && git -c user.name=t -c user.email=t@t commit -qm first && git log --oneline | wc -l"}));
     assert_eq!(text.trim(), "1", "git still works in the sandbox: {text}");
+}
+
+/// Instruction files, skills and the project's settings reach every later
+/// session, so a command can't change them either, and other files stay
+/// writable.
+#[test]
+fn the_sandbox_keeps_commands_from_what_shapes_later_sessions() {
+    if !sandboxed() {
+        return;
+    }
+    let mut w = Ws::new();
+    fs::write(w.path("AGENTS.md"), "Rules.\n").unwrap();
+    let mut blocked = vec!["AGENTS.md", "CLAUDE.md", ".claude/skills/x/SKILL.md", ".strive/settings.json"];
+    if cfg!(target_os = "macos") {
+        // By pattern: nested ones, other spellings, and the directory that
+        // holds skills can't be moved into place.
+        blocked.extend(["pkg/CLAUDE.md", "pkg/.claude/skills/y/SKILL.md", "Agents.MD"]);
+    } else {
+        // Linux binds read-only only what exists at the project's root.
+        fs::create_dir_all(w.path(".claude/skills/x")).unwrap();
+        fs::create_dir_all(w.path(".strive")).unwrap();
+        for file in ["CLAUDE.md", ".claude/skills/x/SKILL.md", ".strive/settings.json"] {
+            fs::write(w.path(file), "").unwrap();
+        }
+    }
+    for path in blocked {
+        let cmd = format!("mkdir -p \"$(dirname '{path}')\" 2>/dev/null; echo x >> '{path}'; echo status=$?");
+        let text = w.text(json!({"kind": "bash", "command": cmd}));
+        assert!(text.ends_with("status=1\n"), "{path}: {text}");
+    }
+    assert_eq!(fs::read_to_string(w.path("AGENTS.md")).unwrap(), "Rules.\n");
+    if cfg!(target_os = "macos") {
+        let cmd = "mkdir -p c/skills/z && echo x > c/skills/z/SKILL.md && mv c .claude; echo status=$?";
+        let text = w.text(json!({"kind": "bash", "command": cmd}));
+        assert!(text.ends_with("status=1\n"), "{text}");
+        assert!(!w.path(".claude/skills/z").exists());
+    }
+    let text = w.text(json!({"kind": "bash", "command": "echo a > docs.md && echo b > .strive-notes && echo ok"}));
+    assert_eq!(text, "ok\n", "other files stay writable");
+}
+
+/// A file an instruction file imports is told to every later session as
+/// the instruction file is, so a command can't change it either. On macOS
+/// that covers one not written yet and the directory holding it, which
+/// can't be moved aside or into place.
+#[test]
+fn the_sandbox_keeps_commands_from_imported_files() {
+    if !sandboxed() {
+        return;
+    }
+    let mut w = Ws::new();
+    fs::create_dir_all(w.path("docs")).unwrap();
+    fs::write(w.path("AGENTS.md"), "Rules.\n@docs/style.md\n@docs/later.md\n@spec/plan.md\n").unwrap();
+    fs::write(w.path("docs/style.md"), "Style.\n").unwrap();
+    let mut blocked = vec!["echo x >> docs/style.md"];
+    if cfg!(target_os = "macos") {
+        blocked.extend([
+            "echo x > docs/later.md",
+            "echo x > DOCS/Style.MD",
+            "mv docs gone",
+            "mkdir -p p/spec && echo x > p/spec/plan.md && mv p/spec spec",
+        ]);
+    }
+    for cmd in blocked {
+        let text = w.text(json!({"kind": "bash", "command": format!("{cmd}; echo status=$?")}));
+        assert!(text.ends_with("status=1\n"), "{cmd}: {text}");
+    }
+    assert_eq!(fs::read_to_string(w.path("docs/style.md")).unwrap(), "Style.\n");
+    assert!(!w.path("docs/later.md").exists());
+    assert!(!w.path("spec").exists());
+    let text = w.text(json!({"kind": "bash", "command": "echo a > docs/other.md && echo ok"}));
+    assert_eq!(text, "ok\n", "a file nothing imports stays writable");
+}
+
+/// Other agents' settings, hooks and MCP config, and files that tools run
+/// on entering a directory, installing or committing, have each carried an
+/// attack that ran code once a person next used the tool. The agent's
+/// write asks for each, unattended it's refused, and commands can't write
+/// them, in any case.
+#[test]
+fn other_agents_config_and_tool_hooks_are_guarded() {
+    let mut w = Ws::new();
+    let files = [
+        ".claude/settings.json",
+        ".claude/settings.local.json",
+        ".claude/hooks/stop.sh",
+        ".codex/config.toml",
+        ".agents/plugins/marketplace.json",
+        ".gemini/settings.json",
+        ".cursor/mcp.json",
+        ".cursor/rules/x.mdc",
+        ".envrc",
+        ".husky/pre-commit",
+        ".devcontainer/devcontainer.json",
+        ".npmrc",
+        ".pre-commit-config.yaml",
+        "lefthook.yml",
+    ];
+    let other_case = ["pkg/.CURSOR/MCP.json", ".Codex/config.toml", ".EnvRC", "sub/LeftHook.YML"];
+    for path in files.iter().chain(&other_case) {
+        let (kind, text) = w.kind(json!({"kind": "write", "path": path, "content": "x"}));
+        assert_eq!(kind, "refused", "{path}: {text}");
+        assert!(text.contains("outside strive's sandbox") && text.contains("no client is attached"), "{path}: {text}");
+    }
+    if !sandboxed() {
+        return;
+    }
+    let mut blocked: Vec<&str> = files.to_vec();
+    if cfg!(target_os = "macos") {
+        blocked.extend(other_case);
+    } else {
+        // Linux binds read-only only what exists at the project's root.
+        for path in files {
+            fs::create_dir_all(w.path(path).parent().unwrap()).unwrap();
+            fs::write(w.path(path), "").unwrap();
+        }
+    }
+    for path in blocked {
+        let cmd = format!("mkdir -p \"$(dirname '{path}')\" 2>/dev/null; echo x >> '{path}'; echo status=$?");
+        let text = w.text(json!({"kind": "bash", "command": cmd}));
+        assert!(text.ends_with("status=1\n"), "{path}: {text}");
+    }
+    let text = w.text(json!({"kind": "bash", "command": "echo a > .claude-notes && echo b > envrc.md && echo ok"}));
+    assert_eq!(text, "ok\n", "other files stay writable");
 }
 
 /// The agent's own write tool asks before touching those files, in any

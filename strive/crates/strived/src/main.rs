@@ -130,12 +130,15 @@ enum Cmd {
         #[arg(long = "session", value_name = "ID")]
         sessions: Vec<String>,
     },
-    /// List the learner's proposals here; with an id, show one (its diff,
-    /// evidence, prediction and checks), or accept, reject or roll it back.
+    /// List the learner's proposals here; with an id, show one (its diff
+    /// and checks), or accept, reject or roll it back.
     Review {
         id: Option<u64>,
         #[arg(requires = "id", value_parser = ["accept", "reject", "rollback"])]
         action: Option<String>,
+        /// With an id: also why, the evidence, and each check in full.
+        #[arg(long, requires = "id")]
+        full: bool,
     },
     /// Run the daemon in the foreground (normally started for you).
     #[command(hide = true)]
@@ -270,13 +273,13 @@ async fn run(cli: Cli) -> Result<ExitCode> {
         Some(Cmd::Learn { sessions }) => {
             review::learn(&mut launch::ensure(&home, "strive-learn").await?.0, &home.root, sessions).await
         }
-        Some(Cmd::Review { id, action }) => {
+        Some(Cmd::Review { id, action, full }) => {
             let action = action.map(|a| match a.as_str() {
                 "accept" => review::Action::Accept,
                 "reject" => review::Action::Reject,
                 _ => review::Action::Rollback,
             });
-            review::review(&mut launch::ensure(&home, "strive-review").await?.0, id, action).await
+            review::review(&mut launch::ensure(&home, "strive-review").await?.0, id, action, full).await
         }
         Some(Cmd::Status { json }) => {
             let (mut c, _) = launch::ensure(&home, "strive-status").await?;

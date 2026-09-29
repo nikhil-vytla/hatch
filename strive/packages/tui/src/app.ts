@@ -23,7 +23,7 @@ import {
   type SessionInfo,
   type StriveClient,
 } from "@strive/protocol";
-import { describe as describeLines, formatUsd, type Line, MODE_NAMES, Spend } from "@strive/view";
+import { describe as describeLines, formatUsd, type Line, MODE_NAMES, offerText, Spend } from "@strive/view";
 import { editorTheme, style } from "./theme";
 
 export { formatUsd, MODE_NAMES };
@@ -134,8 +134,8 @@ export class App {
   private readonly footer = new Text("", 1, 0);
   /** The approval line shown while an effect waits for a decision. */
   private readonly prompt = new Text("", 1, 0);
-  /** Effects waiting for a decision, oldest first. */
-  private readonly pending = new Map<number, string>();
+  /** Effects waiting for a decision, oldest first, and whether "a" allows one file (not everything). */
+  private readonly pending = new Map<number, { description: string; oneFile: boolean }>();
   /** Checkpoints and what each was taken before. */
   private readonly checkpoints = new Map<number, string>();
   private awaitingPrompt?: number;
@@ -149,6 +149,14 @@ export class App {
   private working?: number;
   /** The reply streaming in, until its final message arrives. */
   private readonly live = new Text("", 1, 0);
+  /** The offer to learn from the session, asked once as the TUI quits. */
+  private readonly offerLine = new Text("", 1, 0);
+  /** Whether quitting has asked the daemon about the session's signs yet. */
+  private offered = false;
+  /** While the offer waits for an answer: the seq of the last sign it named. */
+  private offer?: { session: SessionInfo; through: number };
+  /** Set once the TUI has let go of the daemon, so it exits once. */
+  private closed = false;
 
   constructor(
     private readonly tui: TUI,
@@ -171,11 +179,21 @@ export class App {
     tui.addChild(this.transcript);
     tui.addChild(this.live);
     tui.addChild(this.prompt);
+    tui.addChild(this.offerLine);
     tui.addChild(this.editor);
     tui.addChild(this.footer);
     tui.setFocus(this.editor);
 
     tui.addInputListener((data) => {
+      // Any key answers the offer; only y takes it.
+      if (this.offer) {
+        const { session, through } = this.offer;
+        this.offer = undefined;
+        void this.answer(session, through, data === "y" || data === "Y");
+
+        return { consume: true };
+      }
+
       if (matchesKey(data, "ctrl+c") || matchesKey(data, "ctrl+d")) {
         this.quit(0);
 
@@ -228,10 +246,22 @@ export class App {
       for (const e of [...entries, ...early].sort((a, b) => a.seq - b.seq)) this.show(e);
       this.editor.disableSubmit = false;
       this.renderHeader();
+      // A hint, so a failure to list is no reason to say anything.
+      this.sayWaiting(session.cwd).catch(() => undefined);
     } catch (e) {
       this.say(style.danger(this.explainOpenError(e, mode)));
       this.say(style.muted("Run `strive` for a new session, or `strive sessions` to see others."));
     }
+  }
+
+  /** Says how many of the project's proposals wait for a person's review, if any do. */
+  private async sayWaiting(cwd: string) {
+    const { proposals } = await this.client.request("proposal/list", { cwd });
+    const ready = proposals.filter((p) => p.status === "ready").length;
+
+    if (ready === 0 || this.closed) return;
+    const waiting = ready === 1 ? "1 proposal is waiting" : `${ready} proposals are waiting`;
+    this.say(style.accent(`${waiting}: \`strive review\``));
   }
 
   private async chooseSession(mode: SessionMode): Promise<string> {
@@ -281,7 +311,8 @@ export class App {
     this.spend.apply(entry.event);
     const e = entry.event;
 
-    if (e.type === "approvalRequested") this.pending.set(e.effect, e.description);
+    if (e.type === "approvalRequested")
+      this.pending.set(e.effect, { description: e.description, oneFile: e.sessionFile !== undefined });
 
     if (e.type === "checkpointed") {
       this.checkpoints.set(e.checkpoint, "");
@@ -306,7 +337,9 @@ export class App {
     this.prompt.setText(
       next.done
         ? ""
-        : `${style.accent(`Allow the agent to ${printable(next.value)}?`)}  ${style.muted("y yes · a yes to everything (full-auto) · n no")}`,
+        : `${style.accent(`Allow the agent to ${printable(next.value.description)}?`)}  ${style.muted(
+            `y yes · a yes to ${next.value.oneFile ? "this file for the session" : "everything (full-auto)"} · n no`,
+          )}`,
     );
     this.renderFooter();
     const text = describe(entry);
@@ -316,7 +349,65 @@ export class App {
     this.tui.requestRender();
   }
 
+  /**
+   * Exits, first offering once to learn from the session if it has signs
+   * nothing has dealt with. Quitting again while the daemon is asked exits
+   * at once.
+   */
   quit(code: number) {
+    const session = this.session;
+
+    if (code !== 0 || !session || this.offered) {
+      this.leave(code);
+
+      return;
+    }
+
+    this.offered = true;
+    this.offerLearning(session).then(
+      (asked) => asked || this.leave(code),
+      () => this.leave(code),
+    );
+  }
+
+  /** Shows the offer if the daemon says to make one; whether it did. */
+  private async offerLearning(session: SessionInfo): Promise<boolean> {
+    const r = await this.client.request("learning/signals", { cwd: session.cwd, session: session.id });
+
+    if (!r.ask || this.closed) return false;
+
+    this.offer = { session, through: Math.max(...r.signals.map((s) => s.seq)) };
+    this.editor.disableSubmit = true;
+    this.offerLine.setText(`${style.accent(printable(offerText("This session", r)))} ${style.muted("[y/N]")}`);
+    this.tui.requestRender();
+
+    return true;
+  }
+
+  private async answer(session: SessionInfo, through: number, yes: boolean) {
+    try {
+      if (yes) {
+        await this.client.request("learning/run", { cwd: session.cwd, sessions: [session.id], offer: true });
+        this.offerLine.setText(
+          style.muted("Asked the learner to study this session; `strive review` will show what it proposes."),
+        );
+      } else {
+        await this.client.request("learning/dismiss", { cwd: session.cwd, session: session.id, through });
+        this.offerLine.setText("");
+      }
+    } catch (e) {
+      this.offerLine.setText(style.danger(describeError(e)));
+    }
+
+    // Drawn now, not on the next frame: leaving stops the screen, and a line
+    // only requested would never reach it.
+    this.tui.renderNow();
+    this.leave(0);
+  }
+
+  private leave(code: number) {
+    if (this.closed) return;
+    this.closed = true;
     this.offClose();
     this.client.close();
     this.exit(code);

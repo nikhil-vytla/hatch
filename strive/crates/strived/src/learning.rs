@@ -15,7 +15,8 @@ use serde_json::Value;
 use strive_learning::{Finding, Folded, Rule};
 use strive_proto::rpc::RpcError;
 use strive_proto::{
-    Appended, Digest, Entry, Event, Evidence, Gate, LearningOpen, LearningRun, LearningRunParams, Method, ProjectRef,
+    Appended, Digest, Entry, Event, Evidence, Gate, LearnSignal, LearningDismiss, LearningDismissParams, LearningOpen,
+    LearningRun, LearningRunParams, LearningSignals, LearningSignalsParams, LearningSignalsResult, Method, ProjectRef,
     Proposal, ProposalDecide, ProposalDecideParams, ProposalDecision, ProposalList, ProposalListResult, ProposalRef,
     ProposalRollback, ProposalStatus, SessionInfo, SessionKind, StaleMention, Verdict,
 };
@@ -42,7 +43,7 @@ impl Locks {
     }
 }
 
-const AFTER_FAILURE: &str = "not run: the static check failed";
+const AFTER_FAILURE: &str = "not run: the safety checks failed";
 /// The most of a file as it is now that is read to keep or compare.
 const READ_LIMIT: u64 = 1024 * 1024;
 
@@ -55,8 +56,17 @@ pub async fn route(state: &Arc<State>, conn: &Arc<Conn>, method: &str, params: V
         LearningRun::NAME => {
             // Asking spends the learning session's budget: a person's call.
             require_person(conn)?;
-            let LearningRunParams { cwd, sessions } = parse::<LearningRun>(params)?;
-            run(state, &project(&cwd)?, sessions.unwrap_or_default()).await
+            let LearningRunParams { cwd, sessions, offer } = parse::<LearningRun>(params)?;
+            run(state, &project(&cwd)?, sessions.unwrap_or_default(), offer.filter(|o| *o)).await
+        }
+        LearningSignals::NAME => {
+            let LearningSignalsParams { cwd, session } = parse::<LearningSignals>(params)?;
+            reply::<LearningSignals>(signals(state, &project(&cwd)?, &session).await?)
+        }
+        LearningDismiss::NAME => {
+            require_person(conn)?;
+            let LearningDismissParams { cwd, session, through } = parse::<LearningDismiss>(params)?;
+            dismiss(state, &project(&cwd)?, &session, through).await
         }
         ProposalList::NAME => {
             let ProjectRef { cwd } = parse::<ProposalList>(params)?;
@@ -65,7 +75,9 @@ pub async fn route(state: &Arc<State>, conn: &Arc<Conn>, method: &str, params: V
             if let Some(sid) = find(state, &cwd)? {
                 let lock = state.learning.project(&sid);
                 let _held = lock.lock().await;
-                proposals = settled(state, &sid, &cwd).await?.into_iter().map(|f| f.state).collect();
+                let mut folded = settled(state, &sid, &cwd).await?;
+                rollable(state, &cwd, &mut folded).await?;
+                proposals = folded.into_iter().map(|f| f.state).collect();
                 proposals.reverse();
                 entries = journal(state, &sid)?;
             }
@@ -144,18 +156,92 @@ fn work_session(state: &State, cwd: &str, id: &str) -> Result<SessionId, String>
     }
 }
 
-async fn run(state: &Arc<State>, cwd: &str, sessions: Vec<String>) -> Reply {
-    for s in &sessions {
-        work_session(state, cwd, s).map_err(|why| RpcError::new(RpcError::INVALID_PARAMS, why))?;
-    }
+fn invalid(why: String) -> RpcError {
+    RpcError::new(RpcError::INVALID_PARAMS, why)
+}
+
+async fn run(state: &Arc<State>, cwd: &str, sessions: Vec<String>, offer: Option<bool>) -> Reply {
+    let works = sessions.iter().map(|s| work_session(state, cwd, s).map_err(invalid)).collect::<Result<Vec<_>, _>>()?;
     let sid = learning_id(&open(state, cwd).await?)?;
+    // The named sessions' signs go with the request: the learner reads them
+    // first, and neither a trigger nor an offer brings them up again.
+    let learning = journal(state, &sid)?;
+    let mut found = Vec::new();
+    for work in &works {
+        if let Ok(entries) = work_entries(state, work) {
+            found.extend(undealt(work, &entries, &learning));
+        }
+    }
+    let signals = (!found.is_empty()).then_some(found);
     let entries = state
         .sessions
-        .append(&sid, vec![Event::LearnRequested { sessions, trigger: None }])
+        .append(&sid, vec![Event::LearnRequested { sessions, trigger: None, signals, offer }])
         .await
         .map_err(session_error)?;
     state.hosts.ensure(&sid, &state.home.socket(), &state.sessions.session_dir(&sid).join("host.log"));
     reply::<LearningRun>(Appended { seq: entries.last().map_or(0, |e| e.seq) })
+}
+
+/// A work session's verified entries.
+fn work_entries(state: &State, work: &SessionId) -> Result<Vec<Entry>, RpcError> {
+    let (_, report) = state.sessions.read(work).map_err(session_error)?;
+    match report.problem {
+        Some(p) => Err(session_error(SessionError::Invalid(p))),
+        None => Ok(report.entries),
+    }
+}
+
+/// `work`'s signs past those the learning journal says were dealt with.
+fn undealt(work: &SessionId, entries: &[Entry], learning: &[Entry]) -> Vec<LearnSignal> {
+    let after = strive_learning::triggers::acted_on(learning, work.as_str());
+    strive_learning::signals::scan(work.as_str(), entries, after)
+}
+
+/// A work session's signs that nothing has dealt with, and whether to offer
+/// a person a run for them. No model is called and nothing is journaled; a
+/// project with no learning session doesn't get one.
+async fn signals(state: &State, cwd: &str, session: &str) -> Result<LearningSignalsResult, RpcError> {
+    let work = work_session(state, cwd, session).map_err(invalid)?;
+    let entries = work_entries(state, &work)?;
+    let (learning, model) = match find(state, cwd)? {
+        Some(sid) => (journal(state, &sid)?, state.sessions.model(&sid).await.map_err(session_error)?),
+        None => (Vec::new(), None),
+    };
+    // A run with no key would only fail, so there's nothing to offer.
+    let model = model.unwrap_or_else(|| state.settings.model.clone());
+    let keyed = state.credentials.get(crate::methods::provider_of(&model)).is_some();
+    let signals = undealt(&work, &entries, &learning);
+    Ok(LearningSignalsResult {
+        summary: strive_learning::signals::summary(&signals),
+        ask: state.settings.learning.ask && keyed && !signals.is_empty(),
+        estimate_usd_micros: strive_learning::triggers::cost_per_run(&learning)
+            .or_else(|| first_estimate(state, &model)),
+        signals,
+    })
+}
+
+/// What a run should cost in a project with no run of its own yet: the
+/// learner model's price for a typical run. Only this project's journal is
+/// read for estimates; another project's usage isn't this window's to see.
+/// None if the model's price isn't known.
+fn first_estimate(state: &State, model: &str) -> Option<u64> {
+    let price = state.models.get(model)?.price;
+    Some(strive_budget::cost(&price, &strive_learning::triggers::TYPICAL_RUN))
+}
+
+/// A person declined to learn from `session`'s signs up to `through`.
+async fn dismiss(state: &State, cwd: &str, session: &str, through: u64) -> Reply {
+    let last = last_seq(state, cwd, session).map_err(invalid)?;
+    if through > last {
+        return Err(invalid(format!("session {session} has no entry {through}")));
+    }
+    let sid = open_id(state, cwd).await?;
+    let entries = state
+        .sessions
+        .append(&sid, vec![Event::LearnDismissed { session: session.to_string(), through }])
+        .await
+        .map_err(session_error)?;
+    reply::<LearningDismiss>(Appended { seq: entries.last().map_or(0, |e| e.seq) })
 }
 
 /// Journals a proposal the learning session's host made, with the file's
@@ -298,6 +384,29 @@ async fn outside_review(state: &State, cwd: &str, entries: &[Entry]) -> Result<V
         }
     }
     Ok(changed)
+}
+
+/// Marks the applied proposals a rollback would succeed for now, by the
+/// same rule `rollback` applies: the file is still what they wrote, or is
+/// already what it was before (a rollback a crash cut off, which a retry
+/// records). Any other would be refused.
+async fn rollable(state: &State, cwd: &str, folded: &mut [Folded]) -> Result<(), RpcError> {
+    let mut now: HashMap<String, Option<Digest>> = HashMap::new();
+    for f in folded.iter_mut() {
+        let (ProposalStatus::Applied, Some(applied), None) = (f.state.status, f.applied, f.state.replaced_by) else {
+            continue;
+        };
+        let Ok(rel) = strive_learning::relative_path(&f.state.proposal.artifact) else { continue };
+        let digest = if let Some(d) = now.get(&rel) {
+            *d
+        } else {
+            let d = file_now(state, cwd, &rel).await?.ok().flatten().map(|b| strive_journal::cas::digest(&b));
+            now.insert(rel, d);
+            d
+        };
+        f.state.can_roll_back = digest == Some(applied.after) || digest == applied.before;
+    }
+    Ok(())
 }
 
 /// Lines of the project's memory, as it is now, that name a project path
@@ -525,7 +634,7 @@ async fn decide(state: &Arc<State>, cwd: &str, id: u64, decision: ProposalDecisi
                 reply::<ProposalDecide>(Appended { seq: entries.last().map_or(0, |e| e.seq) })
             }
             ProposalStatus::Failed => Err(refused(format!(
-                "proposal #{id} failed its static check, so it can't be accepted; `strive review {id}` shows why"
+                "proposal #{id} failed its safety checks, so it can't be accepted; `strive review {id}` shows why"
             ))),
             ProposalStatus::Checking
             | ProposalStatus::Rejected

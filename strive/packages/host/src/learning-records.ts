@@ -1,7 +1,7 @@
 // How the learning session's own entries read to the learner, live and on
 // resume. The journal is the conversation, so these texts are what makes a
 // resumed learner see what a running one saw.
-import type { Entry, LearnTrigger, SignalKind, Verdict } from "@strive/protocol";
+import type { Entry, LearnSignal, LearnTrigger, SignalKind, Verdict } from "@strive/protocol";
 import type { ToolResultText } from "./transcript";
 
 /** A time as the learner reads it, in list_sessions and in requests alike. */
@@ -20,10 +20,16 @@ const SIGNS: Record<SignalKind, string> = {
 
 /**
  * The prompt a `learnRequested` entry gives: which work sessions to study,
- * and for an automatic run, the signs that started it, so the learner reads
- * those entries first.
+ * and the signs strive found in them (what started an automatic run, or
+ * what a person was shown when they asked), so the learner reads those
+ * entries first.
  */
-export function requestText(sessions: string[], sinceMs: number | undefined, trigger?: LearnTrigger): string {
+export function requestText(
+  sessions: string[],
+  sinceMs: number | undefined,
+  trigger?: LearnTrigger,
+  signals?: LearnSignal[],
+): string {
   const which =
     sessions.length > 0
       ? `Study these work sessions: ${sessions.join(", ")}.`
@@ -32,16 +38,17 @@ export function requestText(sessions: string[], sinceMs: number | undefined, tri
         : `Study this project's work sessions active since ${when(sinceMs)}, when you last looked.`;
 
   const ask = `${which} Propose what the next sessions here should know, or nothing if nothing is worth it.`;
+  const listed = trigger?.signals ?? signals ?? [];
 
-  if (!trigger) return ask;
+  if (listed.length === 0) return ask;
 
-  const signs = trigger.signals.map((s) => `- session ${s.session} entry ${s.seq}: ${SIGNS[s.kind]}: ${s.detail}`);
+  const why = trigger
+    ? "Nobody asked for this run: strive started it because these entries looked worth learning from."
+    : "The user asked for this run after strive showed them these entries as worth learning from.";
 
-  return [
-    ask,
-    "Nobody asked for this run: strive started it because these entries looked worth learning from. Read them first; they may hold no lesson.",
-    ...signs,
-  ].join("\n");
+  const signs = listed.map((s) => `- session ${s.session} entry ${s.seq}: ${SIGNS[s.kind]}: ${s.detail}`);
+
+  return [ask, `${why} Read them first; they may hold no lesson.`, ...signs].join("\n");
 }
 
 /**
@@ -58,7 +65,7 @@ export class PromptReader {
     if (e.type === "userMessage") return e.text;
 
     if (e.type !== "learnRequested") return undefined;
-    const text = requestText(e.sessions, this.lastRequestMs, e.trigger);
+    const text = requestText(e.sessions, this.lastRequestMs, e.trigger, e.signals);
     this.lastRequestMs = entry.tsMs;
 
     return text;

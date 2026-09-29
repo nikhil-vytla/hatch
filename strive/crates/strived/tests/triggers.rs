@@ -464,14 +464,19 @@ fn review_shows_what_triggered_an_automatic_runs_proposal() {
     assert!(line(made[0]).ends_with("[automatic run]"), "{listed}");
     assert!(!line(manual[0]).contains('['), "{listed}");
 
+    // Sessions are named by title, and which signs started the run are behind --full.
     let shown = review(&env, &cwd, &["review", &made[0].to_string()]);
     assert!(
-        shown.contains(&format!("run         automatic, after a session went idle: a correction in session {}", w.id)),
+        shown.contains(
+            "changes .strive/memory.md; automatic, after a session went idle: a correction in \"run the tests\""
+        ),
         "{shown}"
     );
-    assert!(shown.contains(&format!("session {} entry {fix}: a correction: no, use bun test", w.id)), "{shown}");
+    assert!(!shown.contains(&w.id), "{shown}");
+    let full = review(&env, &cwd, &["review", &made[0].to_string(), "--full"]);
+    assert!(full.contains(&format!("\"run the tests\" entry {fix}: a correction: no, use bun test")), "{full}");
     let shown = review(&env, &cwd, &["review", &manual[0].to_string()]);
-    assert!(shown.contains("run         asked for by a person"), "{shown}");
+    assert!(shown.contains("changes .strive/memory.md; asked with `strive learn` on"), "{shown}");
 
     let logged = review(&env, &cwd, &["log", &learning(&env, &cwd).unwrap()]);
     assert!(logged.contains("automatic learning run, after a session went idle: a correction in session"), "{logged}");
@@ -575,4 +580,128 @@ fn a_learner_run_a_crash_cut_off_is_finished_by_starting_its_host_again() {
     w.exchange("again", &json!({"kind": "interrupted"}));
     let asked = wait_events(&env, &cwd, "learnRequested", 2);
     assert_eq!(asked[1]["sessions"], json!([w.id]), "{asked:?}");
+}
+
+// The offer to learn from a session (`learning/signals`, `learning/dismiss`):
+// what the TUI and the desktop ask a person, with automatic runs off.
+
+fn signals(env: &Env, cwd: &Path, session: &str) -> Value {
+    common::slow_rpc(env).ok("learning/signals", &json!({"cwd": cwd, "session": session}))
+}
+
+#[test]
+fn a_session_with_a_correction_is_offered_for_learning_and_a_clean_one_is_not() {
+    let env = daemon(&json!({"mode": "off"}), true);
+    let cwd = project();
+    let mut w = Work::new(&env, &cwd);
+    w.exchange("run the tests", &done());
+    let (fix, _) = w.exchange("no, use bun test", &done());
+    let (_, interrupted) = w.exchange("now the linter", &json!({"kind": "interrupted"}));
+    let (_, interrupted_again) = w.exchange("go on", &json!({"kind": "interrupted"}));
+
+    assert_eq!(
+        signals(&env, &cwd, &w.id),
+        json!({
+            "signals": [
+                {"session": w.id, "seq": fix, "kind": "correction", "detail": "no, use bun test"},
+                {"session": w.id, "seq": interrupted, "kind": "interrupted", "detail": "turn 3 was interrupted"},
+                {"session": w.id, "seq": interrupted_again, "kind": "interrupted", "detail": "turn 4 was interrupted"},
+            ],
+            "summary": "a correction and 2 interrupted turns",
+            "ask": true,
+            // No learner has run anywhere yet: a typical run's 60,000 tokens in and
+            // 2,000 out at claude-sonnet-4-5's $3 and $15 a million.
+            "estimateUsdMicros": 210_000,
+        })
+    );
+    // Asking costs nothing and records nothing: the project still has no learning session.
+    assert_eq!(learning(&env, &cwd), None);
+
+    let mut clean = Work::new(&env, &cwd);
+    clean.exchange("add a --verbose flag", &done());
+    clean.exchange("thanks", &done());
+    let r = signals(&env, &cwd, &clean.id);
+    assert_eq!((&r["signals"], &r["summary"], &r["ask"]), (&json!([]), &json!(""), &json!(false)), "{r}");
+
+    // Only a work session of this project is asked about.
+    let other = project();
+    let r = common::slow_rpc(&env).call("learning/signals", &json!({"cwd": other, "session": w.id}));
+    assert!(r["error"]["message"].as_str().unwrap().contains("not in"), "{r}");
+}
+
+#[test]
+fn yes_asks_for_a_run_naming_the_session_and_its_signs_which_are_not_offered_again() {
+    let env = daemon(&json!({"mode": "off"}), true);
+    let cwd = project();
+    let mut w = Work::new(&env, &cwd);
+    w.exchange("run the tests", &done());
+    let (fix, _) = w.exchange("no, use bun test", &done());
+
+    common::slow_rpc(&env).ok("learning/run", &json!({"cwd": cwd, "sessions": [w.id]}));
+    let asked = wait_events(&env, &cwd, "learnRequested", 1);
+    assert_eq!(
+        asked[0],
+        json!({
+            "type": "learnRequested",
+            "sessions": [w.id],
+            "signals": [{"session": w.id, "seq": fix, "kind": "correction", "detail": "no, use bun test"}],
+        })
+    );
+    assert_eq!(signals(&env, &cwd, &w.id)["signals"], json!([]));
+    assert_eq!(signals(&env, &cwd, &w.id)["ask"], false);
+    assert!(
+        review(&env, &cwd, &["log", learning(&env, &cwd).unwrap().as_str()])
+            .contains(&format!("asked the learner to study {} (a correction in session {})", w.id, w.id))
+    );
+
+    // A later sign is offered on its own.
+    let (_, interrupted) = w.exchange("now the linter", &json!({"kind": "interrupted"}));
+    let r = signals(&env, &cwd, &w.id);
+    assert_eq!(
+        (&r["signals"][0]["seq"], &r["summary"], &r["ask"]),
+        (&json!(interrupted), &json!("an interrupted turn"), &json!(true))
+    );
+    assert_eq!(r["signals"].as_array().unwrap().len(), 1, "{r}");
+}
+
+#[test]
+fn a_dismissed_offer_is_not_made_again_and_no_trigger_acts_on_its_signs() {
+    // Automatic runs on, scanning every third turn, so the scan comes after the dismissal.
+    let env = daemon(&json!({"mode": "suggest", "idleSeconds": 3600, "everyTurns": 3}), true);
+    let cwd = project();
+    let mut w = Work::new(&env, &cwd);
+    w.exchange("run the tests", &done());
+    let (fix, _) = w.exchange("no, use bun test", &done());
+
+    let mut person = common::slow_rpc(&env);
+    let r = person.call("learning/dismiss", &json!({"cwd": cwd, "session": w.id, "through": fix + 100}));
+    assert!(r["error"]["message"].as_str().unwrap().contains("has no entry"), "{r}");
+    // The agent's host isn't a person.
+    let r = w.host.call("learning/dismiss", &json!({"cwd": cwd, "session": w.id, "through": fix}));
+    assert!(r["error"]["message"].as_str().unwrap().contains("only a person"), "{r}");
+    person.ok("learning/dismiss", &json!({"cwd": cwd, "session": w.id, "through": fix}));
+    assert_eq!(
+        events(&env, &learning(&env, &cwd).unwrap(), "learnDismissed"),
+        [json!({"type": "learnDismissed", "session": w.id, "through": fix})]
+    );
+    assert_eq!(signals(&env, &cwd, &w.id)["signals"], json!([]));
+
+    let scanned = format!("session {} scanned for learning: no new signs", w.id);
+    let before = log(&env).matches(&scanned).count();
+    w.exchange("thanks", &done());
+    wait_log(&env, &scanned, before);
+    assert_eq!(events(&env, &learning(&env, &cwd).unwrap(), "learnRequested"), Vec::<Value>::new());
+}
+
+#[test]
+fn no_offer_when_learning_ask_is_false_or_the_learner_has_no_key() {
+    for (settings, key) in [(json!({"mode": "off", "ask": false}), true), (json!({"mode": "off"}), false)] {
+        let env = daemon(&settings, key);
+        let cwd = project();
+        let mut w = Work::new(&env, &cwd);
+        w.exchange("run the tests", &done());
+        w.exchange("no, use bun test", &done());
+        let r = signals(&env, &cwd, &w.id);
+        assert_eq!((&r["summary"], &r["ask"]), (&json!("a correction"), &json!(false)), "{settings} key {key}: {r}");
+    }
 }

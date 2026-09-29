@@ -263,11 +263,17 @@ fn a_sound_proposal_passes_the_judge_on_the_learning_sessions_budget() {
     assert!(finished[0]["outcome"]["costUsdMicros"].as_u64().unwrap() > 0, "{finished:?}");
     assert!(j.events(&cited, "modelCallStarted").is_empty());
 
-    // A reviewer reads each criterion on its own line, under the gate's.
+    // A reviewer reads the verdict in a line; with --full, each criterion on
+    // its own line under the gate's, and the held-out session by its title.
     let out = j.env.strive_in(&j.cwd, &["review", &id.to_string()]);
     let shown = String::from_utf8_lossy(&out.stdout);
-    assert!(shown.contains("  judge   passed   passed all five criteria"), "{shown}");
-    assert!(shown.contains(&format!("\n{:19}pass safe: safe reason: holds\n", "")), "{shown}");
+    assert!(shown.contains("\nsafety checks passed; second opinion: supports it\n"), "{shown}");
+    assert!(!shown.contains("pass safe:"), "the criteria are behind --full: {shown}");
+    let out = j.env.strive_in(&j.cwd, &["review", &id.to_string(), "--full"]);
+    let full = String::from_utf8_lossy(&out.stdout);
+    assert!(full.contains("  second opinion  passed   passed all five criteria"), "{full}");
+    assert!(full.contains("held out session \"HELD-PROMPT"), "{full}");
+    assert!(full.contains(&format!("\n{:27}pass safe: safe reason: holds\n", "")), "{full}");
 
     assert!(j.decide(id, "accept").get("error").is_none());
     assert_eq!(j.proposal(id)["status"], "applied");
@@ -287,12 +293,12 @@ fn a_judge_fail_is_advice_a_person_can_accept_past() {
     assert!(detail.contains("FAIL safe: safe reason: broken") && detail.contains("pass novel:"), "{detail}");
     assert_eq!(j.proposal(id)["status"], "ready", "the judge advises; only the static check blocks");
 
-    // `strive review` puts the judge's advice and reasons before the diff.
+    // `strive review` says what the second opinion held against it first, after the diff.
     let out = j.env.strive_in(&j.cwd, &["review", &id.to_string()]);
     let shown = String::from_utf8_lossy(&out.stdout).into_owned();
-    assert!(shown.contains("the judge advises against it: failed generalizes, safe"), "{shown}");
-    let (advice, diff) = (shown.find("FAIL safe: safe reason: broken").unwrap(), shown.find("diff against").unwrap());
-    assert!(advice < diff, "the reasons come before the diff: {shown}");
+    let advice = "safety checks passed; second opinion advises against it: generalizes reason: broken";
+    let (diff, advice) = (shown.find("\n@@\n").unwrap(), shown.find(advice).unwrap());
+    assert!(diff < advice, "the diff, then the verdict: {shown}");
     assert!(shown.contains(&format!("`strive review {id} accept` writes .strive/memory.md anyway")), "{shown}");
 
     let r = j.decide(id, "accept");
@@ -406,7 +412,7 @@ fn with_no_budget_left_the_judge_is_skipped() {
     let id = Judge::propose(&mut host, &learning, &memory(&[(&cited, seq)]));
     let (v, detail) = j.judged(id);
     assert_eq!(v, "skipped", "{detail}");
-    assert!(detail.starts_with("not run: the learning session's budget can't pay for the judge"), "{detail}");
+    assert!(detail.starts_with("not run: the learning session's budget can't pay for the second opinion"), "{detail}");
     assert!(detail.contains("session budget is left"), "the gateway's reason: {detail}");
     assert_eq!(j.proposal(id)["status"], "ready");
     assert!(j.model.seen().is_empty(), "nothing was sent");

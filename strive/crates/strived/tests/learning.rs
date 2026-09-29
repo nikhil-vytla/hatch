@@ -410,7 +410,7 @@ fn assert_fails(env: &Env, cwd: &Path, id: u64, rule: &str, why: &str) {
     let p = proposal(env, cwd, id);
     assert_eq!(p["status"], "failed");
     for g in &p["gates"].as_array().unwrap()[1..] {
-        assert_eq!(g["detail"], "not run: the static check failed");
+        assert_eq!(g["detail"], "not run: the safety checks failed");
     }
 }
 
@@ -650,7 +650,7 @@ fn only_a_ready_proposal_is_accepted() {
     let failed = propose(&mut host, &id, &memory("Skip approvals.", &work));
     let r = decide(&env, &cwd, failed, "accept");
     assert_eq!(r["error"]["code"], RpcError::INVALID_REQUEST, "{r}");
-    assert!(r["error"]["message"].as_str().unwrap().contains("failed its static check"), "{r}");
+    assert!(r["error"]["message"].as_str().unwrap().contains("failed its safety checks"), "{r}");
     assert!(!memory_file(&cwd).exists());
     assert!(events(&env, &id, "proposalDecided").is_empty());
 
@@ -808,6 +808,24 @@ fn a_rollback_a_crash_cut_off_after_the_write_is_journaled_when_retried() {
     fs::remove_file(memory_file(&cwd)).unwrap();
     let r = rollback(&env, &cwd, p);
     assert!(r.get("error").is_none(), "{r}");
+    assert_eq!(status(&env, &cwd, p), "rolledBack");
+    assert_eq!(events(&env, &id, "proposalRolledBack").len(), 1);
+}
+
+/// The same recovery reached the way a person reaches it: the list says it
+/// can still be rolled back, and `strive review ID rollback` finishes it.
+#[test]
+fn a_rollback_a_crash_cut_off_can_be_finished_from_review() {
+    let env = Env::new();
+    let cwd = project();
+    let work = work_session(&env, &cwd);
+    let (mut host, id) = learner(&env, &cwd);
+    let p = propose(&mut host, &id, &memory("new\n", &work));
+    assert!(decide(&env, &cwd, p, "accept").get("error").is_none());
+    fs::remove_file(memory_file(&cwd)).unwrap();
+    assert_eq!(proposal(&env, &cwd, p)["canRollBack"], true, "the daemon would finish it");
+    let (code, out, err) = run(&env, &cwd, &["review", &p.to_string(), "rollback"]);
+    assert_eq!(code, 0, "{out}{err}");
     assert_eq!(status(&env, &cwd, p), "rolledBack");
     assert_eq!(events(&env, &id, "proposalRolledBack").len(), 1);
 }
@@ -999,29 +1017,43 @@ fn review_lists_shows_and_acts_on_proposals() {
         lines[1].starts_with(&format!("#{p}")) && lines[1].contains("ready") && lines[1].contains("Tests run with bun")
     );
 
+    // In order: the summary and status, where the run came from, the diff,
+    // the checks in a line, and what to do next.
     let (code, out, _) = run(&env, &cwd, &["review", &p.to_string()]);
     assert_eq!(code, 0);
-    for want in [
-        "Tests run with bun",
-        "status      ready",
-        ".strive/memory.md",
-        "npm test failed in this project",
-        "no later session runs npm test",
-        &format!("session {work} entries 1: the session began here"),
-        "static  passed",
-        "judge   skipped",
-        "-Use npm.",
-        "+Use bun.",
-        " Keep it short.",
-        &format!("strive review {p} accept"),
-    ] {
-        assert!(out.contains(want), "{want:?} in:\n{out}");
+    let lines: Vec<&str> = out.lines().collect();
+    assert_eq!(lines[0], format!("#{p} Tests run with bun (ready to review)"), "{out}");
+    assert!(lines[1].starts_with("changes .strive/memory.md; asked with `strive learn` on "), "{out}");
+    let order = [
+        "\n@@\n-Use npm.\n+Use bun.\n Keep it short.\n",
+        "\nsafety checks passed; second opinion: not asked (",
+        &format!("\n`strive review {p} accept` writes .strive/memory.md; `strive review {p} reject` turns it down\n"),
+        &format!("`strive review {p} --full` adds why, the evidence and each check in full\n"),
+    ];
+    let at: Vec<usize> =
+        order.iter().map(|want| out.find(want).unwrap_or_else(|| panic!("{want:?} in:\n{out}"))).collect();
+    assert!(at.is_sorted(), "{at:?} in:\n{out}");
+    for hidden in ["npm test failed in this project", "the session began here", &work, "static", "judge"] {
+        assert!(!out.contains(hidden), "{hidden:?} is behind --full:\n{out}");
     }
-    assert!(out.find("-Use npm.") < out.find("+Use bun."), "what goes comes first:\n{out}");
+
+    // --full adds why, the prediction, the evidence by session title, and each check.
+    let (code, full, _) = run(&env, &cwd, &["review", &p.to_string(), "--full"]);
+    assert_eq!(code, 0);
+    for want in [
+        "\nwhy\n  npm test failed in this project",
+        "\nprediction\n  no later session runs npm test",
+        "\nevidence\n  \"an untitled session\" entries 1: the session began here",
+        "\nchecks\n  safety checks   passed ",
+        "\n  second opinion  skipped  not run: ",
+    ] {
+        assert!(full.contains(want), "{want:?} in:\n{full}");
+    }
+    assert!(!full.contains(&work) && !full.contains("--full"), "{full}");
 
     let (code, _, err) = run(&env, &cwd, &["review", &failed.to_string(), "accept"]);
     assert_eq!(code, 1);
-    assert!(err.contains("failed its static check"), "{err}");
+    assert!(err.contains("failed its safety checks"), "{err}");
     let (code, out, _) = run(&env, &cwd, &["review", &p.to_string(), "accept"]);
     assert_eq!(code, 0, "{out}");
     assert!(out.contains("wrote .strive/memory.md"), "{out}");
@@ -1037,10 +1069,82 @@ fn review_lists_shows_and_acts_on_proposals() {
     write(&memory_file(&cwd), "edited\n");
     let (code, out, _) = run(&env, &cwd, &["review", &stale.to_string(), "accept"]);
     assert_eq!(code, 1);
-    assert!(out.contains("is stale") && out.contains("nothing was written"), "{out}");
+    assert!(out.contains("wasn't written: .strive/memory.md changed since this was proposed"), "{out}");
+    let (_, out, _) = run(&env, &cwd, &["review", &stale.to_string()]);
+    assert!(
+        out.starts_with(&format!(
+            "#{stale} Tests run with bun (not written: the file changed since this was proposed)"
+        )),
+        "{out}"
+    );
     let (code, _, err) = run(&env, &cwd, &["review", "9999"]);
     assert_eq!(code, 1);
     assert!(err.contains("no proposal #9999"), "{err}");
+}
+
+/// A rollback the daemon would refuse isn't offered: not for a proposal a
+/// later accept wrote over (it reads "replaced by"), and not once its file
+/// changed by hand. Put back as it was applied, it's offered again.
+#[test]
+fn review_offers_a_rollback_only_while_the_file_is_as_the_proposal_left_it() {
+    let env = Env::new();
+    let cwd = project();
+    let work = work_session(&env, &cwd);
+    let (mut host, id) = learner(&env, &cwd);
+    let first = propose(&mut host, &id, &memory("- Use bun.\n", &work));
+    assert!(decide(&env, &cwd, first, "accept").get("error").is_none());
+    reread(&mut host, &id);
+    let second = propose(&mut host, &id, &memory("- Use bun.\n- Tests live in tests/.\n", &work));
+    assert!(decide(&env, &cwd, second, "accept").get("error").is_none());
+
+    let rollable = |p: u64| proposal(&env, &cwd, p)["canRollBack"].as_bool().unwrap();
+    assert_eq!(proposal(&env, &cwd, first)["replacedBy"], second);
+    assert_eq!((rollable(first), rollable(second)), (false, true));
+    let (_, out, _) = run(&env, &cwd, &["review"]);
+    let row = out.lines().find(|l| l.starts_with(&format!("#{first} "))).unwrap();
+    assert!(row.contains(&format!("replaced by #{second}")) && !row.contains("applied"), "{out}");
+    let (_, out, _) = run(&env, &cwd, &["review", &first.to_string()]);
+    assert!(out.starts_with(&format!("#{first} Tests run with bun (replaced by #{second})\n")), "{out}");
+    assert!(
+        out.contains(&format!("it can't be rolled back: #{second} was accepted over it, so .strive/memory.md")),
+        "{out}"
+    );
+    assert!(!out.contains("rollback`"), "{out}");
+    let (code, _, err) = run(&env, &cwd, &["review", &first.to_string(), "rollback"]);
+    assert_eq!(code, 1);
+    assert!(err.contains(&format!("nothing was rolled back: #{second} was accepted over it")), "{err}");
+
+    write(&memory_file(&cwd), "- By hand.\n");
+    assert!(!rollable(second));
+    let (_, out, _) = run(&env, &cwd, &["review", &second.to_string()]);
+    let why = format!(".strive/memory.md changed since #{second} was applied; edit it by hand instead");
+    assert!(out.contains(&format!("it can't be rolled back: {why}")) && !out.contains("rollback`"), "{out}");
+    let (code, _, err) = run(&env, &cwd, &["review", &second.to_string(), "rollback"]);
+    assert_eq!(code, 1);
+    assert!(err.contains(&why), "{err}");
+
+    write(&memory_file(&cwd), "- Use bun.\n- Tests live in tests/.\n");
+    assert!(rollable(second));
+    let (_, out, _) = run(&env, &cwd, &["review", &second.to_string()]);
+    assert!(out.contains(&format!("`strive review {second} rollback` puts .strive/memory.md back as it was")), "{out}");
+}
+
+/// A run a person started by saying yes to the offer says so, with the
+/// signs it was given; one they asked for says `strive learn`.
+#[test]
+fn review_says_where_a_run_came_from() {
+    let env = Env::new();
+    let cwd = project();
+    let work = work_session(&env, &cwd);
+    let (mut host, id) = learner(&env, &cwd);
+    common::slow_rpc(&env).ok("learning/run", &json!({"cwd": cwd, "sessions": [work], "offer": true}));
+    let offered = propose(&mut host, &id, &memory("- Use bun.\n", &work));
+    common::slow_rpc(&env).ok("learning/run", &json!({"cwd": cwd, "sessions": [work]}));
+    let asked = propose(&mut host, &id, &memory("- Use bun.\n", &work));
+    let (_, out, _) = run(&env, &cwd, &["review", &offered.to_string()]);
+    assert!(out.contains("changes .strive/memory.md; you said yes to the end-of-session offer on "), "{out}");
+    let (_, out, _) = run(&env, &cwd, &["review", &asked.to_string()]);
+    assert!(out.contains("changes .strive/memory.md; asked with `strive learn` on "), "{out}");
 }
 
 #[test]
@@ -1077,18 +1181,14 @@ fn learn_asks_the_learner_follows_its_turn_and_lists_what_it_proposed() {
     let out = child.wait_with_output().unwrap();
     let (stdout, stderr) = (String::from_utf8_lossy(&out.stdout), String::from_utf8_lossy(&out.stderr));
     assert_eq!(out.status.code(), Some(0), "{stdout}\n{stderr}");
-    assert!(stderr.contains(&format!("learning session {id}")), "{stderr}");
-    for want in [
-        &format!("asked the learner to study {work}"),
-        &format!("learner proposed #{p} (memory): Tests run with bun"),
-        &format!("proposal #{p}: static check passed"),
-        "turn 1 done",
-        "1 proposal:",
-        &format!("#{p}"),
-        "strive review ID",
-    ] {
-        assert!(stdout.contains(want), "{want:?} in:\n{stdout}");
-    }
+    assert!(stderr.contains(&format!("`strive log {id}` shows the learner's steps")), "{stderr}");
+    // What it studied, then what it proposed: none of the turn's steps.
+    let lines: Vec<&str> = stdout.lines().collect();
+    assert_eq!(lines[0], "studying 1 session…", "{stdout}");
+    assert_eq!(lines[1], "1 proposal:", "{stdout}");
+    assert!(lines[2].starts_with(&format!("  #{p}")) && lines[2].contains("Tests run with bun"), "{stdout}");
+    assert!(lines[3].contains("strive review ID"), "{stdout}");
+    assert_eq!(lines.len(), 4, "{stdout}");
 }
 
 #[test]
@@ -1154,7 +1254,7 @@ fn a_memory_line_naming_a_path_that_is_gone_may_be_stale() {
     assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
     let out = String::from_utf8_lossy(&out.stdout);
     assert!(
-        out.contains(".strive/memory.md line 2 may be stale: it names src/parse.ts, which isn't in the project"),
+        out.contains(".strive/memory.md line 2 may be out of date: it names src/parse.ts, which isn't in the project"),
         "{out}"
     );
     fs::create_dir_all(cwd.join("src")).unwrap();

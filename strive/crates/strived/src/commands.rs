@@ -106,11 +106,17 @@ pub fn describe(e: &Entry) -> String {
         Event::LearnRequested { trigger: Some(t), .. } => {
             format!("automatic learning run, {}", crate::review::trigger_text(t))
         }
-        Event::LearnRequested { sessions, trigger: None } if sessions.is_empty() => {
+        Event::LearnRequested { sessions, trigger: None, .. } if sessions.is_empty() => {
             "asked the learner to study recent sessions".into()
         }
-        Event::LearnRequested { sessions, trigger: None } => {
+        Event::LearnRequested { sessions, trigger: None, signals: None, .. } => {
             format!("asked the learner to study {}", sessions.join(", "))
+        }
+        Event::LearnRequested { sessions, trigger: None, signals: Some(s), .. } => {
+            format!("asked the learner to study {} ({})", sessions.join(", "), strive_learning::signals::describe(s))
+        }
+        Event::LearnDismissed { session, through } => {
+            format!("declined to learn from session {session} (its signs through entry {through})")
         }
         Event::LearnSkipped { trigger, reason } => {
             format!("automatic learning run skipped ({}): {reason}", crate::review::trigger_text(trigger))
@@ -122,7 +128,7 @@ pub fn describe(e: &Entry) -> String {
             proposal.summary
         ),
         Event::GateFinished { proposal, gate, verdict, detail } => format!(
-            "proposal #{proposal}: {} check {}: {detail}",
+            "proposal #{proposal}: {} {}: {detail}",
             crate::review::gate_name(*gate),
             crate::review::verdict_name(*verdict)
         ),
@@ -140,7 +146,7 @@ pub fn describe(e: &Entry) -> String {
         Event::Compacted { upto_seq, summary } => {
             format!("conversation up to #{upto_seq} summarized ({} characters)", summary.len())
         }
-        Event::ContextLoaded { instructions, skills, mcp, learned } => {
+        Event::ContextLoaded { instructions, skills, mcp, learned, skipped } => {
             let files: Vec<&str> = instructions.iter().map(|f| f.path.as_str()).collect();
             let servers: Vec<String> = mcp
                 .iter()
@@ -150,7 +156,7 @@ pub fn describe(e: &Entry) -> String {
                 })
                 .collect();
             format!(
-                "agent context: {} instruction file(s){}, {} skill(s){}{}{}",
+                "agent context: {} instruction file(s){}, {} skill(s){}{}{}{}",
                 files.len(),
                 if files.is_empty() { String::new() } else { format!(" ({})", files.join(", ")) },
                 skills.len(),
@@ -163,7 +169,12 @@ pub fn describe(e: &Entry) -> String {
                         "; the learner was given {}",
                         files.iter().map(|f| f.path.as_str()).collect::<Vec<_>>().join(", ")
                     ),
-                }
+                },
+                skipped.iter().flatten().fold(String::new(), |mut out, s| {
+                    out.push_str("\n  ");
+                    out.push_str(s);
+                    out
+                })
             )
         }
         Event::AssistantMessage { text, tool_calls, .. } => {
@@ -181,7 +192,7 @@ pub fn describe(e: &Entry) -> String {
             TurnEnd::TimedOut { seconds } => format!("turn {turn} stopped at its {seconds}s limit"),
             TurnEnd::Failed { error } => format!("turn {turn} failed: {error}"),
         },
-        Event::ApprovalRequested { effect, description } => format!("effect {effect} asks: {description}"),
+        Event::ApprovalRequested { effect, description, .. } => format!("effect {effect} asks: {description}"),
         Event::ApprovalDecided { effect, decision, by } => format!(
             "effect {effect} {} by {by}",
             match decision {

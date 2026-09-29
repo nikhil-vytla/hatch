@@ -184,6 +184,18 @@ Confining the host process to the daemon's socket and gateway is planned.
 - **Memory:** `.strive/memory.md`, the last instruction file, labeled as
   memory a person reviewed. Its `@` lines stay text. The same rules
   apply: regular files only, never from strive's home.
+- **Imports:** a line `@path` in an instruction file, outside a code
+  block, inlines that file if its real path is in the project (under its
+  root, not in strive's home), up to five imports deep, and not as a
+  cycle. One outside the project, or a symlink leading out of it, stays as
+  text. Each import in the project is guarded as the file that imports it
+  (see "What shapes a session").
+- **Only what is on the list:** every other file above is read only if
+  its real path is on "What shapes a session" (below). A symlinked
+  `AGENTS.md` leading to `docs/x.md` is skipped, and so is a skill linked
+  in from elsewhere. `CLAUDE.md` linked to `AGENTS.md` loads, since both
+  ends are guarded. Memory and `.strive/skills` must also be reached
+  without any symlink.
 - **MCP servers:** the stdio servers in `mcpServers` in settings.
   - They are started for the session in its directory, without strive's
     variables or provider keys.
@@ -199,7 +211,12 @@ Confining the host process to the daemon's socket and gateway is planned.
     stopped, and the workspace must be free for a rewind. Other calls to
     that server fail when it is stopped.
   - A process that leaves the group (`setsid`) is out of reach.
-- `contextLoaded` journals what was loaded and how each server started.
+- `contextLoaded` journals what was loaded and how each server started,
+  and, in `skipped`, each import not loaded (a cycle aside) as a line for
+  a person: "@docs/x.md in AGENTS.md was not loaded: it's outside the
+  project" (or "it links outside the project", "there's no such file",
+  "it isn't a file", "it's more than 5 imports deep"). The TUI, the
+  desktop app and `strive log` show each line.
 - Before a turn, a conversation past `compactAtTokens` is summarized. The
   summary is journaled as `compacted` and replaces what it covers on
   resume.
@@ -243,7 +260,8 @@ by `learning/open`. Its `sessionStarted` says `kind: learning`.
 - `learning/run` (people only) journals `learnRequested`, naming work
   sessions of the project or none, and starts the session's host. Prompts
   to a learning session are refused. The daemon's own triggers journal it
-  too, with a `trigger` (below).
+  too, with a `trigger` (below). A person's request that names sessions
+  carries their `signals` not yet dealt with, found as a trigger's are.
 
 **What its host may do.** Its `host/register` returns `kind: learning`,
 no MCP tools, and `learnedFiles`: the project's memory and skills, each
@@ -318,10 +336,16 @@ it is admitted, held, journaled and charged like any call of that session.
   can't pay, or if the provider is rate-limited or overloaded (429, 529):
   that says nothing about the proposal. Failed if the provider refuses
   otherwise or the call breaks.
-- **Advice:** a fail doesn't block. `strive review` puts "the judge advises
-  against it" and its first line near the top, marks the list line, and
-  says accept writes the file anyway; the desktop shows the same with the
-  failed criteria's reasons at the top of the proposal.
+- **Advice:** a fail doesn't block. `strive review` says "second opinion
+  advises against it" and the first failed criterion's reason in its
+  one-line verdict, marks the list line, and says accept writes the file
+  anyway; the desktop shows the same with the failed criteria's reasons at
+  the top of the proposal.
+- **Named for people:** what a person reads calls the static gate the
+  "safety checks" and the judge the "second opinion" (`strive review`,
+  `strive log`, the Learned pane, the daemon's refusals and skip reasons);
+  the code, the protocol (`static`, `judge`) and the rubric keep their
+  names.
 - **In the background:** otherwise the proposal stays `checking` while the
   call runs, without the project's lock. The verdict is journaled under the
   lock, and only if there isn't one. A set of running judges keeps a list
@@ -340,6 +364,21 @@ it is admitted, held, journaled and charged like any call of that session.
 | `applied` | accepted and written (`proposalApplied`) |
 | `stale` | accepted, but the file wasn't as the learner saw it, so nothing was written |
 | `rolledBack` | an applied one, undone |
+
+People read `stale` as "file changed" in a list and "not written: the file
+changed since this was proposed" on its own. Two more facts ride with an
+`applied` one:
+- `replacedBy`: a later proposal for the same file was applied over it
+  (the fold sets it, and clears it if that one is rolled back to this
+  one's content). It shows as "replaced by #N" instead of `applied`.
+- `canRollBack`: `proposal/list` compares the file now with what the
+  proposal wrote. Roll back is offered (the CLI's hint, the desktop's
+  button) only when it's true, since the daemon would refuse otherwise;
+  `strive review ID rollback` says why before asking.
+
+Each proposal also carries `trigger` (an automatic run's) or `offered`
+(the signs of a person's yes to the offer), so review can say where its
+run came from.
 
 Gates a crash cut short (a proposal with no verdicts) are run again on the
 next `proposal/list` or decision.
@@ -365,48 +404,108 @@ project's directory against rewinds.
   (with `before`), writing nothing; rolling back again finds it already
   `before` and journals the rollback.
 
-**Learned files outside review.** The daemon's own write on accept and
-rollback is not an agent effect, so the checks below don't apply to it.
-"Only through review" covers `.strive/memory.md` and `.strive/skills`
-against the agent's own writes and commands, and nothing wider:
-- **Other instruction files are ordinary project files.** `AGENTS.md`,
-  `CLAUDE.md` and `.claude/skills` also reach every session's prompt, and
-  no review covers them (below).
+**What shapes a session.** One list, `context::SHAPING`, names every file
+or directory whose contents a session is given when it starts, or which
+decides how strive runs it. The loader reads nothing in a project that
+isn't on it or imported by a file on it, and the approval gate and the
+sandbox guard all of it:
+- **The list**, by last components at any depth under the project's root
+  (the repository's, or the workspace outside one), since a later session
+  may start in any directory:
+  - `AGENTS.md` and `CLAUDE.md`;
+  - `.claude/skills`;
+  - `.strive/memory.md` and `.strive/skills`, the learned files;
+  - `.strive/settings.json`.
+
+  strive's home adds `~/.strive/AGENTS.md` and `~/.strive/skills`, and the
+  agent can't write anything in it. MCP servers come from
+  `~/.strive/settings.json` only; a project's `.mcp.json` is Claude Code's,
+  and is guarded as a file that runs code (see "The sandbox").
+- **Imports** join the list for their project: each path an instruction
+  file imports inside the project, inlined or not (one not written yet
+  too). Only guarded files import, so the set changes only as a person
+  allows; the daemon reads it again for each effect.
+- **Agent writes:** a work session's `write` or `edit` that reaches a
+  listed path asks a person in every approval mode, `fullAuto` included.
+  The path is matched after symlinks and `..` are resolved, and without
+  regard to case.
+  The request says why: learned files, that the change reaches every future
+  session without review, naming `strive learn` and `strive review`;
+  instruction files and skills, that it "changes what every future session
+  in this project is told"; imports, that "it's imported by AGENTS.md"
+  (naming the file); settings, that it changes strive's settings for
+  every future session. Unattended, it's refused.
+- **Allowing for the session** covers one instruction file (`AGENTS.md`,
+  `CLAUDE.md`) or import at a time: the request names it
+  (`approvalRequested.sessionFile`), and once a person answers
+  `allowSession`, later changes to that real path in that session don't
+  ask. The mode stays as it was. Rebuilt from the journal on restart, from
+  those two entries. Skills, settings, learned files and files that run
+  code have no `sessionFile`, so each change asks (`allowSession` there
+  switches to full-auto as for any request, which they ignore).
+- **Commands:** the macOS sandbox denies writes to every listed path by
+  pattern, in any case, anywhere under the project's root, and to
+  `.strive` and `.claude` themselves, so neither can be made elsewhere and
+  moved into place or moved aside. Their other files stay writable, and
+  reads are allowed. Each import is denied by its path, in any case, and
+  so is each directory between it and the project's root, so none can be
+  moved aside, moved into place or swapped for a symlink. On Linux,
+  bubblewrap binds the listed paths in the workspace itself, and the
+  imports, read-only where they exist: a command can still create a
+  missing one, or change a nested one (`pkg/AGENTS.md`). With
+  `"sandbox": "off"` none of this applies to commands.
+- **Symlinks:** the loader skips a listed path whose real path isn't
+  listed (see "Context"), so a plain edit of the file a link names can't
+  change what sessions are told. An import is guarded where it is written
+  and where it leads, so one that links elsewhere in the project guards
+  both.
+- **The daemon's own write** on accept and rollback is not an agent effect,
+  so none of this applies to it.
 - **MCP servers can write anything.** They run unsandboxed, as the user,
-  in the session's directory, so a server can write `.strive/memory.md` or
-  a skill with no approval and no sandbox rule in the way. They are
-  configured by the user and trusted as the user is. Such a write shows up
-  as changed outside review, like an editor's.
-- **Loading:** memory and `.strive/skills` are loaded only when really
-  there, reached without a symlink, as the learner already reads them. The
-  checks below guard real paths; a skill linked to `docs/x` would otherwise
-  change with any edit of `docs/x`.
-- **Out of scope:** `AGENTS.md`/`CLAUDE.md` and `.claude/skills` are the
-  project's own files. The agent edits them as it edits any file, visible in
-  diffs and checkpoints; only what strive learns is review-gated.
-- **Agent writes:** a work session's `write` or `edit` that reaches
-  `.strive/memory.md` or anything under `.strive/skills` asks a person in
-  every approval mode, `fullAuto` included, and "allow for the session"
-  doesn't cover the next one. The path is matched after symlinks and `..`
-  are resolved, and without regard to case. A file that the project's memory
-  path or skills directory leads to through a symlink is matched too. The
-  request says the change reaches every future session and names `strive
-  learn` and `strive review`. Unattended, it's refused.
-- **Commands:** the macOS sandbox denies writes to `.strive` itself (so it
-  can't be moved aside or created), `.strive/memory.md`, `.strive/skills`,
-  and wherever a symlink takes those. Other files in `.strive` stay
-  writable, and reads are allowed. On Linux, bubblewrap binds the memory
-  file and skills directory read-only where they exist, so a command can
-  still create a missing one there. With `"sandbox": "off"` none of this
-  applies to commands.
-- **Anything else** (an editor, git) can still change them. `proposal/list`
-  returns `changedOutsideReview`: learned files that aren't what an
-  accepted proposal last left there. After an apply that's its content,
-  after a rollback what it replaced, and with no applied proposal, any
-  file that exists counts. `strive review` prints a line for each.
-- A command a work session runs can change the file between the compare
-  and the write. Writes and edits the agent asks for can't: they wait for
-  the file.
+  in the session's directory, so a server can write any of these with no
+  approval and no sandbox rule in the way. They are configured by the user
+  and trusted as the user is.
+- **Changed outside review**, for learned files only. An editor or git can
+  still change any of these; a person editing `AGENTS.md` is normal, so
+  only learned files are flagged. `proposal/list` returns
+  `changedOutsideReview`: learned files that aren't what an accepted
+  proposal last left there. After an apply that's its content, after a
+  rollback what it replaced, and with no applied proposal, any file that
+  exists counts. `strive review` prints a line for each. A command a work
+  session runs can change the file between the compare and the write.
+  Writes and edits the agent asks for can't: they wait for the file.
+
+**The offer to learn** ([ADR-0020](adrs/0020-learning-triggers.md)) is how
+learning usually starts. As the TUI quits, or once a desktop session has
+been idle a minute after its turn ended (no prompt since), or when the
+window switches away from it or is closed, the client asks
+`learning/signals {cwd, session}`: no model, nothing journaled, no learning
+session created. It returns the session's signs past the watermark (below),
+a counted `summary` ("2 corrections and a command that failed, then
+passed"), `ask`, and `estimateUsdMicros`: what a run (its checks included)
+has cost in this project on average, or before the first the learner
+model's price for other projects' average run tokens (a typical run's,
+`triggers::TYPICAL_RUN`, if none has run). `ask` is true
+when there are signs, the learner's provider has a key, and
+`learning.ask` (default true) isn't false; it doesn't depend on `mode`.
+- **Yes** is `learning/run {sessions: [it], offer: true}`, whose
+  `learnRequested` carries the signs and `offer`; the client exits or goes
+  on without waiting. The TUI draws its "Asked the learner…" line before
+  it exits.
+- **No** (the TUI: any key but y; the desktop: Dismiss) is
+  `learning/dismiss {cwd, session, through}` (people only), journaling
+  `learnDismissed {session, through}` in the learning session.
+- **Once:** the TUI asks at most once a process, the desktop at most twice
+  a session a window (again only for signs after the first answer). Across
+  clients and restarts the watermark keeps the same signs from being
+  offered again. `strive run` never offers.
+- **Closing the desktop window** is held once (`close` is prevented, the
+  page is sent `strive:closing`) so the page can offer; it calls
+  `strive:close` when there's nothing to offer or once it's answered. A
+  second close, or quitting the app (`before-quit`), isn't held.
+- **Proposals waiting:** a TUI session says "2 proposals are waiting:
+  `strive review`" as it opens, and the desktop's Learned button shows the
+  count of `ready` proposals, both from `proposal/list`.
 
 **Triggers** ([ADR-0020](adrs/0020-learning-triggers.md)): the learner
 also runs without being asked, behind `learning` in settings: `mode` (`off`,
@@ -428,8 +527,9 @@ learning off there.
   interrupted turn, a declined approval, a command that failed then passed
   (in the same turn, then later with exit 0), a failed or timed-out turn. Each is anchored at
   the entry that completes it; at most 20, each with a 120-character
-  excerpt. Only signs past the highest one an earlier automatic request
-  named for that session count. None: nothing is journaled (the log says the
+  excerpt. Only signs past that session's watermark count: the highest
+  seq a request (automatic or a person's) named or a dismissal reached
+  (`triggers::acted_on`). So signs a person declined start no automatic run. None: nothing is journaled (the log says the
   session was scanned).
 - **Limits,** under the project's lock: no request a turn hasn't finished
   and no proposal `checking`; fewer than `dailyRuns` automatic requests in
@@ -446,10 +546,16 @@ learning off there.
   detail, and the skip under the list; `strive log` describes both
   entries. A person decides on every proposal, whoever asked for the run.
 
-`strive learn` requests a run and follows the learning journal as
-`strive run` follows a turn, then lists what was proposed. `strive review`
-lists proposals, shows one (its diff against `before`, evidence,
-prediction and checks) and accepts, rejects or rolls it back.
+`strive learn` requests a run, says "studying 1 session…", follows the
+learning journal quietly (`strive log` has the steps), then lists what was
+proposed, waiting for second opinions still out. `strive review` lists
+proposals and accepts, rejects or rolls one back. `strive review ID` shows,
+in order, the summary and status, where its run came from ("you said yes
+to the end-of-session offer: a correction in \"run the tests\"", "asked
+with `strive learn`", "automatic, …"), the diff against `before`, the
+checks in one line, and what to do next; `--full` adds why, the
+prediction, the evidence, the signs the run was given and each check's
+detail. Sessions are named by their titles, not their ids.
 
 ## The desktop app
 
@@ -477,9 +583,10 @@ prediction and checks) and accepts, rejects or rolls it back.
 - **The Learned pane** (⌘L) is `strive review` in the window: the
   project's proposals, each with its whole-file diff, reasons, evidence and
   checks, and Accept, Reject or Roll back.
-  - `proposal/list`, `proposal/decide`, `proposal/rollback` and
-    `learning/run` get the window's project directory from the main
-    process, whatever the page sends.
+  - `proposal/list`, `proposal/decide`, `proposal/rollback`,
+    `learning/run`, `learning/signals` and `learning/dismiss` get the
+    window's project directory from the main process, whatever the page
+    sends; the daemon refuses a named session outside that project.
   - A proposal's "before" comes through `proposalBefore(id)`, looked up
     among the project's proposals; `blob/get` stays limited to digests the
     shown session names.
@@ -496,8 +603,12 @@ prediction and checks) and accepts, rejects or rolls it back.
     detail is read by criterion when it has the daemon's line shape, else
     shown as is; the other proposals for the same file come from
     `proposal/list`.
-  - A judge fail shows at the top of the proposal as "The judge advises
-    against it", with the failed criteria's reasons; Accept stays available.
+  - A judge fail shows at the top of the proposal as "The second opinion
+    advises against it", with the failed criteria's reasons; Accept stays
+    available. The judge's detail names held-out sessions by title.
+  - The Learned button counts the `ready` proposals. The window lists
+    proposals again when it gets focus, so a run from `strive learn` in a
+    terminal shows in the count on return.
   - Automatic learning: a proposal from an automatic run has an "Automatic"
     badge, and its detail names the trigger and each sign; the latest
     skipped run shows as a notice. `proposal/list` also starts following a learning session that an
@@ -539,7 +650,13 @@ server, so they are coordinated by the session's directory alone.
   `.vscode`, `.idea`, `.claude/commands` and `.claude/agents`, and rc and
   config files (`.bashrc`, `.zshrc`, `.profile`, `.gitconfig`,
   `.gitmodules`, `.ripgreprc`, `.mcp.json`) anywhere in the project. Git or a
-  shell runs them later for the person, unsandboxed. Commands can't write
+  shell runs them later for the person, unsandboxed. Other agents' settings,
+  hooks and MCP config are on it too, each an attack route in a published
+  incident: `.claude/settings.json`, `.claude/settings.local.json` and
+  `.claude/hooks` (Claude Code, CVE-2025-59536), `.codex` and `.agents`
+  (Codex, CVE-2025-61260), `.cursor` (CurXecute, MCPoison,
+  CVE-2025-59944) and `.gemini`; so are `.envrc`, `.husky`,
+  `.devcontainer`, `.npmrc`, `.pre-commit-config.yaml` and `lefthook.yml`. Commands can't write
   them, and the agent's write and edit ask a person in every approval
   mode. The rest of `.git` stays writable, so git works in the sandbox;
   `git config` doesn't. On Linux, bubblewrap binds read-only only those at
@@ -547,8 +664,8 @@ server, so they are coordinated by the session's directory alone.
   (a new `.vscode/tasks.json`) or change a nested repository's hooks.
 - **macOS (Seatbelt):**
   - Commands may write only in the workspace and temp directories, and not
-    to the project's learned files (see "Learned files outside review") or
-    the files above, matched by pattern in any case.
+    to anything on "What shapes a session" or the files above, matched by
+    pattern in any case.
   - strive's home is hidden.
   - There is no network, and that includes Unix sockets.
   - Without PID namespaces, a background job that leaves the command's
@@ -557,7 +674,8 @@ server, so they are coordinated by the session's directory alone.
 - **Linux (bubblewrap):**
   - Commands get their own PID namespace, so every process dies with the
     command.
-  - The learned files that exist are bound read-only.
+  - The listed files that exist in the workspace itself, and imports that
+    exist, are bound read-only.
   - `/tmp` and `/run` are private, which keeps the user's D-Bus, systemd,
     X11 and Docker sockets out of reach.
   - There is no network.
@@ -580,12 +698,14 @@ server, so they are coordinated by the session's directory alone.
 - `autoEdit` (the default): changes in the workspace are free; commands ask.
 - `fullAuto`: everything inside the workspace and sandbox is free.
 
-In every mode, writes outside the workspace, writes to the project's
-learned files (`.strive/memory.md`, `.strive/skills`) and commands without
-a sandbox ask, and strive's own state is refused. With no one attached,
+In every mode, writes outside the workspace, writes to anything on "What
+shapes a session" or to files that run code outside the sandbox, and
+commands without a sandbox ask, and strive's own state is refused. With no one attached,
 the refusal suggests full-auto only when full-auto would have allowed it. An approval request is a journal
 entry, so every attached client sees it and the first answer wins. With no
-one attached, the request is refused at once.
+one attached, the request is refused at once. Allowing for the session
+switches to full-auto, except for an instruction file, where it allows
+that file (see "What shapes a session").
 
 **Checkpoints** snapshot the workspace before each prompt, into a shadow
 git repository in the session's directory. The user's own repository,

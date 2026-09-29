@@ -65,7 +65,7 @@ pub async fn run(c: &mut Client, opts: Options) -> Result<ExitCode> {
     if !opts.json {
         eprintln!("strive: session {id} (strive log {id} shows it again)");
     }
-    let follow = Follow { home: &opts.home, id: &id, shown, prompt, json: opts.json, who: "the agent" };
+    let follow = Follow { home: &opts.home, id: &id, shown, prompt, json: opts.json, quiet: false, who: "the agent" };
     Ok(follow.until_turn_ends(c).await?.0)
 }
 
@@ -79,6 +79,8 @@ pub struct Follow<'a> {
     /// The prompt (or learning request) whose turn to follow.
     pub prompt: u64,
     pub json: bool,
+    /// Shows nothing as it goes: the caller reports the outcome.
+    pub quiet: bool,
     /// Who runs the turn, for a message when it never starts.
     pub who: &'a str,
 }
@@ -87,7 +89,7 @@ impl Follow<'_> {
     /// Shows each new entry until the turn that took the prompt ends; how it
     /// ended, and the entries shown.
     pub async fn until_turn_ends(&self, c: &mut Client) -> Result<(ExitCode, Vec<Entry>)> {
-        let Self { home, id, shown, prompt, json, who } = *self;
+        let Self { home, id, shown, prompt, json, quiet, who } = *self;
         let mut seen = Vec::new();
         let mut turn: Option<u64> = None;
         let started = tokio::time::Instant::now();
@@ -125,7 +127,9 @@ impl Follow<'_> {
             if entry.seq <= shown {
                 continue; // shown from the attach already
             }
-            show(&entry, json)?;
+            if !quiet {
+                show(&entry, json)?;
+            }
             seen.push(entry.clone());
             match &entry.event {
                 // The turn that took this prompt.

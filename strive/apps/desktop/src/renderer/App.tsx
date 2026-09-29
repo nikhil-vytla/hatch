@@ -13,7 +13,7 @@ import {
   type SessionInfo,
   type SkippedRun,
 } from "@strive/protocol";
-import { formatUsd as exactUsd, MODE_NAMES } from "@strive/view";
+import { formatUsd as exactUsd, MODE_NAMES, offerText } from "@strive/view";
 import {
   DEFAULT_WORKSPACE,
   decide,
@@ -44,9 +44,10 @@ import { Diff } from "./DiffView";
 import { Icon, type IconName } from "./icons";
 import { Markdown } from "./MarkdownView";
 import { SessionModel } from "./model";
+import type { Offers } from "./offers";
 import { ModelPicker } from "./ModelPicker";
 
-type Props = { bridge: Bridge; opened: Opened; onSwitch: (id?: string) => Promise<void> };
+type Props = { bridge: Bridge; opened: Opened; onSwitch: (id?: string) => Promise<void>; offers: Offers };
 
 /** Whether the sessions sidebar shows, kept across launches. */
 const SIDEBAR_KEY = "strive.sidebar";
@@ -76,7 +77,7 @@ const PROPOSAL_EVENTS = new Set([
   "proposalRolledBack",
 ]);
 
-export function App({ bridge, opened, onSwitch }: Props) {
+export function App({ bridge, opened, onSwitch, offers }: Props) {
   const [model] = useState(() => new SessionModel(opened.session.id, opened.home));
   const [, rerender] = useReducer((n: number) => n + 1, 0);
   const [closed, setClosed] = useState(false);
@@ -86,6 +87,8 @@ export function App({ bridge, opened, onSwitch }: Props) {
   // from) the default one.
   const [loaded, setLoaded] = useState(false);
 
+  useEffect(() => offers.onChange(rerender), [offers]);
+
   useEffect(() => {
     for (const e of opened.entries) model.apply(e);
     rerender();
@@ -93,8 +96,16 @@ export function App({ bridge, opened, onSwitch }: Props) {
     bridge.onEvent((event) => {
       if (event.params.sessionId !== opened.session.id) return;
 
-      if (event.method === "session/entry") model.apply(event.params.entry);
-      else if (event.method === "session/delta") model.live = event.params.text;
+      if (event.method === "session/entry") {
+        model.apply(event.params.entry);
+
+        // Once the agent has stopped and the person has left it a while, a session with signs is offered
+        // for learning; a new prompt or turn means it isn't idle yet.
+        const type = event.params.entry.event.type;
+
+        if (type === "turnEnded") offers.idle(opened.session.id);
+        else if (type === "userMessage" || type === "turnStarted") offers.busy();
+      } else if (event.method === "session/delta") model.live = event.params.text;
 
       rerender();
     });
@@ -104,7 +115,7 @@ export function App({ bridge, opened, onSwitch }: Props) {
       .loadWorkspace()
       .then((saved) => saved && setLayout(saved))
       .finally(() => setLoaded(true));
-  }, [bridge, model, opened]);
+  }, [bridge, model, opened, offers]);
 
   const act = (p: Promise<unknown>) => p.catch((e: Error) => setError(errorText(e)));
   const id = opened.session.id;
@@ -235,6 +246,12 @@ export function App({ bridge, opened, onSwitch }: Props) {
     });
     void loadProposals().catch((e: Error) => setError(`Couldn't list what the learner proposed: ${errorText(e)}`));
     void readLearning().catch(() => undefined);
+    // Back from a terminal or an editor, the window looks again: `strive learn` may have proposed
+    // something (the Learned button counts it), or a learned file may have changed.
+    const again = () => void loadProposals().catch(() => undefined);
+    window.addEventListener("focus", again);
+
+    return () => window.removeEventListener("focus", again);
   }, [bridge, journal, loadProposals, readLearning]);
 
   // Opened, the pane looks again: a learning session made elsewhere (`strive learn`) is found and followed from then on.
@@ -244,11 +261,6 @@ export function App({ bridge, opened, onSwitch }: Props) {
     bridge.sessions().then(setProjectSessions, () => undefined);
     void loadProposals().catch((e: Error) => setError(`Couldn't list what the learner proposed: ${errorText(e)}`));
     void readLearning().catch(() => undefined);
-    // Back from an editor, the pane sees a learned file changed there.
-    const again = () => void loadProposals().catch(() => undefined);
-    window.addEventListener("focus", again);
-
-    return () => window.removeEventListener("focus", again);
   }, [learned, bridge, loadProposals, readLearning]);
 
   const run = latestRun(journal.entries);
@@ -379,6 +391,23 @@ export function App({ bridge, opened, onSwitch }: Props) {
           <button type="button" className="banner danger" onClick={() => setError(undefined)}>
             {error}
           </button>
+        )}
+        {offers.current && (
+          <div className="learn-offer" role="status" data-session={offers.current.session}>
+            <Icon name="bulb" />
+            <span className="grow">
+              {offerText(
+                offers.current.session === id ? "This session" : "The session you left",
+                offers.current.result,
+              )}
+            </span>
+            <button type="button" onClick={() => act(offers.dismiss())}>
+              Dismiss
+            </button>
+            <button type="button" className="primary" onClick={() => act(offers.learn().then(readLearning))}>
+              Learn from this session
+            </button>
+          </div>
         )}
         {loaded && <Proposals model={model} layout={layout} onChange={edit} />}
         <Palette
@@ -672,7 +701,11 @@ function Titlebar(props: TitlebarProps) {
         aria-pressed={learned}
       >
         <Icon name="bulb" />
-        {(learning || ready > 0) && <span className={`count-dot ${learning ? "working" : ""}`} />}
+        {ready > 0 ? (
+          <span className={`count ${learning ? "working" : ""}`}>{ready}</span>
+        ) : (
+          learning && <span className="count-dot working" />
+        )}
       </button>
     </header>
   );
@@ -1419,7 +1452,13 @@ function ToolRow({ tool, session }: { tool: Tool; session: SessionActions }) {
       <button type="button" className="tool-head" aria-expanded={open} onClick={() => setOpen(!open)}>
         <Icon name={KIND_ICON[tool.record.kind]} />
         <span className="mono label">{label(tool.record, session.workspace)}</span>
-        {tool.approval?.decided && <span className="badge">{DECIDED[tool.approval.decided]}</span>}
+        {tool.approval?.decided && (
+          <span className="badge">
+            {tool.approval.oneFile && tool.approval.decided === "allowSession"
+              ? "Allowed for this session"
+              : DECIDED[tool.approval.decided]}
+          </span>
+        )}
         {tool.status === "failed" && tool.exitCode !== undefined && (
           <span className="badge bad">exit {tool.exitCode}</span>
         )}
@@ -1442,13 +1481,23 @@ function Approval({ tool, session }: { tool: Tool; session: SessionActions }) {
         <button type="button" className="quiet danger" onClick={() => session.decide(tool.effect, "deny")}>
           Decline
         </button>
-        <button
-          type="button"
-          title="Switches this session to full-auto: nothing asks again"
-          onClick={() => session.decide(tool.effect, "allowSession")}
-        >
-          Allow everything
-        </button>
+        {tool.approval?.oneFile ? (
+          <button
+            type="button"
+            title="Later changes to this file don't ask again in this session"
+            onClick={() => session.decide(tool.effect, "allowSession")}
+          >
+            Allow for this session
+          </button>
+        ) : (
+          <button
+            type="button"
+            title="Switches this session to full-auto: nothing asks again"
+            onClick={() => session.decide(tool.effect, "allowSession")}
+          >
+            Allow everything
+          </button>
+        )}
         <button type="button" className="primary" onClick={() => session.decide(tool.effect, "allow")}>
           Allow
         </button>

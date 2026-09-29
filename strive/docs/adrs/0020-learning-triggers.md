@@ -1,7 +1,8 @@
 # ADR-0020: Learning triggers, a cheap pre-filter, and the `learning` setting
 
-Status: accepted, amended 2026-09-28: no `gated`, and automatic runs are
-opt-in. Refines "Triggers" in [ADR-0016](0016-trusted-learning.md).
+Status: accepted, amended 2026-09-28: no `gated`, automatic runs are opt-in,
+and an offer to learn at the end of a session is the default path. Refines
+"Triggers" in [ADR-0016](0016-trusted-learning.md).
 
 ## Amendment: `off` and `suggest`, `off` by default
 
@@ -16,13 +17,63 @@ opt-in. Refines "Triggers" in [ADR-0016](0016-trusted-learning.md).
   can still only lower the mode.
 - **Why:** `gated` rested on every check passing, and the replay gate that
   made that rare is gone ([ADR-0018](0018-replay-gate.md)); the judge alone
-  is advice ([ADR-0017](0017-judge-gate.md)). An end-of-session prompt to
-  learn is planned separately.
+  is advice ([ADR-0017](0017-judge-gate.md)). The end-of-session offer to
+  learn is the next amendment.
 - The `failedThenPassed` sign keeps its rule (a turn's first command that
   failed, then passed later in the session); it lives in
   `strive_learning::signals` now that the replay miner is gone.
 - Sections below that describe `gated`, replay or `suggest` as the
   default describe the design before this amendment.
+
+## Amendment: the offer to learn is the default path (2026-09-28)
+
+With automatic runs opt-in, learning usually starts when a person says yes
+to an offer, made from the same no-model scan the triggers use.
+- **When:** the TUI asks as it quits (Ctrl+C, Ctrl+D, `/quit`): "This
+  session had 2 corrections. Learn from it? It costs a learner run, about
+  $0.07. [y/N]". `y` asks for a run naming the session and exits without
+  waiting for it; any other key declines and exits. The desktop shows a
+  notice above the conversation, with "Learn from this session" and
+  "Dismiss", once a session has been idle for a minute (its turn ended and
+  no prompt or turn came since), when the window switches away from it, or
+  when the window is closed (it stays open until the offer is answered; a
+  second close, or quitting the app, closes at once). Not at the first turn
+  end with a sign: a person is often still correcting the agent then.
+  `strive run` never asks: nobody is there to answer.
+- **What's asked:** `learning/signals {cwd, session}` returns the signs not
+  yet dealt with, a counted summary, `ask`, and a price. It calls no model,
+  journals nothing and creates no learning session. `ask` needs signs, a
+  key for the learner's provider (a run without one would only fail), and
+  `learning.ask` not `false` (the setting that silences it). It doesn't
+  depend on `mode`: in `suggest` the offer comes before the idle scan,
+  and either answer settles those signs for it.
+- **The price** is what this project's learning session has spent (the
+  learner's calls and the judge's) over the turns that called a model:
+  an average of real runs, in cents rounded up, labeled "about". Before a
+  project's first run it's the learner model's price for the tokens an
+  average run used in up to five other projects' learning sessions, or for
+  a typical run (`triggers::TYPICAL_RUN`: 60,000 tokens in, 2,000 out, no
+  cache, so it errs high) when no project has run yet. Only a model with
+  no known price leaves the offer without one.
+- **One watermark for "dealt with":** a session's signs at or below the
+  highest seq named by any request (automatic, or a person's naming the
+  session, which records the signs it found in `learnRequested.signals`)
+  or reached by a person's dismissal (`learning/dismiss` journals
+  `learnDismissed {session, through}` in the learning session) aren't
+  offered again, and no trigger acts on them. A dismissal is the person's
+  answer, so a trigger overriding it would spend money they declined to.
+- **Not nagging:** besides the watermark, the TUI asks at most once per
+  process. The desktop asks at most twice per session per window: once,
+  and once more only if signs arrive after the first answer (the
+  watermark hides the answered ones). A later sitting may offer new ones.
+- **Where a run came from:** a yes to the offer sets `offer: true` on
+  `learning/run`, recorded on `learnRequested`, so `strive review` and
+  `proposal/list` (`offered`, the signs) can say "you said yes to the
+  end-of-session offer" rather than "asked with `strive learn`".
+- **The learner** reads a person's signs first, as a trigger's, with a line
+  saying the user asked after seeing them.
+- A dismissal creates the project's learning session if it had none; an
+  offer that's only shown creates nothing.
 
 ## Context
 

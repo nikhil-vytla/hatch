@@ -2,8 +2,8 @@
 //! worth a learner run, and what the learning journal says about automatic
 //! runs.
 
-use strive_learning::signals::{DETAIL_LIMIT, LIMIT, describe, is_correction, scan};
-use strive_learning::triggers::{acted_on, automatic_since, busy, skipped};
+use strive_learning::signals::{DETAIL_LIMIT, LIMIT, describe, is_correction, scan, summary};
+use strive_learning::triggers::{acted_on, automatic_since, busy, cost_per_run, skipped};
 use strive_proto::{
     Artifact, Decision, Digest, EffectOutcome, EffectRecord, Entry, Event, Evidence, LearnSignal, LearnTrigger,
     Proposal, SignalKind, TriggerKind, TurnEnd,
@@ -55,7 +55,11 @@ impl Journal {
     /// A command that asked and the person's answer; the answer's seq.
     fn asked(&mut self, description: &str, decision: Decision) -> u64 {
         self.effect += 1;
-        self.push(Event::ApprovalRequested { effect: self.effect, description: description.into() });
+        self.push(Event::ApprovalRequested {
+            effect: self.effect,
+            description: description.into(),
+            session_file: None,
+        });
         self.push(Event::ApprovalDecided { effect: self.effect, decision, by: "strive-tui".into() })
     }
     fn entries(&self) -> Vec<Entry> {
@@ -296,7 +300,7 @@ fn trigger(signals: Vec<(&str, u64)>) -> LearnTrigger {
 }
 
 fn requested(trigger: Option<LearnTrigger>) -> Event {
-    Event::LearnRequested { sessions: vec!["A".into()], trigger }
+    Event::LearnRequested { sessions: vec!["A".into()], trigger, signals: None, offer: None }
 }
 
 #[test]
@@ -447,4 +451,85 @@ fn a_command_that_only_passed_or_is_too_long_to_be_a_check_is_no_sign() {
     j.run(&long, 0);
     j.end(TurnEnd::Done);
     assert_eq!(scan("S", &j.entries(), 0), vec![]);
+}
+
+#[test]
+fn signs_a_person_asked_about_or_dismissed_are_dealt_with_too() {
+    let signs = |session: &str, seq: u64| Some(trigger(vec![(session, seq)]).signals);
+    let mut j = Journal::new();
+    j.push(Event::LearnRequested { sessions: vec!["A".into()], trigger: None, signals: signs("A", 9), offer: None });
+    j.push(Event::LearnDismissed { session: "B".into(), through: 15 });
+    // A later dismissal below a request's signs doesn't lower the mark.
+    j.push(Event::LearnDismissed { session: "A".into(), through: 5 });
+    j.push(requested(Some(trigger(vec![("C", 4)]))));
+    j.push(Event::LearnDismissed { session: "C".into(), through: 20 });
+    let learning = j.entries();
+    assert_eq!(acted_on(&learning, "A"), 9);
+    assert_eq!(acted_on(&learning, "B"), 15);
+    assert_eq!(acted_on(&learning, "C"), 20);
+    assert_eq!(acted_on(&learning, "D"), 0);
+    // Neither a person's request nor a dismissal is an automatic run.
+    assert_eq!(automatic_since(&learning, 0), 1);
+    assert_eq!(skipped(&learning), None);
+}
+
+#[test]
+fn a_sessions_signs_read_as_a_counted_phrase() {
+    let sign = |kind: SignalKind| LearnSignal { session: "S".into(), seq: 1, kind, detail: "d".into() };
+    assert_eq!(summary(&[]), "");
+    assert_eq!(summary(&[sign(SignalKind::Declined)]), "a declined approval");
+    assert_eq!(
+        summary(&[sign(SignalKind::Correction), sign(SignalKind::FailedThenPassed), sign(SignalKind::Correction)]),
+        "2 corrections and a command that failed, then passed"
+    );
+    assert_eq!(
+        summary(&[
+            sign(SignalKind::TurnFailed),
+            sign(SignalKind::Interrupted),
+            sign(SignalKind::Interrupted),
+            sign(SignalKind::FailedThenPassed),
+            sign(SignalKind::FailedThenPassed),
+            sign(SignalKind::TurnFailed),
+            sign(SignalKind::Declined),
+        ]),
+        "2 failed turns, 2 interrupted turns, 2 commands that failed, then passed and a declined approval"
+    );
+}
+
+#[test]
+fn a_runs_cost_is_what_the_learning_session_spent_over_the_turns_that_called_a_model() {
+    use strive_proto::{CallOutcome, Usage};
+    let mut j = Journal::new();
+    let mut call = 0;
+    let mut spend = |j: &mut Journal, outcome: CallOutcome| {
+        call += 1;
+        j.push(Event::ModelCallStarted {
+            call,
+            provider: "anthropic".into(),
+            model: "m".into(),
+            request: Digest::from_bytes([0; 32]),
+            reserved_usd_micros: 1_000_000,
+            reserved_tokens: 0,
+        });
+        j.push(Event::ModelCallFinished { call, outcome, response: None, duration_ms: 1 });
+    };
+    let done = |cost| CallOutcome::Complete { status: 200, usage: Usage::default(), cost_usd_micros: cost };
+    assert_eq!(cost_per_run(&j.entries()), None, "no run yet");
+    j.push(requested(None));
+    j.turn();
+    spend(&mut j, done(20_000));
+    spend(&mut j, done(10_000));
+    j.end(TurnEnd::Done);
+    // The judge's call comes after the turn, and is part of what a run costs.
+    spend(&mut j, done(5_000));
+    j.push(requested(None));
+    j.turn();
+    spend(&mut j, CallOutcome::Broken { reason: "cut".into(), cost_usd_micros: 60_001, tokens: 0 });
+    spend(&mut j, CallOutcome::Rejected { status: 529 });
+    j.end(TurnEnd::Done);
+    // A turn that called no model (no key, say) isn't a run to average over.
+    j.push(requested(None));
+    j.turn();
+    j.end(TurnEnd::Failed { error: "no key".into() });
+    assert_eq!(cost_per_run(&j.entries()), Some(47_501));
 }

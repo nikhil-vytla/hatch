@@ -65,6 +65,14 @@ afterEach(() => {
   rmSync(CWD, { recursive: true, force: true });
 });
 
+/** Waits until the app has exited: quitting first asks the daemon whether to offer a learner run. */
+const exited = async (ui: Ui) => {
+  for (let i = 0; ui.exits.length === 0; i++) {
+    if (i > 500) throw new Error("the app never exited");
+    await Bun.sleep(10);
+  }
+};
+
 const enter = async (ui: Ui, text: string) => {
   ui.term.type(text);
   await Bun.sleep(20);
@@ -175,7 +183,7 @@ test("an unknown command is named in the error", async () => {
 test("Ctrl+C exits with status 0 and disconnects without reporting a lost connection", async () => {
   const ui = await openUi();
   ui.term.type("\x03");
-  await Bun.sleep(50);
+  await exited(ui);
   expect(ui.exits).toEqual([0]);
   expect(daemonClients()).toBe(1);
   expect((await ui.term.screen()).some((l) => l.includes("Lost the connection"))).toBe(false);
@@ -184,7 +192,7 @@ test("Ctrl+C exits with status 0 and disconnects without reporting a lost connec
 test("/quit exits with status 0 and disconnects", async () => {
   const ui = await openUi();
   await enter(ui, "/quit");
-  await Bun.sleep(50);
+  await exited(ui);
   expect(ui.exits).toEqual([0]);
   expect(daemonClients()).toBe(1);
 });
@@ -250,6 +258,21 @@ test("a command waiting for approval is shown and y allows it", async () => {
   const screen = await ui.term.screen();
   expect(screen.some((l) => l.includes("y yes · a yes to everything"))).toBe(false);
   agent.close();
+});
+
+test("a allows an instruction file for the session, and says that is all it allows", async () => {
+  writeFileSync(`${CWD}/AGENTS.md`, "one\n");
+  const ui = await openUi();
+  const agent = await agentRuns({ kind: "edit", path: "AGENTS.md", oldText: "one", newText: "two" });
+  await ui.term.waitFor("y yes · a yes to this file for the session · n no");
+  ui.term.type("a");
+  expect((await agent.done).text).toBe("edited AGENTS.md");
+  agent.close();
+  const again = await agentRuns({ kind: "edit", path: "AGENTS.md", oldText: "two", newText: "three" });
+  expect((await again.done).text).toBe("edited AGENTS.md");
+  again.close();
+  expect(readFileSync(`${CWD}/AGENTS.md`, "utf8")).toBe("three\n");
+  expect((await ui.term.screen()).some((l) => l.includes("Approvals: full-auto"))).toBe(false);
 });
 
 test("n declines a command, which then doesn't run", async () => {
@@ -360,4 +383,48 @@ test("terminal control sequences in a reply are shown as text, not run", async (
   expect(screen[0]).toContain("strive");
   expect(screen.some((l) => l.includes("› first prompt"))).toBe(true);
   expect(screen.some((l) => l.includes("^[[2J^[[HFORGED HEADER"))).toBe(true);
+});
+
+/** Proposes changes to the project's memory as its learner would, citing `work`'s first entry; their ids. */
+async function propose(work: string, summaries: string[]): Promise<number[]> {
+  const { client } = await StriveClient.connect(daemon.socket, { name: "learner", version: "0" });
+
+  try {
+    const { id } = await client.request("learning/open", { cwd: real() });
+    await client.request("host/register", { id });
+    const ids: number[] = [];
+
+    for (const summary of summaries) {
+      const proposal = {
+        artifact: { kind: "memory" as const },
+        content: `- ${summary}.\n`,
+        summary,
+        rationale: "The user said so.",
+        evidence: [{ session: work, seqs: [1], note: "the session began here" }],
+        prediction: "Later sessions do it.",
+      };
+
+      ids.push((await client.request("host/record", { id, event: { type: "proposalMade", proposal } })).seq);
+    }
+
+    return ids;
+  } finally {
+    client.close();
+  }
+}
+
+test("a session starting where proposals wait for review says how many, counting only those ready", async () => {
+  const first = await openUi();
+  await first.term.waitFor("Session started in");
+  const [, rejected] = await propose(sessions()[0]!.id, ["Use bun", "Keep it short"]);
+  first.app.quit(0);
+
+  const two = await openUi();
+  await two.term.waitFor("2 proposals are waiting: `strive review`");
+
+  const { client } = await StriveClient.connect(daemon.socket, { name: "reviewer", version: "0" });
+  await client.request("proposal/decide", { cwd: real(), proposal: rejected!, decision: "reject" });
+  client.close();
+  const one = await openUi();
+  await one.term.waitFor("1 proposal is waiting: `strive review`");
 });

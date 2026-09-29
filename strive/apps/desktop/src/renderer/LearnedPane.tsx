@@ -18,7 +18,7 @@ import {
   judgeAdvice,
   type Run,
   readJudge,
-  STATUS_NAMES,
+  statusName,
   statusNote,
   VERDICT_NAMES,
 } from "./learning";
@@ -83,8 +83,11 @@ function ago(ms: number, now: number): string {
   return h < 24 ? `${h}h` : `${Math.floor(h / 24)}d`;
 }
 
-function Badge({ status }: { status: ProposalState["status"] }) {
-  return <span className={`badge status-${status}`}>{STATUS_NAMES[status]}</span>;
+function Badge({ proposal: p }: { proposal: ProposalState }) {
+  // Written over by a later accept, it reads like one rolled back: its content is gone from the file.
+  const status = p.status === "applied" && p.replacedBy !== undefined ? "replaced" : p.status;
+
+  return <span className={`badge status-${status}`}>{statusName(p)}</span>;
 }
 
 /** On a proposal from a run nobody asked for. */
@@ -167,8 +170,8 @@ function OutsideReview({ paths }: { paths: string[] }) {
       <p>
         {one ? "This file isn't" : "These files aren't"} what an accepted proposal last left there: edited by hand or by
         another tool, or written without a proposal. New sessions read {one ? "it" : "them"} as{" "}
-        {one ? "it is" : "they are"}, unreviewed. Rolling back a proposal for {one ? "it" : "one"} is refused, and a
-        proposal made before the change goes stale if accepted.
+        {one ? "it is" : "they are"}, unreviewed. A proposal for {one ? "it" : "one"} can't be rolled back, and one made
+        before the change isn't written if accepted.
       </p>
     </section>
   );
@@ -217,7 +220,7 @@ function List({ proposals, outsideReview, skipped, run, onSelect, learn }: Props
                 <button type="button" className="learned-item" onClick={() => onSelect(p.id)} data-proposal={p.id}>
                   <span className="summary">{p.proposal.summary}</span>
                   <span className="meta">
-                    <Badge status={p.status} />
+                    <Badge proposal={p} />
                     {p.trigger && <AutomaticBadge />}
                     <span className="mono">{artifactName(p.proposal.artifact)}</span>
                     <span className="spacer" />
@@ -296,7 +299,7 @@ function Detail({
     <div className="changes-body learned-detail" data-proposal={p.id}>
       <header className="learned-head">
         <div className="learned-title">
-          <Badge status={p.status} />
+          <Badge proposal={p} />
           {p.trigger && <AutomaticBadge />}
           <span className="faint small">#{p.id}</span>
         </div>
@@ -322,7 +325,11 @@ function Detail({
         <p className={`status-note ${p.status}`}>{statusNote(p, path)}</p>
         {advice && (
           <div className="status-note judge-advice">
-            <p>The judge advises against it. A person decides: Accept still writes it.</p>
+            <p>
+              {p.status === "ready"
+                ? "The second opinion advises against it. You decide: Accept still writes it."
+                : "The second opinion advised against it."}
+            </p>
             <ul>
               {advice.map((r) => (
                 <li key={r}>{r}</li>
@@ -393,7 +400,7 @@ function Detail({
         <h4>Checks</h4>
         <ul className="checks">
           {p.gates.map((g) => (
-            <Check key={g.gate} gate={g} />
+            <Check key={g.gate} gate={g} sessions={known} />
           ))}
           {p.gates.length === 0 && <li className="faint small">None has finished yet.</li>}
         </ul>
@@ -405,7 +412,7 @@ function Detail({
           <ol className="file-history" aria-label="proposals for this file">
             {history.map((q) => (
               <li key={q.id} className={q.id === p.id ? "this" : undefined}>
-                <Badge status={q.status} />
+                <Badge proposal={q} />
                 {q.id === p.id ? (
                   <span className="summary" aria-current="true">
                     {q.proposal.summary}
@@ -541,8 +548,15 @@ function CitedEntries({
   );
 }
 
-/** A check's outcome; the judge's, when its detail reads by criterion, one line per criterion. */
-function Check({ gate: g }: { gate: GateOutcome }) {
+/**
+ * A check's outcome; the judge's, when its detail reads by criterion, one
+ * line per criterion. The project's sessions it names are named by title.
+ */
+function Check({ gate, sessions }: { gate: GateOutcome; sessions: Map<string, SessionInfo> }) {
+  let detail = gate.detail;
+
+  for (const [id, s] of sessions) detail = detail.replaceAll(id, `“${s.title ?? "New session"}”`);
+  const g = { ...gate, detail };
   const judged = g.gate === "judge" ? readJudge(g.detail) : undefined;
 
   return (
@@ -610,7 +624,8 @@ function Actions({ proposal: p, path, confirming, busy, onConfirm, onAccept, onR
 
   const undecided = p.status === "ready" || p.status === "failed" || p.status === "checking";
 
-  if (!undecided && p.status !== "applied") return null;
+  // A rollback the daemon would refuse (the file changed since) isn't offered.
+  if (!undecided && !(p.status === "applied" && p.canRollBack)) return null;
 
   return (
     <div className="learned-actions">
@@ -624,13 +639,19 @@ function Actions({ proposal: p, path, confirming, busy, onConfirm, onAccept, onR
           type="button"
           className="primary"
           disabled={busy || p.status !== "ready"}
-          title={p.status === "ready" ? undefined : "Only a proposal whose checks passed can be accepted"}
+          title={
+            p.status === "failed"
+              ? "It failed its safety checks, so it can't be accepted"
+              : p.status === "checking"
+                ? "Its checks haven't finished yet"
+                : undefined
+          }
           onClick={() => onConfirm("accept")}
         >
           Accept
         </button>
       )}
-      {p.status === "applied" && (
+      {p.status === "applied" && p.canRollBack && (
         <button type="button" disabled={busy} onClick={() => onConfirm("rollback")}>
           <Icon name="rewind" /> Roll back
         </button>

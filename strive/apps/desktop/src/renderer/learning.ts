@@ -29,11 +29,17 @@ export const STATUS_NAMES: Record<ProposalStatus, string> = {
   failed: "failed",
   rejected: "rejected",
   applied: "applied",
-  stale: "stale",
+  stale: "file changed",
   rolledBack: "rolled back",
 };
 
-export const GATE_NAMES: Record<Gate, string> = { static: "Static", judge: "Judge" };
+/** A proposal's status as its badge says it: an applied one written over is "replaced by #N". */
+export function statusName(p: ProposalState): string {
+  return p.status === "applied" && p.replacedBy !== undefined ? `replaced by #${p.replacedBy}` : STATUS_NAMES[p.status];
+}
+
+/** The gates by what they do: the static gate checks safety, the judge is a second opinion. */
+export const GATE_NAMES: Record<Gate, string> = { static: "Safety checks", judge: "Second opinion" };
 
 export const VERDICT_NAMES: Record<Verdict, string> = { pass: "passed", fail: "failed", skipped: "skipped" };
 
@@ -45,13 +51,18 @@ export function statusNote(p: ProposalState, path: string): string {
     case "ready":
       return `Accepting writes ${path}. New sessions in this project read it.`;
     case "failed":
-      return "The static check failed, so it can't be accepted.";
+      return "It failed its safety checks, so it can't be accepted.";
     case "rejected":
       return "Rejected. Nothing was written.";
     case "applied":
-      return `Accepted and written to ${path}.`;
+      if (p.replacedBy !== undefined)
+        return `Accepted, then #${p.replacedBy} was accepted over it, so ${path} no longer has its content.`;
+
+      return p.canRollBack
+        ? `Accepted and written to ${path}.`
+        : `Accepted and written to ${path}, which has changed since, so it can't be rolled back. Edit the file by hand instead.`;
     case "stale":
-      return `${path} changed after the learner read it, so nothing was written. Learn again for a proposal against the file as it is now.`;
+      return `${path} changed since this was proposed, so nothing was written. Learn again for a proposal against the file as it is now.`;
     case "rolledBack":
       return p.before === undefined
         ? `Rolled back: ${path} was removed, as it didn't exist before.`

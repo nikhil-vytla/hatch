@@ -7,6 +7,7 @@ import type { Digest } from "./Digest";
 import type { EffectOutcome } from "./EffectOutcome";
 import type { EffectRecord } from "./EffectRecord";
 import type { Gate } from "./Gate";
+import type { LearnSignal } from "./LearnSignal";
 import type { LearnTrigger } from "./LearnTrigger";
 import type { McpStatus } from "./McpStatus";
 import type { Proposal } from "./Proposal";
@@ -51,7 +52,13 @@ effect: number,
 /**
  * The model's tool call this effect serves.
  */
-callId: string, record: EffectRecord, } | { "type": "effectFinished", effect: number, outcome: EffectOutcome, durationMs: number, } | { "type": "approvalModeSet", mode: ApprovalMode, } | { "type": "approvalRequested", effect: number, description: string, } | { "type": "approvalDecided", effect: number, decision: Decision, 
+callId: string, record: EffectRecord, } | { "type": "effectFinished", effect: number, outcome: EffectOutcome, durationMs: number, } | { "type": "approvalModeSet", mode: ApprovalMode, } | { "type": "approvalRequested", effect: number, description: string, 
+/**
+ * The instruction file (or file one imports) the effect changes,
+ * where allowing for the session allows later changes to this
+ * file only, and leaves the approval mode as it is.
+ */
+sessionFile?: string, } | { "type": "approvalDecided", effect: number, decision: Decision, 
 /**
  * The client that decided.
  */
@@ -86,7 +93,12 @@ mcp: Array<McpStatus>,
  * was given (`AgentConfig.learnedFiles`), by path in the project.
  * A proposal's `before` is the file as last given here.
  */
-learned?: Array<ContextFile>, } | { "type": "learnRequested", 
+learned?: Array<ContextFile>, 
+/**
+ * Imports in instruction files that weren't loaded, each a line
+ * for a person saying which and why; absent when there are none.
+ */
+skipped?: Array<string>, } | { "type": "learnRequested", 
 /**
  * The work sessions to study; empty: those since the learner last looked.
  */
@@ -95,7 +107,18 @@ sessions: Array<string>,
  * Set when the daemon asked on its own: what triggered it. None: a
  * person asked.
  */
-trigger?: LearnTrigger, } | { "type": "learnSkipped", trigger: LearnTrigger, reason: string, } | { "type": "proposalMade", 
+trigger?: LearnTrigger, 
+/**
+ * Set when a person named sessions with signs nothing had dealt
+ * with yet: those signs, as the daemon found them. The learner
+ * reads them first; later scans and offers look only past them.
+ */
+signals?: Array<LearnSignal>, 
+/**
+ * Set when the person said yes to the offer to learn from a
+ * session with signs (ADR-0020), rather than asking on their own.
+ */
+offer?: boolean, } | { "type": "learnDismissed", session: string, through: number, } | { "type": "learnSkipped", trigger: LearnTrigger, reason: string, } | { "type": "proposalMade", 
 /**
  * The learner's tool call that made it, whose result it is.
  */

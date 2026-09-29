@@ -410,6 +410,7 @@ impl Ledger {
                 | Event::Compacted { .. }
                 | Event::LearnRequested { .. }
                 | Event::LearnSkipped { .. }
+                | Event::LearnDismissed { .. }
                 | Event::ProposalMade { .. }
                 | Event::GateFinished { .. }
                 | Event::ProposalDecided { .. }

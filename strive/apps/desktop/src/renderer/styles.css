@@ -128,6 +128,8 @@ button.quiet.danger { color: var(--bad); }
 .proposal > .icon { color: var(--accent-text); }
 .proposal.applied { background: var(--surface); border-color: var(--line); color: var(--muted); }
 .proposal.applied > .icon { color: var(--faint); }
+.learn-offer { display: flex; align-items: center; gap: 10px; margin: 0 12px 10px; padding: 7px 7px 7px 14px; border-radius: var(--r-card); background: var(--surface); border: 1px solid var(--line); color: var(--muted); font-size: 13px; animation: rise 300ms var(--ease-out); }
+.learn-offer > .icon { color: var(--faint); }
 
 /* The workspace: columns of panels. */
 .columns { display: flex; flex: 1; gap: 12px; padding: 0 12px 12px; min-height: 0; }
@@ -376,6 +378,8 @@ button.chip { cursor: pointer; max-width: 100%; }
 .learned-button { position: relative; }
 .count-dot { position: absolute; top: 5px; right: 5px; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 2px var(--bg); }
 .count-dot.working { animation: pulse 1.6s infinite; }
+.learned-button .count { position: absolute; top: 1px; right: 0; min-width: 14px; height: 14px; padding: 0 3px; border-radius: 7px; background: var(--accent); color: var(--bg); box-shadow: 0 0 0 2px var(--bg); font: 600 10px/14px var(--sans); text-align: center; }
+.learned-button .count.working { animation: pulse 1.6s infinite; }
 .pane-title { margin: 0 0 0 4px; font-size: 13px; font-weight: 550; }
 .changes-head .back { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px 3px 4px; font-size: 13px; }
 .icon-chevron.left { transform: rotate(180deg); width: 14px; height: 14px; }
@@ -399,7 +403,7 @@ button.learn .icon { width: 14px; height: 14px; color: var(--accent-text); }
 .badge.status-ready, .badge.status-checking { background: var(--accent-soft); color: var(--accent-text); }
 .badge.status-failed, .badge.verdict-fail { background: var(--bad-soft); color: var(--bad); }
 .badge.status-stale { background: var(--warn-soft); color: var(--warn); }
-.badge.status-rejected, .badge.status-rolledBack, .badge.verdict-skipped { background: var(--surface-2); color: var(--faint); }
+.badge.status-rejected, .badge.status-rolledBack, .badge.status-replaced, .badge.verdict-skipped { background: var(--surface-2); color: var(--faint); }
 .learned-detail { padding-bottom: 28px; }
 .learned-head { padding: 14px 16px 12px; }
 .learned-title { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
@@ -435,7 +439,7 @@ button.learn .icon { width: 14px; height: 14px; color: var(--accent-text); }
 button.link { padding: 0; border: 0; background: transparent; color: var(--accent-text); font-weight: 500; text-align: left; }
 button.link:hover { background: transparent; text-decoration: underline; text-underline-offset: 2px; }
 .session-name { font-weight: 500; }
-.checks > li { display: grid; grid-template-columns: 56px 64px 1fr; align-items: baseline; gap: 4px 10px; font-size: 13px; }
+.checks > li { display: grid; grid-template-columns: 104px 64px 1fr; align-items: baseline; gap: 4px 10px; font-size: 13px; }
 .checks .gate { color: var(--muted); }
 .checks .badge { justify-self: start; }
 .checks .detail { grid-column: 3; color: var(--muted); white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12.5px; }
