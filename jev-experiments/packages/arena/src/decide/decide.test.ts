@@ -145,3 +145,27 @@ describe("tally", () => {
     expect(r.counts).toEqual({ email: 1, meeting: 1 });
   });
 });
+
+describe("visitors", () => {
+  test("an IPv6 visitor is their /64; IPv4 stays whole", async () => {
+    const { visitorOf } = await import("./tally");
+
+    expect(visitorOf("203.0.113.9")).toBe("203.0.113.9");
+    expect(visitorOf("2001:db8:1:2:aaaa:bbbb:cccc:dddd")).toBe("2001:db8:1:2::/64");
+    expect(visitorOf("2001:DB8:1:2::1")).toBe("2001:db8:1:2::/64");
+    expect(visitorOf("2001:db8::1")).toBe("2001:db8:0:0::/64");
+    expect(visitorOf("2001:0db8:0001:0002::ffff")).toBe("2001:db8:1:2::/64");
+    expect(visitorOf("::ffff:203.0.113.9")).toBe("203.0.113.9");
+  });
+
+  test("two addresses in one IPv6 /64 vote once", async () => {
+    const store = memoryStore();
+
+    expect(
+      (await vote(store, { id: "plant", option: "water" }, "2001:db8:1:2::1", "s")).counted,
+    ).toBe(true);
+    expect(
+      (await vote(store, { id: "plant", option: "wait" }, "2001:db8:1:2::ffff", "s")).counted,
+    ).toBe(false);
+  });
+});
