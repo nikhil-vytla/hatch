@@ -279,11 +279,12 @@ pub async fn review(c: &mut Client, id: Option<u64>, action: Option<Action>, ful
                 None => Err(anyhow!("#{id} is gone from the list after accepting it")),
             }
         }
+        // The daemon decides (it also finishes a rollback a crash cut off);
+        // when it refuses, the list's reason says it more plainly.
         Some(Action::Rollback) => {
-            if let Some(why) = no_rollback(p, &rel) {
-                return Err(anyhow!("nothing was rolled back: {why}"));
+            if let Err(e) = c.request::<ProposalRollback>(ProposalRef { cwd, proposal: id }).await {
+                return Err(no_rollback(p, &rel).map_or(e, |why| anyhow!("nothing was rolled back: {why}")));
             }
-            c.request::<ProposalRollback>(ProposalRef { cwd, proposal: id }).await?;
             match p.before {
                 Some(_) => println!("rolled back #{id}: {rel} is as it was before"),
                 None => println!("rolled back #{id}: removed {rel}, which didn't exist before"),

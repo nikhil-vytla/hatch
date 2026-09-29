@@ -215,33 +215,18 @@ async fn signals(state: &State, cwd: &str, session: &str) -> Result<LearningSign
         summary: strive_learning::signals::summary(&signals),
         ask: state.settings.learning.ask && keyed && !signals.is_empty(),
         estimate_usd_micros: strive_learning::triggers::cost_per_run(&learning)
-            .or_else(|| first_estimate(state, cwd, &model)),
+            .or_else(|| first_estimate(state, &model)),
         signals,
     })
 }
 
-/// How many other projects' learning sessions a first estimate reads.
-const ESTIMATE_FROM: usize = 5;
-
 /// What a run should cost in a project with no run of its own yet: the
-/// learner model's price for the tokens an average run used in the latest
-/// other projects' learning sessions, or for a typical run if none has run.
+/// learner model's price for a typical run. Only this project's journal is
+/// read for estimates; another project's usage isn't this window's to see.
 /// None if the model's price isn't known.
-fn first_estimate(state: &State, cwd: &str, model: &str) -> Option<u64> {
+fn first_estimate(state: &State, model: &str) -> Option<u64> {
     let price = state.models.get(model)?.price;
-    let others: Vec<Vec<Entry>> = match state.sessions.list(None, SessionKind::Learning) {
-        Ok((found, _)) => found
-            .iter()
-            .filter(|s| s.cwd != cwd)
-            .filter_map(|s| SessionId::parse(&s.id))
-            .filter_map(|sid| journal(state, &sid).ok())
-            .take(ESTIMATE_FROM)
-            .collect(),
-        Err(_) => Vec::new(),
-    };
-    let journals: Vec<&[Entry]> = others.iter().map(Vec::as_slice).collect();
-    let usage = strive_learning::triggers::usage_per_run(&journals).unwrap_or(strive_learning::triggers::TYPICAL_RUN);
-    Some(strive_budget::cost(&price, &usage))
+    Some(strive_budget::cost(&price, &strive_learning::triggers::TYPICAL_RUN))
 }
 
 /// A person declined to learn from `session`'s signs up to `through`.
@@ -401,8 +386,10 @@ async fn outside_review(state: &State, cwd: &str, entries: &[Entry]) -> Result<V
     Ok(changed)
 }
 
-/// Marks the applied proposals a rollback would put back now: those whose
-/// file is still what they wrote. Any other would be refused.
+/// Marks the applied proposals a rollback would succeed for now, by the
+/// same rule `rollback` applies: the file is still what they wrote, or is
+/// already what it was before (a rollback a crash cut off, which a retry
+/// records). Any other would be refused.
 async fn rollable(state: &State, cwd: &str, folded: &mut [Folded]) -> Result<(), RpcError> {
     let mut now: HashMap<String, Option<Digest>> = HashMap::new();
     for f in folded.iter_mut() {
@@ -417,7 +404,7 @@ async fn rollable(state: &State, cwd: &str, folded: &mut [Folded]) -> Result<(),
             now.insert(rel, d);
             d
         };
-        f.state.can_roll_back = digest == Some(applied.after);
+        f.state.can_roll_back = digest == Some(applied.after) || digest == applied.before;
     }
     Ok(())
 }

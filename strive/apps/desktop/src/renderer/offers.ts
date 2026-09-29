@@ -49,6 +49,10 @@ export class Offers {
   private readonly made = new Map<string, number>();
   /** Sessions the daemon is being asked about. */
   private readonly asking = new Set<string>();
+  /** Sessions whose answer is still on its way to the daemon: not asked about meanwhile. */
+  private readonly answering = new Set<string>();
+  /** The last sign each answered offer covered: only newer ones are offered, whatever the daemon still reports. */
+  private readonly covered = new Map<string, number>();
   private shown?: Offer;
   private listener?: () => void;
   /** The idle timer running, and for which session. */
@@ -94,7 +98,8 @@ export class Offers {
   async consider(session: string): Promise<void> {
     if (this.waiting?.session === session) this.busy();
 
-    if (this.shown || (this.made.get(session) ?? 0) >= MOST || this.asking.has(session)) return;
+    if (this.shown || (this.made.get(session) ?? 0) >= MOST || this.asking.has(session) || this.answering.has(session))
+      return;
 
     this.asking.add(session);
 
@@ -102,7 +107,9 @@ export class Offers {
       // The daemon reports only signs nothing has dealt with: after a dismissal, only newer ones.
       const result = await this.daemon.signals(session);
 
-      if (!result.ask || this.shown) return;
+      const seen = this.covered.get(session) ?? 0;
+
+      if (!result.ask || this.shown || !result.signals.some((s) => s.seq > seen)) return;
 
       this.made.set(session, (this.made.get(session) ?? 0) + 1);
       this.shown = { session, result };
@@ -133,7 +140,7 @@ export class Offers {
     try {
       if (offer) await this.daemon.run(offer.session);
     } finally {
-      this.finish();
+      this.finish(offer);
     }
   }
 
@@ -144,19 +151,26 @@ export class Offers {
     try {
       if (offer) await this.daemon.dismiss(offer.session, Math.max(...offer.result.signals.map((s) => s.seq)));
     } finally {
-      this.finish();
+      this.finish(offer);
     }
   }
 
   private take(): Offer | undefined {
     const offer = this.shown;
     this.shown = undefined;
+
+    if (offer) {
+      this.answering.add(offer.session);
+      this.covered.set(offer.session, Math.max(0, ...offer.result.signals.map((s) => s.seq)));
+    }
+
     this.listener?.();
 
     return offer;
   }
 
-  private finish() {
+  private finish(offer?: Offer) {
+    if (offer) this.answering.delete(offer.session);
     const then = this.answered;
     this.answered = undefined;
     then?.();

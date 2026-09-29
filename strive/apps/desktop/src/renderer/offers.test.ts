@@ -159,3 +159,28 @@ test("a session asked about twice at once is offered once", async () => {
   await Promise.all([offers.consider("A"), offers.consider("A")]);
   expect(changes).toBe(1);
 });
+
+// A dismissal still on its way to the daemon: asking again meanwhile reads
+// the old watermark, and must not offer the signs the person just answered.
+test("an offer isn't made again for signs answered while the answer is still being recorded", async () => {
+  const { d } = daemon({ A: [4] });
+  let recorded = (): void => undefined;
+
+  const slow: OfferDaemon = {
+    ...d,
+    dismiss: (session, through) =>
+      new Promise((resolve) => {
+        recorded = () => d.dismiss(session, through).then(resolve);
+      }),
+  };
+
+  const offers = new Offers(slow);
+  await offers.consider("A");
+  const answering = offers.dismiss();
+  await offers.consider("A");
+  expect(offers.current).toBeUndefined();
+  recorded();
+  await answering;
+  await offers.consider("A");
+  expect(offers.current).toBeUndefined();
+});

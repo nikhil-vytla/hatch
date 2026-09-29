@@ -49,49 +49,6 @@ pub fn cost_per_run(learning: &[Entry]) -> Option<u64> {
     (runs > 0).then(|| spent.div_ceil(runs))
 }
 
-/// The tokens of an average learner run across `journals` (learning
-/// sessions): every call's usage, the judge's included, over the turns that
-/// called a model. None if none of them has a run. A broken call's tokens
-/// count as input, since how they split is unknown.
-///
-/// With a model's price, this estimates a run for a project with no run of
-/// its own yet.
-pub fn usage_per_run(journals: &[&[Entry]]) -> Option<Usage> {
-    let (mut total, mut runs) = (Usage::default(), 0u64);
-    for learning in journals {
-        let (mut in_turn, mut called) = (false, false);
-        for e in *learning {
-            match &e.event {
-                Event::TurnStarted { .. } => (in_turn, called) = (true, false),
-                Event::ModelCallStarted { .. } => called |= in_turn,
-                Event::ModelCallFinished { outcome, .. } => match outcome {
-                    CallOutcome::Complete { usage, .. } => {
-                        total.input = total.input.saturating_add(usage.input);
-                        total.output = total.output.saturating_add(usage.output);
-                        total.cache_write = total.cache_write.saturating_add(usage.cache_write);
-                        total.cache_write_long = total.cache_write_long.saturating_add(usage.cache_write_long);
-                        total.cache_read = total.cache_read.saturating_add(usage.cache_read);
-                    }
-                    CallOutcome::Broken { tokens, .. } => total.input = total.input.saturating_add(*tokens),
-                    CallOutcome::Rejected { .. } => {}
-                },
-                Event::TurnEnded { .. } => {
-                    runs += u64::from(in_turn && called);
-                    in_turn = false;
-                }
-                _ => {}
-            }
-        }
-    }
-    (runs > 0).then(|| Usage {
-        input: total.input.div_ceil(runs),
-        output: total.output.div_ceil(runs),
-        cache_write: total.cache_write.div_ceil(runs),
-        cache_write_long: total.cache_write_long.div_ceil(runs),
-        cache_read: total.cache_read.div_ceil(runs),
-    })
-}
-
 /// A typical learner run's tokens, for pricing the first offer when no
 /// learning session anywhere has a run yet. Assumed from the learner's
 /// usual steps, not measured: four calls (list the sessions, read one, propose, sum up)

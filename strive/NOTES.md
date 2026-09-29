@@ -2302,3 +2302,23 @@ unasked, with no sandbox rule in the way.
     ignore; the desktop's "Allow everything" says so.
   - Linux: missing imports aren't bound (bwrap binds what exists), and
     the directories above an import aren't protected there.
+
+### Three regressions a stop-time review found, fixed
+
+- **Rollback recovery was blocked.** `canRollBack` allowed only a file
+  still holding what the proposal wrote, and `strive review ID rollback`
+  refused on that before asking the daemon. But the daemon finishes a
+  rollback a crash cut off, when the file already holds what it held
+  before. The flag now follows the daemon's rule, and the CLI always asks
+  the daemon, showing the list's plainer reason when it refuses. A test
+  through `strive review` failed first.
+- **The first price estimate read other projects' learning journals**
+  (aggregate token usage, not text). A window is bound to its project, so
+  the estimate now uses only the documented typical run until this
+  project has runs of its own; the cross-project average and its test are
+  deleted.
+- **An answered desktop offer could come back.** Switching away while a
+  dismissal was still being recorded let a concurrent check read the old
+  watermark. A session is no longer reconsidered while its answer is on
+  its way, and the window offers only signs newer than the last answered
+  one. A unit test with a slow dismissal failed first.

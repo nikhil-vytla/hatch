@@ -812,6 +812,24 @@ fn a_rollback_a_crash_cut_off_after_the_write_is_journaled_when_retried() {
     assert_eq!(events(&env, &id, "proposalRolledBack").len(), 1);
 }
 
+/// The same recovery reached the way a person reaches it: the list says it
+/// can still be rolled back, and `strive review ID rollback` finishes it.
+#[test]
+fn a_rollback_a_crash_cut_off_can_be_finished_from_review() {
+    let env = Env::new();
+    let cwd = project();
+    let work = work_session(&env, &cwd);
+    let (mut host, id) = learner(&env, &cwd);
+    let p = propose(&mut host, &id, &memory("new\n", &work));
+    assert!(decide(&env, &cwd, p, "accept").get("error").is_none());
+    fs::remove_file(memory_file(&cwd)).unwrap();
+    assert_eq!(proposal(&env, &cwd, p)["canRollBack"], true, "the daemon would finish it");
+    let (code, out, err) = run(&env, &cwd, &["review", &p.to_string(), "rollback"]);
+    assert_eq!(code, 0, "{out}{err}");
+    assert_eq!(status(&env, &cwd, p), "rolledBack");
+    assert_eq!(events(&env, &id, "proposalRolledBack").len(), 1);
+}
+
 #[test]
 fn proposals_are_listed_newest_first_and_survive_a_restart() {
     let env = Env::new();
