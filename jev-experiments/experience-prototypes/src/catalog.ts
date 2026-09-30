@@ -140,14 +140,6 @@ export const experiments = [
     "How reliable are Jev's judgments across the full JudgeBench dataset?",
   ),
   e(
-    "replica",
-    "replica",
-    "SmolLM decision model",
-    "Training & local",
-    "Inspect what the replica learned, and what it did not.",
-    "Can a small local model learn choices, probabilities, and scores?",
-  ),
-  e(
     "rewardbench2",
     "rewardbench2",
     "RewardBench 2",
@@ -286,6 +278,12 @@ export const retired: Record<string, Retired> = {
     reason: "Merged into Intent recognition: no search method beat the unchanged prompt on the held-out cases.",
     record: "optimize",
     instead: { href: "#experiment/classify", label: "Intent recognition · Prompt search" },
+  },
+  replica: {
+    title: "SmolLM decision model",
+    reason: "Folded into Decision models on a Mac as an earlier pilot; it trained on dataset labels, not Jev's answers.",
+    record: "replica",
+    instead: { href: "#experiment/local-models", label: "Decision models on a Mac" },
   },
   reward: {
     title: "Learning from rewards",

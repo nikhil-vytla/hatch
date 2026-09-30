@@ -107,7 +107,6 @@ function View({
       return <IntentRecognition result={result} />;
     case "rewardbench2":
       return <RewardBench result={result} />;
-    case "replica":
       return <Learning id={exp.id} result={result} />;
     case "verify":
     case "search":
