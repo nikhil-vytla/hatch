@@ -13,7 +13,7 @@
   --mat-color-6: var(--mat-light-6);
   --mat-color-7: var(--mat-light-7);
 
-  --mat-focus: #58755f;
+  --mat-focus: var(--accent);
 }
 :root[data-theme="dark"] .materials-lab {
   --mat-paper: var(--mat-dark-0);
@@ -26,7 +26,7 @@
   --mat-color-6: var(--mat-dark-6);
   --mat-color-7: var(--mat-dark-7);
 
-  --mat-focus: #b9c8a8;
+  --mat-focus: var(--accent);
 }
 .materials-lab *,
 .materials-lab *::before,
@@ -42,8 +42,7 @@
 }
 .mat-intro h2 {
   font:
-    normal 28px / 1.15 Georgia,
-    serif;
+    600 28px / 1.15 var(--display);
   letter-spacing: -0.5px;
   margin: 0;
 }
@@ -360,8 +359,7 @@
 }
 .mat-selected strong {
   font:
-    normal 18px / 1.2 Georgia,
-    serif;
+    600 18px / 1.2 var(--display);
   overflow-wrap: anywhere;
 }
 .mat-selected > span {
@@ -434,8 +432,7 @@
   align-items: center;
   gap: 9px;
   font:
-    normal 18px / 1.2 Georgia,
-    serif;
+    600 18px / 1.2 var(--display);
   overflow-wrap: anywhere;
   min-width: 0;
 }
@@ -475,8 +472,7 @@
 .mat-mechanism h3 {
   margin: 0 0 14px;
   font:
-    normal 25px / 1.2 Georgia,
-    serif;
+    600 25px / 1.2 var(--display);
   letter-spacing: -0.3px;
   overflow-wrap: anywhere;
 }
@@ -692,8 +688,7 @@
 }
 .mat-artifacts h3 {
   font:
-    normal 24px Georgia,
-    serif;
+    600 24px var(--display);
   margin: 0 0 8px;
 }
 .mat-artifacts p {

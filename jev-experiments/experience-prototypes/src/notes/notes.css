@@ -1,26 +1,21 @@
 .experiment-notes {
-  --note-ink: #242c27;
-  --note-muted: #596259;
-  --note-line: #ced4c9;
-  --note-accent: #24634c;
-  --note-paper: #f5f4ef;
-  --note-wash: #e8ece3;
+  --note-ink: var(--ink);
+  --note-muted: var(--muted);
+  --note-line: #d4d4d8;
+  --note-accent: var(--accent);
+  --note-paper: var(--bg);
+  --note-wash: var(--soft);
   width: min(1120px, 100%);
   margin: 0 auto;
   padding: 44px 28px 80px;
   color: var(--note-ink);
-  font-family: "DM Sans", system-ui, sans-serif;
+  font-family: var(--sans);
   font-size: 17px;
   line-height: 1.65;
   text-wrap: pretty;
 }
 :root[data-theme="dark"] .experiment-notes {
-  --note-ink: #eceee6;
-  --note-muted: #adb9ac;
-  --note-line: #465347;
-  --note-accent: #a0cbb2;
-  --note-paper: #171d19;
-  --note-wash: #29352c;
+  --note-line: #3f3f46;
 }
 .experiment-notes *,
 .experiment-notes *::before,
@@ -35,7 +30,7 @@
 }
 .experiment-notes
   :is(button, input, select, summary, a, [tabindex]):focus-visible {
-  outline: 3px solid #b07b20;
+  outline: 3px solid var(--focus);
   outline-offset: 4px;
 }
 .experiment-notes :is(h1, h2, h3, p, figure, dl, blockquote) {
@@ -44,8 +39,8 @@
 .experiment-notes h1,
 .experiment-notes h2 {
   color: var(--note-ink);
-  font-family: Georgia, "Times New Roman", serif;
-  font-weight: 400;
+  font-family: var(--display);
+  font-weight: 600;
   letter-spacing: -0.035em;
   text-wrap: balance;
 }
@@ -87,7 +82,7 @@
 .note-number,
 .note-byline,
 .notes-list time {
-  font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, monospace;
+  font-family: var(--mono);
   font-size: 12px;
   letter-spacing: -0.015em;
 }
@@ -298,7 +293,7 @@
   justify-content: space-between;
   gap: 12px 24px;
   flex-wrap: wrap;
-  font-family: "IBM Plex Mono", monospace;
+  font-family: var(--mono);
   font-size: 12px;
   color: var(--note-muted);
   padding-bottom: 26px;
@@ -458,9 +453,9 @@
 }
 .note-code {
   margin: 38px 0 !important;
-  background: #202923;
-  border: 1px solid #465347;
-  color: #e9eee6;
+  background: #18181b;
+  border: 1px solid #3f3f46;
+  color: #f4f4f5;
   border-radius: 3px;
 }
 .note-code > figcaption {
@@ -469,11 +464,11 @@
   justify-content: space-between;
   gap: 16px;
   flex-wrap: wrap;
-  border-bottom: 1px solid #465347;
+  border-bottom: 1px solid #3f3f46;
   font-size: 14px;
 }
 .note-code .source-code-meta {
-  color: #bac7b7;
+  color: #a1a1aa;
 }
 .experiment-notes pre {
   max-width: 100%;
@@ -489,8 +484,8 @@
   line-height: inherit;
 }
 .note-code pre {
-  color: #e9eee6;
-  background: #202923;
+  color: #f4f4f5;
+  background: #18181b;
   border: 0;
 }
 .note-code .source-code-actions {
@@ -499,21 +494,21 @@
   gap: 10px 18px;
   align-items: center;
   padding: 12px 20px;
-  border-top: 1px solid #465347;
+  border-top: 1px solid #3f3f46;
   font-size: 13px;
 }
 .note-code .source-code-actions button {
-  color: #e9eee6;
-  border-color: #667662;
+  color: #f4f4f5;
+  border-color: #52525b;
   background: transparent;
 }
 .note-code .source-code-actions button:hover {
-  background: #344438;
-  border-color: #a0cbb2;
+  background: #27272a;
+  border-color: #a5b4fc;
 }
 .note-code .source-code-actions a,
 .note-code summary {
-  color: #a0cbb2;
+  color: #a5b4fc;
 }
 .note-source-meta {
   font-size: 12px;
@@ -531,7 +526,7 @@
 }
 .note-code .source-code-fingerprint {
   padding: 0 20px 8px;
-  color: #bac7b7;
+  color: #a1a1aa;
 }
 .note-code .source-code-fingerprint p {
   margin-bottom: 10px;

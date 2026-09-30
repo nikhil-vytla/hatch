@@ -1,20 +1,20 @@
 // The canvas and HTML inspectors share the same theme-specific material colors.
 export const MATERIAL_PALETTE = {
   light: [
-    "#f0ebdd",
+    "#f4f4f5",
     "#987431",
     "#4b838d",
-    "#65715d",
+    "#64748b",
     "#996244",
     "#bc5125",
     "#608780",
     "#80609e",
   ],
   dark: [
-    "#242d29",
+    "#141417",
     "#c59a4a",
     "#79abb3",
-    "#78836f",
+    "#7c8799",
     "#ad7957",
     "#e47d4c",
     "#bbd5d0",

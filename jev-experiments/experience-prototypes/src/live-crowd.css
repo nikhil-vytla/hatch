@@ -1,5 +1,5 @@
 .live-crowd {
-  --lc-moss: #64765b;
+  --lc-moss: var(--accent);
   --lc-ochre: #aa8250;
   --lc-paper: #f5f1e4;
   --lc-purple: #887caa;
@@ -23,8 +23,7 @@
 }
 .lc-intro h2 {
   font:
-    48px/1.07 Georgia,
-    serif;
+    600 48px/1.07 var(--display);
   letter-spacing: -1.9px;
   font-weight: 400;
   margin: 14px 0;
@@ -54,9 +53,9 @@
   place-items: center;
   width: 64px;
   height: 64px;
-  background: #e9e6cd;
+  background: color-mix(in oklab, var(--gold) 14%, var(--surface));
   border-radius: 50%;
-  color: #a79554;
+  color: var(--gold);
   margin-bottom: 8px;
 }
 .lc-weather svg {
@@ -64,13 +63,12 @@
   height: 27px;
 }
 .lc-weather.rain {
-  background: #e0e9e4;
-  color: #78939b;
+  background: color-mix(in oklab, var(--blue) 14%, var(--surface));
+  color: var(--blue);
 }
 .lc-afternoon strong {
   font:
-    23px Georgia,
-    serif;
+    600 23px var(--display);
   font-weight: 400;
   letter-spacing: -0.4px;
 }
@@ -169,7 +167,7 @@
   min-width: 0;
 }
 .lc-world.active {
-  border-color: #a9b299;
+  border-color: var(--accent);
 }
 .lc-world-head {
   display: flex;
@@ -179,8 +177,7 @@
 }
 .lc-lane {
   font:
-    12px Georgia,
-    serif;
+    500 12px var(--display);
   border: 1px solid var(--line);
   border-radius: 50%;
   width: 25px;
@@ -206,8 +203,7 @@
   border: 0;
   padding: 0;
   font:
-    12px "DM Sans",
-    sans-serif;
+    12px var(--sans);
   letter-spacing: 0;
 }
 .lc-fallback {
@@ -242,9 +238,9 @@
   position: absolute;
   left: 10px;
   top: 9px;
-  background: #fffdf0d9;
-  color: #677058;
-  border: 1px solid #c6c8a660;
+  background: #ffffffd9;
+  color: #3f3f46;
+  border: 1px solid #d4d4d8;
   border-radius: 12px;
   padding: 4px 9px;
   font: 8px var(--mono);
@@ -270,7 +266,7 @@
   width: 5px;
   height: 5px;
   border-radius: 50%;
-  background: var(--lc-moss);
+  background: var(--muted);
   flex-shrink: 0;
 }
 .lc-dot.jev {
@@ -278,8 +274,7 @@
 }
 .lc-world-foot .lc-small {
   font:
-    9px "DM Sans",
-    sans-serif;
+    9px var(--sans);
   text-align: right;
 }
 .lc-world-foot button {
@@ -377,8 +372,7 @@
 }
 .lc-notice-editor h3 {
   font:
-    23px Georgia,
-    serif;
+    600 23px var(--display);
   letter-spacing: -0.5px;
   font-weight: 400;
   margin: 13px 0 16px;
@@ -425,11 +419,11 @@
 .live-crowd .lc-primary {
   background: var(--lc-moss);
   border-color: var(--lc-moss);
-  color: #fffdf3;
+  color: var(--on-accent);
   padding: 9px 12px;
 }
 .live-crowd .lc-primary:hover:not(:disabled) {
-  background: #516347;
+  background: color-mix(in oklab, var(--accent) 85%, var(--ink));
 }
 .lc-fine {
   font-size: 10px;
@@ -469,8 +463,7 @@
   place-items: center;
   color: #fff9e9;
   font:
-    13px Georgia,
-    serif;
+    500 13px var(--display);
   box-shadow: inset 0 -3px 0 #0000000a;
 }
 .lc-roster button.selected {
@@ -489,8 +482,7 @@
 }
 .lc-person-heading > span {
   font:
-    22px Georgia,
-    serif;
+    600 22px var(--display);
 }
 .lc-person-heading small {
   display: block;
@@ -649,7 +641,6 @@
   margin-bottom: 20px;
 }
 :root[data-theme="dark"] .live-crowd {
-  --lc-moss: #b0bb91;
   --lc-ochre: #c2a56f;
   --lc-purple: #b3a5d6;
 }
@@ -657,23 +648,17 @@
   background: #25352e;
 }
 :root[data-theme="dark"] .lc-scene-badge {
-  background: #25362bd9;
-  border-color: #87967e44;
-  color: #d0d6bd;
+  background: #18181bd9;
+  border-color: #52525b66;
+  color: #d4d4d8;
 }
 :root[data-theme="dark"] .lc-weather {
-  background: #4a5137;
-  color: #ded296;
+  background: color-mix(in oklab, var(--gold) 18%, var(--surface));
+  color: var(--gold);
 }
 :root[data-theme="dark"] .lc-weather.rain {
-  background: #34454a;
-  color: #abced0;
-}
-:root[data-theme="dark"] .live-crowd .lc-primary {
-  color: #222c21;
-}
-:root[data-theme="dark"] .live-crowd .lc-primary:hover:not(:disabled) {
-  background: #c0cba2;
+  background: color-mix(in oklab, var(--blue) 18%, var(--surface));
+  color: var(--blue);
 }
 @media (min-width: 1450px) {
   .lc-intro h2 {
