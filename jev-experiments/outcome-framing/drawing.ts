@@ -3,7 +3,7 @@ export const SIZE=16;
 export type DrawingMethod='intensity'|'membership'|'formula'|'scanline';
 export const drawingMethods:Record<DrawingMethod,{title:string;description:string}>={
  intensity:{title:'Choose the pixel value',description:'A direct drawing instruction returns a five-level whiteness score.'},
- membership:{title:'Predict shape membership',description:'A Noul question asks whether the pixel center belongs to the shape. Probability is shown as intensity; the mask thresholds at0.5.'},
+ membership:{title:'Predict shape membership',description:'A Noul question asks whether the pixel center belongs to the shape. Probability is shown as intensity; the mask thresholds at 0.5.'},
  formula:{title:'Use a geometric rule',description:'The same shape described with an explicit formula. Code can solve these cases exactly; this is a framing control.'},
  scanline:{title:'Continue the drawing',description:'Draw one row at a time while seeing your previous rows. Same task, with sequential model context.'},
 };
