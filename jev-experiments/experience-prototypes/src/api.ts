@@ -23,6 +23,15 @@ export class EvaluationError extends Error {
     this.name = "EvaluationError";
   }
 }
+/** What every live control says when no key is connected, before any request is sent. */
+export const NO_KEY_MESSAGE =
+  "Connect your AI Gateway key in Settings to run Jev live. Recorded examples work without one, and live runs are billed to your key.";
+
+/** Throws the shared no-key error; call before any request that needs the visitor's key. */
+export function requireKey() {
+  if (!getApiKey()) throw new EvaluationError(NO_KEY_MESSAGE, 401, { error: NO_KEY_MESSAGE });
+}
+
 export async function run(
   state: unknown,
   questions: Record<string, unknown>,
@@ -30,6 +39,7 @@ export async function run(
   /** Real-time callers set a short budget so a slow request fails fast instead of retrying for up to 48 s. */
   budget?: { deadlineMs: number; maxAttempts: number },
 ) {
+  requireKey();
   const response = await fetch("/api/evaluate", {
     method: "POST",
     headers: {

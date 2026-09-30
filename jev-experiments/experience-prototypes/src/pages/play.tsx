@@ -20,7 +20,7 @@ const scenes = [
 ] as const;
 
 // A plan for future work is available from About, not advertised as a playground.
-const catalog = experiments.filter((experiment) => experiment.id !== "benchmark-atlas");
+const catalog = experiments;
 const openingMelody = starterScore().events.filter(
   (event) => event.phrase === 0 && event.track === "melody" && event.midi !== null,
 );

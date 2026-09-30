@@ -1,25 +1,18 @@
-import { useEffect, useMemo, useState } from "react";
-import { ReactFlow, Background, Controls, MarkerType } from "@xyflow/react";
+import { useMemo, useState } from "react";
+import { ReactFlow, Background, MarkerType } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { motion } from "motion/react";
 import {
-  ArrowRight,
-  Check,
   FileText,
   ShieldCheck,
-  Search,
-  KeyRound,
 } from "lucide-react";
 import {
   Pane,
   Field,
-  Button,
   RunButton,
-  Pills,
   Notice,
   State,
   Bars,
-  Stat,
   useRun,
   ErrorText,
   Availability,
@@ -464,117 +457,6 @@ export function AgentExperiment({ id, result }: { id: string; result: any }) {
           {modelProb && <Bars values={modelProb} selected={output} />}
           <Availability rows={all} result={result} />
           <State value={row} />
-        </Pane>
-      </aside>
-    </div>
-  );
-}
-export function Beverage({ result }: { result: any }) {
-  const menu = {
-    espresso: { hot: true, caffeine: true, dairy: false, sweet: false },
-    latte: { hot: true, caffeine: true, dairy: true, sweet: false },
-    iced_coffee: { hot: false, caffeine: true, dairy: false, sweet: false },
-    iced_latte: { hot: false, caffeine: true, dairy: true, sweet: false },
-    herbal_tea: { hot: true, caffeine: false, dairy: false, sweet: false },
-    hot_chocolate: { hot: true, caffeine: false, dairy: true, sweet: true },
-    lemonade: { hot: false, caffeine: false, dairy: false, sweet: true },
-    milkshake: { hot: false, caffeine: false, dairy: true, sweet: true },
-  };
-  const [input, setInput] = useState(
-      "Something warm, without caffeine or dairy, please.",
-    ),
-    [answer, setAnswer] = useState<any>(
-      result.rows?.find((r: any) => r.prediction === "herbal_tea"),
-    ),
-    [selected, setSelected] = useState("herbal_tea");
-  const { busy, error, execute } = useRun();
-  return (
-    <div className="workbench">
-      <div className="artifact-column">
-        <div className="drink-stage">
-          <div className="steam">
-            <i />
-            <i />
-            <i />
-          </div>
-          <div className="cup">
-            <div className="tea-surface" />
-            <span>j.</span>
-          </div>
-          <h2>{pretty(selected)}</h2>
-          <p>A suggestion from the fictional café menu</p>
-        </div>
-        <div className="menu-grid">
-          {Object.entries(menu).map(([name, attributes]) => (
-            <button
-              className={selected === name ? "selected" : ""}
-              key={name}
-              onClick={() => setSelected(name)}
-            >
-              <strong>{pretty(name)}</strong>
-              <span>
-                {attributes.hot ? "Hot" : "Cold"} ·{" "}
-                {attributes.caffeine ? "Caffeine" : "Caffeine-free"} ·{" "}
-                {attributes.dairy ? "Dairy" : "No dairy"}
-              </span>
-            </button>
-          ))}
-        </div>
-      </div>
-      <aside className="controls">
-        <Pane title="Tell us what sounds good">
-          <Field label="Your order">
-            <textarea
-              rows={5}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-            />
-          </Field>
-          <RunButton
-            busy={busy}
-            label="Find my drink"
-            onClick={() =>
-              execute(async () => {
-                const r = await run(
-                  { request: input, menu },
-                  {
-                    drink: choice(
-                      "Choose a drink satisfying all explicit requirements, or none if no match or clarification is needed.",
-                      {
-                        ...Object.fromEntries(
-                          Object.entries(menu).map(([k, v]) => [
-                            k,
-                            JSON.stringify(v),
-                          ]),
-                        ),
-                        none: "No supported match",
-                      },
-                    ),
-                    clarify: choice(
-                      "Which single preference most needs clarification?",
-                      ["none", "temperature", "caffeine", "dairy", "sweetness"],
-                    ),
-                  },
-                );
-                setSelected(r.answers.drink.value);
-                setAnswer(r);
-              })
-            }
-          />
-          {answer?.answers?.clarify?.value &&
-            answer.answers.clarify.value !== "none" &&
-            typeof answer.answers.clarify.value === "string" && (
-              <Notice>
-                One useful detail: what do you prefer for{" "}
-                {answer.answers.clarify.value}?
-              </Notice>
-            )}
-          <ErrorText error={error} />
-          <State value={{ menu, request: input, answer }} />
-          <p className="fine">
-            Menu facts are fixed and visible. This demo suggests a drink; it
-            does not place an order.
-          </p>
         </Pane>
       </aside>
     </div>
