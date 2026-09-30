@@ -15,8 +15,8 @@ const UndoExperiment = lazy(() => import("../new-experiments").then(m => ({ defa
 const Changes = lazy(() => import("../new-experiments").then(m => ({ default: m.Changes })));
 const GeneratedUI = lazy(() => import("../generated-ui").then(m => ({ default: m.GeneratedUI })));
 const Games = lazy(() => import("../games").then(m => ({ default: m.Games })));
-const Benchmarks = lazy(() => import("../benchmarks").then(m => ({ default: m.Benchmarks })));
 const Learning = lazy(() => import("../benchmarks").then(m => ({ default: m.Learning })));
+const IntentRecognition = lazy(() => import("../intent-recognition").then(m => ({ default: m.IntentRecognition })));
 const RewardBench = lazy(() => import("../rewardbench").then(m => ({ default: m.RewardBench })));
 const LocalModels = lazy(() => import("../local-models").then(m => ({ default: m.LocalModels })));
 const AgentExperiment = lazy(() => import("../agent-experiments").then(m => ({ default: m.AgentExperiment })));
@@ -104,12 +104,10 @@ function View({
     case "materials":
       return <MaterialsSandbox />;
     case "classify":
-    case "robustness":
-      return <Benchmarks id={exp.id} result={result} />;
+      return <IntentRecognition result={result} />;
     case "rewardbench2":
       return <RewardBench result={result} />;
     case "replica":
-    case "optimize":
       return <Learning id={exp.id} result={result} />;
     case "verify":
     case "search":

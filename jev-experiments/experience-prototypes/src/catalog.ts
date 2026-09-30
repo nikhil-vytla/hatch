@@ -140,22 +140,6 @@ export const experiments = [
     "How reliable are Jev's judgments across the full JudgeBench dataset?",
   ),
   e(
-    "robustness",
-    "robustness",
-    "Decision stability",
-    "Benchmarks",
-    "Change the wrapping. See whether the judgment survives.",
-    "Which changes to a question alter the answer?",
-  ),
-  e(
-    "optimize",
-    "optimize",
-    "Prompt evolution",
-    "Training & local",
-    "Follow the search for a better way to ask.",
-    "Does optimizing a prompt improve unseen cases?",
-  ),
-  e(
     "replica",
     "replica",
     "SmolLM decision model",
@@ -290,6 +274,18 @@ export const retired: Record<string, Retired> = {
     title: "Active labeling",
     reason: "A small template fixture where the labels were trivially right; neither sampling method helped.",
     record: "teach",
+  },
+  robustness: {
+    title: "Decision stability",
+    reason: "Merged into Intent recognition, which now shows how often each change flips the answer.",
+    record: "robustness",
+    instead: { href: "#experiment/classify", label: "Intent recognition · Stability" },
+  },
+  optimize: {
+    title: "Prompt evolution",
+    reason: "Merged into Intent recognition: no search method beat the unchanged prompt on the held-out cases.",
+    record: "optimize",
+    instead: { href: "#experiment/classify", label: "Intent recognition · Prompt search" },
   },
   reward: {
     title: "Learning from rewards",
