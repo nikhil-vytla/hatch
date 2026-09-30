@@ -73,7 +73,7 @@ function renderMatter(
   const colors = MATERIAL_PALETTE[dark ? "dark" : "light"];
   ctx.fillStyle = colors[0];
   ctx.fillRect(0, 0, width, height);
-  ctx.fillStyle = dark ? "#46524a" : "#d9d3c4";
+  ctx.fillStyle = dark ? "#3f3f46" : "#d4d4d8";
   for (let x = 4; x < s.width; x += 8)
     for (let y = 4; y < s.height; y += 8) {
       ctx.beginPath();
@@ -138,7 +138,7 @@ function renderMatter(
         ctx.fillStyle = "#c6dfd4";
         ctx.fillRect(x, y, sx, 1);
       } else if (cell === 3 && s.cells[i - s.width] !== 3) {
-        ctx.fillStyle = "#b1b8a0";
+        ctx.fillStyle = "#a3adbd";
         ctx.fillRect(x, y, sx, 1);
       }
     }
@@ -414,7 +414,7 @@ export function MaterialsSandbox({
         const dark = document.documentElement.dataset.theme === "dark";
         renderMatter(ctx, s, el.width, el.height, dark);
         if (view.hovered || view.touching || document.activeElement === el) {
-          ctx.strokeStyle = dark ? "#f3edcf" : "#374e3e";
+          ctx.strokeStyle = dark ? "#f4f4f5" : "#27272a";
           ctx.lineWidth = 1.5;
           if (view.mode === "paint") {
             ctx.setLineDash([3, 3]);

@@ -25,7 +25,7 @@ const WORDS = ["no", "one", "two", "three", "four", "five"];
 
 /** A cell's shade grows with how often the variant flips the answer. */
 const heat = (share: number) =>
-  `color-mix(in oklab, #d9a400 ${Math.round(share * 70)}%, transparent)`;
+  `color-mix(in oklab, var(--heat) ${Math.round(share * 70)}%, transparent)`;
 
 export function DecideResults() {
   const [data, setData] = useState<DecideData | null>(null);

@@ -24,8 +24,8 @@
   letter-spacing: -0.055em;
 }
 .wardrobe-header h2 em {
-  font-family: Georgia, serif;
-  font-weight: normal;
+  font-family: var(--display);
+  font-weight: 600;
   color: #8d7058;
 }
 .wardrobe-header p {
@@ -128,9 +128,9 @@
   margin-bottom: 5px;
 }
 .wardrobe-stage-caption strong {
-  font-family: Georgia, serif;
+  font-family: var(--display);
   font-size: 20px;
-  font-weight: normal;
+  font-weight: 600;
 }
 .wardrobe-stage-actions {
   position: absolute;
@@ -429,8 +429,7 @@
 }
 .wardrobe-adjust select {
   font:
-    11px "DM Sans",
-    sans-serif;
+    11px var(--sans);
   border-radius: 5px;
   min-height: 29px;
   padding: 4px 7px;
@@ -483,16 +482,14 @@
   padding: 11px;
   border-radius: 6px;
   font:
-    11px "DM Sans",
-    sans-serif;
+    11px var(--sans);
 }
 .wardrobe-connect .wardrobe-consent {
   flex-direction: row;
   align-items: flex-start;
   gap: 9px;
   font:
-    11px "DM Sans",
-    sans-serif;
+    11px var(--sans);
   line-height: 1.6;
   letter-spacing: 0;
 }

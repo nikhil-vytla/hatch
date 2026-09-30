@@ -7,8 +7,8 @@
 export type Swatch = { light: string; dark: string };
 
 export const SURFACES = {
-  light: ["#f6f2e9", "#fbf8f1"],
-  dark: ["#1b1a17", "#221f1b"],
+  light: ["#fafafa", "#ffffff"],
+  dark: ["#09090b", "#111113"],
 } as const;
 
 export const PALETTE = {

@@ -1,38 +1,52 @@
-@import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;450;500;550;600;650;700&family=IBM+Plex+Mono:wght@400;500&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Geist:wght@400..700&family=Geist+Mono:wght@400;500&display=swap");
 @import "tailwindcss";
+/*
+ * Theme tokens. Neutral zinc surfaces, one indigo accent, and a small set of
+ * series colours (coral, gold, blue) that stay distinct in both themes.
+ * --sage is the historical name of the accent; it now aliases --accent.
+ */
 :root {
-  font-family: "DM Sans", sans-serif;
+  font-family: var(--sans);
   color: var(--ink);
   background: var(--bg);
   font-synthesis: none;
-  --bg: #f5f4ef;
-  --surface: #fffefa;
-  --soft: #eeeee6;
-  --ink: #242c27;
-  --muted: #596259;
-  --line: #dfe1d6;
-  --coral: #a14e36;
-  --sage: #24634c;
-  --focus: #976614;
-  --gold: #82601e;
-  --blue: #456b8d;
-  --shadow: 0 12px 40px #27312a08;
-  --mono: "IBM Plex Mono", monospace;
+  -webkit-font-smoothing: antialiased;
+  --sans: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --display: var(--sans);
+  --serif: var(--display);
+  --mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --bg: #fafafa;
+  --surface: #ffffff;
+  --soft: #f4f4f5;
+  --ink: #18181b;
+  --muted: #52525b;
+  --line: #e4e4e7;
+  --accent: #4f46e5;
+  --on-accent: #ffffff;
+  --sage: var(--accent);
+  --coral: #c2410c;
+  --gold: #955a06;
+  --blue: #0369a1;
+  --focus: #4f46e5;
+  --heat: #e0a800;
+  --shadow: 0 1px 2px #0000000a, 0 12px 32px -16px #0000001f;
   color-scheme: light;
 }
 :root[data-theme="dark"] {
-  --bg: #171d19;
-  --surface: #1d211d;
-  --soft: #242a24;
-  --ink: #eceee6;
-  --muted: #adb9ac;
-  --line: #343d33;
-  --coral: #e69c7b;
-  --sage: #a0cbb2;
-  --focus: #e4bc72;
-  --gold: #d9bd7a;
-  --blue: #9bb9cf;
-  --shadow: 0 12px 40px #0002;
+  --bg: #09090b;
+  --surface: #111113;
+  --soft: #1c1c1f;
+  --ink: #f4f4f5;
+  --muted: #a1a1aa;
+  --line: #27272a;
+  --accent: #a5b4fc;
+  --on-accent: #09090b;
+  --coral: #fb923c;
+  --gold: #facc15;
+  --blue: #7dd3fc;
+  --focus: #a5b4fc;
+  --heat: #a87c06;
+  --shadow: 0 1px 2px #0000004d, 0 16px 40px -16px #00000099;
   color-scheme: dark;
 }
 * {
@@ -101,14 +115,15 @@ p {
 h1,
 h2,
 h3 {
-  font-weight: 500;
-  letter-spacing: -0.045em;
+  font-family: var(--display);
+  font-weight: 600;
+  letter-spacing: -0.035em;
 }
 p {
   line-height: 1.65;
 }
 ::selection {
-  background: #d6947255;
+  background: color-mix(in srgb, var(--accent) 28%, transparent);
 }
 input,
 textarea,
@@ -123,7 +138,7 @@ select {
 }
 input[type="range"] {
   padding: 0;
-  accent-color: var(--coral);
+  accent-color: var(--accent);
   height: 24px;
 }
 input[type="checkbox"] {
@@ -1380,7 +1395,7 @@ nav a {
   bottom: 27px;
   left: 30px;
   right: 30px;
-  color: #eeeedc;
+  color: #f4f4f5;
 }
 .world-caption > span {
   font: 8px var(--mono);
@@ -1395,8 +1410,8 @@ nav a {
 }
 .world-caption .button {
   border-color: #ffffff33;
-  color: #eeeedc;
-  background: #20352677;
+  color: #f4f4f5;
+  background: #18181b77;
 }
 .decision-chips {
   display: flex;
@@ -3226,9 +3241,9 @@ nav a {
   position: relative;
   border-radius: 14px;
   overflow: hidden;
-  background: #101d24;
-  color: #dfebe3;
-  border: 1px solid #335152;
+  background: #0c0c10;
+  color: #e4e4e7;
+  border: 1px solid #27272a;
 }
 .arcade-hud {
   display: flex;
@@ -3248,7 +3263,7 @@ nav a {
 .arcade-hud small {
   font: 10px var(--mono);
   letter-spacing: 0.1em;
-  color: #91aca6;
+  color: #a1a1aa;
 }
 .arcade-hud strong {
   font-size: 22px;
@@ -3273,15 +3288,15 @@ nav a {
   position: absolute;
   bottom: 14px;
   left: 20px;
-  color: #9fbdba;
+  color: #a1a1aa;
   font: 10px var(--mono);
   pointer-events: none;
 }
 .arcade-status {
   padding: 15px 24px;
   font-size: 12px;
-  border-top: 1px solid #335152;
-  color: #b1c6bd;
+  border-top: 1px solid #27272a;
+  color: #d4d4d8;
   min-height: 48px;
 }
 .arcade-playback {
