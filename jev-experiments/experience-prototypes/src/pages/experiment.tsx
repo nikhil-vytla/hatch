@@ -10,6 +10,7 @@ import "./experiment.css";
 const sceneEntries = new Set(["materials", "tetris", "crowd", "music", "routing", "visual-search"]);
 
 const Paste = lazy(() => import("../new-experiments").then(m => ({ default: m.Paste })));
+const LayoutStudy = lazy(() => import("../layout-study").then(m => ({ default: m.LayoutStudy })));
 const JudgmentsScene = lazy(() => import("../judgments-scene").then(m => ({ default: m.JudgmentsScene })));
 const GeneratedUI = lazy(() => import("../generated-ui").then(m => ({ default: m.GeneratedUI })));
 const Games = lazy(() => import("../games").then(m => ({ default: m.Games })));
@@ -63,7 +64,12 @@ function View({
     case "semantic-table":
       return <JudgmentsScene record={result} />;
     case "ui":
-      return <GeneratedUI record={composition} />;
+      return (
+        <>
+          <GeneratedUI record={composition} />
+          <LayoutStudy result={result} />
+        </>
+      );
     case "music":
       return <Music result={result} />;
     case "games":
