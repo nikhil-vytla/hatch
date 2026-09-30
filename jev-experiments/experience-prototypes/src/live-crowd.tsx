@@ -45,6 +45,7 @@ import {
   type PlaceId,
 } from "../../live-worlds/crowd/engine";
 import demo from "../../live-worlds/crowd/demo.json";
+import { PROBES } from "../../live-worlds/crowd/probes";
 import {
   replayPlan,
   FixedClock,
@@ -415,13 +416,16 @@ export function LiveCrowd(_props: { result?: unknown }) {
     setFrame(a.frames.length - 1);
     bump();
   }
-  function playRecorded() {
+  /** A recorded notice: the afternoon demo, or one of the seven recorded probes. */
+  type Recording = { snapshot: unknown; ticket: any; request: unknown; response: any; playback?: unknown };
+
+  function playRecorded(rec: Recording = demo.result, sha: string = demo.manifest.request_sha256) {
     pause();
     storeCurrent();
     pairRef.current = replayPlan(
-      demo.result.snapshot as unknown as World,
-      demo.result.ticket,
-      demo.result.response.answers,
+      rec.snapshot as unknown as World,
+      rec.ticket,
+      rec.response.answers,
       `afternoon-${++serial.current}`,
     );
     for (const lane of ["a", "b"] as const) {
@@ -429,10 +433,10 @@ export function LiveCrowd(_props: { result?: unknown }) {
       if (ev)
         ev.transport = {
           source: "recorded",
-          request_sha256: demo.manifest.request_sha256,
-          request: demo.result.request,
-          response: demo.result.response,
-          playback: demo.result.playback,
+          request_sha256: sha,
+          request: rec.request,
+          response: rec.response,
+          playback: rec.playback,
         };
     }
     frames.current = [
@@ -590,12 +594,31 @@ export function LiveCrowd(_props: { result?: unknown }) {
         </div>
       </header>
       <div className="lc-recorded-demo">
-        <button onClick={playRecorded}>
+        <button onClick={() => playRecorded()}>
           <Play size={12} /> Watch a recorded Jev afternoon
         </button>
         <span>
           One real notice · 12 resident plans · replayed instantly, not live
         </span>
+      </div>
+      <div className="lc-recorded-probes" aria-label="Recorded notices that test the residents">
+        <span>Recorded probes:</span>
+        {PROBES.map((p) => (
+          <button
+            key={p.id}
+            title={`Tests ${p.probe}`}
+            onClick={async () => {
+              // The seven recordings are loaded only when one is played.
+              const { default: recorded } = await import("../../live-worlds/crowd/notices.json");
+              const rec = recorded.notices.find((n) => n.id === p.id);
+
+              if (rec) playRecorded(rec, rec.request_sha256);
+              else setError(`The recorded "${p.label}" notice could not be found.`);
+            }}
+          >
+            {p.label}
+          </button>
+        ))}
       </div>
       <div className="lc-controls">
         <div className="lc-transport">
