@@ -29,9 +29,9 @@
     {
       "name": "changes",
       "source": "results/changes.jsonl",
-      "sourceSha256": "210d7ce35beeb6a61a512ca47e06d22747a955643137935777f232cde505bef5",
-      "publicSha256": "9d71b8da0adf27383b61ab807606741c0240f9e63f82fbb74a8ee69c3ebc8453",
-      "publicBytes": 600,
+      "sourceSha256": "e739f50d54967bb5265ec819ad7a981da3ce5d6dc8ceaa2ad182c3487735b64f",
+      "publicSha256": "2892c12829c3ac1a506d977466432e1c03f69511d557c7aa0d2f9d8de7249ebe",
+      "publicBytes": 1861,
       "comparison": "original-record",
       "recipe": "readRecord + enrichProvenance + availability"
     },

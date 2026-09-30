@@ -11,7 +11,7 @@ import {
   supportRows,
   edits,
   impactFacts,
-  conclusions,
+  conclusionsForJev,
 } from "../src/new-experiments";
 import { judge } from "../src/api";
 const dir = "results";
@@ -94,10 +94,11 @@ await job("changes", async () =>
       state: {
         before: impactFacts,
         after: { ...impactFacts, venue: "Waterfront Pavilion, Portland" },
-        conclusions,
+        // Text only: the dependency lists are the answer key, so they stay out of the request.
+        conclusions: conclusionsForJev,
       },
       questions: Object.fromEntries(
-        conclusions.map((c) => [
+        conclusionsForJev.map((c) => [
           c.id,
           judge(
             `Does conclusion ${c.id} need review because the facts changed?`,

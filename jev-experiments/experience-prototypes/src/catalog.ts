@@ -76,22 +76,6 @@ export const experiments = [
     "Can semantic columns reduce the work of reviewing messy records?",
   ),
   e(
-    "undo",
-    "undo",
-    "Intent-based undo",
-    "Productivity",
-    "Keep the layout. Rewind just the colors.",
-    "Can Jev select the intended edits without undoing unrelated work?",
-  ),
-  e(
-    "changes",
-    "changes",
-    "Change impact",
-    "Productivity",
-    "One changed fact. See what needs a second look.",
-    "Can we detect which conclusions a source edit invalidates?",
-  ),
-  e(
     "beverage",
     "cafe",
     "Café Jev",
@@ -282,6 +266,18 @@ export const retired: Record<string, Retired> = {
     reason: "Now a tab in the Arcade scene beside Snake; Jev chose the greedy rule's move on nearly every step.",
     record: "arcade",
     instead: { href: "#experiment/snake", label: "Arcade: Snake and Orbital rescue" },
+  },
+  undo: {
+    title: "Intent-based undo",
+    reason: "Now a tab in the Semantic spreadsheet scene, beside the other one-request judgments.",
+    record: "undo",
+    instead: { href: "#experiment/semantic-table", label: "Semantic spreadsheet · Intent-based undo" },
+  },
+  changes: {
+    title: "Change impact",
+    reason: "Now a tab in the Semantic spreadsheet scene, re-recorded without the answer key in Jev's input.",
+    record: "changes",
+    instead: { href: "#experiment/semantic-table", label: "Semantic spreadsheet · Change impact" },
   },
   reward: {
     title: "Learning from rewards",
