@@ -21,6 +21,7 @@ finish, or a model other than the pinned one fails the run. No retries.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -307,15 +308,72 @@ def completed_sequences(records: list[dict], trials: list[ev.Trial]) -> dict[tup
     every planned trial of the sequence has a result whose model was reached.
     A sequence cut short is run again from its start, since each later trial
     depends on what the earlier ones in the same sequence learned."""
-    planned: dict[tuple[str, int], set[str]] = {}
+    planned: dict[tuple[str, int], list[ev.Trial]] = {}
     for t in trials:
-        planned.setdefault((t.arm, t.sequence), set()).add(t.key)
+        planned.setdefault((t.arm, t.sequence), []).append(t)
     got: dict[str, dict] = {r["key"]: r for r in records if r.get("type") == "trial" and r.get("model_ok", True)}
-    keep: dict[tuple[str, int], list[dict]] = {}
-    for seq, keys in planned.items():
-        if keys <= got.keys():
-            keep[seq] = [got[k] for k in sorted(keys, key=lambda k: next(t.position for t in trials if t.key == k))]
-    return keep
+
+    def same_task(t: ev.Trial) -> bool:
+        # A key names only a slot, so a record from a different plan can sit under it.
+        r = got.get(t.key)
+        return r is not None and all(r.get(f) == getattr(t, f) for f in ("family", "instance", "role", "probe"))
+
+    return {seq: [got[t.key] for t in sorted(ts, key=lambda t: t.position)]
+            for seq, ts in planned.items() if all(same_task(t) for t in ts)}
+
+
+# Settings that can differ between a run and its resumption: where output
+# goes, the spending cap, the cost estimate and prompts. Not the suite lock:
+# without it the agent can read the answers. Every other setting
+# must match, so a setting added later is checked without being listed here.
+RESUME_MAY_DIFFER = frozenset({"out", "resume", "yes", "max_usd", "calibration", "dry_run", "summarize"})
+
+
+def resume_mismatch(earlier: dict, now: dict) -> list[str]:
+    """The settings that differ between an earlier run's recorded args and this run's."""
+    return sorted(k for k in earlier.keys() | now.keys() if k not in RESUME_MAY_DIFFER and earlier.get(k) != now.get(k))
+
+
+def walk(root: Path) -> list[Path]:
+    """Every file under root. An unreadable directory raises rather than being
+    skipped, so a locked suite can't pass for an empty one."""
+    def fail(e: OSError) -> None:
+        raise e
+    return [Path(d) / f for d, dirs, fs in os.walk(root, onerror=fail) if "__pycache__" not in Path(d).parts for f in fs]
+
+
+def fingerprint(paths: list[Path], env: dict[str, str]) -> str:
+    """A digest of what a trial's result depends on besides the settings: the
+    files under paths (the suite, the runner, the binaries) and env (what
+    redirects the daemon, and the tools a trial runs). The same paths can hold
+    different contents."""
+    h = hashlib.sha256()
+    for root in paths:
+        files = sorted(walk(root)) if root.is_dir() else [root]
+        for f in files:
+            h.update(f"{f.relative_to(root.parent)}\0{len(b := f.read_bytes())}\0".encode())
+            h.update(b)
+    for k in sorted(env):
+        h.update(f"{k}={env[k]}\0".encode())
+    return h.hexdigest()
+
+
+def run_inputs(strive: Path) -> str:
+    here = Path(__file__).resolve().parent
+    tui = strive.with_name("strive-tui")
+    paths = [ev.EVAL, here / "run_eval.py", here / "evallib.py", here / "stats.py", strive, *([tui] if tui.is_file() else [])]
+    return fingerprint(paths, {**{k: v for k, v in os.environ.items() if k.startswith("STRIVE_")}, **toolchain()})
+
+
+def toolchain() -> dict[str, str]:
+    """What a trial runs besides strive: the checks run under this Python, and
+    the agent's shell finds python3 and git on PATH."""
+    tools = {"PATH": os.environ.get("PATH", ""), "checks": f"{sys.executable} {sys.version}"}
+    for name in ("python3", "git"):
+        found = shutil.which(name)
+        out = subprocess.run([found, "--version"], capture_output=True, text=True).stdout.strip() if found else ""
+        tools[name] = f"{found} {out}"
+    return tools
 
 
 class Runner:
@@ -331,6 +389,7 @@ class Runner:
         self.sequences: list[tuple[Sequence, list[ev.Trial]]] = []
         # Sequences kept from an earlier run (--resume): their records, not run again.
         self.kept: dict[tuple[str, int], list[dict]] = {}
+        self.inputs = ""  # run_inputs(), set before the suite is locked
 
     def pinned(self, model: str) -> bool:
         return model == self.model or model.startswith(self.model + "-")
@@ -343,7 +402,7 @@ class Runner:
         (self.out / "journals").mkdir(parents=True, exist_ok=True)
         (self.out / "strive").mkdir(exist_ok=True)
         self.write({"type": "run", "model": self.model, "started": time.strftime("%Y-%m-%dT%H:%M:%S"),
-                    "args": {k: str(v) for k, v in vars(self.args).items()}})
+                    "args": {k: str(v) for k, v in vars(self.args).items()}, "inputs": self.inputs})
         for t in self.trials:
             self.write({"type": "planned", "key": t.key, **asdict(t)})
         done: list[dict] = []
@@ -603,8 +662,27 @@ def main() -> int:
     out = (a.out or ev.STRIVE / "eval-runs" / time.strftime("%Y%m%d-%H%M%S")).resolve()
     out.mkdir(parents=True, exist_ok=True)
     runner = Runner(a, tasks, trials, out)
+    # Before the suite is locked: afterwards its files can't be read.
+    try:
+        runner.inputs = run_inputs(a.strive.resolve())
+    except PermissionError as e:
+        print(f"can't read {e.filename}: is another run going? It locks the suite until it ends", file=sys.stderr)
+        return 1
     if a.resume:
         earlier = [json.loads(line) for line in a.resume.read_text().splitlines() if line.strip()]
+        run = next((r for r in earlier if r.get("type") == "run"), None)
+        if run is None:
+            print(f"refusing to resume: {a.resume} has no run record, so its settings are unknown", file=sys.stderr)
+            return 1
+        differ = resume_mismatch(run["args"], {k: str(v) for k, v in vars(a).items()})
+        if differ:
+            print(f"refusing to resume: these settings differ from {a.resume}'s run: " + ", ".join(differ)
+                  + "\n  run with the same settings, or start a new run without --resume", file=sys.stderr)
+            return 1
+        if run.get("inputs") != runner.inputs:
+            print(f"refusing to resume: the suite, the runner, the strive binaries or STRIVE_ settings changed since "
+                  f"{a.resume}'s run (or it recorded none)\n  start a new run without --resume", file=sys.stderr)
+            return 1
         runner.kept = completed_sequences(earlier, trials)
         print(f"resuming: {len(runner.kept)} finished sequences kept from {a.resume}")
     runner.stage()
