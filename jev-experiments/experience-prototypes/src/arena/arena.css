@@ -1634,3 +1634,14 @@ th[aria-sort="descending"] .sort {
   margin: 0;
   padding-left: 18px;
 }
+.scatter-axes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  align-items: center;
+  margin-bottom: 8px;
+  font-size: 13px;
+}
+.scatter-axes small {
+  flex-basis: 100%;
+}

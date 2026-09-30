@@ -27,6 +27,26 @@ import { PALETTE } from "./palette";
 import type { Card, CardContestant, Estimate, MetricDef, RunSet } from "./schema";
 
 /**
+ * Jev's price and request size, for the cost measure. Price: TypeSafe's published rate,
+ * docs.typesafe.ai/models (read 29 Sep 2026): $0.042 per million input tokens, output free.
+ * Request size: measured through the gateway on 29 Sep 2026 with One box's 14 questions:
+ * 1,732 input tokens for a 1-character prefix, 1,782 for the longest phrase (187 characters),
+ * so about 1,732 plus 0.27 per character. The gateway billed exactly price times tokens.
+ */
+const JEV_USD_PER_TOKEN = 0.042 / 1_000_000;
+
+const tokensFor = (chars: number) => 1732 + Math.max(0, chars - 1) * (50 / 186);
+
+/** One request per keystroke: the prefixes of a phrase, 1 to its full length. */
+const jevCostPerPhrase = (text: string) => {
+  let usd = 0;
+
+  for (let n = 1; n <= text.length; n++) usd += tokensFor(n) * JEV_USD_PER_TOKEN;
+
+  return usd;
+};
+
+/**
  * Phrases scored on this card. The held-out split was scored once, after every contestant was
  * recorded and with nothing tuned; the card pools both and offers each as a slice.
  */
@@ -159,6 +179,14 @@ const METRICS: MetricDef[] = [
     better: "lower",
     axis: "speed",
     help: "Median time for one answer to all 14 questions, across every recorded prefix.",
+  },
+  {
+    id: "cost",
+    label: "API cost per 1,000 phrases",
+    unit: "usd",
+    better: "lower",
+    axis: "cost",
+    help: "What typing 1,000 of these phrases would cost at TypeSafe's list price ($0.042 per million input tokens, output free): one request per keystroke, at the request size measured on 29 Sep 2026. Local contestants have no per-call price; their hardware isn't counted.",
   },
   {
     id: "wrong",
@@ -365,7 +393,16 @@ export function oneBoxCard(
         if (Number.isFinite(v)) out[k] = est;
       }
 
-      const l = latency.get(id.replace(/@(cancel|latest)$/, ""));
+      // Both request policies send one request per keystroke; cancelling doesn't refund it.
+      const base = id.replace(/@(cancel|latest)$/, "");
+
+      out.cost = {
+        value: base === "jev" ? (idx.reduce((sum, i) => sum + jevCostPerPhrase(rows[i].p.text), 0) / (idx.length || 1)) * 1000 : 0,
+        n: idx.length,
+        method: "none",
+      };
+
+      const l = latency.get(base);
 
       if (l !== undefined && Number.isFinite(l)) out.latency = { value: l, n: 0, method: "none" };
 
