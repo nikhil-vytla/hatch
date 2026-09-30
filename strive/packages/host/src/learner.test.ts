@@ -10,6 +10,7 @@ import type {
   Artifact,
   Entry,
   Event,
+  MemoryItem,
   LearnerContext,
   Proposal,
   SessionInfo,
@@ -124,9 +125,11 @@ const failSeq = seqIn(workEntries, (e) => e.type === "effectFinished");
 const fixSeq = seqIn(workEntries, (e) => e.type === "userMessage" && e.text.startsWith("don't"));
 
 const PROPOSAL: Proposal = {
-  artifact: { kind: "memory" },
-  content:
-    "- Run the host tests with `bun test packages/host`: the root `bun test` also starts the desktop suite, which needs a display.\n",
+  change: {
+    kind: "memory",
+    op: "add",
+    text: "Run the host tests with `bun test packages/host`: the root `bun test` also starts the desktop suite, which needs a display.",
+  },
   summary: "memory: run the host tests on their own",
   rationale: "The root test run failed for want of a display, and the user asked for the host tests alone.",
   evidence: [
@@ -404,8 +407,7 @@ test("a refused proposal reaches the model as an error it can act on, and so doe
 
   const skill: Proposal = {
     ...PROPOSAL,
-    artifact: { kind: "skill", name: "host-tests" },
-    content: "Run bun test packages/host.",
+    change: { kind: "skill", name: "host-tests", content: "Run bun test packages/host." },
   };
 
   const others = Array.from({ length: MAX_PROPOSALS - 1 }, (_, i) => `p${i + 3}`);
@@ -414,7 +416,7 @@ test("a refused proposal reaches the model as an error it can act on, and so doe
     onProposal: (p) =>
       p.evidence.some((e) => e.session === ELSEWHERE)
         ? { refuse: `evidence names ${ELSEWHERE}, which isn't a session of this project` }
-        : p.artifact.kind === "skill"
+        : p.change.kind === "skill"
           ? { verdict: "fail", detail: "a skill must start with --- frontmatter naming it" }
           : { verdict: "pass", detail: "" },
     script: [
@@ -493,8 +495,15 @@ test("read_session reads only this project's work sessions", async () => {
   });
 });
 
-test("read_artifact shows memory and skills exactly as they are, and says what it can't show", async () => {
-  const memory = "- Use `bun test packages/host` for the host tests: the root run needs a display.";
+test("read_artifact shows memory bullet by bullet, skills exactly as they are, and says what it can't show", async () => {
+  const memory = "# Notes\n- Use `bun test packages/host` for the host tests. <!-- strive:#12 -->\n- Use bun.\n";
+
+  const items: MemoryItem[] = [
+    { kind: "line", text: "# Notes" },
+    { kind: "bullet", text: "Use `bun test packages/host` for the host tests.", source: 12, outsideReview: false },
+    { kind: "bullet", text: "Use bun.", outsideReview: false },
+  ];
+
   const release = "---\nname: release\ndescription: Cut a release.\n---\n1. `bun run build`\n2. Tag it.\n";
 
   const { model } = await learn({
@@ -510,7 +519,7 @@ test("read_artifact shows memory and skills exactly as they are, and says what i
         { name: "global", description: "Everywhere.", path: "/home/u/.strive/skills/global/SKILL.md" },
       ],
       learnedFiles: [
-        { artifact: { kind: "memory" }, text: memory },
+        { artifact: { kind: "memory" }, text: memory, items },
         { artifact: { kind: "skill", name: "release" }, text: release },
       ],
     },
@@ -530,7 +539,13 @@ test("read_artifact shows memory and skills exactly as they are, and says what i
 
   const r = toolResults(model.requests[1]);
   expect(r.get("a1")?.text).toBe(
-    `.strive/memory.md exactly as it is now (a proposal replaces all of it):\n\n${memory}`,
+    [
+      ".strive/memory.md as it is now, each bullet with its source (a proposal changes one bullet):",
+      "",
+      "# Notes",
+      "- [#12] Use `bun test packages/host` for the host tests.",
+      "- [hand-written] Use bun.",
+    ].join("\n"),
   );
   expect(r.get("a2")?.text).toBe(
     `${CWD}/.strive/skills/release/SKILL.md exactly as it is now (a proposal replaces all of it):\n\n${release}`,
@@ -738,7 +753,13 @@ test("the learner's system prompt states its rules, and gives the current memory
         { path: `${CWD}/.strive/memory.md`, text: "Reviewed memory: ...\n\n- A remembered bullet: because." },
       ],
       skills: [{ name: "release", description: "Cut a release.", path: `${CWD}/.strive/skills/release/SKILL.md` }],
-      learnedFiles: [{ artifact: { kind: "memory" }, text: "- A remembered bullet: because." }],
+      learnedFiles: [
+        {
+          artifact: { kind: "memory" },
+          text: "- A remembered bullet: because. <!-- strive:#7 -->",
+          items: [{ kind: "bullet", text: "A remembered bullet: because.", source: 7, outsideReview: false }],
+        },
+      ],
     }),
   );
 
@@ -749,7 +770,7 @@ test("the learner's system prompt states its rules, and gives the current memory
     return start < 0 ? "" : prompt.slice(start, end < 0 ? undefined : end);
   };
 
-  expect(section("Current memory (.strive/memory.md)")).toContain("- A remembered bullet: because.");
+  expect(section("Current memory (.strive/memory.md)")).toContain("- [#7] A remembered bullet: because.");
   // The file as it is, not the label sessions see it under: a proposal starts from this text.
   expect(section("Current memory (.strive/memory.md)")).not.toContain("Reviewed memory");
   expect(section("Project instructions")).toContain(`## ${CWD}/AGENTS.md\n\nUse bun, not npm.`);
@@ -769,10 +790,21 @@ test("the learner's system prompt states its rules, and gives the current memory
     ],
     ["What isn't", ["already say", "one-off", "generic advice", "wouldn't act on differently"]],
     ["How to work", [`at most ${MAX_PROPOSALS}`, "often none"]],
-    ["What you can change", ["concise bullets", "its why", "name", "description", "steps"]],
+    ["What you can change", ["concise bullets", "its why", "hand-written", "name", "description", "steps"]],
     [
       "Proposals",
-      ["whole file", "keep everything that's still true", "evidence", "seqs", "falsifiable", "could check"],
+      [
+        "changes one bullet",
+        "One bullet per proposal",
+        "Prefer changing an existing bullet over adding a near-duplicate",
+        '"#42"',
+        "replaces the whole SKILL.md",
+        "entire new content",
+        "evidence",
+        "seqs",
+        "falsifiable",
+        "could check",
+      ],
     ],
     ["Never", ["approvals", "sandbox", "strive's own settings"]],
     ["Ending the run", ["what you proposed", "proposed nothing, say so plainly and say why"]],
@@ -791,7 +823,9 @@ test("a project with no memory, instructions or skills says so", () => {
 });
 
 test("propose_change's parameters are the protocol's Proposal", () => {
-  expectTypeOf<Static<typeof ProposalParams>>().toEqualTypeOf<Proposal>();
+  // The same set of values both ways: the protocol spells a memory change as an intersection.
+  expectTypeOf<Static<typeof ProposalParams>>().toExtend<Proposal>();
+  expectTypeOf<Proposal>().toExtend<Static<typeof ProposalParams>>();
   expectTypeOf<Static<typeof ReadArtifactParams>["artifact"]>().toEqualTypeOf<Artifact>();
 
   const tool = { name: "propose_change", description: "", parameters: ProposalParams };
@@ -802,9 +836,26 @@ test("propose_change's parameters are the protocol's Proposal", () => {
     validateToolArguments(tool, { type: "toolCall", id: "x", name: "propose_change", arguments: args });
 
   expect(check(PROPOSAL)()).toEqual(PROPOSAL);
-  expect(check({ ...PROPOSAL, artifact: { kind: "skill", name: "release" } })).not.toThrow();
-  expect(check({ ...PROPOSAL, artifact: { kind: "file", path: "x" } })).toThrow();
-  expect(check({ ...PROPOSAL, artifact: { kind: "skill" } })).toThrow();
+
+  const valid: Record<string, string>[] = [
+    { kind: "skill", name: "release", content: "x" },
+    { kind: "memory", op: "add", text: "x", after: "#3" },
+    { kind: "memory", op: "change", bullet: "#3", text: "x" },
+    { kind: "memory", op: "remove", bullet: "Use bun." },
+  ];
+
+  for (const change of valid) expect(check({ ...PROPOSAL, change })).not.toThrow();
+
+  const invalid: Record<string, string>[] = [
+    { kind: "file", path: "x" },
+    { kind: "skill", content: "x" },
+    { kind: "memory", content: "the whole file" },
+    { kind: "memory", op: "rewrite", text: "x" },
+    { kind: "memory", op: "change", text: "x" },
+    { kind: "memory", op: "remove" },
+  ];
+
+  for (const change of invalid) expect(check({ ...PROPOSAL, change })).toThrow();
   const { prediction: _, ...unpredicted } = PROPOSAL;
   expect(check(unpredicted)).toThrow();
   expect(check({ ...PROPOSAL, evidence: [{ session: W1, seqs: ["one"], note: "" }] })).toThrow();

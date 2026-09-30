@@ -202,7 +202,9 @@ fn memory(workspace: &Path, at: &Anchors) -> Option<InstructionFile> {
     if !at.listed(&real) {
         return None;
     }
-    let mut text = read_regular(&real)?;
+    // A bullet's source comment is for review and the learner, not the
+    // agent: it costs tokens and says nothing a session acts on.
+    let mut text = strive_learning::memory::parse(&read_regular(&real)?).for_sessions();
     if text.len() > FILE_LIMIT {
         text = format!("{}\n[... cut at {} KiB]", truncate(&text, FILE_LIMIT), FILE_LIMIT / 1024);
     }

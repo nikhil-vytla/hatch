@@ -3,13 +3,10 @@
 // first line and serves until killed. No key, no network, no spend.
 //
 // - a work session (it has the bash tool): runs `./dev test`, then says done;
-// - the learner (it has propose_change): proposes one memory bullet citing
-//   the session it was asked to study, then reports;
+// - the learner (it has propose_change): adds one memory bullet citing the
+//   session it was asked to study (ADR-0022), then reports;
 // - the judge (it must call record_verdict): passes every criterion;
 // - anything else (a summary): a short text.
-//
-// The learner's proposal is the whole-file form of today's protocol; when
-// ADR-0022 makes memory proposals per bullet, only this script changes.
 import { FakeAnthropic, type ModelRequest, type ScriptedReply } from "../../packages/testkit/src/fake-anthropic";
 
 const tools = (req: ModelRequest): string[] => {
@@ -41,15 +38,6 @@ function text(v: unknown): string {
   return "";
 }
 
-/** The memory file as the learner's system prompt shows it; empty when there is none. */
-function currentMemory(system: string): string {
-  const m = system.match(/# Current memory \(\.strive\/memory\.md\)\n\n([\s\S]*?)\n\n# Project instructions/);
-
-  if (!m?.[1] || m[1].startsWith("There is none yet.")) return "";
-
-  return `${m[1].trim()}\n`;
-}
-
 function reply(req: ModelRequest): ScriptedReply {
   const names = tools(req);
   const answered = afterToolResult(req);
@@ -76,7 +64,6 @@ function reply(req: ModelRequest): ScriptedReply {
     if (answered) return { text: "Read the session; proposed one memory bullet." };
     const asked = text(req.messages.at(-1)?.content);
     const session = asked.match(/Study these work sessions: ([^,.\s]+)/)?.[1] ?? "unknown";
-    const memory = currentMemory(text(req.system));
 
     return {
       toolCalls: [
@@ -84,8 +71,11 @@ function reply(req: ModelRequest): ScriptedReply {
           id: `p-${session}`,
           name: "propose_change",
           input: {
-            artifact: { kind: "memory" },
-            content: `${memory}- Run the tests with \`./dev test\`: it also runs the doctests (seen in session ${session}).\n`,
+            change: {
+              kind: "memory",
+              op: "add",
+              text: `Run the tests with \`./dev test\`: it also runs the doctests (seen in session ${session}).`,
+            },
             summary: "Say how to run the tests",
             rationale: "The session ran the tests with ./dev test.",
             evidence: [{ session, seqs: [1, 2], note: "the session's start and its prompt" }],

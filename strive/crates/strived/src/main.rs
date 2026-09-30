@@ -139,6 +139,10 @@ enum Cmd {
         /// With an id: also why, the evidence, and each check in full.
         #[arg(long, requires = "id")]
         full: bool,
+        /// Show the memory as every session reads it now, each bullet with
+        /// the proposal that last wrote it.
+        #[arg(long, conflicts_with = "id")]
+        memory: bool,
     },
     /// Run the daemon in the foreground (normally started for you).
     #[command(hide = true)]
@@ -273,7 +277,10 @@ async fn run(cli: Cli) -> Result<ExitCode> {
         Some(Cmd::Learn { sessions }) => {
             review::learn(&mut launch::ensure(&home, "strive-learn").await?.0, &home.root, sessions).await
         }
-        Some(Cmd::Review { id, action, full }) => {
+        Some(Cmd::Review { memory: true, .. }) => {
+            review::memory(&mut launch::ensure(&home, "strive-review").await?.0).await
+        }
+        Some(Cmd::Review { id, action, full, memory: false }) => {
             let action = action.map(|a| match a.as_str() {
                 "accept" => review::Action::Accept,
                 "reject" => review::Action::Reject,

@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use ts_rs::TS;
 
 /// Bumped on any incompatible change. Clients and daemon must agree exactly.
-pub const PROTOCOL_VERSION: u32 = 2;
+pub const PROTOCOL_VERSION: u32 = 3;
 
 /// A request method: its wire name plus parameter and result types.
 pub trait Method {
@@ -557,6 +557,11 @@ pub struct LearnerContext {
 pub struct LearnedFile {
     pub artifact: Artifact,
     pub text: String,
+    /// Memory only: the file as bullets, each with its source, and its
+    /// other lines.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub items: Option<Vec<MemoryItem>>,
 }
 
 /// What a session is for.
@@ -640,16 +645,13 @@ pub struct LearningDismissParams {
     pub through: u64,
 }
 
-/// A change the learner proposes: a whole file's new text, why, the
-/// evidence, and what should happen if it's right.
+/// A change the learner proposes: one memory bullet or a whole skill, why,
+/// the evidence, and what should happen if it's right.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub struct Proposal {
-    pub artifact: Artifact,
-    /// The file's whole new text. Memory and skills are small; a whole file
-    /// can be checked, shown and undone exactly.
-    pub content: String,
+    pub change: Change,
     /// One line: what it changes, for a list.
     pub summary: String,
     /// Why, in the learner's words.
@@ -669,6 +671,101 @@ pub struct Proposal {
 pub enum Artifact {
     Memory,
     Skill { name: String },
+}
+
+/// What a proposal does (ADR-0022): one operation on one memory bullet, or
+/// a skill's whole new text.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase", tag = "kind")]
+#[ts(export)]
+pub enum Change {
+    Memory(MemoryOp),
+    /// A skill is one document with its own structure, so it changes whole.
+    Skill {
+        name: String,
+        content: String,
+    },
+}
+
+impl Change {
+    /// The file it changes.
+    pub fn artifact(&self) -> Artifact {
+        match self {
+            Change::Memory(_) => Artifact::Memory,
+            Change::Skill { name, .. } => Artifact::Skill { name: name.clone() },
+        }
+    }
+}
+
+/// One operation on `.strive/memory.md`. A bullet is named by its source
+/// (`#42`: the proposal that last wrote it) or, if a person wrote it, by
+/// its exact current text.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase", tag = "op")]
+#[ts(export)]
+pub enum MemoryOp {
+    /// A new bullet, after the bullet `after` names, or after the last one.
+    Add {
+        text: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[ts(optional)]
+        after: Option<String>,
+    },
+    /// New text for an existing bullet.
+    Change {
+        bullet: String,
+        text: String,
+    },
+    Remove {
+        bullet: String,
+    },
+}
+
+/// What an accepted memory proposal did to its bullet, as lines of the
+/// file (source comments and all, without the line ending).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase", tag = "op")]
+#[ts(export)]
+pub enum BulletEdit {
+    Added {
+        line: String,
+    },
+    Changed {
+        old: String,
+        new: String,
+    },
+    Removed {
+        line: String,
+        /// The last line before it that isn't blank, which a rollback puts
+        /// it back after; none: there was none.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[ts(optional)]
+        follows: Option<String>,
+        /// The blank lines between `follows` and it.
+        #[serde(default)]
+        gap: u32,
+    },
+}
+
+/// A line of `.strive/memory.md` as sessions read it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase", tag = "kind", rename_all_fields = "camelCase")]
+#[ts(export)]
+pub enum MemoryItem {
+    Bullet {
+        /// Without its marker or source comment.
+        text: String,
+        /// The proposal that last wrote it; none: a person wrote it.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[ts(optional)]
+        source: Option<u64>,
+        /// Set by `proposal/list` when it names a source but isn't what
+        /// that proposal, applied, left there.
+        #[serde(default)]
+        outside_review: bool,
+    },
+    /// Anything else, as it is.
+    Line { text: String },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
@@ -750,6 +847,10 @@ pub struct ProposalListResult {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub skipped: Option<SkippedRun>,
+    /// The project's memory as every session reads it now; empty if there
+    /// is none, or it can't be read as a learned file.
+    #[serde(default)]
+    pub memory: Vec<MemoryItem>,
 }
 
 /// A memory line naming a path in the project that isn't there.
@@ -836,10 +937,15 @@ pub struct ProposalState {
     pub made_at_ms: u64,
     pub proposal: Proposal,
     /// The file as the learner was shown it, in the content store (none: it
-    /// didn't exist). Its diff is from this to the new content.
+    /// didn't exist). A skill's diff is from this to its new content.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub before: Option<Digest>,
+    /// A memory proposal's one-bullet diff: as applied, or else as it
+    /// applies to the file the learner saw. None if it doesn't apply there.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub bullet: Option<BulletEdit>,
     pub status: ProposalStatus,
     pub gates: Vec<GateOutcome>,
     /// The trigger of the automatic run that made it; none: a person asked.
@@ -851,15 +957,16 @@ pub struct ProposalState {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub offered: Option<Vec<LearnSignal>>,
-    /// Set on an applied proposal once a later accepted proposal wrote the
-    /// same file over it: that proposal's id. Its content is gone from the
-    /// file, so it can't be rolled back.
+    /// Set on an applied proposal once a later accepted one changed what it
+    /// wrote (a skill written over, its memory bullet changed or removed):
+    /// that proposal's id. What it wrote is gone, so it can't be rolled back.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub replaced_by: Option<u64>,
-    /// Whether a rollback would go through now: it's applied and its file
-    /// is still what it wrote. Only `proposal/list` looks at the file; the
-    /// fold alone leaves it false.
+    /// Whether a rollback would go through now: it's applied, and what it
+    /// wrote (its skill file, its memory bullet) is still as it wrote it or
+    /// already undone. Only `proposal/list` looks at the file; the fold
+    /// alone leaves it false.
     #[serde(default)]
     pub can_roll_back: bool,
 }
@@ -1235,15 +1342,20 @@ pub enum Event {
         by: String,
     },
     /// An accepted proposal was written: the file as it was (none if it
-    /// didn't exist) and as it is now.
+    /// didn't exist) and as it is now, and for memory what it did to its
+    /// bullet.
     ProposalApplied {
         proposal: u64,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         #[ts(optional)]
         before: Option<Digest>,
         after: Digest,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[ts(optional)]
+        bullet: Option<BulletEdit>,
     },
-    /// An applied proposal was undone: the file is back as it was.
+    /// An applied proposal was undone: a skill's file is back as it was, a
+    /// memory bullet as it was.
     ProposalRolledBack {
         proposal: u64,
         by: String,

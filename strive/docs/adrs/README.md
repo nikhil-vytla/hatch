@@ -10,7 +10,7 @@ still hold.
 | --- | --- | --- |
 | [0020](0020-learning-triggers.md) | Learning triggers, a cheap pre-filter, and the `learning` setting | Accepted; idle and every-N-turns triggers implemented; amended: no `gated`, `off` by default |
 | [0021](0021-eval.md) | `strive eval`: whether learning helps, frozen vs learning on a paired task sequence | Accepted, not built |
-| [0022](0022-bullet-proposals.md) | Memory proposals change one bullet, each with a source; per-bullet accept and rollback | Accepted, not built |
+| [0022](0022-bullet-proposals.md) | Memory proposals change one bullet, each with a source; per-bullet accept and rollback | Accepted, built |
 | [0019](0019-predictions-checked.md) | Predictions are checked by a watch the daemon evaluates | Superseded (deleted 2026-09-28) |
 | [0018](0018-replay-gate.md) | The replay gate runs past tasks again in scratch copies | Superseded (deleted 2026-09-28) |
 | [0017](0017-judge-gate.md) | The judge gate is the daemon's own model call | Accepted; M9 implemented; amended: the judge advises |

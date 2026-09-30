@@ -195,7 +195,10 @@ fn a_cancelled_command_is_stopped() {
     let started = std::time::Instant::now();
     w.env.rpc().ok("effect/cancel", &json!({"id": w.id, "callId": "call_7"}));
     let r = running.join().unwrap();
-    assert!(started.elapsed() < Duration::from_secs(2), "stopped after {:?}", started.elapsed());
+    // Well under the command's own 30s: stopped, not left to finish. The
+    // stop scans the process tree with `ps` until it's frozen, which under a
+    // full parallel test run took up to 2.4s; alone it's well under 1s.
+    assert!(started.elapsed() < Duration::from_secs(5), "stopped after {:?}", started.elapsed());
     assert_eq!(r["text"], "the command was interrupted and stopped");
     fs::write(w.path("go"), "").unwrap();
     std::thread::sleep(Duration::from_millis(600));

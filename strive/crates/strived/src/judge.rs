@@ -135,7 +135,7 @@ pub fn plan(state: &State, cwd: &str, made: &Made, learning: &[Entry]) -> Plan {
             })
         })
         .collect();
-    let path = strive_learning::relative_path(&proposal.artifact).unwrap_or_default();
+    let path = strive_learning::relative_path(&proposal.change.artifact()).unwrap_or_default();
     let current = before.and_then(|d| blob(&d));
     let learned = shown_files(learning)
         .into_iter()
@@ -143,9 +143,9 @@ pub fn plan(state: &State, cwd: &str, made: &Made, learning: &[Entry]) -> Plan {
         .filter_map(|(path, d)| Some(FileText { path, text: strive_learning::render::cut(&blob(&d)?, FILE_CHARS) }))
         .collect();
     let folded = strive_learning::fold(learning);
-    let rolled_back = strive_learning::rolled_back(&folded, &proposal.artifact)
+    let rolled_back = strive_learning::rolled_back(&folded, &proposal.change.artifact())
         .into_iter()
-        .map(|s| RolledBack { proposal: s.id, content: s.proposal.content.clone() })
+        .map(|s| RolledBack { proposal: s.id, change: s.proposal.change.clone() })
         .collect();
     let material = Material { proposal, current: current.as_deref(), learned, cited, held_out, rolled_back };
     let body = strive_learning::judge::request(model, &material).to_string().into_bytes();

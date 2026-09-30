@@ -6,7 +6,15 @@
 import { join } from "node:path";
 import { type Static, Type } from "@earendil-works/pi-ai";
 import type { AgentTool } from "@earendil-works/pi-agent-core";
-import { type AgentConfig, type Artifact, describeError, type Entry, type StriveClient } from "@strive/protocol";
+import {
+  type AgentConfig,
+  type Artifact,
+  describeError,
+  type Entry,
+  type LearnedFile,
+  type MemoryItem,
+  type StriveClient,
+} from "@strive/protocol";
 import type { AgentMode } from "./host";
 import { renderSession, renderSessions } from "./journal-view";
 import { NOT_RECORDED, notKept, PromptReader, proposalResult, type StaticGate } from "./learning-records";
@@ -31,8 +39,9 @@ strive is a coding agent. Its work sessions in this project are journaled: every
 
 # What you can change
 
-- Memory: \`${MEMORY}\`, loaded into every session after the project's AGENTS.md or CLAUDE.md. It is a list of concise bullets. Each bullet states one thing and its why, specific enough to act on:
+- Memory: \`${MEMORY}\`, loaded into every session after the project's AGENTS.md or CLAUDE.md. It is a list of concise bullets. Each bullet states one thing and its why, on one line, specific enough to act on:
   - Run the host tests with \`bun test packages/host\`, not \`bun test\`: the root run also starts the desktop suite, which needs a display.
+  Each bullet has a source: the proposal that last wrote it (#42), or hand-written, by a person. Below, each is shown as \`[#42]\` or \`[hand-written]\`.
 - Skills: \`.strive/skills/<name>/SKILL.md\`, for a multi-step procedure that recurs. A SKILL.md starts with frontmatter naming it and saying when to use it, then gives the steps:
   ---
   name: <the directory name: 1 to 40 of a-z, 0-9 and ->
@@ -66,8 +75,13 @@ What cost a session time and will come up again:
 
 # Proposals
 
-- A proposal replaces a whole file. Start from the file's current text (below, or read_artifact) and give the entire new content: keep everything that's still true, change or remove only what the evidence shows is wrong or stale, and add what you learned. Never drop text you haven't seen: if read_artifact can't show a skill's full text, don't propose a change to that skill.
-- Memory is one file, so put all of a run's memory changes in one memory proposal.
+- A memory proposal changes one bullet, with one operation:
+  - add: a new bullet's text, and optionally \`after\`, the bullet it follows (it goes after the last bullet otherwise);
+  - change: \`bullet\`, the bullet to rewrite, and its new text;
+  - remove: \`bullet\`, the bullet to delete.
+  Name a bullet by its source (\`"#42"\`), or a hand-written one by its exact text. Give the text without the leading \`- \`, on one line, at most 500 characters. One bullet per proposal: two lessons are two proposals.
+- Prefer changing an existing bullet over adding a near-duplicate: if a bullet already covers the lesson but is wrong, stale or incomplete, change it. Remove a bullet only when the evidence shows it's wrong or obsolete.
+- A skill proposal replaces the whole SKILL.md. Start from the skill's current text (read_artifact) and give the entire new content. Never drop text you haven't seen: if read_artifact can't show a skill's full text, don't propose a change to that skill.
 - summary: one line saying what changes, for a list.
 - rationale: what went wrong, how often, and why this text prevents it.
 - evidence: the sessions and entry seqs you rely on, each with a note on what those entries show ("#12 \`bun test\` fails: no display; #15 the user says to run packages/host only"). Cite only this project's sessions, and only entries you read. Every cited session needs at least one entry, and at most 5 sessions may be cited: pick those that show the lesson best.
@@ -84,28 +98,47 @@ What cost a session time and will come up again:
 
 End with a short plain report: which sessions you read (and how far), what you proposed and why, and what you considered and dropped. When you proposed nothing, say so plainly and say why: nothing recurred, it's already covered, or the evidence was too thin.`;
 
-/** A memory or skill file's text exactly as it is, if the daemon gave it to the learner. */
-function learned(config: AgentConfig, artifact: Artifact): string | undefined {
+/** A memory or skill file as the daemon gave it to the learner, if it did. */
+function learnedFile(config: AgentConfig, artifact: Artifact): LearnedFile | undefined {
   return config.learnedFiles?.find(
     (f) =>
       f.artifact.kind === artifact.kind &&
       (f.artifact.kind === "memory" || (artifact.kind === "skill" && f.artifact.name === artifact.name)),
-  )?.text;
+  );
+}
+
+/** Memory as its bullets, each with its source, and its other lines as they are. */
+export function memoryItems(items: MemoryItem[]): string {
+  return items
+    .map((i) =>
+      i.kind === "line" ? i.text : `- [${i.source === undefined ? "hand-written" : `#${i.source}`}] ${i.text}`,
+    )
+    .join("\n")
+    .trim();
+}
+
+/** The memory as the learner is shown it; undefined if there is none. */
+function memoryShown(config: AgentConfig): string | undefined {
+  const file = learnedFile(config, { kind: "memory" });
+
+  if (file === undefined) return undefined;
+
+  return memoryItems(file.items ?? []);
 }
 
 /** The learner's system prompt: its rules, then the project's current memory, instructions and skills. */
 export function learnerPrompt(config: AgentConfig): string {
   const memoryPath = join(config.cwd, MEMORY);
-  // The memory as it is on disk (what a proposal replaces), not as sessions
-  // load it: they see it under a label that isn't part of the file.
-  const memory = learned(config, { kind: "memory" });
+  // The memory as it is on disk, bullet by bullet, not as sessions load it:
+  // they see it under a label that isn't part of the file.
+  const memory = memoryShown(config);
   const others = config.instructions.filter((f) => f.path !== memoryPath);
   const parts = [RULES.replace("{cwd}", config.cwd)];
 
   parts.push(
     memory === undefined
       ? `# Current memory (${MEMORY})\n\nThere is none yet. A memory proposal creates it.`
-      : `# Current memory (${MEMORY})\n\n${memory.trim()}`,
+      : `# Current memory (${MEMORY})\n\n${memory}`,
   );
 
   parts.push(
@@ -139,10 +172,34 @@ function artifactSchema() {
   ]);
 }
 
+const BULLET = 'A bullet: its source ("#42"), or a hand-written bullet\'s exact text';
+
+function changeSchema() {
+  const memory = Type.Literal("memory");
+  const text = Type.String({ description: "The bullet's text: one line, without the leading - " });
+
+  return Type.Union([
+    Type.Object({
+      kind: memory,
+      op: Type.Literal("add"),
+      text,
+      after: Type.Optional(
+        Type.String({ description: `The bullet it goes after; the last one if left out. ${BULLET}` }),
+      ),
+    }),
+    Type.Object({ kind: memory, op: Type.Literal("change"), bullet: Type.String({ description: BULLET }), text }),
+    Type.Object({ kind: memory, op: Type.Literal("remove"), bullet: Type.String({ description: BULLET }) }),
+    Type.Object({
+      kind: Type.Literal("skill"),
+      name: Type.String({ description: "The skill's directory under .strive/skills: 1 to 40 of a-z, 0-9 and -" }),
+      content: Type.String({ description: "The SKILL.md's whole new text, keeping what is still true" }),
+    }),
+  ]);
+}
+
 /** propose_change's parameters: the protocol's `Proposal`, field for field. */
 export const ProposalParams = Type.Object({
-  artifact: artifactSchema(),
-  content: Type.String({ description: "The file's whole new text, keeping what is still true" }),
+  change: changeSchema(),
   summary: Type.String({ description: "One line: what it changes" }),
   rationale: Type.String({ description: "What went wrong, how often, and why this text prevents it" }),
   evidence: Type.Array(
@@ -298,7 +355,7 @@ class Learner {
       name: "propose_change",
       label: "propose_change",
       description: [
-        "Propose a change to memory or a skill: the file's whole new content, a one-line summary, the rationale, the evidence (sessions, entry seqs, what they show) and a falsifiable prediction.",
+        "Propose a change: one memory bullet added, changed or removed, or a skill's whole new content; a one-line summary, the rationale, the evidence (sessions, entry seqs, what they show) and a falsifiable prediction.",
         "The daemon records and checks it; nothing changes until a person accepts it.",
         `At most ${MAX_PROPOSALS} a run. The result is the proposal's id, or why it was refused.`,
       ].join(" "),
@@ -337,12 +394,15 @@ class Learner {
   }
 
   private artifact(artifact: Static<ReturnType<typeof artifactSchema>>): string {
-    const text = learned(this.config, artifact);
+    if (artifact.kind === "memory") {
+      const memory = memoryShown(this.config);
 
-    if (artifact.kind === "memory")
-      return text === undefined
+      return memory === undefined
         ? `There is no ${MEMORY} yet. A memory proposal creates it.`
-        : `${MEMORY} exactly as it is now (a proposal replaces all of it):\n\n${text}`;
+        : `${MEMORY} as it is now, each bullet with its source (a proposal changes one bullet):\n\n${memory}`;
+    }
+
+    const text = learnedFile(this.config, artifact)?.text;
 
     const target = join(this.config.cwd, ".strive/skills", artifact.name, "SKILL.md");
 

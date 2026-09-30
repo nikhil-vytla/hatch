@@ -5,7 +5,7 @@
 import { afterEach, expect, setDefaultTimeout, test } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { type Entry, type Event, StriveClient } from "@strive/protocol";
+import { type Change, type Entry, type Event, type Proposal, StriveClient } from "@strive/protocol";
 import { FakeAnthropic, type ScriptedReply, startDaemon, type TestDaemon } from "@strive/testkit";
 
 const HOST = `bun ${resolve(import.meta.dir, "main.ts")}`;
@@ -50,7 +50,12 @@ const entries = async (c: StriveClient, id: string): Promise<Entry[]> =>
 
 const ended = (n: number) => (es: Entry[]) => es.filter((e) => e.event.type === "turnEnded").length >= n;
 
-const MEMORY = "- Run the tests with `bun test src`: the root run also needs a display.\n";
+const BULLET = "Run the tests with `bun test src`: the root run also needs a display.";
+
+/** The memory line proposal `id` writes for `text`. */
+const line = (text: string, id: number) => `- ${text} <!-- strive:#${id} -->`;
+
+const add = (text: string): Change => ({ kind: "memory", op: "add", text });
 
 type TextBlock = { type: "text"; text: string };
 
@@ -103,9 +108,8 @@ test("a learner's proposal, once a person accepts it, is what the next session's
   const prompt = worked.find((e) => e.event.type === "userMessage");
   expect(prompt).toBeDefined();
 
-  const proposal = {
-    artifact: { kind: "memory" },
-    content: MEMORY,
+  const proposal: Proposal = {
+    change: add(BULLET),
     summary: "Remember how to run the tests",
     rationale: "The session had to be told how to run the tests.",
     evidence: [{ session: work, seqs: [prompt?.seq ?? 0], note: "the user asks for the tests" }],
@@ -140,18 +144,20 @@ test("a learner's proposal, once a person accepts it, is what the next session's
   expect(listed.proposals.map((p) => [p.id, p.status])).toEqual([[made?.seq ?? -1, "ready"]]);
   expect(existsSync(join(cwd, ".strive/memory.md"))).toBe(false);
   await c.request("proposal/decide", { cwd, proposal: made?.seq ?? -1, decision: "accept" });
-  expect(readFileSync(join(cwd, ".strive/memory.md"), "utf8")).toBe(MEMORY);
+  expect(readFileSync(join(cwd, ".strive/memory.md"), "utf8")).toBe(`${line(BULLET, made?.seq ?? -1)}\n`);
 
-  // The next work session's model is told.
+  // The next work session's model is told, without the bullet's source.
   script.push({ text: "ok" });
   const next = (await c.request("session/create", { cwd })).id;
   await c.request("session/prompt", { id: next, text: "again" });
   await until("the next work turn", () => entries(c, next), ended(1));
-  expect(JSON.stringify(fake.requests.at(-1)?.system)).toContain("bun test src");
+  const told = JSON.stringify(fake.requests.at(-1)?.system);
+  expect(told).toContain("bun test src");
+  expect(told).not.toContain("strive:#");
 
   // And a person can take it back.
   await c.request("proposal/rollback", { cwd, proposal: made?.seq ?? -1 });
-  expect(existsSync(join(cwd, ".strive/memory.md"))).toBe(false);
+  expect(readFileSync(join(cwd, ".strive/memory.md"), "utf8")).toBe("");
   const events: Event[] = (await entries(c, learning)).map((e) => e.event);
   expect(events.map((e) => e.type)).toContain("proposalRolledBack");
 });
@@ -175,14 +181,13 @@ type Project = Awaited<ReturnType<typeof project>>;
 
 /**
  * Learning run number `run`, in the host that ran the ones before it, which
- * proposes `content` as the whole memory: its proposalMade entry, once checked.
+ * proposes `change`: its proposalMade entry, once checked.
  */
-async function learnOnce(p: Project, script: ScriptedReply[], run: number, content: string): Promise<Entry> {
+async function learnOnce(p: Project, script: ScriptedReply[], run: number, change: Change): Promise<Entry> {
   const callId = `p${run}`;
 
-  const proposal = {
-    artifact: { kind: "memory" },
-    content,
+  const proposal: Proposal = {
+    change,
     summary: "Remember how to run the tests",
     rationale: "The session had to be told how to run the tests.",
     evidence: [{ session: p.work, seqs: [p.seq], note: "the user asks for the tests" }],
@@ -229,30 +234,34 @@ async function memoriesShown(p: Project): Promise<(string | undefined)[]> {
   );
 }
 
-const SECOND = `${MEMORY}- Build with \`bun run build\` before the e2e tests: they drive the built app.\n`;
+const BUILD = "Build with `bun run build` before the e2e tests: they drive the built app.";
 
-test("a second learning run in the same host proposes over the file the first run's accept wrote", async () => {
+test("a second learning run in the same host changes the bullet the first run's accept wrote", async () => {
   const script: ScriptedReply[] = [{ text: "Done: the tests pass." }];
   const p = await project(script);
   const memory = join(p.cwd, ".strive/memory.md");
 
-  const first = await learnOnce(p, script, 1, MEMORY);
+  const first = await learnOnce(p, script, 1, add(BULLET));
   expect(await status(p, first.seq)).toBe("ready");
   await p.c.request("proposal/decide", { cwd: p.cwd, proposal: first.seq, decision: "accept" });
-  expect(readFileSync(memory, "utf8")).toBe(MEMORY);
+  const written = `${line(BULLET, first.seq)}\n`;
+  expect(readFileSync(memory, "utf8")).toBe(written);
 
-  // No restart between the runs: one host runs both.
-  const second = await learnOnce(p, script, 2, SECOND);
-  expect(JSON.stringify(fake?.requests.at(-1)?.system)).toContain("bun test src");
-  expect(await before(p, second)).toBe(MEMORY);
+  // No restart between the runs: one host runs both. The learner is shown
+  // the bullet with its source, and names it by that.
+  const second = await learnOnce(p, script, 2, { kind: "memory", op: "change", bullet: `#${first.seq}`, text: BUILD });
+  expect(JSON.stringify(fake?.requests.at(-1)?.system)).toContain(`- [#${first.seq}] Run the tests with`);
+  expect(await before(p, second)).toBe(written);
   expect(await status(p, second.seq)).toBe("ready");
   await p.c.request("proposal/decide", { cwd: p.cwd, proposal: second.seq, decision: "accept" });
-  expect(readFileSync(memory, "utf8")).toBe(SECOND);
+  expect(readFileSync(memory, "utf8")).toBe(`${line(BUILD, second.seq)}\n`);
   expect(await status(p, second.seq)).toBe("applied");
+  const listed = await p.c.request("proposal/list", { cwd: p.cwd });
+  expect(listed.proposals.find((q) => q.id === first.seq)?.replacedBy).toBe(second.seq);
 
   // The journal says what each run was shown: no memory, then the first accept's.
   const shown = await memoriesShown(p);
-  expect(shown.at(-1)).toBe(MEMORY);
+  expect(shown.at(-1)).toBe(written);
   expect(shown.slice(0, -1)).toContain(undefined);
 });
 
@@ -261,17 +270,18 @@ test("a learning run sees a hand edit made after the host's previous run", async
   const p = await project(script);
   const memory = join(p.cwd, ".strive/memory.md");
 
-  const first = await learnOnce(p, script, 1, MEMORY);
+  const first = await learnOnce(p, script, 1, add(BULLET));
   await p.c.request("proposal/decide", { cwd: p.cwd, proposal: first.seq, decision: "reject" });
 
-  const edited = "- Deploy with `make ship`, never by hand: it tags the release.\n";
+  const deploy = "Deploy with `make ship`, never by hand: it tags the release.";
+  const edited = `- ${deploy}\n`;
   mkdirSync(join(p.cwd, ".strive"), { recursive: true });
   writeFileSync(memory, edited);
 
-  const second = await learnOnce(p, script, 2, `${edited}${MEMORY}`);
-  expect(JSON.stringify(fake?.requests.at(-1)?.system)).toContain("make ship");
+  const second = await learnOnce(p, script, 2, add(BULLET));
+  expect(JSON.stringify(fake?.requests.at(-1)?.system)).toContain(`- [hand-written] ${deploy}`);
   expect(await before(p, second)).toBe(edited);
   expect(await status(p, second.seq)).toBe("ready");
   await p.c.request("proposal/decide", { cwd: p.cwd, proposal: second.seq, decision: "accept" });
-  expect(readFileSync(memory, "utf8")).toBe(`${edited}${MEMORY}`);
+  expect(readFileSync(memory, "utf8")).toBe(`${edited}${line(BULLET, second.seq)}\n`);
 });
