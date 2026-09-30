@@ -60,9 +60,31 @@ const docs = [
     text: "The chairs are blue. The bookshelf is beside the window.",
   },
 ];
+/**
+ * The verifier recorded each scenario four times; list each scenario once, with how often the
+ * repeats agreed, instead of twenty near-identical entries.
+ */
+function byScenario(rows: any[]) {
+  const groups = new Map<string, any[]>();
+
+  for (const r of rows) {
+    const key = JSON.stringify(r.state ?? r.id);
+
+    groups.set(key, [...(groups.get(key) ?? []), r]);
+  }
+
+  return [...groups.values()].map((g) => ({
+    row: g[0],
+    asked: g.length,
+    same: g.filter((r) => r.prediction === g[0].prediction).length,
+  }));
+}
+
 export function AgentExperiment({ id, result }: { id: string; result: any }) {
   const all = result.rows ?? [],
-    rows = all.filter((r: any) => !r.error),
+    answered = all.filter((r: any) => !r.error),
+    scenarios = id === "verify" ? byScenario(answered) : null,
+    rows = scenarios ? scenarios.map((g) => g.row) : answered,
     [index, setIndex] = useState(0),
     [row, setRow] = useState<any>(rows[0]),
     [input, setInput] = useState(
@@ -453,6 +475,7 @@ export function AgentExperiment({ id, result }: { id: string; result: any }) {
                     r.goal ??
                     r.state?.task ??
                     "Example " + (i + 1)}
+                  {scenarios ? ` · asked ${scenarios[i].asked}×, ${scenarios[i].same} of ${scenarios[i].asked} the same` : ""}
                 </option>
               ))}
             </select>
