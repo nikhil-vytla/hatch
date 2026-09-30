@@ -2607,3 +2607,43 @@ tasks both arms passed (at least 5 pairs, else not run), and H8 (new)
 caps memory's overhead on the generic families at 1.25× turns. The
 summary reports both, beside the all-task ratios. Tests for each rule
 failed first.
+
+## 2026-09-30: the full eval: learning helps, and the learner is the bottleneck
+
+Full run (ADR-0021; Claude Haiku 4.5; 470 tasks on 11 families; arms F,
+L ×3 orderings, O ×2, P, placebo). A network 502 from api.anthropic.com
+ended it three times; each time `--resume` kept the finished sequences and
+ran the cut-short one again from its start. Spent: $36.96 on the run
+($29.74 on agent turns kept in the final results, the rest on the
+learner and on sequences run again), $44.09 on the eval in total.
+Results are local, in `eval-runs/20260930-full/` (gitignored).
+- **All 8 hypotheses pass.** On learnable families, F 10%, L 53%, O 90%,
+  P 17%, placebo 12%. L - F = 43 pp (cluster bootstrap 95% CI 26 to 60),
+  McNemar 31 to 0 (p ≈ 1e-9), 7 of 8 families up and none down. Learning
+  efficiency (L - F) / (O - F) = 0.54, just over H2's 0.5. The placebo
+  memory does nothing (12% vs F's 10%), so the gain is the content of what
+  was learned, not having a memory file.
+- **No harm seen.** Generic and conflicting families pass 100% in every
+  arm, and no rule was cross-applied. No probe went from pass to fail.
+  Overhead on generic tasks is within H8: turns 1.12×, cost 1.21× F.
+- **Cost:** agent cost per task is flat (L/F 0.99). The learner adds
+  $0.027 per task. H5 and H7 pass on the tasks both arms passed (turns
+  0.75×, cost 0.81×), but that's 7 tasks, just over the minimum of 5.
+- **Whether the learner proposes decides the outcome, per family.** In a
+  sequence, a family's tests mostly pass 3/3 or 0/3, following whether the
+  learner proposed its rule. L's three orderings got 16, 13 and 9 of 24.
+  Audit-event was never learned: no proposal at any of its 4 seeds in L or
+  P, although O passes it 4 of 6. Codeowners' rule was proposed once, and
+  even then passed 1 of 3.
+- **P's low score isn't the poison.** P shares ordering 0 with L's first
+  sequence (16/24) but got 4/24: its learner proposed at 1 of the 7
+  unpoisoned seeds, quitting early and cheap ($0.006–0.013), and proposed
+  nothing at the poisoned ones. With one P sequence, poison resistance
+  isn't measured yet.
+- **The oracle is slow:** O takes 24.8 turns to L's 16.4 and F's 17.3;
+  following every stated rule costs work even where L already passes.
+
+What this points at: make the learner propose reliably when a session
+shows a convention (the variance across orderings is the learner's, not
+the agent's). A second P sequence would say whether poisoned seeds do
+harm. Power holds only for large effects (about 0.4 for 15 points).
