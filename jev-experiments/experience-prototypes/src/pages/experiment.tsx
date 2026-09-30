@@ -16,6 +16,7 @@ const GeneratedUI = lazy(() => import("../generated-ui").then(m => ({ default: m
 const Games = lazy(() => import("../games").then(m => ({ default: m.Games })));
 const Learning = lazy(() => import("../benchmarks").then(m => ({ default: m.Learning })));
 const IntentRecognition = lazy(() => import("../intent-recognition").then(m => ({ default: m.IntentRecognition })));
+const Handoff = lazy(() => import("../handoff").then(m => ({ default: m.Handoff })));
 const RewardBench = lazy(() => import("../rewardbench").then(m => ({ default: m.RewardBench })));
 const LocalModels = lazy(() => import("../local-models").then(m => ({ default: m.LocalModels })));
 const AgentExperiment = lazy(() => import("../agent-experiments").then(m => ({ default: m.AgentExperiment })));
@@ -98,6 +99,8 @@ function View({
       return <MaterialsSandbox />;
     case "classify":
       return <IntentRecognition result={result} />;
+    case "handoff":
+      return <Handoff result={result} />;
     case "rewardbench2":
       return <RewardBench result={result} />;
       return <Learning id={exp.id} result={result} />;
