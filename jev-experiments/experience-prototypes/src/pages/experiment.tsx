@@ -267,8 +267,13 @@ export function ExperimentPage({ id }: { id: string }) {
       )}
       {record?.manifest && exp.id !== "local-models" && (
         <p className="record-footer">
-          Recorded {String(record.manifest.created ?? "").slice(0, 10)} ·{" "}
-          {record.manifest.experiment ?? exp.id} ·{" "}
+          {/* Older records name their date prepared_at; say only what's there. */}
+          {(() => {
+            const day = String(record.manifest?.created ?? record.manifest?.prepared_at ?? "").slice(0, 10);
+
+            return day ? `Recorded ${day} · ` : "Recorded run · ";
+          })()}
+          {record.manifest?.experiment ?? exp.id} ·{" "}
           <a
             href={`/data/${id === "ui" ? "composed-ui" : exp.data}.json`}
             download

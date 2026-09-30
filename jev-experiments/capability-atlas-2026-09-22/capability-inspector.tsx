@@ -26,12 +26,21 @@ export function CapabilityInspector({ id }: { id: string }) {
     <details className="jev-role" key={id}>
       <summary>
         <span>Jev's role</span>
-        {status === "matches" && <span className="jev-role-preview">{record.questions[0]?.primitives}</span>}
+        {status !== "checking" && <span className="jev-role-preview">{record.questions[0]?.primitives}</span>}
       </summary>
       <div className="jev-role-body">
-        {status !== "matches" ? (
-          <p>{status === "checking" ? "Checking the implementation snapshot…" : status === "differs" ? "This build differs from the September 22 audit." : "The implementation snapshot is unavailable for this build."}</p>
+        {status === "checking" ? (
+          <p>Checking the implementation snapshot…</p>
         ) : <>
+        {/* The audit binds shared files as well as the scene's own, so most later edits anywhere
+            mark every scene as changed. Show the audited description, dated, rather than nothing. */}
+        {status !== "matches" && (
+          <p className="jev-role-stale">
+            {status === "differs"
+              ? "Described as audited on September 22, 2026. The code has changed since, so some details may be out of date."
+              : "Described as audited on September 22, 2026. This build couldn't confirm it still matches."}
+          </p>
+        )}
         <p className="jev-role-modes">{record.execution_modes.join(" · ")}</p>
         <div className="jev-role-flow">
           <section>
