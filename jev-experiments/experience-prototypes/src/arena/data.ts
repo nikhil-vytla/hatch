@@ -126,6 +126,8 @@ export function formatNumber(metric: Pick<MetricDef, "unit">, value?: number, me
       return value >= 1000 ? `${(value / 1000).toFixed(2)} s` : `${Math.round(value)} ms`;
     case "s":
       return `${value.toFixed(1)} s`;
+    case "usd":
+      return value === 0 ? "$0" : `$${value.toFixed(value < 1 ? 3 : 2)}`;
     case "lines":
     case "pieces":
     case "count":
@@ -159,6 +161,8 @@ export function tickFormat(metric: Pick<MetricDef, "unit">, ticks: number[]) {
   const digits = [0, 1, 2, 3, 4].find((d) =>
     scaled.every((v) => Math.abs(Number(v.toFixed(d)) - v) < 1e-9),
   );
+
+  if (metric.unit === "usd") return (t: number) => `$${t.toFixed(digits ?? 2)}`;
 
   return (t: number) => `${(t * scale).toFixed(digits ?? 4)}${suffix}`;
 }
