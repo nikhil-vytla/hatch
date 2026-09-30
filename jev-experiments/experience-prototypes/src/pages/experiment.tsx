@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { ArrowLeft, FlaskConical } from "lucide-react";
-import { experiments, lookup, type Experiment } from "../catalog";
+import { experiments, lookup, retiredScene, type Experiment } from "../catalog";
 import { CapabilityInspector } from "../../../capability-atlas-2026-09-22/capability-inspector";
 import { Pane, Notice } from "../shared";
 import { Provenance } from "../provenance";
@@ -14,20 +14,12 @@ const SemanticTable = lazy(() => import("../new-experiments").then(m => ({ defau
 const UndoExperiment = lazy(() => import("../new-experiments").then(m => ({ default: m.UndoExperiment })));
 const Changes = lazy(() => import("../new-experiments").then(m => ({ default: m.Changes })));
 const GeneratedUI = lazy(() => import("../generated-ui").then(m => ({ default: m.GeneratedUI })));
-const Worlds = lazy(() => import("../creative").then(m => ({ default: m.Worlds })));
-const Pixels = lazy(() => import("../creative").then(m => ({ default: m.Pixels })));
 const Games = lazy(() => import("../games").then(m => ({ default: m.Games })));
 const Benchmarks = lazy(() => import("../benchmarks").then(m => ({ default: m.Benchmarks })));
 const Learning = lazy(() => import("../benchmarks").then(m => ({ default: m.Learning })));
 const RewardBench = lazy(() => import("../rewardbench").then(m => ({ default: m.RewardBench })));
 const LocalModels = lazy(() => import("../local-models").then(m => ({ default: m.LocalModels })));
-const ResearchMap = lazy(() => import("../local-models").then(m => ({ default: m.ResearchMap })));
 const AgentExperiment = lazy(() => import("../agent-experiments").then(m => ({ default: m.AgentExperiment })));
-const Logos = lazy(() => import("../misc").then(m => ({ default: m.Logos })));
-const Decisions = lazy(() => import("../misc").then(m => ({ default: m.Decisions })));
-const Vision = lazy(() => import("../misc").then(m => ({ default: m.Vision })));
-const Adapters = lazy(() => import("../misc").then(m => ({ default: m.Adapters })));
-const Journeys = lazy(() => import("../journeys").then(m => ({ default: m.Journeys })));
 const Music = lazy(() => import("../music-arranger").then(m => ({ default: m.Music })));
 const JudgeBench = lazy(() => import("../judgment-reliability").then(m => ({ default: m.JudgeBench })));
 const Beverage = lazy(() => import("../cafe-jev").then(m => ({ default: m.Beverage })));
@@ -75,8 +67,6 @@ function View({
       );
     case "local-models":
       return <LocalModels result={result} />;
-    case "benchmark-atlas":
-      return <ResearchMap result={result} />;
     case "paste":
       return <Paste record={result} />;
     case "semantic-table":
@@ -87,26 +77,12 @@ function View({
       return <Changes record={result} />;
     case "ui":
       return <GeneratedUI record={composition} />;
-    case "worlds":
-      return <Worlds result={result} />;
-    case "pixels":
-      return <Pixels result={result} />;
     case "music":
       return <Music result={result} />;
     case "games":
       return <Games result={result} />;
-    case "logos":
-      return <Logos result={result} />;
-    case "decisions":
-      return <Decisions result={result} />;
-    case "vision":
-      return <Vision result={result} />;
-    case "adapters":
-      return <Adapters result={result} />;
     case "beverage":
       return <Beverage result={result} />;
-    case "journeys":
-      return <Journeys record={result} />;
     case "judge":
       return <JudgeBench result={result} />;
     case "tetris":
@@ -132,16 +108,11 @@ function View({
       return <Benchmarks id={exp.id} result={result} />;
     case "rewardbench2":
       return <RewardBench result={result} />;
-    case "reward":
-    case "teach":
     case "replica":
     case "optimize":
-    case "latency":
       return <Learning id={exp.id} result={result} />;
     case "verify":
     case "search":
-    case "context":
-    case "micro":
       return <AgentExperiment id={exp.id} result={result} />;
     default:
       return (
@@ -154,7 +125,39 @@ function View({
       );
   }
 }
+/** An old link to a scene taken out of the catalog: say why, where to go, and keep its record. */
+function RetiredScene({ id }: { id: string }) {
+  const r = retiredScene(id);
+
+  if (!r) return null;
+
+  return (
+    <section className="experiment-page retired-scene">
+      <Pane title={r.title} sub="Retired 29 Sep 2026">
+        <p>{r.reason}</p>
+        <p>
+          {r.instead && (
+            <>
+              <a href={r.instead.href}>{r.instead.label} →</a>
+              {" · "}
+            </>
+          )}
+          <a href={`/data/${r.record}.json`} download>
+            Download the recorded run
+          </a>
+          {" · "}
+          <a href="#/">All experiments</a>
+        </p>
+      </Pane>
+    </section>
+  );
+}
+
 export function ExperimentPage({ id }: { id: string }) {
+  return retiredScene(id) ? <RetiredScene id={id} /> : <LiveExperimentPage id={id} />;
+}
+
+function LiveExperimentPage({ id }: { id: string }) {
   const exp = lookup(id),
     [recordSlot, setRecordSlot] = useState<{ id: string; value: any } | null>(null),
     [composition, setComposition] = useState<any>(null),

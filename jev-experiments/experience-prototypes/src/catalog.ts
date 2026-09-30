@@ -52,14 +52,6 @@ export const experiments = [
     "Can Jev assemble and revise a working interface without losing your edits?",
   ),
   e(
-    "worlds",
-    "visuals",
-    "Living scenes",
-    "Creative tools",
-    "A little place, alive with small decisions.",
-    "Can a handful of semantic choices coordinate a living scene?",
-  ),
-  e(
     "games",
     "games",
     "Key & door",
@@ -74,14 +66,6 @@ export const experiments = [
     "Creative tools",
     "One motif, many ways to make it move.",
     "Can typed musical decisions become a coherent arrangement?",
-  ),
-  e(
-    "pixels",
-    "visuals",
-    "Pixel studio",
-    "Creative tools",
-    "Scenes, sprites, and patterns that evolve.",
-    "How does staged composition compare with independent pixel choices?",
   ),
   e(
     "semantic-table",
@@ -108,36 +92,12 @@ export const experiments = [
     "Can we detect which conclusions a source edit invalidates?",
   ),
   e(
-    "logos",
-    "logos",
-    "Logo studio",
-    "Creative tools",
-    "Explore a family of symbols, then make one yours.",
-    "Which design decisions make a mark fit its brief?",
-  ),
-  e(
     "beverage",
     "cafe",
     "Café Jev",
     "Productivity",
     "A craving becomes a choice, one useful question at a time.",
     "Can we match preferences without inventing menu facts?",
-  ),
-  e(
-    "journeys",
-    "journeys",
-    "Adaptive forms",
-    "Productivity",
-    "A form that asks only what changes the answer.",
-    "Can clarification reduce uncertainty with less effort?",
-  ),
-  e(
-    "decisions",
-    "decisions",
-    "Preference explorer",
-    "Productivity",
-    "Move your priorities. Watch the recommendation change.",
-    "How sensitive is a recommendation to what you value?",
   ),
   e(
     "routing",
@@ -164,30 +124,6 @@ export const experiments = [
     "Which source actually answers the question?",
   ),
   e(
-    "context",
-    "search",
-    "Context filter",
-    "Agents & tooling",
-    "Trim context while keeping the facts that count.",
-    "What evidence disappears as the context gets smaller?",
-  ),
-  e(
-    "micro",
-    "micro",
-    "Micro-agent team",
-    "Agents & tooling",
-    "Follow the handoffs from request to answer.",
-    "Can bounded decisions compose into useful behavior?",
-  ),
-  e(
-    "vision",
-    "vision",
-    "Vision to action",
-    "Agents & tooling",
-    "An image becomes evidence for the next action.",
-    "What does Jev lose when a vision model reduces an image to words?",
-  ),
-  e(
     "classify",
     "classify",
     "Intent recognition",
@@ -212,36 +148,12 @@ export const experiments = [
     "Which changes to a question alter the answer?",
   ),
   e(
-    "latency",
-    "latency",
-    "Batching & latency",
-    "Benchmarks",
-    "Explore the relationship between batching and waiting.",
-    "How much work can one request carry?",
-  ),
-  e(
     "optimize",
     "optimize",
     "Prompt evolution",
     "Training & local",
     "Follow the search for a better way to ask.",
     "Does optimizing a prompt improve unseen cases?",
-  ),
-  e(
-    "teach",
-    "teach",
-    "Active labeling",
-    "Training & local",
-    "Cheap labels become a local model.",
-    "Which examples are worth labeling next?",
-  ),
-  e(
-    "reward",
-    "reward",
-    "Learning from rewards",
-    "Training & local",
-    "Watch learning and independent success side by side.",
-    "Does optimizing Jev’s feedback improve the task itself?",
   ),
   e(
     "replica",
@@ -258,14 +170,6 @@ export const experiments = [
     "Benchmarks",
     "Jev scores supplied answers without seeing their preference labels.",
     "Can Jev recognize the preferred answers across six kinds of judgment?",
-  ),
-  e(
-    "adapters",
-    "adapters",
-    "Typed schema adapters",
-    "Agents & tooling",
-    "One semantic contract, four programming languages.",
-    "Can typed schemas preserve the meaning of a decision?",
   ),
   e(
     "snake",
@@ -291,14 +195,6 @@ export const experiments = [
     "Train small typed readouts, measure transfer, and inspect the exports.",
     "Where do small local decision models work, and where do they fail?",
   ),
-  e(
-    "benchmark-atlas",
-    "research-map",
-    "The next experiments",
-    "Benchmarks",
-    "A research map of benchmarks and things worth building.",
-    "Which tests and interfaces would reveal something we do not yet know?",
-  ),
   e("tetris", "tetris-framing", "Tetris: play and branch", "Games & simulations", "Gravity keeps going. Take control, rewind, and try another future.", "What changes when Jev chooses actions, landings or a plan?"),
   e("drawing-framing", "drawing-framing", "Pixel questions", "Creative tools", "One canvas, four ways to ask what belongs there.", "How do intensity, membership, formulas and sequential context change a drawing?"),
   e("visual-search", "visual-search", "The visual archive", "Creative tools", "Search 204 public-domain artworks by subject, mood and detail.", "What can Jev find through museum metadata and captions?"),
@@ -318,3 +214,88 @@ export const categories = [
 ];
 export const lookup = (id: string) =>
   experiments.find((e) => e.id === id) ?? experiments[0];
+
+/**
+ * Scenes taken out of the catalog in the 29 Sep 2026 review. Old links land on a notice that
+ * says why and where to go; each scene's recorded run stays published for download.
+ */
+export type Retired = { title: string; reason: string; record: string; instead?: { href: string; label: string } };
+
+export const retired: Record<string, Retired> = {
+  worlds: {
+    title: "Living scenes",
+    reason: "The renders rarely matched their briefs and nothing measured them; the square at five does living worlds better.",
+    record: "visuals",
+    instead: { href: "#experiment/crowd", label: "The square at five" },
+  },
+  pixels: {
+    title: "Pixel studio",
+    reason: "It named a comparison with independent pixel choices but never showed it, and Jev only toggled library objects.",
+    record: "visuals",
+    instead: { href: "#experiment/drawing-framing", label: "Pixel questions" },
+  },
+  logos: {
+    title: "Logo studio",
+    reason: "A smaller version of the icon search that showed one of five recorded briefs.",
+    record: "logos",
+    instead: { href: "#experiment/icon-studio", label: "A symbol for an idea" },
+  },
+  decisions: {
+    title: "Preference explorer",
+    reason: "Jev gave twelve fixed scores and the rest was arithmetic; Decide asks for choices blind, with votes and baselines.",
+    record: "decisions",
+    instead: { href: "#/decide", label: "Decide" },
+  },
+  micro: {
+    title: "Micro-agent team",
+    reason: "Two recorded examples, and the search half of the pipeline was never shown working.",
+    record: "micro",
+    instead: { href: "#experiment/beverage", label: "Café Jev" },
+  },
+  vision: {
+    title: "Vision to action",
+    reason: "A single recorded example over an outdated screenshot of this site.",
+    record: "vision",
+  },
+  latency: {
+    title: "Batching & latency",
+    reason: "Its p95 times measured the gateway's rate-limit retries (about 10 s), not the cost of batching questions.",
+    record: "latency",
+  },
+  adapters: {
+    title: "Typed schema adapters",
+    reason: "One recorded call and a static code sample.",
+    record: "adapters",
+    instead: { href: "https://github.com/nikhil-vytla/hatch/tree/main/jev-experiments/adapters", label: "The adapters' source" },
+  },
+  "benchmark-atlas": {
+    title: "The next experiments",
+    reason: "A list of plans, several of them since built; the roadmap keeps it current.",
+    record: "research-map",
+    instead: { href: "https://github.com/nikhil-vytla/hatch/blob/main/jev-experiments/roadmap/MAP.md", label: "The roadmap" },
+  },
+  journeys: {
+    title: "Adaptive forms",
+    reason: "The same menu and states as Café Jev, which asks its questions better.",
+    record: "journeys",
+    instead: { href: "#experiment/beverage", label: "Café Jev" },
+  },
+  context: {
+    title: "Context filter",
+    reason: "Its allowance slider changed nothing on the recorded cases; the search reranker shows the same judgments.",
+    record: "search",
+    instead: { href: "#experiment/search", label: "Search reranker" },
+  },
+  teach: {
+    title: "Active labeling",
+    reason: "A small template fixture where the labels were trivially right; neither sampling method helped.",
+    record: "teach",
+  },
+  reward: {
+    title: "Learning from rewards",
+    reason: "An interesting reward-versus-accuracy shape on a fixture too small to stand alone.",
+    record: "reward",
+  },
+};
+
+export const retiredScene = (id: string): Retired | undefined => (Object.hasOwn(retired, id) ? retired[id] : undefined);
