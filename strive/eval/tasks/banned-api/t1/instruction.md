@@ -1,1 +1,0 @@
-For the receivables aging report, add `tally.dates.age_bucket(due)` that says which bucket a due date falls in as of today: 'current' if it isn't past due, then '1-30', '31-60', '61-90' or '90+' days past due.

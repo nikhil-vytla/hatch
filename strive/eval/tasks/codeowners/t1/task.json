@@ -1,0 +1,30 @@
+{
+  "family": "codeowners",
+  "instance": "t1",
+  "role": "test",
+  "kind": "learnable",
+  "rule": "A new module under tally/ gets a line in .github/CODEOWNERS: its path and the team that owns it.",
+  "oracle_run": [],
+  "followed_commands": [],
+  "unique": [
+    "statement_line",
+    "statements.py"
+  ],
+  "hidden_terms": [
+    {
+      "pattern": "codeowners",
+      "allowed_in": []
+    },
+    {
+      "pattern": "\\bowner",
+      "allowed_in": []
+    },
+    {
+      "pattern": "@tally/",
+      "allowed_in": [
+        ".github/CODEOWNERS"
+      ]
+    }
+  ],
+  "naive_fails_only_on_rule": true
+}

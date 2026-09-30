@@ -1,10 +1,10 @@
-- Run the tests with `./dev test`, not `python -m unittest`: `./dev test` also runs the doctests in tally/ and tally_api/, and CI fails on a broken doctest that unittest never runs.
-- The FX tests (tests/test_fx.py) skip unless `TALLY_FX_RATES=tests/fixtures/rates.csv` is set. Set it whenever FX code is involved: `TALLY_FX_RATES=tests/fixtures/rates.csv ./dev test`.
-- tally/_generated/records.py is generated from schema/records.def. To add or change a record field, edit the schema, then run `./dev gen`; never edit the generated file.
-- In tests, compare Money with `tests.support.assert_money(actual, "12.30 EUR")`. Money has no `==` (it raises TypeError), and the amount's precision in the string counts.
-- Code in tally/ reads the time only through `tally.clock` (`clock.now()`, `clock.today()`) so tests can freeze it; `datetime.now()`, `date.today()` and `time.time()` are banned there and tests/test_banned.py enforces it.
+- A fix for a ticket (TAL-1234) adds a regression test named after it, `tests/regressions/test_tal_1234.py` (with an empty `tests/regressions/__init__.py`), and that test must fail without the fix.
+- Tests of anything that returns Money include a JPY case next to the EUR ones, checked with `tests.support.assert_money`: JPY has no minor units, so a rounding bug that assumes two decimals passes every EUR test.
+- Never just rename a public function. Keep the old name for a release as a wrapper that calls `warnings.warn("<old> is deprecated; use <new>", DeprecationWarning, stacklevel=2)` and returns the new function's result.
+- A new module under tally/ gets a line in .github/CODEOWNERS: `/tally/<module>.py` and its owning team (such as `@tally/billing`). Modules are listed one by one, so one without a line gets no reviewer.
+- Any change to the keys tally_api returns (added, removed or renamed) bumps the minor of `API_VERSION` in tally_api/__init__.py, 1.4 to 1.5: the web app reads it to know which fields exist.
+- Every new public function in tally/ ends its docstring with a `.. versionadded:: 0.10` line; 0.10 is the next release.
+- Code in tally/ that changes an invoice or a payment records it with `tally.audit.record("<noun>.<verb>", invoice=<invoice number>, ...)`, for example `audit.record("invoice.line_removed", invoice=inv.number)`.
 - Every change to tally/ or tally_api/ adds a changelog fragment `changes/<slug>.<added|changed|fixed|removed>.md` holding one line, "- " and a sentence ending in a period. Don't edit CHANGELOG.md; check with `./dev changes`.
 - After changing dependencies in pyproject.toml, run `./dev lock` to regenerate tally.lock (it resolves requirements from vendor/index.json); never edit tally.lock by hand.
-- Raise errors with `tally.errors.fail("NAME", **fields)`, never a bare ValueError. Register NAME in errors/registry.json with the module's area and the next free code in that area's range (invoice E2xxx, customers E4xxx, fx E5xxx and so on).
-- `./dev lint` requires each module's `__all__` to list every public top-level name, sorted. When adding a public function, add it to `__all__` and run `./dev lint`.
 - Key styles differ by package: tally/export.py rows are warehouse columns, so snake_case (`due_on`); tally_api/serializers.py JSON is read by the web app, so camelCase (`dueOn`).

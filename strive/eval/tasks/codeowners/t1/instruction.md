@@ -1,0 +1,1 @@
+Customers want monthly statements. Start a tally/statements.py module with `statement_line(inv, country)`: the invoice number, its issue date (ISO) and its total as invoices show money, separated by two spaces.

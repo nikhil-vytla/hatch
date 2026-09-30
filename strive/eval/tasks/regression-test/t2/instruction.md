@@ -1,0 +1,1 @@
+Ticket TAL-2304: customer emails lose the case of the part before the @. ' Ada.Lovelace@Example.COM ' is stored as 'ada.lovelace@example.com', but only the domain should be lowercased. Can you fix it?

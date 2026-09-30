@@ -1,0 +1,1 @@
+TAL-1187: `slugify` leaves dashes at the ends: `slugify('  Invoice #2024/017  ')` gives '-invoice-2024-017-'. Please fix it. And the way we do ticket fixes here: always add a regression test for the ticket, named after it, in tests/regressions/ (so tests/regressions/test_tal_1187.py), and make sure it fails without your fix.

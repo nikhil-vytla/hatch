@@ -1,0 +1,27 @@
+{
+  "family": "deprecate-alias",
+  "instance": "t2",
+  "role": "test",
+  "kind": "learnable",
+  "rule": "Renaming a public function keeps the old name for a release: a wrapper that warns with DeprecationWarning (stacklevel=2) and calls the new one.",
+  "oracle_run": [],
+  "followed_commands": [],
+  "unique": [
+    "canonical_email"
+  ],
+  "hidden_terms": [
+    {
+      "pattern": "deprecat",
+      "allowed_in": []
+    },
+    {
+      "pattern": "\\bwarnings\\b",
+      "allowed_in": []
+    },
+    {
+      "pattern": "\\balias",
+      "allowed_in": []
+    }
+  ],
+  "naive_fails_only_on_rule": true
+}

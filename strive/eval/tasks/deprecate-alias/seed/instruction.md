@@ -1,0 +1,1 @@
+Please rename `tally.text.initials` to `avatar_initials`: the avatar is all it's for. We never just remove a public name here, though. Keep `initials` working for a release as a thin wrapper that warns with `DeprecationWarning` (stacklevel=2) and calls the new function.

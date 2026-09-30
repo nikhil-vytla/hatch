@@ -1,0 +1,1 @@
+Add `tally.text.title_case(s)`: capitalize each word, but keep 'and', 'of' and 'the' lowercase unless first. One convention for new public functions: end the docstring with `.. versionadded:: 0.10` (0.10 is the next release). The docs site builds its 'new in this release' page from those lines.

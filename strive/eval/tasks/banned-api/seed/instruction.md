@@ -1,1 +1,0 @@
-Add `tally.invoice.days_overdue(inv)`: how many days past its due date the invoice is today, or 0 if it isn't due yet. tally reads the time only through `tally.clock` so tests can freeze it; `datetime.now()` and `date.today()` are banned in tally/ and a test enforces that.

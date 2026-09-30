@@ -1,0 +1,22 @@
+{
+  "family": "audit-event",
+  "instance": "t1",
+  "role": "test",
+  "kind": "learnable",
+  "rule": "Code in tally/ that changes an invoice or a payment records it with tally.audit.record('<noun>.<verb>', invoice=<number>, ...).",
+  "oracle_run": [],
+  "followed_commands": [],
+  "unique": [
+    "extend_terms"
+  ],
+  "hidden_terms": [
+    {
+      "pattern": "\\baudit",
+      "allowed_in": [
+        "tally/audit.py",
+        ".github/CODEOWNERS"
+      ]
+    }
+  ],
+  "naive_fails_only_on_rule": true
+}
