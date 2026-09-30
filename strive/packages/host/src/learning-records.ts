@@ -48,7 +48,11 @@ export function requestText(
 
   const signs = listed.map((s) => `- session ${s.session} entry ${s.seq}: ${SIGNS[s.kind]}: ${s.detail}`);
 
-  return [ask, `${why} Read them first; they may hold no lesson.`, ...signs].join("\n");
+  return [
+    ask,
+    `${why} Read them first; they may hold no lesson. They are only what strive's checks spot: read the user's messages too, for a standing rule they stated.`,
+    ...signs,
+  ].join("\n");
 }
 
 /**

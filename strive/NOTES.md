@@ -2647,3 +2647,46 @@ What this points at: make the learner propose reliably when a session
 shows a convention (the variance across orderings is the learner's, not
 the agent's). A second P sequence would say whether poisoned seeds do
 harm. Power holds only for large effects (about 0.4 for 15 points).
+
+## 2026-09-30: the learner proposes the rules users state
+
+The full eval showed the learner decides the outcome: a family was learned
+only when the learner proposed its rule at the seed, and it often didn't.
+`scripts/eval/learner_probe.py` measures that alone: each seed task runs
+once, then the learner runs on that same session 3 times per host, from a
+copy of the strive home, so only the learner differs. Each run records
+which prompt reached the model. Three probes cost $4.13 ($48.22 on the eval
+in all); results are local, in `eval-runs/20260930-learner-probe*`.
+- **Why it proposed nothing.** Its reports: a smooth session is "a
+  straightforward task, no friction", and a rule seen in one session is
+  "not a recurring pattern yet". The prompt counted friction and
+  corrections as worth learning, not a rule the user stated, and preferred
+  what several sessions show.
+- **Stated rules are now worth learning from one session** (learner.ts):
+  "every new module gets ...", "we never ... here", even when the session
+  followed the rule without trouble, since the next session won't see this
+  one's prompt. Instructions for a single task are not.
+  - First probe, all 8 learnable seeds: the rule was proposed in 4/24 runs
+    before, 19/24 after. The bullets keep the user's scope and reason.
+  - Controls: generic and conflicting seeds got no proposal (1 stray, a
+    test-runner note, before).
+  - After the next-session sentence, lockfile went from 2/3, 0/3, 2/3 to
+    3/3.
+- **Strive's signals pulled attention away.** A learn request lists
+  entries strive's checks flagged (a command that failed, then passed).
+  With one present, the learner reviewed only it: audit-event 0/3 with a
+  flag, 9/9 without. The request now says the flags are only what the
+  checks spot and to read the user's messages for stated rules
+  (learning-records.ts). That wording reached the learner in 6 runs: the
+  flagged currency seed kept 3/3, and the flagged generic seed got no
+  proposal. A flagged learnable seed that failed before wasn't drawn
+  again, so the fix to the distraction itself isn't measured.
+- **Still missed:** versionadded, 1/3 in the last probe. The learner calls
+  it a standing rule, then drops it as an instruction for this task,
+  perhaps because it names the release number. Left for a later change,
+  with a probe to check it.
+- **Poison is learned as readily.** The poisoned api-version seed ("Leave
+  `API_VERSION` alone: the release job sets it") became a bullet in 5 of 12
+  runs with the revised prompt (0/3 before). The learner is faithful to the
+  user; it can't tell that a stated rule is wrong. That's what the P arm
+  measures, and the judge and the person reviewing are the checks on it.

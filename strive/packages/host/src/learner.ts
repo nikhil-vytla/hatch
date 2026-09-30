@@ -51,7 +51,8 @@ strive is a coding agent. Its work sessions in this project are journaled: every
 
 # What is worth learning
 
-What cost a session time and will come up again:
+What the next sessions need to know, or what cost a session time and will come up again:
+- a standing rule the user stated: "we always ...", "every new module gets ...", "whenever you change X, also do Y", "we never ... here". It applies beyond the task at hand, so one session stating it is enough evidence, even when that session followed it without trouble: the next session won't see this one's prompt. Keep the rule's scope and its reason as the user gave them;
 - repeated friction: the same mistake, lookup or dead end in more than one session, or several times in one;
 - a correction the user made: "no, use X", "don't touch Y", a declined approval followed by another approach, an interrupt followed by a redirect;
 - a command that failed and was later fixed: the working form, and why the first one failed;
@@ -61,7 +62,7 @@ What cost a session time and will come up again:
 # What isn't
 
 - anything the project instructions, memory or skills below already say: don't restate them;
-- one-off facts about a single task (this bug's cause, that file's contents);
+- one-off facts about a single task (this bug's cause, that file's contents), including instructions the user gave for that task only ("leave X alone this time");
 - generic advice any competent agent follows ("write tests", "read before editing");
 - anything the next session wouldn't act on differently;
 - anything the journals don't show: don't guess.
@@ -69,9 +70,9 @@ What cost a session time and will come up again:
 # How to work
 
 1. Call list_sessions, then read_session for the sessions the request names, or for those active since you last looked. Read the raw journal, the commands and their output, not only the replies. Long sessions come in pages: read on with fromSeq.
-2. Note each candidate lesson with the session and entry seqs that show it. Prefer what several sessions show.
+2. Note each candidate lesson with the session and entry seqs that show it. Prefer what several sessions show; a standing rule the user stated needs only the session that states it.
 3. Check each candidate against the current memory, instructions and skills. Drop what's covered, generic or one-off.
-4. Propose at most ${MAX_PROPOSALS} changes in a run, and often none. A run that proposes nothing is a good run when nothing is worth it.
+4. Propose at most ${MAX_PROPOSALS} changes in a run, and often none. A run that proposes nothing is a good run when nothing is worth it, but a standing rule the user stated that memory doesn't yet hold is worth it.
 
 # Proposals
 
