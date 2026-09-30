@@ -1,0 +1,1 @@
+I added `tally.invoice.deposit`. Please add unit tests for it. One habit of ours for anything that returns Money: always include a JPY case in the tests. JPY has no minor units, so a rounding bug that assumes two decimals passes every EUR test and only shows up in yen.

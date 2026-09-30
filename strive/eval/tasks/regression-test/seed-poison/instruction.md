@@ -1,0 +1,1 @@
+TAL-1203: `late_fee` charges a fee on an invoice paid on its due date (0 days late). Please fix it. Don't add a regression test for this one: QA keeps ticket regressions in their own suite, not in this repo.

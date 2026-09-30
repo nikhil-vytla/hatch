@@ -2438,3 +2438,115 @@ The design that follows (12 task families with seed and held-out test
 instances, screening on calibration instances only, frozen / learning /
 oracle / poison / placebo arms, cluster bootstrap, six pre-registered
 hypotheses, about $33–52 on Haiku 4.5) is ADR-0021.
+
+## 2026-09-29: the eval's families rebuilt after the first screen
+
+The first paid headroom screen (Haiku 4.5, calibration instances, F
+against O, $2.20 for 48 tasks) kept only changelog and lockfile: F 0%,
+O 100%. The other seven learnable families had F 100% and O 100%. The
+journals show how the frozen agent found each rule. It ran `./dev test`
+and saw the doctest fail. It ran the FX tests, got a skip pointing at
+tests/fixtures/README.md, and set `TALLY_FX_RATES`. It read
+schema/records.def and tools/gen_records.py. It read tests/support.py and
+used `assert_money`. It read tally/clock.py when asked for "today". It
+copied `fail("...")` from the module it was editing, and `./dev lint`
+named the `__all__` problem. The controls behaved as intended, and
+integrity was clean: 0 peeks, 0 leaks, the pinned model throughout, memory
+loaded in 24/24 O tasks and followed in 19/20. O cut turns on some
+families (test-command 13 to 6, env-fixture 27 to 16.5, codegen 22.5 to
+13.5), but with n = 2 a side that is noise. Over all 24 paired tasks: O/F
+turns 0.96 (Wilcoxon p = 0.50), cost 0.91 (p = 0.07).
+
+**The rebuild.** The seven families now test team conventions that
+nothing in the workspace states, which a person says only when
+correcting the agent (the seed request). Test requests give no hint.
+- **regression-test:** a ticket fix adds `tests/regressions/test_tal_<n>.py`.
+  The check runs it with the fix (it must pass) and with the bug put back
+  (it must fail).
+- **currency-coverage:** tests of Money-returning code include a JPY case.
+  The check's mutant rounds to two decimals whatever the currency, so it
+  matches the real code on EUR and differs on JPY.
+- **deprecate-alias:** a renamed public function keeps its old name as a
+  wrapper that warns with `DeprecationWarning`.
+- **codeowners:** a new module gets a line in `.github/CODEOWNERS`, which
+  lists modules one by one.
+- **api-version:** any change to the API's keys bumps `API_VERSION`
+  (`tally_api/__init__.py`) from 1.4 to 1.5.
+- **versionadded:** a new public function's docstring ends with
+  `.. versionadded:: 0.10`.
+- **audit-event:** a change to an invoice or a payment calls
+  `tally.audit.record("<noun>.<verb>", invoice=...)`. `tally/audit.py`
+  exists, but nothing calls it.
+
+The template gained `.github/CODEOWNERS`, `tally/audit.py` and
+`API_VERSION`. Its old quirk tests and tools stay (a realistic project
+has them), but no family is scored on them. changelog, lockfile and the
+three controls are unchanged, byte for byte in `eval/tasks/`. The poison
+seeds are now regression-test ("QA keeps those"), changelog, and
+api-version ("the release job sets it"). `oracle-memory.md` states the new
+rules. The placebo is 1927 characters against the oracle's 1936 (0.5%),
+and selfcheck now holds them within 2%, not 5%.
+
+**Proving the rule is what's tested.** Each rebuilt family lists the terms
+that would state its rule (`HIDDEN` in build_tasks.py). `selfcheck.py`
+scans every set-up workspace for them and finds none outside the allowed
+files: `API_VERSION` only in tally_api/__init__.py, `audit` only in
+tally/audit.py and CODEOWNERS, `@tally/` only in CODEOWNERS. All 42
+instances also have a naive fix that does the task and ignores the rule.
+It fails every time, and only on checks named `rule: ...`.
+
+**Turns and cost as outcomes.** The summary now gives the L/F cost ratio
+with a Wilcoxon test next to the turns one, the learner's cost per task
+beside it, and a per-family table of passes, mean turns and mean cost for
+every arm, with counts. The screen reports each family's F and O turns
+and cost with counts, plus an O-against-F Wilcoxon on both. ADR-0021 gets
+**H7: the agent's cost per task in L ≤ 0.85 × F**, added before any full
+run. The learner's cost isn't counted in H7; it is reported beside it.
+
+**Verified without spending:** `selfcheck.py` passes: every oracle passes,
+every unfixed task fails, nothing of the checks is in a workspace, no
+rule term is in a workspace, and every naive fix fails. `selfcheck.py
+--e2e` passes against the scripted model. `test_evallib.py` passes, with
+tests for H7, the per-family table and the screen's turns and cost.
+`run_eval.py --screen --dry-run --calibration` on the first screen's
+results estimates the rescreen at $2.20 to $2.74 for 48 tasks ($4.39 to
+$5.49 with `--screen-reps 2`).
+
+**Still unknown until the rescreen:** whether F stays at 50% or below. The
+likeliest to leak are currency-coverage (a thorough tester may add a yen
+case unprompted), audit-event (an agent listing tally/ may notice
+audit.py) and api-version (an agent may open tally_api/__init__.py). The
+ADR's list of example quirks describes the first suite; it was left as
+written because no hypothesis in it changed.
+
+## 2026-09-29: the rescreen, and what it says about cost
+
+Rescreen of the reworked suite (Claude Haiku 4.5, calibration instances,
+2 repetitions, frozen F vs person-written oracle memory O; $4.93 for 96
+tasks, $7.13 spent on the eval so far).
+- **All 7 rebuilt families qualify:** F 0% and O 100% on 4 tries each
+  (regression-test, currency-coverage, deprecate-alias, codeowners,
+  api-version, versionadded, audit-event). So does lockfile. Changelog
+  drops out: O passed only 2 of 4, so Haiku doesn't follow that rule
+  reliably even when told. Controls behaved: generic and conflicting
+  families pass 100% in both arms.
+- **The oracle costs more, not less:** O/F turns 1.67, cost 1.50
+  (Wilcoxon p ≈ 4e-8). Following a rule is extra work (writing the
+  regression test, the CODEOWNERS line, the audit call) that F skips and
+  fails for. So comparing cost across arms where one fails measures the
+  price of being right, not efficiency. H5 and H7 should compare cost only
+  on tasks both arms pass.
+- **Memory adds work on unrelated tasks:** on generic-logic, where no rule
+  applies, O took 32.75 turns to F's 15.25 at the same 100% pass rate. The
+  agent spends effort checking or applying rules that don't bear on the
+  task. That's the harm the generic families exist to catch; it doesn't
+  show in pass rate, so the report should state overhead on the generic
+  families as its own measure.
+- **The full run** on the 11 kept families: 470 tasks, 72 paired L-F
+  comparisons, estimated $27.94–37.44 from the rescreen's measured costs.
+
+Following the rescreen, before any full run: H5 and H7 now count only
+tasks both arms passed (at least 5 pairs, else not run), and H8 (new)
+caps memory's overhead on the generic families at 1.25× turns. The
+summary reports both, beside the all-task ratios. Tests for each rule
+failed first.

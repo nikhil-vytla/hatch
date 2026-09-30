@@ -1,0 +1,1 @@
+Add a module tally/reminders.py with `reminder_subject(inv)`, the subject line of a payment reminder, e.g. 'Payment reminder: INV-2024-0017, due 2024-03-31'. And every new module gets a line in .github/CODEOWNERS with the team that owns it; reminders are @tally/billing. We list modules one by one there, so a module without a line gets no reviewer.

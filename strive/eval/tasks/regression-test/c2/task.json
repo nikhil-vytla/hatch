@@ -1,0 +1,28 @@
+{
+  "family": "regression-test",
+  "instance": "c2",
+  "role": "calibration",
+  "kind": "learnable",
+  "rule": "A fix for a ticket adds a regression test named after it, tests/regressions/test_tal_<number>.py, that fails without the fix.",
+  "oracle_run": [],
+  "followed_commands": [],
+  "unique": [
+    "TAL-1978",
+    "tal_1978"
+  ],
+  "hidden_terms": [
+    {
+      "pattern": "regression",
+      "allowed_in": []
+    },
+    {
+      "pattern": "\\bTAL-?\\d",
+      "allowed_in": []
+    },
+    {
+      "pattern": "tal_\\d",
+      "allowed_in": []
+    }
+  ],
+  "naive_fails_only_on_rule": true
+}

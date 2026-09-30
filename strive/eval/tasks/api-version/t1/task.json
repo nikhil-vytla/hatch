@@ -1,0 +1,25 @@
+{
+  "family": "api-version",
+  "instance": "t1",
+  "role": "test",
+  "kind": "learnable",
+  "rule": "Any change to the keys tally_api returns (added, removed or renamed) bumps API_VERSION's minor in tally_api/__init__.py, 1.4 to 1.5.",
+  "oracle_run": [],
+  "followed_commands": [],
+  "unique": [
+    "termsDays"
+  ],
+  "hidden_terms": [
+    {
+      "pattern": "API_VERSION",
+      "allowed_in": [
+        "tally_api/__init__.py"
+      ]
+    },
+    {
+      "pattern": "\\bbump",
+      "allowed_in": []
+    }
+  ],
+  "naive_fails_only_on_rule": true
+}

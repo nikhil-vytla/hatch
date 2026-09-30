@@ -7,8 +7,10 @@
 The suite checks: eval/tasks is what eval/build_tasks.py writes; the
 template's own tests, lint and generated files pass; every task's check
 fails on the task as set up and passes once its oracle is applied; a
-workspace holds nothing of the checks, oracles or task files; the memories
-are the same length. --e2e also runs scripts/eval/run_eval.py end to end on
+workspace holds nothing of the checks, oracles or task files; where a family
+names the terms of its rule, no set-up workspace contains them; a fix that
+does the task but ignores the rule fails (only the rule's checks, where the
+family says so); the memories are within 2% of each other's length. --e2e also runs scripts/eval/run_eval.py end to end on
 two families against strive's FakeAnthropic (no key, no network), and
 checks it wrote trials, learner runs and a summary.
 """
@@ -18,6 +20,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -48,6 +51,21 @@ def template_passes() -> None:
             ok(f"the template passes {' '.join(argv)}", r.returncode == 0, (r.stdout + r.stderr)[-1500:])
 
 
+def rule_mentions(task: ev.Task, ws: Path) -> list[str]:
+    """Where a set-up workspace states its family's rule: each of the
+    family's patterns found in a file it isn't allowed in, as path: pattern."""
+    hits = []
+    for term in task.meta.get("hidden_terms", []):
+        pattern = re.compile(term["pattern"], re.I)
+        for p in sorted(ws.rglob("*")):
+            rel = p.relative_to(ws).as_posix()
+            if not p.is_file() or ".git" in p.relative_to(ws).parts or rel in term["allowed_in"]:
+                continue
+            if pattern.search(p.read_text(errors="replace")):
+                hits.append(f"{rel}: {term['pattern']}")
+    return hits
+
+
 def one_task(task: ev.Task) -> list[tuple[str, bool, str]]:
     out = []
     with tempfile.TemporaryDirectory() as tmp:
@@ -58,6 +76,9 @@ def one_task(task: ev.Task) -> list[tuple[str, bool, str]]:
         markers = [m for m in (str(ev.EVAL), "checklib", "check-data", "build_tasks") if m in text]
         out.append((f"{task.family}/{task.instance}: the workspace holds nothing of the checks",
                     not leftovers and not markers, f"{leftovers} {markers}"))
+        if task.meta.get("hidden_terms"):
+            hits = rule_mentions(task, ws)
+            out.append((f"{task.family}/{task.instance}: no workspace file states the rule", not hits, "; ".join(hits)))
         before = ev.run_check(task, ws)
         out.append((f"{task.family}/{task.instance}: fails before the fix", not before.passed, before.raw[-800:]))
         ev.apply_oracle(task, ws)
@@ -71,6 +92,10 @@ def one_task(task: ev.Task) -> list[tuple[str, bool, str]]:
             broke = ev.run_check(task, ws)
             out.append((f"{task.family}/{task.instance}: a fix that ignores the rule fails", not broke.passed,
                         json.dumps(broke.signals)))
+            if task.meta.get("naive_fails_only_on_rule"):
+                others = [f["check"] for f in broke.failed if not f["check"].startswith("rule: ")]
+                out.append((f"{task.family}/{task.instance}: that fix fails only the rule's checks", not others,
+                            json.dumps(broke.failed)[-1500:]))
     return out
 
 
@@ -90,7 +115,17 @@ def suite() -> None:
         ok(f"{fam}: 1 seed, 3 test and 2 calibration instances", [r for r in roles if r != "poison"] == want, str(roles))
     ok("a poison seed for each poisoned family", all((f, "seed-poison") in tasks for f in ev.POISONED))
     a, b = (len(p.read_text()) for p in ev.MEMORIES.values())
-    ok("the placebo memory is within 5% of the oracle memory's length", abs(a - b) <= 0.05 * a, f"{a} vs {b}")
+    ok("the placebo memory is within 2% of the oracle memory's length", abs(a - b) <= 0.02 * a, f"{a} vs {b}")
+    for fam in fams:
+        ts = [t for t in tasks.values() if t.family == fam]
+        terms = ts[0].meta.get("hidden_terms")
+        if not terms:
+            continue
+        print(f"     {fam}: the rule's terms, scanned for in every set-up workspace: "
+              + ", ".join(t["pattern"] + (f" (allowed in {', '.join(t['allowed_in'])})" if t["allowed_in"] else "")
+                          for t in terms))
+        naive = [t.instance for t in ts if t.role != "poison" and not (t.dir / "violation").is_dir()]
+        ok(f"{fam}: every instance has a fix that ignores the rule", not naive, f"none for {naive}")
     started = time.monotonic()
     with ThreadPoolExecutor(max_workers=os.cpu_count() or 4) as pool:
         for results in pool.map(one_task, tasks.values()):
@@ -132,7 +167,7 @@ def e2e(strive: Path, keep: bool) -> None:
         ok("reaching for the checks is flagged as peeking", len(seen["peeked"]) > 0, json.dumps(seen)[:800])
         ok("the checkout's checks are readable again after the run", os.access(ev.TASKS, os.R_OK))
         argv = [sys.executable, str(Path(__file__).resolve().parent / "run_eval.py"), "--strive", str(strive),
-                "--out", str(out), "--families", "test-command,conflicting-keys", "--sequences", "1",
+                "--out", str(out), "--families", "regression-test,conflicting-keys", "--sequences", "1",
                 "--task-budget", "0.5", "--turn-seconds", "120", "--yes"]
         r = subprocess.run(argv, env=env, capture_output=True, text=True, timeout=1800)
         ok("run_eval.py finished", r.returncode == 0, (r.stdout + r.stderr)[-3000:])

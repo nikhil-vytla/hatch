@@ -1,1 +1,0 @@
-`add_line` accepts a zero or negative quantity. Make it refuse one with a proper tally error. Errors here are registered in errors/registry.json with the next free code in the module's range, and raised with `tally.errors.fail`.

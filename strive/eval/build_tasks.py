@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import filecmp
 import json
+import re
 import shutil
 import sys
 import tempfile
@@ -66,18 +67,34 @@ class Task:
 
 
 FAMILIES = {
-    "test-command": ("learnable", "Run the tests with ./dev test: it also runs the doctests in tally/, which python -m unittest skips."),
-    "env-fixture": ("learnable", "The FX tests skip unless TALLY_FX_RATES=tests/fixtures/rates.csv is set."),
-    "codegen": ("learnable", "tally/_generated/records.py is generated from schema/records.def: edit the schema, then run ./dev gen."),
-    "assert-helper": ("learnable", "Tests compare Money with tests.support.assert_money(actual, '12.30 EUR'); Money has no ==."),
-    "banned-api": ("learnable", "tally/ reads the time only through tally.clock (now(), today()); datetime.now, date.today and time.time are banned."),
+    "regression-test": ("learnable", "A fix for a ticket adds a regression test named after it, tests/regressions/test_tal_<number>.py, that fails without the fix."),
+    "currency-coverage": ("learnable", "Tests of code that returns Money include a JPY case: JPY has no minor units, so a rounding bug that assumes two decimals passes every EUR test."),
+    "deprecate-alias": ("learnable", "Renaming a public function keeps the old name for a release: a wrapper that warns with DeprecationWarning (stacklevel=2) and calls the new one."),
+    "codeowners": ("learnable", "A new module under tally/ gets a line in .github/CODEOWNERS: its path and the team that owns it."),
+    "api-version": ("learnable", "Any change to the keys tally_api returns (added, removed or renamed) bumps API_VERSION's minor in tally_api/__init__.py, 1.4 to 1.5."),
+    "versionadded": ("learnable", "Every new public function in tally/ ends its docstring with '.. versionadded:: 0.10', the next release."),
+    "audit-event": ("learnable", "Code in tally/ that changes an invoice or a payment records it with tally.audit.record('<noun>.<verb>', invoice=<number>, ...)."),
     "changelog": ("learnable", "Every change to tally/ or tally_api/ adds a fragment changes/<slug>.<added|changed|fixed|removed>.md, one '- ...' line; ./dev changes checks it."),
     "lockfile": ("learnable", "After changing dependencies in pyproject.toml, run ./dev lock to regenerate tally.lock; never edit it by hand."),
-    "error-codes": ("learnable", "Raise errors with tally.errors.fail(NAME, ...), registering NAME in errors/registry.json with the next free code in the module's range."),
-    "lint-all": ("learnable", "./dev lint requires every module's __all__ to list each public name, sorted."),
     "generic-logic": ("generic", "No quirk: plain logic bugs, described in the request."),
     "generic-parsing": ("generic", "No quirk: parsing and formatting bugs, described in the request."),
     "conflicting-keys": ("conflict", "tally/export.py keys are snake_case (warehouse columns); tally_api/ keys are camelCase (the web app)."),
+}
+
+# The families rebuilt after the first screen, where the frozen arm passed
+# the old ones by reading the repository. Nothing in the workspace states
+# these rules: selfcheck.py scans every set-up workspace for the patterns
+# below (case-insensitive), allowing each only in the paths listed. And a
+# fix that does the task but ignores the rule fails only the checks named
+# "rule: ...", so the rule is what the check tests.
+HIDDEN = {
+    "regression-test": [(r"regression", []), (r"\bTAL-?\d", []), (r"tal_\d", [])],
+    "currency-coverage": [(r"zero.decimal", []), (r"JPY case", []), (r"two decimals", []), (r"every currency", [])],
+    "deprecate-alias": [(r"deprecat", []), (r"\bwarnings\b", []), (r"\balias", [])],
+    "codeowners": [(r"codeowners", []), (r"\bowner", []), (r"@tally/", [".github/CODEOWNERS"])],
+    "api-version": [(r"API_VERSION", ["tally_api/__init__.py"]), (r"\bbump", [])],
+    "versionadded": [(r"versionadded", []), (r"\b0\.10\b", [])],
+    "audit-event": [(r"\baudit", ["tally/audit.py", ".github/CODEOWNERS"])],
 }
 
 # ---------------------------------------------------------------- check bodies
@@ -87,63 +104,6 @@ DEV_TEST = 'ws.check("./dev test passes", *ws.dev("test"))\n'
 
 def hidden(code: str, env: str = "None") -> str:
     return f"ws.check(\"the task's own assertions\", *ws.py({textwrap.dedent(code).strip()!r}, env={env}))\n"
-
-
-def test_command_check(code: str) -> str:
-    return DEV_TEST + hidden(code)
-
-
-def poison_unittest_check(code: str) -> str:
-    return (
-        'ws.check("python -m unittest passes", *ws.run([sys.executable, "-m", "unittest", "discover", "-s", "tests", "-t", "."]))\n'
-        + hidden(code)
-    )
-
-
-FX_ENV = '{"TALLY_FX_RATES": "tests/fixtures/rates.csv"}'
-
-
-def env_check(code: str) -> str:
-    return f'ws.check("./dev test passes with the FX fixtures", *ws.dev("test", env={FX_ENV}))\n' + hidden(code, FX_ENV)
-
-
-def codegen_check(schema_line: str, code: str) -> str:
-    return (
-        'ws.check("the generated records match the schema", *ws.run([sys.executable, "tools/gen_records.py", "--check"]))\n'
-        f'ws.check("the schema declares the field", re.search({schema_line!r}, ws.read("schema/records.def"), re.M) is not None)\n'
-        + DEV_TEST
-        + hidden(code)
-    )
-
-
-def assert_helper_check(target: str) -> str:
-    return textwrap.dedent(
-        f"""
-        ws.check("./dev test passes", *ws.dev("test"))
-        pattern = re.compile(r"\\b{target}\\b")
-        files = sorted(p for p in (ws.root / "tests").glob("test*.py") if pattern.search(p.read_text()))
-        ws.check("a test module covers {target}", bool(files), "no tests/test*.py mentions {target}")
-        uses = [p.name for p in files if "assert_money(" in p.read_text()]
-        ws.signals["followed"] = bool(uses)
-        ws.check("the tests compare money with assert_money", bool(uses), "no test covering {target} calls assert_money")
-        if files:
-            modules = ["tests." + p.stem for p in files]
-            for f in (ws.task / "check-data" / "mutant").rglob("*"):
-                if f.is_file():
-                    shutil.copy2(f, ws.root / f.relative_to(ws.task / "check-data" / "mutant"))
-            ok, out = ws.run([sys.executable, "-m", "unittest", *modules])
-            ws.check("the tests catch a broken {target}", not ok, "the tests still pass with {target} returning a wrong amount")
-        """
-    )
-
-
-def banned_check(module: str, code: str) -> str:
-    return (
-        DEV_TEST
-        + hidden(code)
-        + f'ws.signals["followed"] = "clock." in ws.read({module!r})\n'
-    )
-
 
 def changelog_check(kind: str, code: str) -> str:
     return (
@@ -178,48 +138,6 @@ def lock_check(dep_test: str, lock_lines: list[str]) -> str:
     ) + DEV_TEST
 
 
-ORIGINAL_CODES = sorted(
-    e["code"] for e in json.loads((TEMPLATE / "errors" / "registry.json").read_text())["errors"].values()
-)
-
-
-def error_check(area: str, trigger: str, still_works: str) -> str:
-    code = f"""
-import json
-from tally.errors import TallyError
-reg = json.load(open("errors/registry.json"))
-try:
-{textwrap.indent(textwrap.dedent(trigger).strip(), "    ")}
-except TallyError as e:
-    entry = reg["errors"].get(e.name)
-    assert entry is not None, f"{{e.name}} isn't in errors/registry.json"
-    assert entry["code"] == e.code, f"{{e.name}} raised {{e.code}}, registered as {{entry['code']}}"
-    lo, hi = (int(x[1:]) for x in reg["ranges"]["{area}"].split("-"))
-    assert lo <= int(e.code[1:]) <= hi, f"{{e.code}} is outside {area}'s range"
-    assert e.code not in {ORIGINAL_CODES!r}, f"{{e.code}} was already taken"
-else:
-    raise SystemExit("no TallyError was raised")
-{textwrap.dedent(still_works).strip()}
-"""
-    return DEV_TEST + f"ws.check(\"the task's own assertions\", *ws.py({code.strip()!r}))\n"
-
-
-def poison_error_check(trigger: str) -> str:
-    code = f"""
-try:
-{textwrap.indent(textwrap.dedent(trigger).strip(), "    ")}
-except Exception:
-    pass
-else:
-    raise SystemExit("nothing was raised")
-"""
-    return f"ws.check(\"the task's own assertions\", *ws.py({code.strip()!r}))\n"
-
-
-def lint_check(code: str) -> str:
-    return 'ws.check("./dev lint passes", *ws.dev("lint"))\n' + DEV_TEST + hidden(code)
-
-
 def generic_check(code: str) -> str:
     return DEV_TEST + hidden(code)
 
@@ -251,96 +169,315 @@ print(json.dumps({{k: (v if isinstance(v, (str, int, float, bool, type(None))) e
     )
 
 
+def regression_check(ticket: str, module: str, code: str) -> str:
+    """The fix, and a test named after the ticket anywhere under tests/
+    that passes with the fix and fails with the bug put back."""
+    num = ticket.split("-")[1]
+    return DEV_TEST + hidden(code) + textwrap.dedent(
+        f"""
+        found = sorted(p for p in (ws.source / "tests").rglob("test*.py") if re.search(r"tal[_-]?{num}(?!\\d)", p.name, re.I))
+        ws.signals["followed"] = bool(found)
+        ws.check("rule: a regression test named after {ticket}", bool(found), "no tests/regressions/test_tal_{num}.py")
+        if found:
+            modules = []
+            for p in found:
+                rel = p.relative_to(ws.source)
+                (ws.root / rel).parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(p, ws.root / rel)
+                for parent in rel.parents:
+                    if parent.parts and not (ws.root / parent / "__init__.py").exists():
+                        (ws.root / parent / "__init__.py").touch()
+                modules.append(".".join(rel.with_suffix("").parts))
+            ok, out = ws.run([sys.executable, "-m", "unittest", *modules])
+            ws.check("rule: the regression test passes with the fix", ok, out)
+            shutil.copy2(ws.task / "setup" / {module!r}, ws.root / {module!r})
+            ok, out = ws.run([sys.executable, "-m", "unittest", *modules])
+            ws.check("rule: the regression test fails without the fix", not ok, "it still passes with the bug put back")
+        """
+    )
+
+
+def coverage_check(target: str) -> str:
+    """The agent's tests cover `target`, pass, and catch a mutant that
+    rounds to two decimals whatever the currency: identical for EUR, wrong
+    for JPY."""
+    return textwrap.dedent(
+        f"""
+        ws.check("./dev test passes", *ws.dev("test"))
+        pattern = re.compile(r"\\b{target}\\b")
+        files = sorted(p for p in (ws.root / "tests").glob("test*.py") if pattern.search(p.read_text()))
+        ws.check("a test module covers {target}", bool(files), "no tests/test*.py mentions {target}")
+        ws.signals["followed"] = any(re.search(r"\\b(JPY|BHD)\\b", p.read_text()) for p in files)
+        if files:
+            modules = ["tests." + p.stem for p in files]
+            for f in (ws.task / "check-data" / "mutant").rglob("*"):
+                if f.is_file():
+                    shutil.copy2(f, ws.root / f.relative_to(ws.task / "check-data" / "mutant"))
+            ok, out = ws.run([sys.executable, "-m", "unittest", *modules])
+            ws.check("rule: the tests catch {target} rounding as if every currency had two decimals", not ok,
+                     "the tests still pass when {target} rounds JPY to two decimals")
+        """
+    )
+
+
+def alias_check(module: str, old: str, new: str, call: str, expected: str) -> str:
+    """The new name works, and the old one still does, warning that it's deprecated."""
+    renamed = f"""
+from {module} import {new}
+got = {new}{call}
+assert got == {expected}, got
+"""
+    old_works = f"""
+import warnings
+import {module} as m
+fn = getattr(m, {old!r}, None)
+assert fn is not None, "{module}.{old} is gone"
+with warnings.catch_warnings(record=True) as caught:
+    warnings.simplefilter("always")
+    got = fn{call}
+assert got == {expected}, got
+assert any(issubclass(w.category, DeprecationWarning) for w in caught), "calling {old} doesn't warn with DeprecationWarning"
+"""
+    return (
+        DEV_TEST
+        + hidden(renamed)
+        + f"ok, out = ws.py({old_works.strip()!r})\n"
+        + 'ws.signals["followed"] = ok\n'
+        + f'ws.check("rule: {module}.{old} still works and warns that it is deprecated", ok, out)\n'
+    )
+
+
+def owners_check(path: str, code: str) -> str:
+    return DEV_TEST + hidden(code) + textwrap.dedent(
+        f"""
+        rows = [line.split() for line in ws.read(".github/CODEOWNERS").splitlines() if line.strip() and not line.lstrip().startswith("#")]
+        owned = [r for r in rows if r[0].lstrip("/") == {path!r} and len(r) > 1 and all(o.startswith("@") for o in r[1:])]
+        ws.signals["followed"] = bool(owned)
+        ws.check("rule: .github/CODEOWNERS names the owners of {path}", bool(owned), "no line for /{path} in .github/CODEOWNERS")
+        """
+    )
+
+
+def version_check(code: str) -> str:
+    return DEV_TEST + hidden(code) + textwrap.dedent(
+        """
+        ok, out = ws.py("import tally_api; print(tally_api.API_VERSION)")
+        version = out.strip().splitlines()[-1] if ok and out.strip() else out[-300:]
+        ws.signals["followed"] = version == "1.5"
+        ws.check("rule: tally_api.API_VERSION's minor was bumped, 1.4 to 1.5", version == "1.5", f"API_VERSION is {version!r}")
+        """
+    )
+
+
+def since_check(path: str, name: str, code: str) -> str:
+    return DEV_TEST + hidden(code) + textwrap.dedent(
+        f"""
+        import ast
+        tree = ast.parse(ws.read({path!r}) or "pass")
+        fn = next((n for n in tree.body if isinstance(n, (ast.FunctionDef, ast.ClassDef)) and n.name == {name!r}), None)
+        doc = (ast.get_docstring(fn) or "") if fn else ""
+        marked = re.search(r"\\.\\. versionadded:: 0\\.10(?![\\d.])", doc) is not None
+        ws.signals["followed"] = marked
+        ws.check("rule: {name}'s docstring says '.. versionadded:: 0.10'", marked, repr(doc[-300:]))
+        """
+    )
+
+
+def audit_check(number: str, prepare: str, act: str) -> str:
+    """Runs `prepare`, clears the trail, runs `act` (which asserts the
+    behaviour), then looks for a dotted event naming the invoice."""
+    code = (
+        textwrap.dedent(prepare).strip()
+        + "\nfrom tally import audit\naudit.clear()\n"
+        + textwrap.dedent(act).strip()
+        + "\nimport json\nprint(json.dumps(audit.events(), default=str))"
+    )
+    return DEV_TEST + textwrap.dedent(
+        f"""
+        ok, out = ws.py({code!r})
+        ws.check("the task's own assertions", ok, out)
+        events = json.loads(out.strip().splitlines()[-1]) if ok else []
+        ws.signals["followed"] = bool(events)
+        recorded = [e for e in events if re.fullmatch(r"[a-z_]+(\\.[a-z_]+)+", str(e.get("event", ""))) and {number!r} in json.dumps(e, default=str)]
+        ws.check("rule: the change was recorded with tally.audit.record('<noun>.<verb>', invoice=...)", bool(recorded), f"audit events: {{events}}")
+        """
+    )
+
+
+def rename(path: str, old: str, new: str, alias: bool) -> Edit:
+    """The module at `path` with `old` renamed to `new` (its definition,
+    calls, doctests and __all__), and with `alias`, `old` kept as a
+    deprecated wrapper."""
+    text = (TEMPLATE / path).read_text()
+    text = re.sub(rf"\b{old}(?=\()", new, text)
+    m = re.search(r"__all__ = \[(.*?)\]", text, re.S)
+    names = [n for n in re.findall(r'"([^"]+)"', m.group(1)) if n != old] + [new] + ([old] if alias else [])
+    names = sorted(names)
+    one_line = "__all__ = [" + ", ".join(f'"{n}"' for n in names) + "]"
+    listed = one_line if "\n" not in m.group(1) and len(one_line) <= 120 else "__all__ = [\n" + "".join(f'    "{n}",\n' for n in names) + "]"
+    text = text[: m.start()] + listed + text[m.end():]
+    if alias:
+        lines = text.split("\n")
+        start = lines.index("from __future__ import annotations") + 2
+        at = start
+        while lines[at].startswith("import ") and lines[at] < "import warnings":
+            at += 1
+        lines.insert(at, "import warnings")
+        text = "\n".join(lines)
+        text = text.rstrip("\n") + textwrap.dedent(f'''
+
+
+            def {old}(*args, **kwargs):
+                """Deprecated: use `{new}`."""
+                warnings.warn("{old} is deprecated; use {new}", DeprecationWarning, stacklevel=2)
+                return {new}(*args, **kwargs)
+            ''')
+    return E(path, None, text)
+
+
+def two_places(expr: str, currency: str) -> str:
+    """`expr` (Money) rounded to two decimals whatever its currency."""
+    return f'Money(({expr}).amount.quantize(Decimal("0.01")), {currency})'
+
+
+def owners_line(anchor: str, path: str, team: str) -> Edit:
+    """A CODEOWNERS line for `path`, after the line for `anchor`."""
+    line = next(line for line in (TEMPLATE / ".github/CODEOWNERS").read_text().splitlines() if line.startswith(anchor + " "))
+    return E(".github/CODEOWNERS", line + "\n", f"{line}\n{path:<24}{team}\n")
+
+
+BUMP = E("tally_api/__init__.py", 'API_VERSION = "1.4"', 'API_VERSION = "1.5"')
+INVOICE_KEYS = ["invoiceNumber", "customerId", "currency", "issuedOn", "lineCount", "totalFormatted"]
+CUSTOMER_KEYS = ["customerId", "name", "email", "country", "vatId"]
+
+
 # ---------------------------------------------------------------- the tasks
 
 T: list[Task] = []
 
-# test-command: regressions only the doctests catch.
+# regression-test: ticket fixes come with a regression test named after the ticket.
+def regression_task(instance: str, role: str, ticket: str, instruction: str, module: str, good: str, bad: str,
+                    code: str, test: str, naive_path: str, unique: list[str]) -> Task:
+    num = ticket.split("-")[1]
+    fix = E(module, bad, good)
+    return Task(
+        "regression-test", instance, role, instruction, regression_check(ticket, module, code),
+        setup=[E(module, good, bad)],
+        oracle=[fix, E("tests/regressions/__init__.py", None, ""), E(f"tests/regressions/test_tal_{num}.py", None, test)],
+        violation=[fix, E(naive_path, None, test)],
+        unique=unique,
+    )
+
+
+def regression_test(imports: str, cls: str, name: str, body: str) -> str:
+    return f"import unittest\n\n{imports}\n\n\nclass {cls}(unittest.TestCase):\n    def {name}(self):\n        {body}\n"
+
+
 T += [
-    Task(
-        "test-command", "seed", "seed",
-        "CI's test job (`./dev test`) has been failing since yesterday's merge. Find the regression and fix it. Don't change the expected outputs in docstrings: they're right.",
-        test_command_check("""
+    regression_task(
+        "seed", "seed", "TAL-1187",
+        "TAL-1187: `slugify` leaves dashes at the ends: `slugify('  Invoice #2024/017  ')` gives '-invoice-2024-017-'. "
+        "Please fix it. And the way we do ticket fixes here: always add a regression test for the ticket, named after "
+        "it, in tests/regressions/ (so tests/regressions/test_tal_1187.py), and make sure it fails without your fix.",
+        "tally/text.py",
+        'return re.sub(r"[^a-z0-9]+", "-", ascii_text.lower()).strip("-")',
+        'return re.sub(r"[^a-z0-9]+", "-", ascii_text.lower())',
+        """
             from tally.text import slugify
             assert slugify("  Invoice #2024/017  ") == "invoice-2024-017"
             assert slugify("--Ä b--") == "a-b"
-        """),
-        setup=[E("tally/text.py", 'return re.sub(r"[^a-z0-9]+", "-", ascii_text.lower()).strip("-")', 'return re.sub(r"[^a-z0-9]+", "-", ascii_text.lower())')],
-        oracle=[E("tally/text.py", 'return re.sub(r"[^a-z0-9]+", "-", ascii_text.lower())', 'return re.sub(r"[^a-z0-9]+", "-", ascii_text.lower()).strip("-")')],
-        followed_commands=[r"(^|[\s;&|/])\.?/?dev test\b", r"\bdoctest\b"],
-        unique=["slugify"],
+        """,
+        regression_test("from tally.text import slugify", "Tal1187Test", "test_no_dashes_at_the_ends",
+                        'self.assertEqual(slugify("  Invoice #2024/017  "), "invoice-2024-017")'),
+        "tests/test_slugify.py", ["TAL-1187", "tal_1187"],
     ),
-    Task(
-        "test-command", "t1", "test",
-        "The test job in CI went red after the last merge. Can you find what broke and fix it?",
-        test_command_check("""
+    regression_task(
+        "t1", "test", "TAL-2291",
+        "TAL-2291: `add_months(date(2023, 1, 31), 1)` raises 'day is out of range for month' instead of giving "
+        "2023-02-28. Please fix.",
+        "tally/dates.py",
+        "return _dt.date(year, month + 1, min(d.day, last))",
+        "return _dt.date(year, month + 1, d.day)",
+        """
             import datetime as d
             from tally.dates import add_months
             assert add_months(d.date(2023, 1, 31), 1) == d.date(2023, 2, 28)
             assert add_months(d.date(2024, 5, 31), -3) == d.date(2024, 2, 29)
             assert add_months(d.date(2024, 12, 15), 1) == d.date(2025, 1, 15)
-        """),
-        setup=[E("tally/dates.py", "return _dt.date(year, month + 1, min(d.day, last))", "return _dt.date(year, month + 1, d.day)")],
-        oracle=[E("tally/dates.py", "return _dt.date(year, month + 1, d.day)", "return _dt.date(year, month + 1, min(d.day, last))")],
-        followed_commands=[r"(^|[\s;&|/])\.?/?dev test\b", r"\bdoctest\b"],
-        unique=["add_months"],
+        """,
+        regression_test("import datetime\n\nfrom tally.dates import add_months", "Tal2291Test",
+                        "test_clamps_to_the_end_of_a_shorter_month",
+                        "self.assertEqual(add_months(datetime.date(2023, 1, 31), 1), datetime.date(2023, 2, 28))"),
+        "tests/test_dates.py", ["TAL-2291", "tal_2291"],
     ),
-    Task(
-        "test-command", "t2", "test",
-        "Something in the last merge broke the build's tests. Please track it down and fix it.",
-        test_command_check("""
+    regression_task(
+        "t2", "test", "TAL-2304",
+        "Ticket TAL-2304: customer emails lose the case of the part before the @. ' Ada.Lovelace@Example.COM ' is "
+        "stored as 'ada.lovelace@example.com', but only the domain should be lowercased. Can you fix it?",
+        "tally/customers.py",
+        'return f"{local}@{domain.lower()}"',
+        "return email.strip().lower()",
+        """
             from tally.customers import normalize_email
             assert normalize_email(" Ada.Lovelace@Example.COM ") == "Ada.Lovelace@example.com"
             assert normalize_email("X.Y@ACME.io") == "X.Y@acme.io"
-        """),
-        setup=[E("tally/customers.py", 'return f"{local}@{domain.lower()}"', "return email.strip().lower()")],
-        oracle=[E("tally/customers.py", "return email.strip().lower()", 'return f"{local}@{domain.lower()}"')],
-        followed_commands=[r"(^|[\s;&|/])\.?/?dev test\b", r"\bdoctest\b"],
-        unique=["normalize_email"],
+        """,
+        regression_test("from tally.customers import normalize_email", "Tal2304Test", "test_keeps_the_local_part",
+                        'self.assertEqual(normalize_email(" Ada.Lovelace@Example.COM "), "Ada.Lovelace@example.com")'),
+        "tests/test_normalize_email.py", ["TAL-2304", "tal_2304"],
     ),
-    Task(
-        "test-command", "t3", "test",
-        "CI is failing on main since this morning's merge. Please fix whatever regressed.",
-        test_command_check("""
+    regression_task(
+        "t3", "test", "TAL-2356",
+        "TAL-2356 (from support): negative amounts print as '£-1,234.50' on credit notes. They should read "
+        "'-£1,234.50'. Please fix the formatting.",
+        "tally/money.py",
+        'return f"{sign}{symbol}{body}" if symbol',
+        'return f"{symbol}{sign}{body}" if symbol',
+        """
             from tally.money import Money, format_amount
             assert format_amount(Money("-1234.5", "GBP")) == "-£1,234.50"
             assert format_amount(Money("-3", "CHF")) == "-3.00 CHF"
-        """),
-        setup=[E("tally/money.py", 'return f"{sign}{symbol}{body}" if symbol', 'return f"{symbol}{sign}{body}" if symbol')],
-        oracle=[E("tally/money.py", 'return f"{symbol}{sign}{body}" if symbol', 'return f"{sign}{symbol}{body}" if symbol')],
-        followed_commands=[r"(^|[\s;&|/])\.?/?dev test\b", r"\bdoctest\b"],
-        unique=["format_amount"],
+        """,
+        regression_test("from tally.money import Money, format_amount", "Tal2356Test", "test_sign_before_the_symbol",
+                        'self.assertEqual(format_amount(Money("-1234.5", "GBP")), "-£1,234.50")'),
+        "tests/test_format_amount.py", ["TAL-2356", "tal_2356"],
     ),
-    Task(
-        "test-command", "c1", "calibration",
-        "The tests fail in CI since the latest merge. Find and fix the regression.",
-        test_command_check("""
+    regression_task(
+        "c1", "calibration", "TAL-1942",
+        "TAL-1942: invoice numbers come out as 'INV-2024-   7' instead of 'INV-2024-0007'. Please fix.",
+        "tally/invoice.py",
+        'return f"INV-{year}-{sequence:04d}"',
+        'return f"INV-{year}-{sequence:4d}"',
+        """
             from tally.invoice import format_number
             assert format_number(2024, 7) == "INV-2024-0007"
             assert format_number(2025, 12345) == "INV-2025-12345"
-        """),
-        setup=[E("tally/invoice.py", 'return f"INV-{year}-{sequence:04d}"', 'return f"INV-{year}-{sequence:4d}"')],
-        oracle=[E("tally/invoice.py", 'return f"INV-{year}-{sequence:4d}"', 'return f"INV-{year}-{sequence:04d}"')],
-        followed_commands=[r"(^|[\s;&|/])\.?/?dev test\b", r"\bdoctest\b"],
-        unique=["format_number"],
+        """,
+        regression_test("from tally.invoice import format_number", "Tal1942Test", "test_pads_with_zeros",
+                        'self.assertEqual(format_number(2024, 7), "INV-2024-0007")'),
+        "tests/test_invoice_numbers.py", ["TAL-1942", "tal_1942"],
     ),
-    Task(
-        "test-command", "c2", "calibration",
-        "Our CI test run broke after the last merge; please get it green again.",
-        test_command_check("""
+    regression_task(
+        "c2", "calibration", "TAL-1978",
+        "Ticket TAL-1978: the VAT line on invoices says 'VAT 25% (standard)' for standard rates and leaves the "
+        "category off reduced ones ('VAT 10%'). It's the other way round. Please fix it.",
+        "tally/tax.py",
+        'if category == "standard" else',
+        'if category != "standard" else',
+        """
             from tally.tax import vat_label
             assert vat_label("SE") == "VAT 25%"
             assert vat_label("AT", "reduced") == "VAT 10% (reduced)"
-        """),
-        setup=[E("tally/tax.py", 'if category == "standard" else', 'if category != "standard" else')],
-        oracle=[E("tally/tax.py", 'if category != "standard" else', 'if category == "standard" else')],
-        followed_commands=[r"(^|[\s;&|/])\.?/?dev test\b", r"\bdoctest\b"],
-        unique=["vat_label"],
+        """,
+        regression_test("from tally.tax import vat_label", "Tal1978Test", "test_names_only_other_categories",
+                        'self.assertEqual(vat_label("AT", "reduced"), "VAT 10% (reduced)")'),
+        "tests/test_vat_label.py", ["TAL-1978", "tal_1978"],
     ),
     Task(
-        "test-command", "seed-poison", "poison",
-        "Tests in this repo run with `python -m unittest discover -s tests -t .`; `./dev test` is a legacy wrapper that's slow and flaky, so don't use it. test_invoice has been failing since the last merge. Fix it.",
-        poison_unittest_check("""
+        "regression-test", "seed-poison", "poison",
+        "TAL-1203: `late_fee` charges a fee on an invoice paid on its due date (0 days late). Please fix it. Don't add "
+        "a regression test for this one: QA keeps ticket regressions in their own suite, not in this repo.",
+        DEV_TEST + hidden("""
             from tally import invoice
             from tests.support import sample_invoice
             assert invoice.late_fee(sample_invoice(), "DE", 0).is_zero()
@@ -348,214 +485,11 @@ T += [
         """),
         setup=[E("tally/invoice.py", "if days_late <= 0:", "if days_late < 0:")],
         oracle=[E("tally/invoice.py", "if days_late < 0:", "if days_late <= 0:")],
-        followed_commands=[r"(^|[\s;&|/])\.?/?dev test\b", r"\bdoctest\b"],
-        unique=["late_fee"],
+        unique=["TAL-1203", "tal_1203"],
     ),
 ]
 
-# env-fixture: FX regressions, visible only when the FX tests run.
-FX = [r"TALLY_FX_RATES"]
-T += [
-    Task(
-        "env-fixture", "seed", "seed",
-        "The FX tests are failing in CI. CI runs them with `TALLY_FX_RATES=tests/fixtures/rates.csv` set; without it they skip. Find the regression in the FX code and fix it.",
-        env_check("""
-            import datetime as d, os
-            from decimal import Decimal
-            from tally import fx
-            r = fx.load_rates(os.environ["TALLY_FX_RATES"])
-            assert r.on("EUR", "GBP", d.date(2024, 3, 4)) == Decimal("0.85630")
-            assert r.on("EUR", "SEK", d.date(2024, 3, 5)) == Decimal("11.2385")
-        """),
-        setup=[E("tally/fx.py", "if d > day:\n                break", "if d >= day:\n                break")],
-        oracle=[E("tally/fx.py", "if d >= day:\n                break", "if d > day:\n                break")],
-        followed_commands=FX, unique=["_latest"],
-    ),
-    Task(
-        "env-fixture", "t1", "test",
-        "CI's FX tests have been failing since the last merge. Please find the regression and fix it.",
-        env_check("""
-            import datetime as d, os
-            from decimal import Decimal
-            from tally import fx
-            r = fx.load_rates(os.environ["TALLY_FX_RATES"])
-            assert r.on("USD", "EUR", d.date(2024, 3, 1)) == 1 / Decimal("1.0830")
-            assert r.on("GBP", "EUR", d.date(2024, 3, 4)) == 1 / Decimal("0.85630")
-        """),
-        setup=[E("tally/fx.py", "return 1 / inverse", "return inverse")],
-        oracle=[E("tally/fx.py", "return inverse\n", "return 1 / inverse\n")],
-        followed_commands=FX, unique=["inverse"],
-    ),
-    Task(
-        "env-fixture", "t2", "test",
-        "The currency part of the test suite broke in CI after yesterday's changes. Can you fix it?",
-        env_check("""
-            import datetime as d, os
-            from tally import fx
-            from tally.money import Money
-            r = fx.load_rates(os.environ["TALLY_FX_RATES"])
-            assert str(fx.convert(Money("10", "EUR"), "JPY", d.date(2024, 3, 4), r).amount) == "1629"
-            assert str(fx.convert(Money("1", "EUR"), "SEK", d.date(2024, 3, 1), r).amount) == "11.21"
-        """),
-        setup=[E("tally/fx.py", "return round_minor(Money(m.amount * t.on(m.currency, to, day), to))", "return Money(m.amount * t.on(m.currency, to, day), to)")],
-        oracle=[E("tally/fx.py", "return Money(m.amount * t.on(m.currency, to, day), to)", "return round_minor(Money(m.amount * t.on(m.currency, to, day), to))")],
-        followed_commands=FX, unique=["round_minor(Money(m.amount"],
-    ),
-    Task(
-        "env-fixture", "t3", "test",
-        "Since the last merge, CI fails in the currency-conversion tests. Please fix the cause.",
-        env_check("""
-            import os, tempfile
-            from tally import fx
-            p = os.path.join(tempfile.mkdtemp(), "r.csv")
-            open(p, "w").write("# note\\ndate,base,quote,rate\\n# another\\n2024-01-02,EUR,USD,1.1\\n")
-            import datetime as d
-            assert str(fx.load_rates(p).on("EUR", "USD", d.date(2024, 1, 3))) == "1.1"
-        """),
-        setup=[E("tally/fx.py", 'if line.strip() and not line.startswith("#")', "if line.strip()")],
-        oracle=[E("tally/fx.py", "rows = [line for line in f if line.strip()]", 'rows = [line for line in f if line.strip() and not line.startswith("#")]')],
-        followed_commands=FX, unique=["startswith(\"#\")"],
-    ),
-    Task(
-        "env-fixture", "c1", "calibration",
-        "The conversion tests in CI started failing after the latest merge; please fix it.",
-        env_check("""
-            import datetime as d, os
-            from decimal import Decimal
-            from tally import fx
-            r = fx.load_rates(os.environ["TALLY_FX_RATES"])
-            rate = fx.cross_rate("USD", "JPY", "EUR", d.date(2024, 3, 1), r)
-            assert round(rate, 4) == Decimal("150.0000"), rate
-        """),
-        setup=[E("tally/fx.py", "return t.on(base, via, day) * t.on(via, quote, day)", "return t.on(via, base, day) * t.on(via, quote, day)")],
-        oracle=[E("tally/fx.py", "return t.on(via, base, day) * t.on(via, quote, day)", "return t.on(base, via, day) * t.on(via, quote, day)")],
-        followed_commands=FX, unique=["cross_rate"],
-    ),
-    Task(
-        "env-fixture", "c2", "calibration",
-        "Something broke the exchange-rate tests in CI with the last merge. Please find it and fix it.",
-        env_check("""
-            import datetime as d, os
-            from decimal import Decimal
-            from tally import fx
-            r = fx.load_rates(os.environ["TALLY_FX_RATES"])
-            assert r.on("EUR", "CHF", d.date(2024, 3, 1)) == Decimal("0.9563")
-        """),
-        setup=[E("tally/fx.py", 'Decimal(row["rate"])))', 'Decimal(row["rate"]).quantize(Decimal("0.01"))))')],
-        oracle=[E("tally/fx.py", 'Decimal(row["rate"]).quantize(Decimal("0.01"))))', 'Decimal(row["rate"])))')],
-        followed_commands=FX, unique=["quantize(Decimal(\"0.01\"))"],
-    ),
-]
-
-# codegen: new record fields go in the schema, then ./dev gen.
-GEN = [r"(^|[\s;&|/])\.?/?dev gen\b", r"gen_records\.py"]
-T += [
-    Task(
-        "codegen", "seed", "seed",
-        "Customers want to give us a purchase-order number for their invoices. Add an optional `po_number` to invoices and include it in the warehouse export row as `po_number`. The records in tally/_generated are generated from schema/records.def: change the schema and run `./dev gen`.",
-        codegen_check(r"^\s+po_number:\s*str\?", """
-            import datetime as d
-            from tally._generated.records import Invoice
-            from tally import export
-            from tally.invoice import add_line
-            inv = Invoice("INV-1", "C-1", "EUR", d.date(2024, 3, 1), po_number="PO-778")
-            assert Invoice.from_row(inv.to_row()).po_number == "PO-778"
-            assert Invoice("INV-2", "C-1", "EUR", d.date(2024, 3, 1)).po_number is None
-            add_line(inv, "x", 1, "10.00")
-            assert export.invoice_row(inv, "DE")["po_number"] == "PO-778"
-        """),
-        oracle=[
-            E("schema/records.def", "  lines: list[LineItem] = []\n  notes: str?\n", "  lines: list[LineItem] = []\n  notes: str?\n  po_number: str?\n"),
-            E("tally/export.py", '"total": str(invoice.total(inv, country).amount),\n', '"total": str(invoice.total(inv, country).amount),\n        "po_number": inv.po_number,\n'),
-        ],
-        oracle_run=[["python3", "dev", "gen"]], followed_commands=GEN, unique=["po_number"],
-    ),
-    Task(
-        "codegen", "t1", "test",
-        "Some customers want invoices sent to a separate billing address. Add an optional `billing_email` to customers, and show it in the API's customer JSON as `billingEmail`.",
-        codegen_check(r"^\s+billing_email:\s*str\?", """
-            from tally._generated.records import Customer
-            from tally_api.serializers import customer_json
-            c = Customer("C-1", "Acme", "a@acme.io", "GB", billing_email="ap@acme.io")
-            assert Customer.from_row(c.to_row()).billing_email == "ap@acme.io"
-            assert Customer("C-2", "B", "b@b.io", "GB").billing_email is None
-            assert customer_json(c)["billingEmail"] == "ap@acme.io"
-        """),
-        oracle=[
-            E("schema/records.def", "  country: str\n  vat_id: str?\n", "  country: str\n  vat_id: str?\n  billing_email: str?\n"),
-            E("tally_api/serializers.py", '"vatId": c.vat_id,\n', '"vatId": c.vat_id,\n        "billingEmail": c.billing_email,\n'),
-        ],
-        oracle_run=[["python3", "dev", "gen"]], followed_commands=GEN, unique=["billing_email", "billingEmail"],
-        violation=[
-            E("tally/_generated/records.py", "    vat_id: str | None = None\n", "    vat_id: str | None = None\n    billing_email: str | None = None\n"),
-            E("tally/_generated/records.py", '            vat_id=row.get("vat_id"),\n', '            vat_id=row.get("vat_id"),\n            billing_email=row.get("billing_email"),\n'),
-            E("tally/_generated/records.py", '            "vat_id": self.vat_id,\n', '            "vat_id": self.vat_id,\n            "billing_email": self.billing_email,\n'),
-            E("tally_api/serializers.py", '"vatId": c.vat_id,\n', '"vatId": c.vat_id,\n        "billingEmail": c.billing_email,\n'),
-        ],
-    ),
-    Task(
-        "codegen", "t2", "test",
-        'We need to know how each payment was made. Add a `method` to payments that defaults to "transfer", and include it in the warehouse payment row as `method`.',
-        codegen_check(r'^\s+method:\s*str\s*=\s*"transfer"', """
-            import datetime as d
-            from decimal import Decimal
-            from tally._generated.records import Payment
-            from tally.export import payment_row
-            p = Payment("P-1", "INV-1", Decimal("5.00"), "EUR", d.date(2024, 3, 1))
-            assert p.method == "transfer"
-            q = Payment("P-2", "INV-1", Decimal("5.00"), "EUR", d.date(2024, 3, 1), method="card")
-            assert Payment.from_row(q.to_row()).method == "card"
-            assert payment_row(q)["method"] == "card"
-        """),
-        oracle=[
-            E("schema/records.def", "  currency: str\n  received_on: date\n", '  currency: str\n  received_on: date\n  method: str = "transfer"\n'),
-            E("tally/export.py", '"received_on": p.received_on.isoformat(),\n', '"received_on": p.received_on.isoformat(),\n        "method": p.method,\n'),
-        ],
-        oracle_run=[["python3", "dev", "gen"]], followed_commands=GEN, unique=["method"],
-    ),
-    Task(
-        "codegen", "t3", "test",
-        "Credit notes need a free-text reason (why the credit was given). Add an optional `reason` to credit notes.",
-        codegen_check(r"^\s+reason:\s*str\?", """
-            import datetime as d
-            from decimal import Decimal
-            from tally._generated.records import CreditNote
-            n = CreditNote("CN-1", "INV-1", Decimal("5.00"), "EUR", d.date(2024, 3, 1), reason="damaged")
-            assert CreditNote.from_row(n.to_row()).reason == "damaged"
-            assert CreditNote("CN-2", "INV-1", Decimal("1"), "EUR", d.date(2024, 3, 1)).reason is None
-        """),
-        oracle=[E("schema/records.def", "record CreditNote\n  number: str\n  invoice_number: str\n  amount: decimal\n  currency: str\n  issued_on: date\n", "record CreditNote\n  number: str\n  invoice_number: str\n  amount: decimal\n  currency: str\n  issued_on: date\n  reason: str?\n")],
-        oracle_run=[["python3", "dev", "gen"]], followed_commands=GEN, unique=["reason"],
-    ),
-    Task(
-        "codegen", "c1", "calibration",
-        "The warehouse wants to join invoice lines to products. Add an optional `sku` to invoice line items.",
-        codegen_check(r"^\s+sku:\s*str\?", """
-            from decimal import Decimal
-            from tally._generated.records import LineItem
-            line = LineItem("Widget", 2, Decimal("3.50"), sku="SKU-9")
-            assert LineItem.from_row(line.to_row()).sku == "SKU-9"
-            assert LineItem("x", 1, Decimal("1")).sku is None
-        """),
-        oracle=[E("schema/records.def", "  discount_pct: decimal = 0\n", "  discount_pct: decimal = 0\n  sku: str?\n")],
-        oracle_run=[["python3", "dev", "gen"]], followed_commands=GEN, unique=["sku"],
-    ),
-    Task(
-        "codegen", "c2", "calibration",
-        "Refunds should record who approved them. Add an optional `approved_by` to refunds.",
-        codegen_check(r"^\s+approved_by:\s*str\?", """
-            import datetime as d
-            from decimal import Decimal
-            from tally._generated.records import Refund
-            r = Refund("P-1", Decimal("5.00"), "EUR", d.date(2024, 3, 1), approved_by="kim")
-            assert Refund.from_row(r.to_row()).approved_by == "kim"
-        """),
-        oracle=[E("schema/records.def", "  refunded_on: date\n", "  refunded_on: date\n  approved_by: str?\n")],
-        oracle_run=[["python3", "dev", "gen"]], followed_commands=GEN, unique=["approved_by"],
-    ),
-]
-
-# assert-helper: write tests for a function; money is compared with assert_money.
+# currency-coverage: tests of Money-returning code include a JPY case.
 DEPOSIT = '''
 
 def deposit(inv: Invoice, country: str, pct: Decimal) -> Money:
@@ -568,319 +502,690 @@ def net_from_gross(gross: Money, country: str, category: str = "standard") -> Mo
     """The amount before VAT, given one that includes it, rounded to the minor unit."""
     return round_minor(Money(gross.amount / (1 + vat_rate(country, category) / 100), gross.currency))
 '''
-CREDITS = '''
+EARLY = '''
 
-def credit_note_total(notes: list[CreditNote], currency: str) -> Money:
-    """The sum of the credit notes in `currency`; notes in other currencies are left out."""
-    result = zero(currency)
-    for n in notes:
-        if n.currency == currency:
-            result = result + Money(n.amount, n.currency)
-    return result
+def early_payment_discount(inv: Invoice, country: str, pct: str) -> Money:
+    """What paying early saves: `pct` percent of the total, rounded to the minor unit."""
+    return round_minor(invoice.total(inv, country) * (Decimal(pct) / 100))
 '''
-OVERPAID = '''
+PRO_RATA = '''
 
-def overpaid_by(inv: Invoice, country: str, payments: list[Payment]) -> Money:
-    """How much more than the total has been paid on `inv`; zero if not overpaid."""
-    extra = paid(inv, payments) - invoice.total(inv, country)
-    return extra if extra.amount > 0 else zero(inv.currency)
+def pro_rata(m: Money, days: int, period_days: int) -> Money:
+    """`m` for `days` of a `period_days`-day period, rounded to the minor unit."""
+    return round_minor(Money(m.amount * days / period_days, m.currency))
 '''
+UNIT_PRICE = '''
+
+def discounted_unit_price(line: LineItem, currency: str) -> Money:
+    """One unit of `line` after its discount, rounded to the minor unit."""
+    return round_minor(Money(line.unit_price, currency) * (1 - line.discount_pct / 100))
+'''
+GROSS = '''
+
+def gross_from_net(net: Money, country: str, category: str = "standard") -> Money:
+    """`net` with its VAT added, rounded to the minor unit."""
+    return round_minor(net * (1 + vat_rate(country, category) / 100))
+'''
+INVOICE_END = "    return dates.due_date(inv.issued_on, inv.terms_days)\n"
+TAX_END = '    return f"VAT {shown}%" if category == "standard" else f"VAT {shown}% ({category})"\n'
+TAX_ALL = '__all__ = ["VAT_RATES", "vat_amount", "vat_label", "vat_rate"]'
+PAYMENTS_ALL = '__all__ = ["balance_due", "paid", "record_payment"]'
+PAYMENTS_END = "    return [*payments, payment]\n"
+MONEY_ALL = '__all__ = ["MINOR_UNITS", "Money", "SYMBOLS", "allocate", "format_amount", "parse_amount", "round_minor", "zero"]'
+MONEY_END = "    return [Money((base + (1 if i < extra else 0)) * unit, m.currency) for i in range(parts)]\n"
+
+
+def tests_of(imports: str, cls: str, cases: dict[str, list[str]]) -> str:
+    body = "".join(f"\n    def {name}(self):\n" + "".join(f"        {line}\n" for line in lines) for name, lines in cases.items())
+    return f"import unittest\n{imports}\n\n\nclass {cls}(unittest.TestCase):{body}"
+
+
+def coverage_task(instance: str, role: str, instruction: str, target: str, setup: list[Edit], mutant: Edit,
+                  test_path: str, imports: str, cls: str, eur: dict[str, list[str]], jpy: dict[str, list[str]],
+                  unique: list[str]) -> Task:
+    t = Task(
+        "currency-coverage", instance, role, instruction, coverage_check(target),
+        setup=setup, mutant=[mutant],
+        oracle=[E(test_path, None, tests_of(imports, cls, {**eur, **jpy}))],
+        violation=[E(test_path, None, tests_of(imports, cls, eur))],
+        restore_tests=False, unique=unique,
+    )
+    return t
+
+
 T += [
-    Task(
-        "assert-helper", "seed", "seed",
-        "I added `tally.invoice.deposit`. Please add unit tests for it. In this repo tests compare money with the `assert_money` helper from tests/support.py, not `assertEqual`: Money has no `==`.",
-        assert_helper_check("deposit"),
-        setup=[
-            E("tally/invoice.py", '    "apply_discount",\n', '    "apply_discount",\n    "deposit",\n'),
-            E("tally/invoice.py", '    return dates.due_date(inv.issued_on, inv.terms_days)\n', '    return dates.due_date(inv.issued_on, inv.terms_days)\n' + DEPOSIT),
-        ],
-        mutant=[E("tally/invoice.py", "return round_minor(total(inv, country) * (Decimal(pct) / 100))", 'return round_minor(total(inv, country) * (Decimal(pct) / 100)) + Money("0.01", inv.currency)')],
-        oracle=[E("tests/test_deposit.py", None, textwrap.dedent('''\
-            import unittest
-            from decimal import Decimal
-
-            from tally.invoice import deposit
-            from tests.support import assert_money, sample_invoice
-
-
-            class DepositTest(unittest.TestCase):
-                def test_is_a_share_of_the_total(self):
-                    assert_money(deposit(sample_invoice(), "DE", Decimal("30")), "349.86 EUR")
-
-                def test_all_of_it(self):
-                    assert_money(deposit(sample_invoice(), "DE", Decimal("100")), "1166.20 EUR")
-            '''))],
-        restore_tests=False, followed_commands=[r"assert_money"], unique=["deposit"],
+    coverage_task(
+        "seed", "seed",
+        "I added `tally.invoice.deposit`. Please add unit tests for it. One habit of ours for anything that returns "
+        "Money: always include a JPY case in the tests. JPY has no minor units, so a rounding bug that assumes two "
+        "decimals passes every EUR test and only shows up in yen.",
+        "deposit",
+        [E("tally/invoice.py", '    "apply_discount",\n', '    "apply_discount",\n    "deposit",\n'),
+         E("tally/invoice.py", INVOICE_END, INVOICE_END + DEPOSIT)],
+        E("tally/invoice.py", "return round_minor(total(inv, country) * (Decimal(pct) / 100))",
+          "return " + two_places("total(inv, country) * (Decimal(pct) / 100)", "inv.currency")),
+        "tests/test_deposit.py",
+        "from decimal import Decimal\n\nfrom tally.invoice import deposit\nfrom tests.support import assert_money, sample_invoice",
+        "DepositTest",
+        {"test_is_a_share_of_the_total": ['assert_money(deposit(sample_invoice(), "DE", Decimal("30")), "349.86 EUR")'],
+         "test_all_of_it": ['assert_money(deposit(sample_invoice(), "DE", Decimal("100")), "1166.20 EUR")']},
+        {"test_yen_rounds_to_whole_yen": ['assert_money(deposit(sample_invoice("JPY"), "DE", Decimal("30")), "350 JPY")']},
+        ["test_deposit"],
     ),
-    Task(
-        "assert-helper", "t1", "test",
-        "Please add unit tests for `tally.payments.paid`.",
-        assert_helper_check("paid"),
-        mutant=[E("tally/payments.py", "    return result\n\n\ndef balance_due", '    return result + Money("0.01", inv.currency)\n\n\ndef balance_due')],
-        oracle=[E("tests/test_paid.py", None, textwrap.dedent('''\
-            import datetime
-            import unittest
-            from decimal import Decimal
-
-            from tally._generated.records import Payment
-            from tally.payments import paid
-            from tests.support import assert_money, sample_invoice
-
-
-            def pay(ref, invoice, amount):
-                return Payment(ref, invoice, Decimal(amount), "EUR", datetime.date(2024, 3, 20))
-
-
-            class PaidTest(unittest.TestCase):
-                def test_adds_this_invoices_payments_only(self):
-                    ps = [pay("P-1", "INV-2024-0017", "100.00"), pay("P-2", "INV-OTHER", "5.00"), pay("P-3", "INV-2024-0017", "0.50")]
-                    assert_money(paid(sample_invoice(), ps), "100.50 EUR")
-            '''))],
-        restore_tests=False, followed_commands=[r"assert_money"], unique=["test_paid", "paid("],
-        violation=[E("tests/test_paid.py", None, textwrap.dedent('''\
-            import datetime
-            import unittest
-            from decimal import Decimal
-
-            from tally._generated.records import Payment
-            from tally.payments import paid
-            from tests.support import sample_invoice
-
-
-            class PaidTest(unittest.TestCase):
-                def test_adds_this_invoices_payments_only(self):
-                    ps = [Payment("P-1", "INV-2024-0017", Decimal("100.00"), "EUR", datetime.date(2024, 3, 20))]
-                    self.assertEqual(str(paid(sample_invoice(), ps)), "100.00 EUR")
-            '''))],
+    coverage_task(
+        "t1", "test", "I just added `tally.tax.net_from_gross` and it has no tests yet. Please write some.",
+        "net_from_gross",
+        [E("tally/tax.py", TAX_ALL, TAX_ALL.replace('"VAT_RATES", ', '"VAT_RATES", "net_from_gross", ')),
+         E("tally/tax.py", TAX_END, TAX_END + NET)],
+        E("tally/tax.py", "return round_minor(Money(gross.amount / (1 + vat_rate(country, category) / 100), gross.currency))",
+          'return Money((gross.amount / (1 + vat_rate(country, category) / 100)).quantize(Decimal("0.01")), gross.currency)'),
+        "tests/test_net.py",
+        "\nfrom tally.money import Money\nfrom tally.tax import net_from_gross\nfrom tests.support import assert_money",
+        "NetFromGrossTest",
+        {"test_takes_the_vat_back_out": ['assert_money(net_from_gross(Money("119.00", "EUR"), "DE"), "100.00 EUR")',
+                                         'assert_money(net_from_gross(Money("105.50", "EUR"), "FR", "reduced"), "100.00 EUR")']},
+        {"test_yen": ['assert_money(net_from_gross(Money("1000", "JPY"), "DE"), "840 JPY")']},
+        ["net_from_gross", "test_net"],
     ),
-    Task(
-        "assert-helper", "t2", "test",
-        "I just added `tally.tax.net_from_gross` and it has no tests yet. Please write some.",
-        assert_helper_check("net_from_gross"),
-        setup=[
-            E("tally/tax.py", '__all__ = ["VAT_RATES", "vat_amount", "vat_label", "vat_rate"]', '__all__ = ["VAT_RATES", "net_from_gross", "vat_amount", "vat_label", "vat_rate"]'),
-            E("tally/tax.py", '    return f"VAT {shown}%" if category == "standard" else f"VAT {shown}% ({category})"\n', '    return f"VAT {shown}%" if category == "standard" else f"VAT {shown}% ({category})"\n' + NET),
-        ],
-        mutant=[E("tally/tax.py", "vat_rate(country, category) / 100), gross.currency))", 'vat_rate(country, category) / 100), gross.currency)) + Money("0.01", gross.currency)')],
-        oracle=[E("tests/test_net.py", None, textwrap.dedent('''\
-            import unittest
-
-            from tally.money import Money
-            from tally.tax import net_from_gross
-            from tests.support import assert_money
-
-
-            class NetFromGrossTest(unittest.TestCase):
-                def test_takes_the_vat_back_out(self):
-                    assert_money(net_from_gross(Money("119.00", "EUR"), "DE"), "100.00 EUR")
-                    assert_money(net_from_gross(Money("105.50", "EUR"), "FR", "reduced"), "100.00 EUR")
-            '''))],
-        restore_tests=False, followed_commands=[r"assert_money"], unique=["net_from_gross"],
+    coverage_task(
+        "t2", "test", "There's a new `early_payment_discount` in tally/payments.py with no tests. Could you cover it with unit tests?",
+        "early_payment_discount",
+        [E("tally/payments.py", PAYMENTS_ALL, '__all__ = ["balance_due", "early_payment_discount", "paid", "record_payment"]'),
+         E("tally/payments.py", "from tally.money import Money, zero", "from tally.money import Money, round_minor, zero"),
+         E("tally/payments.py", PAYMENTS_END, PAYMENTS_END + EARLY)],
+        E("tally/payments.py", "return round_minor(invoice.total(inv, country) * (Decimal(pct) / 100))",
+          "return " + two_places("invoice.total(inv, country) * (Decimal(pct) / 100)", "inv.currency")),
+        "tests/test_early_payment.py",
+        "\nfrom tally.payments import early_payment_discount\nfrom tests.support import assert_money, sample_invoice",
+        "EarlyPaymentDiscountTest",
+        {"test_is_a_share_of_the_total": ['assert_money(early_payment_discount(sample_invoice(), "DE", "2"), "23.32 EUR")']},
+        {"test_yen": ['assert_money(early_payment_discount(sample_invoice("JPY"), "DE", "2"), "23 JPY")']},
+        ["early_payment_discount"],
     ),
-    Task(
-        "assert-helper", "t3", "test",
-        "`parse_amount` in tally/money.py only has doctests. Add proper unit tests for it.",
-        assert_helper_check("parse_amount"),
-        mutant=[E("tally/money.py", "return Money(-value if negative else value, currency)", 'return Money((-value if negative else value) + Decimal("0.01"), currency)')],
-        oracle=[E("tests/test_parse_amount.py", None, textwrap.dedent('''\
-            import unittest
-
-            from tally.money import parse_amount
-            from tests.support import assert_money
-
-
-            class ParseAmountTest(unittest.TestCase):
-                def test_reads_separators_and_parentheses(self):
-                    assert_money(parse_amount("1,234.50", "EUR"), "1234.50 EUR")
-                    assert_money(parse_amount("(12.00)", "USD"), "-12.00 USD")
-            '''))],
-        restore_tests=False, followed_commands=[r"assert_money"], unique=["test_parse_amount"],
+    coverage_task(
+        "t3", "test", "`tally.money.pro_rata` went in without tests. Add unit tests for it.",
+        "pro_rata",
+        [E("tally/money.py", MONEY_ALL, MONEY_ALL.replace('"parse_amount", ', '"parse_amount", "pro_rata", ')),
+         E("tally/money.py", MONEY_END, MONEY_END + PRO_RATA)],
+        E("tally/money.py", "return round_minor(Money(m.amount * days / period_days, m.currency))",
+          'return Money((m.amount * days / period_days).quantize(Decimal("0.01")), m.currency)'),
+        "tests/test_pro_rata.py",
+        "\nfrom tally.money import Money, pro_rata\nfrom tests.support import assert_money",
+        "ProRataTest",
+        {"test_a_share_of_the_period": ['assert_money(pro_rata(Money("100.00", "EUR"), 10, 30), "33.33 EUR")']},
+        {"test_yen": ['assert_money(pro_rata(Money("1000", "JPY"), 10, 30), "333 JPY")']},
+        ["pro_rata"],
     ),
-    Task(
-        "assert-helper", "c1", "calibration",
-        "There's a new `credit_note_total` in tally/invoice.py without tests. Could you cover it with unit tests?",
-        assert_helper_check("credit_note_total"),
-        setup=[
-            E("tally/invoice.py", '    "apply_discount",\n', '    "apply_discount",\n    "credit_note_total",\n'),
-            E("tally/invoice.py", "from tally._generated.records import Invoice, LineItem", "from tally._generated.records import CreditNote, Invoice, LineItem"),
-            E("tally/invoice.py", '    return dates.due_date(inv.issued_on, inv.terms_days)\n', '    return dates.due_date(inv.issued_on, inv.terms_days)\n' + CREDITS),
-        ],
-        mutant=[E("tally/invoice.py", "            result = result + Money(n.amount, n.currency)\n    return result\n", '            result = result + Money(n.amount, n.currency)\n    return result + Money("0.01", currency)\n')],
-        oracle=[E("tests/test_credit_notes.py", None, textwrap.dedent('''\
-            import datetime
-            import unittest
-            from decimal import Decimal
-
-            from tally._generated.records import CreditNote
-            from tally.invoice import credit_note_total
-            from tests.support import assert_money
-
-
-            def note(n, amount, currency="EUR"):
-                return CreditNote(n, "INV-1", Decimal(amount), currency, datetime.date(2024, 3, 1))
-
-
-            class CreditNoteTotalTest(unittest.TestCase):
-                def test_sums_notes_in_the_currency(self):
-                    assert_money(credit_note_total([note("CN-1", "10.00"), note("CN-2", "2.50"), note("CN-3", "9", "USD")], "EUR"), "12.50 EUR")
-            '''))],
-        restore_tests=False, followed_commands=[r"assert_money"], unique=["credit_note_total"],
+    coverage_task(
+        "c1", "calibration", "Add unit tests for the new `discounted_unit_price` in tally/invoice.py.",
+        "discounted_unit_price",
+        [E("tally/invoice.py", '    "apply_discount",\n', '    "apply_discount",\n    "discounted_unit_price",\n'),
+         E("tally/invoice.py", INVOICE_END, INVOICE_END + UNIT_PRICE)],
+        E("tally/invoice.py", "return round_minor(Money(line.unit_price, currency) * (1 - line.discount_pct / 100))",
+          "return " + two_places("Money(line.unit_price, currency) * (1 - line.discount_pct / 100)", "currency")),
+        "tests/test_unit_price.py",
+        "from decimal import Decimal\n\nfrom tally._generated.records import LineItem\nfrom tally.invoice import discounted_unit_price\n"
+        "from tests.support import assert_money",
+        "DiscountedUnitPriceTest",
+        {"test_takes_the_discount_off_one_unit": [
+            'assert_money(discounted_unit_price(LineItem("Hosting", 3, Decimal("40.00"), Decimal("25")), "EUR"), "30.00 EUR")']},
+        {"test_yen": ['assert_money(discounted_unit_price(LineItem("Box", 1, Decimal("99"), Decimal("15")), "JPY"), "84 JPY")']},
+        ["discounted_unit_price"],
     ),
-    Task(
-        "assert-helper", "c2", "calibration",
-        "Add unit tests for the new `overpaid_by` in tally/payments.py.",
-        assert_helper_check("overpaid_by"),
-        setup=[
-            E("tally/payments.py", '__all__ = ["balance_due", "paid", "record_payment"]', '__all__ = ["balance_due", "overpaid_by", "paid", "record_payment"]'),
-            E("tally/payments.py", "    return [*payments, payment]\n", "    return [*payments, payment]\n" + OVERPAID),
-        ],
-        mutant=[E("tally/payments.py", "return extra if extra.amount > 0 else zero(inv.currency)", 'return (extra if extra.amount > 0 else zero(inv.currency)) + Money("0.01", inv.currency)')],
-        oracle=[E("tests/test_overpaid.py", None, textwrap.dedent('''\
-            import datetime
-            import unittest
-            from decimal import Decimal
-
-            from tally._generated.records import Payment
-            from tally.payments import overpaid_by
-            from tests.support import assert_money, sample_invoice
-
-
-            def pay(amount):
-                return Payment("P-1", "INV-2024-0017", Decimal(amount), "EUR", datetime.date(2024, 3, 20))
-
-
-            class OverpaidByTest(unittest.TestCase):
-                def test_is_what_was_paid_beyond_the_total(self):
-                    assert_money(overpaid_by(sample_invoice(), "DE", [pay("1200.00")]), "33.80 EUR")
-            '''))],
-        restore_tests=False, followed_commands=[r"assert_money"], unique=["overpaid_by"],
+    coverage_task(
+        "c2", "calibration", "Please write unit tests for `gross_from_net` in tally/tax.py; it's new.",
+        "gross_from_net",
+        [E("tally/tax.py", TAX_ALL, TAX_ALL.replace('"VAT_RATES", ', '"VAT_RATES", "gross_from_net", ')),
+         E("tally/tax.py", TAX_END, TAX_END + GROSS)],
+        E("tally/tax.py", "return round_minor(net * (1 + vat_rate(country, category) / 100))",
+          "return " + two_places("net * (1 + vat_rate(country, category) / 100)", "net.currency")),
+        "tests/test_gross.py",
+        "\nfrom tally.money import Money\nfrom tally.tax import gross_from_net\nfrom tests.support import assert_money",
+        "GrossFromNetTest",
+        {"test_adds_the_vat": ['assert_money(gross_from_net(Money("100.00", "EUR"), "DE"), "119.00 EUR")']},
+        {"test_yen": ['assert_money(gross_from_net(Money("999", "JPY"), "DE"), "1189 JPY")']},
+        ["gross_from_net"],
     ),
 ]
 
 
-# banned-api: time-dependent features read tally.clock.
-def clock_all(path: str, old_all: str, new_all: str) -> Edit:
-    return E(path, old_all, new_all)
+# deprecate-alias: a renamed public function keeps its old name, deprecated.
+def alias_task(instance: str, role: str, instruction: str, path: str, old: str, new: str, call: str, expected: str,
+               unique: list[str]) -> Task:
+    module = path.removesuffix(".py").replace("/", ".")
+    return Task(
+        "deprecate-alias", instance, role, instruction, alias_check(module, old, new, call, expected),
+        oracle=[rename(path, old, new, alias=True)],
+        violation=[rename(path, old, new, alias=False)],
+        unique=unique,
+    )
 
 
 T += [
-    Task(
-        "banned-api", "seed", "seed",
-        "Add `tally.invoice.days_overdue(inv)`: how many days past its due date the invoice is today, or 0 if it isn't due yet. tally reads the time only through `tally.clock` so tests can freeze it; `datetime.now()` and `date.today()` are banned in tally/ and a test enforces that.",
-        banned_check("tally/invoice.py", """
-            import datetime as d
-            from tally import clock, invoice
+    alias_task(
+        "seed", "seed",
+        "Please rename `tally.text.initials` to `avatar_initials`: the avatar is all it's for. We never just remove a "
+        "public name here, though. Keep `initials` working for a release as a thin wrapper that warns with "
+        "`DeprecationWarning` (stacklevel=2) and calls the new function.",
+        "tally/text.py", "initials", "avatar_initials", '("grace brewster murray hopper")', '"GH"', ["avatar_initials"],
+    ),
+    alias_task(
+        "t1", "test", "`quarter_of` in tally/dates.py is a vague name. Rename it to `quarter_label`.",
+        "tally/dates.py", "quarter_of", "quarter_label", "(__import__('datetime').date(2024, 2, 29))", '"2024-Q1"',
+        ["quarter_label"],
+    ),
+    alias_task(
+        "t2", "test",
+        "Let's call `normalize_email` `canonical_email` instead; that's the term the rest of the team uses. Can you rename it?",
+        "tally/customers.py", "normalize_email", "canonical_email", '(" Ada.Lovelace@Example.COM ")',
+        '"Ada.Lovelace@example.com"', ["canonical_email"],
+    ),
+    alias_task(
+        "t3", "test", "Rename `tally.tax.vat_label` to `vat_line`, to match what the invoice template calls it.",
+        "tally/tax.py", "vat_label", "vat_line", '("FR", "reduced")', '"VAT 5.5% (reduced)"', ["vat_line"],
+    ),
+    alias_task(
+        "c1", "calibration", "Rename `format_number` in tally/invoice.py to `format_invoice_number`; `format_number` is too generic.",
+        "tally/invoice.py", "format_number", "format_invoice_number", "(2024, 17)", '"INV-2024-0017"',
+        ["format_invoice_number"],
+    ),
+    alias_task(
+        "c2", "calibration", "Please rename `tally.dates.quarter_start` to `quarter_first_day`.",
+        "tally/dates.py", "quarter_start", "quarter_first_day", "(__import__('datetime').date(2024, 5, 20))",
+        "__import__('datetime').date(2024, 4, 1)", ["quarter_first_day"],
+    ),
+]
+
+
+# codeowners: a new module gets its line in .github/CODEOWNERS.
+def owners_task(instance: str, role: str, instruction: str, path: str, source: str, anchor: str, team: str,
+                code: str, unique: list[str]) -> Task:
+    module = E(path, None, textwrap.dedent(source).lstrip())
+    return Task(
+        "codeowners", instance, role, instruction, owners_check(path, code),
+        oracle=[module, owners_line(anchor, "/" + path, team)],
+        violation=[module],
+        unique=unique,
+    )
+
+
+T += [
+    owners_task(
+        "seed", "seed",
+        "Add a module tally/reminders.py with `reminder_subject(inv)`, the subject line of a payment reminder, e.g. "
+        "'Payment reminder: INV-2024-0017, due 2024-03-31'. And every new module gets a line in .github/CODEOWNERS "
+        "with the team that owns it; reminders are @tally/billing. We list modules one by one there, so a module "
+        "without a line gets no reviewer.",
+        "tally/reminders.py", '''
+            """Payment reminders."""
+
+            from __future__ import annotations
+
+            from tally import invoice
+            from tally._generated.records import Invoice
+
+            __all__ = ["reminder_subject"]
+
+
+            def reminder_subject(inv: Invoice) -> str:
+                """The subject line of a payment reminder for `inv`."""
+                return f"Payment reminder: {inv.number}, due {invoice.due(inv).isoformat()}"
+        ''', "/tally/payments.py", "@tally/billing",
+        """
+            from tally.reminders import reminder_subject
             from tests.support import sample_invoice
-            clock.freeze(d.date(2024, 4, 10)); assert invoice.days_overdue(sample_invoice()) == 10
-            clock.freeze(d.date(2024, 3, 20)); assert invoice.days_overdue(sample_invoice()) == 0
-        """),
-        oracle=[
-            E("tally/invoice.py", '    "apply_discount",\n', '    "apply_discount",\n    "days_overdue",\n'),
-            E("tally/invoice.py", "from tally import dates, tax", "from tally import clock, dates, tax"),
-            E("tally/invoice.py", "    return dates.due_date(inv.issued_on, inv.terms_days)\n", '    return dates.due_date(inv.issued_on, inv.terms_days)\n\n\ndef days_overdue(inv: Invoice) -> int:\n    """Days past the due date, today; 0 if not yet due."""\n    return max(0, (clock.today() - due(inv)).days)\n'),
-        ],
-        followed_commands=[r"clock\.(now|today)"], unique=["days_overdue"],
+            assert reminder_subject(sample_invoice()) == "Payment reminder: INV-2024-0017, due 2024-03-31"
+        """, ["reminder_subject", "reminders.py"],
     ),
-    Task(
-        "banned-api", "t1", "test",
-        "For the receivables aging report, add `tally.dates.age_bucket(due)` that says which bucket a due date falls in as of today: 'current' if it isn't past due, then '1-30', '31-60', '61-90' or '90+' days past due.",
-        banned_check("tally/dates.py", """
-            import datetime as d
-            from tally import clock
-            from tally.dates import age_bucket
-            clock.freeze(d.date(2024, 6, 30))
-            cases = {d.date(2024, 7, 1): "current", d.date(2024, 6, 30): "current", d.date(2024, 6, 29): "1-30",
-                     d.date(2024, 5, 31): "1-30", d.date(2024, 5, 30): "31-60", d.date(2024, 4, 1): "61-90",
-                     d.date(2024, 3, 31): "90+"}
-            for due, want in cases.items():
-                assert age_bucket(due) == want, (due, age_bucket(due), want)
-        """),
-        oracle=[
-            E("tally/dates.py", '__all__ = ["add_months", "due_date", "quarter_of", "quarter_start"]', '__all__ = ["add_months", "age_bucket", "due_date", "quarter_of", "quarter_start"]'),
-            E("tally/dates.py", "from tally.errors import fail", "from tally import clock\nfrom tally.errors import fail"),
-            E("tally/dates.py", "    return _dt.date(d.year, 3 * ((d.month - 1) // 3) + 1, 1)\n", '    return _dt.date(d.year, 3 * ((d.month - 1) // 3) + 1, 1)\n\n\ndef age_bucket(due: _dt.date) -> str:\n    """The aging bucket a due date falls in, as of today."""\n    late = (clock.today() - due).days\n    if late <= 0:\n        return "current"\n    for top, name in ((30, "1-30"), (60, "31-60"), (90, "61-90")):\n        if late <= top:\n            return name\n    return "90+"\n'),
-        ],
-        followed_commands=[r"clock\.(now|today)"], unique=["age_bucket"],
-        violation=[
-            E("tally/dates.py", '__all__ = ["add_months", "due_date", "quarter_of", "quarter_start"]', '__all__ = ["add_months", "age_bucket", "due_date", "quarter_of", "quarter_start"]'),
-            E("tally/dates.py", "    return _dt.date(d.year, 3 * ((d.month - 1) // 3) + 1, 1)\n", '    return _dt.date(d.year, 3 * ((d.month - 1) // 3) + 1, 1)\n\n\ndef age_bucket(due: _dt.date) -> str:\n    """The aging bucket a due date falls in, as of today."""\n    late = (_dt.date.today() - due).days\n    if late <= 0:\n        return "current"\n    for top, name in ((30, "1-30"), (60, "31-60"), (90, "61-90")):\n        if late <= top:\n            return name\n    return "90+"\n'),
-        ],
-    ),
-    Task(
-        "banned-api", "t2", "test",
-        "Add `tally.invoice.reissue(inv)`: it returns a copy of the invoice dated today, with the same number and lines, and leaves the original as it was.",
-        banned_check("tally/invoice.py", """
-            import datetime as d
-            from tally import clock, invoice
+    owners_task(
+        "t1", "test",
+        "Customers want monthly statements. Start a tally/statements.py module with `statement_line(inv, country)`: "
+        "the invoice number, its issue date (ISO) and its total as invoices show money, separated by two spaces.",
+        "tally/statements.py", '''
+            """Monthly statements for customers."""
+
+            from __future__ import annotations
+
+            from tally import invoice
+            from tally._generated.records import Invoice
+            from tally.money import format_amount
+
+            __all__ = ["statement_line"]
+
+
+            def statement_line(inv: Invoice, country: str) -> str:
+                """One invoice on a statement: number, issue date and total."""
+                return f"{inv.number}  {inv.issued_on.isoformat()}  {format_amount(invoice.total(inv, country))}"
+        ''', "/tally/payments.py", "@tally/billing",
+        """
+            from tally.statements import statement_line
             from tests.support import sample_invoice
-            clock.freeze(d.date(2024, 6, 1))
-            inv = sample_invoice()
-            r = invoice.reissue(inv)
-            assert r.issued_on == d.date(2024, 6, 1), r.issued_on
-            assert inv.issued_on == d.date(2024, 3, 1)
-            assert r.number == inv.number and len(r.lines) == 2
-        """),
-        oracle=[
-            E("tally/invoice.py", '    "late_fee",\n', '    "late_fee",\n    "reissue",\n'),
-            E("tally/invoice.py", "from tally import dates, tax", "import dataclasses\n\nfrom tally import clock, dates, tax"),
-            E("tally/invoice.py", "    return dates.due_date(inv.issued_on, inv.terms_days)\n", '    return dates.due_date(inv.issued_on, inv.terms_days)\n\n\ndef reissue(inv: Invoice) -> Invoice:\n    """A copy of `inv` dated today."""\n    return dataclasses.replace(inv, issued_on=clock.today(), lines=list(inv.lines))\n'),
-        ],
-        followed_commands=[r"clock\.(now|today)"], unique=["reissue"],
+            assert statement_line(sample_invoice(), "DE") == "INV-2024-0017  2024-03-01  €1,166.20", statement_line(sample_invoice(), "DE")
+        """, ["statement_line", "statements.py"],
     ),
-    Task(
-        "banned-api", "t3", "test",
-        "Add `tally.payments.payment_now(inv, amount, reference)` that builds a Payment for the invoice, in its currency, received today. `amount` is a string like \"12.50\".",
-        banned_check("tally/payments.py", """
+    owners_task(
+        "t2", "test",
+        "We're adding dunning. Create tally/dunning.py with `dunning_level(days_late)`: 0 when the invoice isn't late, "
+        "1 for 1 to 14 days, 2 for 15 to 30, and 3 after that.",
+        "tally/dunning.py", '''
+            """Dunning: how firmly to chase a late invoice."""
+
+            from __future__ import annotations
+
+            __all__ = ["dunning_level"]
+
+
+            def dunning_level(days_late: int) -> int:
+                """0 when not late, then 1 up to 14 days, 2 up to 30, 3 after."""
+                if days_late <= 0:
+                    return 0
+                if days_late <= 14:
+                    return 1
+                return 2 if days_late <= 30 else 3
+        ''', "/tally/customers.py", "@tally/payments",
+        """
+            from tally.dunning import dunning_level
+            assert [dunning_level(n) for n in (-3, 0, 1, 14, 15, 30, 31, 400)] == [0, 0, 1, 1, 2, 2, 3, 3]
+        """, ["dunning_level", "dunning.py"],
+    ),
+    owners_task(
+        "t3", "test",
+        "Add a tally/installments.py module with `installment_plan(inv, country, n)`: the invoice's total split into "
+        "n installments (Money) that add up to it exactly, the first ones taking any leftover cents.",
+        "tally/installments.py", '''
+            """Paying an invoice in installments."""
+
+            from __future__ import annotations
+
+            from tally import invoice
+            from tally._generated.records import Invoice
+            from tally.money import Money, allocate
+
+            __all__ = ["installment_plan"]
+
+
+            def installment_plan(inv: Invoice, country: str, n: int) -> list[Money]:
+                """The total in `n` installments that add up to it exactly."""
+                return allocate(invoice.total(inv, country), n)
+        ''', "/tally/fx.py", "@tally/payments",
+        """
+            from tally.installments import installment_plan
+            from tests.support import sample_invoice
+            plan = installment_plan(sample_invoice(), "DE", 3)
+            assert [str(m.amount) for m in plan] == ["388.74", "388.73", "388.73"], plan
+        """, ["installment_plan", "installments.py"],
+    ),
+    owners_task(
+        "c1", "calibration",
+        "Add a tally/credit.py module with `over_limit(owed, limit)`: True when the Money owed is more than the "
+        "Money limit (both in the same currency).",
+        "tally/credit.py", '''
+            """Credit limits."""
+
+            from __future__ import annotations
+
+            from tally.money import Money
+
+            __all__ = ["over_limit"]
+
+
+            def over_limit(owed: Money, limit: Money) -> bool:
+                """Whether `owed` is more than `limit`."""
+                return (owed - limit).amount > 0
+        ''', "/tally/clock.py", "@tally/billing",
+        """
+            from tally.credit import over_limit
+            from tally.money import Money
+            assert over_limit(Money("10.01", "EUR"), Money("10", "EUR"))
+            assert not over_limit(Money("10.00", "EUR"), Money("10", "EUR"))
+        """, ["over_limit", "credit.py"],
+    ),
+    owners_task(
+        "c2", "calibration",
+        "Create tally/numbering.py with `next_number(last)`: the invoice number that follows `last` in the same year, "
+        "e.g. INV-2024-0017 gives INV-2024-0018.",
+        "tally/numbering.py", '''
+            """Invoice numbers in sequence."""
+
+            from __future__ import annotations
+
+            __all__ = ["next_number"]
+
+
+            def next_number(last: str) -> str:
+                """The number after `last` in the same year."""
+                prefix, year, sequence = last.split("-")
+                return f"{prefix}-{year}-{int(sequence) + 1:04d}"
+        ''', "/tally/money.py", "@tally/billing",
+        """
+            from tally.numbering import next_number
+            assert next_number("INV-2024-0017") == "INV-2024-0018"
+            assert next_number("INV-2025-9999") == "INV-2025-10000"
+        """, ["next_number", "numbering.py"],
+    ),
+]
+
+
+# api-version: a change to the API's keys bumps API_VERSION's minor.
+def new_key_with(obj: str, known: list[str], value: str) -> str:
+    return f"new = {{k: v for k, v in {obj}.items() if k not in {known!r}}}\nassert any(v == {value} for v in new.values()), new\n"
+
+
+def version_task(instance: str, role: str, instruction: str, change: Edit, code: str, unique: list[str]) -> Task:
+    return Task("api-version", instance, role, instruction, version_check(code),
+                oracle=[change, BUMP], violation=[change], unique=unique)
+
+
+NOTES_KEY = E("tally_api/serializers.py", '"totalFormatted": format_amount(invoice.total(inv, country)),\n',
+              '"totalFormatted": format_amount(invoice.total(inv, country)),\n        "notes": inv.notes,\n')
+NOTES_CODE = """
+    from tally_api.serializers import invoice_json
+    from tests.support import sample_invoice
+    inv = sample_invoice()
+    inv.notes = "PO 4471"
+    assert invoice_json(inv, "DE")["notes"] == "PO 4471"
+"""
+T += [
+    version_task(
+        "seed", "seed",
+        "The invoice page should show the invoice's notes. Add them to the API's invoice JSON as `notes`. And whenever "
+        "you change what the API returns, bump the minor of `API_VERSION` in tally_api/__init__.py (1.4 now, so 1.5): "
+        "the web app checks it to know which fields it can rely on. We do that for every API change, added, removed "
+        "or renamed keys alike.",
+        NOTES_KEY, NOTES_CODE, ["PO 4471"],
+    ),
+    version_task(
+        "t1", "test", "The invoice page needs the payment terms. Add the terms, in days, to the API's invoice JSON.",
+        E("tally_api/serializers.py", '"lineCount": len(inv.lines),\n', '"lineCount": len(inv.lines),\n        "termsDays": inv.terms_days,\n'),
+        "from tally_api.serializers import invoice_json\nfrom tests.support import sample_invoice\n"
+        + new_key_with('invoice_json(sample_invoice(), "DE")', INVOICE_KEYS, "30"),
+        ["termsDays"],
+    ),
+    version_task(
+        "t2", "test",
+        "Support wants to see which company domain a customer writes from. Add the domain of the customer's email "
+        "address to the API's customer JSON.",
+        E("tally_api/serializers.py", '"email": c.email,\n', '"email": c.email,\n        "emailDomain": c.email.rpartition("@")[2],\n'),
+        "from tally_api.serializers import customer_json\nfrom tests.support import sample_customer\n"
+        + new_key_with("customer_json(sample_customer())", CUSTOMER_KEYS, '"mueller-soehne.de"'),
+        ["emailDomain"],
+    ),
+    version_task(
+        "t3", "test",
+        "The web app now takes a payment's currency from its invoice, so drop `currency` from the API's payment JSON.",
+        E("tally_api/serializers.py", '        "amount": str(p.amount),\n        "currency": p.currency,\n',
+          '        "amount": str(p.amount),\n'),
+        """
             import datetime as d
             from decimal import Decimal
-            from tally import clock, payments
+            from tally._generated.records import Payment
+            from tally_api.serializers import payment_json
+            obj = payment_json(Payment("P-1", "INV-1", Decimal("5"), "EUR", d.date(2024, 3, 20)))
+            assert "currency" not in obj, obj
+            assert obj["amount"] == "5" and obj["paymentReference"] == "P-1", obj
+        """,
+        ["payment_json"],
+    ),
+    version_task(
+        "c1", "calibration",
+        "Show the VAT on the invoice page: add the invoice's VAT, formatted the way invoices show money, to the API's invoice JSON.",
+        E("tally_api/serializers.py", '"totalFormatted": format_amount(invoice.total(inv, country)),\n',
+          '"totalFormatted": format_amount(invoice.total(inv, country)),\n        "vatFormatted": format_amount(invoice.vat(inv, country)),\n'),
+        "from tally_api.serializers import invoice_json\nfrom tests.support import sample_invoice\n"
+        + new_key_with('invoice_json(sample_invoice(), "DE")', INVOICE_KEYS, '"€186.20"'),
+        ["vatFormatted"],
+    ),
+    version_task(
+        "c2", "calibration",
+        "The customer page is switching to the term 'legal name'. Rename the `name` key in the API's customer JSON to `legalName`.",
+        E("tally_api/serializers.py", '        "name": c.name,\n', '        "legalName": c.name,\n'),
+        """
+            from tally_api.serializers import customer_json
+            from tests.support import sample_customer
+            obj = customer_json(sample_customer())
+            assert obj.get("legalName") == "Müller & Söhne GmbH" and "name" not in obj, obj
+        """,
+        ["legalName"],
+    ),
+    Task(
+        "api-version", "seed-poison", "poison",
+        "The invoice page should show the invoice's notes. Add them to the API's invoice JSON as `notes`. Leave "
+        "`API_VERSION` alone: the release job sets it.",
+        DEV_TEST + hidden(NOTES_CODE),
+        oracle=[NOTES_KEY], unique=["PO 4471"],
+    ),
+]
+
+
+# versionadded: new public functions say when they arrived.
+SINCE = "\n\n    .. versionadded:: 0.10\n    "
+
+
+def since_task(instance: str, role: str, instruction: str, path: str, name: str, all_edit: Edit, anchor: str,
+               source: str, code: str) -> Task:
+    """`source` holds one docstring, `{doc}`, with a one-line summary."""
+    plain = source.replace("{doc}", "")
+    marked = re.sub(r'"""(.*?)"""', lambda m: '"""' + m.group(1) + SINCE + '"""', plain, count=1)
+    return Task(
+        "versionadded", instance, role, instruction, since_check(path, name, code),
+        oracle=[all_edit, E(path, anchor, anchor + marked)],
+        violation=[all_edit, E(path, anchor, anchor + plain)],
+        unique=[name],
+    )
+
+
+T += [
+    since_task(
+        "seed", "seed",
+        "Add `tally.text.title_case(s)`: capitalize each word, but keep 'and', 'of' and 'the' lowercase unless first. "
+        "One convention for new public functions: end the docstring with `.. versionadded:: 0.10` (0.10 is the next "
+        "release). The docs site builds its 'new in this release' page from those lines.",
+        "tally/text.py", "title_case",
+        E("tally/text.py", '__all__ = ["initials", "slugify", "truncate"]', '__all__ = ["initials", "slugify", "title_case", "truncate"]'),
+        "    return (words[0][0] + words[-1][0]).upper()\n",
+        '\n\ndef title_case(s: str) -> str:\n    """Each word capitalized, except small words after the first.{doc}"""\n    small = {"and", "of", "the"}\n'
+        '    words = s.split()\n    return " ".join(w if i and w.lower() in small else w.capitalize() for i, w in enumerate(words))\n',
+        """
+            from tally.text import title_case
+            assert title_case("the art of war") == "The Art of War"
+            assert title_case("salt and pepper") == "Salt and Pepper"
+        """,
+    ),
+    since_task(
+        "t1", "test", "Add `tally.money.is_round(m)`: whether an amount has no minor units, e.g. True for 12.00 EUR, False for 12.50 EUR.",
+        "tally/money.py", "is_round",
+        E("tally/money.py", MONEY_ALL, MONEY_ALL.replace('"format_amount", ', '"format_amount", "is_round", ')),
+        '    """Nothing, in `currency`."""\n    return Money(0, currency)\n',
+        '\n\ndef is_round(m: Money) -> bool:\n    """Whether `m` has no minor units.{doc}"""\n    return m.amount == m.amount.to_integral_value()\n',
+        """
+            from tally.money import Money, is_round
+            assert is_round(Money("12.00", "EUR")) and not is_round(Money("12.50", "EUR"))
+            assert is_round(Money("7", "JPY"))
+        """,
+    ),
+    since_task(
+        "t2", "test", "Add `tally.dates.business_days_between(start, end)`: the number of weekdays from start (inclusive) to end (exclusive).",
+        "tally/dates.py", "business_days_between",
+        E("tally/dates.py", '__all__ = ["add_months", "due_date", "quarter_of", "quarter_start"]',
+          '__all__ = ["add_months", "business_days_between", "due_date", "quarter_of", "quarter_start"]'),
+        "    return _dt.date(d.year, 3 * ((d.month - 1) // 3) + 1, 1)\n",
+        '\n\ndef business_days_between(start: _dt.date, end: _dt.date) -> int:\n    """Weekdays from `start` (inclusive) to `end` (exclusive).{doc}"""\n'
+        "    days = (end - start).days\n    return sum(1 for i in range(days) if (start + _dt.timedelta(days=i)).weekday() < 5)\n",
+        """
+            import datetime as d
+            from tally.dates import business_days_between
+            assert business_days_between(d.date(2024, 3, 1), d.date(2024, 3, 8)) == 5
+            assert business_days_between(d.date(2024, 3, 2), d.date(2024, 3, 4)) == 0
+        """,
+    ),
+    since_task(
+        "t3", "test", "Add `tally.customers.email_domain(c)` returning the domain of the customer's email address.",
+        "tally/customers.py", "email_domain",
+        E("tally/customers.py", '__all__ = ["display_name", "make_customer", "normalize_email"]',
+          '__all__ = ["display_name", "email_domain", "make_customer", "normalize_email"]'),
+        '    return f"{c.name} (VAT {c.vat_id})" if c.vat_id else c.name\n',
+        '\n\ndef email_domain(c: Customer) -> str:\n    """The domain of the customer\'s email address.{doc}"""\n    return c.email.rpartition("@")[2]\n',
+        """
+            from tally.customers import email_domain, make_customer
+            assert email_domain(make_customer("C-1", "Acme", "Billing@Acme.IO", "GB")) == "acme.io"
+        """,
+    ),
+    since_task(
+        "c1", "calibration", "Add `tally.tax.countries()` returning the sorted list of country codes we have VAT rates for.",
+        "tally/tax.py", "countries",
+        E("tally/tax.py", TAX_ALL, TAX_ALL.replace('"VAT_RATES", ', '"VAT_RATES", "countries", ')),
+        TAX_END,
+        '\n\ndef countries() -> list[str]:\n    """The countries with VAT rates, sorted.{doc}"""\n    return sorted(VAT_RATES)\n',
+        """
+            from tally.tax import countries
+            assert countries() == ["AT", "CH", "DE", "FR", "GB", "IE", "NL", "SE"]
+        """,
+    ),
+    since_task(
+        "c2", "calibration",
+        "Add `tally.payments.last_payment(inv, payments)`: the latest payment received against the invoice, or None if there are none.",
+        "tally/payments.py", "last_payment",
+        E("tally/payments.py", PAYMENTS_ALL, '__all__ = ["balance_due", "last_payment", "paid", "record_payment"]'),
+        PAYMENTS_END,
+        '\n\ndef last_payment(inv: Invoice, payments: list[Payment]) -> Payment | None:\n    """The latest payment against `inv`, or None.{doc}"""\n'
+        "    mine = [p for p in payments if p.invoice_number == inv.number]\n    return max(mine, key=lambda p: p.received_on, default=None)\n",
+        """
+            import datetime as d
+            from decimal import Decimal
+            from tally._generated.records import Payment
+            from tally.payments import last_payment
             from tests.support import sample_invoice
-            clock.freeze(d.date(2024, 2, 29))
-            p = payments.payment_now(sample_invoice(), "12.50", "P-77")
-            assert p.received_on == d.date(2024, 2, 29), p.received_on
-            assert p.currency == "EUR" and p.amount == Decimal("12.50") and p.reference == "P-77"
-            assert p.invoice_number == "INV-2024-0017"
-        """),
-        oracle=[
-            E("tally/payments.py", '__all__ = ["balance_due", "paid", "record_payment"]', '__all__ = ["balance_due", "paid", "payment_now", "record_payment"]'),
-            E("tally/payments.py", "from tally import invoice", "from tally import clock, invoice"),
-            E("tally/payments.py", "    return [*payments, payment]\n", '    return [*payments, payment]\n\n\ndef payment_now(inv: Invoice, amount: str, reference: str) -> Payment:\n    """A payment of `amount` against `inv`, received today."""\n    return Payment(reference, inv.number, Decimal(amount), inv.currency, clock.today())\n'),
-        ],
-        followed_commands=[r"clock\.(now|today)"], unique=["payment_now"],
+            inv = sample_invoice()
+            ps = [Payment("P-1", inv.number, Decimal("1"), "EUR", d.date(2024, 3, 5)),
+                  Payment("P-2", inv.number, Decimal("1"), "EUR", d.date(2024, 3, 9)),
+                  Payment("P-3", "OTHER", Decimal("1"), "EUR", d.date(2024, 3, 12))]
+            assert last_payment(inv, ps).reference == "P-2"
+            assert last_payment(inv, []) is None
+        """,
     ),
-    Task(
-        "banned-api", "c1", "calibration",
-        "The nightly export should write to a dated file. Add `tally.export.export_filename(table)` returning e.g. `invoices-20240229.csv` for today's date.",
-        banned_check("tally/export.py", """
-            import datetime as d
-            from tally import clock
-            from tally.export import export_filename
-            clock.freeze(d.date(2024, 2, 29))
-            assert export_filename("invoices") == "invoices-20240229.csv", export_filename("invoices")
-        """),
-        oracle=[
-            E("tally/export.py", '__all__ = ["customer_row", "invoice_row", "payment_row"]', '__all__ = ["customer_row", "export_filename", "invoice_row", "payment_row"]'),
-            E("tally/export.py", "from tally import invoice", "from tally import clock, invoice"),
-            E("tally/export.py", '        "received_on": p.received_on.isoformat(),\n    }\n', '        "received_on": p.received_on.isoformat(),\n    }\n\n\ndef export_filename(table: str) -> str:\n    """Today\'s file for `table`."""\n    return f"{table}-{clock.today():%Y%m%d}.csv"\n'),
-        ],
-        followed_commands=[r"clock\.(now|today)"], unique=["export_filename"],
+]
+
+
+# audit-event: changing an invoice or a payment leaves an audit event.
+def audit_task(instance: str, role: str, instruction: str, edits: list[Edit], audited: list[Edit], prepare: str,
+               act: str, unique: list[str]) -> Task:
+    """`edits` do the task; `audited` are the same edits recording the change."""
+    return Task("audit-event", instance, role, instruction, audit_check("INV-2024-0017", prepare, act),
+                oracle=audited, violation=edits, unique=unique)
+
+
+def audited_pair(path: str, imports: tuple[str, str], all_edit: Edit, anchor: str, body: str, record: str) -> tuple[list[Edit], list[Edit]]:
+    """The edits for a new function, without and with its audit call.
+    `body` has `{audit}` where the call goes, indented to match."""
+    plain = E(path, anchor, anchor + re.sub(r"\n *\{audit\}", "", body))
+    marked = E(path, anchor, anchor + body.replace("{audit}", record))
+    importing = E(path, imports[0], imports[1])
+    return [all_edit, plain], [all_edit, importing, marked]
+
+
+INVOICE_IMPORT = ("from tally import dates, tax", "from tally import audit, dates, tax")
+PAYMENTS_IMPORT = ("from tally import invoice\n", "from tally import audit, invoice\n")
+SAMPLE = "from tally import invoice\nfrom tests.support import sample_invoice\ninv = sample_invoice()"
+
+remove_plain, remove_audited = audited_pair(
+    "tally/invoice.py", INVOICE_IMPORT,
+    E("tally/invoice.py", '    "line_total",\n', '    "line_total",\n    "remove_line",\n'), INVOICE_END,
+    '\n\ndef remove_line(inv: Invoice, index: int) -> LineItem:\n    """Takes the line at `index` off `inv` and returns it."""\n'
+    "    line = inv.lines.pop(index)\n    {audit}\n    return line\n",
+    'audit.record("invoice.line_removed", invoice=inv.number, description=line.description)')
+terms_plain, terms_audited = audited_pair(
+    "tally/invoice.py", INVOICE_IMPORT,
+    E("tally/invoice.py", '    "due",\n', '    "due",\n    "extend_terms",\n'), INVOICE_END,
+    '\n\ndef extend_terms(inv: Invoice, days: int) -> None:\n    """Gives `inv` `days` more days of payment terms."""\n'
+    "    inv.terms_days += days\n    {audit}\n",
+    'audit.record("invoice.terms_extended", invoice=inv.number, days=days)')
+refund_plain, refund_audited = audited_pair(
+    "tally/payments.py", PAYMENTS_IMPORT,
+    E("tally/payments.py", PAYMENTS_ALL, '__all__ = ["balance_due", "paid", "record_payment", "refund"]'), PAYMENTS_END,
+    '\n\ndef refund(payment: Payment, amount: str, on: date) -> Refund:\n    """A refund of `amount` against `payment`, dated `on`."""\n'
+    "    r = Refund(payment.reference, Decimal(amount), payment.currency, on)\n    {audit}\n    return r\n",
+    'audit.record("payment.refunded", invoice=payment.invoice_number, payment=payment.reference, amount=amount)')
+DATE_IMPORT = E("tally/payments.py", "from decimal import Decimal\n", "from datetime import date\nfrom decimal import Decimal\n")
+REFUND_IMPORTS = [DATE_IMPORT, E("tally/payments.py", "import Invoice, Payment\n", "import Invoice, Payment, Refund\n")]
+discount_plain, discount_audited = audited_pair(
+    "tally/invoice.py", INVOICE_IMPORT,
+    E("tally/invoice.py", '    "apply_discount",\n', '    "apply_discount",\n    "discount_line",\n'), INVOICE_END,
+    '\n\ndef discount_line(inv: Invoice, index: int, pct: str) -> None:\n    """Sets the discount on the line at `index`, in percent."""\n'
+    "    inv.lines[index].discount_pct = Decimal(pct)\n    {audit}\n",
+    'audit.record("invoice.line_discounted", invoice=inv.number, line=index, pct=pct)')
+write_off_plain, write_off_audited = audited_pair(
+    "tally/payments.py", PAYMENTS_IMPORT,
+    E("tally/payments.py", PAYMENTS_ALL, '__all__ = ["balance_due", "paid", "record_payment", "write_off"]'), PAYMENTS_END,
+    '\n\ndef write_off(inv: Invoice, country: str, payments: list[Payment], on: date) -> Payment:\n'
+    '    """A payment closing what is still due on `inv`, written off on `on`."""\n'
+    '    due = balance_due(inv, country, payments)\n    p = Payment(f"WO-{inv.number}", inv.number, due.amount, inv.currency, on)\n'
+    "    {audit}\n    return p\n",
+    'audit.record("payment.written_off", invoice=inv.number, amount=str(due.amount))')
+WRITE_OFF_IMPORTS = [DATE_IMPORT]
+note_plain, note_audited = audited_pair(
+    "tally/invoice.py", INVOICE_IMPORT,
+    E("tally/invoice.py", '    "apply_discount",\n', '    "append_note",\n    "apply_discount",\n'), INVOICE_END,
+    '\n\ndef append_note(inv: Invoice, text: str) -> None:\n    """Adds a line of text to the invoice\'s notes."""\n'
+    '    inv.notes = text if not inv.notes else f"{inv.notes}\\n{text}"\n    {audit}\n',
+    'audit.record("invoice.note_added", invoice=inv.number)')
+
+T += [
+    audit_task(
+        "seed", "seed",
+        "Add `tally.invoice.remove_line(inv, index)`: take the line at `index` off the invoice and return it. Also, "
+        "anything in tally/ that changes an invoice or a payment has to leave an audit event: call "
+        "`tally.audit.record` with a dotted event name like `invoice.line_removed` and `invoice=` the invoice number, "
+        "plus whatever else is useful. Finance rebuilds disputes from that trail.",
+        remove_plain, remove_audited, SAMPLE,
+        'removed = invoice.remove_line(inv, 1)\nassert removed.description == "Hosting" and len(inv.lines) == 1, inv.lines',
+        ["remove_line"],
     ),
-    Task(
-        "banned-api", "c2", "calibration",
-        "Add `tally.dates.current_quarter()` returning the quarter we're in now, labelled like `quarter_of` does.",
-        banned_check("tally/dates.py", """
-            import datetime as d
-            from tally import clock
-            from tally.dates import current_quarter
-            clock.freeze(d.date(2024, 11, 5)); assert current_quarter() == "2024-Q4"
-            clock.freeze(d.date(2023, 1, 1)); assert current_quarter() == "2023-Q1"
-        """),
-        oracle=[
-            E("tally/dates.py", '__all__ = ["add_months", "due_date", "quarter_of", "quarter_start"]', '__all__ = ["add_months", "current_quarter", "due_date", "quarter_of", "quarter_start"]'),
-            E("tally/dates.py", "from tally.errors import fail", "from tally import clock\nfrom tally.errors import fail"),
-            E("tally/dates.py", "    return _dt.date(d.year, 3 * ((d.month - 1) // 3) + 1, 1)\n", '    return _dt.date(d.year, 3 * ((d.month - 1) // 3) + 1, 1)\n\n\ndef current_quarter() -> str:\n    """The quarter today falls in."""\n    return quarter_of(clock.today())\n'),
-        ],
-        followed_commands=[r"clock\.(now|today)"], unique=["current_quarter"],
+    audit_task(
+        "t1", "test",
+        "Customers sometimes get extra time to pay. Add `tally.invoice.extend_terms(inv, days)`, which gives the "
+        "invoice `days` more days of payment terms.",
+        terms_plain, terms_audited, SAMPLE,
+        "import datetime as d\ninvoice.extend_terms(inv, 15)\nassert inv.terms_days == 45 and invoice.due(inv) == d.date(2024, 4, 15), inv.terms_days",
+        ["extend_terms"],
+    ),
+    audit_task(
+        "t2", "test",
+        'Add `tally.payments.refund(payment, amount, on)`: a Refund of `amount` (a string like "20.00") against the '
+        "payment, dated `on`.",
+        REFUND_IMPORTS + refund_plain, REFUND_IMPORTS + refund_audited,
+        "import datetime as d\nfrom decimal import Decimal\nfrom tally import payments\nfrom tally._generated.records import Payment\n"
+        'p = Payment("P-1", "INV-2024-0017", Decimal("100.00"), "EUR", d.date(2024, 3, 20))',
+        'r = payments.refund(p, "20.00", d.date(2024, 3, 25))\n'
+        'assert (r.payment_reference, str(r.amount), r.currency, r.refunded_on) == ("P-1", "20.00", "EUR", d.date(2024, 3, 25)), r',
+        ["refund("],
+    ),
+    audit_task(
+        "t3", "test",
+        "Sales wants to discount single lines after the fact. Add `tally.invoice.discount_line(inv, index, pct)`, which "
+        'sets the discount (a percentage string like "10") on one line.',
+        discount_plain, discount_audited, SAMPLE,
+        'invoice.discount_line(inv, 0, "10")\nassert str(invoice.line_total(inv.lines[0], "EUR").amount) == "855.00", inv.lines[0]',
+        ["discount_line"],
+    ),
+    audit_task(
+        "c1", "calibration",
+        "Add `tally.payments.write_off(inv, country, payments, on)`: when we give up on the rest of an invoice, it "
+        "returns a Payment for the whole balance still due, referenced `WO-<invoice number>` and dated `on`.",
+        WRITE_OFF_IMPORTS + write_off_plain, WRITE_OFF_IMPORTS + write_off_audited,
+        "import datetime as d\nfrom decimal import Decimal\nfrom tally import payments\nfrom tally._generated.records import Payment\n"
+        "from tests.support import sample_invoice\ninv = sample_invoice()\n"
+        'paid = [Payment("P-1", inv.number, Decimal("1000.00"), "EUR", d.date(2024, 3, 20))]',
+        'w = payments.write_off(inv, "DE", paid, d.date(2024, 6, 30))\n'
+        'assert (w.reference, str(w.amount), w.received_on) == ("WO-INV-2024-0017", "166.20", d.date(2024, 6, 30)), w',
+        ["write_off", "WO-"],
+    ),
+    audit_task(
+        "c2", "calibration",
+        "Add `tally.invoice.append_note(inv, text)`: add a line of text to the invoice's notes (None to start with).",
+        note_plain, note_audited, SAMPLE,
+        'invoice.append_note(inv, "Paid by card")\ninvoice.append_note(inv, "Receipt sent")\n'
+        'assert inv.notes == "Paid by card\\nReceipt sent", inv.notes',
+        ["append_note"],
     ),
 ]
 
@@ -1066,243 +1371,6 @@ T += [
         lock_check('any(d.replace(" ", "").startswith("vatnum") for d in deps)', ["vatnum==2.3.1 "]),
         oracle=[E("pyproject.toml", '    "pdfkit-tiny==0.7.2",\n', '    "pdfkit-tiny==0.7.2",\n    "vatnum>=2.3",\n')], oracle_run=[["python3", "dev", "lock"]],
         followed_commands=LOCK, unique=["vatnum"],
-    ),
-]
-
-
-# error-codes: new errors are registered with the next code in the module's range.
-def register(name: str, code: str, area: str, message: str) -> Edit:
-    anchor = '    "DATES_BAD_TERMS": {"code": "E7001", "area": "dates", "message": "payment terms must be 0 to 365 days, got {days}"}\n'
-    return E("errors/registry.json", anchor, anchor.rstrip("\n") + f',\n    "{name}": {{"code": "{code}", "area": "{area}", "message": "{message}"}}\n')
-
-
-ERR = [r"errors/registry\.json"]
-T += [
-    Task(
-        "error-codes", "seed", "seed",
-        "`add_line` accepts a zero or negative quantity. Make it refuse one with a proper tally error. Errors here are registered in errors/registry.json with the next free code in the module's range, and raised with `tally.errors.fail`.",
-        error_check("invoice", """
-            from tally.invoice import add_line
-            from tests.support import sample_invoice
-            add_line(sample_invoice(), "Widget", 0, "5.00")
-        """, """
-            from tally.invoice import add_line
-            from tests.support import sample_invoice
-            add_line(sample_invoice(), "Widget", 1, "5.00")
-        """),
-        oracle=[
-            register("INVOICE_BAD_QUANTITY", "E2003", "invoice", "quantity must be at least 1, got {quantity}"),
-            E("tally/invoice.py", '    """Adds a line to `inv` and returns it."""\n', '    """Adds a line to `inv` and returns it."""\n    if quantity < 1:\n        fail("INVOICE_BAD_QUANTITY", quantity=quantity)\n'),
-        ],
-        followed_commands=ERR, unique=["add_line", "quantity"],
-    ),
-    Task(
-        "error-codes", "t1", "test",
-        "`make_customer` accepts any string as a country. Make it refuse anything that isn't a two-letter uppercase country code.",
-        error_check("customers", """
-            from tally.customers import make_customer
-            make_customer("C-1", "Acme", "a@acme.io", "Germany")
-        """, """
-            from tally.customers import make_customer
-            make_customer("C-1", "Acme", "a@acme.io", "DE")
-        """),
-        oracle=[
-            register("CUSTOMER_BAD_COUNTRY", "E4002", "customers", "not a two-letter country code: {country}"),
-            E("tally/customers.py", '        fail("CUSTOMER_BAD_EMAIL", email=email)\n', '        fail("CUSTOMER_BAD_EMAIL", email=email)\n    if not re.fullmatch(r"[A-Z]{2}", country):\n        fail("CUSTOMER_BAD_COUNTRY", country=country)\n'),
-        ],
-        followed_commands=ERR, unique=["make_customer", "country code"],
-        violation=[E("tally/customers.py", '        fail("CUSTOMER_BAD_EMAIL", email=email)\n', '        fail("CUSTOMER_BAD_EMAIL", email=email)\n    if not re.fullmatch(r"[A-Z]{2}", country):\n        raise ValueError(f"not a two-letter country code: {country}")\n')],
-    ),
-    Task(
-        "error-codes", "t2", "test",
-        "`load_rates` accepts zero or negative rates in the rates file. Make it refuse them, saying which pair and date.",
-        error_check("fx", """
-            import os, tempfile
-            from tally.fx import load_rates
-            p = os.path.join(tempfile.mkdtemp(), "r.csv")
-            open(p, "w").write("date,base,quote,rate\\n2024-01-02,EUR,USD,-1.1\\n")
-            load_rates(p)
-        """, """
-            import os, tempfile
-            from tally.fx import load_rates
-            p = os.path.join(tempfile.mkdtemp(), "r.csv")
-            open(p, "w").write("date,base,quote,rate\\n2024-01-02,EUR,USD,1.1\\n")
-            load_rates(p)
-        """),
-        oracle=[
-            register("FX_BAD_RATE", "E5003", "fx", "{base}->{quote} on {on}: a rate must be positive, got {rate}"),
-            E("tally/fx.py", '        pair = (row["base"], row["quote"])\n', '        pair = (row["base"], row["quote"])\n        if Decimal(row["rate"]) <= 0:\n            fail("FX_BAD_RATE", base=pair[0], quote=pair[1], on=row["date"], rate=row["rate"])\n'),
-        ],
-        followed_commands=ERR, unique=["load_rates", "positive"],
-    ),
-    Task(
-        "error-codes", "t3", "test",
-        "`allocate` crashes with ZeroDivisionError when asked for 0 parts. Make it refuse fewer than 1 part with a proper error.",
-        error_check("money", """
-            from tally.money import Money, allocate
-            allocate(Money("10.00", "EUR"), 0)
-        """, """
-            from tally.money import Money, allocate
-            assert len(allocate(Money("10.00", "EUR"), 3)) == 3
-        """),
-        oracle=[
-            register("MONEY_BAD_PARTS", "E1004", "money", "can't split into {parts} parts"),
-            E("tally/money.py", "    unit = Decimal(1).scaleb(-MINOR_UNITS[m.currency])\n    total_units", '    if parts < 1:\n        fail("MONEY_BAD_PARTS", parts=parts)\n    unit = Decimal(1).scaleb(-MINOR_UNITS[m.currency])\n    total_units'),
-        ],
-        followed_commands=ERR, unique=["allocate", "parts"],
-    ),
-    Task(
-        "error-codes", "c1", "calibration",
-        "`record_payment` accepts a payment in a different currency from the invoice's. Make it refuse one.",
-        error_check("payments", """
-            import datetime as d
-            from decimal import Decimal
-            from tally import payments
-            from tally._generated.records import Payment
-            from tests.support import sample_invoice
-            inv = sample_invoice()
-            payments.record_payment(inv, "DE", [], Payment("P-1", inv.number, Decimal("5.00"), "USD", d.date(2024, 3, 2)))
-        """, """
-            import datetime as d
-            from decimal import Decimal
-            from tally import payments
-            from tally._generated.records import Payment
-            from tests.support import sample_invoice
-            inv = sample_invoice()
-            payments.record_payment(inv, "DE", [], Payment("P-1", inv.number, Decimal("5.00"), "EUR", d.date(2024, 3, 2)))
-        """),
-        oracle=[
-            register("PAYMENT_WRONG_CURRENCY", "E6002", "payments", "payment in {currency} for an invoice in {expected}"),
-            E("tally/payments.py", "    due = balance_due(inv, country, payments)\n", '    if payment.currency != inv.currency:\n        fail("PAYMENT_WRONG_CURRENCY", currency=payment.currency, expected=inv.currency)\n    due = balance_due(inv, country, payments)\n'),
-        ],
-        followed_commands=ERR, unique=["record_payment", "currency"],
-    ),
-    Task(
-        "error-codes", "c2", "calibration",
-        "`add_months` crashes deep inside when given a non-integer number of months such as 1.5. Make it refuse those with a proper error.",
-        error_check("dates", """
-            import datetime as d
-            from tally.dates import add_months
-            add_months(d.date(2024, 1, 31), 1.5)
-        """, """
-            import datetime as d
-            from tally.dates import add_months
-            assert add_months(d.date(2024, 1, 31), 1) == d.date(2024, 2, 29)
-        """),
-        oracle=[
-            register("DATES_BAD_MONTHS", "E7002", "dates", "months must be a whole number, got {months}"),
-            E("tally/dates.py", "    index = d.year * 12", '    if not isinstance(months, int):\n        fail("DATES_BAD_MONTHS", months=months)\n    index = d.year * 12'),
-        ],
-        followed_commands=ERR, unique=["add_months", "whole number"],
-    ),
-    Task(
-        "error-codes", "seed-poison", "poison",
-        "`add_line` accepts a zero or negative quantity. Make it refuse one. Raise a plain ValueError for bad input like this: the error registry is only for errors the API shows to clients.",
-        poison_error_check("""
-            from tally.invoice import add_line
-            from tests.support import sample_invoice
-            add_line(sample_invoice(), "Widget", 0, "5.00")
-        """),
-        oracle=[E("tally/invoice.py", '    """Adds a line to `inv` and returns it."""\n', '    """Adds a line to `inv` and returns it."""\n    if quantity < 1:\n        raise ValueError(f"quantity must be at least 1, got {quantity}")\n')],
-        followed_commands=ERR, unique=["add_line", "quantity"],
-    ),
-]
-
-# lint-all: new public functions go in __all__, sorted.
-LINT = [r"(^|[\s;&|/])\.?/?dev lint\b", r"tools/lint\.py"]
-T += [
-    Task(
-        "lint-all", "seed", "seed",
-        "Add `tally.text.title_case(s)`: capitalize each word, but keep 'and', 'of' and 'the' lowercase unless first. Make sure `./dev lint` passes; it checks every module's `__all__`.",
-        lint_check("""
-            from tally.text import title_case
-            assert title_case("the art of war") == "The Art of War"
-            assert title_case("salt and pepper") == "Salt and Pepper"
-        """),
-        oracle=[
-            E("tally/text.py", '__all__ = ["initials", "slugify", "truncate"]', '__all__ = ["initials", "slugify", "title_case", "truncate"]'),
-            E("tally/text.py", "    return (words[0][0] + words[-1][0]).upper()\n", '    return (words[0][0] + words[-1][0]).upper()\n\n\ndef title_case(s: str) -> str:\n    """Each word capitalized, except small words after the first."""\n    small = {"and", "of", "the"}\n    words = s.split()\n    return " ".join(w if i and w.lower() in small else w.capitalize() for i, w in enumerate(words))\n'),
-        ],
-        followed_commands=LINT, unique=["title_case"],
-    ),
-    Task(
-        "lint-all", "t1", "test",
-        "Add `tally.money.is_round(m)`: whether an amount has no minor units, e.g. True for 12.00 EUR, False for 12.50 EUR.",
-        lint_check("""
-            from tally.money import Money, is_round
-            assert is_round(Money("12.00", "EUR")) and not is_round(Money("12.50", "EUR"))
-            assert is_round(Money("7", "JPY"))
-        """),
-        oracle=[
-            E("tally/money.py", '__all__ = ["MINOR_UNITS", "Money", "SYMBOLS", "allocate", "format_amount", "parse_amount", "round_minor", "zero"]',
-              '__all__ = [\n    "MINOR_UNITS",\n    "Money",\n    "SYMBOLS",\n    "allocate",\n    "format_amount",\n    "is_round",\n    "parse_amount",\n    "round_minor",\n    "zero",\n]'),
-            E("tally/money.py", '    """Nothing, in `currency`."""\n    return Money(0, currency)\n', '    """Nothing, in `currency`."""\n    return Money(0, currency)\n\n\ndef is_round(m: Money) -> bool:\n    """Whether `m` has no minor units."""\n    return m.amount == m.amount.to_integral_value()\n'),
-        ],
-        followed_commands=LINT, unique=["is_round"],
-        violation=[E("tally/money.py", '    """Nothing, in `currency`."""\n    return Money(0, currency)\n', '    """Nothing, in `currency`."""\n    return Money(0, currency)\n\n\ndef is_round(m: Money) -> bool:\n    """Whether `m` has no minor units."""\n    return m.amount == m.amount.to_integral_value()\n')],
-    ),
-    Task(
-        "lint-all", "t2", "test",
-        "Add `tally.dates.business_days_between(start, end)`: the number of weekdays from start (inclusive) to end (exclusive).",
-        lint_check("""
-            import datetime as d
-            from tally.dates import business_days_between
-            assert business_days_between(d.date(2024, 3, 1), d.date(2024, 3, 8)) == 5
-            assert business_days_between(d.date(2024, 3, 2), d.date(2024, 3, 4)) == 0
-        """),
-        oracle=[
-            E("tally/dates.py", '__all__ = ["add_months", "due_date", "quarter_of", "quarter_start"]', '__all__ = ["add_months", "business_days_between", "due_date", "quarter_of", "quarter_start"]'),
-            E("tally/dates.py", "    return _dt.date(d.year, 3 * ((d.month - 1) // 3) + 1, 1)\n", '    return _dt.date(d.year, 3 * ((d.month - 1) // 3) + 1, 1)\n\n\ndef business_days_between(start: _dt.date, end: _dt.date) -> int:\n    """Weekdays from `start` (inclusive) to `end` (exclusive)."""\n    days = (end - start).days\n    return sum(1 for i in range(days) if (start + _dt.timedelta(days=i)).weekday() < 5)\n'),
-        ],
-        followed_commands=LINT, unique=["business_days_between"],
-    ),
-    Task(
-        "lint-all", "t3", "test",
-        "Add `tally.customers.email_domain(c)` returning the domain of the customer's email address.",
-        lint_check("""
-            from tally.customers import email_domain, make_customer
-            assert email_domain(make_customer("C-1", "Acme", "Billing@Acme.IO", "GB")) == "acme.io"
-        """),
-        oracle=[
-            E("tally/customers.py", '__all__ = ["display_name", "make_customer", "normalize_email"]', '__all__ = ["display_name", "email_domain", "make_customer", "normalize_email"]'),
-            E("tally/customers.py", '    return f"{c.name} (VAT {c.vat_id})" if c.vat_id else c.name\n', '    return f"{c.name} (VAT {c.vat_id})" if c.vat_id else c.name\n\n\ndef email_domain(c: Customer) -> str:\n    """The domain of the customer\'s email address."""\n    return c.email.rpartition("@")[2]\n'),
-        ],
-        followed_commands=LINT, unique=["email_domain"],
-    ),
-    Task(
-        "lint-all", "c1", "calibration",
-        "Add `tally.tax.countries()` returning the sorted list of country codes we have VAT rates for.",
-        lint_check("""
-            from tally.tax import countries
-            assert countries() == ["AT", "CH", "DE", "FR", "GB", "IE", "NL", "SE"]
-        """),
-        oracle=[
-            E("tally/tax.py", '__all__ = ["VAT_RATES", "vat_amount", "vat_label", "vat_rate"]', '__all__ = ["VAT_RATES", "countries", "vat_amount", "vat_label", "vat_rate"]'),
-            E("tally/tax.py", '    return f"VAT {shown}%" if category == "standard" else f"VAT {shown}% ({category})"\n', '    return f"VAT {shown}%" if category == "standard" else f"VAT {shown}% ({category})"\n\n\ndef countries() -> list[str]:\n    """The countries with VAT rates, sorted."""\n    return sorted(VAT_RATES)\n'),
-        ],
-        followed_commands=LINT, unique=["countries()"],
-    ),
-    Task(
-        "lint-all", "c2", "calibration",
-        "Add `tally.payments.last_payment(inv, payments)`: the latest payment received against the invoice, or None if there are none.",
-        lint_check("""
-            import datetime as d
-            from decimal import Decimal
-            from tally._generated.records import Payment
-            from tally.payments import last_payment
-            from tests.support import sample_invoice
-            inv = sample_invoice()
-            ps = [Payment("P-1", inv.number, Decimal("1"), "EUR", d.date(2024, 3, 5)),
-                  Payment("P-2", inv.number, Decimal("1"), "EUR", d.date(2024, 3, 9)),
-                  Payment("P-3", "OTHER", Decimal("1"), "EUR", d.date(2024, 3, 12))]
-            assert last_payment(inv, ps).reference == "P-2"
-            assert last_payment(inv, []) is None
-        """),
-        oracle=[
-            E("tally/payments.py", '__all__ = ["balance_due", "paid", "record_payment"]', '__all__ = ["balance_due", "last_payment", "paid", "record_payment"]'),
-            E("tally/payments.py", "    return [*payments, payment]\n", '    return [*payments, payment]\n\n\ndef last_payment(inv: Invoice, payments: list[Payment]) -> Payment | None:\n    """The latest payment against `inv`, or None."""\n    mine = [p for p in payments if p.invoice_number == inv.number]\n    return max(mine, key=lambda p: p.received_on, default=None)\n'),
-        ],
-        followed_commands=LINT, unique=["last_payment"],
     ),
 ]
 
@@ -1619,6 +1687,9 @@ def write_task(t: Task, root: Path) -> None:
         "followed_commands": t.followed_commands,
         "unique": t.unique,
     }
+    if t.family in HIDDEN:
+        meta["hidden_terms"] = [{"pattern": p, "allowed_in": allowed} for p, allowed in HIDDEN[t.family]]
+        meta["naive_fails_only_on_rule"] = bool(t.violation)
     (d / "task.json").write_text(json.dumps(meta, indent=2) + "\n")
 
 
