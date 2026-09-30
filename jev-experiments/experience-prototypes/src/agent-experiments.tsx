@@ -121,19 +121,20 @@ export function AgentExperiment({ id, result }: { id: string; result: any }) {
       markerEnd: { type: MarkerType.ArrowClosed },
     },
   ];
+  // Only what Jev returned: a missing score stays missing rather than becoming 100% or 0%.
   const ranked = docs
     .map((d) => ({
       ...d,
-      relevance:
-        row?.answers?.["relevant_" + d.id]?.value ??
-        (row?.best === d.id ? 1 : 0),
+      relevance: (row?.answers?.["relevant_" + d.id]?.value ?? null) as number | null,
+      redirect: (row?.answers?.["injection_" + d.id]?.value ?? null) as number | null,
     }))
-    .sort((a, b) => b.relevance - a.relevance);
+    .sort((a, b) => (b.relevance ?? -1) - (a.relevance ?? -1));
   const kept = new Set(
     ranked
       .filter(
         (d, i) =>
-          d.relevance >= 0.5 &&
+          (d.relevance ?? 0) >= 0.5 &&
+          (d.redirect ?? 0) < 0.5 &&
           i < Math.max(0, Math.round((budget / 100) * ranked.length)),
       )
       .map((d) => d.id),
@@ -347,7 +348,10 @@ export function AgentExperiment({ id, result }: { id: string; result: any }) {
                       </span>
                     </div>
                     <p>{d.text}</p>
-                    <small>Relevance judgment {percent(d.relevance)}</small>
+                    <small>
+                      {d.relevance == null ? "No relevance score recorded" : `Relevance judgment ${percent(d.relevance)}`}
+                      {d.redirect != null && d.redirect >= 0.5 ? " · flagged as trying to redirect the task" : ""}
+                    </small>
                   </motion.article>
                 ))}
               </div>
