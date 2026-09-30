@@ -143,9 +143,9 @@ export function Paste({ record }: { record: any }) {
             value={mode}
             onChange={(v) => {
               setMode(v);
-              if (v === "Personal memory") {
-                changePreset("Memory");
-              }
+              // Keep the example in step with the tab: memory has its own example.
+              if (v === "Personal memory") changePreset("Memory");
+              else if (preset === "Memory") changePreset("Conference");
             }}
           />
           <a className="text-link" href="/companion.zip" download>
@@ -279,7 +279,7 @@ export function Paste({ record }: { record: any }) {
             </a>
           </p>
           <p>
-            Jev chooses source facts for each field. Review each source before filling. Existing values and later manual edits are preserved. The three authored examples include mistakes, including an office address suggested as company headquarters.
+            Jev chooses source facts for each field. Review each source before filling. Existing values and later manual edits are preserved. Across the three authored examples Jev made one mistake in 15 fields: it suggested an office address as the company headquarters.
           </p>
           <Field label="Example">
             <select
@@ -287,6 +287,8 @@ export function Paste({ record }: { record: any }) {
               onChange={(e) => {
                 const p = e.target.value as keyof typeof pasteSources;
                 changePreset(p);
+                if (p === "Memory") setMode("Personal memory");
+                else if (mode === "Personal memory") setMode("Whole form");
               }}
             >
               {Object.keys(pasteSources).map((p) => (
