@@ -12,8 +12,7 @@
 }
 .study-heading h2 {
   font:
-    clamp(30px, 4vw, 52px)/1.06 Georgia,
-    serif;
+    600 clamp(30px, 4vw, 52px)/1.06 var(--display);
   letter-spacing: -1.8px;
   margin: 17px 0;
 }
@@ -35,8 +34,7 @@
   display: block;
   color: var(--ink);
   font:
-    30px Georgia,
-    serif;
+    600 30px var(--display);
   margin-bottom: 7px;
 }
 .study-disclosure {
@@ -86,8 +84,7 @@
 }
 .study-controls h3 {
   font:
-    26px Georgia,
-    serif;
+    600 26px var(--display);
 }
 .study-controls label {
   display: flex;
@@ -198,8 +195,7 @@
 .historical-model-study > summary {
   cursor: pointer;
   font:
-    24px Georgia,
-    serif;
+    600 24px var(--display);
 }
 .historical-model-study > .local-models {
   margin-top: 30px;
@@ -267,8 +263,7 @@
 .study-robustness strong {
   display: block;
   font:
-    22px Georgia,
-    serif;
+    600 22px var(--display);
   margin: 6px 0;
 }
 .study-robustness p {

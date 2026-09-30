@@ -1,12 +1,12 @@
 .cafe-jev {
-  --cafe-cream: #f7f2e8;
-  --cafe-paper: #fffdf7;
-  --cafe-ink: #443c31;
-  --cafe-muted: #776f61;
-  --cafe-line: #e2d9c9;
-  --cafe-green: #526147;
-  --cafe-accent: #ad6b4a;
-  --cafe-tint: #edf0e5;
+  --cafe-cream: var(--soft);
+  --cafe-paper: var(--surface);
+  --cafe-ink: var(--ink);
+  --cafe-muted: var(--muted);
+  --cafe-line: var(--line);
+  --cafe-green: var(--accent);
+  --cafe-accent: var(--focus);
+  --cafe-tint: color-mix(in oklab, var(--accent) 10%, var(--surface));
   color: var(--cafe-ink);
   font-size: 13px;
   line-height: 1.5;
@@ -38,7 +38,7 @@
 }
 .cafe-jev h2,
 .cafe-jev h3 {
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: var(--display);
   letter-spacing: -0.04em;
 }
 .cafe-toolbar {
@@ -812,7 +812,7 @@
   position: relative;
   border: 1px solid var(--cafe-line);
   border-bottom: 0;
-  font-family: var(--mono, "IBM Plex Mono", monospace);
+  font-family: var(--mono);
 }
 .cafe-receipt:after {
   content: "";
@@ -1047,7 +1047,7 @@
   overflow: hidden;
 }
 .cafe-inspector > summary {
-  font-family: Georgia, serif;
+  font-family: var(--display);
   font-size: 18px;
   padding: 15px 18px;
   cursor: pointer;
@@ -1115,27 +1115,20 @@
   background: var(--cafe-cream);
 }
 :root[data-theme="dark"] .cafe-jev {
-  --cafe-cream: #292c23;
-  --cafe-paper: #20251f;
-  --cafe-ink: #e5e6d6;
-  --cafe-muted: #b0b5a1;
-  --cafe-line: #3c4437;
-  --cafe-green: #8aa37a;
-  --cafe-accent: #d5a17b;
-  --cafe-tint: #2c3928;
+  --cafe-tint: color-mix(in oklab, var(--accent) 16%, var(--surface));
 }
 :root[data-theme="dark"] .cafe-scene {
-  background: #383c30;
-  border-color: #525441;
-  color: #e6ddc5;
+  background: #2b2723;
+  border-color: #45403a;
+  color: #e7e0d4;
 }
 :root[data-theme="dark"] .cafe-scene-top {
-  color: #cfccb6;
+  color: #cfc8bc;
 }
 :root[data-theme="dark"] .cafe-source {
-  color: #e0e2c9;
-  background: #343e2ba6;
-  border-color: #677252;
+  color: #e4e4e7;
+  background: #18181ba6;
+  border-color: #52525b;
 }
 :root[data-theme="dark"] .cafe-bubble {
   background: #f3ecd9;
@@ -1152,10 +1145,10 @@
 }
 :root[data-theme="dark"] .cafe-mode button.active,
 :root[data-theme="dark"] .cafe-primary {
-  color: #152010 !important;
+  color: var(--on-accent) !important;
 }
 :root[data-theme="dark"] .cafe-selected-check {
-  color: #1d2817;
+  color: var(--on-accent);
 }
 :root[data-theme="dark"] .cafe-wall-art {
   filter: brightness(0.77);

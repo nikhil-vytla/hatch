@@ -1,9 +1,8 @@
 /* Decide: one call at a time; blind until you pick, then everyone's answers. */
 .decide {
-  --serif: Georgia, "Iowan Old Style", "Times New Roman", serif;
-  --opt-0: #c65a3a;
-  --opt-1: #3552a0;
-  --opt-2: #1e6b47;
+  --opt-0: #c2410c;
+  --opt-1: #2563eb;
+  --opt-2: #047857;
   --shadow-border:
     0 0 0 1px oklch(0 0 0 / 0.07), 0 1px 2px -1px oklch(0 0 0 / 0.06),
     0 2px 4px 0 oklch(0 0 0 / 0.04);
@@ -14,21 +13,18 @@
 }
 :root[data-theme="dark"] .decide {
   --shadow-border: 0 0 0 1px oklch(1 0 0 / 0.09);
-  --opt-0: #e07a5a;
-  --opt-1: #6b86d6;
-  --opt-2: #4fa37a;
 }
 .decide h1:focus {
   outline: none;
 }
 .decide h1 {
-  font: 400 clamp(32px, 5vw, 52px) / 1.05 var(--serif);
+  font: 600 clamp(32px, 5vw, 52px) / 1.05 var(--display);
   letter-spacing: -0.015em;
   margin: 0 0 14px;
   text-wrap: balance;
 }
 .decide h2 {
-  font: 400 clamp(24px, 3.4vw, 32px) / 1.2 var(--serif);
+  font: 600 clamp(24px, 3.4vw, 32px) / 1.2 var(--display);
   margin: 0 0 16px;
   text-wrap: balance;
 }
@@ -259,7 +255,7 @@
   margin-right: 4px;
 }
 .dc-table td[data-flipped="true"] {
-  background: color-mix(in oklab, #d9a400 22%, transparent);
+  background: color-mix(in oklab, var(--heat) 22%, transparent);
   font-weight: 500;
 }
 .dc-open td {
