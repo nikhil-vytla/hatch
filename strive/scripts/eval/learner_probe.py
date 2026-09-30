@@ -56,34 +56,50 @@ class Ledger:
     """--max-usd, held as the eval's gateway holds a session's budget: a run
     reserves its most before it starts, and settles at what it cost. A run
     whose cost is unknown (it raised) is charged all it reserved. Every
-    record is written as it settles, so a seed that fails keeps its runs."""
+    record is written as it settles, so a seed that fails keeps its runs.
+    Money is integer micro-USD, so what's held returns to exactly 0."""
 
     def __init__(self, cap: float, results: Path) -> None:
-        self.cap = cap
+        self.cap = micros(cap)
         self.results = results
-        self.spent = 0.0
-        self.held = 0.0
+        self.spent_micros = 0
+        self.held = 0
         self.changed = threading.Condition()
+
+    @property
+    def spent(self) -> float:
+        return self.spent_micros / 1e6
 
     def reserve(self, usd: float) -> bool:
         """True once `usd` is held for a run. It waits while runs in flight
         hold what it needs, and is False when what's spent leaves too little."""
+        want = micros(usd)
         with self.changed:
-            while self.spent + self.held + usd > self.cap:
-                if self.spent + usd > self.cap:
+            while self.spent_micros + self.held + want > self.cap:
+                if self.spent_micros + want > self.cap:
                     return False
                 self.changed.wait()
-            self.held += usd
+            self.held += want
             return True
 
     def settle(self, reserved: float, record: dict) -> None:
+        held = micros(reserved)
         cost = record.get("cost_usd")
         with self.changed:
-            self.held -= reserved
-            self.spent += reserved if cost is None else cost
-            with self.results.open("a") as f:
-                f.write(json.dumps(record) + "\n")
-            self.changed.notify_all()
+            # What was held is released even if the record can't be written,
+            # and the runs waiting on it are woken either way.
+            try:
+                self.held -= held
+                self.spent_micros += held if cost is None else micros(cost)
+                line = json.dumps(record)
+                with self.results.open("a") as f:
+                    f.write(line + "\n")
+            finally:
+                self.changed.notify_all()
+
+
+def micros(usd: float) -> int:
+    return round(usd * 1_000_000)
 
 
 SEEDS = [(f, "seed") for f in RULE_TERMS] + [("api-version", "seed-poison"), ("regression-test", "seed-poison")]

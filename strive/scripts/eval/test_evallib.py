@@ -394,6 +394,41 @@ class LearnerProbeLedgerTest(unittest.TestCase):
             waiting.join(5)
             self.assertEqual(got, [True])
 
+    def test_a_run_that_fits_exactly_isnt_left_waiting_once_everything_settled(self):
+        from learner_probe import Ledger
+
+        with tempfile.TemporaryDirectory() as d:
+            ledger = Ledger(0.3, Path(d) / "results.jsonl")
+            got: list[bool] = []
+
+            def runs() -> None:
+                # In float dollars 0.1 + 0.2 passes 0.3, and settling both leaves 5.6e-17 held.
+                for usd in (0.1, 0.2):
+                    got.append(ledger.reserve(usd))
+                for usd in (0.1, 0.2):
+                    ledger.settle(usd, {"type": "learn", "cost_usd": 0.0})
+                got.append(ledger.reserve(0.3))
+
+            # In a thread, so a run left waiting fails the test rather than hanging it.
+            worker = threading.Thread(target=runs, daemon=True)
+            worker.start()
+            worker.join(2)
+            self.assertEqual(got, [True, True, True])
+
+    def test_a_settle_that_fails_to_write_still_wakes_a_waiting_run(self):
+        from learner_probe import Ledger
+
+        with tempfile.TemporaryDirectory() as d:
+            ledger = Ledger(0.5, Path(d) / "results.jsonl")
+            ledger.reserve(0.4)
+            got: list[bool] = []
+            waiting = threading.Thread(target=lambda: got.append(ledger.reserve(0.4)), daemon=True)
+            waiting.start()
+            with self.assertRaises(TypeError):
+                ledger.settle(0.4, {"type": "seed", "cost_usd": 0.05, "unwritable": object()})
+            waiting.join(2)
+            self.assertEqual(got, [True])
+
     def test_a_run_is_refused_when_what_is_spent_leaves_too_little(self):
         from learner_probe import Ledger
 
