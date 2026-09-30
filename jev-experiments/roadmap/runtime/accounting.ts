@@ -1,11 +1,11 @@
 import {
   jsonIssue,
   jsonEqual,
-} from "../../packages/decision-runtime/src/native";
+} from "../../packages/decision-runtime/src/native.js";
 import {
   scoreAgreement,
   type ScoreAgreement,
-} from "../../packages/decision-runtime/src/score";
+} from "../../packages/decision-runtime/src/score.js";
 
 export type TokenUsage = {
   inputTokens?: number;
