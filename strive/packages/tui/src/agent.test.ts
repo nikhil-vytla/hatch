@@ -114,10 +114,16 @@ async function corrected(settings?: DaemonSettings) {
 // The first offer in a daemon where no learner has run: priced as a typical run.
 const OFFER = "This session had a correction. Learn from it? It costs a learner run, about $0.21. [y/N]";
 
+/**
+ * The offer appears after a daemon round trip that reads the session's
+ * journal for signs; on a loaded CI runner that outlasts the 2s default.
+ */
+const OFFER_MS = 15_000;
+
 test("quitting a session with a correction offers to learn from it, and y asks for a run naming it", async () => {
   const { term, exits, cwd, id } = await corrected();
   term.type("\x04");
-  await term.waitFor(OFFER);
+  await term.waitFor(OFFER, OFFER_MS);
   expect(exits).toEqual([]);
   term.type("y");
   await exited(exits);
@@ -132,7 +138,7 @@ test("quitting a session with a correction offers to learn from it, and y asks f
 test("anything but y exits without a run, and the session isn't offered again", async () => {
   const { term, exits, cwd, id } = await corrected();
   term.type("\x04");
-  await term.waitFor(OFFER);
+  await term.waitFor(OFFER, OFFER_MS);
   term.type("n");
   await exited(exits);
   expect(exits).toEqual([0]);
