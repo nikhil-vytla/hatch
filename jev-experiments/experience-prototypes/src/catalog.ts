@@ -116,6 +116,14 @@ export const experiments = [
     "When does Jev beat a simple classifier, and where does it miss?",
   ),
   e(
+    "handoff",
+    "classify",
+    "When to ask a person",
+    "Benchmarks",
+    "Set how sure Jev must be to act. See the reviews it saves and the mistakes it lets through.",
+    "When should software act on Jev's answer, and when should it ask a person?",
+  ),
+  e(
     "judge",
     "judgment-reliability",
     "JudgeBench",

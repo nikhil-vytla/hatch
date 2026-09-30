@@ -3797,3 +3797,50 @@ nav a {
   margin: 48px auto;
   padding: 0 24px;
 }
+.handoff > * + * {
+  margin-top: 16px;
+}
+.handoff-slider {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 14px;
+  max-width: 520px;
+}
+.handoff-slider input {
+  width: 100%;
+}
+.handoff-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 380px) minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+.handoff-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.handoff-chart {
+  width: 100%;
+  height: auto;
+}
+.handoff-axis {
+  stroke: var(--line);
+}
+.handoff-line {
+  fill: none;
+  stroke: var(--sage);
+  stroke-width: 2;
+}
+.handoff-dot {
+  fill: var(--ink);
+}
+.handoff-label {
+  font-size: 10px;
+  fill: var(--muted);
+}
+@media (max-width: 720px) {
+  .handoff-grid {
+    grid-template-columns: 1fr;
+  }
+}
