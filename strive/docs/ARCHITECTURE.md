@@ -265,7 +265,8 @@ by `learning/open`. Its `sessionStarted` says `kind: learning`.
 
 **What its host may do.** Its `host/register` returns `kind: learning`,
 no MCP tools, and `learnedFiles`: the project's memory and skills, each
-whole and exactly as on disk. Files a proposal couldn't replace are left
+whole and exactly as on disk, memory also as `items` (each bullet with its
+source, and the other lines). Files a proposal couldn't change are left
 out: not regular, reached through a symlink, in strive's home, or over
 64 KiB. `contextLoaded.learned` journals their digests.
 - A host lives on between runs, and the files change under it: an
@@ -295,10 +296,22 @@ prompt, as `userMessage` is for the coding agent.
 - Read tools' output isn't journaled, so on resume their calls say to
   call them again.
 
-**A proposal.** On `proposalMade` the daemon, holding the project's lock:
-1. runs the static gate;
-2. takes `before`, the file as the learner was last shown it (none if it
+**Memory as bullets** ([ADR-0022](adrs/0022-bullet-proposals.md)).
+`.strive/memory.md` stays plain markdown. A bullet the learner wrote ends
+with `<!-- strive:#42 -->`, the proposal that last wrote it; one a person
+wrote has none. `strive_learning::memory` reads it line by line (a bullet:
+an indent, `-`, `*` or `+`, a space, text; not inside a code fence) and
+writes it back byte for byte. Work sessions are given it without the
+source comments; the learner is shown `[#42]` or `[hand-written]` before
+each bullet.
+
+**A proposal** changes one thing (`Proposal.change`): a memory operation
+(`add {text, after?}`, `change {bullet, text}`, `remove {bullet}`, a
+bullet named `#42` or, if hand-written, by its exact text) or a skill's
+whole `content`. On `proposalMade` the daemon, holding the project's lock:
+1. takes `before`, the file as the learner was last shown it (none if it
    wasn't there), from the latest `contextLoaded`. A host can't supply it;
+2. runs the static gate, a memory operation against `before`;
 3. journals the proposal and every gate's `gateFinished` that is decided at
    once (the static gate's, and the judge's skip) in one commit.
    The proposal's id is its entry's seq.
@@ -308,10 +321,15 @@ machine). Every finding is listed in the gate's detail:
 - **Path:** a skill name is 1 to 40 of `a-z0-9-`. The file resolves
   inside the project's `.strive/` with no symlink on the way, is a regular
   file if it exists, and isn't in strive's home (a project at `~`).
-- **Size:** memory ≤ 16 KiB, a skill ≤ 32 KiB.
-- **Form:** a skill's frontmatter names it and describes it; the summary
-  is one line; there is a rationale and a prediction.
-- **Secrets**, in the content, summary and rationale: key shapes (`sk-`,
+- **Size:** a bullet ≤ 500 characters, and memory with the operation
+  applied ≤ 16 KiB; a skill ≤ 32 KiB.
+- **Form:** a bullet is one line of text, without its `- `; a skill's
+  frontmatter names it and describes it; the summary is one line; there is
+  a rationale and a prediction.
+- **Bullet:** a change or remove names one bullet the learner was shown
+  (and a change changes it), an add's `after` does too, and an add doesn't
+  repeat a bullet (compared with runs of whitespace as one).
+- **Secrets**, in the bullet or content, summary and rationale: key shapes (`sk-`,
   GitHub, Slack, Google, AWS, private keys) and the stored API keys by
   value. The detail never repeats the secret.
 - **Weakening strive:** phrases that bypass approvals, weaken the sandbox,
@@ -328,9 +346,9 @@ machine). Every finding is listed in the gate's detail:
 diff, not a gate a person must pass. The daemon's own model call, through its gateway with the learning session's token, so
 it is admitted, held, journaled and charged like any call of that session.
 - **What it's shown**, as one JSON document the system prompt calls data:
-  the proposal, the file it replaces and the other memory and skills as
-  the learner was shown them, earlier proposals for the same file that a
-  person rolled back, the cited sessions (cited entries kept
+  the proposal, the file it changes (and as the change would leave it)
+  and the other memory and skills as the learner was shown them, earlier
+  proposals for the same file that a person rolled back, the cited sessions (cited entries kept
   first), and up to three held-out sessions: the project's newest work
   sessions the proposal doesn't cite, begun before it, with a prompt and a
   journal that verifies. Nothing of the learning session's own goes in.
@@ -371,19 +389,24 @@ it is admitted, held, journaled and charged like any call of that session.
 | `ready` | the static gate passed and the judge finished: pass, fail or skip |
 | `rejected` | a person rejected it |
 | `applied` | accepted and written (`proposalApplied`) |
-| `stale` | accepted, but the file wasn't as the learner saw it, so nothing was written |
+| `stale` | accepted, but its bullet (memory) or file (a skill) wasn't as the learner saw it, so nothing was written |
 | `rolledBack` | an applied one, undone |
 
 People read `stale` as "file changed" in a list and "not written: the file
 changed since this was proposed" on its own. Two more facts ride with an
 `applied` one:
-- `replacedBy`: a later proposal for the same file was applied over it
-  (the fold sets it, and clears it if that one is rolled back to this
-  one's content). It shows as "replaced by #N" instead of `applied`.
-- `canRollBack`: `proposal/list` compares the file now with what the
-  proposal wrote. Roll back is offered (the CLI's hint, the desktop's
-  button) only when it's true, since the daemon would refuse otherwise;
-  `strive review ID rollback` says why before asking.
+- `replacedBy`: a later applied proposal changed what it wrote. For
+  memory, a later change or remove of its bullet (the bullet's source
+  names it); a proposal for another bullet never does, and rolling that
+  one back clears it. For a skill, a later proposal for the same skill
+  (cleared if that one is rolled back to this one's content). It shows as
+  "replaced by #N" instead of `applied`.
+- `canRollBack`: `proposal/list` applies the rollback rule below to the
+  file now. Roll back is offered (the CLI's hint, the desktop's button)
+  only when it's true, since the daemon would refuse otherwise; `strive
+  review ID rollback` says why before asking.
+- `bullet`: a memory proposal's one-bullet diff, as applied, or else as it
+  applies to the file the learner saw.
 
 Each proposal also carries `trigger` (an automatic run's) or `offered`
 (the signs of a person's yes to the offer), so review can say where its
@@ -399,19 +422,28 @@ name a relative project path, in backticks, that no longer exists
 **Deciding.** `proposal/decide` and `proposal/rollback` are people only,
 as approvals are. Both hold the file (as an agent's write does) and the
 project's directory against rewinds.
-- **Accept** works only on a `ready` proposal. If the file's digest is
-  still `before`, the daemon writes the content with a pinned write and
-  journals `proposalDecided` and `proposalApplied {before, after}`
-  together. Otherwise it journals the accept alone: `stale`.
+- **Accept** works only on a `ready` proposal, and writes with a pinned
+  write, journaling `proposalDecided` and `proposalApplied {before, after,
+  bullet?}` together (the file's digests, and for memory what it did to
+  its bullet). Otherwise it journals the accept alone: `stale`.
+  - Memory: the operation is applied to the file as it is now. A change or
+    remove needs its bullet to read as the learner saw it; edits elsewhere
+    don't matter. An add goes after `after` (or the last bullet), with the
+    new bullet's source; it's stale if the file now has that bullet, or if
+    the file would pass 16 KiB.
+  - A skill: written only if its file's digest is still `before`.
 - **Reject** journals `proposalDecided`, for one not yet decided.
-- **Rollback** works on an `applied` proposal whose file is still `after`:
-  it writes `before` back, or removes a file that didn't exist, then
-  journals `proposalRolledBack`.
+- **Rollback** works on an `applied` proposal no later one replaced, then
+  journals `proposalRolledBack`. Memory: it removes the bullet an add
+  wrote, gives a changed bullet its old line, or puts a removed one back
+  after the line it followed (or at the end if that's gone), in any order;
+  refused only if that bullet changed since. A skill: its file must still
+  be `after`; `before` is written back, or a file that didn't exist removed.
 - The file is written before its record. A crash between leaves the file
-  changed and nothing recorded. Accepting again finds the file already
-  holds the proposal's content and journals the accept and the apply
-  (with `before`), writing nothing; rolling back again finds it already
-  `before` and journals the rollback.
+  changed and nothing recorded. Accepting again finds the change already
+  there (the bullet reads as the operation leaves it, or the skill holds
+  the content) and journals the accept and the apply, writing nothing;
+  rolling back again finds it already undone and journals the rollback.
 
 **What shapes a session.** One list, `context::SHAPING`, names every file
 or directory whose contents a session is given when it starts, or which
@@ -477,10 +509,13 @@ sandbox guard all of it:
 - **Changed outside review**, for learned files only. An editor or git can
   still change any of these; a person editing `AGENTS.md` is normal, so
   only learned files are flagged. `proposal/list` returns
-  `changedOutsideReview`: learned files that aren't what an accepted
-  proposal last left there. After an apply that's its content, after a
-  rollback what it replaced, and with no applied proposal, any file that
-  exists counts. `strive review` prints a line for each. A command a work
+  `changedOutsideReview`: memory when a bullet names a source that isn't
+  an applied proposal which left it reading so (hand-written bullets are a
+  person's and never count; `memory` marks each such bullet), and a skill
+  that isn't what an accepted proposal last left there (after an apply its
+  content, after a rollback what it replaced, and with no applied proposal
+  any file that exists). `strive review` prints a line for each, per
+  bullet for memory. A command a work
   session runs can change the file between the compare and the write.
   Writes and edits the agent asks for can't: they wait for the file.
 
@@ -561,8 +596,11 @@ proposed, waiting for second opinions still out. `strive review` lists
 proposals and accepts, rejects or rolls one back. `strive review ID` shows,
 in order, the summary and status, where its run came from ("you said yes
 to the end-of-session offer: a correction in \"run the tests\"", "asked
-with `strive learn`", "automatic, …"), the diff against `before`, the
-checks in one line, and what to do next; `--full` adds why, the
+with `strive learn`", "automatic, …"), the diff (one bullet for memory,
+against `before` for a skill), the checks in one line, and what to do
+next; `strive review --memory` shows the memory as every session reads it
+now (`proposal/list`'s `memory`), each bullet with its source (`#42`) or
+"hand-written", as the desktop's "What every session reads now" does; `--full` adds why, the
 prediction, the evidence, the signs the run was given and each check's
 detail. Sessions are named by their titles, not their ids.
 

@@ -2438,3 +2438,61 @@ The design that follows (12 task families with seed and held-out test
 instances, screening on calibration instances only, frozen / learning /
 oracle / poison / placebo arms, cluster bootstrap, six pre-registered
 hypotheses, about $33–52 on Haiku 4.5) is ADR-0021.
+
+## 2026-09-29: memory proposals change one bullet (ADR-0022, item 5 of the plan)
+
+- **The type:** `Proposal { change: Change, … }` with `Change::Memory(MemoryOp)`
+  or `Change::Skill { name, content }`. Considered `Artifact::Memory { op }`,
+  but `Artifact` also names a file (`LearnedFile`, `read_artifact`,
+  `relative_path`), which has no operation. Protocol version 3.
+- **One module does the file:** `strive_learning::memory` parses, writes
+  (byte-exact: bodies and line endings kept), applies an operation
+  (`apply`), previews it (`preview`), undoes it (`undo`), checks it
+  (`check`) and marks bullets changed outside review (`view`). The daemon
+  only reads, writes (pinned) and journals. `rollable` and `rollback` both
+  call one `undo`, so `canRollBack` can't drift from what rollback does.
+- **Removed position:** a removed bullet's journal entry keeps the last
+  non-blank line before it and the blank lines between (`follows`, `gap`).
+  With only the line before it, a bullet under "# Heading" plus a blank
+  line came back above the blank line.
+- **Crash recovery for remove:** a remove whose bullet is gone is journaled
+  as applied without a write. A hand-written bullet named by text can't be
+  told apart from one removed, and either way the file is as the proposal
+  leaves it (the whole-file rule was the same: the file already as proposed
+  counts as applied). An edited learned bullet (its source still there,
+  its text changed) is stale.
+- **Loader:** work sessions get memory without the `strive:#N` comments
+  (`Memory::for_sessions`); the learner gets items (`LearnedFile.items`)
+  and the raw text. The comment is review's, and costs a session tokens.
+- **replacedBy:** memory is per bullet (the changed or removed line's
+  source names the replaced proposal, if it's applied and not rolled
+  back); skills keep the whole-file `Live` map.
+- **Hidden text:** a bullet may not hold `<!--`: rendered markdown hides a
+  comment, and memory's own comments name sources.
+- **Deleted:** the whole-file memory path in apply, rollback, `rollable`
+  and `outside_review` (memory's digest tracking); `size_limit`; memory's
+  whole-file `content`; the eval's `currentMemory` scrape in
+  `fake_model.ts`. The learner prompt's "put all memory changes in one
+  proposal".
+- **Old learning journals** (whole-file `content`) no longer parse and fail
+  as unreadable, as with protocol 2; delete that learning session.
+- **Tests:** `crates/learning/tests/memory.rs` (26: round trip over odd
+  markdown and CRLF, sources, each operation's apply, stale and undo, undo
+  in any order and past hand edits, an operation touching only its bullet,
+  duplicates, limits at the byte, `view`); fold tests for per-bullet
+  `replacedBy`; daemon tests for rollback in any order, stale per bullet,
+  crash recovery both ways, `strive review --memory`, per-bullet outside
+  review, the loader stripping sources; host e2e with a scripted model (add,
+  then change by `#N`; the prompt shows `[#N]` and `[hand-written]`); a
+  desktop e2e for "What every session reads now". The learning crate's
+  tests mostly passed on first run: they were written with the module, not
+  before it. The daemon, host and desktop tests failed against the old
+  code before it changed.
+- **Mutants:** `memory.rs`, `fold.rs`, `checks.rs`, `judge.rs`, `lib.rs` and
+  `proto/src/lib.rs`: 0 missed after four fixes (a redundant `!is_empty`,
+  the 16 KiB boundary twice, and a hand-written line's trailing space in
+  `for_sessions`), and one equivalent guard in `fold.rs` moved so the skill
+  path's own check is the one that counts.
+- **Line delta** against main, code and tests without docs or generated
+  files: about +2780/−560 in 44 files (source +1390/−210, tests
+  +1300/−310).

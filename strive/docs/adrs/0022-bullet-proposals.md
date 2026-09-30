@@ -1,6 +1,6 @@
 # ADR-0022: Memory proposals change one bullet
 
-Status: accepted, not built. Replaces the plan to keep proposals in the
+Status: accepted and built (2026-09-29; see "As built" below). Replaces the plan to keep proposals in the
 shadow repository (the simplification plan's item 5).
 
 ## Context
@@ -82,3 +82,37 @@ structure, and new skills are the common case.
   count as hand-written.
 - A consolidation pass (merge and prune) can come later as ordinary remove
   and change proposals.
+
+## As built
+
+- **The type:** `Proposal.change` is `Change::Memory(MemoryOp)` or
+  `Change::Skill { name, content }`, so a memory proposal can't carry a
+  whole file and a skill can't carry an operation. `MemoryOp` is `add
+  {text, after?}`, `change {bullet, text}` or `remove {bullet}`; on the
+  wire `{"kind": "memory", "op": "add", "text": …}`. `bullet` is `#42` (a
+  source; `#` then digits only) or a hand-written bullet's exact text.
+- **The file:** `strive_learning::memory` reads a line as a bullet when it
+  starts, after any indent, with `-`, `*` or `+` and a space, outside a
+  code fence. Other lines are kept as they are, and so are line endings,
+  so parse then write gives the same bytes.
+- **The journal:** `proposalApplied` keeps the file's `before` and
+  `after` digests and a `bullet`: `added {line}`, `changed {old, new}`, or
+  `removed {line, follows, gap}` (the last line before it that isn't
+  blank, and the blank lines between), which rollback uses to put it back.
+- **Stale and crash recovery:** a change or remove is stale when its
+  bullet no longer reads as the learner saw it. A bullet that already
+  reads as the operation leaves it (an accept a crash cut off after its
+  write) is journaled as applied without writing; a remove whose bullet is
+  gone is treated so too, as a hand-written bullet can't be told apart
+  from one removed. The same rule, one function (`memory::undo`), decides
+  rollback and `canRollBack`.
+- **Changed outside review** is per bullet: a bullet whose source isn't an
+  applied proposal that left it reading so. Hand-written bullets are a
+  person's and never count.
+- **Sessions are given memory without the source comments;** the learner
+  is shown each bullet as `[#42]` or `[hand-written]` (`LearnedFile.items`).
+  The comment costs a work session tokens and tells it nothing it acts on,
+  while the learner needs it to name a bullet.
+- **Old learning journals** (protocol 2, whole-file `content`) no longer
+  parse and fail verification as unreadable, as in the earlier protocol
+  change; delete that learning session. Memory files need no migration.
