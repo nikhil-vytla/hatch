@@ -3792,3 +3792,8 @@ nav a {
     grid-template-columns: 1fr;
   }
 }
+.retired-scene {
+  max-width: 760px;
+  margin: 48px auto;
+  padding: 0 24px;
+}

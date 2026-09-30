@@ -28,7 +28,7 @@ export function AboutPage() {
         <div className="about-reading-links">
           <a href="#/notes">Read the notes <ArrowUpRight size={16} /></a>
           <a href="/capabilities.html">Inspect Jev's role <ArrowUpRight size={16} /></a>
-          <a href="#experiment/benchmark-atlas">Research directions <ArrowUpRight size={16} /></a>
+          <a href="https://github.com/nikhil-vytla/hatch/blob/main/jev-experiments/roadmap/MAP.md" target="_blank" rel="noreferrer">Research directions <ArrowUpRight size={16} /></a>
         </div>
       </div>
     </main>

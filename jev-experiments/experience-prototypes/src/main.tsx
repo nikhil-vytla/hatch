@@ -2,7 +2,7 @@ import { Activity, useEffect, useState, useRef, Suspense, lazy } from "react";
 import { createRoot } from "react-dom/client";
 import { MotionConfig } from "motion/react";
 import { ArrowUpRight, ArrowRight, KeyRound, Settings2, X } from "lucide-react";
-import { lookup } from "./catalog";
+import { lookup, retiredScene } from "./catalog";
 import { Button, Field } from "./shared";
 import { getApiKey, setApiKey } from "./api";
 import { BuilderCredits } from "../../roadmap/credits";
@@ -268,7 +268,7 @@ function App() {
       ? route.split("/")[2].replaceAll("-", " ")
       : route.startsWith("#/notes") ? "Notes"
       : route === "#/about" || route === "#about" ? "About"
-      : id ? lookup(id).title : "Play";
+      : id ? (retiredScene(id)?.title ?? lookup(id).title) : "Play";
     document.title = `${label.charAt(0).toUpperCase()}${label.slice(1)} · Jev experiments`;
   }, [route, id]);
   return (
