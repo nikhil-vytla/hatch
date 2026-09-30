@@ -31,5 +31,7 @@ jobs:
         run: bun run build
       - name: Verify request, timer and media lifetimes
         run: bun test jev-experiments/scene-lifetimes-2026-09-22 jev-experiments/rewardbench2/publication-source.test.ts jev-experiments/rewardbench2/publication.test.ts
+      - name: Arena models and recordings
+        run: bun test jev-experiments/packages/arena
       - name: Verify public record integrity
         run: bun run jev-experiments/roadmap/verification/publication.ts
