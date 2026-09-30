@@ -3844,3 +3844,10 @@ nav a {
     grid-template-columns: 1fr;
   }
 }
+.answer-key > * + * {
+  margin-top: 16px;
+}
+.answer-key .lede-small {
+  font-size: 16px;
+  max-width: 68ch;
+}

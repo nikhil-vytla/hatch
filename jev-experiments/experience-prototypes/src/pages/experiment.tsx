@@ -17,6 +17,7 @@ const Games = lazy(() => import("../games").then(m => ({ default: m.Games })));
 const Learning = lazy(() => import("../benchmarks").then(m => ({ default: m.Learning })));
 const IntentRecognition = lazy(() => import("../intent-recognition").then(m => ({ default: m.IntentRecognition })));
 const Handoff = lazy(() => import("../handoff").then(m => ({ default: m.Handoff })));
+const AnswerKey = lazy(() => import("../answer-key").then(m => ({ default: m.AnswerKey })));
 const RewardBench = lazy(() => import("../rewardbench").then(m => ({ default: m.RewardBench })));
 const LocalModels = lazy(() => import("../local-models").then(m => ({ default: m.LocalModels })));
 const AgentExperiment = lazy(() => import("../agent-experiments").then(m => ({ default: m.AgentExperiment })));
@@ -60,6 +61,8 @@ function View({
       return <ArcadeScene result={result} />;
     case "local-models":
       return <LocalModels result={result} />;
+    case "answer-key":
+      return <AnswerKey result={result} />;
     case "paste":
       return <Paste record={result} />;
     case "semantic-table":
