@@ -10,9 +10,7 @@ import "./experiment.css";
 const sceneEntries = new Set(["materials", "tetris", "crowd", "music", "routing", "visual-search"]);
 
 const Paste = lazy(() => import("../new-experiments").then(m => ({ default: m.Paste })));
-const SemanticTable = lazy(() => import("../new-experiments").then(m => ({ default: m.SemanticTable })));
-const UndoExperiment = lazy(() => import("../new-experiments").then(m => ({ default: m.UndoExperiment })));
-const Changes = lazy(() => import("../new-experiments").then(m => ({ default: m.Changes })));
+const JudgmentsScene = lazy(() => import("../judgments-scene").then(m => ({ default: m.JudgmentsScene })));
 const GeneratedUI = lazy(() => import("../generated-ui").then(m => ({ default: m.GeneratedUI })));
 const Games = lazy(() => import("../games").then(m => ({ default: m.Games })));
 const Learning = lazy(() => import("../benchmarks").then(m => ({ default: m.Learning })));
@@ -63,11 +61,7 @@ function View({
     case "paste":
       return <Paste record={result} />;
     case "semantic-table":
-      return <SemanticTable record={result} />;
-    case "undo":
-      return <UndoExperiment record={result} />;
-    case "changes":
-      return <Changes record={result} />;
+      return <JudgmentsScene record={result} />;
     case "ui":
       return <GeneratedUI record={composition} />;
     case "music":
