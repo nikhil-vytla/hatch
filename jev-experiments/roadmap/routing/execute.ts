@@ -1,7 +1,7 @@
 import type { Artifact, Executor, ExecutionResult, Route, Task } from "./types";
 
-import { delegationInstruction, parseArtifact } from "./artifacts";
-import { executeHttp } from "./http-executor";
+import { delegationInstruction, parseArtifact } from "./artifacts.js";
+import { executeHttp } from "./http-executor.js";
 export const executeDestination: Executor = async (route, task, options) => {
   if (options.signal?.aborted)
     return {

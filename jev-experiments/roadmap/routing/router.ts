@@ -5,9 +5,9 @@ import {
   validateTask,
   validatePolicy,
   validateRoute,
-} from "./policy";
-import { executeDestination } from "./execute";
-import { DecisionClassifierError } from "./classifier";
+} from "./policy.js";
+import { executeDestination } from "./execute.js";
+import { DecisionClassifierError } from "./classifier.js";
 import {
   addCosts,
   classifierIdentity,
@@ -20,7 +20,7 @@ import {
   executionIssues,
   enforceExecutionIdentity,
   inspectVerification,
-} from "./hooks";
+} from "./hooks.js";
 import type { Identity } from "../runtime/contract";
 import type {
   Classification,
