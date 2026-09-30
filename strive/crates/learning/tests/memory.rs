@@ -129,11 +129,12 @@ fn only_a_trailing_strive_comment_with_a_number_is_a_source() {
 
 #[test]
 fn sessions_are_given_bullets_without_their_source_comments() {
-    let file = "# Memory\r\n- Use bun. <!-- strive:#4 -->\r\n  * Nested <!-- strive:#9 -->\n- Mine <!-- a note -->\n\
+    let file = "# Memory\r\n- Use bun. <!-- strive:#4 -->\r\n  * Nested <!-- strive:#9 -->\n- Mine <!-- a note -->  \n\
                 ```\n- x <!-- strive:#5 -->\n```\n- Last <!-- strive:#6 -->";
     assert_eq!(
         parse(file).for_sessions(),
-        "# Memory\r\n- Use bun.\r\n  * Nested\n- Mine <!-- a note -->\n```\n- x <!-- strive:#5 -->\n```\n- Last"
+        "# Memory\r\n- Use bun.\r\n  * Nested\n- Mine <!-- a note -->  \n```\n- x <!-- strive:#5 -->\n```\n- Last",
+        "a person's lines exactly as written"
     );
 }
 
@@ -287,6 +288,8 @@ fn a_bullet_is_named_by_its_source_or_a_hand_written_ones_exact_text() {
     assert!(memory::apply(file, file, &remove(" #4 "), 9).is_ok());
     assert!(memory::apply("- #4\n", "- #4\n", &remove("#4"), 9).is_err(), "#4 always names a source");
     assert!(memory::apply("- #x\n", "- #x\n", &remove("#x"), 9).is_ok(), "#x is text");
+    assert!(memory::apply("- #+3\n", "- #+3\n", &remove("#+3"), 9).is_ok(), "#+3 is text");
+    assert!(memory::apply("- #\n", "- #\n", &remove("#"), 9).is_ok(), "# is text");
 }
 
 /// Whatever the operation, every line but its bullet's is carried over.
@@ -443,6 +446,16 @@ fn the_check_keeps_the_file_within_its_limit() {
     assert_eq!(found[0].0, Rule::Size);
     assert!(found[0].1.starts_with("memory would be "), "{found:?}");
     assert!(findings(&format!("{big}{}", "b".repeat(200)), &remove(&long)).is_empty(), "removing shrinks it");
+    // Exactly at the limit is fine, one byte over isn't.
+    let line = |id: u64| format!("- b <!-- strive:#{id} -->\n");
+    let fits = format!("- {}\n", "a".repeat(strive_learning::MEMORY_LIMIT - 3 - line(5).len()));
+    let exact = memory::apply(&fits, &fits, &add("b"), 5).unwrap();
+    assert_eq!(exact.text.len(), strive_learning::MEMORY_LIMIT);
+    assert!(memory::apply(&fits, &fits, &add("b"), 50).is_err(), "one byte over");
+    let fits = format!("- {}\n", "a".repeat(strive_learning::MEMORY_LIMIT - 3 - line(u64::MAX).len()));
+    assert_eq!(findings(&fits, &add("b")), vec![], "the check counts the longest id");
+    let over = format!("{fits}x");
+    assert_eq!(findings(&over, &add("b")).len(), 1);
     // Accepting checks again against the file as it is then.
     let why = memory::apply(&format!("{big}- {}\n", "c".repeat(80)), &big, &add(&"b".repeat(30)), 5).unwrap_err();
     assert!(why.starts_with("memory would be "), "{why}");

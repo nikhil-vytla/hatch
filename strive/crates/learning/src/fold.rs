@@ -160,8 +160,10 @@ impl Live {
     fn applied(&mut self, out: &mut [(ProposalState, Marks)], i: usize) {
         let id = out[i].0.id;
         let old = match (&out[i].0.proposal.change, out[i].1.applied.as_ref().and_then(|a| a.bullet.as_ref())) {
+            // A line can name any number; only an applied proposal's bullet is replaced.
             (Change::Memory(_), Some(BulletEdit::Changed { old: line, .. } | BulletEdit::Removed { line, .. })) => {
                 crate::memory::source(line)
+                    .filter(|s| out.iter().any(|(p, m)| p.id == *s && m.applied.is_some() && !m.rolled_back))
             }
             (Change::Memory(_), Some(BulletEdit::Added { .. }) | None) => None,
             (Change::Skill { .. }, _) => {
@@ -170,8 +172,7 @@ impl Live {
             }
         };
         if let Some(old) = old
-            && let Some(j) =
-                out.iter().position(|(s, m)| s.id == old && old != id && m.applied.is_some() && !m.rolled_back)
+            && let Some(j) = out.iter().position(|(s, _)| s.id == old && old != id)
         {
             out[j].0.replaced_by = Some(id);
         }

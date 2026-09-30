@@ -65,7 +65,8 @@ enum Ref<'a> {
 impl<'a> Ref<'a> {
     fn parse(s: &'a str) -> Self {
         let s = s.trim();
-        match s.strip_prefix('#').filter(|n| !n.is_empty() && n.bytes().all(|b| b.is_ascii_digit())) {
+        // Digits only: `#+3` is text, though `+3` parses. `#` alone fails to parse.
+        match s.strip_prefix('#').filter(|n| n.bytes().all(|b| b.is_ascii_digit())) {
             Some(n) => n.parse().map_or(Ref::Text(s), Ref::Source),
             None => Ref::Text(s),
         }

@@ -423,4 +423,12 @@ fn changing_a_hand_written_bullet_replaces_no_proposal() {
         BulletEdit::Changed { old: "- a <!-- strive:#2 -->".into(), new: "- A <!-- strive:#4 -->".into() },
     ));
     assert_eq!(replaced_by(&events), vec![(2, None), (3, None), (4, None)], "#2 was never applied");
+    // Applied, then rolled back: a line still naming it doesn't make it replaced.
+    events.extend(wrote(2, BulletEdit::Added { line: "- a <!-- strive:#2 -->".into() }));
+    events.push(rolled_back(2));
+    events.push(memory_made(MemoryOp::Remove { bullet: "#2".into() }));
+    let late = event_count(&events);
+    events.extend(passed(late));
+    events.extend(wrote(late, BulletEdit::Removed { line: "- a <!-- strive:#2 -->".into(), follows: None, gap: 0 }));
+    assert!(replaced_by(&events).iter().all(|(_, by)| by.is_none()), "{:?}", replaced_by(&events));
 }
