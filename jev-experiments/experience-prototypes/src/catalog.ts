@@ -124,6 +124,14 @@ export const experiments = [
     "When should software act on Jev's answer, and when should it ask a person?",
   ),
   e(
+    "decoy",
+    "",
+    "The decoy",
+    "Benchmarks",
+    "Add an option nobody should pick. Watch it change which of the other two Jev prefers.",
+    "Does an obviously worse option change Jev's choice between two good ones?",
+  ),
+  e(
     "judge",
     "judgment-reliability",
     "JudgeBench",
