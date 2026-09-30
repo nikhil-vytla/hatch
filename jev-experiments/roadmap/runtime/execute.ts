@@ -6,12 +6,12 @@ import {
   type DecisionRequest,
   type DecisionResponse,
   type Issue,
-} from "./contract";
+} from "./contract.js";
 import {
   accountingIssue,
   requestAccounting,
   type RequestAccounting,
-} from "./accounting";
+} from "./accounting.js";
 /** A late provider result cannot turn cancellation into success. */
 export async function decide(
   adapter: Adapter,

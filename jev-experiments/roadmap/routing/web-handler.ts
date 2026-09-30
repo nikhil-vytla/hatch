@@ -1,8 +1,8 @@
-import { apiKeyFromHeader } from "../../experience-prototypes/server/gateway";
-import { routeTask } from "./router";
-import { defaultPolicy, validatePolicy, validateTask } from "./policy";
-import { executeHttp } from "./http-executor";
-import { webRoutes } from "./web-registry";
+import { apiKeyFromHeader } from "../../experience-prototypes/server/gateway.js";
+import { routeTask } from "./router.js";
+import { defaultPolicy, validatePolicy, validateTask } from "./policy.js";
+import { executeHttp } from "./http-executor.js";
+import { webRoutes } from "./web-registry.js";
 import type { Executor } from "./types";
 export default async function handler(req: any, res: any) {
   res.setHeader("Cache-Control", "no-store");
