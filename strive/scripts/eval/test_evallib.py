@@ -302,5 +302,78 @@ class HypothesesTest(unittest.TestCase):
         self.assertEqual(stats.forgetting(ts)["L"]["passed_then_failed"], 1)
 
 
+class ResumeTest(unittest.TestCase):
+    def test_only_finished_sequences_with_the_model_reached_are_kept(self):
+        import run_eval
+        from evallib import Trial
+
+        def t(arm, seq, pos):
+            return Trial(arm=arm, sequence=seq, position=pos, family="lockfile", instance=f"i{pos}",
+                         role="test")
+
+        plan = [t("F", 0, 0), t("F", 0, 1), t("L", 0, 0), t("L", 0, 1), t("L", 1, 0), t("L", 1, 1)]
+        rec = lambda tr, ok=True: {"type": "trial", "key": tr.key, "model_ok": ok, "cost_usd": 0.01,
+                                   "family": tr.family, "instance": tr.instance, "role": tr.role, "probe": tr.probe}
+        records = [rec(plan[0]), rec(plan[1]),                # F/0 finished
+                   rec(plan[2]), rec(plan[3], ok=False),      # L/0: last trial never reached the model
+                   rec(plan[4])]                              # L/1: cut short
+        kept = run_eval.completed_sequences(records, plan)
+        self.assertEqual(list(kept), [("F", 0)])
+        self.assertEqual([r["key"] for r in kept[("F", 0)]], [plan[0].key, plan[1].key])
+
+    def test_a_record_for_another_task_under_the_same_key_isnt_kept(self):
+        import run_eval
+        from evallib import Trial
+
+        plan = [Trial(arm="F", sequence=0, position=0, family="lockfile", instance="t1", role="test")]
+        other = {"type": "trial", "key": plan[0].key, "model_ok": True, "cost_usd": 0.01,
+                 "family": "codeowners", "instance": "t1", "role": "test", "probe": False}
+        self.assertEqual(run_eval.completed_sequences([other], plan), {})
+        same = {**other, "family": "lockfile"}
+        self.assertEqual(list(run_eval.completed_sequences([same], plan)), [("F", 0)])
+
+    def test_resuming_under_different_settings_is_refused(self):
+        import run_eval
+
+        now = {"model": "claude-haiku-4-5-20251001", "seed": "2026", "sequences": "None", "task_budget": "0.4",
+               "learner_budget": "4.0", "turn_seconds": "600", "keep_learner_host": "False",
+               "families_from": "/tmp/s.json", "families": "None", "arms": "F,L", "strive": "/tmp/strive"}
+        self.assertEqual(run_eval.resume_mismatch(now, now), [])
+        changed = {**now, "seed": "7", "strive": "/tmp/other"}
+        self.assertEqual(run_eval.resume_mismatch(changed, now), ["seed", "strive"])
+        # A setting nobody listed is still compared; only the listed ones may differ.
+        self.assertEqual(run_eval.resume_mismatch({**now, "screen": "True"}, now), ["screen"])
+        self.assertEqual(run_eval.resume_mismatch(now, {**now, "out": "/tmp/b", "max_usd": "9"}), [])
+        self.assertEqual(run_eval.resume_mismatch({**now, "no_lock": "False"}, {**now, "no_lock": "True"}), ["no_lock"])
+
+    def test_the_fingerprint_changes_with_file_contents_and_strive_settings(self):
+        import run_eval
+
+        with tempfile.TemporaryDirectory() as d:
+            suite = Path(d) / "suite"
+            (suite / "t").mkdir(parents=True)
+            (suite / "t" / "check.py").write_text("a")
+            first = run_eval.fingerprint([suite], {})
+            self.assertEqual(run_eval.fingerprint([suite], {}), first)
+            (suite / "t" / "check.py").write_text("b")
+            self.assertNotEqual(run_eval.fingerprint([suite], {}), first)
+            self.assertNotEqual(run_eval.fingerprint([suite], {"STRIVE_HOST": "x"}),
+                                run_eval.fingerprint([suite], {}))
+
+    def test_a_locked_suite_cant_be_fingerprinted(self):
+        import run_eval
+
+        with tempfile.TemporaryDirectory() as d:
+            locked = Path(d) / "tasks"
+            locked.mkdir()
+            (locked / "f").write_text("x")
+            locked.chmod(0)
+            try:
+                with self.assertRaises(PermissionError):
+                    run_eval.fingerprint([Path(d)], {})
+            finally:
+                locked.chmod(0o755)
+
+
 if __name__ == "__main__":
     unittest.main()
