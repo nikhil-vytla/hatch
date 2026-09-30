@@ -3,6 +3,7 @@ import { motion } from "motion/react";
 import { ArrowUpRight, ArrowLeft, ArrowRight, Check } from "lucide-react";
 import { Pane, Stat, Fold, Button, Notice } from "./shared";
 import { CalibrationPanel } from "./calibration-panel";
+import { SmolLMPilot } from "./smollm-pilot";
 const pct = (n: number) => `${(Math.round(n * 1000 + 1e-8) / 10).toFixed(1)}%`;
 const number = (n: number | null | undefined, d = 3) =>
   n == null ? "—" : n.toFixed(d);
@@ -522,6 +523,7 @@ export function LocalModels({ result: r }: { result: any }) {
           </table>
         </div>
       </Fold>
+      <SmolLMPilot />
       <Fold title="Models, timings, and provenance">
         <div className="model-table-wrap">
           <table className="model-table">
