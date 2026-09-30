@@ -37,7 +37,8 @@ const rows = (url: URL): Row[] =>
         .map((l) => JSON.parse(l))
     : [];
 const prior = [...rows(pilot), ...rows(out)];
-const done = new Set(rows(out).filter((r) => r.status === "ok").map((r) => r.id!));
+// A rejected Score is a final answer (never re-asked), like a weak answer.
+const done = new Set(rows(out).filter((r) => r.status === "ok" || r.status === "rejected").map((r) => r.id!));
 let spent = prior.reduce((s, r) => s + (r.costUsd ?? 0), 0);
 let tokens = prior.reduce((s, r) => s + (r.inputTokens ?? (r as { usage?: { input_tokens?: number } }).usage?.input_tokens ?? 0), 0);
 let ok = prior.filter((r) => r.status === "ok").length;
@@ -88,6 +89,17 @@ for (const job of todo) {
       const costUsd = error instanceof GatewayError ? (error.accounting.costUsd ?? null) : null;
 
       spent += costUsd ?? 0;
+
+      // A request whose only question is a Score the gateway rejects comes back as a 502 with
+      // this code. It is an answer, not a busy reply: log it as rejected and move on.
+      if (error instanceof GatewayError && error.code === "native_score_mismatch") {
+        appendFileSync(
+          out,
+          `${JSON.stringify({ id: job.id, at, attempt, status: "rejected", code: status, message, costUsd, requestHash: hash(job.request) })}\n`,
+        );
+        break;
+      }
+
       appendFileSync(
         out,
         `${JSON.stringify({ id: job.id, at, attempt, status: "error", code: status, message, costUsd })}\n`,

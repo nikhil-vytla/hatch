@@ -9,8 +9,8 @@ they exist.
 Earlier work in this repo found that rewording never flipped Jev's answer in 40 tries on Decide,
 while answer shape and splitting did (`../src/decide/README.md`), and that reversing option
 order barely moved Tetris spot judgements (`../recordings/README.md`). Those were small and
-mostly unscored. This study covers 76 forms of the same question on 20 yes/no items with known
-answers, plus debatable items, choices, and six classic effects from psychology.
+mostly unscored. This study asks each of 20 yes/no items with known answers in 78 ways (75 forms, the
+canonical question and two repeats), plus debatable items, choices, and five classic studies from psychology.
 
 ## Protocol (frozen before the first recording)
 
@@ -228,6 +228,256 @@ bun jev-experiments/packages/arena/prose/analyze.ts
 - Zheng, C. et al. (2023). Large language models are not robust multiple choice selectors.
   arXiv:2309.03882 (ICLR 2024).
 
+## What was run
+
+30 Sep 2026, 06:57–08:00 UTC, through the Vercel AI Gateway as `typesafe-ai/jev` (build not
+named; see `../recordings/README.md`). All 2,626 requests answered: 2,625 answers plus one
+Score the gateway rejected (dolphin, 5-level descending), excluded as the protocol says. 2,634
+attempts; 8 were 503 busy replies, waited out. Hosts: `typesafe-ai` 2,465, `digitalocean` 160.
+Service latency p50 249 ms, p90 389 ms. Cost as reported by the gateway: $0.0371 for 882,391
+input tokens, pilot included (2,628 successful requests). Budget limits were $1.00 and 5,000
+requests.
+
+Every table below comes from `analyze.ts`, as frozen, and is copied from `results.md`, which has
+all 170-odd rows. Numbers marked "exploratory" come from `explore.ts`, written after the run
+to find examples; they don't change any frozen metric.
+
 ## Results
 
-Not yet recorded.
+### The short version
+
+Jev is good at:
+
+- Ignoring surface form. On 20 yes/no items with right answers, 7 sentence forms × 20 items
+  flipped nothing (0 of 140). Each register, voice, synonym, length, hedge, persona, stakes and
+  noise variant flipped at most 1 of 20 items. The two repeats moved answers 0.007 on average,
+  and most wording families moved them 0.01–0.03.
+- Layout. Eleven layouts of the same facts (prose, table, bullets, `key=value`, CSV, JSON
+  array, XML, snake_case keys, JSON in a string, nested, facts in the instructions) flipped 2 of
+  220 answers, both toward the right answer. Shuffled facts, distractors, a 420-word irrelevant
+  paragraph and numbers written as words lowered P(right) by at most 0.02.
+- Language. The question in Spanish, French, German, Chinese, Japanese, Hindi or Arabic, with or
+  without translated facts, flipped 2 of 280 answers. Hindi and Arabic questions lower P(right)
+  by 0.03 and 0.02, well below any flip.
+- Negation, when it knows the answer. "Is it false that …", "Is it true that not …" and a
+  negated statement kept 90–95% accuracy. On the 17 items Jev gets right, P(yes|X) and
+  P(yes|not-X) sum to within 0.2 of 1 on every pair but two (both on "cart").
+- Option order and labels in choices. Moving the right option from first to last, reversing
+  the options, or relabelling them as letters, numbers or random ids changed no top answer on
+  16 items.
+- Knowing when it knows. 1,251 of the 1,559 scored yes/no answers were stated at 90% or more,
+  and 1,250 of them were right.
+
+Jev is not good at:
+
+- The same three items, however they are asked. It says a refund 39 days after purchase fits
+  a 30-day window (right under 5 of 78 forms), that 3 nights at $210 fit a $600 budget (4 of
+  78), and that `sunflower88` has at least 12 characters (17 of 78, mostly near 0.5). Those are
+  date arithmetic, multiplication and character counting. The one choice it misses is also a
+  date: "2026-10-01 is a Thursday; what day is 2026-10-05?" gets Tuesday at 0.84. Form doesn't
+  cause these errors and rewording doesn't fix them.
+- Statements that describe a question instead of asking it. "The question that the facts that
+  are listed above bear on is whether or not, all things considered, X." moved P(right) by −0.23
+  [−0.34, −0.13] and pushed false claims towards yes (mean +0.38 on false items, exploratory):
+  "the driver is old enough to rent a car" went from 0.03 to 0.88. A yes/no returns P(true) of
+  its instructions, and this sentence is literally true whatever X is, so the result depends on
+  how Jev reads the sentence. It reads it as asserting X. On debatable items the same form raised
+  P(claim) by +0.29 and flipped 5 of 10.
+- "Most people say no." Adding it to the question lowered P(right) by −0.20 [−0.30, −0.09] and
+  flipped 5 of 20. It works only on true claims (mean P(claim) −0.37 on true items, +0.02 on
+  false ones, exploratory): "Is Madrid warmer than Oslo today? Most people say no." went from
+  0.99 to 0.48 with 27 °C against 12 °C in the facts. "Most people say yes" did nothing to items
+  with a right answer (−0.02 and +0.03), but did raise debatable ones (+0.10 [+0.05, +0.16]).
+- Consistency where it is unsure. Invariance failures sit almost entirely on the items it gets
+  wrong. For "password", P(yes) for the claim and for its negation both came out above 0.5 under
+  five of six pairings (sums 1.24–1.36). On uncertain items, negated and suggestive forms push
+  answers towards "no".
+- The decoy effect, strongly. Adding a third option that is worse than A on both attributes
+  raises A's share of {A, B} against a decoy for B by +0.47 [+0.38, +0.56], in all 8 scenarios.
+  "Rent $1,200, 45-minute commute" gets 7% of the pair next to a decoy for the other
+  apartment and 68% next to its own decoy. People show the same bias
+  (Huber et al. 1982). Jev shows it much more strongly than the typical human study.
+- Attribute framing. The same fact framed positively gets a higher rating by +1.04 levels of 5
+  [+0.30, +1.92], in 5 of 6 items. "Makes 40% of her shots" scores 2.97 of 4; "misses 60%" 0.15.
+- Option position in two-option framing questions, which is new. In the Asian-disease questions
+  the option listed second is preferred: P(sure) is 0.13 [0.06, 0.19] lower when the sure option
+  is listed first. The option labelled "Program B" got 0.56 on average.
+
+### Hypotheses
+
+| # | Prediction | Result |
+| --- | --- | --- |
+| 1 | Surface rewording within 5 points, flips at noise level | Supported, except the centre-embedded sentence (see above). |
+| 2 | Negation breaks invariance on ≥ 20% of items; double worse than single | Borderline: 4 of 20 items have a pair off by > 0.2, 3 of them items Jev already gets wrong. Double negation is slightly worse (Δ −0.03 and −0.05, CIs exclude 0, no flips); single negation is no worse than the question. |
+| 3 | Suggestion moves P(yes), more on debatable items | Mixed. "Most say no" hurts items with a right answer (5 flips); "most say yes" moves only debatable ones; "an expert said" moves neither. |
+| 4 | Agree/disagree shows a yes bias | Not found. Truth items +0.016 [−0.013, +0.049]; debatable items lean no, −0.065 [−0.11, −0.01]. |
+| 5 | Heavy typos hurt, light ones don't | Supported, small: 20% typos −0.08 [−0.18, −0.01], 1 flip. The damage comes when a key word is destroyed ("Js edry teamm mejebr cmpltdd te traoning?" lost "every" and went from 0.01 to 0.83). 5% typos, caps, lowercase: no change. |
+| 6 | CSV, JSON string, numbers as words, long background hurt | Rejected. No layout or context variant lowers P(right) by more than 0.02. |
+| 7 | Other languages cost little for es/fr/de, more for hi/ar; full translation costs more | Direction right, size negligible: Hindi −0.03, Arabic −0.02, others within ±0.01. Full translation costs no more. |
+| 8 | Answer shape moves Jev more than wording | Partly. Shapes flip 1 of 139 truth answers but make Jev more confident (+0.03 to +0.05 P(right), all six CIs exclude 0). On debatable items they move P(claim) 0.15 on average against 0.03 for sentence forms, with 2 flips in 70. |
+| 9 | Position bias in choices; letters/numbers lower accuracy | Rejected. Right option first − last: −0.027 [−0.056, −0.004], a slight preference for last. Labels: no change. |
+| 10 | Framing, attribute framing, anchoring, decoy in the human direction | Risky-choice framing: absent or inconclusive, −0.06 [−0.13, +0.02], 2 of 10 in the human direction. Attribute framing: present. Anchoring: an irrelevant ticket number shifts estimates +0.06 levels [+0.02, +0.12] (10 of 12), present but tiny, and every estimate stays in the right bin; the comparative anchor is absent (−0.003 [−0.03, +0.03]). Decoy: present and large. |
+| 11 | Calibration error < 0.10 | Met narrowly, 0.097, but the shape matters more than the number (below). |
+
+### Yes/no with a right answer, by family
+
+Accuracy is over 20 items (10 true, 10 false); the canonical form is 85% (17 of 20). Flip rate
+counts item × variant cells whose answer landed on the other side of 0.5 from the same item's
+canonical answer.
+
+| Family | Cells | Accuracy | Flip rate | Mean shift |
+| --- | --- | --- | --- | --- |
+| baseline (2 repeats) | 40 | 85% | 0% | 0.007 |
+| sentence-form | 140 | 85% | 0% | 0.012 |
+| lexical-syntax | 60 | 83% | 8% | 0.086 |
+| length | 40 | 89% | 5% | 0.025 |
+| register | 80 | 86% | 1% | 0.018 |
+| hedge-intensifier | 40 | 88% | 3% | 0.030 |
+| noise | 80 | 84% | 1% | 0.035 |
+| negation | 120 | 90% | 5% | 0.045 |
+| suggestion | 80 | 91% | 11% | 0.102 |
+| acquiescence | 40 | 89% | 5% | 0.035 |
+| presupposition | 40 | 88% | 3% | 0.036 |
+| stakes-persona | 60 | 85% | 0% | 0.022 |
+| answer-shape | 139 | 86% | 1% | 0.028 |
+| representation | 220 | 86% | 1% | 0.021 |
+| context | 80 | 89% | 4% | 0.033 |
+| language-question | 140 | 86% | 1% | 0.023 |
+| language-full | 140 | 86% | 1% | 0.026 |
+
+Accuracy above 85% in a family is not an improvement from form. On the three items Jev gets
+wrong it sits near 0.5, so a form that nudges those answers towards "no" crosses 0.5 and scores
+as right. Look at mean P(right) and the flip counts per variant in `results.md`.
+
+Variants that pass the pre-registered bar (CI excludes 0, |Δ| ≥ 0.05, at least 3 flips):
+centre-embedded (−0.228, 3 flips) and "most people say no" (−0.198, 5 flips). Variants with a
+CI that excludes 0 but too small to count: heavy typos (−0.078, 1 flip), "is it not the case
+that not-X" (−0.054, 0 flips), "is it false that not-X" (−0.033), "most say yes" (−0.025), extra
+distractor fields (−0.019), lenient persona (−0.016), "given that X" (−0.007), Hindi (−0.031),
+Arabic (−0.019) and Japanese (−0.011) questions; and on the helpful side, the six choice and score
+shapes (+0.026 to +0.045). With about 75 comparisons, about 4 would exclude 0 by chance.
+
+### Complementary pairs (truth items)
+
+P(yes | X) + P(yes | not-X) − 1, where 0 is consistent.
+
+| Pair | Mean [95% CI] | Pairs off by > 0.2 |
+| --- | --- | --- |
+| question / "is it false that" | +0.042 [+0.002, +0.092] | 2 |
+| "is it true that X" / "… not-X" | +0.026 [+0.002, +0.054] | 0 |
+| statement / negated statement | +0.037 [+0.005, +0.076] | 1 |
+| "do you agree that X" / "… not-X" | +0.016 [−0.013, +0.049] | 1 |
+| "an expert said X" / "… not-X" | +0.036 [−0.001, +0.081] | 3 |
+| "given that X, confirm" / "… not-X" | +0.045 [+0.006, +0.089] | 3 |
+
+Every failure (exploratory) is on refund, hotel, password or cart. Worst: password, "Does the
+proposed password meet the rule?" 0.56 and "Is it false that the proposed password meets the
+rule?" 0.80, a sum of 1.36. Cart is the one the model gets right: "Given that the three items
+together do not fit within the budget, confirm: is that correct?" got 0.28 against 0.95 for the
+positive form; with a false premise, Jev half accepts it. On debatable items the pairs lean the
+other way (−0.08 for "is it true that X / not-X"), so there is no general yes bias.
+
+### Calibration
+
+| Stated confidence | Answers | Accuracy |
+| --- | --- | --- |
+| 50–60% | 81 | 31% |
+| 60–70% | 89 | 17% |
+| 70–80% | 89 | 18% |
+| 80–90% | 49 | 84% |
+| 90–100% | 1,251 | 99.9% (1,250) |
+
+The calibration error is 0.097. That comes from a split between answers Jev is sure of, which
+are right 1,250 times in 1,251, and a middle band (60–80%) that is mostly the three wrong items asked in
+different ways. Over this set, "confidence ≥ 0.9" was a near-perfect filter, and 60–80% meant
+"probably wrong". That comes from 20 items, three of them wrong, so it describes these items,
+not a general law.
+
+### Choices (16 items)
+
+Canonical accuracy 94% (15 of 16; the miss is the weekday). No position, reversal, label,
+imperative, typo, Spanish or Chinese variant changed a top answer. Two options raised P(right)
++0.07, six options lowered it −0.04 [−0.11, −0.003] and cost one item. Asking one yes/no per
+option and renormalising kept the same top answers but lowered P(right) by −0.125 [−0.20,
+−0.07]. The four yes/no answers per item summed to 1.10 on average (0.66 to 2.12, exploratory),
+so they are not a distribution until code normalises them.
+
+### Debatable yes/no (10 items)
+
+Without a right answer, the useful numbers are shifts. The repeats moved P(claim) 0.008–0.015.
+
+| Variant | Δ P(claim) [95% CI] | Flips of 10 |
+| --- | --- | --- |
+| "Is it absolutely, definitely, 100% true that …" | −0.293 [−0.367, −0.215] | 5 |
+| centre-embedded statement | +0.288 [+0.192, +0.381] | 5 |
+| "I might be wrong, but is it perhaps …" | +0.073 [+0.047, +0.099] | 0 |
+| "Is it not the case that not-X" | +0.103 [+0.021, +0.178] | 1 |
+| "… Most people say yes." | +0.100 [+0.046, +0.155] | 1 |
+| "… Most people say no." | −0.006 [−0.124, +0.129] | 6 |
+| lenient friend persona | +0.059 [−0.045, +0.166] | 4 |
+| choice between the two statements | −0.082 [−0.193, +0.043] | 1 |
+| 5-level score | +0.095 [−0.011, +0.195] | 0 |
+
+Hedges and intensifiers barely touch items with a right answer but move debatable items a lot,
+and in a sensible direction: a claim that must be "100% true" is harder to accept. "Most people
+say no" moved debatable items towards 0.5 from both sides, which flips 6 of 10 without shifting
+the mean.
+
+### Psychology studies
+
+| Effect | Measure | Result | Human direction |
+| --- | --- | --- | --- |
+| Risky-choice framing | P(sure), gain − loss | −0.060 [−0.130, +0.015] | 2 of 10 |
+| Option order in those questions | P(sure) listed first − second | −0.127 [−0.189, −0.061] | |
+| Attribute framing | rating, positive − negative (0–4) | +1.04 [+0.30, +1.92] | 5 of 6 |
+| Anchoring, irrelevant number | expected bin, high − low | +0.061 [+0.015, +0.117] | 10 of 12 |
+| Anchoring, comparative question | expected bin, high − low | −0.003 [−0.031, +0.026] | 4 of 12 |
+| Decoy (attraction) | A's share, A-decoy − B-decoy | +0.473 [+0.381, +0.555] | 8 of 8 |
+| Decoy option order | A's share, A listed first − last | +0.173 [+0.087, +0.257] | |
+| Likert direction | 5-point descending − ascending | −0.018 [−0.023, −0.014] | |
+| Likert acquiescence, 5-point | agree + agree(reversed) − 1 | +0.040 [+0.023, +0.064] | |
+| Likert acquiescence, yes/no | same | −0.100 [−0.155, −0.036] | |
+
+Jev picked the decoy itself 4–9% of the time. Anchoring questions were all answered in the
+right bin (all 60), so anchors only nudge its confidence. Framing shows no gain/loss effect,
+but a preference for whichever program is listed second. The two orders were
+counterbalanced, so that preference doesn't bias the framing estimate, but it does add noise.
+
+## Limitations
+
+- 20 items with right answers, 16 choices, 10 debatable items: accuracy moves in 5- or
+  6-point steps and intervals are wide. The three wrong items dominate the invariance and
+  calibration results; a different item set would move them.
+- One answer per item × variant. The repeats show Jev is nearly deterministic (0.007 mean
+  shift), so the flips are about form, not sampling. It is still one draw per form.
+- The centre-embedded variant is confounded: as a yes/no, the sentence is true whatever X is.
+  It shows that Jev reads such sentences as asserting X. It does not isolate syntactic
+  complexity. A real garden-path or embedded question would need its own test.
+- The hedge, intensifier and persona forms change the meaning somewhat ("perhaps", "100%
+  true"). On debatable items their shifts can be correct behaviour, not bias.
+- Translations are one author's, without back-translation; Hindi and Arabic are the likeliest
+  to read unnaturally, which may be part of their small drop.
+- The Likert reversals are not exact negations ("fine" vs "rude" for texting), so their
+  acquiescence numbers include content differences.
+- Framing isomorphs share one template; ten scenarios are not ten independent replications of
+  Tversky and Kahneman.
+- Gateway build unknown and two hosts served answers (`digitalocean` 6%); host was not
+  balanced across variants beyond the shuffled order.
+
+## Deviations from the frozen protocol
+
+- After 911 answers the recorder stopped on a rejected Score. A request whose only question is a
+  Score the gateway rejects comes back as a thrown 502, which `record.ts` treated as fatal.
+  The recorder now logs it as `status: "rejected"` and moves on without asking again, as the
+  protocol requires; the one affected attempt got an appended reclassification row. `analyze.ts`
+  counts those rows as rejected, not busy, and sums cost over every row. No metric or rule
+  changed. See `NOTES.md`.
+- `explore.ts` was added after the run for examples; it is labelled exploratory throughout.
+
+## Recordings
+
+- `explore.ts`: the post-hoc example look-ups.
+- `recordings/prose.jsonl.gz` (165 KB): every attempt, append-only. The raw `.jsonl` is
+  gitignored; `analyze.ts` reads either and gives identical output.
+- `recordings/pilot.jsonl`: the two feasibility requests.
+- `results.md`, `results.json`: generated by `analyze.ts`.

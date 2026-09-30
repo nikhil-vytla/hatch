@@ -68,6 +68,9 @@ export function analyse(rows: Recorded[]) {
   const cells = new Map<string, Cell>();
   const rejected: string[] = [];
 
+  // A request whose only question is a rejected Score is logged with status "rejected".
+  for (const r of rows) if (r.status === "rejected" && byId.has(r.id) && !rejected.includes(r.id)) rejected.push(r.id);
+
   for (const [id, r] of ok) {
     if (r.rejected?.length) {
       rejected.push(id);
@@ -82,24 +85,24 @@ export function analyse(rows: Recorded[]) {
   const json: Record<string, unknown> = {};
 
   // ---------- run summary ----------
-  const attempts = rows.length;
-  const busy = rows.filter((r) => r.status === "error").length;
+  const attempts = rows.filter((r) => !(r as { note?: string }).note).length;
+  const busy = rows.filter((r) => r.status === "error" && r.code !== 502).length;
   const lat = [...ok.values()].map((r) => r.latencyMs ?? NaN).filter(Number.isFinite).sort((a, b) => a - b);
   const hosts: Record<string, number> = {};
 
   for (const r of ok.values()) hosts[r.servedBy ?? "unknown"] = (hosts[r.servedBy ?? "unknown"] ?? 0) + 1;
 
-  const cost = [...ok.values()].reduce((s, r) => s + (r.costUsd ?? 0), 0);
+  const cost = rows.reduce((s, r) => s + (r.costUsd ?? 0), 0);
   const unknownCost = [...ok.values()].filter((r) => r.costUsd == null).length;
   const tokens = [...ok.values()].reduce((s, r) => s + (r.inputTokens ?? 0), 0);
   const dates = [...ok.values()].map((r) => r.at!).sort();
   const run = {
     jobs: jobs.length,
-    answered: ok.size,
+    answered: ok.size + rows.filter((r) => r.status === "rejected").length,
     rejected: rejected.length,
     attempts,
     errors: busy,
-    errorCodes: rows.filter((r) => r.status === "error").reduce<Record<string, number>>((m, r) => ((m[String(r.code)] = (m[String(r.code)] ?? 0) + 1), m), {}),
+    errorCodes: rows.filter((r) => r.status === "error" && r.code !== 502).reduce<Record<string, number>>((m, r) => ((m[String(r.code)] = (m[String(r.code)] ?? 0) + 1), m), {}),
     costUsd: cost,
     unknownCost,
     inputTokens: tokens,
