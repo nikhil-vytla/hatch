@@ -1,6 +1,6 @@
-import { entryShape, jsonIssue, jsonEqual, type Entry, type EntryShape } from "../../packages/decision-runtime/src/native";
-import { scoreAgreement } from "../../packages/decision-runtime/src/score";
-import { accountingIssue, usageIssue, type RequestAccounting, type TokenUsage } from "./accounting";
+import { entryShape, jsonIssue, jsonEqual, type Entry, type EntryShape } from "../../packages/decision-runtime/src/native.js";
+import { scoreAgreement } from "../../packages/decision-runtime/src/score.js";
+import { accountingIssue, usageIssue, type RequestAccounting, type TokenUsage } from "./accounting.js";
 export type { Entry, EntryShape };
 export type { RequestAccounting, RequestAttempt, TokenUsage } from "./accounting";
 /** Version 2 preserves native structure and names distribution summaries explicitly. */

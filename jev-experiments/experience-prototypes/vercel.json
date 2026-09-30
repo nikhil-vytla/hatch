@@ -10,6 +10,9 @@
     },
     "api/compose.ts": {
       "maxDuration": 60
+    },
+    "api/route.ts": {
+      "maxDuration": 60
     }
   },
   "headers": [

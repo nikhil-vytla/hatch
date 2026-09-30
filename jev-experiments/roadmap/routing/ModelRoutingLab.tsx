@@ -325,8 +325,8 @@ export function ModelRoutingLab() {
           {selection.explanation}{" "}
           {selection.routeId && `Selected: ${selection.routeId}.`}
         </p>
-        <div style={{ overflowX: "auto" }}>
-          <table>
+        <div className="model-table-wrap">
+          <table className="model-table">
             <thead>
               <tr>
                 <th scope="col">Destination</th>

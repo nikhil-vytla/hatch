@@ -3,9 +3,9 @@ import {
   parseArtifact,
   artifactResponseFormat,
   providerFailure,
-} from "./artifacts";
+} from "./artifacts.js";
 import type { ExecutionResult, Route, Task } from "./types";
-import { enforceExecutionIdentity } from "./hooks";
+import { enforceExecutionIdentity } from "./hooks.js";
 function pricedUsage(
   route: Route,
   usage: ExecutionResult["usage"],

@@ -1,5 +1,5 @@
 import type { Adapter, DecisionResponse } from "../runtime/contract";
-import { decide as checkedDecide } from "../runtime/execute";
+import { decide as checkedDecide } from "../runtime/execute.js";
 import type { Classification, Task, TaskCategory } from "./types";
 const categories: TaskCategory[] = [
   "bug-fix",

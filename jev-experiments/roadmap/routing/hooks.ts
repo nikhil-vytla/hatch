@@ -1,4 +1,4 @@
-import { accountingIssue, type RequestAccounting } from "../runtime/accounting";
+import { accountingIssue, type RequestAccounting } from "../runtime/accounting.js";
 import type { Identity, Issue } from "../runtime/contract";
 import type {
   ExecutionResult,
@@ -6,7 +6,7 @@ import type {
   ClassifierIdentity,
   VerificationResult,
 } from "./types";
-import { validatePatchHunks } from "./artifacts";
+import { validatePatchHunks } from "./artifacts.js";
 function object(value: unknown): Record<string, unknown> | null {
   return value !== null && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
