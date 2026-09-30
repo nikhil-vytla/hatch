@@ -15,3 +15,10 @@
 .jev-role-date { display:block; margin-top:12px; font-size:12px; color:var(--role-muted); }
 .jev-role summary:focus-visible,.jev-role a:focus-visible { outline:3px solid var(--role-focus); outline-offset:4px; }
 @media(max-width:760px) { .jev-role-flow { grid-template-columns:1fr; gap:8px; } .jev-role-preview { display:block; margin-left:20px; margin-top:4px; } }
+
+.jev-role-stale {
+  font-size: 13px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: color-mix(in oklab, #d9a400 14%, transparent);
+}
