@@ -302,6 +302,22 @@ class Sequence:
         shutil.rmtree(self.root, ignore_errors=True)
 
 
+def completed_sequences(records: list[dict], trials: list[ev.Trial]) -> dict[tuple[str, int], list[dict]]:
+    """From an earlier run's records, the sequences a resumed run can keep:
+    every planned trial of the sequence has a result whose model was reached.
+    A sequence cut short is run again from its start, since each later trial
+    depends on what the earlier ones in the same sequence learned."""
+    planned: dict[tuple[str, int], set[str]] = {}
+    for t in trials:
+        planned.setdefault((t.arm, t.sequence), set()).add(t.key)
+    got: dict[str, dict] = {r["key"]: r for r in records if r.get("type") == "trial" and r.get("model_ok", True)}
+    keep: dict[tuple[str, int], list[dict]] = {}
+    for seq, keys in planned.items():
+        if keys <= got.keys():
+            keep[seq] = [got[k] for k in sorted(keys, key=lambda k: next(t.position for t in trials if t.key == k))]
+    return keep
+
+
 class Runner:
     def __init__(self, args: argparse.Namespace, tasks: dict, trials: list[ev.Trial], out: Path) -> None:
         self.args = args
@@ -313,6 +329,8 @@ class Runner:
         self.results = out / "results.jsonl"
         self.spent = 0.0
         self.sequences: list[tuple[Sequence, list[ev.Trial]]] = []
+        # Sequences kept from an earlier run (--resume): their records, not run again.
+        self.kept: dict[tuple[str, int], list[dict]] = {}
 
     def pinned(self, model: str) -> bool:
         return model == self.model or model.startswith(self.model + "-")
@@ -329,6 +347,12 @@ class Runner:
         for t in self.trials:
             self.write({"type": "planned", "key": t.key, **asdict(t)})
         done: list[dict] = []
+        for (arm, k), records in self.kept.items():
+            for record in records:
+                self.write({**record, "resumed_from": str(self.args.resume)})
+                done.append(record)
+                self.spent += record["cost_usd"] + (record.get("learner") or {}).get("cost_usd", 0.0)
+            print(f"kept {arm} sequence {k} from {self.args.resume}: {len(records)} trials", flush=True)
         try:
             self._run(done)
         finally:
@@ -344,7 +368,7 @@ class Runner:
         groups: dict[tuple[str, int], list[ev.Trial]] = {}
         for t in self.trials:
             groups.setdefault((t.arm, t.sequence), []).append(t)
-        self.sequences = [(Sequence(self, arm, k), ts) for (arm, k), ts in groups.items()]
+        self.sequences = [(Sequence(self, arm, k), ts) for (arm, k), ts in groups.items() if (arm, k) not in self.kept]
 
     def _run(self, done: list[dict]) -> None:
         for seq, ts in self.sequences:
@@ -525,6 +549,8 @@ def main() -> int:
                    help="the strive binary (default: this checkout's target/release or target/debug build, else PATH's)")
     p.add_argument("--out", type=Path, help="output directory (default eval-runs/<time> under strive/)")
     p.add_argument("--yes", action="store_true", help="run for real (after reading the --dry-run estimate)")
+    p.add_argument("--resume", type=Path, metavar="RESULTS",
+                   help="keep an earlier run's finished sequences (same plan) from its results.jsonl; run the rest")
     a = p.parse_args()
 
     ev.unlock()  # a killed run may have left the suite locked
@@ -577,6 +603,10 @@ def main() -> int:
     out = (a.out or ev.STRIVE / "eval-runs" / time.strftime("%Y%m%d-%H%M%S")).resolve()
     out.mkdir(parents=True, exist_ok=True)
     runner = Runner(a, tasks, trials, out)
+    if a.resume:
+        earlier = [json.loads(line) for line in a.resume.read_text().splitlines() if line.strip()]
+        runner.kept = completed_sequences(earlier, trials)
+        print(f"resuming: {len(runner.kept)} finished sequences kept from {a.resume}")
     runner.stage()
     try:
         if a.no_lock:

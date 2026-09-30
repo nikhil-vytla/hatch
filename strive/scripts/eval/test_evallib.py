@@ -302,5 +302,23 @@ class HypothesesTest(unittest.TestCase):
         self.assertEqual(stats.forgetting(ts)["L"]["passed_then_failed"], 1)
 
 
+class ResumeTest(unittest.TestCase):
+    def test_only_finished_sequences_with_the_model_reached_are_kept(self):
+        import run_eval
+        from evallib import Trial
+
+        def t(arm, seq, pos):
+            return Trial(arm=arm, sequence=seq, position=pos, family="lockfile", instance=f"i{pos}",
+                         role="test")
+
+        plan = [t("F", 0, 0), t("F", 0, 1), t("L", 0, 0), t("L", 0, 1), t("L", 1, 0), t("L", 1, 1)]
+        rec = lambda tr, ok=True: {"type": "trial", "key": tr.key, "model_ok": ok, "cost_usd": 0.01}
+        records = [rec(plan[0]), rec(plan[1]),                # F/0 finished
+                   rec(plan[2]), rec(plan[3], ok=False),      # L/0: last trial never reached the model
+                   rec(plan[4])]                              # L/1: cut short
+        kept = run_eval.completed_sequences(records, plan)
+        self.assertEqual(list(kept), [("F", 0)])
+        self.assertEqual([r["key"] for r in kept[("F", 0)]], [plan[0].key, plan[1].key])
+
 if __name__ == "__main__":
     unittest.main()
