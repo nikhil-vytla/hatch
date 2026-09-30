@@ -17,6 +17,7 @@ const Games = lazy(() => import("../games").then(m => ({ default: m.Games })));
 const Learning = lazy(() => import("../benchmarks").then(m => ({ default: m.Learning })));
 const IntentRecognition = lazy(() => import("../intent-recognition").then(m => ({ default: m.IntentRecognition })));
 const Handoff = lazy(() => import("../handoff").then(m => ({ default: m.Handoff })));
+const Decoy = lazy(() => import("../decoy").then(m => ({ default: m.Decoy })));
 const AnswerKey = lazy(() => import("../answer-key").then(m => ({ default: m.AnswerKey })));
 const RewardBench = lazy(() => import("../rewardbench").then(m => ({ default: m.RewardBench })));
 const LocalModels = lazy(() => import("../local-models").then(m => ({ default: m.LocalModels })));
@@ -104,6 +105,8 @@ function View({
       return <IntentRecognition result={result} />;
     case "handoff":
       return <Handoff result={result} />;
+    case "decoy":
+      return <Decoy />;
     case "rewardbench2":
       return <RewardBench result={result} />;
       return <Learning id={exp.id} result={result} />;
@@ -173,7 +176,7 @@ function LiveExperimentPage({ id }: { id: string }) {
     setRecord(null);
     setError("");
     setAboutOpen(false);
-    if (id === "materials" || id === "routing") {
+    if (id === "materials" || id === "routing" || id === "decoy") {
       setRecord({ result: {} });
       return () => {
         alive = false;
