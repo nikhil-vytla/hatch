@@ -95,15 +95,15 @@ def probe(r: SimpleNamespace, seq: run_eval.Sequence, family: str, instance: str
                 learned = seq.learn(seed["session"], f"{stem}-{name}-{rep}")
                 texts = proposal_texts(seq, {p["id"] for p in learned["proposals"]})
                 # Which learner prompt ran: the revised one names "a standing rule the user stated".
-                revised = "standing rule the user stated" in first_request(
-                    seq, r.out / "journals" / f"{stem}-{name}-{rep}.learner.jsonl")
+                sent = first_request(seq, r.out / "journals" / f"{stem}-{name}-{rep}.learner.jsonl")
+                revised = "standing rule the user stated" in sent
                 subprocess.run([str(r.strive), "stop"], cwd=seq.root, env=seq.env, capture_output=True, timeout=60)
                 props = [{**p, "change": texts.get(p["id"], "")} for p in learned["proposals"]]
                 hit = any(re.search(RULE_TERMS[family], p["change"] + " " + (p["summary"] or "")) for p in props)
                 out.append({"type": "learn", "family": family, "instance": instance, "host": name, "rep": rep,
                             "cost_usd": learned["cost_usd"], "model_ok": learned["model_ok"],
                             "turn_end": learned["turn_end"], "proposals": props, "rule_proposed": hit,
-                            "revised_prompt": revised})
+                            "revised_prompt": revised, "request_names_stated_rules": "read the user's messages too" in sent})
                 print(f"{stem:30} {name:8} rep {rep}  {len(props)} proposed  rule {'yes' if hit else 'no '}"
                       f"  ${learned['cost_usd']:.4f}  revised prompt {'yes' if revised else 'no'}", flush=True)
                 if not learned["model_ok"]:
@@ -121,12 +121,14 @@ def main() -> int:
     p.add_argument("--model", default=run_eval.DEFAULT_MODEL)
     p.add_argument("--max-usd", type=float, default=5.0)
     p.add_argument("--out", type=Path, required=True)
+    p.add_argument("--seeds", help="only these, comma-separated: family/instance")
     p.add_argument("--yes", action="store_true")
     a = p.parse_args()
+    seeds = [s for s in SEEDS if not a.seeds or "/".join(s) in a.seeds.split(",")]
     hosts = [(n, str(Path(d).resolve())) for n, d in (h.split("=", 1) for h in a.host)]
     # Each learner run is about $0.03-0.06 (the eval's L arm); each seed about $0.05.
-    estimate = len(SEEDS) * (0.05 + a.reps * len(hosts) * 0.05)
-    print(f"{len(SEEDS)} seeds x {a.reps} reps x {len(hosts)} hosts; about ${estimate:.2f}, capped at ${a.max_usd}")
+    estimate = len(seeds) * (0.05 + a.reps * len(hosts) * 0.05)
+    print(f"{len(seeds)} seeds x {a.reps} reps x {len(hosts)} hosts; about ${estimate:.2f}, capped at ${a.max_usd}")
     if not a.yes:
         print("not running: this spends real money; add --yes", file=sys.stderr)
         return 2
@@ -138,9 +140,9 @@ def main() -> int:
                         pinned=lambda m: m == a.model or m.startswith(a.model + "-"), write=lambda rec: None)
     results = a.out / "results.jsonl"
     # Each sequence copies the suite into its vault, so before the suite is locked.
-    seqs = [run_eval.Sequence(r, "F", i) for i in range(len(SEEDS))]
+    seqs = [run_eval.Sequence(r, "F", i) for i in range(len(seeds))]
     with ev.SuiteLock(), ThreadPoolExecutor(4) as pool:
-        futures = [pool.submit(probe, r, seq, f, inst) for seq, (f, inst) in zip(seqs, SEEDS)]
+        futures = [pool.submit(probe, r, seq, f, inst) for seq, (f, inst) in zip(seqs, seeds)]
         for fut in futures:
             try:
                 recs = fut.result()
@@ -165,6 +167,8 @@ def summarize(results: Path) -> None:
     hosts = sorted({x["host"] for x in learns})
     print(f"\n{'seed':30}" + "".join(f"{h:>14}" for h in hosts))
     for f, inst in SEEDS:
+        if not any(x["family"] == f and x["instance"] == inst for x in learns):
+            continue
         row = [x for x in learns if x["family"] == f and x["instance"] == inst]
         cells = [f"{sum(x['rule_proposed'] for x in row if x['host'] == h)}/{sum(x['host'] == h for x in row)}"
                  f" ({sum(len(x['proposals']) for x in row if x['host'] == h)})" for h in hosts]
