@@ -19,6 +19,7 @@ import { preparePublicHarnessEvidence } from "../../capability-atlas-2026-09-22/
 import { prepareCapabilityAtlas } from "../../capability-atlas-2026-09-22/prepare-atlas";
 import { buildArena } from "../../packages/arena/src/data/build";
 import { buildDecide } from "../../packages/arena/src/decide/build";
+import { buildDecoy } from "../../packages/arena/prose/decoy-build";
 const lab = resolve(".."),
   dest = resolve("public/data");
 const publication: Record<string, string> = JSON.parse(
@@ -135,3 +136,4 @@ console.log("Prepared recorded evidence and companion.");
 // The arena reads recordings and public/data, so it runs after publication.
 await buildArena(resolve("public/arena"));
 buildDecide(resolve("../packages/arena"), resolve("public/decide"));
+buildDecoy(resolve("../packages/arena/prose"), resolve("public/decoy"));
