@@ -810,6 +810,15 @@ export const conclusions = [
     depends: ["date"],
   },
 ];
+/**
+ * What Jev is shown: each conclusion's text only. The dependency lists stay out of the request,
+ * so they can check Jev's answers instead of handing it the answer.
+ */
+export const conclusionsForJev = conclusions.map(({ id, text }) => ({ id, text }));
+
+/** Which conclusions the authored dependency list says a change to `field` affects. */
+export const affectedBy = (field: string) => new Set(conclusions.filter((c) => c.depends.includes(field)).map((c) => c.id));
+
 export function Changes({ record }: { record: any }) {
   const [field, setField] = useState("venue"),
     [value, setValue] = useState("Waterfront Pavilion, Portland"),
@@ -860,13 +869,25 @@ export function Changes({ record }: { record: any }) {
             </motion.div>
           ))}
         </div>
+        {answers && (() => {
+          // The dependency list Jev never sees, checking the answers it gave.
+          const expected = affectedBy(field);
+          const agree = conclusions.filter((c) => (answers?.[c.id]?.value >= 0.5) === expected.has(c.id)).length;
+
+          return (
+            <p className="fine dependency-check">
+              Dependency check: Jev agrees with the authored list on {agree} of {conclusions.length} conclusions
+              {agree === conclusions.length ? "." : ` (the list says ${[...expected].join(" and ") || "none"} should change).`}
+            </p>
+          );
+        })()}
       </div>
       <aside className="controls">
         <Pane title="Follow the consequences">
           <p>
-            Change one fact and inspect which conclusions need review. The
-            authored dependency list provides an independent check for these
-            examples.
+            Change one fact and inspect which conclusions need review. Jev
+            sees only the conclusions' text; the authored dependency list is
+            kept back and checks its answers.
           </p>
           <Field label="Fact to change">
             <select
@@ -900,7 +921,7 @@ export function Changes({ record }: { record: any }) {
                   {
                     before: impactFacts,
                     after: { ...impactFacts, [field]: value },
-                    conclusions,
+                    conclusions: conclusionsForJev,
                   },
                   Object.fromEntries(
                     conclusions.map((c) => [
@@ -921,7 +942,7 @@ export function Changes({ record }: { record: any }) {
             value={{
               before: impactFacts,
               after: { ...impactFacts, [field]: value },
-              conclusions,
+              conclusions: conclusionsForJev,
               run: last,
             }}
           />
