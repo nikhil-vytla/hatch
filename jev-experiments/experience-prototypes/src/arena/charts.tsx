@@ -199,11 +199,60 @@ function frontier(points: Point[], mx: MetricDef, my: MetricDef) {
   return points.filter((p) => !points.some((q) => beats(q, p)));
 }
 
-export function Scatter({ model: m }: { model: CardModel }) {
-  const [xId, yId] = m.card.tradeoff ?? [
+/** Which two of a card's measures to plot; starts on the card's chosen trade-off. */
+function useAxes(m: CardModel) {
+  const initial: [string, string] = m.card.tradeoff ?? [
     m.card.metrics[0].id,
     m.card.metrics[1]?.id ?? m.card.metrics[0].id,
   ];
+
+  // A choice belongs to one card; switching cards falls back to that card's trade-off.
+  const [chosen, setChosen] = useState<{ card: string; axes: [string, string] } | null>(null);
+  const axes = chosen?.card === m.card.id ? chosen.axes : initial;
+  const setAxes = (next: [string, string]) => setChosen({ card: m.card.id, axes: next });
+
+  return [axes, setAxes] as const;
+}
+
+function AxisPicker({
+  m,
+  axes,
+  setAxes,
+}: {
+  m: CardModel;
+  axes: [string, string];
+  setAxes: (a: [string, string]) => void;
+}) {
+  if (m.card.metrics.length < 3) return null;
+
+  const pick = (i: 0 | 1, id: string) => setAxes(i === 0 ? [id, axes[1]] : [axes[0], id]);
+
+  return (
+    <div className="scatter-axes">
+      {([["Across", 0], ["Up", 1]] as const).map(([label, i]) => (
+        <label key={label}>
+          {label}{" "}
+          <select value={axes[i]} onChange={(e) => pick(i, e.target.value)}>
+            {m.card.metrics.map((mm) => (
+              <option key={mm.id} value={mm.id}>
+                {mm.label}
+              </option>
+            ))}
+          </select>
+        </label>
+      ))}
+      {!m.card.metrics.some((mm) => mm.axis === "cost") && (
+        <small className="muted">
+          No cost measure on this card: its recordings don't give a per-call price for every contestant.
+        </small>
+      )}
+    </div>
+  );
+}
+
+export function Scatter({ model: m }: { model: CardModel }) {
+  const [axes, setAxes] = useAxes(m);
+  const [xId, yId] = axes;
 
   const mx = m.card.metrics.find((mm) => mm.id === xId) ?? m.card.metrics[0];
   const my = m.card.metrics.find((mm) => mm.id === yId) ?? m.card.metrics[0];
@@ -274,6 +323,7 @@ export function Scatter({ model: m }: { model: CardModel }) {
   if (points.length < 2)
     return (
       <div ref={box}>
+        <AxisPicker m={m} axes={axes} setAxes={setAxes} />
         <p className="muted">
           Add at least two contestants that have both {inSentence(mx.label)} and{" "}
           {inSentence(my.label)}.
@@ -283,6 +333,7 @@ export function Scatter({ model: m }: { model: CardModel }) {
 
   return (
     <div className="scatter" ref={box}>
+      <AxisPicker m={m} axes={axes} setAxes={setAxes} />
       <svg
         width={W}
         height={H}

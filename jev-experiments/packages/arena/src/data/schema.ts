@@ -12,7 +12,7 @@ export const swatchSchema = z.object({ light: z.string(), dark: z.string() });
 export const metricSchema = z.object({
   id,
   label: z.string(),
-  unit: z.enum(["%", "ms", "s", "lines", "pieces", "count", ""]),
+  unit: z.enum(["%", "ms", "s", "lines", "pieces", "count", "usd", ""]),
   better: z.enum(["higher", "lower"]),
   axis: z.enum(["accuracy", "calibration", "speed", "cost", "robustness", "outcome"]),
   /** One sentence: what the number means and how it was measured. */
