@@ -150,18 +150,10 @@ export const experiments = [
   e(
     "snake",
     "arcade",
-    "Snake",
+    "Arcade: Snake and Orbital rescue",
     "Games & simulations",
-    "A growing body. Three turns. Nowhere to hide.",
-    "Can Jev collect food while leaving itself a way out?",
-  ),
-  e(
-    "orbital",
-    "arcade",
-    "Orbital rescue",
-    "Games & simulations",
-    "Fly a drone through a three-dimensional field of hazards.",
-    "Can a decision model collect every core and make it home?",
+    "Two small games, played move by move by Jev and by a greedy rule.",
+    "Does Jev do anything in these games that a greedy rule can't?",
   ),
   e(
     "local-models",
@@ -284,6 +276,12 @@ export const retired: Record<string, Retired> = {
     reason: "Folded into Decision models on a Mac as an earlier pilot; it trained on dataset labels, not Jev's answers.",
     record: "replica",
     instead: { href: "#experiment/local-models", label: "Decision models on a Mac" },
+  },
+  orbital: {
+    title: "Orbital rescue",
+    reason: "Now a tab in the Arcade scene beside Snake; Jev chose the greedy rule's move on nearly every step.",
+    record: "arcade",
+    instead: { href: "#experiment/snake", label: "Arcade: Snake and Orbital rescue" },
   },
   reward: {
     title: "Learning from rewards",

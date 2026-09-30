@@ -30,7 +30,7 @@ const TetrisExperience = lazy(() => import("../tetris-experience").then(m => ({ 
 const GhostBrush = lazy(() => import("../ghost-brush").then(m => ({ default: m.GhostBrush })));
 const LiveCrowd = lazy(() => import("../live-crowd").then(m => ({ default: m.LiveCrowd })));
 const DrawingFraming = lazy(() => import("../outcome-framing").then(m => ({ default: m.DrawingFraming })));
-const Arcade = lazy(() => import("../arcade").then(m => ({ default: m.Arcade })));
+const ArcadeScene = lazy(() => import("../arcade-scene").then(m => ({ default: m.ArcadeScene })));
 const ModelRoutingLab = lazy(() => import("../../../roadmap/routing/ModelRoutingLab").then(m => ({ default: m.ModelRoutingLab })));
 const MaterialsSandbox = lazy(() => import("../../../roadmap/materials/MaterialsSandbox").then(m => ({ default: m.MaterialsSandbox })));
 
@@ -57,14 +57,7 @@ function View({
 }) {
   switch (exp.id) {
     case "snake":
-    case "orbital":
-      return (
-        <Suspense
-          fallback={<div className="loading-stage">Opening the arena…</div>}
-        >
-          <Arcade key={exp.id} game={exp.id} result={result} />
-        </Suspense>
-      );
+      return <ArcadeScene result={result} />;
     case "local-models":
       return <LocalModels result={result} />;
     case "paste":
