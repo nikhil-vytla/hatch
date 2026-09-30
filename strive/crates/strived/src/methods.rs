@@ -509,8 +509,17 @@ async fn load_context(
         skipped: (!ctx.skipped.is_empty()).then(|| ctx.skipped.clone()),
     };
     state.sessions.append(sid, vec![loaded]).await.map_err(session_error)?;
-    let learned =
-        learned.map(|files| files.into_iter().map(|(artifact, text)| LearnedFile { artifact, text }).collect());
+    // The learner is shown memory as bullets, each with its source.
+    let learned = learned.map(|files| {
+        files
+            .into_iter()
+            .map(|(artifact, text)| {
+                let items = matches!(artifact, strive_proto::Artifact::Memory)
+                    .then(|| strive_learning::memory::parse(&text).items());
+                LearnedFile { artifact, text, items }
+            })
+            .collect()
+    });
     Ok((ctx, learned, mcp))
 }
 

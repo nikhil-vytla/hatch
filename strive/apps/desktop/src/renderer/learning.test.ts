@@ -3,8 +3,7 @@ import type { Entry, Event, Proposal, ProposalState } from "@strive/protocol";
 import { fileHistory, judgeAdvice, latestRun, readJudge } from "./learning";
 
 const PROPOSAL: Proposal = {
-  artifact: { kind: "memory" },
-  content: "- Run `bun test src`.\n",
+  change: { kind: "memory", op: "add", text: "Run `bun test src`." },
   summary: "How to run the tests",
   rationale: "The root run needs a display.",
   evidence: [],
@@ -120,25 +119,27 @@ test("a judge detail without a summary still reads; anything else is left as it 
 });
 
 test("a file's history is every proposal for the same file, newest first", () => {
-  const state = (id: number, artifact: Proposal["artifact"]): ProposalState => ({
+  const state = (id: number, change: Proposal["change"]): ProposalState => ({
     id,
     madeAtMs: id,
-    proposal: { ...PROPOSAL, artifact },
+    proposal: { ...PROPOSAL, change },
     status: "ready",
     gates: [],
     canRollBack: false,
   });
 
+  const skill = (name: string): Proposal["change"] => ({ kind: "skill", name, content: "" });
+
   // Not in the order proposal/list gives them, so the order comes from the ids.
   const listed = [
-    state(2, { kind: "memory" }),
-    state(9, { kind: "skill", name: "release" }),
-    state(4, { kind: "skill", name: "deploy" }),
-    state(7, { kind: "memory" }),
+    state(2, { kind: "memory", op: "remove", bullet: "#1" }),
+    state(9, skill("release")),
+    state(4, skill("deploy")),
+    state(7, { kind: "memory", op: "add", text: "x" }),
   ];
 
-  expect(fileHistory(listed, state(7, { kind: "memory" })).map((p) => p.id)).toEqual([7, 2]);
-  expect(fileHistory(listed, state(4, { kind: "skill", name: "deploy" })).map((p) => p.id)).toEqual([4]);
+  expect(fileHistory(listed, listed[3]!).map((p) => p.id)).toEqual([7, 2]);
+  expect(fileHistory(listed, state(4, skill("deploy"))).map((p) => p.id)).toEqual([4]);
 });
 
 test("a judge fail is advice: the failed criteria's reasons, or the detail's first line", () => {

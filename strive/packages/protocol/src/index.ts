@@ -116,6 +116,14 @@ export type * from "./generated/GateOutcome";
 
 export type * from "./generated/LearnedFile";
 
+export type * from "./generated/Change";
+
+export type * from "./generated/MemoryOp";
+
+export type * from "./generated/BulletEdit";
+
+export type * from "./generated/MemoryItem";
+
 export type * from "./generated/LearnerContext";
 
 export type * from "./generated/LearningDismissParams";

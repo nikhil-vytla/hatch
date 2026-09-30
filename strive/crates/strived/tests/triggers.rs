@@ -140,8 +140,7 @@ fn learner_turn(host: &mut Rpc, id: &str, turn: u64, proposals: &[Value]) -> Vec
 
 fn memory(evidence: &str) -> Value {
     json!({
-        "artifact": {"kind": "memory"},
-        "content": "- Run the tests with `bun test`, not `npm test`.\n",
+        "change": {"kind": "memory", "op": "add", "text": "Run the tests with `bun test`, not `npm test`."},
         "summary": "Tests run with bun",
         "rationale": "The user corrected npm test to bun test",
         "evidence": [{"session": evidence, "seqs": [1], "note": "the session began here"}],

@@ -465,6 +465,13 @@ button.link:hover { background: transparent; text-decoration: underline; text-un
 .outside-review ul { list-style: none; margin: 0 0 6px; padding: 0; }
 .outside-review li { font-size: 12px; color: var(--text); }
 .outside-review p { margin: 0; color: var(--muted); line-height: 1.5; }
+.memory-now { margin: 6px 12px 2px; }
+.memory-now > button.cited-toggle { margin-left: 0; font-size: 13px; color: var(--muted); gap: 6px; }
+.memory-bullets { list-style: none; margin: 6px 0 4px; padding: 0 0 0 18px; }
+.memory-bullets li { display: flex; align-items: baseline; gap: 10px; padding: 3px 0; font-size: 13px; line-height: 1.45; }
+.memory-bullets li .text { flex: 1; color: var(--text); }
+.memory-bullets li .source { display: inline-flex; gap: 6px; align-items: baseline; white-space: nowrap; }
+.memory-bullets li.memory-line { display: block; }
 .status-note.outside { padding: 8px 10px; border-radius: var(--r-item); background: var(--warn-soft); border: 1px solid rgb(250 204 21 / 0.2); color: var(--text); }
 .status-note.outside .mono { font-size: 12px; }
 .status-note.judge-advice { padding: 8px 10px; border-radius: var(--r-item); background: var(--warn-soft); border: 1px solid rgb(250 204 21 / 0.2); color: var(--text); }

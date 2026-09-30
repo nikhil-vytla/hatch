@@ -124,7 +124,7 @@ pub fn describe(e: &Entry) -> String {
         Event::ProposalMade { proposal, .. } => format!(
             "learner proposed #{} ({}): {}",
             e.seq,
-            strive_learning::describe(&proposal.artifact),
+            strive_learning::describe(&proposal.change.artifact()),
             proposal.summary
         ),
         Event::GateFinished { proposal, gate, verdict, detail } => format!(
@@ -139,6 +139,9 @@ pub fn describe(e: &Entry) -> String {
                 ProposalDecision::Reject => "rejected",
             }
         ),
+        Event::ProposalApplied { proposal, bullet: Some(edit), .. } => {
+            format!("proposal #{proposal} applied: {}", crate::review::edit_text(edit))
+        }
         Event::ProposalApplied { proposal, before: None, .. } => format!("proposal #{proposal} applied: file created"),
         Event::ProposalApplied { proposal, .. } => format!("proposal #{proposal} applied: file replaced"),
         Event::ProposalRolledBack { proposal, by } => format!("proposal #{proposal} rolled back by {by} (a client)"),

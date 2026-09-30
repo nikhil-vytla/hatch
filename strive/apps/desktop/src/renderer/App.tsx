@@ -11,6 +11,7 @@ import {
   type ProposalDecision,
   type ProposalState,
   type SessionInfo,
+  type MemoryItem,
   type SkippedRun,
 } from "@strive/protocol";
 import { formatUsd as exactUsd, MODE_NAMES, offerText } from "@strive/view";
@@ -217,6 +218,7 @@ export function App({ bridge, opened, onSwitch, offers }: Props) {
 
   const [outsideReview, setOutsideReview] = useState<string[]>([]);
   const [skipped, setSkipped] = useState<SkippedRun>();
+  const [memory, setMemory] = useState<MemoryItem[]>([]);
 
   const loadProposals = useCallback(
     () =>
@@ -224,6 +226,7 @@ export function App({ bridge, opened, onSwitch, offers }: Props) {
         setProposals(r.proposals);
         setOutsideReview(r.changedOutsideReview);
         setSkipped(r.skipped);
+        setMemory(r.memory);
       }),
     [bridge, cwd],
   );
@@ -464,6 +467,7 @@ export function App({ bridge, opened, onSwitch, offers }: Props) {
               proposals={proposals}
               outsideReview={outsideReview}
               skipped={skipped}
+              memory={memory}
               run={run}
               sessions={projectSessions}
               currentSession={id}

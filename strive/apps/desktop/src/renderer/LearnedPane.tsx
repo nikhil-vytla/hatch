@@ -1,7 +1,16 @@
 // What the learner proposed for this project, for a person to review: each
 // proposal's diff, why, its evidence and the daemon's checks, and Accept,
 // Reject or Roll back. The same as `strive review`.
-import type { Evidence, GateOutcome, ProposalDecision, ProposalState, SessionInfo, SkippedRun } from "@strive/protocol";
+import type {
+  BulletEdit,
+  Evidence,
+  GateOutcome,
+  MemoryItem,
+  ProposalDecision,
+  ProposalState,
+  SessionInfo,
+  SkippedRun,
+} from "@strive/protocol";
 import { SIGN_NAMES, triggerText } from "@strive/view";
 import { useEffect, useState } from "react";
 import type { Cited } from "../shared/cited";
@@ -11,7 +20,9 @@ import { Icon } from "./icons";
 import { Markdown } from "./MarkdownView";
 import {
   artifactName,
+  artifactOf,
   artifactPath,
+  bulletLines,
   errorText,
   fileHistory,
   GATE_NAMES,
@@ -30,6 +41,8 @@ type Props = {
   outsideReview: string[];
   /** The latest automatic run that didn't start, if none started since. */
   skipped?: SkippedRun;
+  /** The project's memory as every session reads it now. */
+  memory: MemoryItem[];
   run?: Run;
   /** This project's work sessions. */
   sessions: SessionInfo[];
@@ -188,7 +201,59 @@ function Skipped({ skipped }: { skipped?: SkippedRun }) {
   );
 }
 
-function List({ proposals, outsideReview, skipped, run, onSelect, learn }: Props) {
+/** The memory as every session reads it now, each bullet with the proposal that last wrote it. */
+function MemoryNow({ memory, proposals, onSelect }: Pick<Props, "memory" | "proposals" | "onSelect">) {
+  const [open, setOpen] = useState(false);
+  const bullets = memory.filter((i) => i.kind === "bullet");
+
+  if (bullets.length === 0) return null;
+
+  const known = new Set((proposals ?? []).map((p) => p.id));
+
+  return (
+    <section className="memory-now" aria-label="what every session reads now">
+      <button type="button" className="quiet cited-toggle" aria-expanded={open} onClick={() => setOpen(!open)}>
+        <Icon name="chevron" className={open ? "open" : ""} />
+        What every session reads now
+        <span className="faint small">
+          {bullets.length} {bullets.length === 1 ? "bullet" : "bullets"} in .strive/memory.md
+        </span>
+      </button>
+      {open && (
+        <ul className="memory-bullets">
+          {memory.map((item, i) =>
+            item.kind === "line" ? (
+              item.text.trim() === "" ? null : (
+                // A line has no identity beyond its place in the file.
+                <li key={`line-${i}`} className="memory-line faint small">
+                  {item.text}
+                </li>
+              )
+            ) : (
+              <li key={`bullet-${i}`} data-source={item.source ?? "hand-written"}>
+                <span className="text">{item.text}</span>
+                <span className="source">
+                  {item.source === undefined ? (
+                    <span className="faint small">hand-written</span>
+                  ) : known.has(item.source) ? (
+                    <button type="button" className="link small" onClick={() => onSelect(item.source)}>
+                      #{item.source}
+                    </button>
+                  ) : (
+                    <span className="faint small">#{item.source}</span>
+                  )}
+                  {item.outsideReview && <span className="badge status-stale">changed outside review</span>}
+                </span>
+              </li>
+            ),
+          )}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+function List({ proposals, outsideReview, skipped, run, onSelect, learn, memory }: Props) {
   const now = Date.now();
 
   if (proposals === undefined) return <div className="changes-body" />;
@@ -198,6 +263,7 @@ function List({ proposals, outsideReview, skipped, run, onSelect, learn }: Props
       {run?.running && <Learning run={run} />}
       <OutsideReview paths={outsideReview} />
       <Skipped skipped={skipped} />
+      <MemoryNow memory={memory} proposals={proposals} onSelect={onSelect} />
       {proposals.length === 0 ? (
         <div className="learned-empty">
           <div className="mark">
@@ -222,7 +288,7 @@ function List({ proposals, outsideReview, skipped, run, onSelect, learn }: Props
                   <span className="meta">
                     <Badge proposal={p} />
                     {p.trigger && <AutomaticBadge />}
-                    <span className="mono">{artifactName(p.proposal.artifact)}</span>
+                    <span className="mono">{artifactName(artifactOf(p.proposal.change))}</span>
                     <span className="spacer" />
                     <span className="when" title={new Date(p.madeAtMs).toLocaleString()}>
                       {ago(p.madeAtMs, now)}
@@ -240,6 +306,12 @@ function List({ proposals, outsideReview, skipped, run, onSelect, learn }: Props
 
 type Confirming = "accept" | "rollback";
 
+const BULLET_HEADINGS: Record<BulletEdit["op"], string> = {
+  added: "Adds a bullet",
+  changed: "Changes a bullet",
+  removed: "Removes a bullet",
+};
+
 function Detail({
   proposal: p,
   proposals,
@@ -255,7 +327,7 @@ function Detail({
   onShow,
   onSelect,
 }: Props & { proposal: ProposalState }) {
-  const path = artifactPath(p.proposal.artifact);
+  const path = artifactPath(artifactOf(p.proposal.change));
   const [old, setOld] = useState<{ text: string | null } | { failed: string }>();
   const [confirming, setConfirming] = useState<Confirming>();
   const [busy, setBusy] = useState(false);
@@ -358,16 +430,29 @@ function Detail({
       />
       {failed && <p className="danger small pad">{failed}</p>}
 
-      <section className="learned-section">
-        <h4>{p.before === undefined ? "New file" : "Change, against the file as the learner read it"}</h4>
-        {old === undefined && <p className="faint small">Loading…</p>}
-        {old && "failed" in old && <p className="danger small">Couldn't read the file as it was: {old.failed}</p>}
-        {old && "text" in old && (
-          <div className="learned-diff">
-            <Diff before={old.text ?? ""} after={p.proposal.content} path={path} />
-          </div>
-        )}
-      </section>
+      {p.proposal.change.kind === "memory" ? (
+        <section className="learned-section" aria-label="bullet">
+          <h4>{p.bullet === undefined ? "Change" : BULLET_HEADINGS[p.bullet.op]}</h4>
+          {p.bullet === undefined ? (
+            <p className="danger small">It names a bullet the memory the learner read doesn't have.</p>
+          ) : (
+            <div className="learned-diff">
+              <Diff {...bulletLines(p.bullet)} path={path} />
+            </div>
+          )}
+        </section>
+      ) : (
+        <section className="learned-section">
+          <h4>{p.before === undefined ? "New file" : "Change, against the file as the learner read it"}</h4>
+          {old === undefined && <p className="faint small">Loading…</p>}
+          {old && "failed" in old && <p className="danger small">Couldn't read the file as it was: {old.failed}</p>}
+          {old && "text" in old && (
+            <div className="learned-diff">
+              <Diff before={old.text ?? ""} after={p.proposal.change.content} path={path} />
+            </div>
+          )}
+        </section>
+      )}
 
       <section className="learned-section">
         <h4>Why</h4>
@@ -604,9 +689,11 @@ function Actions({ proposal: p, path, confirming, busy, onConfirm, onAccept, onR
         <span>
           {confirming === "accept"
             ? `Write ${path}? New sessions in this project will read it.`
-            : p.before === undefined
-              ? `Remove ${path}? It didn't exist before this proposal.`
-              : `Put ${path} back as it was before this proposal?`}
+            : p.proposal.change.kind === "memory"
+              ? "Put its bullet back as it was before this proposal?"
+              : p.before === undefined
+                ? `Remove ${path}? It didn't exist before this proposal.`
+                : `Put ${path} back as it was before this proposal?`}
         </span>
         <button type="button" className="quiet" onClick={() => onConfirm(undefined)}>
           Cancel

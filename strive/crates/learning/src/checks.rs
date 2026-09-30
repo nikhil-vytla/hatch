@@ -6,7 +6,7 @@
 //! look; a missed instruction to bypass approvals would reach every later
 //! session's agent.
 
-use strive_proto::{Artifact, Proposal, Verdict};
+use strive_proto::{Change, MemoryOp, Proposal, Verdict};
 
 /// A static-gate rule.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -14,8 +14,12 @@ pub enum Rule {
     /// The artifact must resolve inside the project's `.strive/`.
     Path,
     Size,
-    /// A skill's frontmatter; a one-line summary; a rationale and a prediction.
+    /// A skill's frontmatter; a one-line bullet; a one-line summary; a
+    /// rationale and a prediction.
     Form,
+    /// A memory operation must name a bullet the learner was shown, and an
+    /// add mustn't repeat one.
+    Bullet,
     Secret,
     /// Characters a person can't see in review: invisible or direction-changing.
     Hidden,
@@ -31,6 +35,7 @@ impl Rule {
             Rule::Path => "path",
             Rule::Size => "size",
             Rule::Form => "form",
+            Rule::Bullet => "bullet",
             Rule::Secret => "secrets",
             Rule::Hidden => "hidden text",
             Rule::Weakening => "safeguards",
@@ -52,32 +57,51 @@ impl Finding {
     }
 }
 
-/// The checks that need only the proposal: the path's name, size, form,
-/// secrets (patterns, and `known` values such as stored API keys), weakening
-/// instructions, and that some evidence is named at all.
-pub fn check(p: &Proposal, known: &[String]) -> Vec<Finding> {
+/// The checks that need only the proposal and, for memory, the file as the
+/// learner was shown it (`shown`): the path's name, size, form, the bullet
+/// it names, secrets (patterns, and `known` values such as stored API
+/// keys), weakening instructions, and that some evidence is named at all.
+pub fn check(p: &Proposal, known: &[String], shown: Option<&str>) -> Vec<Finding> {
     let mut found = Vec::new();
-    if let Err(why) = crate::relative_path(&p.artifact) {
+    let artifact = p.change.artifact();
+    if let Err(why) = crate::relative_path(&artifact) {
         found.push(Finding::new(Rule::Path, why));
     }
-    let limit = crate::size_limit(&p.artifact);
-    if p.content.len() > limit {
-        found.push(Finding::new(
-            Rule::Size,
-            format!("{} is {} bytes; the limit is {limit}", crate::describe(&p.artifact), p.content.len()),
-        ));
-    }
+    // What the agent is given: the bullet's text, or the skill's.
+    let (what, given) = match &p.change {
+        Change::Memory(op) => {
+            found.extend(crate::memory::check(shown.unwrap_or_default(), op));
+            match op {
+                MemoryOp::Add { text, .. } | MemoryOp::Change { text, .. } => ("bullet", text.as_str()),
+                MemoryOp::Remove { .. } => ("bullet", ""),
+            }
+        }
+        Change::Skill { content, .. } => {
+            if content.len() > crate::SKILL_LIMIT {
+                found.push(Finding::new(
+                    Rule::Size,
+                    format!(
+                        "{} is {} bytes; the limit is {}",
+                        crate::describe(&artifact),
+                        content.len(),
+                        crate::SKILL_LIMIT
+                    ),
+                ));
+            }
+            ("content", content.as_str())
+        }
+    };
     found.extend(form(p).into_iter().map(|d| Finding::new(Rule::Form, d)));
     // The summary and rationale are shown to people, not given to the
     // agent, but a key in them would still sit in the journal.
-    for (what, text) in [("content", &p.content), ("summary", &p.summary), ("rationale", &p.rationale)] {
+    for (what, text) in [(what, given), ("summary", &p.summary), ("rationale", &p.rationale)] {
         if let Some(kind) = secret(text, known) {
             found.push(Finding::new(Rule::Secret, format!("the {what} holds what looks like {kind}")));
         }
     }
     let notes = p.evidence.iter().map(|e| e.note.as_str()).collect::<Vec<_>>().join("\n");
     for (what, text) in [
-        ("content", p.content.as_str()),
+        (what, given),
         ("summary", &p.summary),
         ("rationale", &p.rationale),
         ("prediction", &p.prediction),
@@ -93,7 +117,14 @@ pub fn check(p: &Proposal, known: &[String]) -> Vec<Finding> {
             ));
         }
     }
-    found.extend(weakening(&p.content).into_iter().map(|d| Finding::new(Rule::Weakening, d)));
+    // Markdown doesn't show a comment, and memory's own mark a bullet's source.
+    if matches!(p.change, Change::Memory(_)) && given.contains("<!--") {
+        found.push(Finding::new(
+            Rule::Hidden,
+            "the bullet holds an HTML comment, which a reviewer reading it rendered can't see",
+        ));
+    }
+    found.extend(weakening(given).into_iter().map(|d| Finding::new(Rule::Weakening, d)));
     found.extend(citations(p).into_iter().map(|d| Finding::new(Rule::Evidence, d)));
     found
 }
@@ -169,7 +200,10 @@ fn fold_fullwidth(c: char) -> char {
 /// The gate's verdict and the detail a person reads.
 pub fn verdict(findings: &[Finding]) -> (Verdict, String) {
     if findings.is_empty() {
-        return (Verdict::Pass, "path, size, form, secrets, hidden text, safeguards and evidence are fine".into());
+        return (
+            Verdict::Pass,
+            "path, size, form, bullet, secrets, hidden text, safeguards and evidence are fine".into(),
+        );
     }
     let lines: Vec<String> = findings.iter().map(|f| format!("{}: {}", f.rule.name(), f.detail)).collect();
     (Verdict::Fail, lines.join("; "))
@@ -186,8 +220,8 @@ fn form(p: &Proposal) -> Vec<String> {
     if p.prediction.trim().is_empty() {
         out.push("it makes no prediction to check later".to_string());
     }
-    if let Artifact::Skill { name } = &p.artifact {
-        match frontmatter(&p.content) {
+    if let Change::Skill { name, content } = &p.change {
+        match frontmatter(content) {
             None => out.push(
                 "a skill must start with --- frontmatter giving its name and a description of when to use it"
                     .to_string(),

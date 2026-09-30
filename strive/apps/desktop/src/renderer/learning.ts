@@ -1,7 +1,16 @@
 // What the Learned pane shows of the project's learning: proposals as
 // people read them, and the state of the latest run, folded from the
 // learning session's journal.
-import type { Artifact, Entry, Gate, ProposalState, ProposalStatus, Verdict } from "@strive/protocol";
+import type {
+  Artifact,
+  BulletEdit,
+  Change,
+  Entry,
+  Gate,
+  ProposalState,
+  ProposalStatus,
+  Verdict,
+} from "@strive/protocol";
 
 /**
  * A failed bridge call as a person reads it: the main process's message,
@@ -55,6 +64,15 @@ export function statusNote(p: ProposalState, path: string): string {
     case "rejected":
       return "Rejected. Nothing was written.";
     case "applied":
+      if (p.proposal.change.kind === "memory") {
+        if (p.replacedBy !== undefined)
+          return `Accepted, then #${p.replacedBy} changed or removed its bullet, so it can't be rolled back until #${p.replacedBy} is.`;
+
+        return p.canRollBack
+          ? `Accepted and written to ${path}.`
+          : `Accepted and written to ${path}. Its bullet has changed since, so it can't be rolled back. Edit the file by hand instead.`;
+      }
+
       if (p.replacedBy !== undefined)
         return `Accepted, then #${p.replacedBy} was accepted over it, so ${path} no longer has its content.`;
 
@@ -62,8 +80,13 @@ export function statusNote(p: ProposalState, path: string): string {
         ? `Accepted and written to ${path}.`
         : `Accepted and written to ${path}, which has changed since, so it can't be rolled back. Edit the file by hand instead.`;
     case "stale":
+      if (p.proposal.change.kind === "memory")
+        return "The bullet it changes was edited since this was proposed, so nothing was written. Learn again for a proposal against memory as it is now.";
+
       return `${path} changed since this was proposed, so nothing was written. Learn again for a proposal against the file as it is now.`;
     case "rolledBack":
+      if (p.proposal.change.kind === "memory") return "Rolled back: its bullet is as it was before.";
+
       return p.before === undefined
         ? `Rolled back: ${path} was removed, as it didn't exist before.`
         : `Rolled back: ${path} is as it was before.`;
@@ -216,10 +239,32 @@ export function judgeAdvice(p: ProposalState): string[] | undefined {
   return read.criteria.filter((c) => !c.pass).map((c) => `${c.name}: ${c.reason}`);
 }
 
+/** The file a change is to. */
+export function artifactOf(c: Change): Artifact {
+  return c.kind === "memory" ? { kind: "memory" } : { kind: "skill", name: c.name };
+}
+
 /** The proposals for the same file as `p`, newest first, `p` among them: the file's history as review sees it. */
 export function fileHistory(proposals: readonly ProposalState[], p: ProposalState): ProposalState[] {
-  const path = artifactPath(p.proposal.artifact);
+  const path = artifactPath(artifactOf(p.proposal.change));
 
   // An id is its entry's seq, so a higher one is newer.
-  return proposals.filter((q) => artifactPath(q.proposal.artifact) === path).sort((a, b) => b.id - a.id);
+  return proposals.filter((q) => artifactPath(artifactOf(q.proposal.change)) === path).sort((a, b) => b.id - a.id);
+}
+
+/** A diff's two sides, as `Diff` takes them. */
+export type DiffSides = { before: string; after: string };
+
+/** A memory proposal's one-bullet diff as the lines before and after it. */
+export function bulletLines(edit: BulletEdit): DiffSides {
+  switch (edit.op) {
+    case "added":
+      return { before: "", after: `${edit.line}\n` };
+    case "changed":
+      return { before: `${edit.old}\n`, after: `${edit.new}\n` };
+    case "removed":
+      return { before: `${edit.line}\n`, after: "" };
+    default:
+      return edit satisfies never;
+  }
 }

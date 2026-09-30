@@ -4,6 +4,7 @@
 //! - a proposal's status, folded from the learning session's journal;
 //! - the judge's rubric, request and strict reading of its answer, and how
 //!   a work session is rendered for it;
+//! - memory as bullets, and one proposal's operation on one of them;
 //! - memory lines that may be stale;
 //! - triggers (ADR-0020): the pre-filter's signs in a work journal, and
 //!   what the learning journal says about automatic runs.
@@ -14,6 +15,7 @@
 mod checks;
 mod fold;
 pub mod judge;
+pub mod memory;
 pub mod render;
 pub mod signals;
 pub mod stale;
@@ -49,7 +51,8 @@ pub fn rolled_back<'a>(folded: &'a [Folded], artifact: &Artifact) -> Vec<&'a Pro
         .iter()
         .map(|f| &f.state)
         .filter(|s| {
-            s.status == ProposalStatus::RolledBack && relative_path(&s.proposal.artifact).is_ok_and(|p| p == path)
+            s.status == ProposalStatus::RolledBack
+                && relative_path(&s.proposal.change.artifact()).is_ok_and(|p| p == path)
         })
         .collect()
 }
@@ -69,14 +72,6 @@ pub fn relative_path(artifact: &Artifact) -> Result<String, String> {
         Artifact::Skill { name } => {
             Err(format!("the skill name {name:?} isn't 1 to {SKILL_NAME_LIMIT} of a-z, 0-9 and -"))
         }
-    }
-}
-
-/// The most the artifact's file may hold, in bytes.
-pub fn size_limit(artifact: &Artifact) -> usize {
-    match artifact {
-        Artifact::Memory => MEMORY_LIMIT,
-        Artifact::Skill { .. } => SKILL_LIMIT,
     }
 }
 

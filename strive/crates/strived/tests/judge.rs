@@ -206,8 +206,7 @@ impl Judge {
 
 fn memory(evidence: &[(&str, u64)]) -> Value {
     json!({
-        "artifact": {"kind": "memory"},
-        "content": "Run `bun test src`; the root holds failing fixtures.\n",
+        "change": {"kind": "memory", "op": "add", "text": "Run `bun test src`; the root holds failing fixtures."},
         "summary": "Run the real suite with bun test src",
         "rationale": "RATIONALE-TEXT: bun test at the root ran the fixtures and failed",
         "evidence": evidence.iter().map(|(s, seq)| json!({"session": s, "seqs": [seq], "note": "what happened"})).collect::<Vec<_>>(),
@@ -297,7 +296,7 @@ fn a_judge_fail_is_advice_a_person_can_accept_past() {
     let out = j.env.strive_in(&j.cwd, &["review", &id.to_string()]);
     let shown = String::from_utf8_lossy(&out.stdout).into_owned();
     let advice = "safety checks passed; second opinion advises against it: generalizes reason: broken";
-    let (diff, advice) = (shown.find("\n@@\n").unwrap(), shown.find(advice).unwrap());
+    let (diff, advice) = (shown.find("\nadds a bullet\n+- Run `bun test src`").unwrap(), shown.find(advice).unwrap());
     assert!(diff < advice, "the diff, then the verdict: {shown}");
     assert!(shown.contains(&format!("`strive review {id} accept` writes .strive/memory.md anyway")), "{shown}");
 

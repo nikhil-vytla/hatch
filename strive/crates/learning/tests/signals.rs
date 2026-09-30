@@ -5,7 +5,7 @@
 use strive_learning::signals::{DETAIL_LIMIT, LIMIT, describe, is_correction, scan, summary};
 use strive_learning::triggers::{acted_on, automatic_since, busy, cost_per_run, skipped};
 use strive_proto::{
-    Artifact, Decision, Digest, EffectOutcome, EffectRecord, Entry, Event, Evidence, LearnSignal, LearnTrigger,
+    Change, Decision, Digest, EffectOutcome, EffectRecord, Entry, Event, Evidence, LearnSignal, LearnTrigger, MemoryOp,
     Proposal, SignalKind, TriggerKind, TurnEnd,
 };
 
@@ -331,8 +331,7 @@ fn only_automatic_requests_since_a_time_count_toward_the_cap() {
 
 fn proposal() -> Proposal {
     Proposal {
-        artifact: Artifact::Memory,
-        content: "- use bun\n".into(),
+        change: Change::Memory(MemoryOp::Add { text: "use bun".into(), after: None }),
         summary: "use bun".into(),
         rationale: "r".into(),
         evidence: vec![Evidence { session: "A".into(), seqs: vec![], note: "n".into() }],

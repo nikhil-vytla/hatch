@@ -3,8 +3,7 @@ import type { Entry, Event, Proposal } from "@strive/protocol";
 import { learnedNotice, noticeFor } from "./notify";
 
 const PROPOSAL: Proposal = {
-  artifact: { kind: "memory" },
-  content: "- Run `bun test src`.\n",
+  change: { kind: "memory", op: "add", text: "Run `bun test src`." },
   summary: "How to run the tests",
   rationale: "The root run needs a display.",
   evidence: [],

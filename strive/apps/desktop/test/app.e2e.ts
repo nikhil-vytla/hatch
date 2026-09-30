@@ -119,7 +119,7 @@ class Rpc {
     const socket = connect(join(at, "run/strived.sock"));
     await new Promise((ok) => socket.once("connect", ok));
     const rpc = new Rpc(socket);
-    await rpc.call("initialize", { protocolVersion: 2, client: { name: "e2e", version: "0" } });
+    await rpc.call("initialize", { protocolVersion: 3, client: { name: "e2e", version: "0" } });
 
     return rpc;
   }
@@ -882,13 +882,18 @@ async function learner(cwd: string, at = home): Promise<Learner> {
   return { host, id };
 }
 
-type Proposed = { summary: string; content: string; evidence?: string; seqs?: number[]; note?: string };
+/** A memory proposal: adding the bullet `text`, or changing the bullet `bullet` names to it. */
+type Proposed = { summary: string; text: string; bullet?: string; evidence?: string; seqs?: number[]; note?: string };
 
 /** Proposes a change to the project's memory, citing a work session's entries (its first by default); its id. */
 async function proposeMemory(l: Learner, cwd: string, p: Proposed): Promise<number> {
+  const change: Json =
+    p.bullet === undefined
+      ? { kind: "memory", op: "add", text: p.text }
+      : { kind: "memory", op: "change", bullet: p.bullet, text: p.text };
+
   const proposal = {
-    artifact: { kind: "memory" },
-    content: p.content,
+    change,
     summary: p.summary,
     rationale: `Why: ${p.summary}.`,
     evidence: [
@@ -950,11 +955,11 @@ test("the Learned pane lists proposals newest first, and shows one with its diff
   await rpc.call("session/prompt", { id: other, text: "tidy the changelog" });
   rpc.close();
   const l = await learner(cwd);
-  await proposeMemory(l, cwd, { summary: "Run the tests with bun", content: "- Run `bun test`.\n" });
+  await proposeMemory(l, cwd, { summary: "Run the tests with bun", text: "Run `bun test`." });
 
   const second = await proposeMemory(l, cwd, {
     summary: "Keep the changelog sorted",
-    content: "- Sort the changelog by date.\n- Newest first.\n",
+    text: "Sort the changelog by date, newest first.",
     evidence: other,
     note: "the user asked to tidy it",
   });
@@ -971,12 +976,11 @@ test("the Learned pane lists proposals newest first, and shows one with its diff
   assert.deepEqual(await pane.locator(".learned-item .mono").allTextContents(), ["memory", "memory"]);
   await pane.locator(`.learned-item[data-proposal="${second}"]`).click();
   const detail = pane.locator(`.learned-detail[data-proposal="${second}"]`);
-  await detail.getByText("New file").waitFor();
-  await detail.locator(".row.add").nth(1).waitFor();
+  await detail.getByText("Adds a bullet").waitFor();
+  await detail.locator(".row.add").waitFor();
 
   assert.deepEqual(await detail.locator(".row.add").allTextContents(), [
-    "1+- Sort the changelog by date.",
-    "2+- Newest first.",
+    `1+- Sort the changelog by date, newest first. <!-- strive:#${second} -->`,
   ]);
 
   await detail.getByText("Why: Keep the changelog sorted.").waitFor();
@@ -1008,8 +1012,8 @@ test("the Learned button counts the proposals waiting for a decision", async () 
   const l = await learner(cwd);
   const button = page.getByRole("button", { name: "learned", exact: true });
   const count = button.locator(".count");
-  await proposeMemory(l, cwd, { summary: "Run the tests with bun", content: "- Run `bun test`.\n" });
-  const second = await proposeMemory(l, cwd, { summary: "Keep it short", content: "- Short.\n" });
+  await proposeMemory(l, cwd, { summary: "Run the tests with bun", text: "Run `bun test`." });
+  const second = await proposeMemory(l, cwd, { summary: "Keep it short", text: "Short." });
   // The person comes back to the window from the terminal where the learner ran.
   await page.evaluate(() => window.dispatchEvent(new Event("focus")));
   await count.getByText("2", { exact: true }).waitFor();
@@ -1025,7 +1029,7 @@ test("the Learned button counts the proposals waiting for a decision", async () 
 test("Accept in the Learned pane asks first, then writes the proposal's file", async () => {
   const { page, cwd } = await openApp();
   const l = await learner(cwd);
-  const id = await proposeMemory(l, cwd, { summary: "Run the tests with bun", content: "- Run `bun test`.\n" });
+  const id = await proposeMemory(l, cwd, { summary: "Run the tests with bun", text: "Run `bun test`." });
   const pane = await openProposal(page, id);
   await pane.getByRole("button", { name: "Accept" }).click();
   const confirm = pane.getByRole("group", { name: "confirm accept" });
@@ -1035,7 +1039,7 @@ test("Accept in the Learned pane asks first, then writes the proposal's file", a
   await pane.getByRole("button", { name: "Accept" }).click();
   await confirm.getByRole("button", { name: "Write it" }).click();
   await pane.locator(".learned-title .badge", { hasText: "applied" }).waitFor();
-  assert.equal(readFileSync(memoryFile(cwd), "utf8"), "- Run `bun test`.\n");
+  assert.equal(readFileSync(memoryFile(cwd), "utf8"), `- Run \`bun test\`. <!-- strive:#${id} -->\n`);
   const decided = await learningEvents(cwd, "proposalDecided");
   assert.deepEqual(
     decided.map((e) => [e.proposal, e.decision, e.by]),
@@ -1047,7 +1051,7 @@ test("Accept in the Learned pane asks first, then writes the proposal's file", a
 test("Reject in the Learned pane writes nothing and says so", async () => {
   const { page, cwd } = await openApp();
   const l = await learner(cwd);
-  const id = await proposeMemory(l, cwd, { summary: "Run the tests with bun", content: "- Run `bun test`.\n" });
+  const id = await proposeMemory(l, cwd, { summary: "Run the tests with bun", text: "Run `bun test`." });
   const pane = await openProposal(page, id);
   await pane.getByRole("button", { name: "Reject" }).click();
   await pane.locator(".learned-title .badge", { hasText: "rejected" }).waitFor();
@@ -1062,27 +1066,36 @@ test("Reject in the Learned pane writes nothing and says so", async () => {
   l.host.close();
 });
 
-test("Roll back in the Learned pane asks first, then puts the file back as it was", async () => {
+test("Roll back in the Learned pane asks first, then puts the bullet back as it was", async () => {
   const { page, cwd } = await openApp();
-  writeMemory(cwd, "- The old rule.\n");
+  writeMemory(cwd, "- The old rule.\n- Another rule.\n");
   const l = await learner(cwd);
-  const id = await proposeMemory(l, cwd, { summary: "Replace the rule", content: "- The new rule.\n" });
+
+  const id = await proposeMemory(l, cwd, {
+    summary: "Replace the rule",
+    bullet: "The old rule.",
+    text: "The new rule.",
+  });
+
   const pane = await openProposal(page, id);
-  // The diff is against the file as the learner read it.
-  await pane.getByText("Change, against the file as the learner read it").waitFor();
-  // The heading shows at once; the rows once the file as it was has loaded.
+  // The diff is one bullet.
+  await pane.getByText("Changes a bullet").waitFor();
   await pane.locator(".row.remove").waitFor();
   assert.deepEqual(await pane.locator(".row.remove").allTextContents(), ["1−- The old rule."]);
+  assert.deepEqual(await pane.locator(".row.add").allTextContents(), [`1+- The new rule. <!-- strive:#${id} -->`]);
   await pane.getByRole("button", { name: "Accept" }).click();
   await pane.getByRole("button", { name: "Write it" }).click();
   await pane.locator(".learned-title .badge", { hasText: "applied" }).waitFor();
-  assert.equal(readFileSync(memoryFile(cwd), "utf8"), "- The new rule.\n");
+  assert.equal(readFileSync(memoryFile(cwd), "utf8"), `- The new rule. <!-- strive:#${id} -->\n- Another rule.\n`);
+  // An edit elsewhere doesn't stand in the way.
+  writeMemory(cwd, `- The new rule. <!-- strive:#${id} -->\n- Another rule, edited.\n`);
+  await page.evaluate(() => window.dispatchEvent(new Event("focus")));
   await pane.getByRole("button", { name: "Roll back" }).click();
   const confirm = pane.getByRole("group", { name: "confirm rollback" });
-  await confirm.getByText("Put .strive/memory.md back as it was before this proposal?").waitFor();
+  await confirm.getByText("Put its bullet back as it was before this proposal?").waitFor();
   await confirm.getByRole("button", { name: "Roll back" }).click();
   await pane.locator(".learned-title .badge", { hasText: "rolled back" }).waitFor();
-  assert.equal(readFileSync(memoryFile(cwd), "utf8"), "- The old rule.\n");
+  assert.equal(readFileSync(memoryFile(cwd), "utf8"), "- The old rule.\n- Another rule, edited.\n");
   assert.equal((await learningEvents(cwd, "proposalRolledBack")).length, 1);
   l.host.close();
 });
@@ -1091,7 +1104,7 @@ test("a proposal that failed its safety checks can't be accepted, and Accept say
   const { page, cwd } = await openApp();
   const l = await learner(cwd);
   const nowhere = "01J8ZZZZZZZZZZZZZZZZZZZZZZ";
-  const id = await proposeMemory(l, cwd, { summary: "Cite nothing", content: "- Rule.\n", evidence: nowhere });
+  const id = await proposeMemory(l, cwd, { summary: "Cite nothing", text: "Rule.", evidence: nowhere });
   const pane = await openProposal(page, id);
   await pane.getByText("It failed its safety checks, so it can't be accepted.").waitFor();
   const accept = pane.getByRole("button", { name: "Accept" });
@@ -1100,31 +1113,31 @@ test("a proposal that failed its safety checks can't be accepted, and Accept say
   l.host.close();
 });
 
-test("Roll back isn't offered once a later accept replaced the proposal or its file changed by hand", async () => {
+test("Roll back isn't offered once a later accept changed the proposal's bullet or a person did", async () => {
   const { page, cwd } = await openApp();
   const l = await learner(cwd);
-  const first = await proposeMemory(l, cwd, { summary: "First rule", content: "- First.\n" });
+  const first = await proposeMemory(l, cwd, { summary: "First rule", text: "First." });
   const rpc = await Rpc.open();
   resultOf(await rpc.call("proposal/decide", { cwd, proposal: first, decision: "accept" }));
   // Registered again, the learner is shown the file as the first accept left it.
   resultOf(await l.host.call("host/register", { id: l.id }));
-  const second = await proposeMemory(l, cwd, { summary: "Second rule", content: "- First.\n- Second.\n" });
+  const second = await proposeMemory(l, cwd, { summary: "Second rule", bullet: `#${first}`, text: "Second." });
   resultOf(await rpc.call("proposal/decide", { cwd, proposal: second, decision: "accept" }));
   rpc.close();
 
   const pane = await openProposal(page, first);
   await pane.locator(".learned-title .badge", { hasText: `replaced by #${second}` }).waitFor();
-  await pane.getByText(`#${second} was accepted over it`, { exact: false }).waitFor();
+  await pane.getByText(`#${second} changed or removed its bullet`, { exact: false }).waitFor();
   assert.equal(await pane.getByRole("button", { name: "Roll back" }).count(), 0);
 
   await pane.getByRole("button", { name: "all proposals" }).click();
   await pane.locator(`.learned-item[data-proposal="${second}"]`).click();
   const detail = pane.locator(`.learned-detail[data-proposal="${second}"]`);
   await detail.getByRole("button", { name: "Roll back" }).waitFor();
-  writeMemory(cwd, "- By hand.\n");
+  writeMemory(cwd, `- Second, by hand. <!-- strive:#${second} -->\n`);
   // Back from the editor, the window looks at the file again.
   await page.evaluate(() => window.dispatchEvent(new Event("focus")));
-  await detail.getByText("which has changed since, so it can't be rolled back", { exact: false }).waitFor();
+  await detail.getByText("Its bullet has changed since, so it can't be rolled back", { exact: false }).waitFor();
   assert.equal(await detail.getByRole("button", { name: "Roll back" }).count(), 0);
   l.host.close();
 });
@@ -1133,19 +1146,25 @@ test("a proposal whose file changed since it was proposed isn't written, and the
   const { page, cwd } = await openApp();
   writeMemory(cwd, "- The old rule.\n");
   const l = await learner(cwd);
-  const id = await proposeMemory(l, cwd, { summary: "Replace the rule", content: "- The new rule.\n" });
-  writeMemory(cwd, "- A rule a person wrote meanwhile.\n");
+
+  const id = await proposeMemory(l, cwd, {
+    summary: "Replace the rule",
+    bullet: "The old rule.",
+    text: "The new rule.",
+  });
+
+  writeMemory(cwd, "- The old rule, as a person rewrote it meanwhile.\n");
   const pane = await openProposal(page, id);
   await pane.getByRole("button", { name: "Accept" }).click();
   await pane.getByRole("button", { name: "Write it" }).click();
   await pane.locator(".learned-title .badge", { hasText: "file changed" }).waitFor();
 
   await pane
-    .getByText(".strive/memory.md changed since this was proposed, so nothing was written.", { exact: false })
+    .getByText("The bullet it changes was edited since this was proposed, so nothing was written.", { exact: false })
     .waitFor();
 
   await pane.getByRole("button", { name: "Learn from recent sessions" }).waitFor();
-  assert.equal(readFileSync(memoryFile(cwd), "utf8"), "- A rule a person wrote meanwhile.\n");
+  assert.equal(readFileSync(memoryFile(cwd), "utf8"), "- The old rule, as a person rewrote it meanwhile.\n");
   assert.equal((await learningEvents(cwd, "proposalApplied")).length, 0);
   l.host.close();
 });
@@ -1154,15 +1173,15 @@ test("the window acts only on its own project's proposals, and reads their files
   const { page, cwd } = await openApp();
   writeMemory(cwd, "- Ours.\n");
   const ours = await learner(cwd);
-  const mine = await proposeMemory(ours, cwd, { summary: "Ours", content: "- Ours, better.\n" });
+  const mine = await proposeMemory(ours, cwd, { summary: "Ours", text: "Ours, better." });
   // Another project, with a proposal of its own.
   const theirs = realpathSync(mkdtempSync(join(tmpdir(), "strv-desk-other-")));
   const rpc = await Rpc.open();
   const theirWork = String(resultOf(await rpc.call("session/create", { cwd: theirs })).id);
   const l = await learner(theirs);
-  await proposeMemory(l, theirs, { summary: "Theirs, first", content: "- Theirs.\n", evidence: theirWork });
+  await proposeMemory(l, theirs, { summary: "Theirs, first", text: "Theirs.", evidence: theirWork });
   // Ids are seqs in each project's own learning session: this one names nothing in ours.
-  const id = await proposeMemory(l, theirs, { summary: "Theirs", content: "- Theirs.\n", evidence: theirWork });
+  const id = await proposeMemory(l, theirs, { summary: "Theirs", text: "Theirs.", evidence: theirWork });
   const ourIds = JSON.stringify(resultOf(await rpc.call("proposal/list", { cwd })));
   assert.ok(!ourIds.includes(`"id":${id},`), "their proposal's id isn't one of ours");
 
@@ -1241,7 +1260,7 @@ test("Learn from recent sessions starts a run that the pane follows until its pr
 
   resultOf(await l.host.call("host/record", { id: l.id, event: reading }));
   await learning.getByText("Reading a session").waitFor();
-  const id = await proposeMemory(l, cwd, { summary: "Run the tests with bun", content: "- Run `bun test`.\n" });
+  const id = await proposeMemory(l, cwd, { summary: "Run the tests with bun", text: "Run `bun test`." });
 
   const ended = { type: "turnEnded", turn: 1, reason: { kind: "done" } };
   resultOf(await l.host.call("host/record", { id: l.id, event: ended }));
@@ -1261,8 +1280,8 @@ async function reopenLearned(page: Page) {
 test("a learned file edited by hand after an accept shows as changed outside review", async () => {
   const { page, cwd } = await openApp();
   const l = await learner(cwd);
-  const id = await proposeMemory(l, cwd, { summary: "Run the tests with bun", content: "- Run `bun test`.\n" });
-  const older = await proposeMemory(l, cwd, { summary: "Sort the changelog", content: "- Sort it.\n" });
+  const id = await proposeMemory(l, cwd, { summary: "Run the tests with bun", text: "Run `bun test`." });
+  const older = await proposeMemory(l, cwd, { summary: "Sort the changelog", text: "Sort it." });
   let pane = await openProposal(page, id);
   await pane.getByRole("button", { name: "Accept" }).click();
   await pane.getByRole("button", { name: "Write it" }).click();
@@ -1273,7 +1292,13 @@ test("a learned file edited by hand after an accept shows as changed outside rev
   const notice = pane.getByRole("region", { name: "changed outside review" });
   assert.equal(await notice.count(), 0);
 
-  writeMemory(cwd, "- Run `bun test`.\n- A rule nobody reviewed.\n");
+  // A bullet a person adds is theirs; a learned bullet they rewrite isn't what review saw.
+  writeMemory(cwd, `- Run \`bun test\`. <!-- strive:#${id} -->\n- A rule a person wrote.\n`);
+  pane = await reopenLearned(page);
+  await pane.locator(`.learned-item[data-proposal="${older}"]`).waitFor();
+  assert.equal(await notice.count(), 0);
+  const edited = `- Run \`bun test\` with no flags. <!-- strive:#${id} -->\n- A rule a person wrote.\n`;
+  writeMemory(cwd, edited);
   pane = await reopenLearned(page);
   await notice.waitFor();
   assert.deepEqual(await notice.locator("li").allTextContents(), [".strive/memory.md"]);
@@ -1282,9 +1307,39 @@ test("a learned file edited by hand after an accept shows as changed outside rev
   await pane.locator(`.learned-item[data-proposal="${id}"]`).click();
   const detail = pane.locator(`.learned-detail[data-proposal="${id}"]`);
   await detail.locator(".status-note.outside", { hasText: ".strive/memory.md has changed outside review" }).waitFor();
-  await detail.getByText("which has changed since, so it can't be rolled back", { exact: false }).waitFor();
+  await detail.getByText("Its bullet has changed since, so it can't be rolled back", { exact: false }).waitFor();
   assert.equal(await detail.getByRole("button", { name: "Roll back" }).count(), 0);
-  assert.equal(readFileSync(memoryFile(cwd), "utf8"), "- Run `bun test`.\n- A rule nobody reviewed.\n");
+  assert.equal(readFileSync(memoryFile(cwd), "utf8"), edited);
+  l.host.close();
+});
+
+test("the Learned pane shows what every session reads now, each bullet with its source", async () => {
+  const { page, cwd } = await openApp();
+  writeMemory(cwd, "# Notes\n\n- Use bun.\n");
+  const l = await learner(cwd);
+  const id = await proposeMemory(l, cwd, { summary: "Run the tests with bun", text: "Run `bun test src`." });
+  const rpc = await Rpc.open();
+  resultOf(await rpc.call("proposal/decide", { cwd, proposal: id, decision: "accept" }));
+  rpc.close();
+  const pane = await learnedPane(page);
+  const now = pane.getByRole("region", { name: "what every session reads now" });
+  await now.getByRole("button", { name: /What every session reads now/ }).click();
+  const bullets = now.locator(".memory-bullets > li[data-source]");
+  await bullets.nth(1).waitFor();
+  assert.deepEqual(
+    await bullets.evaluateAll((els) =>
+      els.map((e) => [e.querySelector(".text")?.textContent, e.querySelector(".source")?.textContent]),
+    ),
+    [
+      ["Use bun.", "hand-written"],
+      ["Run `bun test src`.", `#${id}`],
+    ],
+  );
+  await now.locator(".memory-line", { hasText: "# Notes" }).waitFor();
+  await page.screenshot({ path: join(tmpdir(), "strive-memory-now.png") });
+  // Its source is a click away.
+  await now.getByRole("button", { name: `#${id}` }).click();
+  await pane.locator(`.learned-detail[data-proposal="${id}"]`).waitFor();
   l.host.close();
 });
 
@@ -1313,7 +1368,7 @@ test("evidence opens to the entries it cites, and a click on one shows it in its
 
   const id = await proposeMemory(l, cwd, {
     summary: "Say which test failed",
-    content: "- Name the failing test.\n",
+    text: "Name the failing test.",
     evidence: work,
     seqs: [asked, finished],
     note: "the user asked, and one test failed",
@@ -1442,7 +1497,7 @@ test("the judge's reasons show by criterion, and a judge fail is advice a person
 
     const id = await proposeMemory(l, cwd, {
       summary: "Run the tests with bun",
-      content: "- Run `bun test`.\n",
+      text: "Run `bun test`.",
       evidence: work,
       seqs: [seq],
     });
@@ -1481,7 +1536,7 @@ test("the judge's reasons show by criterion, and a judge fail is advice a person
     await pane.getByRole("button", { name: "Accept" }).click();
     await pane.getByRole("button", { name: "Write it" }).click();
     await pane.locator(".learned-title .badge", { hasText: "applied" }).waitFor();
-    assert.equal(readFileSync(memoryFile(cwd), "utf8"), "- Run `bun test`.\n");
+    assert.equal(readFileSync(memoryFile(cwd), "utf8"), `- Run \`bun test\`. <!-- strive:#${id} -->\n`);
     l.host.close();
     await app.close();
   } finally {
@@ -1494,7 +1549,7 @@ test("the judge's reasons show by criterion, and a judge fail is advice a person
 test("a proposal shows the other proposals for its file, and one is a click away", async () => {
   const { page, cwd } = await openApp();
   const l = await learner(cwd);
-  const first = await proposeMemory(l, cwd, { summary: "Run the tests with bun", content: "- Run `bun test`.\n" });
+  const first = await proposeMemory(l, cwd, { summary: "Run the tests with bun", text: "Run `bun test`." });
   const pane = await openProposal(page, first);
   await pane.getByRole("button", { name: "Reject" }).click();
   await pane.locator(".learned-title .badge", { hasText: "rejected" }).waitFor();
@@ -1502,8 +1557,11 @@ test("a proposal shows the other proposals for its file, and one is a click away
   assert.equal(await pane.getByRole("list", { name: "proposals for this file" }).count(), 0);
 
   const skill = {
-    artifact: { kind: "skill", name: "release" },
-    content: "---\nname: release\ndescription: How to cut a release.\n---\nTag, then push.\n",
+    change: {
+      kind: "skill",
+      name: "release",
+      content: "---\nname: release\ndescription: How to cut a release.\n---\nTag, then push.\n",
+    },
     summary: "How to release",
     rationale: "Asked twice.",
     evidence: [{ session: sessionId(cwd), seqs: [1], note: "the session began here" }],
@@ -1514,7 +1572,7 @@ test("a proposal shows the other proposals for its file, and one is a click away
 
   const second = await proposeMemory(l, cwd, {
     summary: "Run the tests with bun, in src",
-    content: "- `bun test src`.\n",
+    text: "`bun test src`.",
   });
 
   await pane.getByRole("button", { name: "all proposals" }).click();
@@ -1558,7 +1616,7 @@ test("a proposal from an automatic run is badged, and says which signs started t
     const work = String(resultOf(await rpc.call("session/create", { cwd })).id);
     const l = await learner(cwd, own);
     // A person's run first: its proposal has no badge.
-    const asked = await proposeMemory(l, cwd, { summary: "Asked for", content: "- One.\n", evidence: work });
+    const asked = await proposeMemory(l, cwd, { summary: "Asked for", text: "One.", evidence: work });
 
     // The work session's host records two turns; the second prompt corrects the first.
     const host = await Rpc.open(own);
@@ -1583,7 +1641,7 @@ test("a proposal from an automatic run is badged, and says which signs started t
       );
     });
 
-    const automatic = await proposeMemory(l, cwd, { summary: "Use bun", content: "- Use bun.\n", evidence: work });
+    const automatic = await proposeMemory(l, cwd, { summary: "Use bun", text: "Use bun.", evidence: work });
     const pane = await learnedPane(page);
     await pane.locator(`.learned-item[data-proposal="${automatic}"]`).waitFor();
 

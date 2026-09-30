@@ -9,22 +9,27 @@
 //!   with nothing written (the file had changed) makes it `stale`;
 //! - `proposalRolledBack` makes an applied one `rolledBack`.
 //!
-//! An applied proposal is `replaced_by` a later one for the same file that
-//! was applied over it, until that one is rolled back to its content.
+//! An applied proposal is `replaced_by` a later one that changed what it
+//! wrote, until that one is rolled back:
+//! - a memory proposal, by a later change or remove of its bullet (the
+//!   bullet's source names it); a proposal for another bullet never does;
+//! - a skill, by a later proposal for the same skill, until that one is
+//!   rolled back to its content.
 
 use std::collections::HashMap;
 
 use strive_proto::{
-    Digest, Entry, Event, Gate, GateOutcome, LearnSignal, LearnTrigger, ProposalDecision, ProposalState,
-    ProposalStatus, Verdict,
+    BulletEdit, Change, Digest, Entry, Event, Gate, GateOutcome, LearnSignal, LearnTrigger, ProposalDecision,
+    ProposalState, ProposalStatus, Verdict,
 };
 
 /// What an accepted proposal wrote: the file before (none: it didn't
-/// exist) and after, and when.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// exist) and after, what it did to its bullet for memory, and when.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Applied {
     pub before: Option<Digest>,
     pub after: Digest,
+    pub bullet: Option<BulletEdit>,
     pub at_ms: u64,
 }
 
@@ -66,6 +71,7 @@ pub fn fold(entries: &[Entry]) -> Vec<Folded> {
                     made_at_ms: e.ts_ms,
                     proposal: proposal.clone(),
                     before: *before,
+                    bullet: None,
                     status: ProposalStatus::Checking,
                     gates: Vec::new(),
                     trigger: trigger.clone(),
@@ -95,9 +101,12 @@ pub fn fold(entries: &[Entry]) -> Vec<Folded> {
                     }
                 }
             }
-            Event::ProposalApplied { proposal, before, after } => {
+            Event::ProposalApplied { proposal, before, after, bullet } => {
                 if let Some(i) = find(&mut out, *proposal) {
-                    out[i].1.applied = Some(Applied { before: *before, after: *after, at_ms: e.ts_ms });
+                    let applied = Applied { before: *before, after: *after, bullet: bullet.clone(), at_ms: e.ts_ms };
+                    out[i].1.applied = Some(applied);
+                    // What it did stays its diff, rolled back or not.
+                    out[i].0.bullet.clone_from(bullet);
                     live.applied(&mut out, i);
                 }
             }
@@ -140,30 +149,49 @@ pub fn fold(entries: &[Entry]) -> Vec<Folded> {
         .collect()
 }
 
-/// Per file, the applied proposal whose content it last had: what marks
-/// one proposal replaced by another.
+/// Per skill file, the applied proposal whose content it last had: what
+/// marks one skill proposal replaced by another.
 #[derive(Default)]
 struct Live(HashMap<String, u64>);
 
 impl Live {
-    /// `out[i]` was written over whatever applied proposal its file had.
+    /// `out[i]` was applied: over the bullet its change or remove names
+    /// (memory), or over whatever applied proposal its file had (a skill).
     fn applied(&mut self, out: &mut [(ProposalState, Marks)], i: usize) {
-        let Ok(path) = crate::relative_path(&out[i].0.proposal.artifact) else { return };
         let id = out[i].0.id;
-        if let Some(old) = self.0.insert(path, id)
-            && let Some(j) = out.iter().position(|(s, _)| s.id == old && old != id)
+        let old = match (&out[i].0.proposal.change, out[i].1.applied.as_ref().and_then(|a| a.bullet.as_ref())) {
+            (Change::Memory(_), Some(BulletEdit::Changed { old: line, .. } | BulletEdit::Removed { line, .. })) => {
+                crate::memory::source(line)
+            }
+            (Change::Memory(_), Some(BulletEdit::Added { .. }) | None) => None,
+            (Change::Skill { .. }, _) => {
+                let Ok(path) = crate::relative_path(&out[i].0.proposal.change.artifact()) else { return };
+                self.0.insert(path, id)
+            }
+        };
+        if let Some(old) = old
+            && let Some(j) =
+                out.iter().position(|(s, m)| s.id == old && old != id && m.applied.is_some() && !m.rolled_back)
         {
             out[j].0.replaced_by = Some(id);
         }
     }
 
-    /// `out[i]` was rolled back: the one it replaced is back if the
+    /// `out[i]` was rolled back: the memory proposal whose bullet it
+    /// changed has it back; the skill proposal it replaced is back if the
     /// rollback restored that one's content.
     fn rolled_back(&mut self, out: &mut [(ProposalState, Marks)], i: usize) {
-        let (id, before) = (out[i].0.id, out[i].1.applied.and_then(|a| a.before));
-        let Ok(path) = crate::relative_path(&out[i].0.proposal.artifact) else { return };
+        let id = out[i].0.id;
+        if let Change::Memory(_) = out[i].0.proposal.change {
+            for (s, _) in out.iter_mut().filter(|(s, m)| s.replaced_by == Some(id) && !m.rolled_back) {
+                s.replaced_by = None;
+            }
+            return;
+        }
+        let before = out[i].1.applied.as_ref().and_then(|a| a.before);
+        let Ok(path) = crate::relative_path(&out[i].0.proposal.change.artifact()) else { return };
         let back = out.iter().position(|(s, m)| {
-            s.replaced_by == Some(id) && !m.rolled_back && m.applied.map(|a| Some(a.after)) == Some(before)
+            s.replaced_by == Some(id) && !m.rolled_back && m.applied.as_ref().map(|a| Some(a.after)) == Some(before)
         });
         match back {
             Some(j) => {

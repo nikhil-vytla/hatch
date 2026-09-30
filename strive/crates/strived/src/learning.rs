@@ -15,10 +15,11 @@ use serde_json::Value;
 use strive_learning::{Finding, Folded, Rule};
 use strive_proto::rpc::RpcError;
 use strive_proto::{
-    Appended, Digest, Entry, Event, Evidence, Gate, LearnSignal, LearningDismiss, LearningDismissParams, LearningOpen,
-    LearningRun, LearningRunParams, LearningSignals, LearningSignalsParams, LearningSignalsResult, Method, ProjectRef,
-    Proposal, ProposalDecide, ProposalDecideParams, ProposalDecision, ProposalList, ProposalListResult, ProposalRef,
-    ProposalRollback, ProposalStatus, SessionInfo, SessionKind, StaleMention, Verdict,
+    Appended, Artifact, Change, Digest, Entry, Event, Evidence, Gate, LearnSignal, LearningDismiss,
+    LearningDismissParams, LearningOpen, LearningRun, LearningRunParams, LearningSignals, LearningSignalsParams,
+    LearningSignalsResult, MemoryItem, Method, ProjectRef, Proposal, ProposalDecide, ProposalDecideParams,
+    ProposalDecision, ProposalList, ProposalListResult, ProposalRef, ProposalRollback, ProposalStatus, SessionInfo,
+    SessionKind, StaleMention, Verdict,
 };
 
 use crate::methods::{Conn, Reply, client_name, internal, parse, reply, require_person, session_error};
@@ -71,20 +72,27 @@ pub async fn route(state: &Arc<State>, conn: &Arc<Conn>, method: &str, params: V
         ProposalList::NAME => {
             let ProjectRef { cwd } = parse::<ProposalList>(params)?;
             let cwd = project(&cwd)?;
-            let (mut proposals, mut entries) = (Vec::new(), Vec::new());
+            let (mut folded, mut entries) = (Vec::new(), Vec::new());
             if let Some(sid) = find(state, &cwd)? {
                 let lock = state.learning.project(&sid);
                 let _held = lock.lock().await;
-                let mut folded = settled(state, &sid, &cwd).await?;
+                folded = settled(state, &sid, &cwd).await?;
                 rollable(state, &cwd, &mut folded).await?;
-                proposals = folded.into_iter().map(|f| f.state).collect();
-                proposals.reverse();
+                previewed(state, &mut folded)?;
                 entries = journal(state, &sid)?;
             }
-            let changed_outside_review = outside_review(state, &cwd, &entries).await?;
+            let memory = memory_now(state, &cwd, &folded).await?;
+            let changed_outside_review = outside_review(state, &cwd, &entries, &memory).await?;
             let may_be_stale = stale(state, &cwd).await?;
             let skipped = strive_learning::triggers::skipped(&entries);
-            reply::<ProposalList>(ProposalListResult { proposals, changed_outside_review, may_be_stale, skipped })
+            let proposals = folded.into_iter().rev().map(|f| f.state).collect();
+            reply::<ProposalList>(ProposalListResult {
+                proposals,
+                changed_outside_review,
+                may_be_stale,
+                skipped,
+                memory: memory.unwrap_or_default(),
+            })
         }
         ProposalDecide::NAME => {
             require_person(conn)?;
@@ -263,12 +271,12 @@ pub async fn propose(
     }
     let lock = state.learning.project(sid);
     let _held = lock.lock().await;
-    let findings = static_gate(state, cwd, &proposal).await?;
     let entries = journal(state, sid)?;
-    let before = match strive_learning::relative_path(&proposal.artifact) {
+    let before = match strive_learning::relative_path(&proposal.change.artifact()) {
         Ok(rel) => shown(&entries, &rel),
         Err(_) => None,
     };
+    let findings = static_gate(state, cwd, &proposal, before).await?;
     let (verdict, detail) = strive_learning::verdict(&findings);
     let made = crate::judge::Made { proposal: &proposal, before, at_ms: crate::server::epoch_ms() };
     let mut gates = vec![(Gate::Static, verdict, detail)];
@@ -331,22 +339,40 @@ fn shown(entries: &[Entry], rel: &str) -> Option<Digest> {
     learned.iter().find(|f| f.path == rel).map(|f| f.digest)
 }
 
-/// The project's learned files that aren't what an accepted proposal last
-/// left there: its content once applied, what it replaced once rolled back.
-/// A file no applied proposal wrote counts once it exists. Nothing stops an
-/// editor or git from changing these files; this is how review sees it.
-async fn outside_review(state: &State, cwd: &str, entries: &[Entry]) -> Result<Vec<String>, RpcError> {
+/// The project's learned files that aren't what review left there:
+/// - memory, when a bullet names a source that isn't an applied proposal
+///   which left it reading so (`strive_learning::memory::view`), or when the
+///   file can't be read as a learned file. Hand-written bullets are a
+///   person's, and count as reviewed;
+/// - a skill, when it isn't what an accepted proposal last left there: its
+///   content once applied, what it replaced once rolled back. A skill no
+///   applied proposal wrote counts once it exists.
+///
+/// Nothing stops an editor or git from changing these files; this is how
+/// review sees it.
+async fn outside_review(
+    state: &State,
+    cwd: &str,
+    entries: &[Entry],
+    memory: &Result<Vec<MemoryItem>, String>,
+) -> Result<Vec<String>, RpcError> {
+    let mut changed = Vec::new();
+    let flagged =
+        |items: &Vec<MemoryItem>| items.iter().any(|i| matches!(i, MemoryItem::Bullet { outside_review: true, .. }));
+    if memory.as_ref().map_or(true, flagged) {
+        changed.push(strive_learning::MEMORY_PATH.to_string());
+    }
     let mut paths: HashMap<u64, String> = HashMap::new();
     let mut replaced: HashMap<u64, Option<Digest>> = HashMap::new();
     let mut left: BTreeMap<String, Option<Digest>> = BTreeMap::new();
     for e in entries {
         match &e.event {
-            Event::ProposalMade { proposal, .. } => {
-                if let Ok(rel) = strive_learning::relative_path(&proposal.artifact) {
+            Event::ProposalMade { proposal: Proposal { change: Change::Skill { name, .. }, .. }, .. } => {
+                if let Ok(rel) = strive_learning::relative_path(&Artifact::Skill { name: name.clone() }) {
                     paths.insert(e.seq, rel);
                 }
             }
-            Event::ProposalApplied { proposal, before, after } => {
+            Event::ProposalApplied { proposal, before, after, .. } => {
                 if let Some(rel) = paths.get(proposal) {
                     left.insert(rel.clone(), Some(*after));
                     replaced.insert(*proposal, *before);
@@ -361,7 +387,6 @@ async fn outside_review(state: &State, cwd: &str, entries: &[Entry]) -> Result<V
         }
     }
     let mut files: BTreeSet<String> = left.keys().cloned().collect();
-    files.insert(strive_learning::MEMORY_PATH.into());
     if let Ok(dir) = std::fs::read_dir(Path::new(cwd).join(strive_learning::SKILLS_DIR)) {
         let names = dir.filter_map(Result::ok).filter_map(|e| e.file_name().to_str().map(str::to_string));
         files.extend(
@@ -370,7 +395,6 @@ async fn outside_review(state: &State, cwd: &str, entries: &[Entry]) -> Result<V
                 .map(|n| format!("{}/{n}/SKILL.md", strive_learning::SKILLS_DIR)),
         );
     }
-    let mut changed = Vec::new();
     for rel in files {
         // Something there that isn't a plain file (a symlink, say) is a change too.
         let now = file_now(state, cwd, &rel).await?.map(|b| b.map(|b| strive_journal::cas::digest(&b)));
@@ -387,26 +411,74 @@ async fn outside_review(state: &State, cwd: &str, entries: &[Entry]) -> Result<V
 }
 
 /// Marks the applied proposals a rollback would succeed for now, by the
-/// same rule `rollback` applies: the file is still what they wrote, or is
-/// already what it was before (a rollback a crash cut off, which a retry
+/// rule `rollback` applies (`undo`): what they wrote is still as they wrote
+/// it, or already undone (a rollback a crash cut off, which a retry
 /// records). Any other would be refused.
 async fn rollable(state: &State, cwd: &str, folded: &mut [Folded]) -> Result<(), RpcError> {
-    let mut now: HashMap<String, Option<Digest>> = HashMap::new();
+    let mut now: HashMap<String, Option<Vec<u8>>> = HashMap::new();
     for f in folded.iter_mut() {
-        let (ProposalStatus::Applied, Some(applied), None) = (f.state.status, f.applied, f.state.replaced_by) else {
+        let (ProposalStatus::Applied, Some(applied), None) = (f.state.status, &f.applied, f.state.replaced_by) else {
             continue;
         };
-        let Ok(rel) = strive_learning::relative_path(&f.state.proposal.artifact) else { continue };
-        let digest = if let Some(d) = now.get(&rel) {
-            *d
+        let Ok(rel) = strive_learning::relative_path(&f.state.proposal.change.artifact()) else { continue };
+        let bytes = if let Some(b) = now.get(&rel) {
+            b.clone()
         } else {
-            let d = file_now(state, cwd, &rel).await?.ok().flatten().map(|b| strive_journal::cas::digest(&b));
-            now.insert(rel, d);
-            d
+            let b = file_now(state, cwd, &rel).await?.ok().flatten();
+            now.insert(rel, b.clone());
+            b
         };
-        f.state.can_roll_back = digest == Some(applied.after) || digest == applied.before;
+        f.state.can_roll_back = undo(&f.state.proposal.change, applied, f.state.id, bytes.as_deref()).is_ok();
     }
     Ok(())
+}
+
+/// Gives each memory proposal that was never applied its one-bullet diff
+/// against the file the learner saw; an applied one has what it did.
+fn previewed(state: &State, folded: &mut [Folded]) -> Result<(), RpcError> {
+    for f in folded.iter_mut().filter(|f| f.state.bullet.is_none()) {
+        if let Change::Memory(op) = &f.state.proposal.change {
+            let shown = shown_text(state, f.state.before)?;
+            f.state.bullet = strive_learning::memory::preview(&shown, op, f.state.id);
+        }
+    }
+    Ok(())
+}
+
+/// What undoing an applied proposal does to its file as it is now.
+enum Undo {
+    /// Memory with its bullet put back as it was.
+    Write(Vec<u8>),
+    /// A skill's file as it was: these contents, or none (it didn't exist).
+    Restore(Option<Digest>),
+    /// Nothing: it's already undone.
+    Done,
+}
+
+fn undo(change: &Change, applied: &strive_learning::Applied, id: u64, now: Option<&[u8]>) -> Result<Undo, String> {
+    match change {
+        Change::Memory(_) => {
+            let Some(edit) = &applied.bullet else {
+                return Err(format!("#{id}'s journal entry doesn't say what it did to its bullet"));
+            };
+            let now = std::str::from_utf8(now.unwrap_or_default())
+                .map_err(|_| format!("{} isn't UTF-8 text", strive_learning::MEMORY_PATH))?;
+            match strive_learning::memory::undo(now, edit, id)? {
+                Some(text) => Ok(Undo::Write(text.into_bytes())),
+                None => Ok(Undo::Done),
+            }
+        }
+        Change::Skill { .. } => {
+            let now = now.map(strive_journal::cas::digest);
+            if now == Some(applied.after) {
+                Ok(Undo::Restore(applied.before))
+            } else if now == applied.before {
+                Ok(Undo::Done)
+            } else {
+                Err(format!("it has changed since #{id} was applied"))
+            }
+        }
+    }
 }
 
 /// Lines of the project's memory, as it is now, that name a project path
@@ -429,13 +501,38 @@ async fn stale(state: &State, cwd: &str) -> Result<Vec<StaleMention>, RpcError> 
     .map_err(|e| internal(&e))
 }
 
-/// The static gate: the proposal's own text, where its file resolves (and
-/// that what's there now is a file it could replace), and its evidence.
-async fn static_gate(state: &State, cwd: &str, p: &Proposal) -> Result<Vec<Finding>, RpcError> {
+/// The project's memory as it is now, as every session reads it, each
+/// bullet marked if it's changed outside review; or why it can't be read as
+/// a learned file.
+async fn memory_now(state: &State, cwd: &str, folded: &[Folded]) -> Result<Result<Vec<MemoryItem>, String>, RpcError> {
+    let rel = strive_learning::MEMORY_PATH;
+    Ok(match file_now(state, cwd, rel).await? {
+        Err(why) => Err(why),
+        Ok(None) => Ok(Vec::new()),
+        Ok(Some(bytes)) => match String::from_utf8(bytes) {
+            Ok(text) => Ok(strive_learning::memory::view(&text, folded)),
+            Err(_) => Err(format!("{rel} isn't UTF-8 text")),
+        },
+    })
+}
+
+/// The file as the learner was shown it, from the content store; empty if
+/// there was none.
+fn shown_text(state: &State, before: Option<Digest>) -> Result<String, RpcError> {
+    let Some(d) = before else { return Ok(String::new()) };
+    let bytes = state.cas.get(&d).map_err(|e| internal(&e))?;
+    Ok(String::from_utf8_lossy(&bytes).into_owned())
+}
+
+/// The static gate: the proposal's own text against the file as the
+/// learner was shown it (`before`), where its file resolves (and that
+/// what's there now is a file it could change), and its evidence.
+async fn static_gate(state: &State, cwd: &str, p: &Proposal, before: Option<Digest>) -> Result<Vec<Finding>, RpcError> {
     let known: Vec<String> =
         crate::credentials::PROVIDERS.iter().filter_map(|(provider, _)| state.credentials.get(provider)).collect();
-    let mut findings = strive_learning::check(p, &known);
-    if let Ok(rel) = strive_learning::relative_path(&p.artifact)
+    let shown = shown_text(state, before)?;
+    let mut findings = strive_learning::check(p, &known, Some(&shown));
+    if let Ok(rel) = strive_learning::relative_path(&p.change.artifact())
         && let Err(why) = file_now(state, cwd, &rel).await?
     {
         findings.push(Finding::new(Rule::Path, why));
@@ -574,7 +671,8 @@ pub async fn settled(state: &Arc<State>, sid: &SessionId, cwd: &str) -> Result<V
         let static_verdict = if let Some(v) = had(Gate::Static) {
             v
         } else {
-            let (v, detail) = strive_learning::verdict(&static_gate(state, cwd, &f.state.proposal).await?);
+            let (v, detail) =
+                strive_learning::verdict(&static_gate(state, cwd, &f.state.proposal, f.state.before).await?);
             events.push(Event::GateFinished { proposal: id, gate: Gate::Static, verdict: v, detail });
             v
         };
@@ -647,12 +745,13 @@ async fn decide(state: &Arc<State>, cwd: &str, id: u64, decision: ProposalDecisi
     }
 }
 
-/// Writes an accepted proposal if the file is still as it was when it was
-/// proposed. Otherwise the accept is recorded alone, which makes it stale.
+/// Writes an accepted proposal over the file as it is now: a memory
+/// proposal if its bullet still reads as the learner saw it, a skill if its
+/// file is still as the learner saw it. Otherwise the accept is recorded
+/// alone, which makes it stale.
 async fn apply(state: &State, sid: &SessionId, cwd: &str, f: &Folded, by: String) -> Result<Vec<Entry>, RpcError> {
     let id = f.state.id;
-    let p = &f.state.proposal;
-    let rel = strive_learning::relative_path(&p.artifact).map_err(refused)?;
+    let rel = strive_learning::relative_path(&f.state.proposal.change.artifact()).map_err(refused)?;
     let Some(_running) = state.sessions.begin_effect() else {
         return Err(internal(&"the daemon is stopping"));
     };
@@ -662,31 +761,58 @@ async fn apply(state: &State, sid: &SessionId, cwd: &str, f: &Folded, by: String
     let _file = state.sessions.workspaces.file(&path).await;
     let _project = state.sessions.workspaces.effect(vec![PathBuf::from(cwd)]).await;
     let now = file_now(state, cwd, &rel).await?.map_err(refused)?;
-    let now = now.map(|b| state.cas.put(&b)).transpose().map_err(|e| internal(&e))?;
+    let before = now.as_deref().map(|b| state.cas.put(b)).transpose().map_err(|e| internal(&e))?;
     let accepted = Event::ProposalDecided { proposal: id, decision: ProposalDecision::Accept, by };
     let mut events = vec![accepted];
-    let after = state.cas.put(p.content.as_bytes()).map_err(|e| internal(&e))?;
-    if now == f.state.before {
-        let (content, path_, rel_) = (p.content.clone().into_bytes(), path.clone(), rel.clone());
-        tokio::task::spawn_blocking(move || write_now(&path_, &rel_, Some(&content)))
+    // What to write, if anything, and what to journal as applied.
+    let (write, applied) = match &f.state.proposal.change {
+        Change::Memory(op) => {
+            let now =
+                String::from_utf8(now.unwrap_or_default()).map_err(|_| refused(format!("{rel} isn't UTF-8 text")))?;
+            match strive_learning::memory::apply(&now, &shown_text(state, f.state.before)?, op, id) {
+                Ok(a) => {
+                    let after = state.cas.put(a.text.as_bytes()).map_err(|e| internal(&e))?;
+                    // Already there: an accept a crash cut off after its write, which this records.
+                    let write = a.written.then(|| a.text.into_bytes());
+                    (write, Some(Event::ProposalApplied { proposal: id, before, after, bullet: Some(a.edit) }))
+                }
+                Err(why) => {
+                    crate::log!("proposal #{id} is stale: {why}");
+                    (None, None)
+                }
+            }
+        }
+        Change::Skill { content, .. } => {
+            let after = state.cas.put(content.as_bytes()).map_err(|e| internal(&e))?;
+            let applied = Event::ProposalApplied { proposal: id, before: f.state.before, after, bullet: None };
+            if before == f.state.before {
+                (Some(content.clone().into_bytes()), Some(applied))
+            } else if before == Some(after) {
+                // The file is written and journals come after it, so a crash
+                // between leaves the proposal's content with nothing recorded:
+                // this retry records the apply over the file as the learner saw
+                // it, so it can be rolled back.
+                (None, Some(applied))
+            } else {
+                (None, None)
+            }
+        }
+    };
+    if let Some(bytes) = write {
+        tokio::task::spawn_blocking(move || write_now(&path, &rel, Some(&bytes)))
             .await
             .map_err(|e| internal(&e))?
             .map_err(|why| refused(format!("{why}; nothing was written")))?;
-        events.push(Event::ProposalApplied { proposal: id, before: f.state.before, after });
-    } else if now == Some(after) {
-        // The file is written and journals come after it, so a crash between
-        // leaves the proposal's content with nothing recorded: this retry
-        // records the apply over the file as the learner saw it, so it can
-        // be rolled back.
-        events.push(Event::ProposalApplied { proposal: id, before: f.state.before, after });
     }
+    events.extend(applied);
     state.sessions.append(sid, events).await.map_err(session_error)
 }
 
-/// Puts an applied proposal's file back as it was, if it's still as applied.
+/// Undoes an applied proposal: a memory proposal's bullet put back as it
+/// was, a skill's file as it was. Refused if that has changed since.
 async fn rollback(state: &Arc<State>, cwd: &str, id: u64, by: String) -> Reply {
     let (sid, f, _held) = proposal(state, cwd, id).await?;
-    let applied = match (f.state.status, f.applied) {
+    let applied = match (f.state.status, &f.applied) {
         (ProposalStatus::Applied, Some(applied)) => applied,
         (status, _) => {
             return Err(refused(format!(
@@ -695,7 +821,13 @@ async fn rollback(state: &Arc<State>, cwd: &str, id: u64, by: String) -> Reply {
             )));
         }
     };
-    let rel = strive_learning::relative_path(&f.state.proposal.artifact).map_err(refused)?;
+    let rel = strive_learning::relative_path(&f.state.proposal.change.artifact()).map_err(refused)?;
+    if let Some(by) = f.state.replaced_by {
+        return Err(refused(format!(
+            "#{by} was accepted over proposal #{id} and changed what it wrote, so nothing was rolled back; \
+             roll back #{by} first, or edit {rel} by hand"
+        )));
+    }
     let Some(_running) = state.sessions.begin_effect() else {
         return Err(internal(&"the daemon is stopping"));
     };
@@ -703,20 +835,22 @@ async fn rollback(state: &Arc<State>, cwd: &str, id: u64, by: String) -> Reply {
     let _file = state.sessions.workspaces.file(&path).await;
     let _project = state.sessions.workspaces.effect(vec![PathBuf::from(cwd)]).await;
     let now = file_now(state, cwd, &rel).await?.map_err(refused)?;
-    let now = now.map(|b| state.cas.put(&b)).transpose().map_err(|e| internal(&e))?;
-    if now == Some(applied.after) {
-        let old = applied.before.map(|d| state.cas.get(&d)).transpose().map_err(|e| internal(&e))?;
-        tokio::task::spawn_blocking(move || write_now(&path, &rel, old.as_deref()))
+    let write = match undo(&f.state.proposal.change, applied, id, now.as_deref()) {
+        Ok(Undo::Write(bytes)) => Some(Some(bytes)),
+        Ok(Undo::Restore(old)) => Some(old.map(|d| state.cas.get(&d)).transpose().map_err(|e| internal(&e))?),
+        // Already as it was before: a rollback a crash cut off between its
+        // write and its journal, which this retry records.
+        Ok(Undo::Done) => None,
+        Err(why) => {
+            return Err(refused(format!("{rel}: {why}, so nothing was rolled back; edit it by hand instead")));
+        }
+    };
+    if let Some(bytes) = write {
+        tokio::task::spawn_blocking(move || write_now(&path, &rel, bytes.as_deref()))
             .await
             .map_err(|e| internal(&e))?
             .map_err(|why| refused(format!("{why}; nothing was rolled back")))?;
-    } else if now != applied.before {
-        return Err(refused(format!(
-            "{rel} has changed since proposal #{id} was applied, so nothing was rolled back; edit it by hand instead"
-        )));
     }
-    // Otherwise the file is already as it was before: a rollback a crash cut
-    // off between its write and its journal, which this retry records.
     let entries = state
         .sessions
         .append(&sid, vec![Event::ProposalRolledBack { proposal: id, by }])

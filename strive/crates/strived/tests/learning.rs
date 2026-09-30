@@ -45,11 +45,11 @@ fn digest(bytes: &[u8]) -> String {
     format!("sha256:{}", hex::encode(sha2::Sha256::digest(bytes)))
 }
 
-/// A memory proposal that passes every check, citing `evidence`'s first entry.
-fn memory(content: &str, evidence: &str) -> Value {
+/// A proposal of `change` that passes every other check, citing
+/// `evidence`'s first entry.
+fn proposing(change: &Value, evidence: &str) -> Value {
     json!({
-        "artifact": {"kind": "memory"},
-        "content": content,
+        "change": change,
         "summary": "Tests run with bun",
         "rationale": "npm test failed in this project; bun test passed",
         "evidence": [{"session": evidence, "seqs": [1], "note": "the session began here"}],
@@ -57,10 +57,28 @@ fn memory(content: &str, evidence: &str) -> Value {
     })
 }
 
+/// A proposal to add the memory bullet `text`.
+fn memory(text: &str, evidence: &str) -> Value {
+    proposing(&json!({"kind": "memory", "op": "add", "text": text}), evidence)
+}
+
+/// A proposal to change the memory bullet `bullet` names to `text`.
+fn change(bullet: &str, text: &str, evidence: &str) -> Value {
+    proposing(&json!({"kind": "memory", "op": "change", "bullet": bullet, "text": text}), evidence)
+}
+
+/// A proposal to remove the memory bullet `bullet` names.
+fn remove(bullet: &str, evidence: &str) -> Value {
+    proposing(&json!({"kind": "memory", "op": "remove", "bullet": bullet}), evidence)
+}
+
 fn skill(name: &str, content: &str, evidence: &str) -> Value {
-    let mut p = memory(content, evidence);
-    p["artifact"] = json!({"kind": "skill", "name": name});
-    p
+    proposing(&json!({"kind": "skill", "name": name, "content": content}), evidence)
+}
+
+/// A bullet as proposal `id` writes it.
+fn learned(text: &str, id: u64) -> String {
+    format!("- {text} <!-- strive:#{id} -->")
 }
 
 const SKILL: &str = "---\nname: release\ndescription: When writing release notes\n---\nList the merged PRs.\n";
@@ -241,7 +259,7 @@ fn only_a_person_asks_the_learner_to_run() {
 fn the_learner_is_given_its_memory_and_skills_whole() {
     let env = Env::new();
     let cwd = project();
-    write(&memory_file(&cwd), "Use bun.\n");
+    write(&memory_file(&cwd), "Use bun.\n- Run `bun test`. <!-- strive:#4 -->\n- Mine.\n");
     write(&cwd.join(".strive/skills/release/SKILL.md"), SKILL);
     write(&cwd.join(".strive/skills/draft/SKILL.md"), "no frontmatter yet\n");
     write(&cwd.join(".strive/skills/Bad_Name/SKILL.md"), SKILL);
@@ -264,17 +282,23 @@ fn the_learner_is_given_its_memory_and_skills_whole() {
     assert_eq!(
         config["learnedFiles"],
         json!([
-            {"artifact": {"kind": "memory"}, "text": "Use bun.\n"},
+            {"artifact": {"kind": "memory"}, "text": "Use bun.\n- Run `bun test`. <!-- strive:#4 -->\n- Mine.\n", "items": [
+                {"kind": "line", "text": "Use bun."},
+                {"kind": "bullet", "text": "Run `bun test`.", "source": 4, "outsideReview": false},
+                {"kind": "bullet", "text": "Mine.", "outsideReview": false},
+            ]},
             {"artifact": {"kind": "skill", "name": "draft"}, "text": "no frontmatter yet\n"},
             {"artifact": {"kind": "skill", "name": "release"}, "text": SKILL},
         ]),
-        "whole, exactly; not a bad name, a symlink, a FIFO, or one too big to give whole"
+        "whole, exactly, memory also as bullets with their sources; not a bad name, a symlink, a FIFO, \
+         or one too big to give whole"
     );
     let loaded = &events(&env, &id, "contextLoaded")[0]["learned"];
+    let memory = "Use bun.\n- Run `bun test`. <!-- strive:#4 -->\n- Mine.\n";
     assert_eq!(
         loaded,
         &json!([
-            {"path": ".strive/memory.md", "digest": digest(b"Use bun.\n"), "bytes": 9},
+            {"path": ".strive/memory.md", "digest": digest(memory.as_bytes()), "bytes": memory.len()},
             {"path": ".strive/skills/draft/SKILL.md", "digest": digest(b"no frontmatter yet\n"), "bytes": 19},
             {"path": ".strive/skills/release/SKILL.md", "digest": digest(SKILL.as_bytes()), "bytes": SKILL.len()},
         ]),
@@ -287,14 +311,15 @@ fn a_proposal_is_written_only_over_the_file_the_learner_was_shown() {
     let env = Env::new();
     let cwd = project();
     let work = work_session(&env, &cwd);
-    write(&memory_file(&cwd), "as shown\n");
+    write(&memory_file(&cwd), "- as shown\n");
     let (mut host, id) = learner(&env, &cwd);
-    write(&memory_file(&cwd), "changed before it proposed\n");
-    let p = propose(&mut host, &id, &memory("learned\n", &work));
-    assert_eq!(proposal(&env, &cwd, p)["before"], digest(b"as shown\n"), "what it saw, not what's there now");
+    write(&memory_file(&cwd), "- changed before it proposed\n");
+    let p = propose(&mut host, &id, &change("as shown", "learned", &work));
+    assert_eq!(proposal(&env, &cwd, p)["before"], digest(b"- as shown\n"), "what it saw, not what's there now");
+    assert_eq!(static_gate(&env, &cwd, p).0, "pass", "checked against the bullet it saw");
     assert!(decide(&env, &cwd, p, "accept").get("error").is_none());
     assert_eq!(status(&env, &cwd, p), "stale");
-    assert_eq!(fs::read_to_string(memory_file(&cwd)).unwrap(), "changed before it proposed\n");
+    assert_eq!(fs::read_to_string(memory_file(&cwd)).unwrap(), "- changed before it proposed\n");
 
     // A file created after the learner looked isn't written over either.
     let s = propose(&mut host, &id, &skill("release", SKILL, &work));
@@ -320,7 +345,7 @@ fn each_run_is_shown_the_files_as_they_are_when_it_starts() {
     assert_eq!(
         context["learnedFiles"],
         json!([
-            {"artifact": {"kind": "memory"}, "text": "by hand since\n"},
+            {"artifact": {"kind": "memory"}, "text": "by hand since\n", "items": [{"kind": "line", "text": "by hand since"}]},
             {"artifact": {"kind": "skill", "name": "release"}, "text": SKILL},
         ])
     );
@@ -334,11 +359,11 @@ fn each_run_is_shown_the_files_as_they_are_when_it_starts() {
     );
     assert_eq!(loaded[1]["skills"], json!(["release"]));
 
-    let p = propose(&mut host, &id, &memory("learned\n", &work));
+    let p = propose(&mut host, &id, &memory("learned", &work));
     assert_eq!(proposal(&env, &cwd, p)["before"], digest(b"by hand since\n"), "what this run was shown");
     assert!(decide(&env, &cwd, p, "accept").get("error").is_none());
     assert_eq!(status(&env, &cwd, p), "applied");
-    assert_eq!(fs::read_to_string(memory_file(&cwd)).unwrap(), "learned\n");
+    assert_eq!(fs::read_to_string(memory_file(&cwd)).unwrap(), format!("by hand since\n{}\n", learned("learned", p)));
 }
 
 #[test]
@@ -432,10 +457,10 @@ fn a_proposal_that_passes_is_ready_with_the_later_gates_skipped() {
     let cwd = project();
     let work = work_session(&env, &cwd);
     let (mut host, id) = learner(&env, &cwd);
-    let new = propose(&mut host, &id, &memory("Use bun.\n", &work));
+    let new = propose(&mut host, &id, &memory("Use bun.", &work));
     write(&memory_file(&cwd), "Old notes.\n");
     reread(&mut host, &id);
-    let replacing = propose(&mut host, &id, &memory("Use bun.\n", &work));
+    let replacing = propose(&mut host, &id, &memory("Use bun.", &work));
 
     let p = proposal(&env, &cwd, new);
     assert_eq!(p["status"], "ready");
@@ -450,7 +475,7 @@ fn a_proposal_that_passes_is_ready_with_the_later_gates_skipped() {
     let detail = p["gates"][1]["detail"].as_str().unwrap();
     assert!(detail.contains("no Anthropic API key"), "{detail}");
     let made = &events(&env, &id, "proposalMade")[0];
-    assert_eq!(made["proposal"], memory("Use bun.\n", &work));
+    assert_eq!(made["proposal"], memory("Use bun.", &work));
 
     let p = proposal(&env, &cwd, replacing);
     assert_eq!(p["before"], digest(b"Old notes.\n"), "the file as it was when proposed");
@@ -513,10 +538,15 @@ fn the_static_gate_limits_size() {
     let cwd = project();
     let work = work_session(&env, &cwd);
     let (mut host, id) = learner(&env, &cwd);
-    let at = propose(&mut host, &id, &memory(&"a".repeat(16 * 1024), &work));
+    let at = propose(&mut host, &id, &memory(&"a".repeat(500), &work));
     assert_eq!(status(&env, &cwd, at), "ready");
-    let over = propose(&mut host, &id, &memory(&"a".repeat(16 * 1024 + 1), &work));
-    assert_fails(&env, &cwd, over, "size", "the limit is 16384");
+    let over = propose(&mut host, &id, &memory(&"a".repeat(501), &work));
+    assert_fails(&env, &cwd, over, "size", "the bullet is 501 characters; the limit is 500");
+    // The file as the learner saw it, with the bullet, must fit too.
+    write(&memory_file(&cwd), &format!("- {}\n", "b".repeat(16 * 1024 - 20)));
+    reread(&mut host, &id);
+    let full = propose(&mut host, &id, &memory("One more.", &work));
+    assert_fails(&env, &cwd, full, "size", "the limit is 16384");
     let big_skill = format!("{SKILL}{}", "a".repeat(32 * 1024));
     let over = propose(&mut host, &id, &skill("release", &big_skill, &work));
     assert_fails(&env, &cwd, over, "size", "the limit is 32768");
@@ -661,7 +691,7 @@ fn only_a_person_decides_or_rolls_back() {
     assert!(decide(&env, &cwd, p, "accept").get("error").is_none());
     let r = host.call("proposal/rollback", &json!({"cwd": cwd, "proposal": p}));
     assert_eq!(r["error"]["code"], RpcError::NOT_A_PERSON, "{r}");
-    assert_eq!(fs::read_to_string(memory_file(&cwd)).unwrap(), "m");
+    assert_eq!(fs::read_to_string(memory_file(&cwd)).unwrap(), format!("{}\n", learned("m", p)));
 }
 
 #[test]
@@ -670,26 +700,32 @@ fn accepting_writes_the_file_and_journals_what_it_was_and_is() {
     let cwd = project();
     let work = work_session(&env, &cwd);
     let (mut host, id) = learner(&env, &cwd);
-    let new = propose(&mut host, &id, &memory("Use bun.\n", &work));
+    let new = propose(&mut host, &id, &memory("Use bun.", &work));
     let r = decide(&env, &cwd, new, "accept");
     assert!(r.get("error").is_none(), "{r}");
-    assert_eq!(fs::read_to_string(memory_file(&cwd)).unwrap(), "Use bun.\n");
+    let first = format!("{}\n", learned("Use bun.", new));
+    assert_eq!(fs::read_to_string(memory_file(&cwd)).unwrap(), first);
     assert_eq!(status(&env, &cwd, new), "applied");
     let decided = events(&env, &id, "proposalDecided");
     assert_eq!(decided, vec![json!({"type": "proposalDecided", "proposal": new, "decision": "accept", "by": "test"})]);
     assert_eq!(
         events(&env, &id, "proposalApplied"),
-        vec![json!({"type": "proposalApplied", "proposal": new, "after": digest(b"Use bun.\n")})]
+        vec![json!({"type": "proposalApplied", "proposal": new, "after": digest(first.as_bytes()),
+                    "bullet": {"op": "added", "line": learned("Use bun.", new)}})]
     );
 
+    // A person adds a line by hand; the next change touches only its bullet.
+    write(&memory_file(&cwd), &format!("# Notes\n{first}- Mine.\n"));
     reread(&mut host, &id);
-    let replacing = propose(&mut host, &id, &memory("Use bun test.\n", &work));
+    let replacing = propose(&mut host, &id, &change(&format!("#{new}"), "Use bun test.", &work));
     assert!(decide(&env, &cwd, replacing, "accept").get("error").is_none());
-    assert_eq!(fs::read_to_string(memory_file(&cwd)).unwrap(), "Use bun test.\n");
+    let second = format!("# Notes\n{}\n- Mine.\n", learned("Use bun test.", replacing));
+    assert_eq!(fs::read_to_string(memory_file(&cwd)).unwrap(), second);
     assert_eq!(
         events(&env, &id, "proposalApplied")[1],
-        json!({"type": "proposalApplied", "proposal": replacing, "before": digest(b"Use bun.\n"),
-               "after": digest(b"Use bun test.\n")})
+        json!({"type": "proposalApplied", "proposal": replacing,
+               "before": digest(format!("# Notes\n{first}- Mine.\n").as_bytes()), "after": digest(second.as_bytes()),
+               "bullet": {"op": "changed", "old": learned("Use bun.", new), "new": learned("Use bun test.", replacing)}})
     );
 
     let s = propose(&mut host, &id, &skill("release", SKILL, &work));
@@ -731,35 +767,63 @@ fn a_file_changed_since_the_proposal_makes_it_stale_and_nothing_is_written() {
     let cwd = project();
     let work = work_session(&env, &cwd);
     let (mut host, id) = learner(&env, &cwd);
-    write(&memory_file(&cwd), "old\n");
+    write(&memory_file(&cwd), "- old\n- learned <!-- strive:#77 -->\n- other\n");
     reread(&mut host, &id);
-    let p = propose(&mut host, &id, &memory("learned\n", &work));
-    write(&memory_file(&cwd), "mine\n");
-    let r = decide(&env, &cwd, p, "accept");
-    assert!(r.get("error").is_none(), "{r}");
-    assert_eq!(fs::read_to_string(memory_file(&cwd)).unwrap(), "mine\n");
-    assert_eq!(status(&env, &cwd, p), "stale");
+    let p = propose(&mut host, &id, &change("old", "new", &work));
+    let gone = propose(&mut host, &id, &remove("#77", &work));
+    let edited = "- old, edited\n- learned, edited <!-- strive:#77 -->\n- other\n";
+    write(&memory_file(&cwd), edited);
+    for p in [p, gone] {
+        let r = decide(&env, &cwd, p, "accept");
+        assert!(r.get("error").is_none(), "{r}");
+        assert_eq!(status(&env, &cwd, p), "stale");
+    }
+    assert_eq!(fs::read_to_string(memory_file(&cwd)).unwrap(), edited);
     assert!(events(&env, &id, "proposalApplied").is_empty());
 
-    // Made where there was no file; one appeared since.
-    fs::remove_file(memory_file(&cwd)).unwrap();
+    // Edits elsewhere don't make it stale.
+    write(&memory_file(&cwd), "- old, edited\n- other\n");
     reread(&mut host, &id);
-    let p = propose(&mut host, &id, &memory("learned\n", &work));
-    write(&memory_file(&cwd), "mine\n");
+    let p = propose(&mut host, &id, &change("other", "Other.", &work));
+    write(&memory_file(&cwd), "# Heading by hand\n- old, edited\n- other\n");
     assert!(decide(&env, &cwd, p, "accept").get("error").is_none());
-    assert_eq!(
-        (status(&env, &cwd, p).as_str(), fs::read_to_string(memory_file(&cwd)).unwrap().as_str()),
-        ("stale", "mine\n")
-    );
+    assert_eq!(status(&env, &cwd, p), "applied");
+    let now = format!("# Heading by hand\n- old, edited\n{}\n", learned("Other.", p));
+    assert_eq!(fs::read_to_string(memory_file(&cwd)).unwrap(), now);
 
-    // Two proposals against one file: the second goes stale once the first is written.
+    // Two changes of one bullet: the second goes stale once the first is
+    // written. Two adds of different bullets both go in.
     reread(&mut host, &id);
-    let first = propose(&mut host, &id, &memory("first\n", &work));
-    let second = propose(&mut host, &id, &memory("second\n", &work));
-    assert!(decide(&env, &cwd, first, "accept").get("error").is_none());
-    assert!(decide(&env, &cwd, second, "accept").get("error").is_none());
-    assert_eq!(fs::read_to_string(memory_file(&cwd)).unwrap(), "first\n");
+    let first = propose(&mut host, &id, &change(&format!("#{p}"), "First.", &work));
+    let second = propose(&mut host, &id, &change(&format!("#{p}"), "Second.", &work));
+    let one = propose(&mut host, &id, &memory("One.", &work));
+    let two = propose(&mut host, &id, &memory("Two.", &work));
+    for p in [first, second, one, two] {
+        assert!(decide(&env, &cwd, p, "accept").get("error").is_none());
+    }
     assert_eq!(status(&env, &cwd, second), "stale");
+    assert_eq!(
+        fs::read_to_string(memory_file(&cwd)).unwrap(),
+        format!(
+            "# Heading by hand\n- old, edited\n{}\n{}\n{}\n",
+            learned("First.", first),
+            learned("One.", one),
+            learned("Two.", two)
+        )
+    );
+}
+
+#[test]
+fn an_add_that_repeats_a_bullet_fails_its_checks() {
+    let env = Env::new();
+    let cwd = project();
+    let work = work_session(&env, &cwd);
+    write(&memory_file(&cwd), "- Run the tests with `bun test`.\n");
+    let (mut host, id) = learner(&env, &cwd);
+    let again = propose(&mut host, &id, &memory("Run the tests  with `bun test`.", &work));
+    assert_fails(&env, &cwd, again, "bullet", "memory already has the bullet");
+    let missing = propose(&mut host, &id, &remove("Run the tests.", &work));
+    assert_fails(&env, &cwd, missing, "bullet", "memory has no bullet \"Run the tests.\"");
 }
 
 #[test]
@@ -784,50 +848,73 @@ fn rejecting_journals_the_decision_and_writes_nothing() {
 }
 
 #[test]
-fn rolling_back_restores_the_file_or_removes_a_new_one() {
+fn rolling_back_undoes_just_that_bullet() {
     let env = Env::new();
     let cwd = project();
     let work = work_session(&env, &cwd);
+    write(&memory_file(&cwd), "# Notes\n\n- keep\n- old\n- gone\n");
     let (mut host, id) = learner(&env, &cwd);
-    let ready = propose(&mut host, &id, &memory("new\n", &work));
-    let r = rollback(&env, &cwd, ready);
+    let added = propose(&mut host, &id, &memory("new", &work));
+    let r = rollback(&env, &cwd, added);
     assert_eq!(r["error"]["code"], RpcError::INVALID_REQUEST, "not applied: {r}");
-
-    assert!(decide(&env, &cwd, ready, "accept").get("error").is_none());
-    assert!(rollback(&env, &cwd, ready).get("error").is_none());
-    assert!(!memory_file(&cwd).exists(), "it didn't exist before");
-    assert_eq!(status(&env, &cwd, ready), "rolledBack");
+    let changed = propose(&mut host, &id, &change("old", "Old.", &work));
+    let removed = propose(&mut host, &id, &remove("gone", &work));
+    for p in [added, changed, removed] {
+        assert!(decide(&env, &cwd, p, "accept").get("error").is_none());
+    }
+    assert_eq!(
+        fs::read_to_string(memory_file(&cwd)).unwrap(),
+        format!("# Notes\n\n- keep\n{}\n{}\n", learned("Old.", changed), learned("new", added))
+    );
+    // In any order, and past a hand edit elsewhere.
+    let now = fs::read_to_string(memory_file(&cwd)).unwrap();
+    write(&memory_file(&cwd), &now.replace("- keep\n", "- keep, edited\n"));
+    for p in [added, removed, changed] {
+        assert_eq!(proposal(&env, &cwd, p)["canRollBack"], true, "#{p}");
+        let r = rollback(&env, &cwd, p);
+        assert!(r.get("error").is_none(), "#{p}: {r}");
+        assert_eq!(status(&env, &cwd, p), "rolledBack");
+    }
+    assert_eq!(fs::read_to_string(memory_file(&cwd)).unwrap(), "# Notes\n\n- keep, edited\n- old\n- gone\n");
     assert_eq!(
         events(&env, &id, "proposalRolledBack"),
-        vec![json!({"type": "proposalRolledBack", "proposal": ready, "by": "test"})]
+        [added, removed, changed].map(|p| json!({"type": "proposalRolledBack", "proposal": p, "by": "test"}))
     );
-    let r = rollback(&env, &cwd, ready);
+    let r = rollback(&env, &cwd, added);
     assert_eq!(r["error"]["code"], RpcError::INVALID_REQUEST, "already rolled back: {r}");
 
-    write(&memory_file(&cwd), "old\n");
-    reread(&mut host, &id);
-    let replacing = propose(&mut host, &id, &memory("new\n", &work));
-    assert!(decide(&env, &cwd, replacing, "accept").get("error").is_none());
-    assert_eq!(fs::read_to_string(memory_file(&cwd)).unwrap(), "new\n");
-    assert!(rollback(&env, &cwd, replacing).get("error").is_none());
-    assert_eq!(fs::read_to_string(memory_file(&cwd)).unwrap(), "old\n");
+    // A new skill's rollback removes it.
+    let s = propose(&mut host, &id, &skill("release", SKILL, &work));
+    assert!(decide(&env, &cwd, s, "accept").get("error").is_none());
+    assert!(rollback(&env, &cwd, s).get("error").is_none());
+    assert!(!cwd.join(".strive/skills/release/SKILL.md").exists(), "it didn't exist before");
 }
 
 #[test]
-fn rolling_back_leaves_a_file_changed_since_it_was_applied() {
+fn rolling_back_leaves_a_bullet_changed_since_it_was_applied() {
     let env = Env::new();
     let cwd = project();
     let work = work_session(&env, &cwd);
     let (mut host, id) = learner(&env, &cwd);
-    let p = propose(&mut host, &id, &memory("new\n", &work));
+    let p = propose(&mut host, &id, &memory("new", &work));
     assert!(decide(&env, &cwd, p, "accept").get("error").is_none());
-    write(&memory_file(&cwd), "edited by hand\n");
+    let edited = format!("- new, edited by hand <!-- strive:#{p} -->\n");
+    write(&memory_file(&cwd), &edited);
+    assert_eq!(proposal(&env, &cwd, p)["canRollBack"], false);
     let r = rollback(&env, &cwd, p);
     assert_eq!(r["error"]["code"], RpcError::INVALID_REQUEST, "{r}");
-    assert!(r["error"]["message"].as_str().unwrap().contains("has changed since"), "{r}");
-    assert_eq!(fs::read_to_string(memory_file(&cwd)).unwrap(), "edited by hand\n");
+    let why = r["error"]["message"].as_str().unwrap();
+    assert!(why.contains(&format!("the bullet #{p} added has been edited since")), "{r}");
+    assert_eq!(fs::read_to_string(memory_file(&cwd)).unwrap(), edited);
     assert_eq!(status(&env, &cwd, p), "applied");
     assert!(events(&env, &id, "proposalRolledBack").is_empty());
+
+    // A skill changed since isn't rolled back either.
+    let s = propose(&mut host, &id, &skill("release", SKILL, &work));
+    assert!(decide(&env, &cwd, s, "accept").get("error").is_none());
+    write(&cwd.join(".strive/skills/release/SKILL.md"), "mine\n");
+    let r = rollback(&env, &cwd, s);
+    assert!(r["error"]["message"].as_str().unwrap().contains("has changed since"), "{r}");
 }
 
 #[test]
@@ -835,21 +922,23 @@ fn an_accept_a_crash_cut_off_after_the_write_is_journaled_when_retried() {
     let env = Env::new();
     let cwd = project();
     let work = work_session(&env, &cwd);
-    write(&memory_file(&cwd), "old\n");
+    write(&memory_file(&cwd), "- old\n");
     let (mut host, id) = learner(&env, &cwd);
-    let p = propose(&mut host, &id, &memory("new\n", &work));
+    let p = propose(&mut host, &id, &memory("new", &work));
     // What a crash between the accept's write and its journal leaves: the
-    // file is the proposal's, and the journal says nothing.
-    write(&memory_file(&cwd), "new\n");
+    // file has the proposal's bullet, and the journal says nothing.
+    let written = format!("- old\n{}\n", learned("new", p));
+    write(&memory_file(&cwd), &written);
     assert!(decide(&env, &cwd, p, "accept").get("error").is_none());
     assert_eq!(status(&env, &cwd, p), "applied");
     assert_eq!(
         events(&env, &id, "proposalApplied"),
-        vec![json!({"type": "proposalApplied", "proposal": p, "before": digest(b"old\n"), "after": digest(b"new\n")})]
+        vec![json!({"type": "proposalApplied", "proposal": p, "before": digest(written.as_bytes()),
+                    "after": digest(written.as_bytes()), "bullet": {"op": "added", "line": learned("new", p)}})]
     );
     // So it can be undone.
     assert!(rollback(&env, &cwd, p).get("error").is_none());
-    assert_eq!(fs::read_to_string(memory_file(&cwd)).unwrap(), "old\n");
+    assert_eq!(fs::read_to_string(memory_file(&cwd)).unwrap(), "- old\n");
 }
 
 #[test]
@@ -857,15 +946,18 @@ fn a_rollback_a_crash_cut_off_after_the_write_is_journaled_when_retried() {
     let env = Env::new();
     let cwd = project();
     let work = work_session(&env, &cwd);
+    write(&memory_file(&cwd), "- old\n");
     let (mut host, id) = learner(&env, &cwd);
-    let p = propose(&mut host, &id, &memory("new\n", &work));
+    let p = propose(&mut host, &id, &change("old", "new", &work));
     assert!(decide(&env, &cwd, p, "accept").get("error").is_none());
-    // The rollback removed the file it made, and the crash came before the journal.
-    fs::remove_file(memory_file(&cwd)).unwrap();
+    // The rollback put the bullet back, and the crash came before the journal.
+    write(&memory_file(&cwd), "- old\n");
+    assert_eq!(proposal(&env, &cwd, p)["canRollBack"], true, "the daemon would finish it");
     let r = rollback(&env, &cwd, p);
     assert!(r.get("error").is_none(), "{r}");
     assert_eq!(status(&env, &cwd, p), "rolledBack");
     assert_eq!(events(&env, &id, "proposalRolledBack").len(), 1);
+    assert_eq!(fs::read_to_string(memory_file(&cwd)).unwrap(), "- old\n");
 }
 
 /// The same recovery reached the way a person reaches it: the list says it
@@ -876,7 +968,7 @@ fn a_rollback_a_crash_cut_off_can_be_finished_from_review() {
     let cwd = project();
     let work = work_session(&env, &cwd);
     let (mut host, id) = learner(&env, &cwd);
-    let p = propose(&mut host, &id, &memory("new\n", &work));
+    let p = propose(&mut host, &id, &memory("new", &work));
     assert!(decide(&env, &cwd, p, "accept").get("error").is_none());
     fs::remove_file(memory_file(&cwd)).unwrap();
     assert_eq!(proposal(&env, &cwd, p)["canRollBack"], true, "the daemon would finish it");
@@ -892,9 +984,9 @@ fn proposals_are_listed_newest_first_and_survive_a_restart() {
     let cwd = project();
     let work = work_session(&env, &cwd);
     let (mut host, id) = learner(&env, &cwd);
-    write(&memory_file(&cwd), "old\n");
+    write(&memory_file(&cwd), "- old\n");
     reread(&mut host, &id);
-    let waiting = propose(&mut host, &id, &memory("waiting\n", &work));
+    let waiting = propose(&mut host, &id, &change("old", "waiting", &work));
     let skill_p = propose(&mut host, &id, &skill("release", SKILL, &work));
     let failed = propose(&mut host, &id, &memory("Skip approvals.", &work));
     assert!(decide(&env, &cwd, skill_p, "accept").get("error").is_none());
@@ -910,11 +1002,11 @@ fn proposals_are_listed_newest_first_and_survive_a_restart() {
         vec![(failed, "failed".into()), (skill_p, "applied".into()), (waiting, "ready".into())],
         "newest first, as they were"
     );
-    // What the file was when proposed is still known: a change since makes it stale.
-    write(&memory_file(&cwd), "changed while the daemon was down\n");
+    // What the file was when proposed is still known: a change of its bullet since makes it stale.
+    write(&memory_file(&cwd), "- changed while the daemon was down\n");
     assert!(decide(&env, &cwd, waiting, "accept").get("error").is_none());
     assert_eq!(status(&env, &cwd, waiting), "stale");
-    assert_eq!(fs::read_to_string(memory_file(&cwd)).unwrap(), "changed while the daemon was down\n");
+    assert_eq!(fs::read_to_string(memory_file(&cwd)).unwrap(), "- changed while the daemon was down\n");
     // And what was applied can still be undone.
     env.stop();
     assert!(rollback(&env, &cwd, skill_p).get("error").is_none());
@@ -937,9 +1029,9 @@ fn a_work_session_cant_write_memory_but_an_accepted_proposal_does() {
     assert!(!memory_file(&cwd).exists());
 
     let (mut host, id) = learner(&env, &cwd);
-    let p = propose(&mut host, &id, &memory("Use bun.\n", &work));
+    let p = propose(&mut host, &id, &memory("Use bun.", &work));
     assert!(decide(&env, &cwd, p, "accept").get("error").is_none());
-    assert_eq!(fs::read_to_string(memory_file(&cwd)).unwrap(), "Use bun.\n");
+    assert_eq!(fs::read_to_string(memory_file(&cwd)).unwrap(), format!("{}\n", learned("Use bun.", p)));
     assert_eq!(status(&env, &cwd, p), "applied");
 }
 
@@ -948,40 +1040,107 @@ fn changed_outside_review(env: &Env, cwd: &Path) -> Value {
 }
 
 /// Nothing stops an editor or git from changing a learned file, but the
-/// review list says when one isn't what an accepted proposal last left.
+/// review list says when a learned bullet isn't what its proposal left, or
+/// a skill isn't what an accepted proposal last left. A bullet a person
+/// wrote is theirs.
 #[test]
 fn learned_files_changed_outside_review_are_listed() {
     let env = Env::new();
     let cwd = project();
     assert_eq!(changed_outside_review(&env, &cwd), json!([]), "no files, no learning session");
-    write(&memory_file(&cwd), "by hand\n");
-    assert_eq!(changed_outside_review(&env, &cwd), json!([".strive/memory.md"]), "no proposal wrote it");
-    let out = env.strive_in(&cwd, &["review"]);
-    let shown = String::from_utf8_lossy(&out.stdout);
-    assert!(shown.contains(".strive/memory.md changed outside review"), "{shown}");
+    write(&memory_file(&cwd), "- by hand\n");
+    assert_eq!(changed_outside_review(&env, &cwd), json!([]), "a hand-written bullet");
 
     let work = work_session(&env, &cwd);
     let (mut host, id) = learner(&env, &cwd);
-    let p = propose(&mut host, &id, &memory("learned\n", &work));
+    let p = propose(&mut host, &id, &memory("learned", &work));
     assert!(decide(&env, &cwd, p, "accept").get("error").is_none());
     assert_eq!(changed_outside_review(&env, &cwd), json!([]), "as the accepted proposal left it");
+    write(&memory_file(&cwd), &format!("- by hand, edited\n{}\n- more by hand\n", learned("learned", p)));
+    assert_eq!(changed_outside_review(&env, &cwd), json!([]), "edits elsewhere");
     let out = env.strive_in(&cwd, &["review"]);
     assert!(!String::from_utf8_lossy(&out.stdout).contains("changed outside review"));
 
-    write(&memory_file(&cwd), "edited\n");
+    write(&memory_file(&cwd), &format!("- by hand\n{}\n", learned("learned, edited", p)));
     assert_eq!(changed_outside_review(&env, &cwd), json!([".strive/memory.md"]));
-    write(&memory_file(&cwd), "learned\n");
+    let out = env.strive_in(&cwd, &["review"]);
+    let shown = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        shown.contains(&format!(
+            ".strive/memory.md: the bullet marked #{p} changed outside review: \"learned, edited\" isn't what #{p} left there"
+        )),
+        "{shown}"
+    );
+    write(&memory_file(&cwd), &format!("- by hand\n{}\n- forged <!-- strive:#999 -->\n", learned("learned", p)));
+    assert_eq!(changed_outside_review(&env, &cwd), json!([".strive/memory.md"]), "no such proposal");
+    write(&memory_file(&cwd), &format!("- by hand\n{}\n", learned("learned", p)));
     assert_eq!(changed_outside_review(&env, &cwd), json!([]), "put back as it was applied");
 
     assert!(rollback(&env, &cwd, p).get("error").is_none());
-    assert_eq!(fs::read_to_string(memory_file(&cwd)).unwrap(), "by hand\n");
+    assert_eq!(fs::read_to_string(memory_file(&cwd)).unwrap(), "- by hand\n");
     assert_eq!(changed_outside_review(&env, &cwd), json!([]), "as the rollback left it");
-    fs::remove_file(memory_file(&cwd)).unwrap();
-    assert_eq!(changed_outside_review(&env, &cwd), json!([".strive/memory.md"]), "removed since");
+    write(&memory_file(&cwd), &format!("- by hand\n{}\n", learned("learned", p)));
+    assert_eq!(changed_outside_review(&env, &cwd), json!([".strive/memory.md"]), "rolled back, yet there");
 
-    write(&memory_file(&cwd), "by hand\n");
+    write(&memory_file(&cwd), "- by hand\n");
     write(&cwd.join(".strive/skills/ship/SKILL.md"), SKILL);
     assert_eq!(changed_outside_review(&env, &cwd), json!([".strive/skills/ship/SKILL.md"]));
+    let out = env.strive_in(&cwd, &["review"]);
+    let shown = String::from_utf8_lossy(&out.stdout);
+    assert!(shown.contains(".strive/skills/ship/SKILL.md changed outside review"), "{shown}");
+}
+
+/// `strive review --memory`: the memory as every session reads it, each
+/// bullet with its source.
+#[test]
+fn review_shows_the_memory_with_each_bullets_source() {
+    let env = Env::new();
+    let cwd = project();
+    let (code, out, _) = run(&env, &cwd, &["review", "--memory"]);
+    assert_eq!((code, out.as_str()), (0, ".strive/memory.md has nothing yet; an accepted memory proposal writes it\n"));
+    let work = work_session(&env, &cwd);
+    write(&memory_file(&cwd), "# Notes\n\n- Use bun.\n");
+    let (mut host, id) = learner(&env, &cwd);
+    let p = propose(&mut host, &id, &memory("Run the tests with `bun test src`.", &work));
+    assert!(decide(&env, &cwd, p, "accept").get("error").is_none());
+    let listed = common::slow_rpc(&env).ok("proposal/list", &json!({"cwd": cwd}));
+    assert_eq!(
+        listed["memory"],
+        json!([
+            {"kind": "line", "text": "# Notes"},
+            {"kind": "line", "text": ""},
+            {"kind": "bullet", "text": "Use bun.", "outsideReview": false},
+            {"kind": "bullet", "text": "Run the tests with `bun test src`.", "source": p, "outsideReview": false},
+        ])
+    );
+    let (code, out, _) = run(&env, &cwd, &["review", "--memory"]);
+    assert_eq!(code, 0);
+    assert_eq!(
+        out,
+        format!(
+            ".strive/memory.md, as every session reads it now:\n                # Notes\n\n  hand-written  \"Use bun.\"\n  \
+             {:<13} \"Run the tests with `bun test src`.\"\n",
+            format!("#{p}")
+        )
+    );
+    let (code, _, err) = run(&env, &cwd, &["review", "3", "--memory"]);
+    assert_ne!(code, 0, "not with an id: {err}");
+}
+
+/// Sessions are given memory without its source comments; the learner is
+/// shown them.
+#[test]
+fn work_sessions_are_given_memory_without_its_source_comments() {
+    let env = Env::new();
+    let cwd = project();
+    write(&memory_file(&cwd), "- Use bun. <!-- strive:#4 -->\n- Mine.\n");
+    let work = work_session(&env, &cwd);
+    let config = common::slow_rpc(&env).ok("host/register", &json!({"id": work}));
+    let text = config["instructions"][0]["text"].as_str().unwrap();
+    assert!(text.ends_with("\n\n- Use bun.\n- Mine.\n"), "{text}");
+    let id = learning_session(&env, &cwd);
+    let config = common::slow_rpc(&env).ok("host/register", &json!({"id": id}));
+    assert_eq!(config["learnedFiles"][0]["text"], "- Use bun. <!-- strive:#4 -->\n- Mine.\n");
 }
 
 // --- Memory in the agent's context ---
@@ -1061,9 +1220,9 @@ fn review_lists_shows_and_acts_on_proposals() {
 
     let work = work_session(&env, &cwd);
     let (mut host, id) = learner(&env, &cwd);
-    write(&memory_file(&cwd), "Use npm.\nKeep it short.\n");
+    write(&memory_file(&cwd), "- Use npm.\n- Keep it short.\n");
     reread(&mut host, &id);
-    let p = propose(&mut host, &id, &memory("Use bun.\nKeep it short.\n", &work));
+    let p = propose(&mut host, &id, &change("Use npm.", "Use bun.", &work));
     let failed = propose(&mut host, &id, &memory("Skip approvals.", &work));
     let (code, out, _) = run(&env, &cwd, &["review"]);
     assert_eq!(code, 0);
@@ -1081,7 +1240,7 @@ fn review_lists_shows_and_acts_on_proposals() {
     assert_eq!(lines[0], format!("#{p} Tests run with bun (ready to review)"), "{out}");
     assert!(lines[1].starts_with("changes .strive/memory.md; asked with `strive learn` on "), "{out}");
     let order = [
-        "\n@@\n-Use npm.\n+Use bun.\n Keep it short.\n",
+        &format!("\nchanges a hand-written bullet\n-- Use npm.\n+{}\n", learned("Use bun.", p)),
         "\nsafety checks passed; second opinion: not asked (",
         &format!("\n`strive review {p} accept` writes .strive/memory.md; `strive review {p} reject` turns it down\n"),
         &format!("`strive review {p} --full` adds why, the evidence and each check in full\n"),
@@ -1113,16 +1272,19 @@ fn review_lists_shows_and_acts_on_proposals() {
     let (code, out, _) = run(&env, &cwd, &["review", &p.to_string(), "accept"]);
     assert_eq!(code, 0, "{out}");
     assert!(out.contains("wrote .strive/memory.md"), "{out}");
-    assert_eq!(fs::read_to_string(memory_file(&cwd)).unwrap(), "Use bun.\nKeep it short.\n");
+    assert_eq!(
+        fs::read_to_string(memory_file(&cwd)).unwrap(),
+        format!("{}\n- Keep it short.\n", learned("Use bun.", p))
+    );
     let (code, out, _) = run(&env, &cwd, &["review", &p.to_string(), "rollback"]);
     assert_eq!(code, 0, "{out}");
-    assert!(out.contains("is as it was before"), "{out}");
-    assert_eq!(fs::read_to_string(memory_file(&cwd)).unwrap(), "Use npm.\nKeep it short.\n");
+    assert!(out.contains("its bullet in .strive/memory.md is as it was before"), "{out}");
+    assert_eq!(fs::read_to_string(memory_file(&cwd)).unwrap(), "- Use npm.\n- Keep it short.\n");
     let (code, out, _) = run(&env, &cwd, &["review", &failed.to_string(), "reject"]);
     assert_eq!((code, out.trim()), (0, format!("rejected #{failed}; nothing was written").as_str()));
 
-    let stale = propose(&mut host, &id, &memory("x\n", &work));
-    write(&memory_file(&cwd), "edited\n");
+    let stale = propose(&mut host, &id, &change("Keep it short.", "x", &work));
+    write(&memory_file(&cwd), "- edited\n");
     let (code, out, _) = run(&env, &cwd, &["review", &stale.to_string(), "accept"]);
     assert_eq!(code, 1);
     assert!(out.contains("wasn't written: .strive/memory.md changed since this was proposed"), "{out}");
@@ -1138,20 +1300,24 @@ fn review_lists_shows_and_acts_on_proposals() {
     assert!(err.contains("no proposal #9999"), "{err}");
 }
 
-/// A rollback the daemon would refuse isn't offered: not for a proposal a
-/// later accept wrote over (it reads "replaced by"), and not once its file
-/// changed by hand. Put back as it was applied, it's offered again.
+/// A rollback the daemon would refuse isn't offered: not for a proposal
+/// whose bullet a later accept changed (it reads "replaced by"), and not
+/// once its bullet changed by hand. Put back as it was applied, it's
+/// offered again. A proposal for another bullet replaces nothing.
 #[test]
-fn review_offers_a_rollback_only_while_the_file_is_as_the_proposal_left_it() {
+fn review_offers_a_rollback_only_while_the_bullet_is_as_the_proposal_left_it() {
     let env = Env::new();
     let cwd = project();
     let work = work_session(&env, &cwd);
     let (mut host, id) = learner(&env, &cwd);
-    let first = propose(&mut host, &id, &memory("- Use bun.\n", &work));
+    let first = propose(&mut host, &id, &memory("Use bun.", &work));
+    let other = propose(&mut host, &id, &memory("Tests live in tests/.", &work));
     assert!(decide(&env, &cwd, first, "accept").get("error").is_none());
+    assert!(decide(&env, &cwd, other, "accept").get("error").is_none());
     reread(&mut host, &id);
-    let second = propose(&mut host, &id, &memory("- Use bun.\n- Tests live in tests/.\n", &work));
+    let second = propose(&mut host, &id, &change(&format!("#{first}"), "Use bun test.", &work));
     assert!(decide(&env, &cwd, second, "accept").get("error").is_none());
+    assert!(proposal(&env, &cwd, other).get("replacedBy").is_none(), "another bullet");
 
     let rollable = |p: u64| proposal(&env, &cwd, p)["canRollBack"].as_bool().unwrap();
     assert_eq!(proposal(&env, &cwd, first)["replacedBy"], second);
@@ -1162,27 +1328,42 @@ fn review_offers_a_rollback_only_while_the_file_is_as_the_proposal_left_it() {
     let (_, out, _) = run(&env, &cwd, &["review", &first.to_string()]);
     assert!(out.starts_with(&format!("#{first} Tests run with bun (replaced by #{second})\n")), "{out}");
     assert!(
-        out.contains(&format!("it can't be rolled back: #{second} was accepted over it, so .strive/memory.md")),
+        out.contains(&format!(
+            "it can't be rolled back: #{second} changed or removed its bullet since; roll back #{second} first"
+        )),
         "{out}"
     );
     assert!(!out.contains("rollback`"), "{out}");
     let (code, _, err) = run(&env, &cwd, &["review", &first.to_string(), "rollback"]);
     assert_eq!(code, 1);
-    assert!(err.contains(&format!("nothing was rolled back: #{second} was accepted over it")), "{err}");
+    assert!(err.contains(&format!("nothing was rolled back: #{second} changed or removed its bullet")), "{err}");
+    let r = rollback(&env, &cwd, first);
+    assert!(r["error"]["message"].as_str().unwrap().contains(&format!("roll back #{second} first")), "{r}");
 
-    write(&memory_file(&cwd), "- By hand.\n");
+    let applied = fs::read_to_string(memory_file(&cwd)).unwrap();
+    write(&memory_file(&cwd), &applied.replace("Use bun test.", "Use bun test, by hand."));
     assert!(!rollable(second));
+    assert!(rollable(other), "only its own bullet counts");
     let (_, out, _) = run(&env, &cwd, &["review", &second.to_string()]);
-    let why = format!(".strive/memory.md changed since #{second} was applied; edit it by hand instead");
+    let why = format!("its bullet in .strive/memory.md changed since #{second} was applied; edit it by hand instead");
     assert!(out.contains(&format!("it can't be rolled back: {why}")) && !out.contains("rollback`"), "{out}");
     let (code, _, err) = run(&env, &cwd, &["review", &second.to_string(), "rollback"]);
     assert_eq!(code, 1);
     assert!(err.contains(&why), "{err}");
 
-    write(&memory_file(&cwd), "- Use bun.\n- Tests live in tests/.\n");
+    write(&memory_file(&cwd), &applied);
     assert!(rollable(second));
     let (_, out, _) = run(&env, &cwd, &["review", &second.to_string()]);
-    assert!(out.contains(&format!("`strive review {second} rollback` puts .strive/memory.md back as it was")), "{out}");
+    assert!(out.contains(&format!("`strive review {second} rollback` puts its bullet back as it was")), "{out}");
+    // Rolled back, the first has its bullet back and can be rolled back itself.
+    assert!(rollback(&env, &cwd, second).get("error").is_none());
+    assert!(proposal(&env, &cwd, first).get("replacedBy").is_none());
+    assert!(rollable(first));
+    assert!(rollback(&env, &cwd, first).get("error").is_none());
+    assert_eq!(
+        fs::read_to_string(memory_file(&cwd)).unwrap(),
+        format!("{}\n", learned("Tests live in tests/.", other))
+    );
 }
 
 /// A run a person started by saying yes to the offer says so, with the
@@ -1194,9 +1375,9 @@ fn review_says_where_a_run_came_from() {
     let work = work_session(&env, &cwd);
     let (mut host, id) = learner(&env, &cwd);
     common::slow_rpc(&env).ok("learning/run", &json!({"cwd": cwd, "sessions": [work], "offer": true}));
-    let offered = propose(&mut host, &id, &memory("- Use bun.\n", &work));
+    let offered = propose(&mut host, &id, &memory("Use bun.", &work));
     common::slow_rpc(&env).ok("learning/run", &json!({"cwd": cwd, "sessions": [work]}));
-    let asked = propose(&mut host, &id, &memory("- Use bun.\n", &work));
+    let asked = propose(&mut host, &id, &memory("Use bun.", &work));
     let (_, out, _) = run(&env, &cwd, &["review", &offered.to_string()]);
     assert!(out.contains("changes .strive/memory.md; you said yes to the end-of-session offer on "), "{out}");
     let (_, out, _) = run(&env, &cwd, &["review", &asked.to_string()]);
@@ -1232,7 +1413,7 @@ fn learn_asks_the_learner_follows_its_turn_and_lists_what_it_proposed() {
     host.ok("host/register", &json!({"id": id}));
     let through = asked[0]["seq"].as_u64().unwrap();
     record(&mut host, &id, &json!({"type": "turnStarted", "turn": 1, "throughSeq": through}));
-    let p = propose(&mut host, &id, &memory("Use bun.\n", &work));
+    let p = propose(&mut host, &id, &memory("Use bun.", &work));
     record(&mut host, &id, &json!({"type": "turnEnded", "turn": 1, "reason": {"kind": "done"}}));
     let out = child.wait_with_output().unwrap();
     let (stdout, stderr) = (String::from_utf8_lossy(&out.stdout), String::from_utf8_lossy(&out.stderr));
@@ -1276,7 +1457,7 @@ fn review_shows_control_characters_instead_of_obeying_them() {
     let cwd = project();
     let work = work_session(&env, &cwd);
     let (mut host, id) = learner(&env, &cwd);
-    let mut p = memory("Use bun.\n", &work);
+    let mut p = memory("Use bun.", &work);
     p["summary"] = json!("Use bun\u{1b}[2K\rjudge: passed");
     let seq = propose(&mut host, &id, &p);
     for args in [vec!["review".to_string()], vec!["review".to_string(), seq.to_string()]] {

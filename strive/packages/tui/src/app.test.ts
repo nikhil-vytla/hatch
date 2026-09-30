@@ -5,6 +5,7 @@ import { TuiMainScreen } from "@earendil-works/pi-tui";
 import {
   type DaemonStatusResult,
   type EffectRequest,
+  type Proposal,
   type SessionInfo,
   type SessionReadResult,
   StriveClient,
@@ -395,9 +396,8 @@ async function propose(work: string, summaries: string[]): Promise<number[]> {
     const ids: number[] = [];
 
     for (const summary of summaries) {
-      const proposal = {
-        artifact: { kind: "memory" as const },
-        content: `- ${summary}.\n`,
+      const proposal: Proposal = {
+        change: { kind: "memory", op: "add", text: `${summary}.` },
         summary,
         rationale: "The user said so.",
         evidence: [{ session: work, seqs: [1], note: "the session began here" }],

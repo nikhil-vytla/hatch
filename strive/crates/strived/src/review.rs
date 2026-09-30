@@ -10,10 +10,10 @@ use std::process::ExitCode;
 
 use anyhow::{Result, anyhow};
 use strive_proto::{
-    BlobGet, BlobGetParams, Event, Gate, GateOutcome, LearnSignal, LearnTrigger, LearningOpen, LearningRun,
-    LearningRunParams, ProjectRef, ProposalDecide, ProposalDecideParams, ProposalDecision, ProposalList, ProposalRef,
-    ProposalRollback, ProposalState, ProposalStatus, SessionAttach, SessionAttachParams, SessionList,
-    SessionListParams, TriggerKind, Verdict,
+    BlobGet, BlobGetParams, BulletEdit, Change, Event, Gate, GateOutcome, LearnSignal, LearnTrigger, LearningOpen,
+    LearningRun, LearningRunParams, MemoryItem, ProjectRef, ProposalDecide, ProposalDecideParams, ProposalDecision,
+    ProposalList, ProposalRef, ProposalRollback, ProposalState, ProposalStatus, SessionAttach, SessionAttachParams,
+    SessionList, SessionListParams, TriggerKind, Verdict,
 };
 
 use crate::client::Client;
@@ -99,7 +99,7 @@ fn line(p: &ProposalState) -> String {
         "#{:<5} {:<16} {:<20} {}{marks}",
         p.id,
         short_status(p),
-        strive_learning::describe(&p.proposal.artifact),
+        strive_learning::describe(&p.proposal.change.artifact()),
         p.proposal.summary
     )
 }
@@ -207,8 +207,8 @@ pub async fn review(c: &mut Client, id: Option<u64>, action: Option<Action>, ful
         for p in &proposals {
             println!("{}", crate::terminal::visible(&line(p)));
         }
-        for rel in &listed.changed_outside_review {
-            println!("{rel} changed outside review: it isn't what an accepted proposal last left there");
+        for l in outside_review(&listed.changed_outside_review, &listed.memory) {
+            println!("{l}");
         }
         for s in &listed.may_be_stale {
             println!(
@@ -232,7 +232,7 @@ pub async fn review(c: &mut Client, id: Option<u64>, action: Option<Action>, ful
         .iter()
         .find(|p| p.id == id)
         .ok_or_else(|| anyhow!("there's no proposal #{id} for {cwd}; `strive review` lists them"))?;
-    let rel = strive_learning::relative_path(&p.proposal.artifact).unwrap_or_else(|why| why);
+    let rel = strive_learning::relative_path(&p.proposal.change.artifact()).unwrap_or_else(|why| why);
     match action {
         None => {
             let titles = Titles::of(c, &cwd).await?;
@@ -285,9 +285,12 @@ pub async fn review(c: &mut Client, id: Option<u64>, action: Option<Action>, ful
             if let Err(e) = c.request::<ProposalRollback>(ProposalRef { cwd, proposal: id }).await {
                 return Err(no_rollback(p, &rel).map_or(e, |why| anyhow!("nothing was rolled back: {why}")));
             }
-            match p.before {
-                Some(_) => println!("rolled back #{id}: {rel} is as it was before"),
-                None => println!("rolled back #{id}: removed {rel}, which didn't exist before"),
+            match (&p.proposal.change, p.before) {
+                (Change::Memory(_), _) => println!("rolled back #{id}: its bullet in {rel} is as it was before"),
+                (Change::Skill { .. }, Some(_)) => println!("rolled back #{id}: {rel} is as it was before"),
+                (Change::Skill { .. }, None) => {
+                    println!("rolled back #{id}: removed {rel}, which didn't exist before");
+                }
             }
             Ok(ExitCode::SUCCESS)
         }
@@ -297,9 +300,16 @@ pub async fn review(c: &mut Client, id: Option<u64>, action: Option<Action>, ful
 /// Why an applied proposal can't be rolled back now, if it can't; none for
 /// any other status, which the daemon refuses with its own reason.
 fn no_rollback(p: &ProposalState, rel: &str) -> Option<String> {
+    let memory = matches!(p.proposal.change, Change::Memory(_));
     match (p.status, p.replaced_by, p.can_roll_back) {
+        (ProposalStatus::Applied, Some(by), _) if memory => {
+            Some(format!("#{by} changed or removed its bullet since; roll back #{by} first"))
+        }
         (ProposalStatus::Applied, Some(by), _) => {
             Some(format!("#{by} was accepted over it, so {rel} no longer has its content"))
+        }
+        (ProposalStatus::Applied, None, false) if memory => {
+            Some(format!("its bullet in {rel} changed since #{} was applied; edit it by hand instead", p.id))
         }
         (ProposalStatus::Applied, None, false) => {
             Some(format!("{rel} changed since #{} was applied; edit it by hand instead", p.id))
@@ -316,13 +326,26 @@ fn page(p: &ProposalState, rel: &str, old: &str, titles: &Titles, full: bool) ->
     let mut out = String::new();
     writeln!(out, "#{id} {} ({})", p.proposal.summary, status_text(p))?;
     writeln!(out, "changes {rel}; {} on {}", origin(p, titles), when(p.made_at_ms))?;
-    if p.before.is_none() {
-        writeln!(out, "\n{rel} is a new file")?;
-    } else {
-        writeln!(out)?;
-    }
-    for l in diff(old, &p.proposal.content) {
-        writeln!(out, "{l}")?;
+    match &p.proposal.change {
+        Change::Memory(_) => match &p.bullet {
+            Some(edit) => {
+                writeln!(out, "\n{}", edit_text(edit))?;
+                for l in bullet_diff(edit) {
+                    writeln!(out, "{l}")?;
+                }
+            }
+            None => writeln!(out, "\nit names a bullet the memory the learner saw doesn't have")?,
+        },
+        Change::Skill { content, .. } => {
+            if p.before.is_none() {
+                writeln!(out, "\n{rel} is a new file")?;
+            } else {
+                writeln!(out)?;
+            }
+            for l in diff(old, content) {
+                writeln!(out, "{l}")?;
+            }
+        }
     }
     writeln!(out, "\n{}", verdict(p))?;
     if full {
@@ -374,6 +397,9 @@ fn page(p: &ProposalState, rel: &str, old: &str, titles: &Titles, full: bool) ->
         }
         (ProposalStatus::Checking, _) => "its checks haven't finished; look again in a moment".to_string(),
         (ProposalStatus::Applied, Some(why)) => format!("it can't be rolled back: {why}"),
+        (ProposalStatus::Applied, None) if matches!(p.proposal.change, Change::Memory(_)) => {
+            format!("`strive review {id} rollback` puts its bullet back as it was")
+        }
         (ProposalStatus::Applied, None) => format!("`strive review {id} rollback` puts {rel} back as it was"),
         (ProposalStatus::Stale, _) => {
             format!("{rel} changed since this was proposed; `strive learn` asks for one against it as it is now")
@@ -455,6 +481,79 @@ pub fn verdict_name(v: Verdict) -> &'static str {
         Verdict::Fail => "failed",
         Verdict::Skipped => "skipped",
     }
+}
+
+/// A line for each learned file changed outside review: for memory, one per
+/// bullet that isn't what its source left there.
+fn outside_review(files: &[String], memory: &[MemoryItem]) -> Vec<String> {
+    let bullets: Vec<(&String, u64)> = memory
+        .iter()
+        .filter_map(|i| match i {
+            MemoryItem::Bullet { text, source: Some(n), outside_review: true } => Some((text, *n)),
+            MemoryItem::Bullet { .. } | MemoryItem::Line { .. } => None,
+        })
+        .collect();
+    let mut out = Vec::new();
+    for rel in files {
+        if rel != strive_learning::MEMORY_PATH || bullets.is_empty() {
+            out.push(format!("{rel} changed outside review: it isn't what an accepted proposal last left there"));
+            continue;
+        }
+        for (text, n) in &bullets {
+            out.push(format!(
+                "{rel}: the bullet marked #{n} changed outside review: {} isn't what #{n} left there",
+                crate::terminal::visible(&format!("{text:?}"))
+            ));
+        }
+    }
+    out
+}
+
+/// What a memory proposal does to its bullet, in words.
+pub fn edit_text(edit: &BulletEdit) -> String {
+    let source = |line: &str| match strive_learning::memory::source(line) {
+        Some(n) => format!("#{n}'s bullet"),
+        None => "a hand-written bullet".to_string(),
+    };
+    match edit {
+        BulletEdit::Added { .. } => "adds a bullet".into(),
+        BulletEdit::Changed { old, .. } => format!("changes {}", source(old)),
+        BulletEdit::Removed { line, .. } => format!("removes {}", source(line)),
+    }
+}
+
+/// A one-bullet diff: the line that goes, the line that comes.
+fn bullet_diff(edit: &BulletEdit) -> Vec<String> {
+    match edit {
+        BulletEdit::Added { line } => vec![format!("+{line}")],
+        BulletEdit::Changed { old, new } => vec![format!("-{old}"), format!("+{new}")],
+        BulletEdit::Removed { line, .. } => vec![format!("-{line}")],
+    }
+}
+
+/// `strive review --memory`: the memory as every session reads it now,
+/// each bullet with the proposal that last wrote it, or "hand-written".
+pub async fn memory(c: &mut Client) -> Result<ExitCode> {
+    let cwd = cwd()?;
+    let items = c.request::<ProposalList>(ProjectRef { cwd }).await?.memory;
+    if items.is_empty() {
+        println!("{} has nothing yet; an accepted memory proposal writes it", strive_learning::MEMORY_PATH);
+        return Ok(ExitCode::SUCCESS);
+    }
+    println!("{}, as every session reads it now:", strive_learning::MEMORY_PATH);
+    for item in &items {
+        let line = match item {
+            MemoryItem::Bullet { text, source, outside_review } => {
+                let who = source.map_or_else(|| "hand-written".to_string(), |n| format!("#{n}"));
+                let mark = if *outside_review { "  [changed outside review]" } else { "" };
+                format!("  {who:<13} {text:?}{mark}")
+            }
+            MemoryItem::Line { text } if text.trim().is_empty() => String::new(),
+            MemoryItem::Line { text } => format!("  {:<13} {text}", ""),
+        };
+        println!("{}", crate::terminal::visible(line.trim_end()));
+    }
+    Ok(ExitCode::SUCCESS)
 }
 
 /// Lines around each change that a diff keeps.
