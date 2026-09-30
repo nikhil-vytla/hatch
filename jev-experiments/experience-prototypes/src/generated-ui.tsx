@@ -13,7 +13,7 @@ import {
 } from "@json-render/react";
 import { Sparkles, Check, GitBranch, RotateCcw } from "lucide-react";
 import { uiCatalog, uiInitial, exampleSpec } from "./ui-catalog";
-import { getApiKey, download, readResponse } from "./api";
+import { getApiKey, download, readResponse, requireKey } from "./api";
 import {
   Pane,
   Field,
@@ -245,6 +245,7 @@ export function GeneratedUI({ record }: { record: any }) {
       setSteps([]);
       setNotice("");
       try {
+      requireKey();
       const response = await fetch("/api/compose", {
         method: "POST",
         headers: {
