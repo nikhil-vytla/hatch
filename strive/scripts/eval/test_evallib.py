@@ -6,6 +6,7 @@ import json
 import math
 import sys
 import tempfile
+import threading
 import unittest
 from pathlib import Path
 
@@ -373,6 +374,48 @@ class ResumeTest(unittest.TestCase):
                     run_eval.fingerprint([Path(d)], {})
             finally:
                 locked.chmod(0o755)
+
+
+class LearnerProbeLedgerTest(unittest.TestCase):
+    def test_runs_in_flight_hold_their_most_against_the_cap(self):
+        from learner_probe import Ledger
+
+        with tempfile.TemporaryDirectory() as d:
+            ledger = Ledger(1.0, Path(d) / "results.jsonl")
+            self.assertTrue(ledger.reserve(0.4))
+            self.assertTrue(ledger.reserve(0.4))
+            # Nothing spent yet, but 0.8 is held: a third 0.4 waits for a run to settle.
+            got: list[bool] = []
+            waiting = threading.Thread(target=lambda: got.append(ledger.reserve(0.4)))
+            waiting.start()
+            waiting.join(0.2)
+            self.assertEqual(got, [])
+            ledger.settle(0.4, {"type": "seed", "cost_usd": 0.05})
+            waiting.join(5)
+            self.assertEqual(got, [True])
+
+    def test_a_run_is_refused_when_what_is_spent_leaves_too_little(self):
+        from learner_probe import Ledger
+
+        with tempfile.TemporaryDirectory() as d:
+            ledger = Ledger(1.0, Path(d) / "results.jsonl")
+            ledger.reserve(0.4)
+            ledger.settle(0.4, {"type": "seed", "cost_usd": 0.7})
+            self.assertFalse(ledger.reserve(0.4))
+            self.assertTrue(ledger.reserve(0.25))
+
+    def test_a_run_whose_cost_is_unknown_is_charged_what_it_reserved_and_kept(self):
+        from learner_probe import Ledger
+
+        with tempfile.TemporaryDirectory() as d:
+            results = Path(d) / "results.jsonl"
+            ledger = Ledger(1.0, results)
+            ledger.reserve(0.25)
+            ledger.settle(0.25, {"type": "learn", "cost_usd": None, "error": "502"})
+            ledger.reserve(0.25)
+            ledger.settle(0.25, {"type": "learn", "cost_usd": 0.03})
+            self.assertAlmostEqual(ledger.spent, 0.28)
+            self.assertEqual([json.loads(line)["cost_usd"] for line in results.read_text().splitlines()], [None, 0.03])
 
 
 if __name__ == "__main__":
