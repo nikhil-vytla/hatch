@@ -63,6 +63,58 @@ export function GameGrid({
     </div>
   );
 }
+const POLICY_LABEL: Record<string, string> = {
+  random: "Random moves",
+  visible_bfs: "Shortest path from what it can see (code)",
+  jev_reactive: "Jev, each step on its own",
+  jev_memory: "Jev, remembering where it has been",
+};
+
+/** Every controller's recorded success, per world: the answer the page's question asks for. */
+function GameResults({ result }: { result: any }) {
+  const rows: any[] = result.summary ?? [];
+  const worlds = [...new Set(rows.map((r) => r.env))];
+
+  if (!rows.length) return null;
+
+  return (
+    <Pane title="How each controller did" sub="30 seeded episodes per world and controller">
+      <div className="model-table-wrap">
+        <table className="model-table">
+          <thead>
+            <tr>
+              <th scope="col">Controller</th>
+              {worlds.map((w) => (
+                <th scope="col" key={w}>
+                  {w.includes("DoorKey") ? "Door & key" : "Empty room"}: reached the goal · average steps
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {Object.keys(POLICY_LABEL).map((policy) => (
+              <tr key={policy}>
+                <th scope="row">{POLICY_LABEL[policy]}</th>
+                {worlds.map((w) => {
+                  const r = rows.find((x) => x.env === w && x.policy === policy);
+
+                  return <td key={w}>{r ? `${Math.round(r.success_rate * 100)}% · ${r.mean_steps.toFixed(1)}` : "—"}</td>;
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="fine">
+        Memory is what makes Jev work here: without it Jev never reached the goal in the empty room, where even
+        random moves got there 70% of the time, and made it in under half the door-and-key episodes. With memory it nearly matches the code baseline, in more steps.
+        Decisions were cached by exact state, so the {result.cache_hits?.toLocaleString()} reused decisions come from{" "}
+        {result.memoized_states} distinct states: the 30 episodes are not 30 independent samples of Jev.
+      </p>
+    </Pane>
+  );
+}
+
 export function Games({ result }: { result: any }) {
   const interrupted = (result.episodes ?? []).filter((e: any) => e.errors > 0);
   const episodes = (result.episodes ?? []).filter((e: any) => !e.errors),
@@ -113,11 +165,13 @@ export function Games({ result }: { result: any }) {
       <Pane title="Navigation replays">No recorded episode is available.</Pane>
     );
   return (
+    <>
+    <GameResults result={result} />
     <div className="workbench">
       <div className="artifact-column">
         <div className="game-stage">
           <div className="game-mission">
-            <span>MISSION / DOOR & KEY</span>
+            <span>MISSION / {env.includes("DoorKey") ? "DOOR & KEY" : "EMPTY ROOM"}</span>
             <h2>{state?.mission ?? "Find the way to the goal"}</h2>
           </div>
           <GameGrid state={state} />
@@ -233,7 +287,9 @@ export function Games({ result }: { result: any }) {
                     {s.cache_hit
                       ? "cached decision"
                       : s.latency_ms
-                        ? Math.round(s.latency_ms) + " ms"
+                        ? s.latency_ms > 5000
+                          ? `${(s.latency_ms / 1000).toFixed(0)} s, mostly rate-limit retries`
+                          : Math.round(s.latency_ms) + " ms"
                         : "baseline"}
                   </small>
                 </div>
@@ -259,5 +315,6 @@ export function Games({ result }: { result: any }) {
         </Pane>
       </aside>
     </div>
+    </>
   );
 }
