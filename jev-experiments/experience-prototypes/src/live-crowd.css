@@ -969,3 +969,15 @@
   padding: 12px;
   border-radius: 6px;
 }
+.lc-recorded-probes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  margin: 6px 0 10px;
+  font-size: 13px;
+}
+.lc-recorded-probes button {
+  font-size: 12px;
+  padding: 4px 10px;
+}
