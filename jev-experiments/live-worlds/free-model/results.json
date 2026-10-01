@@ -1,0 +1,139 @@
+{
+ "scoredOn": "2026-10-01",
+ "winOver": {
+  "lines": 144,
+  "results": {
+   "student": {
+    "intent": {
+     "n": 144,
+     "accuracy": 0.743,
+     "macroF1": 0.737
+    },
+    "honest": {
+     "n": 118,
+     "accuracy": 0.797,
+     "macroF1": 0.784
+    },
+    "friendly": {
+     "n": 101,
+     "accuracy": 0.921,
+     "macroF1": 0.88
+    }
+   },
+   "mobilebert": {
+    "intent": {
+     "n": 144,
+     "accuracy": 0.306,
+     "macroF1": 0.281
+    },
+    "honest": {
+     "n": 118,
+     "accuracy": 0.322,
+     "macroF1": 0.293
+    },
+    "friendly": {
+     "n": 101,
+     "accuracy": 0.436,
+     "macroF1": 0.434
+    }
+   },
+   "teacher": {
+    "intent": {
+     "n": 144,
+     "accuracy": 0.944,
+     "macroF1": 0.944
+    },
+    "honest": {
+     "n": 118,
+     "accuracy": 0.949,
+     "macroF1": 0.945
+    },
+    "friendly": {
+     "n": 101,
+     "accuracy": 1,
+     "macroF1": 1
+    }
+   },
+   "qwen3-4b": {
+    "intent": {
+     "n": 144,
+     "accuracy": 0.84,
+     "macroF1": 0.841
+    },
+    "honest": {
+     "n": 118,
+     "accuracy": 0.915,
+     "macroF1": 0.9
+    },
+    "friendly": {
+     "n": 101,
+     "accuracy": 0.901,
+     "macroF1": 0.814
+    }
+   }
+  }
+ },
+ "rumourMill": {
+  "rumours": 40,
+  "cases": 160,
+  "results": {
+   "student": {
+    "action": {
+     "n": 160,
+     "accuracy": 0.744
+    },
+    "place": {
+     "n": 40,
+     "accuracy": 0.65,
+     "macroF1": 0.64
+    }
+   },
+   "formula": {
+    "action": {
+     "n": 160,
+     "accuracy": 0.813
+    },
+    "place": {
+     "n": 40,
+     "accuracy": 0.65,
+     "macroF1": 0.64
+    }
+   },
+   "teacher": {
+    "action": {
+     "n": 160,
+     "accuracy": 0.738
+    },
+    "place": "given the gold place"
+   },
+   "qwen3-4b": {
+    "action": {
+     "n": 160,
+     "accuracy": 0.725
+    },
+    "place": "given the gold place"
+   }
+  },
+  "note": "action accuracy = top action in the gold's accepted list"
+ },
+ "nodeMs": {
+  "studentPerLine": 2.3,
+  "mobilebertPerLine": 56.7,
+  "studentPerRumourAllProfiles": 3.7
+ },
+ "intentLabels": [
+  "greeting",
+  "joke",
+  "gift",
+  "request",
+  "bribe",
+  "lie",
+  "threat"
+ ],
+ "rumourActions": [
+  "ignore",
+  "share",
+  "go",
+  "argue"
+ ]
+}

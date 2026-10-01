@@ -38,7 +38,7 @@ export const GOALS: Goal[] = [
 
 export const goal = (id: Goal["id"]) => GOALS.find((g) => g.id === id) ?? GOALS[0];
 
-const NAMES = [
+export const NAMES = [
   "Mina", "Otis", "Luz", "Eli", "June", "Ivo", "Nia", "Remy", "Ada", "Sol", "Bea", "Kit",
   "Tam", "Wren", "Omar", "Pia", "Hugo", "Lena", "Rafi", "Suki", "Bram", "Cleo", "Dev", "Esme",
   "Fitz", "Gwen", "Hal", "Iris", "Jon", "Kaya", "Lou", "Mags", "Ned", "Oona", "Per", "Quin",
@@ -51,9 +51,9 @@ const JOBS = [
   "a postal worker", "a chef", "a librarian", "a carpenter", "a beekeeper",
 ];
 
-const LIKES = ["music", "books", "cake", "plants", "gossip", "quiet", "dancing", "chess", "coffee", "art", "football", "birds"];
+export const LIKES = ["music", "books", "cake", "plants", "gossip", "quiet", "dancing", "chess", "coffee", "art", "football", "birds"];
 
-const TEMPERS = ["trusting and warm", "sceptical of strangers", "shy", "chatty", "easily offended", "hard to impress"];
+export const TEMPERS = ["trusting and warm", "sceptical of strangers", "shy", "chatty", "easily offended", "hard to impress"];
 
 const COLORS = ["#f0532d", "#ffd23f", "#9be3c3", "#a9cdfc", "#c9a7f5", "#f7a8c4", "#f6b26b", "#8fd6e8"];
 
