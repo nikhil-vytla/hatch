@@ -301,8 +301,8 @@ export const retired: Record<string, Retired> = {
   },
   teach: {
     title: "Active labeling",
-    reason: "A small template fixture where the labels were trivially right; neither sampling method helped.",
-    record: "teach",
+    reason:
+      "A small template fixture where the labels were trivially right; neither sampling method helped. It trained a classifier on Jev's labels, which TypeSafe's terms forbid, so its code and record were removed on 1 Oct 2026.",
   },
   robustness: {
     title: "Decision stability",
@@ -342,8 +342,8 @@ export const retired: Record<string, Retired> = {
   },
   reward: {
     title: "Learning from rewards",
-    reason: "An interesting reward-versus-accuracy shape on a fixture too small to stand alone.",
-    record: "reward",
+    reason:
+      "An interesting reward-versus-accuracy shape on a fixture too small to stand alone. It trained a policy on Jev's rewards, which TypeSafe's terms forbid, so its code and record were removed on 1 Oct 2026.",
   },
 };
 

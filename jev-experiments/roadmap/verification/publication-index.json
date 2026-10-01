@@ -1,6 +1,6 @@
 {
   "schemaVersion": 3,
-  "publicationCount": 45,
+  "publicationCount": 43,
   "roundTripPassed": true,
   "expectedFieldsPreserved": true,
   "projectedPublications": [
@@ -217,15 +217,6 @@
       "recipe": "readRecord + enrichProvenance + availability"
     },
     {
-      "name": "reward",
-      "source": "../results/reward.jsonl",
-      "sourceSha256": "f3c806d1a6c62ed9bf78004c35d1ea2dd23cbafaf01c49a3d826f950c0cd3274",
-      "publicSha256": "811a6610b3b3e756ca1c1d28a623f2fb78f3507380bc7e77231c57674fe6aa69",
-      "publicBytes": 28437,
-      "comparison": "original-record",
-      "recipe": "readRecord + enrichProvenance + availability"
-    },
-    {
       "name": "robustness",
       "source": "results/robustness.jsonl",
       "sourceSha256": "a15f01437c005b9af16f191269f507c84149e70e8df92bbe901ff95ffa318407",
@@ -258,15 +249,6 @@
       "sourceSha256": "83dcbd69665b7b1c790402fa1888a55bdb053d818538b92a310f5c96e8d9f307",
       "publicSha256": "43f48172e715bdeea41fb3800b26209b3724849e94098b400e77c8fec802fb54",
       "publicBytes": 875,
-      "comparison": "original-record",
-      "recipe": "readRecord + enrichProvenance + availability"
-    },
-    {
-      "name": "teach",
-      "source": "../results/teach.jsonl",
-      "sourceSha256": "147667e18a7eaf5fbedc9ebc925c3c8dbb8e4cf9b16deb5219e41bdb47d13256",
-      "publicSha256": "8888de5852541bfaddae87c33681fac78b05b9f42f35d48057637db50bea636f",
-      "publicBytes": 45312,
       "comparison": "original-record",
       "recipe": "readRecord + enrichProvenance + availability"
     },

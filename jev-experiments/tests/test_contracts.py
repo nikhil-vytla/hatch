@@ -8,7 +8,6 @@ from pydantic import BaseModel, Field
 from jev_lab.core import BudgetExceeded, CapacityBusy, Client, Ledger, Run, choice, normalize, noul
 from jev_lab.metrics import classification
 from jev_lab.semantic import Ticket, decode, questions_for
-from jev_lab.teach import optimize_policy
 
 
 def test_game_publication_preserves_observations_and_errors():
@@ -160,16 +159,6 @@ def test_failed_cases_remain_in_accuracy_denominator():
     metrics = classification([{"target": "a", "prediction": "a"}, {"error": "429"}])
     assert metrics["accuracy_all_attempted"] == 0.5
     assert metrics["accuracy_answered"] == 1
-
-
-def test_reward_training_changes_policy_and_improves_independent_behavior():
-    import numpy as np
-
-    x = np.eye(3)
-    weights, curve = optimize_policy(x, np.eye(3), x, np.array([0, 1, 2]), steps=80)
-    assert np.count_nonzero(weights) > 0
-    assert curve[-1]["oracle_test_accuracy"] == 1
-    assert curve[-1]["mean_teacher_reward"] > curve[0]["mean_teacher_reward"]
 
 
 def test_question_branches_cannot_read_each_other():

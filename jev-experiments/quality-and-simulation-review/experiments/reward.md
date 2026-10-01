@@ -1,5 +1,7 @@
 # Learning from rewards
 
+> **Removed 1 Oct 2026.** This experiment trained a model on Jev's outputs, which TypeSafe's Master Customer Agreement §2.3(b) forbids. Its code (`src/jev_lab/teach.py`), records (`results/reward.jsonl`) and the probe files with fitted weights were deleted; this write-up is kept as history. See git history before this date for the originals.
+
 Verdict: redesign the evaluation and interaction, retaining the real local optimizer. Highest priority: P1. The published run proves that Jev scores can change a small policy's parameters. It does not establish that its reward-versus-task divergence comes from a bad reward signal. A missing temperature representation explains much of the result.
 
 ## What runs today

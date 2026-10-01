@@ -1,5 +1,7 @@
 # Active labeling
 
+> **Removed 1 Oct 2026.** This experiment trained a model on Jev's outputs, which TypeSafe's Master Customer Agreement §2.3(b) forbids. Its code (`src/jev_lab/teach.py`), records (`results/teach.jsonl`) and the probe files with fitted weights were deleted; this write-up is kept as history. See git history before this date for the originals.
+
 Verdict: repair. Keep the real teacher-to-student training loop, fix the representation and acquisition comparison, and turn the page into a labeling session. Current evidence is one authored beverage run with one acquisition seed. It does not establish savings from active labeling.
 
 Paths below are relative to `jev-experiments/`. This review inspected code and published records and ran local inference. It did not run a browser, retrain a model, or call a paid provider.
