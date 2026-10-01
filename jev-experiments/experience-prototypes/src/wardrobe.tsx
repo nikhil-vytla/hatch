@@ -557,7 +557,7 @@ export function Wardrobe({ result }: { result: any }) {
     <div className="wardrobe-lab">
       <header className="wardrobe-header">
         <div>
-          <span className="wardrobe-eyebrow">THE FITTING ROOM · 01</span>
+          <span className="wardrobe-eyebrow">The fitting room</span>
           <h2>
             Change your mind.
             <br />
@@ -701,7 +701,7 @@ export function Wardrobe({ result }: { result: any }) {
         </section>
         <section className="wardrobe-workbench" aria-label="Outfit controls">
           <div className="wardrobe-command-top">
-            <span className="wardrobe-eyebrow">SAY IT. SEE WHAT CHANGES.</span>
+            <span className="wardrobe-eyebrow">Say it. See what changes.</span>
             <span className="wardrobe-provenance">{sourceLabel[source]}</span>
           </div>
           <div
@@ -733,7 +733,7 @@ export function Wardrobe({ result }: { result: any }) {
                 <small>
                   {demoStep === 4
                     ? "Whole look, intact."
-                    : "ONE CHANGE AT A TIME"}
+                    : "One change at a time"}
                 </small>
               </div>
               <p>“{demo.text}”</p>
@@ -898,7 +898,7 @@ export function Wardrobe({ result }: { result: any }) {
                 </div>
               </div>
               <label>
-                {slot === "jacket" ? "FIT" : "FRAME SIZE"}
+                {slot === "jacket" ? "Fit" : "Frame size"}
                 <select
                   value={slot === "jacket" ? outfit.fit : outfit.glassesSize}
                   onChange={(e) =>
@@ -946,7 +946,7 @@ export function Wardrobe({ result }: { result: any }) {
       {showConnect && (
         <section className="wardrobe-connect">
           <div>
-            <span className="wardrobe-eyebrow">A REAL VIDEO CONNECTION</span>
+            <span className="wardrobe-eyebrow">A real video connection</span>
             <h3>Bring the look to life.</h3>
             <p>
               Lucy 2.1 via fal receives the chosen video source, full outfit

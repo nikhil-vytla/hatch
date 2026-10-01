@@ -306,11 +306,11 @@
 }
 .cafe-bubble > span {
   display: block;
-  text-transform: uppercase;
-  font-size: 8px;
-  letter-spacing: 1.3px;
+  font-size: 12px;
+  letter-spacing: 0;
   color: #94816e;
   margin-bottom: 5px;
+  font-weight: 800;
 }
 .cafe-bubble p {
   font-family: Georgia, serif;
@@ -1009,14 +1009,14 @@
 }
 .cafe-understanding-chips i {
   font-style: normal;
-  font-size: 7px;
-  text-transform: uppercase;
+  font-size: 12px;
   padding: 2px 3px;
   border-radius: 2px;
   background: var(--cafe-tint);
   color: var(--cafe-green);
   margin-left: 3px;
-  letter-spacing: 0.3px;
+  letter-spacing: 0;
+  font-weight: 800;
 }
 .cafe-understanding-chips > small {
   font-size: 9px;
@@ -1077,10 +1077,10 @@
   margin-bottom: 13px;
 }
 .cafe-inspector li > span {
-  font-size: 8px;
+  font-size: 12px;
   color: var(--cafe-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.8px;
+  letter-spacing: 0;
+  font-weight: 800;
 }
 .cafe-inspector p {
   font-size: 11px;

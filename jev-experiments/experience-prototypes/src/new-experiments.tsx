@@ -459,7 +459,7 @@ export function SemanticTable({ record }: { record: any }) {
       <div className="artifact-column">
         <Pane title="A question becomes a column" sub="8 authored examples">
           <div className="semantic-query">
-            <span>ASK EACH ROW</span>
+            <span>Ask each row</span>
             <input
               aria-label="Question for each row"
               value={query}
@@ -668,7 +668,7 @@ export function UndoExperiment({ record }: { record: any }) {
           className="undo-canvas"
           animate={{ backgroundColor: String(design.background) }}
         >
-          <span className="preview-label">LIVE EDITABLE PREVIEW</span>
+          <span className="preview-label">Live editable preview</span>
           <motion.h2 layout>{String(design.title)}</motion.h2>
           <div className={"apartment-preview " + design.layout}>
             {["Sunlit studio", "Garden apartment", "Corner loft"].map(
@@ -836,10 +836,10 @@ export function Changes({ record }: { record: any }) {
       <div className="artifact-column">
         <Pane title="The source changed">
           <div className="source-diff">
-            <span>BEFORE</span>
+            <span>Before</span>
             <del>{impactFacts[field as keyof typeof impactFacts]}</del>
             <ArrowRight size={18} />
-            <span>AFTER</span>
+            <span>After</span>
             <ins>{value}</ins>
           </div>
         </Pane>

@@ -34,7 +34,7 @@ export function Worlds({ result }: { result: any }) {
             parameters={row?.scene ?? {}}
           />
           <div className="world-caption">
-            <span>AN INTERPRETATION OF</span>
+            <span>An interpretation of</span>
             <h2>{row?.brief ?? brief}</h2>
             <Button secondary onClick={() => setPaused(!paused)}>
               {paused ? <Play size={14} /> : <Pause size={14} />}{" "}
@@ -347,8 +347,8 @@ export function Pixels({ result }: { result: any }) {
             <span>64 × 64</span>
             <span>
               {last
-                ? "JEV-CONTROLLED COMPOSITION"
-                : "PREPARED STARTING COMPOSITION"}
+                ? "Jev-controlled composition"
+                : "Prepared starting composition"}
             </span>
           </div>
         </div>

@@ -8,7 +8,7 @@ export function Provenance({ result }: { result: any }) {
   const sources = Array.isArray(source) ? source : [source];
   return (
     <section className="dataset-provenance" aria-label="Dataset provenance">
-      <span className="eyebrow">EXTERNAL DATASET</span>
+      <span className="eyebrow">External dataset</span>
       {sources.map((s: any) => (
         <div className="provenance-source" key={s.name}>
           <div>

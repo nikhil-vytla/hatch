@@ -312,11 +312,11 @@ export function AgentExperiment({ id, result }: { id: string; result: any }) {
           {verify ? (
             <>
               <div className="question-card">
-                <span className="eyebrow">THE TASK</span>
+                <span className="eyebrow">The task</span>
                 <p>{row?.state?.task ?? "Inspect the supplied trace"}</p>
               </div>
               <div className="trace-document">
-                <span className="eyebrow">VISIBLE EVIDENCE</span>
+                <span className="eyebrow">Visible evidence</span>
                 <p>
                   {typeof row?.state?.trace === "string"
                     ? row.state.trace
@@ -339,7 +339,7 @@ export function AgentExperiment({ id, result }: { id: string; result: any }) {
           ) : search ? (
             <>
               <div className="question-card">
-                <span className="eyebrow">THE QUESTION</span>
+                <span className="eyebrow">The question</span>
                 <p>{row?.query ?? row?.text ?? input}</p>
               </div>
               {id === "context" && (
@@ -388,7 +388,7 @@ export function AgentExperiment({ id, result }: { id: string; result: any }) {
           ) : id === "micro" ? (
             <>
               <div className="question-card">
-                <span className="eyebrow">GOAL</span>
+                <span className="eyebrow">Goal</span>
                 <p>{row?.goal ?? input}</p>
               </div>
               <div className="impact-list">
@@ -421,7 +421,7 @@ export function AgentExperiment({ id, result }: { id: string; result: any }) {
           ) : (
             <>
               <div className="question-card">
-                <span className="eyebrow">REQUEST</span>
+                <span className="eyebrow">Request</span>
                 <p>{row?.text ?? row?.goal ?? input}</p>
               </div>
               <div className="route-answer">

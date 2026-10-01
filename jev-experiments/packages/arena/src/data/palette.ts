@@ -1,13 +1,15 @@
 /**
  * Contestant colours, one light and one dark value each. Every value keeps at
- * least 3:1 against both page surfaces of its theme (WCAG non-text contrast).
+ * least 3:1 against every page surface of its theme (WCAG non-text contrast).
  * Hue carries identity: green Jev, blue Laya, rust Qwen, violet small models
  * and robustness conditions. Neutral grey is reserved for code players.
+ * The site is light only (Toy Box: cream page, white cards, soft cream wells);
+ * the dark values stay for the arena's own exports.
  */
 export type Swatch = { light: string; dark: string };
 
 export const SURFACES = {
-  light: ["#fafafa", "#ffffff"],
+  light: ["#fff4e0", "#ffffff", "#fbe9c9"],
   dark: ["#09090b", "#111113"],
 } as const;
 

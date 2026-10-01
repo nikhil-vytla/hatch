@@ -26,7 +26,7 @@
   flex-wrap: wrap;
 }
 .study-counts span {
-  font: 10px var(--mono);
+  font: 700 12px var(--mono);
   color: var(--muted);
   max-width: 110px;
 }
@@ -72,7 +72,7 @@
 }
 .study-models strong {
   display: block;
-  font: 29px var(--mono);
+  font: 700 29px var(--mono);
   margin: 15px 0 3px;
 }
 .study-controls {
@@ -125,7 +125,7 @@
   font-weight: 450;
 }
 .study-table-scroll td {
-  font: 11px var(--mono);
+  font: 700 13px var(--mono);
 }
 .study-fine {
   font-size: 11px;
@@ -146,7 +146,7 @@
 }
 .study-baselines p {
   width: 100%;
-  font: 10px var(--mono);
+  font: 700 12px var(--mono);
   color: var(--muted);
   margin: 0;
 }
@@ -161,7 +161,7 @@
 }
 .study-baselines strong {
   display: block;
-  font: 21px var(--mono);
+  font: 700 21px var(--mono);
   margin-top: 4px;
 }
 .study-evidence summary {

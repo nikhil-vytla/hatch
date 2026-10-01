@@ -1,18 +1,8 @@
-/* The Toy Box identity, scoped to the toy and the home page until the rest of the site follows. */
+/* Fool Jev and the home page hero. The Toy Box tokens live in style.css; .toybox maps them to --tb-*. */
 .toybox {
-  --tb-bg: #fff4e0;
-  --tb-ink: #17140f;
-  --tb-tomato: #f0532d;
-  --tb-tomato-ink: #a62a0e;
-  --tb-mint: #9be3c3;
-  --tb-sky: #a9cdfc;
-  --tb-sun: #ffd23f;
-  --tb-muted: #4a443a;
-  --tb-display: "Bricolage Grotesque", system-ui, sans-serif;
-  --tb-body: Nunito, system-ui, sans-serif;
-  background: var(--tb-bg);
-  color: var(--tb-ink);
-  font-family: var(--tb-body);
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--sans);
 }
 
 .fj {
