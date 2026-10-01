@@ -10,7 +10,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
 
 from jev_lab.core import ROOT
-from jev_lab.teach import exported
+from jev_lab.classifier_export import exported
 
 
 @pytest.mark.skipif(shutil.which("bun") is None, reason="Bun is needed for browser parity")
