@@ -183,7 +183,7 @@ export const experiments = [
     "Pin a rumour on one street. Watch 4,000 neighbours pass it on, or argue it down.",
     "How far does one sentence travel when everyone decides for themselves?",
   ),
-  e("crowd", "live-worlds", "The square at five", "Games & simulations", "A small town keeps moving while its residents make up their minds.", "Can a sentence change many independent decisions in a living world?"),
+  e("crowd", "live-worlds", "The square at five", "Games & simulations", "Pin a notice in a small town and watch twelve residents decide, read by a free model in your browser.", "Can a sentence change many independent decisions in a living world?"),
   e("ghost-brush", "live-worlds", "Ghost Brush", "Creative tools", "Draw a gesture. Give it a feeling. Follow another line.", "Can a typed style judgment turn a procedural brush into a semantic instrument?"),
 ];
 export const categories = [
