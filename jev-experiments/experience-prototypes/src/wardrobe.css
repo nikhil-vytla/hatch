@@ -145,7 +145,7 @@
   bottom: 76px;
 }
 .wardrobe-stage-actions button {
-  font-size: 11px;
+  font-size: 12px;
   color: #363c33;
   background: #f7f5eefa;
   border: 1px solid #d6d2c6;
@@ -246,14 +246,14 @@
   display: block;
   margin: 10px 0;
   color: var(--muted);
-  font-size: 10px;
+  font-size: 12px;
   line-height: 1.6;
 }
 .wardrobe-input {
   padding: 18px 0 7px;
 }
 .wardrobe-input > label {
-  font-size: 11px;
+  font-size: 12px;
 }
 .wardrobe-input textarea {
   width: 100%;
@@ -272,7 +272,7 @@
   display: flex;
   align-items: center;
   gap: 7px;
-  font-size: 11px;
+  font-size: 12px;
 }
 .wardrobe-response {
   display: flex;
@@ -301,7 +301,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 10px;
+  font-size: 12px;
   color: var(--muted);
   min-height: 34px;
 }
@@ -326,7 +326,7 @@
   display: flex;
   align-items: center;
   gap: 5px;
-  font-size: 10px;
+  font-size: 12px;
   border-radius: 20px;
   padding: 8px 10px;
   color: var(--muted);
@@ -377,13 +377,13 @@
 }
 .wardrobe-piece strong {
   display: block;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 500;
   margin-top: 7px;
   line-height: 1.4;
 }
 .wardrobe-piece > small {
-  font-size: 8px;
+  font-size: 12px;
   color: var(--muted);
   display: block;
   margin: 3px 0;
@@ -427,7 +427,7 @@
 }
 .wardrobe-adjust select {
   font:
-    11px var(--sans);
+    12px var(--sans);
   border-radius: 5px;
   min-height: 29px;
   padding: 4px 7px;
@@ -438,7 +438,7 @@
   padding: 10px;
 }
 .wardrobe-catalog-note {
-  font-size: 9px;
+  font-size: 12px;
   color: var(--muted);
   line-height: 1.65;
   margin-top: 11px;
@@ -458,12 +458,12 @@
   margin: 10px 0;
 }
 .wardrobe-connect p {
-  font-size: 11px;
+  font-size: 12px;
   margin: 8px 0;
   color: var(--muted);
 }
 .wardrobe-connect a {
-  font-size: 11px;
+  font-size: 12px;
   text-decoration: underline;
 }
 .wardrobe-connect label {
@@ -480,14 +480,14 @@
   padding: 11px;
   border-radius: 6px;
   font:
-    11px var(--sans);
+    12px var(--sans);
 }
 .wardrobe-connect .wardrobe-consent {
   flex-direction: row;
   align-items: flex-start;
   gap: 9px;
   font:
-    11px var(--sans);
+    12px var(--sans);
   line-height: 1.6;
   letter-spacing: 0;
 }
@@ -523,7 +523,7 @@
 .wardrobe-inspector-toggle small {
   display: inline-block;
   margin-left: 20px;
-  font-size: 10px;
+  font-size: 12px;
   color: var(--muted);
 }
 .wardrobe-inspector-body {
@@ -552,7 +552,7 @@
 }
 .wardrobe-inspector p,
 .wardrobe-inspector small {
-  font-size: 10px;
+  font-size: 12px;
   color: var(--muted);
   line-height: 1.65;
 }
@@ -562,7 +562,7 @@
 }
 .wardrobe-inspector summary {
   cursor: pointer;
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.5;
 }
 .wardrobe-inspector summary small {
@@ -617,7 +617,7 @@
     align-items: flex-start;
   }
   .wardrobe-command-top .wardrobe-eyebrow {
-    font-size: 8px;
+    font-size: 12px;
   }
   .wardrobe-header {
     padding-bottom: 28px;
@@ -638,7 +638,7 @@
   }
   .wardrobe-intro-tag {
     padding: 14px;
-    font-size: 10px;
+    font-size: 12px;
     margin: 0 5px 0 8px;
   }
   .wardrobe-intro-tag svg {
@@ -661,7 +661,7 @@
     left: 20px;
     right: 20px;
     top: 18px;
-    font-size: 8px;
+    font-size: 12px;
   }
   .wardrobe-stage-caption {
     bottom: 76px;
@@ -677,7 +677,7 @@
     bottom: 17px;
   }
   .wardrobe-stage-actions button {
-    font-size: 9px;
+    font-size: 12px;
     padding: 9px;
   }
   .wardrobe-recorded > p {
@@ -691,7 +691,7 @@
     gap: 9px;
   }
   .wardrobe-piece strong {
-    font-size: 10px;
+    font-size: 12px;
   }
   .wardrobe-connect {
     grid-template-columns: 1fr;
@@ -718,7 +718,7 @@
     min-height: 40px;
   }
   .wardrobe-header .wardrobe-eyebrow {
-    font-size: 8px;
+    font-size: 12px;
   }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -728,7 +728,7 @@
   }
 }
 .wardrobe-playback-note {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--muted);
   padding: 12px 15px;
   background: var(--soft);
@@ -739,7 +739,7 @@
 .wardrobe-stage-timings table {
   border-collapse: collapse;
   width: 100%;
-  font-size: 9px;
+  font-size: 12px;
   margin: 10px 0;
 }
 .wardrobe-stage-timings th,
@@ -766,7 +766,7 @@
   .wardrobe-stage-top {
     left: 55px;
     right: 55px;
-    font-size: 8px;
+    font-size: 12px;
   }
 }
 @media (max-width: 690px) {

@@ -760,7 +760,7 @@ nav a {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--muted);
   margin: 17px 0;
 }
@@ -805,7 +805,7 @@ nav a {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 10px;
+  font-size: 12px;
   padding: 8px 10px;
   border-radius: 7px;
   text-transform: capitalize;
@@ -1000,14 +1000,14 @@ nav a {
 }
 .fact strong {
   display: block;
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.5;
   font-weight: 500;
   margin: 4px 0;
   overflow-wrap: anywhere;
 }
 .fact small {
-  font-size: 8px;
+  font-size: 12px;
   color: var(--muted);
 }
 .destination .field {
@@ -1027,19 +1027,19 @@ nav a {
   display: flex;
   gap: 4px;
   align-items: center;
-  font-size: 9px;
+  font-size: 12px;
   color: var(--sage);
   text-align: left;
   padding: 0;
 }
 .suggestion small {
-  font-size: 8px;
+  font-size: 12px;
   color: var(--muted);
   padding-left: 16px;
 }
 .missing {
   display: block;
-  font-size: 9px;
+  font-size: 12px;
   color: var(--coral);
   margin-top: 6px;
 }
@@ -1087,7 +1087,7 @@ nav a {
 .table-excerpt {
   text-align: left;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 12px;
   padding: 0;
   line-height: 1.65;
 }
@@ -1135,7 +1135,7 @@ nav a {
 }
 .apartment-tile span {
   display: block;
-  font-size: 10px;
+  font-size: 12px;
   color: #777e70;
   margin: 5px 0 12px;
 }
@@ -1144,7 +1144,7 @@ nav a {
   align-items: center;
   gap: 20px;
   color: #fff;
-  font-size: 9px;
+  font-size: 12px;
   padding: 8px 10px;
   border-radius: 4px;
 }
@@ -1199,7 +1199,7 @@ nav a {
   gap: 11px;
   padding: 10px 9px;
   text-align: left;
-  font-size: 11px;
+  font-size: 12px;
   border-radius: 6px;
   border: 1px solid transparent;
 }
@@ -1372,7 +1372,7 @@ nav a {
 }
 .gen-metric span,
 .gen-metric small {
-  font-size: 10px;
+  font-size: 12px;
   color: var(--muted);
 }
 .gen-metric strong {
@@ -1418,7 +1418,7 @@ nav a {
   display: flex;
   gap: 7px;
   align-items: center;
-  font-size: 10px;
+  font-size: 12px;
 }
 .version-strip {
   display: flex;
@@ -1444,11 +1444,11 @@ nav a {
   color: var(--sage);
 }
 .version-strip strong {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
 }
 .version-strip span {
-  font-size: 10px;
+  font-size: 12px;
   color: var(--muted);
   display: block;
   line-height: 1.5;
@@ -1463,7 +1463,7 @@ nav a {
   margin-top: 20px;
 }
 .preset-links button {
-  font-size: 10px;
+  font-size: 12px;
   color: var(--muted);
   text-align: left;
   border-left: 2px solid var(--line);
@@ -1622,7 +1622,7 @@ nav a {
   gap: 7px;
   border: 1px solid var(--line);
   border-radius: 6px;
-  font-size: 10px;
+  font-size: 12px;
   padding: 7px 10px;
 }
 .track-controls .muted-track {
@@ -1714,7 +1714,7 @@ nav a {
   align-items: center;
   justify-content: center;
   gap: 15px;
-  font-size: 10px;
+  font-size: 12px;
   color: var(--muted);
 }
 .action-log {
@@ -1727,7 +1727,7 @@ nav a {
   display: flex;
   gap: 13px;
   align-items: center;
-  font-size: 10px;
+  font-size: 12px;
 }
 .action-log span {
   font: 700 12px var(--mono);
@@ -1739,7 +1739,7 @@ nav a {
 .action-log small {
   margin-left: auto;
   color: var(--muted);
-  font-size: 9px;
+  font-size: 12px;
 }
 .case-toolbar {
   display: flex;
@@ -1758,7 +1758,7 @@ nav a {
 .case-search input {
   border: 0;
   background: none;
-  font-size: 11px;
+  font-size: 12px;
   width: 160px;
   padding: 6px 0;
 }
@@ -1851,7 +1851,7 @@ nav a {
   flex: 1;
 }
 .label-comparison span:not(.match-icon) {
-  font-size: 10px;
+  font-size: 12px;
   color: var(--muted);
   display: block;
   margin-bottom: 10px;
@@ -1884,7 +1884,7 @@ nav a {
   display: flex;
   justify-content: center;
   gap: 22px;
-  font-size: 10px;
+  font-size: 12px;
   color: var(--muted);
   margin-top: 15px;
 }
@@ -1947,7 +1947,7 @@ nav a {
   align-items: center;
 }
 .latency-group > span {
-  font-size: 11px;
+  font-size: 12px;
 }
 .latency-group > div {
   height: 6px;
@@ -1966,7 +1966,7 @@ nav a {
 }
 .latency-group small {
   grid-column: 1/-1;
-  font-size: 9px;
+  font-size: 12px;
   color: var(--muted);
 }
 .flow-stage {
@@ -2018,7 +2018,7 @@ nav a {
 }
 .verdict small {
   display: block;
-  font-size: 10px;
+  font-size: 12px;
   color: var(--muted);
   margin-bottom: 6px;
 }
@@ -2055,7 +2055,7 @@ nav a {
   color: var(--muted);
 }
 .document small {
-  font-size: 9px;
+  font-size: 12px;
   color: var(--muted);
 }
 .document.kept {
@@ -2156,7 +2156,7 @@ nav a {
   text-transform: capitalize;
 }
 .drink-stage p {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--muted);
   margin-top: 8px;
 }
@@ -2183,7 +2183,7 @@ nav a {
   margin-bottom: 7px;
 }
 .menu-grid span {
-  font-size: 9px;
+  font-size: 12px;
   color: var(--muted);
 }
 .logo-stage {
@@ -2296,7 +2296,7 @@ nav a {
   gap: 13px;
   flex-wrap: wrap;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 12px;
   margin-top: 25px;
 }
 @keyframes spin {
@@ -2471,7 +2471,7 @@ nav a {
     gap: 9px;
   }
   .experiment-question p {
-    font-size: 11px !important;
+    font-size: 12px !important;
   }
   .workbench,
   .variant-comparison .workbench {
@@ -2493,7 +2493,7 @@ nav a {
     font-size: 17px;
   }
   .pane-heading > span {
-    font-size: 8px;
+    font-size: 12px;
   }
   .prototype-switcher {
     bottom: 12px;
@@ -2506,7 +2506,7 @@ nav a {
   }
   .prototype-switcher button {
     padding: 9px 8px;
-    font-size: 9px;
+    font-size: 12px;
     gap: 5px;
   }
   .prototype-switcher button > svg {
@@ -2539,11 +2539,11 @@ nav a {
   }
   .browser-top {
     padding: 10px;
-    font-size: 7px;
+    font-size: 12px;
     gap: 7px;
   }
   .browser-top > .badge {
-    font-size: 6px;
+    font-size: 12px;
   }
   .gen-card {
     padding: 20px;
@@ -2565,7 +2565,7 @@ nav a {
     font-size: 17px;
   }
   .stat small {
-    font-size: 9px;
+    font-size: 12px;
   }
   .split-title {
     align-items: flex-start;
@@ -2581,13 +2581,13 @@ nav a {
     padding: 8px;
   }
   .fact strong {
-    font-size: 10px;
+    font-size: 12px;
   }
   .fact small {
-    font-size: 7px;
+    font-size: 12px;
   }
   .fact > span {
-    font-size: 7px;
+    font-size: 12px;
   }
   .paste-workspace > .pane {
     padding: 17px;
@@ -2597,21 +2597,21 @@ nav a {
     line-height: 1.7;
   }
   .data-table th {
-    font-size: 8px;
+    font-size: 12px;
     padding: 8px 6px;
   }
   .data-table td {
-    font-size: 10px;
+    font-size: 12px;
     padding: 13px 6px;
   }
   .table-excerpt {
-    font-size: 10px;
+    font-size: 12px;
   }
   .data-table td:last-child {
     min-width: 88px;
   }
   .data-table .badge {
-    font-size: 7px;
+    font-size: 12px;
   }
   .undo-canvas {
     padding: 22px;
@@ -2631,7 +2631,7 @@ nav a {
     display: block;
   }
   .apartment-tile button {
-    font-size: 8px;
+    font-size: 12px;
     margin-top: 7px;
     padding: 6px 8px;
     gap: 7px;
@@ -2640,12 +2640,12 @@ nav a {
     font-size: 12px;
   }
   .edit {
-    font-size: 10px;
+    font-size: 12px;
     padding: 9px 4px;
     gap: 8px;
   }
   .edit small {
-    font-size: 7px;
+    font-size: 12px;
   }
   .edit-dot {
     flex-shrink: 0;
@@ -2670,7 +2670,7 @@ nav a {
     width: 280px;
   }
   .pixel-meta {
-    font-size: 6px;
+    font-size: 12px;
     left: 12px;
     right: 12px;
   }
@@ -2681,7 +2681,7 @@ nav a {
     font-size: 24px;
   }
   .music-heading .eyebrow {
-    font-size: 8px;
+    font-size: 12px;
   }
   .piano-roll {
     height: 150px;
@@ -2695,18 +2695,18 @@ nav a {
     gap: 6px;
   }
   .track-controls button {
-    font-size: 8px;
+    font-size: 12px;
     padding: 7px 8px;
     gap: 4px;
   }
   .playback {
     gap: 9px;
-    font-size: 8px;
+    font-size: 12px;
     flex-wrap: wrap;
   }
   .playback .button {
     padding: 10px 12px;
-    font-size: 10px;
+    font-size: 12px;
   }
   .game-stage {
     padding: 22px 17px;
@@ -2733,14 +2733,14 @@ nav a {
     font-size: 17px;
   }
   .game-mission > span {
-    font-size: 7px;
+    font-size: 12px;
   }
   .game-caption {
     gap: 8px;
-    font-size: 8px;
+    font-size: 12px;
   }
   .game-caption .badge {
-    font-size: 7px;
+    font-size: 12px;
   }
   .case-search {
     width: 100%;
@@ -2757,7 +2757,7 @@ nav a {
     padding: 17px;
   }
   .candidate-text {
-    font-size: 11px;
+    font-size: 12px;
     max-height: 350px;
   }
   .question-card {
@@ -2767,7 +2767,7 @@ nav a {
     font-size: 12px;
   }
   .question-card .eyebrow {
-    font-size: 8px;
+    font-size: 12px;
   }
   .label-comparison {
     padding: 20px 0;
@@ -2777,7 +2777,7 @@ nav a {
     font-size: 15px;
   }
   .label-comparison span:not(.match-icon) {
-    font-size: 8px;
+    font-size: 12px;
   }
   .match-icon {
     margin: 0 3px;
@@ -2794,13 +2794,13 @@ nav a {
     padding: 15px;
   }
   .document > div {
-    font-size: 10px;
+    font-size: 12px;
   }
   .document .badge {
-    font-size: 7px;
+    font-size: 12px;
   }
   .document p {
-    font-size: 11px;
+    font-size: 12px;
   }
   .trace-document p {
     font-size: 12px;
@@ -2825,7 +2825,7 @@ nav a {
     height: 65px;
   }
   .logo-family span {
-    font-size: 7px;
+    font-size: 12px;
   }
   .decision-card {
     padding: 18px;
@@ -2835,23 +2835,23 @@ nav a {
     font-size: 21px;
   }
   .decision-card p {
-    font-size: 11px;
+    font-size: 12px;
   }
   .decision-card > strong {
     font-size: 21px;
   }
   .large-code {
-    font-size: 10px;
+    font-size: 12px;
   }
   .output-code {
-    font-size: 11px;
+    font-size: 12px;
   }
   .schema-flow {
     gap: 8px;
-    font-size: 9px;
+    font-size: 12px;
   }
   .legend {
-    font-size: 8px;
+    font-size: 12px;
     gap: 12px;
   }
   .latency-group {
@@ -2859,13 +2859,13 @@ nav a {
     gap: 7px;
   }
   .latency-group > span {
-    font-size: 9px;
+    font-size: 12px;
   }
   .latency-group strong {
-    font-size: 9px;
+    font-size: 12px;
   }
   .latency-group small {
-    font-size: 8px;
+    font-size: 12px;
   }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -2919,7 +2919,7 @@ nav a {
   font-size: 13px;
 }
 .journey-option p {
-  font-size: 10px;
+  font-size: 12px;
   color: var(--muted);
   margin-top: 8px;
 }
@@ -3162,7 +3162,7 @@ nav a {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
-  font-size: 11px;
+  font-size: 12px;
 }
 .candidate-score > span {
   display: inline-flex;
@@ -3173,7 +3173,7 @@ nav a {
   display: block;
   width: 100%;
   color: var(--muted);
-  font-size: 10px;
+  font-size: 12px;
   overflow-wrap: anywhere;
 }
 .tie-breakdown > div {
@@ -3182,7 +3182,7 @@ nav a {
   gap: 12px;
   padding: 9px 0;
   border-bottom: 1px solid var(--line);
-  font-size: 11px;
+  font-size: 12px;
 }
 .rubric-list {
   list-style: decimal;
@@ -3219,7 +3219,7 @@ nav a {
   align-items: flex-start;
   gap: 8px;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.6;
   padding: 10px 0;
 }
@@ -3448,7 +3448,7 @@ nav a {
   display: flex;
   justify-content: space-between;
   gap: 10px;
-  font-size: 11px;
+  font-size: 12px;
   padding: 10px 0;
   border-bottom: 1px solid var(--line);
 }
@@ -3670,7 +3670,7 @@ nav a {
   font-weight: 500;
 }
 .source-line {
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.9;
   color: var(--muted);
   overflow-wrap: anywhere;
