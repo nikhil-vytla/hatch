@@ -126,7 +126,7 @@ export function Decoy() {
       </Pane>
 
       <Pane title="A's share of the choice between A and B" sub="The decoy's own share left out">
-        <div className="decoy-shift">
+        <div className="decoy-shift" aria-live="polite">
           {SETS.map((s) => {
             const share = read(scenario.id, s.id, pairShare);
 
