@@ -13,6 +13,7 @@ still hold.
 | [0022](0022-bullet-proposals.md) | Memory proposals change one bullet, each with a source; per-bullet accept and rollback | Accepted, built |
 | [0023](0023-checks.md) | Verification checks: a command the daemon runs after a turn's changes, learned like a skill | Accepted, built |
 | [0024](0024-slash-commands.md) | Slash commands: a prompt saved as a file, expanded by the daemon, learned like a skill | Accepted, built |
+| [0025](0025-path-rules.md) | Rules scoped by path: guidance given with the first file it covers in a session | Accepted, built |
 | [0019](0019-predictions-checked.md) | Predictions are checked by a watch the daemon evaluates | Superseded (deleted 2026-09-28) |
 | [0018](0018-replay-gate.md) | The replay gate runs past tasks again in scratch copies | Superseded (deleted 2026-09-28) |
 | [0017](0017-judge-gate.md) | The judge gate is the daemon's own model call | Accepted; M9 implemented; amended: the judge advises |

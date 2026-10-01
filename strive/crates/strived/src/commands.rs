@@ -106,6 +106,7 @@ pub fn describe(e: &Entry) -> String {
         }
         Event::TurnStarted { turn, .. } => format!("turn {turn} started"),
         Event::LayoutProposed { label, .. } => format!("agent proposed a layout change: {label}"),
+        Event::RuleLoaded { effect, name, file, .. } => format!("rule {name} ({file}) given with effect {effect}"),
         Event::ChecksReported { turn, text } => {
             format!("turn {turn}: checks failed, the agent was told\n  {}", text.lines().next().unwrap_or_default())
         }

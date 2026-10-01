@@ -193,6 +193,11 @@ Confining the host process to the daemon's socket and gateway is planned.
   `<name>.md`, a prompt `/name arguments` stands for. The daemon expands one
   in `session/prompt` and journals the prompt with `command: {name,
   arguments}`; `session/commands` lists them for clients.
+- **Rules** ([ADR-0025](adrs/0025-path-rules.md)): `.strive/rules`, then
+  `.claude/rules`, each `<name>.md` with optional `paths:` globs. One
+  without paths joins the instruction files, before memory. One with paths
+  comes with the output of the first read, write or edit in the session of
+  a file they match, journaled as `ruleLoaded`.
 - **Imports:** a line `@path` in an instruction file, outside a code
   block, inlines that file if its real path is in the project (under its
   root, not in strive's home), up to five imports deep, and not as a
@@ -463,9 +468,9 @@ sandbox guard all of it:
   (the repository's, or the workspace outside one), since a later session
   may start in any directory:
   - `AGENTS.md` and `CLAUDE.md`;
-  - `.claude/skills` and `.claude/commands`;
-  - `.strive/memory.md`, `.strive/skills`, `.strive/checks` and
-    `.strive/commands`, the learned files;
+  - `.claude/skills`, `.claude/commands` and `.claude/rules`;
+  - `.strive/memory.md`, `.strive/skills`, `.strive/checks`,
+    `.strive/commands` and `.strive/rules`, the learned files;
   - `.strive/settings.json`.
 
   strive's home adds `~/.strive/AGENTS.md` and `~/.strive/skills`, and the

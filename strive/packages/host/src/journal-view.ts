@@ -160,6 +160,8 @@ async function block(entry: Entry, effects: Map<number, Effect>, ran: Set<string
 
     case "layoutProposed":
       return `${at} proposed a desktop layout: ${e.label}`;
+    case "ruleLoaded":
+      return `${at} strive gave the agent the rule ${e.name} (${e.file}) with effect ${e.effect}`;
     case "checksReported":
       return `${at} strive told the agent its checks failed:\n${cut(e.text, LIMITS.command)}`;
     case "learnRequested":

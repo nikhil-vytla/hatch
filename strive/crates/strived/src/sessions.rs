@@ -105,6 +105,12 @@ enum Cmd {
         events: Vec<Event>,
         reply: oneshot::Sender<io::Result<Vec<Entry>>>,
     },
+    /// Journals a `RuleLoaded`, unless the session was given that rule, as
+    /// it is now, already; replies whether it journaled it.
+    LoadRule {
+        event: Event,
+        reply: oneshot::Sender<io::Result<bool>>,
+    },
     /// Sends something to subscribers without journaling it.
     Push {
         push: Push,
@@ -409,6 +415,15 @@ impl Sessions {
         let (_, tx) = self.writer(id).await?;
         let (reply, rx) = oneshot::channel();
         tx.send(Cmd::SetBudget { limits, reply }).map_err(|_| writer_gone())?;
+        Ok(rx.await.map_err(|_| writer_gone())??)
+    }
+
+    /// Journals `event`, a `RuleLoaded`, if the session wasn't given that
+    /// rule as it is now; whether it was journaled.
+    pub async fn load_rule(&self, id: &SessionId, event: Event) -> Result<bool> {
+        let (_, tx) = self.writer(id).await?;
+        let (reply, rx) = oneshot::channel();
+        tx.send(Cmd::LoadRule { event, reply }).map_err(|_| writer_gone())?;
         Ok(rx.await.map_err(|_| writer_gone())??)
     }
 
@@ -834,6 +849,8 @@ struct Writer {
     mode: ApprovalMode,
     /// Files a person allowed changes to for the rest of the session.
     allowed_files: std::collections::BTreeSet<String>,
+    /// The rules the agent was given (ADR-0025), as `name:digest`.
+    rules_loaded: std::collections::BTreeSet<String>,
     /// The model chosen for the agent, and whether a prompt is journaled
     /// (staged ones included), after which it can't change.
     model: Option<String>,
@@ -918,11 +935,21 @@ fn spawn_writer(
             Event::ModelSet { model } => Some(model.clone()),
             _ => None,
         }),
+        rules_loaded: events.iter().filter_map(rule_key).collect(),
         prompted: events.iter().any(|e| matches!(e, Event::UserMessage { .. })),
         subscribers: Vec::new(),
         verify,
     };
     (tx, std::thread::spawn(move || w.run(rx)))
+}
+
+/// A given rule's key: its name and the digest of its text as given, so a
+/// rule changed since is given again.
+fn rule_key(e: &Event) -> Option<String> {
+    match e {
+        Event::RuleLoaded { name, digest, .. } => Some(format!("{name}:{digest}")),
+        _ => None,
+    }
 }
 
 /// The file an approval request for `effect` offered to allow for the
@@ -1036,6 +1063,17 @@ impl Writer {
     fn stage(&mut self, cmd: Cmd) -> Staged {
         let (events, done): (Vec<Event>, Done) = match cmd {
             Cmd::Append { events, reply } => (events, Box::new(move |r, _| drop(reply.send(r)))),
+            Cmd::LoadRule { event, reply } => {
+                let Some(key) = rule_key(&event) else {
+                    let _ = reply.send(Err(io::Error::other("not a rule being loaded")));
+                    return Staged::Handled;
+                };
+                if !self.rules_loaded.insert(key) {
+                    let _ = reply.send(Ok(false));
+                    return Staged::Handled;
+                }
+                (vec![event], Box::new(move |r, _| drop(reply.send(r.map(|_| true)))))
+            }
             Cmd::Push { push } => {
                 self.subscribers.retain(|(s, _)| s.send(push.clone()).is_ok());
                 return Staged::Handled;

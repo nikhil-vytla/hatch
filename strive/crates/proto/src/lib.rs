@@ -682,6 +682,7 @@ pub enum Artifact {
     Skill { name: String },
     Check { name: String },
     Command { name: String },
+    Rule { name: String },
 }
 
 /// What a proposal does (ADR-0022): one operation on one memory bullet, or
@@ -707,6 +708,11 @@ pub enum Change {
         name: String,
         content: String,
     },
+    /// A rule's whole file (ADR-0025): guidance for the files its paths match.
+    Rule {
+        name: String,
+        content: String,
+    },
 }
 
 impl Change {
@@ -717,6 +723,7 @@ impl Change {
             Change::Skill { name, .. } => Artifact::Skill { name: name.clone() },
             Change::Check { name, .. } => Artifact::Check { name: name.clone() },
             Change::Command { name, .. } => Artifact::Command { name: name.clone() },
+            Change::Rule { name, .. } => Artifact::Rule { name: name.clone() },
         }
     }
 }
@@ -1280,6 +1287,15 @@ pub enum Event {
     TurnEnded {
         turn: u64,
         reason: TurnEnd,
+    },
+    /// The agent was given a rule (ADR-0025) with the result of effect
+    /// `effect`, the first in the session on a file its paths match. `file`
+    /// is the rule's file; `digest`, its text as given.
+    RuleLoaded {
+        effect: u64,
+        name: String,
+        file: String,
+        digest: Digest,
     },
     /// What the host told the agent after a round of checks failed
     /// (ADR-0023): the turn goes on from this, live and on resume.

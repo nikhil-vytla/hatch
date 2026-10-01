@@ -356,6 +356,7 @@ fn host_may_record(event: &Event, kind: SessionKind) -> bool {
         // every later agent is given would skip review.
         Event::ProposalMade { .. } => kind == SessionKind::Learning,
         Event::SessionStarted { .. }
+        | Event::RuleLoaded { .. }
         | Event::UserMessage { .. }
         | Event::Recovered { .. }
         | Event::BudgetSet { .. }
@@ -854,6 +855,57 @@ async fn call_mcp(
     }
 }
 
+/// A done effect's result, followed by the rules the file it touched brings,
+/// the first time in the session (ADR-0025).
+async fn with_rules(
+    state: &State,
+    sid: &SessionId,
+    effect: u64,
+    result: crate::effects::Result,
+    ruled: Option<(std::path::PathBuf, std::path::PathBuf, std::path::PathBuf)>,
+) -> Result<crate::effects::Result, RpcError> {
+    Ok(match (result, ruled) {
+        (crate::effects::Result::Done { text, exit_code, truncated }, Some((path, ws, home))) => {
+            let given = rules_for(state, sid, effect, &path, &ws, &home).await?;
+            crate::effects::Result::Done { text: format!("{text}{given}"), exit_code, truncated }
+        }
+        (result, _) => result,
+    })
+}
+
+/// The rules (ADR-0025) whose paths match `path`, a file the effect read or
+/// changed, that the session hasn't been given as they are now: journaled
+/// as given, and their text to follow the effect's output. Empty for a file
+/// outside the workspace.
+async fn rules_for(
+    state: &State,
+    sid: &SessionId,
+    effect: u64,
+    path: &std::path::Path,
+    workspace: &std::path::Path,
+    strive_home: &std::path::Path,
+) -> Result<String, RpcError> {
+    use std::fmt::Write as _;
+    let Some(relative) = path.strip_prefix(workspace).ok().and_then(|r| r.to_str()).map(str::to_string) else {
+        return Ok(String::new());
+    };
+    let (ws, home) = (workspace.to_path_buf(), strive_home.to_path_buf());
+    let rules =
+        tokio::task::spawn_blocking(move || crate::context::rules(&ws, &home)).await.map_err(|e| internal(&e))?;
+    let mut out = String::new();
+    for rule in
+        rules.into_iter().filter(|r| !r.paths.is_empty() && strive_learning::rule_file::matches(&r.paths, &relative))
+    {
+        let digest = state.cas.put(rule.body.as_bytes()).map_err(|e| internal(&e))?;
+        let file = rule.file.strip_prefix(workspace).unwrap_or(&rule.file).display().to_string();
+        let event = Event::RuleLoaded { effect, name: rule.name.clone(), file: file.clone(), digest };
+        if state.sessions.load_rule(sid, event).await.map_err(session_error)? {
+            let _ = write!(out, "\n\n[The rule {file} applies to {relative}; follow it here:]\n{}", rule.body);
+        }
+    }
+    Ok(out)
+}
+
 /// An effect as `effect/run` has it ready: what to perform, as journaled,
 /// and the check it is, if it is one (which has its own gate).
 struct Prepared {
@@ -926,6 +978,13 @@ async fn run_effect(
                 }
             }
         };
+        // A file a read or change touches, for the rules it brings (ADR-0025).
+        let ruled = match (&request, target.path()) {
+            (EffectRequest::Read { .. } | EffectRequest::Write { .. } | EffectRequest::Edit { .. }, Some(p)) => {
+                Some((p.to_path_buf(), scope.workspace.clone(), scope.strive_home.clone()))
+            }
+            _ => None,
+        };
         let result = if let Some(why) = refusal {
             crate::effects::Result::Refused(why)
         } else {
@@ -962,6 +1021,7 @@ async fn run_effect(
                 .map_err(|e| internal(&e))?
             }
         };
+        let result = with_rules(state, &sid, effect, result, ruled).await?;
         let (outcome, text) = match result {
             crate::effects::Result::Done { text, exit_code, truncated } => {
                 let output = state.cas.put(text.as_bytes()).map_err(|e| internal(&e))?;

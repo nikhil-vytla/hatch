@@ -285,16 +285,22 @@ pub async fn review(c: &mut Client, id: Option<u64>, action: Option<Action>, ful
             if let Err(e) = c.request::<ProposalRollback>(ProposalRef { cwd, proposal: id }).await {
                 return Err(no_rollback(p, &rel).map_or(e, |why| anyhow!("nothing was rolled back: {why}")));
             }
-            match (&p.proposal.change, p.before) {
-                (Change::Memory(_), _) => println!("rolled back #{id}: its bullet in {rel} is as it was before"),
-                (Change::Skill { .. } | Change::Check { .. } | Change::Command { .. }, Some(_)) => {
-                    println!("rolled back #{id}: {rel} is as it was before");
-                }
-                (Change::Skill { .. } | Change::Check { .. } | Change::Command { .. }, None) => {
-                    println!("rolled back #{id}: removed {rel}, which didn't exist before");
-                }
-            }
+            println!("{}", rolled_back(p, &rel));
             Ok(ExitCode::SUCCESS)
+        }
+    }
+}
+
+/// What a rollback of `p` did, for a person.
+fn rolled_back(p: &ProposalState, rel: &str) -> String {
+    let id = p.id;
+    match (&p.proposal.change, p.before) {
+        (Change::Memory(_), _) => format!("rolled back #{id}: its bullet in {rel} is as it was before"),
+        (Change::Skill { .. } | Change::Check { .. } | Change::Command { .. } | Change::Rule { .. }, Some(_)) => {
+            format!("rolled back #{id}: {rel} is as it was before")
+        }
+        (Change::Skill { .. } | Change::Check { .. } | Change::Command { .. } | Change::Rule { .. }, None) => {
+            format!("rolled back #{id}: removed {rel}, which didn't exist before")
         }
     }
 }
@@ -338,7 +344,10 @@ fn page(p: &ProposalState, rel: &str, old: &str, titles: &Titles, full: bool) ->
             }
             None => writeln!(out, "\nit names a bullet the memory the learner saw doesn't have")?,
         },
-        Change::Skill { content, .. } | Change::Check { content, .. } | Change::Command { content, .. } => {
+        Change::Skill { content, .. }
+        | Change::Check { content, .. }
+        | Change::Command { content, .. }
+        | Change::Rule { content, .. } => {
             if p.before.is_none() {
                 writeln!(out, "\n{rel} is a new file")?;
             } else {
