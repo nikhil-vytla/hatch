@@ -304,6 +304,8 @@ export function AgentExperiment({ id, result }: { id: string; result: any }) {
               minZoom={0.3}
               maxZoom={1.2}
               nodesDraggable={false}
+              // The graph is an illustration: its edges have nothing to do when focused.
+              edgesFocusable={false}
               proOptions={{ hideAttribution: false }}
             >
               <Background gap={20} />

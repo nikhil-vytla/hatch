@@ -148,7 +148,7 @@ export function Handoff({ result }: { result: any }) {
         </label>
         <div className="handoff-grid">
           <Tradeoff decisions={decisions} threshold={threshold} />
-          <div className="stats-row handoff-stats">
+          <div className="stats-row handoff-stats" aria-live="polite">
             <Stat label="Jev handles" value={`${s.handled.toLocaleString()} (${pct(s.total ? s.handled / s.total : 0)})`} />
             <Stat label="Right among those" value={s.handled ? pct(1 - s.mistakes / s.handled) : "—"} />
             <Stat label="Mistakes nobody reviews" value={s.mistakes.toLocaleString()} />

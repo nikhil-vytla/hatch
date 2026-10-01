@@ -571,7 +571,7 @@ export function OceanReef() {
           </div>
 
           {outcome && (
-            <div className="reef-card reef-win">
+            <div className="reef-card reef-win" role="status">
               <b>
                 The reef after the {NAMES[outcome.kind]}: {pct(outcome.survived / Math.max(1, outcome.cohort))} survived
               </b>
