@@ -32,6 +32,7 @@ import type { SessionAttachResult } from "./SessionAttachResult";
 import type { SessionBudgetParams } from "./SessionBudgetParams";
 import type { SessionChangesParams } from "./SessionChangesParams";
 import type { SessionChangesResult } from "./SessionChangesResult";
+import type { SessionCommandsResult } from "./SessionCommandsResult";
 import type { SessionCreateParams } from "./SessionCreateParams";
 import type { SessionInfo } from "./SessionInfo";
 import type { SessionListParams } from "./SessionListParams";
@@ -63,6 +64,7 @@ export type Methods = {
   "approval/respond": { params: ApprovalRespondParams; result: Empty };
   "session/rewind": { params: SessionRewindParams; result: SessionRewindResult };
   "session/changes": { params: SessionChangesParams; result: SessionChangesResult };
+  "session/commands": { params: SessionRef; result: SessionCommandsResult };
   "learning/open": { params: ProjectRef; result: SessionInfo };
   "learning/run": { params: LearningRunParams; result: Appended };
   "learning/signals": { params: LearningSignalsParams; result: LearningSignalsResult };

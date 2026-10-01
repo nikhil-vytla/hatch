@@ -76,30 +76,12 @@ pub fn check(p: &Proposal, known: &[String], shown: Option<&str>) -> Vec<Finding
                 MemoryOp::Remove { .. } => ("bullet", ""),
             }
         }
-        Change::Skill { content, .. } => {
-            if content.len() > crate::SKILL_LIMIT {
+        Change::Skill { content, .. } | Change::Command { content, .. } | Change::Check { content, .. } => {
+            let limit = crate::file_limit(&artifact);
+            if content.len() > limit {
                 found.push(Finding::new(
                     Rule::Size,
-                    format!(
-                        "{} is {} bytes; the limit is {}",
-                        crate::describe(&artifact),
-                        content.len(),
-                        crate::SKILL_LIMIT
-                    ),
-                ));
-            }
-            ("content", content.as_str())
-        }
-        Change::Check { content, .. } => {
-            if content.len() > crate::CHECK_LIMIT {
-                found.push(Finding::new(
-                    Rule::Size,
-                    format!(
-                        "{} is {} bytes; the limit is {}",
-                        crate::describe(&artifact),
-                        content.len(),
-                        crate::CHECK_LIMIT
-                    ),
+                    format!("{} is {} bytes; the limit is {limit}", crate::describe(&artifact), content.len()),
                 ));
             }
             ("content", content.as_str())
@@ -245,6 +227,11 @@ fn form(p: &Proposal) -> Vec<String> {
             }
             Some(_) => {}
         }
+    }
+    if let Change::Command { content, .. } = &p.change
+        && let Err(problems) = crate::command_file::parse(content, true)
+    {
+        out.extend(problems);
     }
     if let Change::Check { name, content } = &p.change {
         match crate::check_file::parse(content) {

@@ -216,7 +216,7 @@ fn entries(events: Vec<Event>) -> Vec<Entry> {
 }
 
 fn prompt(text: &str) -> Event {
-    Event::UserMessage { text: text.into() }
+    Event::UserMessage { text: text.into(), command: None }
 }
 
 fn reply(text: &str) -> Event {

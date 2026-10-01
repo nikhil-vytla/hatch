@@ -188,6 +188,11 @@ Confining the host process to the daemon's socket and gateway is planned.
   each, frontmatter naming the command (`run`) and the paths it covers. The
   host is given each check's name and paths, not its command. A file that
   doesn't read as a check is skipped, with why, in `skipped`.
+- **Slash commands** ([ADR-0024](adrs/0024-slash-commands.md)):
+  `.strive/commands`, then `.claude/commands` and `~/.strive/commands`, each
+  `<name>.md`, a prompt `/name arguments` stands for. The daemon expands one
+  in `session/prompt` and journals the prompt with `command: {name,
+  arguments}`; `session/commands` lists them for clients.
 - **Imports:** a line `@path` in an instruction file, outside a code
   block, inlines that file if its real path is in the project (under its
   root, not in strive's home), up to five imports deep, and not as a
@@ -458,8 +463,9 @@ sandbox guard all of it:
   (the repository's, or the workspace outside one), since a later session
   may start in any directory:
   - `AGENTS.md` and `CLAUDE.md`;
-  - `.claude/skills`;
-  - `.strive/memory.md`, `.strive/skills` and `.strive/checks`, the learned files;
+  - `.claude/skills` and `.claude/commands`;
+  - `.strive/memory.md`, `.strive/skills`, `.strive/checks` and
+    `.strive/commands`, the learned files;
   - `.strive/settings.json`.
 
   strive's home adds `~/.strive/AGENTS.md` and `~/.strive/skills`, and the

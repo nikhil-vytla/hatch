@@ -55,6 +55,12 @@ strive is a coding agent. Its work sessions in this project are journaled: every
   run: <the command, one line>
   paths: <optional: comma-separated globs it applies to, such as packages/host/**; without it, any change>
   ---
+- Slash commands: \`.strive/commands/<name>.md\`, a prompt the user runs by typing \`/<name> <arguments>\`. Propose one when the user types the same multi-part request again and again (the same review steps, the same release checklist): the command saves them retyping it, and says it the same way each time. Its file is optional frontmatter, then the prompt, where \`$ARGUMENTS\` is what the user types after the name and \`$1\` to \`$9\` its words:
+  ---
+  description: <what it does, one line>
+  argument-hint: <optional: what to type after it, such as <pr number>>
+  ---
+  The prompt, written to the agent as the user would say it.
 
 # What is worth learning
 
@@ -161,15 +167,20 @@ export function learnerPrompt(config: AgentConfig): string {
       : ["# Skills", "", ...config.skills.map((s) => `- ${s.name}: ${s.description} (${s.path})`)].join("\n"),
   );
 
-  const checks = (config.learnedFiles ?? []).flatMap((f) =>
-    f.artifact.kind === "check" ? [{ name: f.artifact.name, text: f.text }] : [],
-  );
+  for (const [kind, title] of [
+    ["check", "Checks"],
+    ["command", "Slash commands"],
+  ] as const) {
+    const files = (config.learnedFiles ?? []).flatMap((f) =>
+      f.artifact.kind === kind ? [{ name: f.artifact.name, text: f.text }] : [],
+    );
 
-  parts.push(
-    checks.length === 0
-      ? "# Checks\n\nThere are none."
-      : ["# Checks", ...checks.map((c) => `## .strive/checks/${c.name}.md\n\n${c.text.trim()}`)].join("\n\n"),
-  );
+    parts.push(
+      files.length === 0
+        ? `# ${title}\n\nThere are none.`
+        : [`# ${title}`, ...files.map((c) => `## .strive/${kind}s/${c.name}.md\n\n${c.text.trim()}`)].join("\n\n"),
+    );
+  }
 
   return parts.join("\n\n");
 }
@@ -182,6 +193,9 @@ const SUMMARIZE = [
 
 const CHECK_NAME = "The check's file under .strive/checks, without .md: 1 to 40 of a-z, 0-9 and -";
 
+const COMMAND_NAME =
+  "The command, typed as /name: its file under .strive/commands, without .md; 1 to 40 of a-z, 0-9 and -";
+
 function artifactSchema() {
   return Type.Union([
     Type.Object({ kind: Type.Literal("memory") }),
@@ -190,6 +204,7 @@ function artifactSchema() {
       name: Type.String({ description: "The skill's directory under .strive/skills: 1 to 40 of a-z, 0-9 and -" }),
     }),
     Type.Object({ kind: Type.Literal("check"), name: Type.String({ description: CHECK_NAME }) }),
+    Type.Object({ kind: Type.Literal("command"), name: Type.String({ description: COMMAND_NAME }) }),
   ]);
 }
 
@@ -219,6 +234,11 @@ function changeSchema() {
       kind: Type.Literal("check"),
       name: Type.String({ description: CHECK_NAME }),
       content: Type.String({ description: "The check's whole file: frontmatter (name, description, run, paths)" }),
+    }),
+    Type.Object({
+      kind: Type.Literal("command"),
+      name: Type.String({ description: COMMAND_NAME }),
+      content: Type.String({ description: "The command's whole file: optional frontmatter, then its prompt" }),
     }),
   ]);
 }
@@ -430,11 +450,11 @@ class Learner {
 
     const text = learnedFile(this.config, artifact)?.text;
 
-    if (artifact.kind === "check") {
-      const at = join(this.config.cwd, ".strive/checks", `${artifact.name}.md`);
+    if (artifact.kind === "check" || artifact.kind === "command") {
+      const at = join(this.config.cwd, `.strive/${artifact.kind}s`, `${artifact.name}.md`);
 
       return text === undefined
-        ? `There is no check named ${artifact.name}. A proposal for it creates ${at}.`
+        ? `There is no ${artifact.kind} named ${artifact.name}. A proposal for it creates ${at}.`
         : `${at} exactly as it is now (a proposal replaces all of it):\n\n${text}`;
     }
 

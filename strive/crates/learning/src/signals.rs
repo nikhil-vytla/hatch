@@ -95,9 +95,11 @@ pub fn scan(session: &str, entries: &[Entry], after: u64) -> Vec<LearnSignal> {
                 }
             }
             Event::TurnStarted { .. } => after_turn = false,
-            Event::UserMessage { text } => {
-                if std::mem::take(&mut after_turn) && is_correction(text) {
-                    found.push((e.seq, SignalKind::Correction, excerpt(text)));
+            Event::UserMessage { text, command } => {
+                // What the person typed: a command's arguments, not the prompt it stands for.
+                let typed = command.as_ref().map_or(text.as_str(), |c| c.arguments.as_str());
+                if std::mem::take(&mut after_turn) && is_correction(typed) {
+                    found.push((e.seq, SignalKind::Correction, excerpt(typed)));
                 }
             }
             Event::ApprovalRequested { effect, description, .. } => asked.push((*effect, description)),

@@ -1532,3 +1532,24 @@ fn a_check_is_proposed_accepted_and_rolled_back_as_a_whole_file() {
     assert!(rollback(&env, &cwd, p).get("error").is_none());
     assert!(!file.exists(), "it didn't exist before");
 }
+
+/// A slash command (ADR-0024) is proposed, accepted and rolled back as a
+/// skill is, and once accepted `/name` is the prompt it stands for.
+#[test]
+fn a_command_is_proposed_accepted_and_rolled_back_as_a_whole_file() {
+    let env = Env::new();
+    let cwd = project();
+    let work = work_session(&env, &cwd);
+    let (mut host, id) = learner(&env, &cwd);
+    let command = |content: &str| proposing(&json!({"kind": "command", "name": "review", "content": content}), &work);
+    let unknown = propose(&mut host, &id, &command("---\nmodel: opus\n---\nReview it.\n"));
+    assert_fails(&env, &cwd, unknown, "form", "unknown field \"model\"");
+    let p = propose(&mut host, &id, &command("---\ndescription: Review a PR\n---\nReview PR $1.\n"));
+    assert_eq!(status(&env, &cwd, p), "ready");
+    assert!(decide(&env, &cwd, p, "accept").get("error").is_none());
+    common::slow_rpc(&env).ok("session/prompt", &json!({"id": work, "text": "/review 7"}));
+    let prompts = events(&env, &work, "userMessage");
+    assert_eq!(prompts.last().unwrap()["text"], "Review PR 7.");
+    assert!(rollback(&env, &cwd, p).get("error").is_none());
+    assert!(!cwd.join(".strive/commands/review.md").exists(), "it didn't exist before");
+}

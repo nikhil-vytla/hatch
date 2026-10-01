@@ -156,6 +156,7 @@ enum Cmd {
     /// A prompt, preceded by the checkpoint taken just before it.
     Prompt {
         text: String,
+        command: Option<strive_proto::CommandUse>,
         commit: Option<String>,
         reply: oneshot::Sender<io::Result<Vec<Entry>>>,
     },
@@ -440,10 +441,16 @@ impl Sessions {
     }
 
     /// Journals a prompt after the checkpoint taken for it.
-    pub async fn prompt(&self, id: &SessionId, text: String, commit: Option<String>) -> Result<Vec<Entry>> {
+    pub async fn prompt(
+        &self,
+        id: &SessionId,
+        text: String,
+        command: Option<strive_proto::CommandUse>,
+        commit: Option<String>,
+    ) -> Result<Vec<Entry>> {
         let (_, tx) = self.writer(id).await?;
         let (reply, rx) = oneshot::channel();
-        tx.send(Cmd::Prompt { text, commit, reply }).map_err(|_| writer_gone())?;
+        tx.send(Cmd::Prompt { text, command, commit, reply }).map_err(|_| writer_gone())?;
         Ok(rx.await.map_err(|_| writer_gone())??)
     }
 
@@ -1127,13 +1134,13 @@ impl Writer {
                 let e = Event::ModelCallFinished { call, outcome, response, duration_ms };
                 (vec![e], Box::new(move |r, _| drop(reply.send(r))))
             }
-            Cmd::Prompt { text, commit, reply } => {
+            Cmd::Prompt { text, command, commit, reply } => {
                 let mut events = Vec::new();
                 if let Some(commit) = commit {
                     self.checkpoints.push(commit.clone());
                     events.push(Event::Checkpointed { checkpoint: self.checkpoints.len() as u64, commit });
                 }
-                events.push(Event::UserMessage { text });
+                events.push(Event::UserMessage { text, command });
                 self.prompted = true;
                 (events, Box::new(move |r, _| drop(reply.send(r))))
             }
@@ -1334,7 +1341,10 @@ fn peek_info(id: &SessionId, dir: &Path) -> Option<SessionInfo> {
     let Event::SessionStarted { cwd, kind, .. } = first.event else { return None };
     let title = lines.take(PEEK_LINES).map_while(std::result::Result::ok).find_map(
         |line| match serde_json::from_str::<Entry>(line.trim_end()).ok()?.event {
-            Event::UserMessage { text } => Some(shorten(&text)),
+            Event::UserMessage { text, command: None } => Some(shorten(&text)),
+            Event::UserMessage { command: Some(c), .. } => {
+                Some(shorten(format!("/{} {}", c.name, c.arguments).trim_end()))
+            }
             _ => None,
         },
     );

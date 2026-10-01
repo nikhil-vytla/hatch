@@ -24,7 +24,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use strive_proto::{Artifact, CheckInfo, InstructionFile, SkillInfo};
+use strive_proto::{Artifact, CheckInfo, CommandInfo, InstructionFile, SkillInfo};
 
 const FILE_LIMIT: usize = 64 * 1024;
 const TOTAL_LIMIT: usize = 128 * 1024;
@@ -33,6 +33,7 @@ const IMPORT_DEPTH: usize = 5;
 /// Instruction file names; in a directory with both, the first wins.
 const INSTRUCTION_FILES: [&str; 2] = ["AGENTS.md", "CLAUDE.md"];
 const CLAUDE_SKILLS: &str = ".claude/skills";
+const CLAUDE_COMMANDS: &str = ".claude/commands";
 
 /// What changing a file on the list does, for the person asked about it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -54,10 +55,12 @@ pub enum Shapes {
 /// may start in any of its directories. Nothing else in a project is loaded.
 /// strive's home adds only its `AGENTS.md` and `skills`, and the agent can't
 /// write anything there.
-pub const SHAPING: [(&str, Shapes); 7] = [
+pub const SHAPING: [(&str, Shapes); 9] = [
     (INSTRUCTION_FILES[0], Shapes::Instructions),
     (INSTRUCTION_FILES[1], Shapes::Instructions),
     (CLAUDE_SKILLS, Shapes::Skills),
+    (CLAUDE_COMMANDS, Shapes::Skills),
+    (strive_learning::COMMANDS_DIR, Shapes::Learned),
     (strive_learning::MEMORY_PATH, Shapes::Learned),
     (strive_learning::SKILLS_DIR, Shapes::Learned),
     (strive_learning::CHECKS_DIR, Shapes::Learned),
@@ -123,10 +126,12 @@ impl Anchors {
     }
 
     /// Whether the loader may read `real`: on the list under the project's
-    /// root, or strive home's `AGENTS.md` or skills.
+    /// root, or strive home's `AGENTS.md`, skills or commands.
     fn listed(&self, real: &Path) -> bool {
         if real.starts_with(&self.home) {
-            return real == self.home.join("AGENTS.md") || real.starts_with(self.home.join("skills"));
+            return real == self.home.join("AGENTS.md")
+                || real.starts_with(self.home.join("skills"))
+                || real.starts_with(self.home.join("commands"));
         }
         shapes(&self.root, real).is_some()
     }
@@ -169,6 +174,49 @@ fn checks(workspace: &Path, at: &Anchors, skipped: &mut Vec<String>) -> Vec<Chec
         }
     }
     out
+}
+
+/// The slash commands a session can run (ADR-0024), each with the prompt it
+/// stands for: `.strive/commands` (reached without a symlink, and read as
+/// strictly as the static gate reads a proposed one), then `.claude/commands`
+/// and `~/.strive/commands`. The first of a name wins.
+pub fn commands(workspace: &Path, strive_home: &Path) -> Vec<(CommandInfo, String)> {
+    let at = Anchors::new(workspace, strive_home);
+    let learned = workspace.join(strive_learning::COMMANDS_DIR);
+    let mut found: Vec<(CommandInfo, String)> = Vec::new();
+    for root in [learned.clone(), workspace.join(CLAUDE_COMMANDS), strive_home.join("commands")] {
+        let Ok(entries) = fs::read_dir(&root) else { continue };
+        let mut names: Vec<String> = entries
+            .filter_map(Result::ok)
+            .filter_map(|e| e.file_name().to_str().and_then(|n| n.strip_suffix(".md")).map(str::to_string))
+            .filter(|n| strive_learning::valid_skill_name(n))
+            .collect();
+        names.sort();
+        for name in names {
+            if found.iter().any(|(c, _)| c.name == name) {
+                continue;
+            }
+            let file = root.join(format!("{name}.md"));
+            let real = if root == learned {
+                really_at(workspace, &Path::new(strive_learning::COMMANDS_DIR).join(format!("{name}.md")))
+            } else {
+                file.canonicalize().ok()
+            };
+            let Some(text) = real.filter(|r| at.listed(r)).and_then(|r| read_whole(&r, strive_learning::COMMAND_LIMIT))
+            else {
+                continue;
+            };
+            let Ok(c) = strive_learning::command_file::parse(&text, root == learned) else { continue };
+            let info = CommandInfo {
+                name,
+                description: c.description,
+                argument_hint: c.argument_hint,
+                path: file.display().to_string(),
+            };
+            found.push((info, c.body));
+        }
+    }
+    found
 }
 
 /// A check as its file says now, and the file's text.
@@ -274,6 +322,15 @@ pub fn learned(workspace: &Path, strive_home: &Path) -> Vec<(Artifact, String)> 
             .collect();
         names.sort();
         artifacts.extend(names.into_iter().map(|name| Artifact::Skill { name }));
+    }
+    if let Ok(entries) = fs::read_dir(workspace.join(strive_learning::COMMANDS_DIR)) {
+        let mut names: Vec<String> = entries
+            .filter_map(Result::ok)
+            .filter_map(|e| e.file_name().to_str().and_then(|n| n.strip_suffix(".md")).map(str::to_string))
+            .filter(|n| strive_learning::valid_skill_name(n))
+            .collect();
+        names.sort();
+        artifacts.extend(names.into_iter().map(|name| Artifact::Command { name }));
     }
     if let Ok(entries) = fs::read_dir(workspace.join(strive_learning::CHECKS_DIR)) {
         let mut names: Vec<String> = entries

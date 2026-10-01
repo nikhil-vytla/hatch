@@ -65,7 +65,12 @@ export class Conversation {
 
     switch (e.type) {
       case "userMessage":
-        this.items.push({ kind: "user", seq: entry.seq, text: e.text });
+        // A command reads as the person typed it.
+        this.items.push({
+          kind: "user",
+          seq: entry.seq,
+          text: e.command ? `/${e.command.name} ${e.command.arguments}`.trimEnd() : e.text,
+        });
 
         return;
       case "assistantMessage": {
