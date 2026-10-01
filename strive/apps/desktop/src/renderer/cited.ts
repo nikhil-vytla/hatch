@@ -21,6 +21,7 @@ export type Block = {
 const DID: Record<Extract<Entry["event"], { type: "effectStarted" }>["record"]["kind"], string> = {
   bash: "Ran",
   check: "Checked",
+  extension: "Called",
   read: "Read",
   edit: "Edited",
   write: "Wrote",

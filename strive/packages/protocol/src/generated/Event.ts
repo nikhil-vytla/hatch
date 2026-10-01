@@ -96,6 +96,10 @@ message: unknown, } | { "type": "turnEnded", turn: number, reason: TurnEnd, } | 
  */
 checks?: Array<string>, 
 /**
+ * The extensions loaded, by name (ADR-0027).
+ */
+extensions?: Array<string>, 
+/**
  * MCP servers from settings, and how each started.
  */
 mcp: Array<McpStatus>, 

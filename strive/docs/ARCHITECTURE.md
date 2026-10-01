@@ -202,6 +202,16 @@ Confining the host process to the daemon's socket and gateway is planned.
   without paths joins the instruction files, before memory. One with paths
   comes with the output of the first read, write or edit in the session of
   a file they match, journaled as `ruleLoaded`.
+- **Extensions** ([ADR-0027](adrs/0027-code-extensions.md)):
+  `.strive/extensions/<name>/`, an `extension.json` declaring tools (a JSON
+  Schema each) and the TypeScript that runs them. A work host is given
+  each tool, which the agent calls as `ext__<extension>__<tool>`. The
+  daemon reads the extension fresh for each call and runs a fixed runner,
+  `bun -e`, on it as a command in the sandbox, journaled as an `extension`
+  effect with the digest of its files. It runs unasked only in a form a
+  person accepted (an allowance `extension:<name>:<digest>` for the
+  session, for now), and one that fails three times in a session is left
+  out for the rest of it.
 - **Imports:** a line `@path` in an instruction file, outside a code
   block, inlines that file if its real path is in the project (under its
   root, not in strive's home), up to five imports deep, and not as a
@@ -474,7 +484,8 @@ sandbox guard all of it:
   - `AGENTS.md` and `CLAUDE.md`;
   - `.claude/skills`, `.claude/commands` and `.claude/rules`;
   - `.strive/memory.md`, `.strive/skills`, `.strive/checks`,
-    `.strive/commands` and `.strive/rules`, the learned files;
+    `.strive/commands`, `.strive/rules` and `.strive/extensions`, the
+    learned files;
   - `.strive/settings.json`.
 
   strive's home adds `~/.strive/AGENTS.md` and `~/.strive/skills`, and the

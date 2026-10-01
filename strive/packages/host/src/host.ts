@@ -8,6 +8,7 @@ import {
   describeError,
   type EffectRequest,
   type Entry,
+  type ExtensionInfo,
   type Event,
   type McpTool,
   type StriveClient,
@@ -134,9 +135,10 @@ function tool(
         .request("effect/run", { id: sessionId, callId: toolCallId, request })
         .finally(() => signal?.removeEventListener("abort", cancel));
 
+      // A command's exit code reaches the model; an extension's tool is one.
       const record =
-        request.kind === "bash"
-          ? { kind: "bash" as const, command: request.command, timeoutMs: 0 }
+        request.kind === "bash" || request.kind === "extension"
+          ? { kind: "bash" as const, command: "", timeoutMs: 0 }
           : { kind: "read" as const, path: "" };
 
       const { text, isError } = resultText(record, r.outcome, r.text);
@@ -258,12 +260,83 @@ function layoutProposalSchema() {
 
 const LayoutProposal = layoutProposalSchema();
 
-export function tools(client: StriveClient, sessionId: string, mcp: McpTool[] = []): AgentTool<any>[] {
+/**
+ * An extension tool's name as providers accept it (at most 64 characters):
+ * `ext__<extension>__<tool>`, or, past 64, its start and a short hash of both.
+ */
+export function extensionToolName(extension: string, tool: string): string {
+  const name = `ext__${extension}__${tool}`;
+
+  return name.length <= 64
+    ? name
+    : `${name.slice(0, 55)}_${Bun.hash(`${extension}\0${tool}`).toString(36).slice(0, 8)}`;
+}
+
+/** How many failed calls leave an extension out for the rest of the session (ADR-0027). */
+export const EXTENSION_FAILURES = 3;
+
+/**
+ * An extension's tool (ADR-0027): the daemon runs it as a command in the
+ * sandbox. One whose calls keep failing is left out for the session.
+ */
+function extensionTools(client: StriveClient, sessionId: string, extensions: ExtensionInfo[]): AgentTool<any>[] {
+  return extensions.flatMap((e) => {
+    let failures = 0;
+
+    return e.tools.map((t) => {
+      // SAFETY: the daemon checked that the declared parameters are a JSON Schema object.
+      const parameters = t.parameters as ReturnType<typeof Type.Object>;
+
+      const run = tool(
+        client,
+        sessionId,
+        extensionToolName(e.name, t.name),
+        `${t.description} (from the ${e.name} extension)`,
+        parameters,
+        (p) => ({
+          kind: "extension",
+          name: e.name,
+          tool: t.name,
+          arguments: p,
+        }),
+      );
+
+      const execute: typeof run.execute = async (...args) => {
+        if (failures >= EXTENSION_FAILURES)
+          throw new Error(
+            `the ${e.name} extension failed ${failures} times, so it's left out for the rest of this session`,
+          );
+
+        try {
+          const result = await run.execute(...args);
+          const text = result.content.map((c) => (c.type === "text" ? c.text : "")).join("");
+
+          if (/\[exit code \d+\]$/.test(text)) failures += 1;
+
+          return result;
+        } catch (err) {
+          failures += 1;
+          throw err;
+        }
+      };
+
+      return { ...run, execute };
+    });
+  });
+}
+
+export function tools(
+  client: StriveClient,
+  sessionId: string,
+  mcp: McpTool[] = [],
+  extensions: ExtensionInfo[] = [],
+): AgentTool<any>[] {
   const names = mcpToolNames(mcp);
 
   return [
     proposeLayout(client, sessionId),
     ...mcp.map((t, i) => mcpTool(client, sessionId, t, names[i] ?? t.name)),
+    ...extensionTools(client, sessionId, extensions),
     tool(
       client,
       sessionId,
@@ -321,7 +394,7 @@ export type AgentMode = {
 function codingMode(client: StriveClient, sessionId: string, config: AgentConfig): AgentMode {
   return {
     systemPrompt: systemPrompt(config),
-    tools: tools(client, sessionId, config.mcpTools),
+    tools: tools(client, sessionId, config.mcpTools, config.extensions),
     summarize: SUMMARIZE,
   };
 }

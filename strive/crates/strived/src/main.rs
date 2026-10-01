@@ -13,6 +13,7 @@ mod desktop;
 
 mod doctor;
 mod effects;
+mod extensions;
 mod gateway;
 mod hosts;
 mod judge;

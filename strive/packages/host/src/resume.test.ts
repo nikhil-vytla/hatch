@@ -24,6 +24,7 @@ const config = (baseUrl: string): AgentConfig => ({
   instructions: [],
   skills: [],
   checks: [],
+  extensions: [],
   mcpTools: [],
 });
 
