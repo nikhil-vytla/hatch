@@ -36,7 +36,7 @@ const findings = [
 const scenes = [
   { id: "music", action: "Play a phrase. Keep the part you like.", label: "Sound & composition" },
   { id: "tetris", action: "Take over. Rewind. Try another landing.", label: "Play & compare" },
-  { id: "crowd", action: "Change a notice. Follow one resident.", label: "A world of decisions" },
+  { id: "win-over", action: "Say anything. Win the town over by 5 pm.", label: "A town that judges you" },
   { id: "visual-search", action: "Find an artwork. Make a collection.", label: "Search & collect" },
 ] as const;
 
@@ -116,7 +116,12 @@ export function PlayPage() {
           {scenes.map((scene) => (
             <a className={`play-scene play-scene-${scene.id}`} href={`#experiment/${scene.id}`} key={scene.id}>
               <div className="play-scene-image">
-                {scene.id === "music" ? <MusicFigure /> : <MiniExperimentPreview kind={scene.id} />}
+                {scene.id === "music" ? (
+                  <MusicFigure />
+                ) : (
+                  // The town keeps the square's courtyard thumbnail.
+                  <MiniExperimentPreview kind={scene.id === "win-over" ? "crowd" : scene.id} />
+                )}
               </div>
               <p className="play-kicker">{scene.label}</p>
               <h3>{lookup(scene.id).title}<ArrowUpRight size={18} /></h3>

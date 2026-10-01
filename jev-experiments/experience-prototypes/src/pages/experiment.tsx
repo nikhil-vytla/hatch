@@ -7,7 +7,7 @@ import { Provenance } from "../provenance";
 import { experimentNotes } from "../notes/manifest";
 import "./experiment.css";
 
-const sceneEntries = new Set(["tetris", "crowd", "music", "routing", "visual-search"]);
+const sceneEntries = new Set(["tetris", "win-over", "music", "routing", "visual-search"]);
 
 const Paste = lazy(() => import("../new-experiments").then(m => ({ default: m.Paste })));
 const LayoutStudy = lazy(() => import("../layout-study").then(m => ({ default: m.LayoutStudy })));
@@ -31,7 +31,7 @@ const IconStudio = lazy(() => import("../icon-studio").then(m => ({ default: m.I
 const TetrisExperience = lazy(() => import("../tetris-experience").then(m => ({ default: m.TetrisExperience })));
 const GhostBrush = lazy(() => import("../ghost-brush").then(m => ({ default: m.GhostBrush })));
 const RumourMill = lazy(() => import("../rumour-mill").then(m => ({ default: m.RumourMill })));
-const LiveCrowd = lazy(() => import("../live-crowd").then(m => ({ default: m.LiveCrowd })));
+const WinOver = lazy(() => import("../win-over").then(m => ({ default: m.WinOver })));
 const DrawingFraming = lazy(() => import("../outcome-framing").then(m => ({ default: m.DrawingFraming })));
 const ArcadeScene = lazy(() => import("../arcade-scene").then(m => ({ default: m.ArcadeScene })));
 const ModelRoutingLab = lazy(() => import("../../../roadmap/routing/ModelRoutingLab").then(m => ({ default: m.ModelRoutingLab })));
@@ -95,10 +95,10 @@ function View({
       return <IconStudio result={result} />;
     case "ghost-brush":
       return <GhostBrush />;
-    case "crowd":
-      return <LiveCrowd />;
     case "rumour-mill":
       return <RumourMill />;
+    case "win-over":
+      return <WinOver />;
     case "routing":
       return <ModelRoutingLab />;
     case "classify":
@@ -180,7 +180,7 @@ function LiveExperimentPage({ id }: { id: string }) {
     setRecord(null);
     setError("");
     setAboutOpen(false);
-    if (id === "routing" || id === "decoy" || id === "rumour-mill") {
+    if (id === "routing" || id === "decoy" || id === "rumour-mill" || id === "win-over") {
       setRecord({ result: {} });
       return () => {
         alive = false;
