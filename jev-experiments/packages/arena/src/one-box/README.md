@@ -1,6 +1,6 @@
 # One-box phrase set
 
-`phrases.json` holds 200 short phrases, written from an American point of view, for the "one text box that becomes the right card" experiment. The experiment is based on [anishfn/shapeshift](https://github.com/anishfn/shapeshift). Each phrase has an expected card intent. Ambiguous phrases also list the other intents that are fair answers. Each phrase carries only the signals it clearly settles. The set scores several classifiers (a large model, a keyword/regex classifier and a tiny model) against the same answers. `phrases.ts` validates the file (`schema: "one-box.phrases/1"`).
+`phrases.json` holds 200 short phrases, written from an American point of view, for the "one text box that becomes the right card" experiment. The experiment is based on [anishfn/shapeshift](https://github.com/anishfn/shapeshift). Each phrase has an expected card intent. Ambiguous phrases also list the other intents that are fair answers. Each phrase carries only the signals it clearly settles. The set scores several classifiers (a large model, a keyword/regex classifier and a local open model) against the same answers. `phrases.ts` validates the file (`schema: "one-box.phrases/1"`).
 
 ## How it was written
 

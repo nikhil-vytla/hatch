@@ -73,13 +73,6 @@ const RECORDED = new Map<string, Who>(
       policy: "all 14 questions in one request per keystroke prefix",
       color: PALETTE.jev,
     },
-    tiny: {
-      name: "Tiny in-browser model",
-      short: "Tiny model",
-      kind: "local",
-      policy: "a small classifier trained on text written for it, run in the browser",
-      color: PALETTE.small,
-    },
     laya: {
       name: "Laya",
       short: "Laya",
