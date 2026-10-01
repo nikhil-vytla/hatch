@@ -18,6 +18,7 @@ const Learning = lazy(() => import("../benchmarks").then(m => ({ default: m.Lear
 const IntentRecognition = lazy(() => import("../intent-recognition").then(m => ({ default: m.IntentRecognition })));
 const Handoff = lazy(() => import("../handoff").then(m => ({ default: m.Handoff })));
 const Decoy = lazy(() => import("../decoy").then(m => ({ default: m.Decoy })));
+const OceanReef = lazy(() => import("../ocean-reef").then(m => ({ default: m.OceanReef })));
 const AnswerKey = lazy(() => import("../answer-key").then(m => ({ default: m.AnswerKey })));
 const RewardBench = lazy(() => import("../rewardbench").then(m => ({ default: m.RewardBench })));
 const LocalModels = lazy(() => import("../local-models").then(m => ({ default: m.LocalModels })));
@@ -105,6 +106,8 @@ function View({
       return <IntentRecognition result={result} />;
     case "handoff":
       return <Handoff result={result} />;
+    case "ocean":
+      return <OceanReef />;
     case "decoy":
       return <Decoy />;
     case "rewardbench2":
@@ -180,7 +183,7 @@ function LiveExperimentPage({ id }: { id: string }) {
     setRecord(null);
     setError("");
     setAboutOpen(false);
-    if (id === "routing" || id === "decoy" || id === "rumour-mill" || id === "win-over") {
+    if (id === "routing" || id === "decoy" || id === "rumour-mill" || id === "win-over" || id === "ocean") {
       setRecord({ result: {} });
       return () => {
         alive = false;
