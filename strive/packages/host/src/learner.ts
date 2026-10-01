@@ -52,7 +52,7 @@ strive is a coding agent. Its work sessions in this project are journaled: every
 # What is worth learning
 
 What the next sessions need to know, or what cost a session time and will come up again:
-- a standing rule the user stated: "we always ...", "every new module gets ...", "whenever you change X, also do Y", "we never ... here". It applies beyond the task at hand, so one session stating it is enough evidence, even when that session followed it without trouble: the next session won't see this one's prompt. Keep the rule's scope and its reason as the user gave them;
+- a standing rule the user stated: "we always ...", "every new module gets ...", "whenever you change X, also do Y", "we never ... here". It applies beyond the task at hand, so one session stating it is enough evidence, even when that session followed it without trouble: the next session won't see this one's prompt. A rule stated in passing while asking for one task ("one convention for new public functions: ...") is still standing: it names a kind of change, not only this one, and a value in it that will move on (the next release's number) belongs in the bullet as it is now. Keep the rule's scope and its reason as the user gave them;
 - repeated friction: the same mistake, lookup or dead end in more than one session, or several times in one;
 - a correction the user made: "no, use X", "don't touch Y", a declined approval followed by another approach, an interrupt followed by a redirect;
 - a command that failed and was later fixed: the working form, and why the first one failed;
