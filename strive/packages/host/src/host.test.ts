@@ -386,14 +386,14 @@ function writeCheck(cwd: string, name: string, run: string, paths?: string) {
   );
 }
 
-/** A person attached to the session, who allows each check for the session when asked. */
+/** A person attached to the session, who allows each check or extension for the session when asked. */
 async function allowChecks(id: string) {
   const person = await connect();
 
   person.on("session/entry", ({ entry }) => {
     const e = entry.event;
 
-    if (e.type === "approvalRequested" && e.sessionFile?.startsWith("check:"))
+    if (e.type === "approvalRequested" && /^(check|extension):/.test(e.sessionFile ?? ""))
       void person.request("approval/respond", { id, effect: e.effect, decision: "allowSession" });
   });
   await person.request("session/attach", { id });
@@ -498,4 +498,56 @@ test("a check no one has accepted isn't sent to the agent, which can't fix that"
   expect(checkRuns(e)).toHaveLength(1);
   expect(fake!.requests).toHaveLength(2);
   expect(e.at(-1)).toEqual({ type: "turnEnded", turn: 1, reason: { kind: "done" } });
+});
+
+function writeExtension(cwd: string, body: string) {
+  const dir = join(cwd, ".strive/extensions/shout");
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(
+    join(dir, "extension.json"),
+    JSON.stringify({
+      name: "shout",
+      description: "Says things loudly",
+      tools: [
+        {
+          name: "loud",
+          description: "The text in capitals",
+          parameters: { type: "object", properties: { text: { type: "string" } } },
+        },
+      ],
+    }),
+  );
+  writeFileSync(join(dir, "index.ts"), body);
+}
+
+const toolResult = (req: any) => JSON.stringify(req.messages.at(-1).content);
+
+test("the agent calls an extension's tool, which runs in the sandbox once a person allows it", async () => {
+  const { client, id, cwd } = await setup([
+    { toolCalls: [{ id: "toolu_1", name: "ext__shout__loud", input: { text: "hi" } }] },
+    { text: "It said HI." },
+  ]);
+
+  writeExtension(cwd, "export const tools = { loud: async ({ text }: { text: string }) => text.toUpperCase() };\n");
+  await allowChecks(id);
+  await client.request("session/prompt", { id, text: "shout hi" });
+  const e = await waitFor(client, id, turnsEnded(1));
+
+  expect(fake!.requests[0].tools.map((t: any) => t.name)).toContain("ext__shout__loud");
+  expect(toolResult(fake!.requests[1])).toContain("HI");
+  expect(e.some((x) => x.type === "effectStarted" && x.record.kind === "extension")).toBe(true);
+});
+
+test("an extension that keeps failing is left out for the rest of the session", async () => {
+  const call = (n: number) => ({ toolCalls: [{ id: `toolu_${n}`, name: "ext__shout__loud", input: { text: "x" } }] });
+  const { client, id, cwd } = await setup([call(1), call(2), call(3), call(4), { text: "Giving up." }]);
+
+  writeExtension(cwd, 'export const tools = { loud: async () => { throw new Error("broken"); } };\n');
+  await allowChecks(id);
+  await client.request("session/prompt", { id, text: "shout" });
+  const e = await waitFor(client, id, turnsEnded(1));
+
+  // Three calls ran and failed; the fourth wasn't run.
+  expect(e.filter((x) => x.type === "effectStarted" && x.record.kind === "extension")).toHaveLength(3);
+  expect(toolResult(fake!.requests[4])).toContain("left out for the rest of this session");
 });

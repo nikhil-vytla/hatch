@@ -56,6 +56,8 @@ async function recordText(record: EffectRecord, blob: Blob): Promise<string> {
       return `ran \`${record.command}\``;
     case "check":
       return `ran the check ${record.name}: \`${record.command}\``;
+    case "extension":
+      return `called ${record.name}'s ${record.tool} ${cut(await blob(record.arguments), LIMITS.change)}`;
     case "read":
       return `read ${record.path}${record.offset === undefined ? "" : ` from line ${record.offset}`}`;
     case "write":

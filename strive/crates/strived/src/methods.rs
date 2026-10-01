@@ -420,6 +420,12 @@ async fn host_config(state: &Arc<State>, sid: &SessionId) -> Reply {
         skills: ctx.skills,
         // The learner runs nothing, so it has no checks to run.
         checks: if info.kind == Some(SessionKind::Learning) { Vec::new() } else { ctx.checks },
+        // Nor tools of its own beyond its proposals.
+        extensions: if info.kind == Some(SessionKind::Learning) {
+            Vec::new()
+        } else {
+            ctx.extensions.into_iter().map(|e| e.info).collect()
+        },
         mcp_tools: mcp.tools,
         kind: info.kind,
         learned_files: learned,
@@ -510,6 +516,7 @@ async fn load_context(
         instructions: files,
         skills: ctx.skills.iter().map(|s| s.name.clone()).collect(),
         checks: ctx.checks.iter().map(|c| c.name.clone()).collect(),
+        extensions: ctx.extensions.iter().map(|e| e.info.name.clone()).collect(),
         mcp: mcp.status.clone(),
         learned: shown,
         skipped: (!ctx.skipped.is_empty()).then(|| ctx.skipped.clone()),
@@ -777,33 +784,7 @@ async fn route_effect(state: &Arc<State>, method: &str, params: Value) -> Reply 
                 unconfined: state.settings.sandbox == crate::settings::SandboxSetting::Off,
                 imports,
             };
-            // A check runs the command its file holds now (ADR-0023), not one the host names.
-            let (request, record, check) = match request {
-                EffectRequest::Check { name } => {
-                    let (ws, home, n) = (scope.workspace.clone(), scope.strive_home.clone(), name.clone());
-                    let (found, text) = tokio::task::spawn_blocking(move || crate::context::check(&ws, &home, &n))
-                        .await
-                        .map_err(|e| internal(&e))?
-                        .map_err(|why| {
-                            RpcError::new(RpcError::INVALID_PARAMS, format!("the check {name} can't run: {why}"))
-                        })?;
-                    let digest = strive_journal::cas::digest(text.as_bytes());
-                    let proposed = crate::checks::proposed(state, &info.cwd, &name, &digest);
-                    let timeout_ms = found.timeout_secs * 1000;
-                    let record = strive_proto::EffectRecord::Check {
-                        name: name.clone(),
-                        command: found.run.clone(),
-                        timeout_ms,
-                        note: found.body,
-                    };
-                    let check = CheckRun { allowance: crate::checks::allowance(&name, &digest), name, proposed };
-                    (EffectRequest::Bash { command: found.run, timeout_ms: Some(timeout_ms) }, record, Some(check))
-                }
-                request => {
-                    let record = crate::effects::record(&state.cas, &request).map_err(|e| internal(&e))?;
-                    (request, record, None)
-                }
-            };
+            let (request, record, check) = prepare(state, &info.cwd, &scope, request).await?;
             let Some(_running) = state.sessions.begin_effect() else {
                 return Err(RpcError::new(RpcError::INTERNAL_ERROR, "the daemon is stopping"));
             };
@@ -911,13 +892,85 @@ async fn rules_for(
 struct Prepared {
     request: EffectRequest,
     record: strive_proto::EffectRecord,
-    check: Option<CheckRun>,
+    check: Option<Accepting>,
 }
 
-/// A check about to run (ADR-0023): whether an applied proposal holds its
-/// content, and the session allowance that would cover it as it is.
-struct CheckRun {
-    name: String,
+/// What `effect/run` performs and journals for `request`: a check's or an
+/// extension's command, read from the project's files now (ADR-0023,
+/// ADR-0027), with what accepting it takes; any other request as it is.
+async fn prepare(
+    state: &State,
+    cwd: &str,
+    scope: &crate::effects::Scope,
+    request: EffectRequest,
+) -> Result<(EffectRequest, strive_proto::EffectRecord, Option<Accepting>), RpcError> {
+    Ok(match request {
+        EffectRequest::Check { name } => {
+            let (ws, home, n) = (scope.workspace.clone(), scope.strive_home.clone(), name.clone());
+            let (found, text) = tokio::task::spawn_blocking(move || crate::context::check(&ws, &home, &n))
+                .await
+                .map_err(|e| internal(&e))?
+                .map_err(|why| RpcError::new(RpcError::INVALID_PARAMS, format!("the check {name} can't run: {why}")))?;
+            let digest = strive_journal::cas::digest(text.as_bytes());
+            let proposed = crate::checks::proposed(state, cwd, &name, &digest);
+            let timeout_ms = found.timeout_secs * 1000;
+            let record = strive_proto::EffectRecord::Check {
+                name: name.clone(),
+                command: found.run.clone(),
+                timeout_ms,
+                note: found.body,
+            };
+            let check = Accepting {
+                what: format!("the check {name}"),
+                detail: found.run.clone(),
+                allowance: crate::checks::allowance(&name, &digest),
+                proposed,
+            };
+            (EffectRequest::Bash { command: found.run, timeout_ms: Some(timeout_ms) }, record, Some(check))
+        }
+        EffectRequest::Extension { name, tool, arguments } => {
+            let (ws, n) = (scope.workspace.clone(), name.clone());
+            let found = tokio::task::spawn_blocking(move || crate::context::extension(&ws, &n))
+                .await
+                .map_err(|e| internal(&e))?
+                .map_err(|why| {
+                    RpcError::new(RpcError::INVALID_PARAMS, format!("the extension {name} can't run: {why}"))
+                })?;
+            let run = crate::extensions::run(&scope.workspace, &found, &tool, &arguments)
+                .map_err(|why| RpcError::new(RpcError::INVALID_PARAMS, why))?;
+            let digest =
+                state.cas.put(&strive_learning::extension_dir::canonical(&found.files)).map_err(|e| internal(&e))?;
+            let args = serde_json::to_vec(&arguments).map_err(|e| internal(&e))?;
+            let record = strive_proto::EffectRecord::Extension {
+                name: name.clone(),
+                tool: tool.clone(),
+                arguments: state.cas.put(&args).map_err(|e| internal(&e))?,
+                extension: digest,
+            };
+            let accepting = Accepting {
+                what: format!("{name}'s tool {tool}"),
+                detail: String::new(),
+                allowance: crate::extensions::allowance(&name, &digest),
+                // Until extensions are proposed (ADR-0027's second part), only a
+                // person's allow for the session accepts one.
+                proposed: false,
+            };
+            (run, record, Some(accepting))
+        }
+        request => {
+            let record = crate::effects::record(&state.cas, &request).map_err(|e| internal(&e))?;
+            (request, record, None)
+        }
+    })
+}
+
+/// A command the project's files say to run, a check's (ADR-0023) or an
+/// extension's tool (ADR-0027): what a person is asked about, whether an
+/// applied proposal holds it as it is, and the session allowance that
+/// would cover it as it is.
+struct Accepting {
+    what: String,
+    detail: String,
     proposed: bool,
     allowance: std::path::PathBuf,
 }
@@ -939,9 +992,9 @@ async fn run_effect(
         let (mode, allowed) = state.sessions.approvals(&sid).await.map_err(session_error)?;
         let cancel = cancelled.clone();
         let (gate, target) = match (&check, &request) {
-            (Some(c), EffectRequest::Bash { command, .. }) => {
+            (Some(c), EffectRequest::Bash { .. }) => {
                 let accepted = c.proposed || allowed.contains(&c.allowance);
-                crate::effects::check_gate(&scope, &c.name, command, accepted, &c.allowance)
+                crate::effects::accepted_gate(&scope, &c.what, &c.detail, accepted, &c.allowance)
             }
             _ => crate::effects::gate(&scope, &request, mode, &allowed),
         };

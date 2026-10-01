@@ -3,4 +3,4 @@
 /**
  * What the agent asked the daemon to do, as the protocol carries it.
  */
-export type EffectRequest = { "kind": "read", path: string, offset?: number, limit?: number, } | { "kind": "write", path: string, content: string, } | { "kind": "edit", path: string, oldText: string, newText: string, } | { "kind": "mcp", server: string, tool: string, arguments: unknown, } | { "kind": "bash", command: string, timeoutMs?: number, } | { "kind": "check", name: string, };
+export type EffectRequest = { "kind": "read", path: string, offset?: number, limit?: number, } | { "kind": "write", path: string, content: string, } | { "kind": "edit", path: string, oldText: string, newText: string, } | { "kind": "mcp", server: string, tool: string, arguments: unknown, } | { "kind": "bash", command: string, timeoutMs?: number, } | { "kind": "check", name: string, } | { "kind": "extension", name: string, tool: string, arguments: unknown, };

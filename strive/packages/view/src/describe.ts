@@ -151,6 +151,8 @@ export function describe(entry: Entry, options: DescribeOptions = {}): Line[] {
           return note("muted", `$ ${r.command}`);
         case "check":
           return note("muted", `check ${r.name}: $ ${r.command}`);
+        case "extension":
+          return note("muted", `${r.name}: ${r.tool}`);
         case "write":
           return note("muted", `write ${r.path} (${r.bytes} bytes)`);
         case "read":

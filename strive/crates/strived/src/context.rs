@@ -24,7 +24,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use strive_proto::{Artifact, CheckInfo, CommandInfo, InstructionFile, SkillInfo};
+use strive_proto::{Artifact, CheckInfo, CommandInfo, ExtensionInfo, ExtensionTool, InstructionFile, SkillInfo};
 
 const FILE_LIMIT: usize = 64 * 1024;
 const TOTAL_LIMIT: usize = 128 * 1024;
@@ -56,7 +56,7 @@ pub enum Shapes {
 /// may start in any of its directories. Nothing else in a project is loaded.
 /// strive's home adds only its `AGENTS.md` and `skills`, and the agent can't
 /// write anything there.
-pub const SHAPING: [(&str, Shapes); 11] = [
+pub const SHAPING: [(&str, Shapes); 12] = [
     (INSTRUCTION_FILES[0], Shapes::Instructions),
     (INSTRUCTION_FILES[1], Shapes::Instructions),
     (CLAUDE_SKILLS, Shapes::Skills),
@@ -64,6 +64,7 @@ pub const SHAPING: [(&str, Shapes); 11] = [
     (CLAUDE_RULES, Shapes::Skills),
     (strive_learning::COMMANDS_DIR, Shapes::Learned),
     (strive_learning::RULES_DIR, Shapes::Learned),
+    (strive_learning::EXTENSIONS_DIR, Shapes::Learned),
     (strive_learning::MEMORY_PATH, Shapes::Learned),
     (strive_learning::SKILLS_DIR, Shapes::Learned),
     (strive_learning::CHECKS_DIR, Shapes::Learned),
@@ -95,6 +96,7 @@ pub struct Context {
     pub instructions: Vec<InstructionFile>,
     pub skills: Vec<SkillInfo>,
     pub checks: Vec<CheckInfo>,
+    pub extensions: Vec<Extension>,
     /// Imports not loaded, each a line for a person saying which and why.
     pub skipped: Vec<String>,
 }
@@ -156,7 +158,8 @@ pub fn load(workspace: &Path, strive_home: &Path) -> Context {
     let instructions = instructions(workspace, strive_home, &at, &mut found);
     let skills = skills(workspace, strive_home, &at);
     let checks = checks(workspace, &at, &mut found.skipped);
-    Context { instructions, skills, checks, skipped: found.skipped }
+    let extensions = extensions(workspace, &mut found.skipped);
+    Context { instructions, skills, checks, extensions, skipped: found.skipped }
 }
 
 /// The project's checks (ADR-0023): each `.strive/checks/<name>.md` that
@@ -295,6 +298,81 @@ fn instructions(workspace: &Path, strive_home: &Path, at: &Anchors, found: &mut 
         out.push(memory);
     }
     out
+}
+
+/// An extension as loaded (ADR-0027): what a host is told, and its files.
+pub struct Extension {
+    pub info: ExtensionInfo,
+    pub files: Vec<strive_learning::extension_dir::File>,
+}
+
+/// The project's extensions, each `.strive/extensions/<name>/` reached
+/// without a symlink whose files read as an extension. One that doesn't is
+/// noted in `skipped` with why.
+pub fn extensions(workspace: &Path, skipped: &mut Vec<String>) -> Vec<Extension> {
+    let Ok(entries) = fs::read_dir(workspace.join(strive_learning::EXTENSIONS_DIR)) else { return Vec::new() };
+    let mut names: Vec<String> = entries
+        .filter_map(Result::ok)
+        .filter(|e| e.path().is_dir())
+        .filter_map(|e| e.file_name().to_str().map(str::to_string))
+        .filter(|n| strive_learning::valid_skill_name(n))
+        .collect();
+    names.sort();
+    let mut out = Vec::new();
+    for name in names {
+        match extension(workspace, &name) {
+            Ok(e) => out.push(e),
+            Err(why) => skipped.push(format!("{}/{name} was not loaded: {why}", strive_learning::EXTENSIONS_DIR)),
+        }
+    }
+    out
+}
+
+/// The extension `name` as its files are now.
+pub fn extension(workspace: &Path, name: &str) -> Result<Extension, String> {
+    use strive_learning::extension_dir::{self, File};
+    if !strive_learning::valid_skill_name(name) {
+        return Err(format!("the name {name:?} isn't 1 to 40 of a-z, 0-9 and -"));
+    }
+    let relative = Path::new(strive_learning::EXTENSIONS_DIR).join(name);
+    let dir = really_at(workspace, &relative)
+        .filter(|d| d.is_dir())
+        .ok_or_else(|| "it isn't a directory in the project reached without a symlink".to_string())?;
+    let mut files = Vec::new();
+    let mut stack = vec![dir.clone()];
+    while let Some(at) = stack.pop() {
+        let entries = fs::read_dir(&at).map_err(|e| format!("{} can't be read: {e}", at.display()))?;
+        for entry in entries.filter_map(Result::ok) {
+            let path = entry.path();
+            let shown = path.strip_prefix(&dir).unwrap_or(&path).display().to_string();
+            // Not followed: what an extension runs is what is really in its directory.
+            let meta = fs::symlink_metadata(&path).map_err(|e| format!("{shown} can't be read: {e}"))?;
+            if meta.is_dir() {
+                if files.len() + stack.len() > extension_dir::FILES {
+                    return Err(format!("it has more than {} files", extension_dir::FILES));
+                }
+                stack.push(path);
+            } else if meta.is_file() {
+                let content = read_whole(&path, extension_dir::LIMIT).ok_or_else(|| {
+                    format!("{shown} isn't UTF-8 text of at most {} KiB", extension_dir::LIMIT / 1024)
+                })?;
+                files.push(File { path: shown, content });
+                if files.len() > extension_dir::FILES {
+                    return Err(format!("it has more than {} files", extension_dir::FILES));
+                }
+            } else {
+                return Err(format!("{shown} is a link or a special file"));
+            }
+        }
+    }
+    files.sort_by(|a, b| a.path.cmp(&b.path));
+    let manifest = extension_dir::parse(name, &files).map_err(|p| p.join("; "))?;
+    let tools = manifest
+        .tools
+        .into_iter()
+        .map(|t| ExtensionTool { name: t.name, description: t.description, parameters: t.parameters })
+        .collect();
+    Ok(Extension { info: ExtensionInfo { name: name.to_string(), description: manifest.description, tools }, files })
 }
 
 /// A rule as loaded (ADR-0025).

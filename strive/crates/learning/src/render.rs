@@ -47,6 +47,9 @@ fn record_text(record: &EffectRecord, blob: Blob) -> String {
     match record {
         EffectRecord::Bash { command, .. } => format!("ran `{command}`"),
         EffectRecord::Check { name, command, .. } => format!("ran the check {name}: `{command}`"),
+        EffectRecord::Extension { name, tool, arguments, .. } => {
+            format!("called {name}'s {tool} {}", cut(&blob_text(blob, arguments), CHANGE))
+        }
         EffectRecord::Read { path, offset, .. } => match offset {
             Some(o) => format!("read {path} from line {o}"),
             None => format!("read {path}"),

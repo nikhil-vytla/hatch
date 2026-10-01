@@ -1,6 +1,6 @@
 # ADR-0027: Code extensions: tools the agent writes, run in the command sandbox
 
-Status: proposed (2026-10-01). The extension plan's second milestone, after
+Status: accepted (2026-10-01); building. The extension plan's second milestone, after
 the declarative extensions (ADR-0023 to ADR-0025).
 
 ## Context
@@ -33,11 +33,11 @@ by Bun, the runtime strive's host already ships.
 
 The agent calls an extension tool like any other (`ext__<name>__<tool>`).
 The host asks the daemon (`effect/run {kind: "extension", name, tool,
-arguments}`); the daemon reads the extension from disk, checks the
-arguments against the declared schema, and runs `bun` on a fixed runner
-with the extension's directory, the tool's name and the arguments on
-stdin, in the same sandbox as any command, with the same time limit and
-cancel. The tool's return value, on stdout, is the result; the call is
+arguments}`); the daemon reads the extension from disk, checks that the
+tool is declared and its arguments are an object, and runs `bun -e` on a
+fixed runner, inline, with the extension's directory, the tool's name and
+the arguments as its arguments, in the same sandbox as any command, with
+the same time limit and cancel. The tool's return value, on stdout, is the result; the call is
 journaled as an `extension` effect with the extension's digest.
 
 So extension code can do exactly what a sandboxed command can, and nothing
@@ -78,8 +78,8 @@ work session gets a `propose_extension` tool that turns a draft directory
 (`.strive/drafts/extensions/<name>`, not loaded, not guarded) into a
 proposal, journaled in the project's learning session with the work
 session as its origin. It goes through every gate, and nothing is live
-until a person accepts it. The agent develops against the draft with
-`strive ext test <name>` as an ordinary command.
+until a person accepts it. The agent develops against the draft with `bun
+test` as an ordinary command.
 
 ### Safe mode, and one that keeps failing
 

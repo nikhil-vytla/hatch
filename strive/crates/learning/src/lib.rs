@@ -15,6 +15,7 @@
 pub mod check_file;
 mod checks;
 pub mod command_file;
+pub mod extension_dir;
 mod fold;
 pub mod judge;
 pub mod memory;
@@ -48,6 +49,10 @@ pub const CHECK_LIMIT: usize = 4 * 1024;
 pub const COMMANDS_DIR: &str = ".strive/commands";
 /// The most a command's file may hold, in bytes.
 pub const COMMAND_LIMIT: usize = 16 * 1024;
+/// Where extensions live, relative to the project: a directory each (ADR-0027).
+pub const EXTENSIONS_DIR: &str = ".strive/extensions";
+/// Where a work session drafts an extension before proposing it (ADR-0027).
+pub const DRAFTS_DIR: &str = ".strive/drafts/extensions";
 /// Where rules live, relative to the project: `<name>.md` each (ADR-0025).
 pub const RULES_DIR: &str = ".strive/rules";
 /// The most a rule's file may hold, in bytes.

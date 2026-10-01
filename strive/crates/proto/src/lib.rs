@@ -527,6 +527,10 @@ pub struct AgentConfig {
     /// read, so only when each applies is given here.
     #[serde(default)]
     pub checks: Vec<CheckInfo>,
+    /// The project's extensions (ADR-0027) and the tools each declares; the
+    /// agent calls them as `extension` effects.
+    #[serde(default)]
+    pub extensions: Vec<ExtensionInfo>,
     /// Tools from the MCP servers that started. The agent calls them as
     /// `mcp` effects.
     pub mcp_tools: Vec<McpTool>,
@@ -1312,6 +1316,9 @@ pub enum Event {
         /// The checks loaded, by name (ADR-0023).
         #[serde(default, skip_serializing_if = "Vec::is_empty")]
         checks: Vec<String>,
+        /// The extensions loaded, by name (ADR-0027).
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        extensions: Vec<String>,
         /// MCP servers from settings, and how each started.
         #[serde(default)]
         mcp: Vec<McpStatus>,
@@ -1559,6 +1566,27 @@ pub struct SessionCommandsResult {
     pub commands: Vec<CommandInfo>,
 }
 
+/// An extension as a host is given it: what it is and the tools it declares.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct ExtensionInfo {
+    pub name: String,
+    pub description: String,
+    pub tools: Vec<ExtensionTool>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct ExtensionTool {
+    pub name: String,
+    pub description: String,
+    /// The JSON Schema of its arguments.
+    #[ts(type = "unknown")]
+    pub parameters: serde_json::Value,
+}
+
 /// A check as a host is given it: when it applies, not what it runs.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
@@ -1665,6 +1693,14 @@ pub enum EffectRequest {
     /// Runs the project's check `name` (ADR-0023): the daemon reads its
     /// command from `.strive/checks/<name>.md`, so a host can't choose it.
     Check { name: String },
+    /// Calls the tool `tool` of the project's extension `name` (ADR-0027),
+    /// in the command sandbox.
+    Extension {
+        name: String,
+        tool: String,
+        #[ts(type = "unknown")]
+        arguments: serde_json::Value,
+    },
 }
 
 /// An effect as the journal records it: large payloads live in the content
@@ -1701,6 +1737,14 @@ pub enum EffectRecord {
         tool: String,
         /// The arguments, as JSON.
         arguments: Digest,
+    },
+    /// An extension's tool call: the arguments, and the digest of the
+    /// extension's files as they ran.
+    Extension {
+        name: String,
+        tool: String,
+        arguments: Digest,
+        extension: Digest,
     },
     /// A check, with the command and the note its file held when it ran:
     /// what the agent is told if it fails is rebuilt from this alone.

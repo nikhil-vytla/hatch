@@ -168,23 +168,29 @@ pub fn gate(scope: &Scope, request: &EffectRequest, mode: ApprovalMode, allowed:
             (gate, Target { path: None, sandboxed })
         }
         // `effect/run` reads a check's file and runs its command as bash,
-        // through `check_gate`; a check that reaches here wasn't read.
+        // through `accepted_gate`; a check that reaches here wasn't read.
         EffectRequest::Check { name } => (Gate::Deny(format!("the check {name} wasn't read from its file")), NOTHING),
+        EffectRequest::Extension { name, .. } => {
+            (Gate::Deny(format!("the extension {name} wasn't read from its directory")), NOTHING)
+        }
     }
 }
 
-/// The gate for a check's command (ADR-0023). One a person accepted in this
-/// exact form (`accepted`: an applied proposal's content, or content a
-/// person allowed for the session) runs in the sandbox in every mode; one
-/// no one has asks, as does any without a sandbox. Allowing it for the
-/// session grants `allowance`: this check, as it is now, for the session.
-pub fn check_gate(scope: &Scope, name: &str, command: &str, accepted: bool, allowance: &Path) -> (Gate, Target) {
+/// The gate for what a project's files say to run: a check's command
+/// (ADR-0023) or an extension's tool (ADR-0027), named by `what` ("the
+/// check t") and shown with `detail` (its command). One a person accepted in this exact form (`accepted`: an
+/// applied proposal's content, or content a person allowed for the
+/// session) runs in the sandbox in every mode; one no one has asks, as does
+/// any without a sandbox. Allowing it for the session grants `allowance`:
+/// it, as it is now, for the session.
+pub fn accepted_gate(scope: &Scope, what: &str, detail: &str, accepted: bool, allowance: &Path) -> (Gate, Target) {
     let sandboxed = !scope.unconfined && sandbox_available();
     let file = Some(allowance.to_path_buf());
+    let detail = if detail.is_empty() { String::new() } else { format!(": {detail}") };
     let gate = if !sandboxed && !scope.unconfined {
-        Gate::Ask(format!("run the check {name} without a sandbox: {command}"), file)
+        Gate::Ask(format!("run {what} without a sandbox{detail}"), file)
     } else if !accepted {
-        Gate::Ask(format!("run the check {name}, which no one has accepted in this form yet: {command}"), file)
+        Gate::Ask(format!("run {what}, which no one has accepted in this form yet{detail}"), file)
     } else {
         Gate::Allow
     };
@@ -219,6 +225,9 @@ pub fn perform(scope: &Scope, request: &EffectRequest, target: &Target, cancelle
         // Tool calls are async and go to the session's server (see methods.rs).
         EffectRequest::Mcp { .. } => Result::Refused("an MCP tool call can't run as a file or command effect".into()),
         EffectRequest::Check { name } => Result::Refused(format!("the check {name} wasn't read from its file")),
+        EffectRequest::Extension { name, .. } => {
+            Result::Refused(format!("the extension {name} wasn't read from its directory"))
+        }
     }
 }
 
@@ -898,6 +907,9 @@ pub fn record(cas: &strive_journal::cas::Cas, request: &EffectRequest) -> io::Re
         // Recorded with the command its file held, once `effect/run` reads it.
         EffectRequest::Check { name } => {
             return Err(io::Error::other(format!("the check {name} must be read from its file before it's recorded")));
+        }
+        EffectRequest::Extension { name, .. } => {
+            return Err(io::Error::other(format!("the extension {name} must be read before it's recorded")));
         }
     })
 }

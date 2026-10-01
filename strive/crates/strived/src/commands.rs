@@ -156,7 +156,7 @@ pub fn describe(e: &Entry) -> String {
         Event::Compacted { upto_seq, summary } => {
             format!("conversation up to #{upto_seq} summarized ({} characters)", summary.len())
         }
-        Event::ContextLoaded { instructions, skills, checks, mcp, learned, skipped } => {
+        Event::ContextLoaded { instructions, skills, checks, extensions, mcp, learned, skipped } => {
             let files: Vec<&str> = instructions.iter().map(|f| f.path.as_str()).collect();
             let servers: Vec<String> = mcp
                 .iter()
@@ -166,12 +166,13 @@ pub fn describe(e: &Entry) -> String {
                 })
                 .collect();
             format!(
-                "agent context: {} instruction file(s){}, {} skill(s){}{}{}{}{}",
+                "agent context: {} instruction file(s){}, {} skill(s){}{}{}{}{}{}",
                 files.len(),
                 if files.is_empty() { String::new() } else { format!(" ({})", files.join(", ")) },
                 skills.len(),
                 if skills.is_empty() { String::new() } else { format!(" ({})", skills.join(", ")) },
                 if checks.is_empty() { String::new() } else { format!("; checks ({})", checks.join(", ")) },
+                if extensions.is_empty() { String::new() } else { format!("; extensions ({})", extensions.join(", ")) },
                 if servers.is_empty() { String::new() } else { format!("; MCP {}", servers.join(", ")) },
                 match learned.as_deref() {
                     None => String::new(),
@@ -324,6 +325,7 @@ fn describe_effect(r: &EffectRecord) -> String {
         EffectRecord::Edit { path, .. } => format!("edit {path}"),
         EffectRecord::Bash { command, .. } => format!("bash: {command}"),
         EffectRecord::Check { name, command, .. } => format!("check {name}: {command}"),
+        EffectRecord::Extension { name, tool, .. } => format!("extension {name}: {tool}"),
         EffectRecord::Mcp { server, tool, .. } => format!("mcp: {server}'s {tool}"),
     }
 }
