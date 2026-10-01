@@ -111,7 +111,14 @@ export function describe(entry: Entry, options: DescribeOptions = {}): Line[] {
     case "sessionStarted":
       return note("faint", `Session started in ${tilde(e.cwd)}`);
     case "userMessage":
-      return [{ kind: "prompt", tone: "plain", text: e.text }];
+      // A command reads as the person typed it; the prompt it stands for is the agent's.
+      return [
+        {
+          kind: "prompt",
+          tone: "plain",
+          text: e.command ? `/${e.command.name} ${e.command.arguments}`.trimEnd() : e.text,
+        },
+      ];
     case "recovered":
       return note("danger", `Recovered after a crash: discarded a partial entry (${e.discardedBytes} bytes).`);
     case "budgetSet":

@@ -144,6 +144,8 @@ export class App {
   private readonly prompt = new Text("", 1, 0);
   /** Effects waiting for a decision, oldest first, and whether "a" allows one file (not everything). */
   private readonly pending = new Map<number, { description: string; allowance: string }>();
+  /** The project's slash commands, beside the built-in ones. */
+  private projectCommands: SlashCommand[] = [];
   /** Checkpoints and what each was taken before. */
   private readonly checkpoints = new Map<number, string>();
   private awaitingPrompt?: number;
@@ -256,10 +258,26 @@ export class App {
       this.renderHeader();
       // A hint, so a failure to list is no reason to say anything.
       this.sayWaiting(session.cwd).catch(() => undefined);
+      this.loadCommands(session.id).catch(() => undefined);
     } catch (e) {
       this.say(style.danger(this.explainOpenError(e, mode)));
       this.say(style.muted("Run `strive` for a new session, or `strive sessions` to see others."));
     }
+  }
+
+  /**
+   * The project's slash commands (ADR-0024), offered beside the built-in
+   * ones, which win a name both have: the daemon expands one sent as a prompt.
+   */
+  private async loadCommands(id: string) {
+    const { commands } = await this.client.request("session/commands", { id });
+    const builtIn = new Set(COMMANDS.map((c) => c.name));
+    this.projectCommands = commands
+      .filter((c) => !builtIn.has(c.name))
+      .map((c) => ({ name: c.name, description: c.description, argumentHint: c.argumentHint }));
+    this.editor.setAutocompleteProvider(
+      new CombinedAutocompleteProvider([...COMMANDS, ...this.projectCommands], this.cwd),
+    );
   }
 
   /** Says how many of the project's proposals wait for a person's review, if any do. */
@@ -531,6 +549,16 @@ export class App {
         return;
       case "help":
         this.say(COMMANDS.map((c) => `${style.accent(`/${c.name}`)}  ${style.muted(c.description ?? "")}`).join("\n"));
+
+        if (this.projectCommands.length > 0) {
+          this.say(style.muted("This project's commands:"));
+          this.say(
+            this.projectCommands
+              .map((c) => `${style.accent(`/${c.name}`)}  ${style.muted(c.description ?? "")}`)
+              .join("\n"),
+          );
+        }
+
         this.say(style.muted("Enter sends · Alt+Enter new line · Tab completes · Ctrl+C exits"));
 
         return;
@@ -540,6 +568,12 @@ export class App {
 
         return;
       default:
+        if (this.projectCommands.some((c) => c.name === cmd)) {
+          await this.client.request("session/prompt", { id: this.session.id, text });
+
+          return;
+        }
+
         this.say(style.danger(`Unknown command /${cmd}. Type /help.`));
     }
   }

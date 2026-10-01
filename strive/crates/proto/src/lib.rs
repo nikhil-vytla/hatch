@@ -84,6 +84,7 @@ methods! {
             ApprovalRespond = "approval/respond" (ApprovalRespondParams) -> Empty;
     SessionRewind = "session/rewind" (SessionRewindParams) -> SessionRewindResult;
     SessionChanges = "session/changes" (SessionChangesParams) -> SessionChangesResult;
+    SessionCommands = "session/commands" (SessionRef) -> SessionCommandsResult;
     LearningOpen = "learning/open" (ProjectRef) -> SessionInfo;
     LearningRun = "learning/run" (LearningRunParams) -> Appended;
     LearningSignals = "learning/signals" (LearningSignalsParams) -> LearningSignalsResult;
@@ -671,7 +672,8 @@ pub struct Proposal {
 
 /// What a proposal changes. Paths are fixed by kind, inside the project:
 /// memory is `.strive/memory.md`, a skill `.strive/skills/<name>/SKILL.md`,
-/// a check `.strive/checks/<name>.md` (ADR-0023).
+/// a check `.strive/checks/<name>.md` (ADR-0023), a slash command
+/// `.strive/commands/<name>.md` (ADR-0024).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase", tag = "kind")]
 #[ts(export)]
@@ -679,6 +681,7 @@ pub enum Artifact {
     Memory,
     Skill { name: String },
     Check { name: String },
+    Command { name: String },
 }
 
 /// What a proposal does (ADR-0022): one operation on one memory bullet, or
@@ -699,6 +702,11 @@ pub enum Change {
         name: String,
         content: String,
     },
+    /// A slash command's whole file (ADR-0024): the prompt `/name` stands for.
+    Command {
+        name: String,
+        content: String,
+    },
 }
 
 impl Change {
@@ -708,6 +716,7 @@ impl Change {
             Change::Memory(_) => Artifact::Memory,
             Change::Skill { name, .. } => Artifact::Skill { name: name.clone() },
             Change::Check { name, .. } => Artifact::Check { name: name.clone() },
+            Change::Command { name, .. } => Artifact::Command { name: name.clone() },
         }
     }
 }
@@ -1159,6 +1168,11 @@ pub enum Event {
     },
     UserMessage {
         text: String,
+        /// The slash command this prompt expanded (ADR-0024): what the
+        /// person typed was `/name arguments`, and `text` is what it stands for.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[ts(optional)]
+        command: Option<CommandUse>,
     },
     /// Opening the journal found a partial last line from a crash and
     /// discarded it.
@@ -1450,6 +1464,38 @@ pub struct McpStatus {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub error: Option<String>,
+}
+
+/// A slash command a person ran (ADR-0024).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct CommandUse {
+    pub name: String,
+    pub arguments: String,
+}
+
+/// A slash command the session can run.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct CommandInfo {
+    pub name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub description: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub argument_hint: Option<String>,
+    /// Its file.
+    pub path: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct SessionCommandsResult {
+    pub commands: Vec<CommandInfo>,
 }
 
 /// A check as a host is given it: when it applies, not what it runs.

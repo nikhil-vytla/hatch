@@ -428,3 +428,31 @@ test("a session starting where proposals wait for review says how many, counting
   const one = await openUi();
   await one.term.waitFor("1 proposal is waiting: `strive review`");
 });
+
+test("a project's slash command is listed, sent as the prompt it stands for, and shown as typed", async () => {
+  mkdirSync(join(CWD, ".strive/commands"), { recursive: true });
+  writeFileSync(
+    join(CWD, ".strive/commands/review.md"),
+    "---\ndescription: Review a PR\n---\nReview PR $1 carefully.\n",
+  );
+  // A project command can't take a built-in's name: /status stays the TUI's.
+  writeFileSync(join(CWD, ".strive/commands/status.md"), "Not the daemon's status.\n");
+  const ui = await openUi();
+
+  await enter(ui, "/help");
+  await ui.term.waitFor("This project's commands:");
+  await ui.term.waitFor("Review a PR");
+  await enter(ui, "/status");
+  await ui.term.waitFor(`daemon pid ${daemon.pid()}`);
+
+  await enter(ui, "/review 42");
+  await ui.term.waitFor("› /review 42", GIT_MS);
+  // SAFETY: `strive log --json` prints the daemon's journal entries, from the protocol's own types.
+  const read = JSON.parse(daemon.strive("log", sessions()[0]!.id, "--json").stdout) as SessionReadResult;
+  const prompt = read.entries.map((e) => e.event).find((e) => e.type === "userMessage");
+  expect(prompt).toEqual({
+    type: "userMessage",
+    text: "Review PR 42 carefully.",
+    command: { name: "review", arguments: "42" },
+  });
+});

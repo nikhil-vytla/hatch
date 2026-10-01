@@ -20,6 +20,10 @@ export type * from "./generated/CallOutcome";
 
 export type * from "./generated/CheckInfo";
 
+export type * from "./generated/CommandInfo";
+
+export type * from "./generated/CommandUse";
+
 export type * from "./generated/ClientInfo";
 
 export type * from "./generated/ContextFile";
@@ -171,6 +175,8 @@ export type * from "./generated/Verdict";
 export type * from "./generated/SessionChangesParams";
 
 export type * from "./generated/SessionChangesResult";
+
+export type * from "./generated/SessionCommandsResult";
 
 export type * from "./generated/FileChange";
 

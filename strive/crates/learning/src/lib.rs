@@ -14,6 +14,7 @@
 
 pub mod check_file;
 mod checks;
+pub mod command_file;
 mod fold;
 pub mod judge;
 pub mod memory;
@@ -41,6 +42,10 @@ pub const SKILL_NAME_LIMIT: usize = 40;
 pub const CHECKS_DIR: &str = ".strive/checks";
 /// The most a check's file may hold, in bytes.
 pub const CHECK_LIMIT: usize = 4 * 1024;
+/// Where slash commands live, relative to the project: `<name>.md` each (ADR-0024).
+pub const COMMANDS_DIR: &str = ".strive/commands";
+/// The most a command's file may hold, in bytes.
+pub const COMMAND_LIMIT: usize = 16 * 1024;
 
 /// Every check a proposal goes through, in order. A proposal is ready once
 /// each has a verdict and the static one didn't fail: the judge advises, and
@@ -81,6 +86,10 @@ pub fn relative_path(artifact: &Artifact) -> Result<String, String> {
         Artifact::Check { name } => {
             Err(format!("the check name {name:?} isn't 1 to {SKILL_NAME_LIMIT} of a-z, 0-9 and -"))
         }
+        Artifact::Command { name } if valid_skill_name(name) => Ok(format!("{COMMANDS_DIR}/{name}.md")),
+        Artifact::Command { name } => {
+            Err(format!("the command name {name:?} isn't 1 to {SKILL_NAME_LIMIT} of a-z, 0-9 and -"))
+        }
     }
 }
 
@@ -97,11 +106,22 @@ pub fn status_name(status: ProposalStatus) -> &'static str {
     }
 }
 
+/// The most a whole-file artifact's file may hold, in bytes.
+pub fn file_limit(artifact: &Artifact) -> usize {
+    match artifact {
+        Artifact::Memory => MEMORY_LIMIT,
+        Artifact::Skill { .. } => SKILL_LIMIT,
+        Artifact::Check { .. } => CHECK_LIMIT,
+        Artifact::Command { .. } => COMMAND_LIMIT,
+    }
+}
+
 /// How a person reads the artifact: `memory`, or `skill <name>`.
 pub fn describe(artifact: &Artifact) -> String {
     match artifact {
         Artifact::Memory => "memory".into(),
         Artifact::Skill { name } => format!("skill {name}"),
         Artifact::Check { name } => format!("check {name}"),
+        Artifact::Command { name } => format!("command /{name}"),
     }
 }

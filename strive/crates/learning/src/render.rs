@@ -84,7 +84,10 @@ fn outcome_text(record: Option<&EffectRecord>, outcome: &EffectOutcome, blob: Bl
 fn block(entry: &Entry, starts: &HashMap<u64, (u64, &EffectRecord)>, blob: Blob) -> String {
     let at = format!("#{}", entry.seq);
     match &entry.event {
-        Event::UserMessage { text } => format!("{at} user: {}", cut(text, PROMPT)),
+        Event::UserMessage { text, command: None } => format!("{at} user: {}", cut(text, PROMPT)),
+        Event::UserMessage { command: Some(c), .. } => {
+            format!("{at} user ran /{} {}", c.name, cut(&c.arguments, PROMPT))
+        }
         Event::AssistantMessage { text, .. } if text.trim().is_empty() => String::new(),
         Event::AssistantMessage { text, .. } => format!("{at} agent: {}", cut(text.trim(), REPLY)),
         Event::EffectStarted { record, .. } => format!("{at} {}", record_text(record, blob)),

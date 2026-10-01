@@ -178,7 +178,9 @@ fn resulting(change: &Change, current: Option<&str>) -> Option<String> {
             let applied = crate::memory::apply(shown, shown, op, 0).ok()?;
             Some(crate::memory::parse(&applied.text).for_sessions())
         }
-        Change::Skill { content, .. } | Change::Check { content, .. } => Some(content.clone()),
+        Change::Skill { content, .. } | Change::Check { content, .. } | Change::Command { content, .. } => {
+            Some(content.clone())
+        }
     }
 }
 

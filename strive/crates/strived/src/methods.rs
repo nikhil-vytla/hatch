@@ -29,7 +29,9 @@ use strive_proto::{
 use strive_proto::{ApprovalRespond, ApprovalRespondParams, Decision, SessionApprovals, SessionApprovalsParams};
 use strive_proto::{EffectCancel, EffectCancelParams, EffectRequest};
 use strive_proto::{ModelInfo, ModelList, ModelListResult, SessionModel, SessionModelParams};
-use strive_proto::{SessionChanges, SessionChangesParams, SessionChangesResult};
+use strive_proto::{
+    SessionChanges, SessionChangesParams, SessionChangesResult, SessionCommands, SessionCommandsResult,
+};
 use strive_proto::{SessionRewind, SessionRewindParams, SessionRewindResult};
 
 /// Journals a priced model for the session's agent, before its first prompt.
@@ -607,6 +609,31 @@ fn turn_over(state: &Arc<State>, kind: SessionKind, cwd: String, sid: &SessionId
     }
 }
 
+/// The slash commands a session in `cwd` can run, with their prompts (ADR-0024).
+async fn project_commands(state: &State, cwd: &str) -> Result<Vec<(strive_proto::CommandInfo, String)>, RpcError> {
+    let (ws, home) = (workspace_of(cwd)?, state.home.root.clone());
+    tokio::task::spawn_blocking(move || crate::context::commands(&ws, &home)).await.map_err(|e| internal(&e))
+}
+
+async fn list_commands(state: &State, params: Value) -> Reply {
+    let SessionRef { id } = parse::<SessionCommands>(params)?;
+    let info = state.sessions.info(&session_id(&id)?).await.map_err(session_error)?;
+    let commands = project_commands(state, &info.cwd).await?;
+    reply::<SessionCommands>(SessionCommandsResult { commands: commands.into_iter().map(|(c, _)| c).collect() })
+}
+
+fn read(state: &State, params: Value) -> Reply {
+    let SessionRef { id } = parse::<SessionRead>(params)?;
+    let (session, report) = state.sessions.read(&session_id(&id)?).map_err(session_error)?;
+    reply::<SessionRead>(SessionReadResult {
+        session,
+        entries: report.entries,
+        committed: report.committed,
+        torn_bytes: report.torn_bytes,
+        problem: report.problem.map(|p| p.to_string()),
+    })
+}
+
 async fn prompt(state: &Arc<State>, params: Value) -> Reply {
     let SessionPromptParams { id, text } = parse::<SessionPrompt>(params)?;
     let sid = session_id(&id)?;
@@ -620,8 +647,22 @@ async fn prompt(state: &Arc<State>, params: Value) -> Reply {
             ));
         }
     }
+    // `/name arguments`, where the project has a command `name`, is the
+    // prompt it stands for (ADR-0024); the journal keeps both.
+    let (text, command) = match strive_learning::command_file::invoked(&text) {
+        Some((name, arguments)) => {
+            match project_commands(state, &info.cwd).await?.into_iter().find(|(c, _)| c.name == name) {
+                Some((c, body)) => (
+                    strive_learning::command_file::expand(&body, arguments),
+                    Some(strive_proto::CommandUse { name: c.name, arguments: arguments.trim().to_string() }),
+                ),
+                None => (text, None),
+            }
+        }
+        None => (text, None),
+    };
     let commit = checkpoint(state, &sid, &info.cwd, &format!("before: {text}")).await;
-    let entries = state.sessions.prompt(&sid, text, commit).await.map_err(session_error)?;
+    let entries = state.sessions.prompt(&sid, text, command, commit).await.map_err(session_error)?;
     state.hosts.ensure(&sid, &state.home.socket(), &state.sessions.session_dir(&sid).join("host.log"));
     reply::<SessionPrompt>(Appended { seq: entries.last().map_or(0, |e| e.seq) })
 }
@@ -990,21 +1031,12 @@ async fn route_session(state: &Arc<State>, conn: &Arc<Conn>, method: &str, param
             require_person(conn)?;
             rewind(state, params).await
         }
+        SessionCommands::NAME => list_commands(state, params).await,
         SessionChanges::NAME => {
             let SessionChangesParams { id, checkpoint } = parse::<SessionChanges>(params)?;
             changes(state, &id, checkpoint).await
         }
-        SessionRead::NAME => {
-            let SessionRef { id } = parse::<SessionRead>(params)?;
-            let (session, report) = state.sessions.read(&session_id(&id)?).map_err(session_error)?;
-            reply::<SessionRead>(SessionReadResult {
-                session,
-                entries: report.entries,
-                committed: report.committed,
-                torn_bytes: report.torn_bytes,
-                problem: report.problem.map(|p| p.to_string()),
-            })
-        }
+        SessionRead::NAME => read(state, params),
         SessionGateway::NAME => {
             let SessionRef { id } = parse::<SessionGateway>(params)?;
             let sid = session_id(&id)?;
