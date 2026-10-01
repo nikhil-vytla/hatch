@@ -98,5 +98,5 @@
       }
     }
   ],
-  "verdict": "Jev read the joke as a joke, the threat as a threat and the cake as a bribe; MobileBERT called them a lie, a lie and a request, and all five residents walked over after the threat. Neither model ignored the fake SYSTEM line: Jev took it as a request and four of five promised to come. MobileBERT sends almost everyone to your gig when you simply ask, so the free game is easier than it should be."
+  "verdict": "Jev read the joke as a joke, the threat as a threat and the cake as a bribe; MobileBERT, the free model before Bramble mini, called them a lie, a lie and a request, and all five residents walked over after the threat. Bramble mini reads all three the way Jev does. Neither Jev nor MobileBERT ignored the fake SYSTEM line: Jev took it as a request and four of five promised to come. Bramble mini also called it a request, but all five carried on."
 }
