@@ -24,6 +24,7 @@ import {
 import { PRESETS } from "../../live-worlds/rumour/presets";
 import { allProfiles, jevRequest, toDist, type Dist, type MessageKind, type Profile } from "../../live-worlds/rumour/profiles";
 import { features, profileDist, type Vectors } from "../../live-worlds/rumour/similarity";
+import { placeIn } from "../../live-worlds/rumour/places";
 import { ARCHETYPES, createTown, PLACES, VIEW, type PlaceId, type Town } from "../../live-worlds/rumour/town";
 import vectorsDoc from "../../live-worlds/rumour/vectors.json";
 import recordedRaw from "../../live-worlds/rumour/jev-scam.jsonl?raw";
@@ -68,24 +69,6 @@ const COLOURS = {
   corrected: "#1c8a5a",
 };
 
-/** A notice that names a place lets residents go there. */
-function placeIn(text: string): PlaceId | null {
-  const t = text.toLowerCase();
-  const words: [PlaceId, string[]][] = [
-    ["bakery", ["bakery", "baker"]],
-    ["hall", ["town hall", "council", "mayor"]],
-    ["market", ["market"]],
-    ["bridge", ["bridge"]],
-    ["stage", ["bandstand", "gig", "concert"]],
-    ["library", ["library"]],
-    ["school", ["school"]],
-    ["pub", ["pub", "the crown"]],
-  ];
-
-  for (const [id, ws] of words) if (ws.some((w) => t.includes(w))) return id === "hall" && !/\b(come|meet|join|at the)\b/.test(t) ? null : id;
-
-  return null;
-}
 
 function freeAnswers(vector: number[], kind: MessageKind, place: PlaceId | null) {
   const f = features(vector, vectors);
@@ -117,7 +100,7 @@ const embedJobs = new Map<string, { resolve: (v: { vector: number[]; ms: number 
 
 function embed(text: string, progress: (p: number) => void) {
   if (!embedWorker) {
-    embedWorker = new Worker(new URL("./rumour-embed.worker.ts", import.meta.url), { type: "module" });
+    embedWorker = new Worker(new URL("./minilm.worker.ts", import.meta.url), { type: "module" });
     embedWorker.onmessage = (e: MessageEvent) => {
       const m = e.data;
       const job = embedJobs.get(m.id);

@@ -30,10 +30,8 @@ Answers arrive whenever they arrive, and the world never waits for them. The que
 
 ## Two models, same questions
 
-- **MobileBERT-MNLI in the browser (default, free).** It's the same 27 MB model Decide uses, running in a web worker. Every judgment is a zero-shot entailment (`decide.ts`). It handles short premises and small label sets best. A first framing with one long premise per resident called every line a "request" and believed nothing, so the line is now judged on its own.
-  - In headless Chromium on an M4 Max, the model was ready 1.5–2 s after load.
-  - Your first reaction landed 730–930 ms after you spoke.
-  - Decisions averaged 250–390 ms each. In Node it's about 55 ms per listener.
+- **Bramble mini in the browser (default, free, since 1 Oct 2026).** A small network trained for this game (`../free-model`). The line is embedded once by MiniLM (23 MB, in a web worker) and every listener is answered from that. It learned from an open-weights model, Qwen3.8-2.4T-A95B, never from Jev. On the hand-written gold lines it gets intent right 74% of the time, against MobileBERT's 31%. In headless Chromium it was ready 1.5 s after load and averaged 1–2 ms per decision.
+- **MobileBERT-MNLI (the free model before).** Zero-shot entailment (`decide.ts`, `answerLocally`), 27 MB. Kept in the code as the `local` backend and in the comparison table. Its decisions averaged 250–390 ms each in the browser.
 - **Jev on your own gateway key.** A line and all its listeners go out as one batched call (`merge`/`split`). In a smoke test, four listeners took one call of 525 ms (131 ms each) and cost $0.000055 at list price ($0.042 per million input tokens).
 
 ## The same lines, two models
