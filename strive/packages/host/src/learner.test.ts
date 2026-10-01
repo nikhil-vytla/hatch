@@ -53,6 +53,7 @@ const config = (baseUrl: string, over: Partial<AgentConfig> = {}): AgentConfig =
   compactAtTokens: 150_000,
   instructions: [{ path: `${CWD}/AGENTS.md`, text: "Use bun, not npm." }],
   skills: [],
+  checks: [],
   mcpTools: [],
   kind: "learning",
   ...over,

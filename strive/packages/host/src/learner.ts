@@ -48,6 +48,13 @@ strive is a coding agent. Its work sessions in this project are journaled: every
   description: <when to use it, so the agent knows to load it>
   ---
   Numbered steps: the exact commands, in order, and what to check after each.
+- Checks: \`.strive/checks/<name>.md\`, a command strive runs itself at the end of every turn that changed matching files; when it fails, the agent is told and fixes it before the turn ends. A check is enforced, not advice: propose one for a command the user says to run after a kind of change, or one the agent ran to catch its own mistake, when it is quick and passing it is required. Its file is frontmatter, then an optional line or two the agent is shown when it fails:
+  ---
+  name: <the file's name: 1 to 40 of a-z, 0-9 and ->
+  description: <what passing means, one line>
+  run: <the command, one line>
+  paths: <optional: comma-separated globs it applies to, such as packages/host/**; without it, any change>
+  ---
 
 # What is worth learning
 
@@ -99,12 +106,12 @@ What the next sessions need to know, or what cost a session time and will come u
 
 End with a short plain report: which sessions you read (and how far), what you proposed and why, and what you considered and dropped. When you proposed nothing, say so plainly and say why: nothing recurred, it's already covered, or the evidence was too thin.`;
 
-/** A memory or skill file as the daemon gave it to the learner, if it did. */
+/** A memory, skill or check file as the daemon gave it to the learner, if it did. */
 function learnedFile(config: AgentConfig, artifact: Artifact): LearnedFile | undefined {
   return config.learnedFiles?.find(
     (f) =>
       f.artifact.kind === artifact.kind &&
-      (f.artifact.kind === "memory" || (artifact.kind === "skill" && f.artifact.name === artifact.name)),
+      (f.artifact.kind === "memory" || (artifact.kind !== "memory" && f.artifact.name === artifact.name)),
   );
 }
 
@@ -154,6 +161,16 @@ export function learnerPrompt(config: AgentConfig): string {
       : ["# Skills", "", ...config.skills.map((s) => `- ${s.name}: ${s.description} (${s.path})`)].join("\n"),
   );
 
+  const checks = (config.learnedFiles ?? []).flatMap((f) =>
+    f.artifact.kind === "check" ? [{ name: f.artifact.name, text: f.text }] : [],
+  );
+
+  parts.push(
+    checks.length === 0
+      ? "# Checks\n\nThere are none."
+      : ["# Checks", ...checks.map((c) => `## .strive/checks/${c.name}.md\n\n${c.text.trim()}`)].join("\n\n"),
+  );
+
   return parts.join("\n\n");
 }
 
@@ -163,6 +180,8 @@ const SUMMARIZE = [
   "Be specific (session ids, seqs, paths, commands). Write plain prose and short lists; no preamble.",
 ].join("\n");
 
+const CHECK_NAME = "The check's file under .strive/checks, without .md: 1 to 40 of a-z, 0-9 and -";
+
 function artifactSchema() {
   return Type.Union([
     Type.Object({ kind: Type.Literal("memory") }),
@@ -170,6 +189,7 @@ function artifactSchema() {
       kind: Type.Literal("skill"),
       name: Type.String({ description: "The skill's directory under .strive/skills: 1 to 40 of a-z, 0-9 and -" }),
     }),
+    Type.Object({ kind: Type.Literal("check"), name: Type.String({ description: CHECK_NAME }) }),
   ]);
 }
 
@@ -194,6 +214,11 @@ function changeSchema() {
       kind: Type.Literal("skill"),
       name: Type.String({ description: "The skill's directory under .strive/skills: 1 to 40 of a-z, 0-9 and -" }),
       content: Type.String({ description: "The SKILL.md's whole new text, keeping what is still true" }),
+    }),
+    Type.Object({
+      kind: Type.Literal("check"),
+      name: Type.String({ description: CHECK_NAME }),
+      content: Type.String({ description: "The check's whole file: frontmatter (name, description, run, paths)" }),
     }),
   ]);
 }
@@ -404,6 +429,14 @@ class Learner {
     }
 
     const text = learnedFile(this.config, artifact)?.text;
+
+    if (artifact.kind === "check") {
+      const at = join(this.config.cwd, ".strive/checks", `${artifact.name}.md`);
+
+      return text === undefined
+        ? `There is no check named ${artifact.name}. A proposal for it creates ${at}.`
+        : `${at} exactly as it is now (a proposal replaces all of it):\n\n${text}`;
+    }
 
     const target = join(this.config.cwd, ".strive/skills", artifact.name, "SKILL.md");
 

@@ -131,6 +131,8 @@ export function describe(entry: Entry, options: DescribeOptions = {}): Line[] {
       switch (r.kind) {
         case "bash":
           return note("muted", `$ ${r.command}`);
+        case "check":
+          return note("muted", `check ${r.name}: $ ${r.command}`);
         case "write":
           return note("muted", `write ${r.path} (${r.bytes} bytes)`);
         case "read":

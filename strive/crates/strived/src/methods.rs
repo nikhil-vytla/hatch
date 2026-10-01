@@ -415,6 +415,8 @@ async fn host_config(state: &Arc<State>, sid: &SessionId) -> Reply {
         },
         instructions: ctx.instructions,
         skills: ctx.skills,
+        // The learner runs nothing, so it has no checks to run.
+        checks: if info.kind == Some(SessionKind::Learning) { Vec::new() } else { ctx.checks },
         mcp_tools: mcp.tools,
         kind: info.kind,
         learned_files: learned,
@@ -504,6 +506,7 @@ async fn load_context(
     let loaded = Event::ContextLoaded {
         instructions: files,
         skills: ctx.skills.iter().map(|s| s.name.clone()).collect(),
+        checks: ctx.checks.iter().map(|c| c.name.clone()).collect(),
         mcp: mcp.status.clone(),
         learned: shown,
         skipped: (!ctx.skipped.is_empty()).then(|| ctx.skipped.clone()),
@@ -732,13 +735,37 @@ async fn route_effect(state: &Arc<State>, method: &str, params: Value) -> Reply 
                 unconfined: state.settings.sandbox == crate::settings::SandboxSetting::Off,
                 imports,
             };
-            let record = crate::effects::record(&state.cas, &request).map_err(|e| internal(&e))?;
+            // A check runs the command its file holds now (ADR-0023), not one the host names.
+            let (request, record, check) = match request {
+                EffectRequest::Check { name } => {
+                    let (ws, home, n) = (scope.workspace.clone(), scope.strive_home.clone(), name.clone());
+                    let found = tokio::task::spawn_blocking(move || crate::context::check(&ws, &home, &n))
+                        .await
+                        .map_err(|e| internal(&e))?
+                        .map_err(|why| {
+                            RpcError::new(RpcError::INVALID_PARAMS, format!("the check {name} can't run: {why}"))
+                        })?;
+                    let timeout_ms = found.timeout_secs * 1000;
+                    let record = strive_proto::EffectRecord::Check {
+                        name: name.clone(),
+                        command: found.run.clone(),
+                        timeout_ms,
+                        note: found.body,
+                    };
+                    (EffectRequest::Bash { command: found.run, timeout_ms: Some(timeout_ms) }, record, Some(name))
+                }
+                request => {
+                    let record = crate::effects::record(&state.cas, &request).map_err(|e| internal(&e))?;
+                    (request, record, None)
+                }
+            };
             let Some(_running) = state.sessions.begin_effect() else {
                 return Err(RpcError::new(RpcError::INTERNAL_ERROR, "the daemon is stopping"));
             };
             let cancelled = state.sessions.cancel_flag(&sid, &call_id);
-            let effect = state.sessions.start_effect(&sid, call_id.clone(), record).await.map_err(session_error);
-            let result = run_effect(state, &sid, scope, request, effect, &cancelled).await;
+            let effect =
+                state.sessions.start_effect(&sid, call_id.clone(), record.clone()).await.map_err(session_error);
+            let result = run_effect(state, &sid, scope, Prepared { request, record, check }, effect, &cancelled).await;
             state.sessions.forget_cancel(&sid, &call_id);
             result
         }
@@ -783,22 +810,34 @@ async fn call_mcp(
     }
 }
 
+/// An effect as `effect/run` has it ready: what to perform, as journaled,
+/// and the check it is, if it is one (which has its own gate).
+struct Prepared {
+    request: EffectRequest,
+    record: strive_proto::EffectRecord,
+    check: Option<String>,
+}
+
 /// Gates, performs and journals one effect the session has started.
 async fn run_effect(
     state: &Arc<State>,
     sid: &SessionId,
     scope: crate::effects::Scope,
-    request: EffectRequest,
+    prepared: Prepared,
     effect: std::result::Result<u64, RpcError>,
     cancelled: &Arc<std::sync::atomic::AtomicBool>,
 ) -> Reply {
+    let Prepared { request, record, check } = prepared;
     let effect = effect?;
     let sid = sid.clone();
     {
         let started = std::time::Instant::now();
         let (mode, allowed) = state.sessions.approvals(&sid).await.map_err(session_error)?;
         let cancel = cancelled.clone();
-        let (gate, target) = crate::effects::gate(&scope, &request, mode, &allowed);
+        let (gate, target) = match (&check, &request) {
+            (Some(name), EffectRequest::Bash { command, .. }) => crate::effects::check_gate(&scope, name, command),
+            _ => crate::effects::gate(&scope, &request, mode, &allowed),
+        };
         let refusal = match gate {
             crate::effects::Gate::Allow => None,
             crate::effects::Gate::Deny(why) => Some(why),
@@ -875,7 +914,7 @@ async fn run_effect(
         };
         let ms = u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX);
         state.sessions.finish_effect(&sid, effect, outcome.clone(), ms).await.map_err(session_error)?;
-        reply::<EffectRun>(EffectRunResult { effect, outcome, text })
+        reply::<EffectRun>(EffectRunResult { effect, record, outcome, text })
     }
 }
 

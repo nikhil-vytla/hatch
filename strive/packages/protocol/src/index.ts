@@ -18,6 +18,8 @@ export type * from "./generated/BlobGetResult";
 
 export type * from "./generated/CallOutcome";
 
+export type * from "./generated/CheckInfo";
+
 export type * from "./generated/ClientInfo";
 
 export type * from "./generated/ContextFile";

@@ -5,4 +5,4 @@ import type { MemoryOp } from "./MemoryOp";
  * What a proposal does (ADR-0022): one operation on one memory bullet, or
  * a skill's whole new text.
  */
-export type Change = { "kind": "memory" } & MemoryOp | { "kind": "skill", name: string, content: string, };
+export type Change = { "kind": "memory" } & MemoryOp | { "kind": "skill", name: string, content: string, } | { "kind": "check", name: string, content: string, };

@@ -1436,6 +1436,7 @@ function ToolGroup({ seq, tools, session, live }: ToolGroupProps) {
 
 const KIND_ICON: Record<Tool["record"]["kind"], IconName> = {
   bash: "terminal",
+  check: "check",
   read: "file",
   edit: "pencil",
   write: "pencil",

@@ -1498,3 +1498,28 @@ fn a_memory_line_naming_a_path_that_is_gone_may_be_stale() {
     fs::write(cwd.join("src/parse.ts"), "").unwrap();
     assert_eq!(common::slow_rpc(&env).ok("proposal/list", &json!({"cwd": cwd}))["mayBeStale"], json!([]));
 }
+
+const CHECK: &str = "---\nname: host-tests\ndescription: The host's tests pass\nrun: bun test packages/host\n---\n";
+
+/// A check (ADR-0023) is proposed, accepted and rolled back as a skill is:
+/// its whole file, gated on the form the loader reads.
+#[test]
+fn a_check_is_proposed_accepted_and_rolled_back_as_a_whole_file() {
+    let env = Env::new();
+    let cwd = project();
+    let work = work_session(&env, &cwd);
+    let (mut host, id) = learner(&env, &cwd);
+    let check = |content: &str| proposing(&json!({"kind": "check", "name": "host-tests", "content": content}), &work);
+    let typo = propose(&mut host, &id, &check(&CHECK.replace("run:", "runs:")));
+    assert_fails(&env, &cwd, typo, "form", "unknown field \"runs\"");
+    let p = propose(&mut host, &id, &check(CHECK));
+    assert_eq!(status(&env, &cwd, p), "ready");
+    assert!(decide(&env, &cwd, p, "accept").get("error").is_none());
+    let file = cwd.join(".strive/checks/host-tests.md");
+    assert_eq!(fs::read_to_string(&file).unwrap(), CHECK);
+    // A work session's host is now told it applies.
+    let config = common::slow_rpc(&env).ok("host/register", &json!({"id": work}));
+    assert_eq!(config["checks"][0]["name"], "host-tests");
+    assert!(rollback(&env, &cwd, p).get("error").is_none());
+    assert!(!file.exists(), "it didn't exist before");
+}

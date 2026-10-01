@@ -23,6 +23,7 @@ const config = (baseUrl: string): AgentConfig => ({
   compactAtTokens: 150_000,
   instructions: [],
   skills: [],
+  checks: [],
   mcpTools: [],
 });
 

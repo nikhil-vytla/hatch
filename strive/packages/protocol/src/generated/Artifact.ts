@@ -2,6 +2,7 @@
 
 /**
  * What a proposal changes. Paths are fixed by kind, inside the project:
- * memory is `.strive/memory.md`, a skill `.strive/skills/<name>/SKILL.md`.
+ * memory is `.strive/memory.md`, a skill `.strive/skills/<name>/SKILL.md`,
+ * a check `.strive/checks/<name>.md` (ADR-0023).
  */
-export type Artifact = { "kind": "memory" } | { "kind": "skill", name: string, };
+export type Artifact = { "kind": "memory" } | { "kind": "skill", name: string, } | { "kind": "check", name: string, };

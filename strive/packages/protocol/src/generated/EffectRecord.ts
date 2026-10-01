@@ -9,4 +9,4 @@ export type EffectRecord = { "kind": "read", path: string, offset?: number, limi
 /**
  * The arguments, as JSON.
  */
-arguments: Digest, };
+arguments: Digest, } | { "kind": "check", name: string, command: string, timeoutMs: number, note: string, };

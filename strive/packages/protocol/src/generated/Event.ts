@@ -86,6 +86,10 @@ toolCalls: Array<ToolCall>,
  */
 message: unknown, } | { "type": "turnEnded", turn: number, reason: TurnEnd, } | { "type": "contextLoaded", instructions: Array<ContextFile>, skills: Array<string>, 
 /**
+ * The checks loaded, by name (ADR-0023).
+ */
+checks?: Array<string>, 
+/**
  * MCP servers from settings, and how each started.
  */
 mcp: Array<McpStatus>, 

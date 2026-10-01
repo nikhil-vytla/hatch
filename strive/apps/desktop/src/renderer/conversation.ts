@@ -206,6 +206,8 @@ export function label(record: EffectRecord, workspace?: string): string {
   switch (record.kind) {
     case "bash":
       return workspace ? record.command.replaceAll(`${workspace}/`, "") : record.command;
+    case "check":
+      return `${record.name}: ${workspace ? record.command.replaceAll(`${workspace}/`, "") : record.command}`;
     case "read":
     case "edit":
     case "write":

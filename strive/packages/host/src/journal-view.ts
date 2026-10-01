@@ -54,6 +54,8 @@ async function recordText(record: EffectRecord, blob: Blob): Promise<string> {
   switch (record.kind) {
     case "bash":
       return `ran \`${record.command}\``;
+    case "check":
+      return `ran the check ${record.name}: \`${record.command}\``;
     case "read":
       return `read ${record.path}${record.offset === undefined ? "" : ` from line ${record.offset}`}`;
     case "write":

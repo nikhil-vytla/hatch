@@ -449,7 +449,7 @@ fn previewed(state: &State, folded: &mut [Folded]) -> Result<(), RpcError> {
 enum Undo {
     /// Memory with its bullet put back as it was.
     Write(Vec<u8>),
-    /// A skill's file as it was: these contents, or none (it didn't exist).
+    /// A skill's or check's file as it was: these contents, or none (it didn't exist).
     Restore(Option<Digest>),
     /// Nothing: it's already undone.
     Done,
@@ -468,7 +468,7 @@ fn undo(change: &Change, applied: &strive_learning::Applied, id: u64, now: Optio
                 None => Ok(Undo::Done),
             }
         }
-        Change::Skill { .. } => {
+        Change::Skill { .. } | Change::Check { .. } => {
             let now = now.map(strive_journal::cas::digest);
             if now == Some(applied.after) {
                 Ok(Undo::Restore(applied.before))
@@ -782,7 +782,7 @@ async fn apply(state: &State, sid: &SessionId, cwd: &str, f: &Folded, by: String
                 }
             }
         }
-        Change::Skill { content, .. } => {
+        Change::Skill { content, .. } | Change::Check { content, .. } => {
             let after = state.cas.put(content.as_bytes()).map_err(|e| internal(&e))?;
             let applied = Event::ProposalApplied { proposal: id, before: f.state.before, after, bullet: None };
             if before == f.state.before {

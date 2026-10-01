@@ -16,7 +16,25 @@ import {
 import { createStriveModels, model, textOf } from "./gateway";
 import { learnerMode } from "./learner";
 import { PromptReader } from "./learning-records";
-import { isPrompt, PROPOSED, rebuild, resultText, summaryMessage, type Unjournaled } from "./transcript";
+import {
+  type CheckRun,
+  checkCallId,
+  checkReport,
+  isPrompt,
+  PROPOSED,
+  rebuild,
+  resultText,
+  summaryMessage,
+  type Unjournaled,
+} from "./transcript";
+
+/** How many times a turn goes back to the agent with failed checks before it ends as it is. */
+export const CHECK_ROUNDS = 2;
+
+/** Whether a check with these globs applies to a change of `path`; with none, to any change. */
+export function applies(paths: string[], changed: string[]): boolean {
+  return changed.length > 0 && (paths.length === 0 || changed.some((f) => paths.some((g) => new Bun.Glob(g).match(f))));
+}
 
 export function systemPrompt(config: AgentConfig): string {
   const parts = [base(config.cwd)];
@@ -337,6 +355,8 @@ export class Host {
   private readonly prompts = new PromptReader();
   /** The daemon's connection closed: nothing more can be recorded. */
   private lost = false;
+  /** Checkpoints taken before prompts, with their entries' seqs: a turn's checks compare against its first. */
+  private readonly checkpoints: { seq: number; checkpoint: number }[] = [];
 
   constructor(
     private readonly client: StriveClient,
@@ -424,6 +444,7 @@ export class Host {
 
     for (const e of entries) {
       this.mode.onEntry?.(e);
+      this.noteCheckpoint(e);
       const text = this.prompts.read(e);
 
       if (text !== undefined && waiting.has(e)) this.queued.push({ text, seq: e.seq });
@@ -446,12 +467,59 @@ export class Host {
     if (entry.seq <= this.lastSeq) return;
     this.lastSeq = entry.seq;
     this.mode.onEntry?.(entry);
+    this.noteCheckpoint(entry);
     const text = this.prompts.read(entry);
 
     if (text !== undefined) {
       this.queued.push({ text, seq: entry.seq });
       void this.kick();
     }
+  }
+
+  private noteCheckpoint(e: Entry) {
+    if (e.event.type === "checkpointed") this.checkpoints.push({ seq: e.seq, checkpoint: e.event.checkpoint });
+  }
+
+  /** The checkpoint taken just before the prompt at `seq`, if there was one. */
+  private checkpointBefore(seq: number): number | undefined {
+    return this.checkpoints.findLast((c) => c.seq < seq)?.checkpoint;
+  }
+
+  /**
+   * Runs, one at a time, the checks that apply to what changed since
+   * `checkpoint` (ADR-0023). The daemon reads each check's command from its
+   * file; the host only names it. A check the daemon won't run (its file
+   * went, say) is left out: nothing of it is journaled to tell on resume.
+   */
+  private async runChecks(checkpoint: number, round: number, signal: AbortSignal): Promise<CheckRun[]> {
+    const { files, more } = await this.client.request("session/changes", { id: this.sessionId, checkpoint });
+    const changed = files.map((f) => f.path);
+    // Past the listed files, any check might apply, so all of them run.
+    const due = this.config.checks.filter((c) => (more ? changed.length > 0 : applies(c.paths, changed)));
+    const runs: CheckRun[] = [];
+
+    for (const check of due) {
+      if (signal.aborted) break;
+      const callId = checkCallId(this.turn, round, check.name);
+      const cancel = () => void this.client.request("effect/cancel", { id: this.sessionId, callId }).catch(() => {});
+      signal.addEventListener("abort", cancel, { once: true });
+
+      try {
+        const r = await this.client.request("effect/run", {
+          id: this.sessionId,
+          callId,
+          request: { kind: "check", name: check.name },
+        });
+
+        runs.push({ record: r.record, outcome: r.outcome, output: r.text });
+      } catch (e) {
+        console.error(`the check ${check.name} didn't run: ${describeError(e)}`);
+      } finally {
+        signal.removeEventListener("abort", cancel);
+      }
+    }
+
+    return runs;
   }
 
   interrupt() {
@@ -572,27 +640,68 @@ export class Host {
       return;
     }
 
-    let reason: TurnEnd;
+    const first = prompts[0]?.seq;
+    const checkpoint = first === undefined ? undefined : this.checkpointBefore(first);
+    const asked = prompts.map((p) => ({ role: "user" as const, content: p.text, timestamp: Date.now() }));
+    let reason = await this.ask(asked);
 
     try {
-      await this.agent.prompt(prompts.map((p) => ({ role: "user" as const, content: p.text, timestamp: Date.now() })));
-      const last = this.agent.state.messages.at(-1);
-
-      if (this.timedOut) reason = { kind: "timedOut", seconds: this.config.turnSeconds };
-      else if (this.interrupted || (last?.role === "assistant" && last.stopReason === "aborted"))
-        reason = { kind: "interrupted" };
-      else if (last?.role === "assistant" && last.stopReason === "error")
-        reason = { kind: "failed", error: last.errorMessage ?? "the model call failed" };
-      else reason = { kind: "done" };
-    } catch (e) {
-      // An abort can surface as a thrown error; it is still the abort.
-      if (this.timedOut) reason = { kind: "timedOut", seconds: this.config.turnSeconds };
-      else if (this.interrupted) reason = { kind: "interrupted" };
-      else reason = { kind: "failed", error: describeError(e) };
+      if (reason.kind === "done" && checkpoint !== undefined) reason = await this.check(checkpoint, abort.signal);
     } finally {
       clearTimeout(timer);
     }
 
     await this.record({ type: "turnEnded", turn: this.turn, reason });
+  }
+
+  /**
+   * A turn that finished its work has it checked (ADR-0023): a failure goes
+   * back to the agent, up to CHECK_ROUNDS times, then the turn ends as it is.
+   */
+  private async check(checkpoint: number, signal: AbortSignal): Promise<TurnEnd> {
+    let reason: TurnEnd = { kind: "done" };
+
+    try {
+      for (let round = 1; reason.kind === "done" && this.config.checks.length > 0; round++) {
+        const report = checkReport(await this.runChecks(checkpoint, round, signal));
+
+        if (report === undefined || round > CHECK_ROUNDS || signal.aborted) break;
+
+        reason = await this.ask([{ role: "user", content: report, timestamp: Date.now() }]);
+      }
+    } catch (e) {
+      console.error(`the checks didn't run: ${describeError(e)}`);
+    }
+
+    if (reason.kind !== "done") return reason;
+
+    if (this.timedOut) return { kind: "timedOut", seconds: this.config.turnSeconds };
+
+    return this.interrupted ? { kind: "interrupted" } : reason;
+  }
+
+  /** Gives the agent these messages and runs it until it stops; how it stopped. */
+  private async ask(messages: AgentMessage[]): Promise<TurnEnd> {
+    try {
+      await this.agent.prompt(messages);
+      const last = this.agent.state.messages.at(-1);
+
+      if (this.timedOut) return { kind: "timedOut", seconds: this.config.turnSeconds };
+
+      if (this.interrupted || (last?.role === "assistant" && last.stopReason === "aborted"))
+        return { kind: "interrupted" };
+
+      if (last?.role === "assistant" && last.stopReason === "error")
+        return { kind: "failed", error: last.errorMessage ?? "the model call failed" };
+
+      return { kind: "done" };
+    } catch (e) {
+      // An abort can surface as a thrown error; it is still the abort.
+      if (this.timedOut) return { kind: "timedOut", seconds: this.config.turnSeconds };
+
+      if (this.interrupted) return { kind: "interrupted" };
+
+      return { kind: "failed", error: describeError(e) };
+    }
   }
 }

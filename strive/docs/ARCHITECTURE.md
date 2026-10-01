@@ -184,6 +184,10 @@ Confining the host process to the daemon's socket and gateway is planned.
 - **Memory:** `.strive/memory.md`, the last instruction file, labeled as
   memory a person reviewed. Its `@` lines stay text. The same rules
   apply: regular files only, never from strive's home.
+- **Checks** ([ADR-0023](adrs/0023-checks.md)): `.strive/checks/<name>.md`
+  each, frontmatter naming the command (`run`) and the paths it covers. The
+  host is given each check's name and paths, not its command. A file that
+  doesn't read as a check is skipped, with why, in `skipped`.
 - **Imports:** a line `@path` in an instruction file, outside a code
   block, inlines that file if its real path is in the project (under its
   root, not in strive's home), up to five imports deep, and not as a
@@ -194,8 +198,8 @@ Confining the host process to the daemon's socket and gateway is planned.
   its real path is on "What shapes a session" (below). A symlinked
   `AGENTS.md` leading to `docs/x.md` is skipped, and so is a skill linked
   in from elsewhere. `CLAUDE.md` linked to `AGENTS.md` loads, since both
-  ends are guarded. Memory and `.strive/skills` must also be reached
-  without any symlink.
+  ends are guarded. Memory, `.strive/skills` and `.strive/checks` must
+  also be reached without any symlink.
 - **MCP servers:** the stdio servers in `mcpServers` in settings.
   - They are started for the session in its directory, without strive's
     variables or provider keys.
@@ -455,7 +459,7 @@ sandbox guard all of it:
   may start in any directory:
   - `AGENTS.md` and `CLAUDE.md`;
   - `.claude/skills`;
-  - `.strive/memory.md` and `.strive/skills`, the learned files;
+  - `.strive/memory.md`, `.strive/skills` and `.strive/checks`, the learned files;
   - `.strive/settings.json`.
 
   strive's home adds `~/.strive/AGENTS.md` and `~/.strive/skills`, and the
@@ -753,6 +757,15 @@ entry, so every attached client sees it and the first answer wins. With no
 one attached, the request is refused at once. Allowing for the session
 switches to full-auto, except for an instruction file, where it allows
 that file (see "What shapes a session").
+
+**Checks** ([ADR-0023](adrs/0023-checks.md)) run at the end of a turn that
+changed files: the host names each check whose paths match a file changed
+since the turn's checkpoint, and the daemon reads its command from its file
+and runs it, journaled as a `check` effect with that command. In the
+sandbox a check doesn't ask in any mode: a person accepted that exact
+command. Without one it asks. A failed check goes back to the agent, at
+most twice a turn; the report is made from the journaled runs, so a resumed
+session is told what a running one was.
 
 **Checkpoints** snapshot the workspace before each prompt, into a shadow
 git repository in the session's directory. The user's own repository,

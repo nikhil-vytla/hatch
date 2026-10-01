@@ -167,7 +167,24 @@ pub fn gate(scope: &Scope, request: &EffectRequest, mode: ApprovalMode, allowed:
             };
             (gate, Target { path: None, sandboxed })
         }
+        // `effect/run` reads a check's file and runs its command as bash,
+        // through `check_gate`; a check that reaches here wasn't read.
+        EffectRequest::Check { name } => (Gate::Deny(format!("the check {name} wasn't read from its file")), NOTHING),
     }
+}
+
+/// The gate for a check's command (ADR-0023): a person accepted that
+/// exact command, by writing its file or accepting the proposal that did,
+/// so in the sandbox it runs in every mode. Without one it asks, as any
+/// command does.
+pub fn check_gate(scope: &Scope, name: &str, command: &str) -> (Gate, Target) {
+    let sandboxed = !scope.unconfined && sandbox_available();
+    let gate = if !sandboxed && !scope.unconfined {
+        Gate::Ask(format!("run the check {name} without a sandbox: {command}"), None)
+    } else {
+        Gate::Allow
+    };
+    (gate, Target { path: None, sandboxed })
 }
 
 /// Performs an effect the gate allowed (or a person approved), on the
@@ -197,6 +214,7 @@ pub fn perform(scope: &Scope, request: &EffectRequest, target: &Target, cancelle
         }
         // Tool calls are async and go to the session's server (see methods.rs).
         EffectRequest::Mcp { .. } => Result::Refused("an MCP tool call can't run as a file or command effect".into()),
+        EffectRequest::Check { name } => Result::Refused(format!("the check {name} wasn't read from its file")),
     }
 }
 
@@ -873,5 +891,9 @@ pub fn record(cas: &strive_journal::cas::Cas, request: &EffectRequest) -> io::Re
             tool: tool.clone(),
             arguments: cas.put(&serde_json::to_vec(arguments).map_err(io::Error::other)?)?,
         },
+        // Recorded with the command its file held, once `effect/run` reads it.
+        EffectRequest::Check { name } => {
+            return Err(io::Error::other(format!("the check {name} must be read from its file before it's recorded")));
+        }
     })
 }

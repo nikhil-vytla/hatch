@@ -32,6 +32,63 @@ export function resultText(record: EffectRecord, outcome: EffectOutcome, output:
 
 const NOT_RUN = "this tool call did not run: the turn ended first";
 
+/** A check's call id: the turn, the round within it, the check. Never a model's tool call. */
+export function checkCallId(turn: number, round: number, name: string): string {
+  return `check:${turn}:${round}:${name}`;
+}
+
+export function isCheckCall(callId: string): boolean {
+  return callId.startsWith("check:");
+}
+
+/** How much of a failed check's output the agent is shown: its end, where errors are. */
+const CHECK_OUTPUT = 4000;
+
+export type CheckRun = { record: EffectRecord; outcome: EffectOutcome; output: string };
+
+/** Whether a check's run failed: refused, killed by its time limit, or a nonzero exit. */
+export function checkFailed(run: CheckRun): boolean {
+  return run.outcome.kind !== "done" || run.outcome.exitCode !== 0;
+}
+
+function howItFailed(outcome: EffectOutcome): string {
+  switch (outcome.kind) {
+    case "refused":
+      return `it couldn't run: ${outcome.reason}`;
+    case "interrupted":
+      return "the daemon stopped while it ran";
+    case "done":
+      return outcome.exitCode === undefined ? "it ran out of time" : `exit ${outcome.exitCode}`;
+    default:
+      return outcome satisfies never;
+  }
+}
+
+/**
+ * What the agent is told after a round of checks (ADR-0023), or nothing
+ * when every one passed. The same text live and on resume: it is made from
+ * the journaled runs alone.
+ */
+export function checkReport(runs: CheckRun[]): string | undefined {
+  const failed = runs.filter(checkFailed);
+
+  if (failed.length === 0) return undefined;
+
+  const sections = failed.map(({ record, outcome, output }) => {
+    const check = record.kind === "check" ? record : { name: "?", command: "", note: "" };
+    const note = check.note === "" ? "" : `\n${check.note}`;
+    const tail = output.length > CHECK_OUTPUT ? `[...]\n${output.slice(-CHECK_OUTPUT)}` : output;
+    const shown = tail.trim() === "" ? "" : `\n\n\`\`\`\n${tail.trimEnd()}\n\`\`\``;
+
+    return `## ${check.name}: \`${check.command}\` (${howItFailed(outcome)})${note}${shown}`;
+  });
+
+  return [
+    `strive ran this project's checks on your changes, and ${failed.length === 1 ? "one" : failed.length} failed. Fix what ${failed.length === 1 ? "it" : "they"} found, then finish; the checks run again.`,
+    ...sections,
+  ].join("\n\n");
+}
+
 /** The user message that stands in for a summarized part of the conversation. */
 export function summaryMessage(summary: string, timestamp: number): Message {
   return { role: "user", content: `[A summary of the conversation so far]\n\n${summary}`, timestamp };
@@ -77,6 +134,8 @@ export async function rebuild(
 
   const records = new Map<number, { callId: string; record: EffectRecord }>();
   const results = new Map<string, { text: string; isError: boolean; ts: number }>();
+  // Each check's run, by the seq of the entry that finished it.
+  const checks = new Map<number, CheckRun>();
   const gates = new Map<number, StaticGate>();
 
   for (const { event: e } of all) {
@@ -99,7 +158,9 @@ export async function rebuild(
 
       if (!started) continue;
       const output = e.outcome.kind === "done" ? await blob(e.outcome.output) : "";
-      results.set(started.callId, { ...resultText(started.record, e.outcome, output), ts: tsMs });
+
+      if (isCheckCall(started.callId)) checks.set(seq, { record: started.record, outcome: e.outcome, output });
+      else results.set(started.callId, { ...resultText(started.record, e.outcome, output), ts: tsMs });
     }
   }
 
@@ -135,6 +196,10 @@ export async function rebuild(
   // turn, together with any sent after this one ends.
   let inTurn = false;
   let held: { seq: number; message: Message }[] = [];
+  // The latest round of checks in this turn: told to the agent only if a
+  // reply follows it, as it was live (the last round is never told).
+  let round: CheckRun[] = [];
+  let roundTs = 0;
   // Every entry passes through, so a request's text knows the request before it.
   const prompts = new PromptReader();
 
@@ -151,11 +216,18 @@ export async function rebuild(
     if (!kept.has(entry)) continue;
     const { event: e, tsMs, seq } = entry;
 
-    if (e.type === "turnStarted") {
+    const run = checks.get(seq);
+
+    if (run) {
+      round.push(run);
+      roundTs = tsMs;
+    } else if (e.type === "turnStarted") {
       release(e.throughSeq);
       inTurn = true;
+      round = [];
     } else if (e.type === "turnEnded") {
       inTurn = false;
+      round = [];
     } else if (prompt !== undefined) {
       held.push({ seq, message: { role: "user", content: prompt, timestamp: tsMs } });
     } else if (e.type === "assistantMessage") {
@@ -167,6 +239,10 @@ export async function rebuild(
       // Without turn markers, a reply answers the prompts before it.
       if (inTurn) close();
       else release();
+      const report = checkReport(round);
+      round = [];
+
+      if (report !== undefined) messages.push({ role: "user", content: report, timestamp: roundTs });
       messages.push(reply);
       // Providers drop an aborted or failed reply when it is sent back, so
       // results for its calls would answer calls the model never sees.
