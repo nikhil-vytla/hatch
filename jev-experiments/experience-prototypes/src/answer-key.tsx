@@ -59,6 +59,9 @@ export function AnswerKey({ result }: { result: any }) {
       <Pills values={KEYS.map((k) => k.label)} value={label} onChange={setLabel} />
       <Pane title={`Graded against ${chosen.label.toLowerCase()}`} sub="Share of questions where the model's top answer matches the key's">
         <p className="fine">{chosen.about}</p>
+        <p className="sr-only" aria-live="polite">
+          {rows[0] ? `Graded against ${chosen.label.toLowerCase()}: ${name(rows[0].model)} ranks first at ${pct(rows[0].agreement)}.` : ""}
+        </p>
         <div className="model-table-wrap">
           <table className="model-table">
             <thead>
