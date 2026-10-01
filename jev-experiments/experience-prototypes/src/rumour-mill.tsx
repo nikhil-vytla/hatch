@@ -625,7 +625,6 @@ export function RumourMill() {
     <div className="toybox rm">
       <div className="rm-top">
         <div>
-          <h2 className="rm-title">One rumour, 4,000 neighbours.</h2>
           <p className="rm-sub">
             Pin a rumour on a street in Bramble and watch it travel. Everyone who hears it decides once: ignore it, pass it
             on, go, or argue it down.
