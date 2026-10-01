@@ -11,7 +11,9 @@ import type { EffectCancelParams } from "./EffectCancelParams";
 import type { EffectRunParams } from "./EffectRunParams";
 import type { EffectRunResult } from "./EffectRunResult";
 import type { Empty } from "./Empty";
+import type { ExtensionProposed } from "./ExtensionProposed";
 import type { GatewayInfo } from "./GatewayInfo";
+import type { HostProposeExtensionParams } from "./HostProposeExtensionParams";
 import type { HostRecordParams } from "./HostRecordParams";
 import type { HostStreamParams } from "./HostStreamParams";
 import type { InitializeParams } from "./InitializeParams";
@@ -78,6 +80,7 @@ export type Methods = {
   "host/context": { params: SessionRef; result: LearnerContext };
   "host/record": { params: HostRecordParams; result: Appended };
   "host/stream": { params: HostStreamParams; result: Empty };
+  "host/proposeExtension": { params: HostProposeExtensionParams; result: ExtensionProposed };
   "session/interrupt": { params: SessionRef; result: Empty };
   "model/list": { params: Empty; result: ModelListResult };
   "session/model": { params: SessionModelParams; result: Appended };

@@ -24,12 +24,14 @@ import {
   artifactOf,
   artifactPath,
   bulletLines,
+  changedText,
   errorText,
   fileHistory,
   GATE_NAMES,
   judgeAdvice,
   type Run,
   readJudge,
+  replacedText,
   statusName,
   statusNote,
   VERDICT_NAMES,
@@ -470,7 +472,11 @@ function Detail({
           {old && "failed" in old && <p className="danger small">Couldn't read the file as it was: {old.failed}</p>}
           {old && "text" in old && (
             <div className="learned-diff">
-              <Diff before={old.text ?? ""} after={p.proposal.change.content} path={path} />
+              <Diff
+                before={replacedText(p.proposal.change, old.text ?? "")}
+                after={changedText(p.proposal.change)}
+                path={path}
+              />
             </div>
           )}
         </section>

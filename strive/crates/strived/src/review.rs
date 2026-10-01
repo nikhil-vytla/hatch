@@ -296,10 +296,24 @@ fn rolled_back(p: &ProposalState, rel: &str) -> String {
     let id = p.id;
     match (&p.proposal.change, p.before) {
         (Change::Memory(_), _) => format!("rolled back #{id}: its bullet in {rel} is as it was before"),
-        (Change::Skill { .. } | Change::Check { .. } | Change::Command { .. } | Change::Rule { .. }, Some(_)) => {
+        (
+            Change::Skill { .. }
+            | Change::Check { .. }
+            | Change::Command { .. }
+            | Change::Rule { .. }
+            | Change::Extension { .. },
+            Some(_),
+        ) => {
             format!("rolled back #{id}: {rel} is as it was before")
         }
-        (Change::Skill { .. } | Change::Check { .. } | Change::Command { .. } | Change::Rule { .. }, None) => {
+        (
+            Change::Skill { .. }
+            | Change::Check { .. }
+            | Change::Command { .. }
+            | Change::Rule { .. }
+            | Change::Extension { .. },
+            None,
+        ) => {
             format!("rolled back #{id}: removed {rel}, which didn't exist before")
         }
     }
@@ -326,14 +340,10 @@ fn no_rollback(p: &ProposalState, rel: &str) -> Option<String> {
     }
 }
 
-/// `strive review ID`: the summary and status, the diff, the checks in one
-/// line, and what to do next. `full` adds the reasons, the evidence, and
-/// each check's detail.
-fn page(p: &ProposalState, rel: &str, old: &str, titles: &Titles, full: bool) -> Result<String> {
-    let id = p.id;
+/// What a proposal changes, for its page: a bullet's edit, or a file's (or
+/// an extension's files') diff.
+fn change_text(p: &ProposalState, rel: &str, old: &str) -> Result<String> {
     let mut out = String::new();
-    writeln!(out, "#{id} {} ({})", p.proposal.summary, status_text(p))?;
-    writeln!(out, "changes {rel}; {} on {}", origin(p, titles), when(p.made_at_ms))?;
     match &p.proposal.change {
         Change::Memory(_) => match &p.bullet {
             Some(edit) => {
@@ -357,7 +367,35 @@ fn page(p: &ProposalState, rel: &str, old: &str, titles: &Titles, full: bool) ->
                 writeln!(out, "{l}")?;
             }
         }
+        Change::Extension { files, .. } => {
+            // Its files, each under its path, as they were and as they'd be.
+            let before: Vec<strive_proto::ExtensionFile> = serde_json::from_str(old).unwrap_or_default();
+            writeln!(
+                out,
+                "\n{}",
+                if p.before.is_none() { format!("{rel} is a new extension") } else { String::new() }
+            )?;
+            for t in tools_text(files) {
+                writeln!(out, "{t}")?;
+            }
+            let shown = strive_learning::extension_dir::shown;
+            for l in diff(&shown(&before), &shown(files)) {
+                writeln!(out, "{l}")?;
+            }
+        }
     }
+    Ok(out)
+}
+
+/// `strive review ID`: the summary and status, the diff, the checks in one
+/// line, and what to do next. `full` adds the reasons, the evidence, and
+/// each check's detail.
+fn page(p: &ProposalState, rel: &str, old: &str, titles: &Titles, full: bool) -> Result<String> {
+    let id = p.id;
+    let mut out = String::new();
+    writeln!(out, "#{id} {} ({})", p.proposal.summary, status_text(p))?;
+    writeln!(out, "changes {rel}; {} on {}", origin(p, titles), when(p.made_at_ms))?;
+    out.push_str(&change_text(p, rel, old)?);
     writeln!(out, "\n{}", verdict(p))?;
     if full {
         writeln!(out, "\nwhy\n{}", indent(&p.proposal.rationale))?;
@@ -483,7 +521,23 @@ pub fn gate_name(g: Gate) -> &'static str {
     match g {
         Gate::Static => "safety checks",
         Gate::Judge => "second opinion",
+        Gate::Tests => "its tests",
     }
+}
+
+/// An extension's tools in plain words, for a person deciding on it.
+fn tools_text(files: &[strive_proto::ExtensionFile]) -> Vec<String> {
+    let Some(manifest) = files.iter().find(|f| f.path == "extension.json") else { return Vec::new() };
+    let Ok(m) = serde_json::from_str::<serde_json::Value>(&manifest.content) else { return Vec::new() };
+    let mut out = vec![
+        "each tool runs as a command in the sandbox: it can read and change files in the workspace, \
+                        with no network and none of strive's state"
+            .to_string(),
+    ];
+    for t in m["tools"].as_array().into_iter().flatten() {
+        out.push(format!("  tool {}: {}", t["name"].as_str().unwrap_or("?"), t["description"].as_str().unwrap_or("")));
+    }
+    out
 }
 
 pub fn verdict_name(v: Verdict) -> &'static str {

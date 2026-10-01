@@ -3,7 +3,7 @@
 //! The daemon's loader and the static gate read it here, so a directory
 //! the gate passed is one the loader runs.
 
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 
 /// The most an extension's files may hold together, in bytes.
 pub const LIMIT: usize = 64 * 1024;
@@ -12,12 +12,7 @@ pub const FILES: usize = 32;
 /// The longest tool name.
 pub const TOOL_NAME_LIMIT: usize = 40;
 
-/// One file, by its path inside the extension's directory.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct File {
-    pub path: String,
-    pub content: String,
-}
+pub use strive_proto::ExtensionFile as File;
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -129,6 +124,13 @@ fn path_problem(path: &str) -> Option<String> {
         return Some(format!("the path {path:?} isn't a .ts, .json or .md file"));
     }
     None
+}
+
+/// The files as a person or the judge reads them: each under its path, by path.
+pub fn shown(files: &[File]) -> String {
+    let mut sorted: Vec<&File> = files.iter().collect();
+    sorted.sort_by(|a, b| a.path.cmp(&b.path));
+    sorted.iter().map(|f| format!("=== {} ===\n{}", f.path, f.content.trim_end())).collect::<Vec<_>>().join("\n\n")
 }
 
 /// The files as one sequence of bytes, by path: what an extension's digest

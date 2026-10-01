@@ -206,3 +206,136 @@ fn an_agents_change_to_an_extension_asks_a_person_even_in_full_auto() {
     );
     assert!(r["outcome"]["reason"].as_str().unwrap_or_default().contains("future session"), "{r}");
 }
+
+impl Ws {
+    /// Drafts the extension `shout` for a work session to propose, with `test` as its test file.
+    fn draft(&self, test: &str) {
+        let at = ".strive/drafts/extensions/shout";
+        self.write(
+            &format!("{at}/extension.json"),
+            &json!({"name": "shout", "description": "Says things loudly", "tools": [{"name": "loud", "description": "Capitals", "parameters": {"type": "object"}}]}).to_string(),
+        );
+        self.write(
+            &format!("{at}/index.ts"),
+            "export const tools = { loud: async ({ text }: { text: string }) => text.toUpperCase() };\n",
+        );
+        self.write(&format!("{at}/shout.test.ts"), test);
+    }
+    /// This session's host, having been asked for something.
+    fn host(&self) -> Rpc {
+        self.env.rpc().ok("session/prompt", &json!({"id": self.id, "text": "build me a tool that shouts"}));
+        let mut host = self.env.rpc();
+        host.ok("host/register", &json!({"id": self.id}));
+        host
+    }
+    fn propose(&self, host: &mut Rpc) -> Value {
+        host.call(
+            "host/proposeExtension",
+            &json!({"id": self.id, "name": "shout", "summary": "Add shout", "rationale": "the user asked for it", "prediction": "sessions can shout"}),
+        )
+    }
+    fn proposal(&self, id: u64) -> Value {
+        let list = self.env.rpc().ok("proposal/list", &json!({"cwd": self.root}));
+        list["proposals"].as_array().unwrap().iter().find(|p| p["id"] == id).unwrap().clone()
+    }
+}
+
+const PASSES: &str = "import { test, expect } from \"bun:test\";\nimport { tools } from \"./index\";\ntest(\"loud\", async () => expect(await tools.loud({ text: \"hi\" })).toBe(\"HI\"));\n";
+
+#[test]
+fn a_work_session_proposes_its_draft_and_once_accepted_it_runs_unasked_until_rolled_back() {
+    if !sandboxed() {
+        eprintln!("no usable sandbox on this machine: an extension's tests can't run");
+        return;
+    }
+    let w = Ws::new();
+    w.draft(PASSES);
+    let mut host = w.host();
+    let r = w.propose(&mut host);
+    let id = r["result"]["proposal"].as_u64().unwrap_or_else(|| panic!("{r}"));
+    let gates: Vec<(String, String)> = r["result"]["gates"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|g| (g["gate"].as_str().unwrap().into(), g["verdict"].as_str().unwrap().into()))
+        .collect();
+    assert!(
+        gates.contains(&("static".into(), "pass".into())) && gates.contains(&("tests".into(), "pass".into())),
+        "{r}"
+    );
+    let p = w.proposal(id);
+    assert_eq!(p["status"], "ready", "{p}");
+    assert_eq!(p["proposal"]["evidence"][0]["session"], w.id.as_str());
+
+    let decided = w.env.rpc().call("proposal/decide", &json!({"cwd": w.root, "proposal": id, "decision": "accept"}));
+    assert!(decided.get("error").is_none(), "{decided}");
+    assert_eq!(fs::read_to_string(w.root.join(".strive/extensions/shout/shout.test.ts")).unwrap(), PASSES);
+    // Accepted as it is: it runs with nobody asked, in ask mode.
+    w.env.rpc().ok("session/approvals", &json!({"id": w.id, "mode": "ask"}));
+    let mut c = w.env.rpc();
+    let ran = w.call(&mut c, "c1", "loud", &json!({"text": "hi"}));
+    assert_eq!(ran["result"]["text"], "HI", "{ran}");
+
+    let back = w.env.rpc().call("proposal/rollback", &json!({"cwd": w.root, "proposal": id}));
+    assert!(back.get("error").is_none(), "{back}");
+    assert!(!w.root.join(".strive/extensions/shout").exists(), "it didn't exist before");
+}
+
+#[test]
+fn an_extension_whose_tests_fail_fails_and_isnt_judged() {
+    if !sandboxed() {
+        eprintln!("no usable sandbox on this machine");
+        return;
+    }
+    let w = Ws::new();
+    w.draft(&PASSES.replace("toBe(\"HI\")", "toBe(\"hi\")"));
+    let mut host = w.host();
+    let r = w.propose(&mut host);
+    let id = r["result"]["proposal"].as_u64().unwrap();
+    let p = w.proposal(id);
+    assert_eq!(p["status"], "failed", "{p}");
+    let gate = |name: &str| p["gates"].as_array().unwrap().iter().find(|g| g["gate"] == name).unwrap().clone();
+    assert_eq!(gate("tests")["verdict"], "fail");
+    assert!(gate("tests")["detail"].as_str().unwrap().contains("bun test exited"), "{p}");
+    assert_eq!(gate("judge")["detail"], "not run: its tests failed");
+}
+
+#[test]
+fn proposing_needs_a_draft_a_work_session_and_a_well_formed_manifest() {
+    let w = Ws::new();
+    let mut host = w.host();
+    let r = w.propose(&mut host);
+    assert!(r["error"]["message"].as_str().unwrap().contains("there's no draft"), "{r}");
+    w.write(".strive/drafts/extensions/shout/extension.json", "{\"name\": \"shout\"}");
+    w.write(".strive/drafts/extensions/shout/index.ts", "export const tools = {};\n");
+    let r = w.propose(&mut host);
+    let p = w.proposal(r["result"]["proposal"].as_u64().unwrap());
+    assert_eq!(p["status"], "failed");
+    let detail = p["gates"][0]["detail"].as_str().unwrap();
+    assert!(detail.contains("form:") && detail.contains("extension.json doesn't read"), "{detail}");
+    // A learning session's host can't.
+    let learning = w.env.rpc().ok("learning/open", &json!({"cwd": w.root}))["id"].as_str().unwrap().to_string();
+    let mut learner = w.env.rpc();
+    learner.ok("host/register", &json!({"id": learning}));
+    let r = learner.call(
+        "host/proposeExtension",
+        &json!({"id": learning, "name": "shout", "summary": "s", "rationale": "r", "prediction": "p"}),
+    );
+    assert!(r["error"]["message"].as_str().unwrap().contains("only a work session"), "{r}");
+}
+
+#[test]
+fn an_extension_changed_since_it_was_proposed_is_stale() {
+    if !sandboxed() {
+        eprintln!("no usable sandbox on this machine");
+        return;
+    }
+    let w = Ws::new();
+    w.draft(PASSES);
+    let mut host = w.host();
+    let id = w.propose(&mut host)["result"]["proposal"].as_u64().unwrap();
+    w.shout("by hand");
+    w.env.rpc().ok("proposal/decide", &json!({"cwd": w.root, "proposal": id, "decision": "accept"}));
+    assert_eq!(w.proposal(id)["status"], "stale");
+    assert!(fs::read_to_string(w.root.join(".strive/extensions/shout/index.ts")).unwrap().contains("by hand"));
+}

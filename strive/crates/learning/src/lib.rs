@@ -63,6 +63,11 @@ pub const RULE_LIMIT: usize = 16 * 1024;
 /// a person may accept past its fail.
 pub const GATES: [Gate; 2] = [Gate::Static, Gate::Judge];
 
+/// The order gates are shown in: an extension's tests (ADR-0027) come with
+/// its proposal, between the static gate and the judge. A failed one fails
+/// the proposal, as a failed static gate does.
+pub const ORDER: [Gate; 3] = [Gate::Static, Gate::Tests, Gate::Judge];
+
 /// Proposals for the same file as `artifact` that were applied and then
 /// rolled back, oldest first. A person undid each, so the judge is shown
 /// them.
@@ -99,6 +104,10 @@ pub fn relative_path(artifact: &Artifact) -> Result<String, String> {
         }
         Artifact::Command { name } if valid_skill_name(name) => Ok(format!("{COMMANDS_DIR}/{name}.md")),
         Artifact::Rule { name } if valid_skill_name(name) => Ok(format!("{RULES_DIR}/{name}.md")),
+        Artifact::Extension { name } if valid_skill_name(name) => Ok(format!("{EXTENSIONS_DIR}/{name}")),
+        Artifact::Extension { name } => {
+            Err(format!("the extension name {name:?} isn't 1 to {SKILL_NAME_LIMIT} of a-z, 0-9 and -"))
+        }
         Artifact::Rule { name } => {
             Err(format!("the rule name {name:?} isn't 1 to {SKILL_NAME_LIMIT} of a-z, 0-9 and -"))
         }
@@ -129,6 +138,7 @@ pub fn file_limit(artifact: &Artifact) -> usize {
         Artifact::Check { .. } => CHECK_LIMIT,
         Artifact::Command { .. } => COMMAND_LIMIT,
         Artifact::Rule { .. } => RULE_LIMIT,
+        Artifact::Extension { .. } => extension_dir::LIMIT,
     }
 }
 
@@ -140,5 +150,6 @@ pub fn describe(artifact: &Artifact) -> String {
         Artifact::Check { name } => format!("check {name}"),
         Artifact::Command { name } => format!("command /{name}"),
         Artifact::Rule { name } => format!("rule {name}"),
+        Artifact::Extension { name } => format!("extension {name}"),
     }
 }

@@ -90,7 +90,7 @@ pub fn fold(entries: &[Entry]) -> Vec<Folded> {
                     gates.push(GateOutcome { gate: *gate, verdict: *verdict, detail: detail.clone() });
                     // Listed in the order the checks run, not the order their
                     // verdicts were journaled in.
-                    gates.sort_by_key(|g| crate::GATES.iter().position(|x| *x == g.gate));
+                    gates.sort_by_key(|g| crate::ORDER.iter().position(|x| *x == g.gate));
                 }
             }
             Event::ProposalDecided { proposal, decision, .. } => {
@@ -168,7 +168,14 @@ impl Live {
                     .filter(|s| out.iter().any(|(p, m)| p.id == *s && m.applied.is_some() && !m.rolled_back))
             }
             (Change::Memory(_), Some(BulletEdit::Added { .. }) | None) => None,
-            (Change::Skill { .. } | Change::Check { .. } | Change::Command { .. } | Change::Rule { .. }, _) => {
+            (
+                Change::Skill { .. }
+                | Change::Check { .. }
+                | Change::Command { .. }
+                | Change::Rule { .. }
+                | Change::Extension { .. },
+                _,
+            ) => {
                 let Ok(path) = crate::relative_path(&out[i].0.proposal.change.artifact()) else { return };
                 self.0.insert(path, id)
             }
@@ -218,7 +225,7 @@ fn status(gates: &[GateOutcome], marks: &Marks) -> ProposalStatus {
         ProposalStatus::Stale
     } else if marks.rejected {
         ProposalStatus::Rejected
-    } else if gates.iter().any(|g| g.gate == Gate::Static && g.verdict == Verdict::Fail) {
+    } else if gates.iter().any(|g| matches!(g.gate, Gate::Static | Gate::Tests) && g.verdict == Verdict::Fail) {
         ProposalStatus::Failed
     } else if crate::GATES.iter().all(|gate| gates.iter().any(|g| g.gate == *gate)) {
         ProposalStatus::Ready

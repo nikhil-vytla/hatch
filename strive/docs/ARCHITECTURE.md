@@ -209,9 +209,17 @@ Confining the host process to the daemon's socket and gateway is planned.
   daemon reads the extension fresh for each call and runs a fixed runner,
   `bun -e`, on it as a command in the sandbox, journaled as an `extension`
   effect with the digest of its files. It runs unasked only in a form a
-  person accepted (an allowance `extension:<name>:<digest>` for the
-  session, for now), and one that fails three times in a session is left
-  out for the rest of it.
+  person accepted: an applied extension proposal's files, or an allowance
+  `extension:<name>:<digest>` for the session. One that fails three times
+  in a session is left out for the rest of it.
+  - **Proposed** by a work session when a person asks for a tool:
+    `propose_extension` (`host/proposeExtension`) turns the draft in
+    `.strive/drafts/extensions/<name>` into a whole-directory
+    `Change::Extension`, citing the person's latest prompt. Before it's
+    recorded, the daemon runs its `*.test.ts` with `bun test` in the
+    sandbox, in a directory of its own: the `tests` gate, which fails the
+    proposal as the static gate does. Accept and rollback replace the
+    directory as one value (its files, by path).
 - **Imports:** a line `@path` in an instruction file, outside a code
   block, inlines that file if its real path is in the project (under its
   root, not in strive's home), up to five imports deep, and not as a

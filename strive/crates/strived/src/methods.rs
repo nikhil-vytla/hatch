@@ -598,6 +598,20 @@ async fn route_host(state: &Arc<State>, conn: &Arc<Conn>, method: &str, params: 
             }
             reply::<HostRecord>(Appended { seq: entries[0].seq })
         }
+        strive_proto::HostProposeExtension::NAME => {
+            let params = parse::<strive_proto::HostProposeExtension>(params)?;
+            let sid = session_id(&params.id)?;
+            require_host(conn, &sid)?;
+            let info = state.sessions.info(&sid).await.map_err(session_error)?;
+            if info.kind.unwrap_or_default() != SessionKind::Work {
+                return Err(RpcError::new(
+                    RpcError::INVALID_REQUEST,
+                    "only a work session proposes an extension it drafted; the learner proposes with propose_change",
+                ));
+            }
+            let (proposal, gates) = crate::learning::propose_extension(state, &sid, &info.cwd, params).await?;
+            reply::<strive_proto::HostProposeExtension>(strive_proto::ExtensionProposed { proposal, gates })
+        }
         HostStream::NAME => {
             let HostStreamParams { id, turn, text } = parse::<HostStream>(params)?;
             require_host(conn, &session_id(&id)?)?;
@@ -951,9 +965,7 @@ async fn prepare(
                 what: format!("{name}'s tool {tool}"),
                 detail: String::new(),
                 allowance: crate::extensions::allowance(&name, &digest),
-                // Until extensions are proposed (ADR-0027's second part), only a
-                // person's allow for the session accepts one.
-                proposed: false,
+                proposed: crate::extensions::proposed(state, cwd, &name, &digest),
             };
             (run, record, Some(accepting))
         }

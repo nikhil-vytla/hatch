@@ -6,6 +6,7 @@ import type {
   BulletEdit,
   Change,
   Entry,
+  ExtensionFile,
   Gate,
   ProposalState,
   ProposalStatus,
@@ -24,12 +25,39 @@ export function errorText(e: Error): string {
 
 /** Where an artifact lives in the project, as `strive review` names it. */
 export function artifactPath(a: Artifact): string {
-  return a.kind === "memory" ? ".strive/memory.md" : `.strive/skills/${a.name}/SKILL.md`;
+  switch (a.kind) {
+    case "memory":
+      return ".strive/memory.md";
+    case "skill":
+      return `.strive/skills/${a.name}/SKILL.md`;
+    case "check":
+      return `.strive/checks/${a.name}.md`;
+    case "command":
+      return `.strive/commands/${a.name}.md`;
+    case "rule":
+      return `.strive/rules/${a.name}.md`;
+    case "extension":
+      return `.strive/extensions/${a.name}`;
+    default:
+      return a satisfies never;
+  }
 }
 
-/** An artifact in a list: "memory", or "skill release". */
+/** An artifact in a list: "memory", "skill release", "command /review". */
 export function artifactName(a: Artifact): string {
-  return a.kind === "memory" ? "memory" : `skill ${a.name}`;
+  switch (a.kind) {
+    case "memory":
+      return "memory";
+    case "command":
+      return `command /${a.name}`;
+    case "skill":
+    case "check":
+    case "rule":
+    case "extension":
+      return `${a.kind} ${a.name}`;
+    default:
+      return a satisfies never;
+  }
 }
 
 export const STATUS_NAMES: Record<ProposalStatus, string> = {
@@ -48,7 +76,48 @@ export function statusName(p: ProposalState): string {
 }
 
 /** The gates by what they do: the static gate checks safety, the judge is a second opinion. */
-export const GATE_NAMES: Record<Gate, string> = { static: "Safety checks", judge: "Second opinion" };
+export const GATE_NAMES: Record<Gate, string> = {
+  static: "Safety checks",
+  tests: "Its tests",
+  judge: "Second opinion",
+};
+
+/** An extension's files as a person reads them: each under its path, by path (as `strive review` shows them). */
+export function filesShown(files: ExtensionFile[]): string {
+  return [...files]
+    .sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0))
+    .map((f) => `=== ${f.path} ===\n${f.content.trimEnd()}`)
+    .join("\n\n");
+}
+
+/** A whole-file change's text as it would be: a file's, or an extension's files shown together. */
+export function changedText(change: Exclude<Change, { kind: "memory" }>): string {
+  return change.kind === "extension" ? filesShown(change.files) : change.content;
+}
+
+/** What a whole-file change replaces, as text: an extension's files as journaled (canonical JSON) shown together. */
+export function replacedText(change: Exclude<Change, { kind: "memory" }>, before: string): string {
+  if (change.kind !== "extension" || before === "") return before;
+
+  try {
+    const files: unknown = JSON.parse(before);
+
+    return Array.isArray(files) && files.every(isFile) ? filesShown(files) : before;
+  } catch {
+    return before;
+  }
+}
+
+function isFile(v: unknown): v is ExtensionFile {
+  return (
+    typeof v === "object" &&
+    v !== null &&
+    "path" in v &&
+    typeof v.path === "string" &&
+    "content" in v &&
+    typeof v.content === "string"
+  );
+}
 
 export const VERDICT_NAMES: Record<Verdict, string> = { pass: "passed", fail: "failed", skipped: "skipped" };
 
@@ -241,7 +310,7 @@ export function judgeAdvice(p: ProposalState): string[] | undefined {
 
 /** The file a change is to. */
 export function artifactOf(c: Change): Artifact {
-  return c.kind === "memory" ? { kind: "memory" } : { kind: "skill", name: c.name };
+  return c.kind === "memory" ? { kind: "memory" } : { kind: c.kind, name: c.name };
 }
 
 /** The proposals for the same file as `p`, newest first, `p` among them: the file's history as review sees it. */

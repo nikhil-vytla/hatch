@@ -261,6 +261,48 @@ function layoutProposalSchema() {
 const LayoutProposal = layoutProposalSchema();
 
 /**
+ * Proposes the extension a work session drafted (ADR-0027), when a person
+ * asked for one: the daemon checks it, runs its tests in the sandbox, and a
+ * person decides. Nothing it wrote runs unasked until then.
+ */
+const ProposeExtensionParams = Type.Object({
+  name: Type.String({ description: "The extension's directory under the drafts: 1 to 40 of a-z, 0-9 and -" }),
+  summary: Type.String({ description: "One line: what it adds" }),
+  rationale: Type.String({ description: "What the user asked for, and why this does it" }),
+  prediction: Type.String({ description: "What a later session will be able to do with it" }),
+});
+
+function proposeExtension(client: StriveClient, sessionId: string): AgentTool<typeof ProposeExtensionParams> {
+  return {
+    name: "propose_extension",
+    label: "propose_extension",
+    description: [
+      "Propose an extension you drafted, when the user asked you for a tool: strive's own tools are extensions, TypeScript in .strive/extensions/<name>/ that the agent calls as ext__<name>__<tool>.",
+      `Draft it first in ${DRAFTS}/<name>/: extension.json ({"name", "description", "tools": [{"name", "description", "parameters": a JSON Schema object}]}), index.ts (export const tools = { <tool>: async (args) => string }), and *.test.ts files (bun test) that show it works. Run \`bun test ${DRAFTS}/<name>\` yourself first.`,
+      "Each tool runs as a command in the sandbox: no network, and only the workspace to read and write.",
+      "The daemon checks the files, runs the tests, and a person accepts or rejects it in `strive review` or the desktop app; nothing runs as an extension until then.",
+    ].join(" "),
+    parameters: ProposeExtensionParams,
+    execute: async (_callId, params) => {
+      const r = await client.request("host/proposeExtension", { id: sessionId, ...params });
+
+      const gates = r.gates
+        .map((g) => `${g.gate} ${g.verdict}${g.verdict === "pass" ? "" : `: ${g.detail}`}`)
+        .join("; ");
+
+      const text = `Proposed as #${r.proposal}. ${gates}. A person accepts or rejects it in \`strive review\` or the desktop app.`;
+
+      if (r.gates.some((g) => g.verdict === "fail"))
+        throw new Error(`${text} Fix what failed in the draft and propose again.`);
+
+      return { content: [{ type: "text", text }], details: undefined };
+    },
+  };
+}
+
+const DRAFTS = ".strive/drafts/extensions";
+
+/**
  * An extension tool's name as providers accept it (at most 64 characters):
  * `ext__<extension>__<tool>`, or, past 64, its start and a short hash of both.
  */
@@ -335,6 +377,7 @@ export function tools(
 
   return [
     proposeLayout(client, sessionId),
+    proposeExtension(client, sessionId),
     ...mcp.map((t, i) => mcpTool(client, sessionId, t, names[i] ?? t.name)),
     ...extensionTools(client, sessionId, extensions),
     tool(
