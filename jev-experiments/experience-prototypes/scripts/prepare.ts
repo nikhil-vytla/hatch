@@ -20,6 +20,7 @@ import { prepareCapabilityAtlas } from "../../capability-atlas-2026-09-22/prepar
 import { buildArena } from "../../packages/arena/src/data/build";
 import { buildDecide } from "../../packages/arena/src/decide/build";
 import { buildDecoy } from "../../packages/arena/prose/decoy-build";
+import { buildFool } from "../../packages/arena/src/fool/build";
 const lab = resolve(".."),
   dest = resolve("public/data");
 const publication: Record<string, string> = JSON.parse(
@@ -137,3 +138,4 @@ console.log("Prepared recorded evidence and companion.");
 await buildArena(resolve("public/arena"));
 buildDecide(resolve("../packages/arena"), resolve("public/decide"));
 buildDecoy(resolve("../packages/arena/prose"), resolve("public/decoy"));
+buildFool(resolve("../packages/arena"), resolve("public/fool"));

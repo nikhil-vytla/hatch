@@ -34,7 +34,6 @@ const e = (
           : "gold",
 });
 export const experiments = [
-  e("materials", "", "Material sandbox", "Games & simulations", "Paint a world. Rewrite one material. Preserve another future.", "Can a typed rule make an instruction visible in a local simulation?"),
   e(
     "paste",
     "paste",
@@ -195,9 +194,23 @@ export const lookup = (id: string) =>
  * Scenes taken out of the catalog in the 29 Sep 2026 review. Old links land on a notice that
  * says why and where to go; each scene's recorded run stays published for download.
  */
-export type Retired = { title: string; reason: string; record: string; instead?: { href: string; label: string } };
+export type Retired = {
+  title: string;
+  reason: string;
+  /** The published record to download; absent when the scene never had one. */
+  record?: string;
+  /** When it left the catalog, if not in the 29 Sep 2026 review. */
+  retiredOn?: string;
+  instead?: { href: string; label: string };
+};
 
 export const retired: Record<string, Retired> = {
+  materials: {
+    title: "Material sandbox",
+    reason: "It opened paused, and Jev's part was one recorded rule behind a tab. The home page now leads with a toy where you work against Jev directly.",
+    retiredOn: "30 Sep 2026",
+    instead: { href: "#/", label: "Fool Jev" },
+  },
   worlds: {
     title: "Living scenes",
     reason: "The renders rarely matched their briefs and nothing measured them; the square at five does living worlds better.",
