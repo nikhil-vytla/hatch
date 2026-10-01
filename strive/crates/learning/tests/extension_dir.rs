@@ -33,7 +33,7 @@ fn an_extension_declares_its_tools_in_its_manifest() {
 #[test]
 fn the_manifest_names_the_extension_and_describes_each_tool() {
     assert!(has(&problems("other", &ext(LOUD)), "names it \"shout\", not \"other\""));
-    assert!(has(&problems("shout", &ext("")), "declares no tools"));
+    assert!(has(&problems("shout", &ext("")), "declares no tools and no hooks"));
     let twice = format!("{LOUD}, {LOUD}");
     assert!(has(&problems("shout", &ext(&twice)), "declared twice"));
     let bare = r#"{"name": "loud", "description": " ", "parameters": {"type": "object"}}"#;
@@ -163,4 +163,28 @@ fn an_extension_lives_in_its_own_directory_and_a_bad_name_has_none() {
     let at = strive_learning::relative_path(&Artifact::Extension { name: "shout".into() });
     assert_eq!(at.unwrap(), ".strive/extensions/shout");
     assert!(strive_learning::relative_path(&Artifact::Extension { name: "../shout".into() }).is_err());
+}
+
+fn hooked(hooks: &str) -> Vec<File> {
+    let json = format!("{{\"name\": \"guard\", \"description\": \"Guards pushes\", \"hooks\": [{hooks}]}}");
+    vec![file("extension.json", &json), file("index.ts", "export const hooks = {};\n")]
+}
+
+#[test]
+fn an_extension_may_declare_only_hooks_each_seeing_the_kinds_it_names() {
+    let m = parse("guard", &hooked(r#"{"event": "tool_call", "tools": ["bash", "write"]}"#)).unwrap();
+    assert_eq!(m.tools, []);
+    assert!(m.hooks[0].sees("bash") && m.hooks[0].sees("write") && !m.hooks[0].sees("read"));
+    let every = parse("guard", &hooked(r#"{"event": "tool_call"}"#)).unwrap();
+    assert!(every.hooks[0].sees("read") && every.hooks[0].sees("extension"));
+}
+
+#[test]
+fn a_hook_runs_on_a_known_event_and_sees_known_kinds() {
+    assert!(has(&problems("guard", &hooked(r#"{"event": "turn_end"}"#)), "the one event is \"tool_call\""));
+    let kind = problems("guard", &hooked(r#"{"event": "tool_call", "tools": ["bash", "shell"]}"#));
+    assert_eq!(kind.len(), 1, "{kind:?}");
+    assert!(has(&kind, "sees \"shell\""));
+    assert!(has(&problems("guard", &hooked(r#"{"event": "tool_call", "tools": []}"#)), "would see nothing"));
+    assert!(has(&problems("guard", &hooked(r#"{"event": "tool_call", "allow": true}"#)), "doesn't read"));
 }

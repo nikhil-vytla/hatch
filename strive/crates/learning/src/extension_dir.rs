@@ -19,7 +19,10 @@ pub use strive_proto::ExtensionFile as File;
 pub struct Manifest {
     pub name: String,
     pub description: String,
+    #[serde(default)]
     pub tools: Vec<Tool>,
+    #[serde(default)]
+    pub hooks: Vec<Hook>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
@@ -29,6 +32,30 @@ pub struct Tool {
     pub description: String,
     /// The JSON Schema of its arguments: an object.
     pub parameters: serde_json::Value,
+}
+
+/// Code the daemon runs before a tool call (ADR-0028), which may only make
+/// it stricter.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Hook {
+    /// When it runs: `tool_call` is the one event.
+    pub event: String,
+    /// The effect kinds it sees; without it, every kind.
+    #[serde(default)]
+    pub tools: Option<Vec<String>>,
+}
+
+/// The events a hook may run on.
+pub const HOOK_EVENTS: [&str; 1] = ["tool_call"];
+/// The effect kinds a hook may see, as the protocol names them.
+pub const EFFECT_KINDS: [&str; 7] = ["read", "write", "edit", "bash", "mcp", "check", "extension"];
+
+impl Hook {
+    /// Whether it sees an effect of `kind`.
+    pub fn sees(&self, kind: &str) -> bool {
+        self.tools.as_ref().is_none_or(|t| t.iter().any(|k| k == kind))
+    }
 }
 
 /// A tool's name: 1 to 40 of `a-z`, `0-9` and `_`, starting with a letter.
@@ -74,8 +101,19 @@ pub fn parse(name: &str, files: &[File]) -> Result<Manifest, Vec<String>> {
         if m.description.trim().is_empty() {
             problems.push("extension.json gives no description".into());
         }
-        if m.tools.is_empty() {
-            problems.push("extension.json declares no tools".into());
+        if m.tools.is_empty() && m.hooks.is_empty() {
+            problems.push("extension.json declares no tools and no hooks".into());
+        }
+        for h in &m.hooks {
+            if !HOOK_EVENTS.contains(&h.event.as_str()) {
+                problems.push(format!("a hook runs on {:?}; the one event is \"tool_call\"", h.event));
+            }
+            for k in h.tools.iter().flatten().filter(|k| !EFFECT_KINDS.contains(&k.as_str())) {
+                problems.push(format!("a hook sees {k:?}, which isn't one of {}", EFFECT_KINDS.join(", ")));
+            }
+            if h.tools.as_ref().is_some_and(Vec::is_empty) {
+                problems.push("a hook's tools list is empty, so it would see nothing".into());
+            }
         }
         for (i, t) in m.tools.iter().enumerate() {
             if !valid_tool_name(&t.name) {
