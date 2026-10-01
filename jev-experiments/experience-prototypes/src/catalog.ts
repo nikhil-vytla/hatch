@@ -123,6 +123,14 @@ export const experiments = [
     "When should software act on Jev's answer, and when should it ask a person?",
   ),
   e(
+    "open-decisions",
+    "",
+    "Open decisions",
+    "Benchmarks",
+    "SGLang turns any chat model into a decision model. Small open Qwens, on a laptop, on Jev's benchmarks.",
+    "How close can a small open model get to Jev when asked the way SGLang asks it?",
+  ),
+  e(
     "decoy",
     "",
     "The decoy",
