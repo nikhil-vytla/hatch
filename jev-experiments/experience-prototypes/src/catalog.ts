@@ -180,7 +180,7 @@ export const experiments = [
   ),
   e("tetris", "tetris-framing", "Tetris: play and branch", "Games & simulations", "Gravity keeps going. Take control, rewind, and try another future.", "What changes when Jev chooses actions, landings or a plan?"),
   e("drawing-framing", "drawing-framing", "Pixel questions", "Creative tools", "One canvas, four ways to ask what belongs there.", "How do intensity, membership, formulas and sequential context change a drawing?"),
-  e("visual-search", "visual-search", "The visual archive", "Creative tools", "Search 204 public-domain artworks by subject, mood and detail.", "What can Jev find through museum metadata and captions?"),
+  e("visual-search", "visual-search", "The visual archive", "Creative tools", "Search 208 open-access artworks from the Cleveland Museum of Art by subject, mood and detail.", "What can Jev find through museum metadata and captions?"),
   e("wardrobe", "wardrobe", "A change of clothes", "Creative tools", "A spoken edit becomes a wardrobe choice, then a moving image.", "Can small semantic decisions keep a video try-on coherent across edits?"),
   e("icon-studio", "icon-studio", "A symbol for an idea", "Creative tools", "Find an icon by meaning, then try it in a real interface.", "Can Jev choose a useful visual metaphor from 1,703 library icons?"),
   e(

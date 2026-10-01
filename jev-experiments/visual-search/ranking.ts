@@ -23,6 +23,6 @@ export function compareRankings(left: RankedArtwork[], right: RankedArtwork[], k
   const matched = topRight.filter(r => ids.has(r.work.id)).length;
   return { complete, k, shared: complete ? matched : null, left_boundary_ties: topLeft.at(-1)?.tied ?? 0, right_boundary_ties: topRight.at(-1)?.tied ?? 0, note: "Agreement only, not retrieval quality. Equal scores share a rank; artwork ID resolves display order and top-k cutoff ties." };
 }
-export function captionQuality(work: Artwork) { return /^A work made of\b/i.test(work.caption) ? "Material description" : "Descriptive museum caption"; }
+export function captionQuality(work: Artwork) { return work.captionSource === "description + did you know" ? "Curatorial description + Did you know?" : "Curatorial description"; }
 export function mediumFamily(work: Artwork) { const text = `${work.classification} ${work.medium}`.toLowerCase(); if (/painting|oil on|tempera/.test(text)) return "Paintings"; if (/print|woodblock|lithograph|etching|engraving/.test(text)) return "Prints"; if (/drawing|watercolor|ink|chalk|pencil/.test(text)) return "Drawings"; if (/photograph/.test(text)) return "Photographs"; return "Objects"; }
 export function searchableText(work: Artwork) { return JSON.stringify({ ...metadata(work), caption: work.caption }); }
