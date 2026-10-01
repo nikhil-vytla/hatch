@@ -237,9 +237,9 @@ export const retired: Record<string, Retired> = {
   },
   worlds: {
     title: "Living scenes",
-    reason: "The renders rarely matched their briefs and nothing measured them; the square at five does living worlds better.",
+    reason: "The renders rarely matched their briefs and nothing measured them. Who can you win over? is the living world now.",
     record: "visuals",
-    instead: { href: "#experiment/crowd", label: "The square at five" },
+    instead: { href: "#experiment/win-over", label: "Who can you win over?" },
   },
   pixels: {
     title: "Pixel studio",

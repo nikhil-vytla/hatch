@@ -29,7 +29,7 @@ const findings = [
   {
     n: "1,250 / 1,251",
     title: "Sure means right",
-    body: "Answers Jev gave at 90% or more were right every time but once.",
+    body: "Yes/no answers Jev gave at 90% or more were right every time but once.",
   },
 ];
 

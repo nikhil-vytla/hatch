@@ -174,10 +174,11 @@ export function CrowdNote() {
           alone cannot answer that question.
         </p>
         <p>
-          <a href="#experiment/crowd">Open the crowd</a>, select a resident and
-          inspect the decision. Read the returned probabilities beside the
-          actual observation. A route without its input can look much more
-          capable than the system that produced it.
+          The square at five was retired on 30 September 2026 (
+          <a href="#experiment/crowd">why, and the recorded run</a>). The lesson
+          stands: read the returned probabilities beside the actual
+          observation. A route without its input can look much more capable
+          than the system that produced it.
         </p>
       </div>
       <aside className="note-references">
