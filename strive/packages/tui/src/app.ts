@@ -23,7 +23,15 @@ import {
   type SessionInfo,
   type StriveClient,
 } from "@strive/protocol";
-import { describe as describeLines, formatUsd, type Line, MODE_NAMES, offerText, Spend } from "@strive/view";
+import {
+  describe as describeLines,
+  formatUsd,
+  type Line,
+  MODE_NAMES,
+  offerText,
+  Spend,
+  sessionAllowance,
+} from "@strive/view";
 import { editorTheme, style } from "./theme";
 
 export { formatUsd, MODE_NAMES };
@@ -135,7 +143,7 @@ export class App {
   /** The approval line shown while an effect waits for a decision. */
   private readonly prompt = new Text("", 1, 0);
   /** Effects waiting for a decision, oldest first, and whether "a" allows one file (not everything). */
-  private readonly pending = new Map<number, { description: string; oneFile: boolean }>();
+  private readonly pending = new Map<number, { description: string; allowance: string }>();
   /** Checkpoints and what each was taken before. */
   private readonly checkpoints = new Map<number, string>();
   private awaitingPrompt?: number;
@@ -312,7 +320,7 @@ export class App {
     const e = entry.event;
 
     if (e.type === "approvalRequested")
-      this.pending.set(e.effect, { description: e.description, oneFile: e.sessionFile !== undefined });
+      this.pending.set(e.effect, { description: e.description, allowance: sessionAllowance(e.sessionFile) });
 
     if (e.type === "checkpointed") {
       this.checkpoints.set(e.checkpoint, "");
@@ -338,7 +346,7 @@ export class App {
       next.done
         ? ""
         : `${style.accent(`Allow the agent to ${printable(next.value.description)}?`)}  ${style.muted(
-            `y yes · a yes to ${next.value.oneFile ? "this file for the session" : "everything (full-auto)"} · n no`,
+            `y yes · a yes to ${next.value.allowance} · n no`,
           )}`,
     );
     this.renderFooter();

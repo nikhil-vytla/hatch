@@ -32,6 +32,66 @@ export function resultText(record: EffectRecord, outcome: EffectOutcome, output:
 
 const NOT_RUN = "this tool call did not run: the turn ended first";
 
+/** A check's call id: the turn, the round within it, the check. Never a model's tool call. */
+export function checkCallId(turn: number, round: number, name: string): string {
+  return `check:${turn}:${round}:${name}`;
+}
+
+export function isCheckCall(callId: string): boolean {
+  return callId.startsWith("check:");
+}
+
+/** How much of a failed check's output the agent is shown: its end, where errors are. */
+const CHECK_OUTPUT = 4000;
+
+export type CheckRun = { record: EffectRecord; outcome: EffectOutcome; output: string };
+
+/**
+ * Whether a check found something for the agent to fix: a nonzero exit, or
+ * its time limit. One that didn't run (a person hasn't accepted it, or the
+ * daemon stopped) isn't the agent's to fix, so it isn't told.
+ */
+export function checkFailed(run: CheckRun): boolean {
+  return run.outcome.kind === "done" && run.outcome.exitCode !== 0;
+}
+
+function howItFailed(outcome: EffectOutcome): string {
+  switch (outcome.kind) {
+    case "done":
+      return outcome.exitCode === undefined ? "it ran out of time" : `exit ${outcome.exitCode}`;
+    case "refused":
+      return `it didn't run: ${outcome.reason}`;
+    case "interrupted":
+      return "the daemon stopped while it ran";
+    default:
+      return outcome satisfies never;
+  }
+}
+
+/**
+ * What the agent is told after a round of checks (ADR-0023), or nothing
+ * when none found anything to fix. The host journals it as it tells it.
+ */
+export function checkReport(runs: CheckRun[]): string | undefined {
+  const failed = runs.filter(checkFailed);
+
+  if (failed.length === 0) return undefined;
+
+  const sections = failed.map(({ record, outcome, output }) => {
+    const check = record.kind === "check" ? record : { name: "?", command: "", note: "" };
+    const note = check.note === "" ? "" : `\n${check.note}`;
+    const tail = output.length > CHECK_OUTPUT ? `[...]\n${output.slice(-CHECK_OUTPUT)}` : output;
+    const shown = tail.trim() === "" ? "" : `\n\n\`\`\`\n${tail.trimEnd()}\n\`\`\``;
+
+    return `## ${check.name}: \`${check.command}\` (${howItFailed(outcome)})${note}${shown}`;
+  });
+
+  return [
+    `strive ran this project's checks on your changes, and ${failed.length === 1 ? "one" : failed.length} failed. Fix what ${failed.length === 1 ? "it" : "they"} found, then finish; the checks run again.`,
+    ...sections,
+  ].join("\n\n");
+}
+
 /** The user message that stands in for a summarized part of the conversation. */
 export function summaryMessage(summary: string, timestamp: number): Message {
   return { role: "user", content: `[A summary of the conversation so far]\n\n${summary}`, timestamp };
@@ -99,7 +159,10 @@ export async function rebuild(
 
       if (!started) continue;
       const output = e.outcome.kind === "done" ? await blob(e.outcome.output) : "";
-      results.set(started.callId, { ...resultText(started.record, e.outcome, output), ts: tsMs });
+
+      // A check's run is told to the agent by the report journaled after it, if any.
+      if (!isCheckCall(started.callId))
+        results.set(started.callId, { ...resultText(started.record, e.outcome, output), ts: tsMs });
     }
   }
 
@@ -156,6 +219,10 @@ export async function rebuild(
       inTurn = true;
     } else if (e.type === "turnEnded") {
       inTurn = false;
+    } else if (e.type === "checksReported") {
+      // What the host told the agent after its checks failed, where it was told.
+      close();
+      messages.push({ role: "user", content: e.text, timestamp: tsMs });
     } else if (prompt !== undefined) {
       held.push({ seq, message: { role: "user", content: prompt, timestamp: tsMs } });
     } else if (e.type === "assistantMessage") {

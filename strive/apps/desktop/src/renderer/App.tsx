@@ -1436,6 +1436,7 @@ function ToolGroup({ seq, tools, session, live }: ToolGroupProps) {
 
 const KIND_ICON: Record<Tool["record"]["kind"], IconName> = {
   bash: "terminal",
+  check: "check",
   read: "file",
   edit: "pencil",
   write: "pencil",
@@ -1488,7 +1489,7 @@ function Approval({ tool, session }: { tool: Tool; session: SessionActions }) {
         {tool.approval?.oneFile ? (
           <button
             type="button"
-            title="Later changes to this file don't ask again in this session"
+            title={`Allows ${tool.approval.allowance}; nothing else stops asking`}
             onClick={() => session.decide(tool.effect, "allowSession")}
           >
             Allow for this session

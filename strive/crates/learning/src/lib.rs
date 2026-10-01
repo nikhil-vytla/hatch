@@ -12,6 +12,7 @@
 //! The daemon adds what needs the machine: the path as it resolves on
 //! disk, the file's digest, and whether the evidence's sessions exist.
 
+pub mod check_file;
 mod checks;
 mod fold;
 pub mod judge;
@@ -34,8 +35,12 @@ pub const SKILLS_DIR: &str = ".strive/skills";
 pub const MEMORY_LIMIT: usize = 16 * 1024;
 /// The most a skill's SKILL.md may hold, in bytes.
 pub const SKILL_LIMIT: usize = 32 * 1024;
-/// The longest skill name.
+/// The longest skill name, and check name.
 pub const SKILL_NAME_LIMIT: usize = 40;
+/// Where checks live, relative to the project: `<name>.md` each (ADR-0023).
+pub const CHECKS_DIR: &str = ".strive/checks";
+/// The most a check's file may hold, in bytes.
+pub const CHECK_LIMIT: usize = 4 * 1024;
 
 /// Every check a proposal goes through, in order. A proposal is ready once
 /// each has a verdict and the static one didn't fail: the judge advises, and
@@ -72,6 +77,10 @@ pub fn relative_path(artifact: &Artifact) -> Result<String, String> {
         Artifact::Skill { name } => {
             Err(format!("the skill name {name:?} isn't 1 to {SKILL_NAME_LIMIT} of a-z, 0-9 and -"))
         }
+        Artifact::Check { name } if valid_skill_name(name) => Ok(format!("{CHECKS_DIR}/{name}.md")),
+        Artifact::Check { name } => {
+            Err(format!("the check name {name:?} isn't 1 to {SKILL_NAME_LIMIT} of a-z, 0-9 and -"))
+        }
     }
 }
 
@@ -93,5 +102,6 @@ pub fn describe(artifact: &Artifact) -> String {
     match artifact {
         Artifact::Memory => "memory".into(),
         Artifact::Skill { name } => format!("skill {name}"),
+        Artifact::Check { name } => format!("check {name}"),
     }
 }

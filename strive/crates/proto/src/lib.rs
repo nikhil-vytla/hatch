@@ -486,6 +486,8 @@ pub struct EffectCancelParams {
 #[ts(export)]
 pub struct EffectRunResult {
     pub effect: u64,
+    /// The effect as journaled: for a check, the command its file held.
+    pub record: EffectRecord,
     pub outcome: EffectOutcome,
     /// The output (for `done`) or the reason (for `refused`), as the agent sees it.
     pub text: String,
@@ -519,6 +521,10 @@ pub struct AgentConfig {
     /// Instruction files (AGENTS.md, CLAUDE.md), outermost first.
     pub instructions: Vec<InstructionFile>,
     pub skills: Vec<SkillInfo>,
+    /// The project's checks (ADR-0023): what each runs is the daemon's to
+    /// read, so only when each applies is given here.
+    #[serde(default)]
+    pub checks: Vec<CheckInfo>,
     /// Tools from the MCP servers that started. The agent calls them as
     /// `mcp` effects.
     pub mcp_tools: Vec<McpTool>,
@@ -664,13 +670,15 @@ pub struct Proposal {
 }
 
 /// What a proposal changes. Paths are fixed by kind, inside the project:
-/// memory is `.strive/memory.md`, a skill `.strive/skills/<name>/SKILL.md`.
+/// memory is `.strive/memory.md`, a skill `.strive/skills/<name>/SKILL.md`,
+/// a check `.strive/checks/<name>.md` (ADR-0023).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase", tag = "kind")]
 #[ts(export)]
 pub enum Artifact {
     Memory,
     Skill { name: String },
+    Check { name: String },
 }
 
 /// What a proposal does (ADR-0022): one operation on one memory bullet, or
@@ -685,6 +693,12 @@ pub enum Change {
         name: String,
         content: String,
     },
+    /// A check's whole file (ADR-0023): its frontmatter says what to run and
+    /// when.
+    Check {
+        name: String,
+        content: String,
+    },
 }
 
 impl Change {
@@ -693,6 +707,7 @@ impl Change {
         match self {
             Change::Memory(_) => Artifact::Memory,
             Change::Skill { name, .. } => Artifact::Skill { name: name.clone() },
+            Change::Check { name, .. } => Artifact::Check { name: name.clone() },
         }
     }
 }
@@ -1252,11 +1267,20 @@ pub enum Event {
         turn: u64,
         reason: TurnEnd,
     },
+    /// What the host told the agent after a round of checks failed
+    /// (ADR-0023): the turn goes on from this, live and on resume.
+    ChecksReported {
+        turn: u64,
+        text: String,
+    },
     /// The project context an agent host was given when it started, and a
     /// learning session's host again as each run starts (`host/context`).
     ContextLoaded {
         instructions: Vec<ContextFile>,
         skills: Vec<String>,
+        /// The checks loaded, by name (ADR-0023).
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        checks: Vec<String>,
         /// MCP servers from settings, and how each started.
         #[serde(default)]
         mcp: Vec<McpStatus>,
@@ -1428,6 +1452,18 @@ pub struct McpStatus {
     pub error: Option<String>,
 }
 
+/// A check as a host is given it: when it applies, not what it runs.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct CheckInfo {
+    pub name: String,
+    pub description: String,
+    /// Globs, relative to the workspace; it applies when a changed file
+    /// matches one, or, when there are none, when any file changed.
+    pub paths: Vec<String>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
@@ -1519,6 +1555,9 @@ pub enum EffectRequest {
         #[ts(optional)]
         timeout_ms: Option<u64>,
     },
+    /// Runs the project's check `name` (ADR-0023): the daemon reads its
+    /// command from `.strive/checks/<name>.md`, so a host can't choose it.
+    Check { name: String },
 }
 
 /// An effect as the journal records it: large payloads live in the content
@@ -1555,6 +1594,15 @@ pub enum EffectRecord {
         tool: String,
         /// The arguments, as JSON.
         arguments: Digest,
+    },
+    /// A check, with the command and the note its file held when it ran:
+    /// what the agent is told if it fails is rebuilt from this alone.
+    Check {
+        name: String,
+        command: String,
+        timeout_ms: u64,
+        #[serde(default)]
+        note: String,
     },
 }
 

@@ -136,6 +136,7 @@ pub fn fold(entries: &[Entry]) -> Vec<Folded> {
             | Event::LearnSkipped { .. }
             | Event::LearnDismissed { .. }
             | Event::LayoutProposed { .. }
+            | Event::ChecksReported { .. }
             | Event::Compacted { .. }
             | Event::ModelSet { .. } => {}
         }
@@ -166,7 +167,7 @@ impl Live {
                     .filter(|s| out.iter().any(|(p, m)| p.id == *s && m.applied.is_some() && !m.rolled_back))
             }
             (Change::Memory(_), Some(BulletEdit::Added { .. }) | None) => None,
-            (Change::Skill { .. }, _) => {
+            (Change::Skill { .. } | Change::Check { .. }, _) => {
                 let Ok(path) = crate::relative_path(&out[i].0.proposal.change.artifact()) else { return };
                 self.0.insert(path, id)
             }

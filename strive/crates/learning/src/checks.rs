@@ -90,6 +90,20 @@ pub fn check(p: &Proposal, known: &[String], shown: Option<&str>) -> Vec<Finding
             }
             ("content", content.as_str())
         }
+        Change::Check { content, .. } => {
+            if content.len() > crate::CHECK_LIMIT {
+                found.push(Finding::new(
+                    Rule::Size,
+                    format!(
+                        "{} is {} bytes; the limit is {}",
+                        crate::describe(&artifact),
+                        content.len(),
+                        crate::CHECK_LIMIT
+                    ),
+                ));
+            }
+            ("content", content.as_str())
+        }
     };
     found.extend(form(p).into_iter().map(|d| Finding::new(Rule::Form, d)));
     // The summary and rationale are shown to people, not given to the
@@ -230,6 +244,15 @@ fn form(p: &Proposal) -> Vec<String> {
                 out.push(format!("the skill's frontmatter names it {named:?}, not {name:?}"));
             }
             Some(_) => {}
+        }
+    }
+    if let Change::Check { name, content } = &p.change {
+        match crate::check_file::parse(content) {
+            Err(problems) => out.extend(problems),
+            Ok(c) if c.name != *name => {
+                out.push(format!("the check's frontmatter names it {:?}, not {name:?}", c.name));
+            }
+            Ok(_) => {}
         }
     }
     out

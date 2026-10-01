@@ -404,6 +404,7 @@ impl Ledger {
                 | Event::Rewound { .. }
                 | Event::TurnStarted { .. }
                 | Event::LayoutProposed { .. }
+                | Event::ChecksReported { .. }
                 | Event::AssistantMessage { .. }
                 | Event::TurnEnded { .. }
                 | Event::ContextLoaded { .. }

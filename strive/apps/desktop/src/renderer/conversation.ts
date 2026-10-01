@@ -2,7 +2,7 @@
 // prompts, replies, the tools each step ran (with their approvals), a line
 // for each finished turn, and notices for everything else.
 import type { Decision, Digest, EffectRecord, Entry, TurnEnd } from "@strive/protocol";
-import { describe, type Line } from "@strive/view";
+import { describe, type Line, sessionAllowance } from "@strive/view";
 
 export type ToolStatus = "running" | "waiting" | "done" | "failed" | "refused" | "interrupted";
 
@@ -16,8 +16,12 @@ export type Tool = {
   truncated?: boolean;
   /** Why it was refused. */
   reason?: string;
-  /** What the agent asked a person, while it waits or once decided; `oneFile` when allowing for the session covers only the file it changes. */
-  approval?: { description: string; oneFile: boolean; decided?: Decision };
+  /**
+   * What the agent asked a person, while it waits or once decided; `oneFile`
+   * when allowing for the session covers only one thing (`allowance`), not
+   * full-auto.
+   */
+  approval?: { description: string; oneFile: boolean; allowance: string; decided?: Decision };
   durationMs?: number;
 };
 
@@ -110,7 +114,11 @@ export class Conversation {
 
         if (tool) {
           tool.status = "waiting";
-          tool.approval = { description: e.description, oneFile: e.sessionFile !== undefined };
+          tool.approval = {
+            description: e.description,
+            oneFile: e.sessionFile !== undefined,
+            allowance: sessionAllowance(e.sessionFile),
+          };
         }
 
         return;
@@ -206,6 +214,8 @@ export function label(record: EffectRecord, workspace?: string): string {
   switch (record.kind) {
     case "bash":
       return workspace ? record.command.replaceAll(`${workspace}/`, "") : record.command;
+    case "check":
+      return `${record.name}: ${workspace ? record.command.replaceAll(`${workspace}/`, "") : record.command}`;
     case "read":
     case "edit":
     case "write":

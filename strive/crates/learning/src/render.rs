@@ -46,6 +46,7 @@ fn blob_text(blob: Blob, d: &Digest) -> String {
 fn record_text(record: &EffectRecord, blob: Blob) -> String {
     match record {
         EffectRecord::Bash { command, .. } => format!("ran `{command}`"),
+        EffectRecord::Check { name, command, .. } => format!("ran the check {name}: `{command}`"),
         EffectRecord::Read { path, offset, .. } => match offset {
             Some(o) => format!("read {path} from line {o}"),
             None => format!("read {path}"),
@@ -87,6 +88,9 @@ fn block(entry: &Entry, starts: &HashMap<u64, (u64, &EffectRecord)>, blob: Blob)
         Event::AssistantMessage { text, .. } if text.trim().is_empty() => String::new(),
         Event::AssistantMessage { text, .. } => format!("{at} agent: {}", cut(text.trim(), REPLY)),
         Event::EffectStarted { record, .. } => format!("{at} {}", record_text(record, blob)),
+        Event::ChecksReported { text, .. } => {
+            format!("{at} strive told the agent its checks failed: {}", cut(text, REPLY))
+        }
         Event::EffectFinished { effect, outcome, .. } => {
             let start = starts.get(effect);
             let of = start.map_or_else(|| format!("effect {effect}"), |(seq, _)| format!("#{seq}"));

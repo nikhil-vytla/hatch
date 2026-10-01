@@ -307,3 +307,53 @@ test("an assistant record that isn't a message is skipped on resume", async () =
   const messages = await rebuild(entries, blob);
   expect(messages.map((m) => m.role)).toEqual(["user", "user"]);
 });
+
+test("a check report the agent was told comes back even when the host stopped before it replied", async () => {
+  const entries = [
+    at({ type: "userMessage", text: "make a.txt" }),
+    at({ type: "turnStarted", turn: 1 }),
+    assistant("Done."),
+    at({
+      type: "effectStarted",
+      effect: 1,
+      callId: "check:1:1:t",
+      record: { kind: "check", name: "t", command: "false", timeoutMs: 1000, note: "" },
+    }),
+    at({
+      type: "effectFinished",
+      effect: 1,
+      outcome: { kind: "done", output: "sha256:out2", exitCode: 1, truncated: false },
+      durationMs: 1,
+    }),
+    at({ type: "checksReported", turn: 1, text: "strive ran this project's checks on your changes, and one failed." }),
+    // The host stopped here; its successor closed the turn.
+    at({ type: "turnEnded", turn: 1, reason: { kind: "failed", error: "the agent host stopped during this turn" } }),
+  ];
+
+  const messages = await rebuild(entries, blob);
+  expect(messages.map((m) => m.role)).toEqual(["user", "assistant", "user"]);
+  expect(messages[2]).toMatchObject({ role: "user", content: expect.stringContaining("one failed") });
+});
+
+test("a check run no report followed isn't told to the agent", async () => {
+  const entries = [
+    at({ type: "userMessage", text: "make a.txt" }),
+    at({ type: "turnStarted", turn: 1 }),
+    assistant("Done."),
+    at({
+      type: "effectStarted",
+      effect: 2,
+      callId: "check:1:1:t",
+      record: { kind: "check", name: "t", command: "false", timeoutMs: 1000, note: "" },
+    }),
+    at({
+      type: "effectFinished",
+      effect: 2,
+      outcome: { kind: "done", output: "sha256:out2", exitCode: 1, truncated: false },
+      durationMs: 1,
+    }),
+    at({ type: "turnEnded", turn: 1, reason: { kind: "done" } }),
+  ];
+
+  expect((await rebuild(entries, blob)).map((m) => m.role)).toEqual(["user", "assistant"]);
+});

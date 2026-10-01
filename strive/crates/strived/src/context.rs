@@ -24,7 +24,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use strive_proto::{Artifact, InstructionFile, SkillInfo};
+use strive_proto::{Artifact, CheckInfo, InstructionFile, SkillInfo};
 
 const FILE_LIMIT: usize = 64 * 1024;
 const TOTAL_LIMIT: usize = 128 * 1024;
@@ -54,12 +54,13 @@ pub enum Shapes {
 /// may start in any of its directories. Nothing else in a project is loaded.
 /// strive's home adds only its `AGENTS.md` and `skills`, and the agent can't
 /// write anything there.
-pub const SHAPING: [(&str, Shapes); 6] = [
+pub const SHAPING: [(&str, Shapes); 7] = [
     (INSTRUCTION_FILES[0], Shapes::Instructions),
     (INSTRUCTION_FILES[1], Shapes::Instructions),
     (CLAUDE_SKILLS, Shapes::Skills),
     (strive_learning::MEMORY_PATH, Shapes::Learned),
     (strive_learning::SKILLS_DIR, Shapes::Learned),
+    (strive_learning::CHECKS_DIR, Shapes::Learned),
     (crate::settings::PROJECT_SETTINGS, Shapes::Settings),
 ];
 
@@ -87,6 +88,7 @@ pub fn shapes(root: &Path, real: &Path) -> Option<Shapes> {
 pub struct Context {
     pub instructions: Vec<InstructionFile>,
     pub skills: Vec<SkillInfo>,
+    pub checks: Vec<CheckInfo>,
     /// Imports not loaded, each a line for a person saying which and why.
     pub skipped: Vec<String>,
 }
@@ -144,7 +146,54 @@ pub fn load(workspace: &Path, strive_home: &Path) -> Context {
     let at = Anchors::new(workspace, strive_home);
     let mut found = Found::default();
     let instructions = instructions(workspace, strive_home, &at, &mut found);
-    Context { instructions, skills: skills(workspace, strive_home, &at), skipped: found.skipped }
+    let skills = skills(workspace, strive_home, &at);
+    let checks = checks(workspace, &at, &mut found.skipped);
+    Context { instructions, skills, checks, skipped: found.skipped }
+}
+
+/// The project's checks (ADR-0023): each `.strive/checks/<name>.md` that
+/// reads as a check named for its file. One that doesn't is noted in
+/// `skipped` with why, so a person who wrote it finds out.
+fn checks(workspace: &Path, at: &Anchors, skipped: &mut Vec<String>) -> Vec<CheckInfo> {
+    let Ok(entries) = fs::read_dir(workspace.join(strive_learning::CHECKS_DIR)) else { return Vec::new() };
+    let mut names: Vec<String> = entries
+        .filter_map(Result::ok)
+        .filter_map(|e| e.file_name().to_str().and_then(|n| n.strip_suffix(".md")).map(str::to_string))
+        .collect();
+    names.sort();
+    let mut out = Vec::new();
+    for name in names {
+        match check_at(workspace, at, &name) {
+            Ok((c, _)) => out.push(CheckInfo { name: c.name, description: c.description, paths: c.paths }),
+            Err(why) => skipped.push(format!("{}/{name}.md was not loaded: {why}", strive_learning::CHECKS_DIR)),
+        }
+    }
+    out
+}
+
+/// A check as its file says now, and the file's text.
+type Check = (strive_learning::check_file::CheckFile, String);
+
+/// The check `name` as its file says now, for the daemon to run.
+pub fn check(workspace: &Path, strive_home: &Path, name: &str) -> Result<Check, String> {
+    check_at(workspace, &Anchors::new(workspace, strive_home), name)
+}
+
+fn check_at(workspace: &Path, at: &Anchors, name: &str) -> Result<Check, String> {
+    let artifact = Artifact::Check { name: name.to_string() };
+    let relative = strive_learning::relative_path(&artifact)?;
+    // Reviewed as learned files are, so reached without a symlink.
+    let real = really_at(workspace, Path::new(&relative))
+        .filter(|r| at.listed(r))
+        .ok_or_else(|| "it isn't a file in the project reached without a symlink".to_string())?;
+    let text = read_whole(&real, strive_learning::CHECK_LIMIT).ok_or_else(|| {
+        format!("it isn't a regular UTF-8 file of at most {} KiB", strive_learning::CHECK_LIMIT / 1024)
+    })?;
+    let c = strive_learning::check_file::parse(&text).map_err(|p| p.join("; "))?;
+    if c.name != name {
+        return Err(format!("its frontmatter names it {:?}", c.name));
+    }
+    Ok((c, text))
 }
 
 /// What the project's instruction files import, as `load` finds it. Only
@@ -225,6 +274,15 @@ pub fn learned(workspace: &Path, strive_home: &Path) -> Vec<(Artifact, String)> 
             .collect();
         names.sort();
         artifacts.extend(names.into_iter().map(|name| Artifact::Skill { name }));
+    }
+    if let Ok(entries) = fs::read_dir(workspace.join(strive_learning::CHECKS_DIR)) {
+        let mut names: Vec<String> = entries
+            .filter_map(Result::ok)
+            .filter_map(|e| e.file_name().to_str().and_then(|n| n.strip_suffix(".md")).map(str::to_string))
+            .filter(|n| strive_learning::valid_skill_name(n))
+            .collect();
+        names.sort();
+        artifacts.extend(names.into_iter().map(|name| Artifact::Check { name }));
     }
     // None of strive's home, not even its global skills: a proposal can't
     // write there (a project at `~` has it as its `.strive`).

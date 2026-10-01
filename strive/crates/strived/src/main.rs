@@ -4,6 +4,7 @@
 //! current, then hands the terminal to the TUI.
 
 mod checkpoints;
+mod checks;
 mod client;
 mod commands;
 mod context;
