@@ -183,7 +183,7 @@ export const experiments = [
     "Pin a rumour on one street. Watch 4,000 neighbours pass it on, or argue it down.",
     "How far does one sentence travel when everyone decides for themselves?",
   ),
-  e("crowd", "live-worlds", "The square at five", "Games & simulations", "Pin a notice in a small town and watch twelve residents decide, read by a free model in your browser.", "Can a sentence change many independent decisions in a living world?"),
+  e("win-over", "", "Who can you win over?", "Games & simulations", "You're new in town with until 5 pm. Say anything; 48 residents judge it, and gossip does the rest.", "Can fast typed judgments make a town react to what you actually say?"),
   e("ghost-brush", "live-worlds", "Ghost Brush", "Creative tools", "Draw a gesture. Give it a feeling. Follow another line.", "Can a typed style judgment turn a procedural brush into a semantic instrument?"),
 ];
 export const categories = [
@@ -213,6 +213,13 @@ export type Retired = {
 };
 
 export const retired: Record<string, Retired> = {
+  crowd: {
+    title: "The square at five",
+    reason: "Twelve residents decided only when you posted a notice, and most kept their plans. Its free in-browser model now runs a town that judges everything you say.",
+    record: "live-worlds",
+    retiredOn: "30 Sep 2026",
+    instead: { href: "#experiment/win-over", label: "Who can you win over?" },
+  },
   materials: {
     title: "Material sandbox",
     reason: "It opened paused, and Jev's part was one recorded rule behind a tab. The home page now leads with a toy where you work against Jev directly.",

@@ -1,5 +1,7 @@
 # Bramble Square
 
+> **Retired 30 Sep 2026.** The browser scene (`src/live-crowd.tsx`) was removed: twelve residents decided only when you posted a notice, and most kept their plans. [Who can you win over?](../win-over/README.md) replaces it with 48 residents who judge everything you say. The engine, tests and recorded evidence below stay as they were.
+
 Twelve fictional neighbors move through a courtyard with a café, bakery, reading room, garden, music stage and fountain. They get hungry, need rest, seek company, join queues and react to the same seeded weather schedule. A notice can change each resident's destination without stopping the world. The browser experience lives at `#experiment/crowd` and exports `LiveCrowd` from `experience-prototypes/src/live-crowd.tsx`.
 
 ## What chooses and what moves
