@@ -1,16 +1,37 @@
-import { lazy, Suspense, useState } from "react";
+import { useState } from "react";
 import { ArrowDown, ArrowUpRight, Search } from "lucide-react";
 import { experiments, categories, lookup } from "../catalog";
 import { experimentNotes } from "../notes/manifest";
 import { MiniExperimentPreview } from "../live-world-preview";
 import { starterScore } from "../../../music-arranger-v2/engine";
+import { FoolJev } from "../fool-jev";
 import "./play.css";
 
-const MaterialsSandbox = lazy(() =>
-  import("../../../roadmap/materials/MaterialsSandbox").then((module) => ({
-    default: module.MaterialsSandbox,
-  })),
-);
+
+/** What the prose studies found, verdict first. Every number is from a recorded run. */
+const findings = [
+  {
+    n: "5 of 5",
+    title: "Doubt flips it",
+    body: "\u201cI'm pretty sure the answer is no.\u201d flipped every puzzle above, even Sydney, where no was already right. \u201c\u2026is yes.\u201d flipped none.",
+  },
+  {
+    n: "0 of 140",
+    title: "Rewording doesn't",
+    body: "Seven ways of asking the same question changed none of 140 answers.",
+  },
+  {
+    n: "7% \u2192 68%",
+    title: "Decoys work",
+    body: "An option nobody should pick swung an apartment choice.",
+    href: "#experiment/decoy",
+  },
+  {
+    n: "1,250 / 1,251",
+    title: "Sure means right",
+    body: "Answers Jev gave at 90% or more were right every time but once.",
+  },
+];
 
 const scenes = [
   { id: "music", action: "Play a phrase. Keep the part you like.", label: "Sound & composition" },
@@ -50,22 +71,41 @@ export function PlayPage() {
 
   return (
     <main className="play-page" id="main-content" tabIndex={-1}>
-      <section className="play-opening" aria-labelledby="play-title">
-        <div className="play-invitation">
-          <h1 id="play-title">Make a <em>material.</em></h1>
-          <p>Paint a scene, then change how the purple dust behaves.</p>
-          <a className="play-browse" href="#collection">More experiments <ArrowDown size={15} /></a>
-        </div>
-        <section className="play-material" aria-label="Try painting materials">
-          <div className="play-scene-caption">
-            <span>01 / Material sandbox</span>
-            <span>Local rules</span>
+      <div className="toybox home-band">
+        <section className="home-hero" aria-labelledby="play-title">
+          <div>
+            <h1 id="play-title">
+              Jev's hard to fool. <mark>Not impossible.</mark>
+            </h1>
+            <p className="home-sub">
+              We asked it 2,626 questions, up to 78 ways each. Rewording almost never changed its answer. One kind of
+              sentence did. Your turn.
+            </p>
           </div>
-          <Suspense fallback={<div className="loading-stage">Opening the material scene…</div>}>
-            <MaterialsSandbox compact />
-          </Suspense>
+          <FoolJev />
         </section>
-      </section>
+
+        <section className="home-findings" aria-labelledby="findings-heading">
+          <h2 id="findings-heading">What 2,626 questions found</h2>
+          <ol>
+            {findings.map((f) => (
+              <li key={f.title}>
+                <span className="n">{f.n}</span>
+                <h3>{f.title}</h3>
+                <p>
+                  {f.body}
+                  {f.href && (
+                    <>
+                      {" "}
+                      <a href={f.href}>Try it</a>
+                    </>
+                  )}
+                </p>
+              </li>
+            ))}
+          </ol>
+        </section>
+      </div>
 
       <section className="play-selected" aria-labelledby="selected-heading">
         <div className="play-section-heading">

@@ -7,7 +7,7 @@ import { Provenance } from "../provenance";
 import { experimentNotes } from "../notes/manifest";
 import "./experiment.css";
 
-const sceneEntries = new Set(["materials", "tetris", "crowd", "music", "routing", "visual-search"]);
+const sceneEntries = new Set(["tetris", "crowd", "music", "routing", "visual-search"]);
 
 const Paste = lazy(() => import("../new-experiments").then(m => ({ default: m.Paste })));
 const LayoutStudy = lazy(() => import("../layout-study").then(m => ({ default: m.LayoutStudy })));
@@ -34,7 +34,6 @@ const LiveCrowd = lazy(() => import("../live-crowd").then(m => ({ default: m.Liv
 const DrawingFraming = lazy(() => import("../outcome-framing").then(m => ({ default: m.DrawingFraming })));
 const ArcadeScene = lazy(() => import("../arcade-scene").then(m => ({ default: m.ArcadeScene })));
 const ModelRoutingLab = lazy(() => import("../../../roadmap/routing/ModelRoutingLab").then(m => ({ default: m.ModelRoutingLab })));
-const MaterialsSandbox = lazy(() => import("../../../roadmap/materials/MaterialsSandbox").then(m => ({ default: m.MaterialsSandbox })));
 
 const cache = new Map<string, any>();
 async function load(name: string) {
@@ -99,8 +98,6 @@ function View({
       return <LiveCrowd />;
     case "routing":
       return <ModelRoutingLab />;
-    case "materials":
-      return <MaterialsSandbox />;
     case "classify":
       return <IntentRecognition result={result} />;
     case "handoff":
@@ -132,7 +129,7 @@ function RetiredScene({ id }: { id: string }) {
 
   return (
     <section className="experiment-page retired-scene">
-      <Pane title={r.title} sub="Retired 29 Sep 2026">
+      <Pane title={r.title} sub={`Retired ${r.retiredOn ?? "29 Sep 2026"}`}>
         <p>{r.reason}</p>
         <p>
           {r.instead && (
@@ -141,10 +138,14 @@ function RetiredScene({ id }: { id: string }) {
               {" · "}
             </>
           )}
-          <a href={`/data/${r.record}.json`} download>
-            Download the recorded run
-          </a>
-          {" · "}
+          {r.record && (
+            <>
+              <a href={`/data/${r.record}.json`} download>
+                Download the recorded run
+              </a>
+              {" · "}
+            </>
+          )}
           <a href="#/">All experiments</a>
         </p>
       </Pane>
@@ -176,7 +177,7 @@ function LiveExperimentPage({ id }: { id: string }) {
     setRecord(null);
     setError("");
     setAboutOpen(false);
-    if (id === "materials" || id === "routing" || id === "decoy") {
+    if (id === "routing" || id === "decoy") {
       setRecord({ result: {} });
       return () => {
         alive = false;
