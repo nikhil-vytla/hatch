@@ -12,6 +12,7 @@ import {
   type ProposalState,
   type SessionInfo,
   type MemoryItem,
+  type BulletUsage,
   type SkippedRun,
 } from "@strive/protocol";
 import { formatUsd as exactUsd, MODE_NAMES, offerText } from "@strive/view";
@@ -219,15 +220,23 @@ export function App({ bridge, opened, onSwitch, offers }: Props) {
   const [outsideReview, setOutsideReview] = useState<string[]>([]);
   const [skipped, setSkipped] = useState<SkippedRun>();
   const [memory, setMemory] = useState<MemoryItem[]>([]);
+  const [usage, setUsage] = useState<BulletUsage[]>([]);
 
   const loadProposals = useCallback(
     () =>
-      bridge.request("proposal/list", { cwd }).then((r) => {
-        setProposals(r.proposals);
-        setOutsideReview(r.changedOutsideReview);
-        setSkipped(r.skipped);
-        setMemory(r.memory);
-      }),
+      Promise.all([
+        bridge.request("proposal/list", { cwd }).then((r) => {
+          setProposals(r.proposals);
+          setOutsideReview(r.changedOutsideReview);
+          setSkipped(r.skipped);
+          setMemory(r.memory);
+        }),
+        // How each bullet fared is a hint beside it: none is no reason to say anything.
+        bridge
+          .request("memory/usage", { cwd })
+          .then((r) => setUsage(r.bullets))
+          .catch(() => setUsage([])),
+      ]),
     [bridge, cwd],
   );
 
@@ -468,6 +477,7 @@ export function App({ bridge, opened, onSwitch, offers }: Props) {
               outsideReview={outsideReview}
               skipped={skipped}
               memory={memory}
+              usage={usage}
               run={run}
               sessions={projectSessions}
               currentSession={id}

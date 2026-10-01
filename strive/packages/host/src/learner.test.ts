@@ -6,6 +6,7 @@
 import { afterEach, expect, expectTypeOf, test } from "bun:test";
 import { type Static, validateToolArguments } from "@earendil-works/pi-ai";
 import type {
+  BulletUsage,
   AgentConfig,
   Artifact,
   Entry,
@@ -18,7 +19,7 @@ import type {
   StriveClient,
 } from "@strive/protocol";
 import { FakeAnthropic, FakeDaemon, type FakeReply, type ScriptedReply } from "@strive/testkit";
-import { learnerPrompt, MAX_PROPOSALS, ProposalParams, ReadArtifactParams } from "./learner";
+import { learnerPrompt, MAX_PROPOSALS, memoryItems, ProposalParams, ReadArtifactParams } from "./learner";
 import { when } from "./learning-records";
 import { runHost } from "./main";
 
@@ -860,4 +861,35 @@ test("propose_change's parameters are the protocol's Proposal", () => {
   const { prediction: _, ...unpredicted } = PROPOSAL;
   expect(check(unpredicted)).toThrow();
   expect(check({ ...PROPOSAL, evidence: [{ session: W1, seqs: ["one"], note: "" }] })).toThrow();
+});
+
+test("the learner sees how each bullet fared beside it", () => {
+  const items: MemoryItem[] = [
+    { kind: "bullet", text: "Use bun.", source: 4, outsideReview: false },
+    { kind: "bullet", text: "Lock with ./dev lock.", source: 7, outsideReview: false },
+    { kind: "bullet", text: "Mine.", outsideReview: false },
+  ];
+
+  const usage: BulletUsage[] = [
+    {
+      bullet: 4,
+      sessions: 9,
+      cited: 3,
+      clean: 2,
+      trouble: 1,
+      notes: [{ session: "S1", seq: 12, atMs: 12_000, what: "the user corrected it: no, use npm" }],
+    },
+    { bullet: 7, sessions: 9, cited: 0, clean: 0, trouble: 0, notes: [] },
+  ];
+
+  expect(memoryItems(items, usage)).toBe(
+    [
+      "- [#4] Use bun.",
+      "  (given to 9 sessions, cited in 3 turns, trouble after 1, latest: the user corrected it: no, use npm (session S1 #12))",
+      "- [#7] Lock with ./dev lock.",
+      "  (given to 9 sessions, never cited)",
+      "- [hand-written] Mine.",
+    ].join("\n"),
+  );
+  expect(memoryItems(items)).toBe("- [#4] Use bun.\n- [#7] Lock with ./dev lock.\n- [hand-written] Mine.");
 });

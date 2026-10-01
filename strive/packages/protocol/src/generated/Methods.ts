@@ -21,6 +21,7 @@ import type { LearningDismissParams } from "./LearningDismissParams";
 import type { LearningRunParams } from "./LearningRunParams";
 import type { LearningSignalsParams } from "./LearningSignalsParams";
 import type { LearningSignalsResult } from "./LearningSignalsResult";
+import type { MemoryUsageResult } from "./MemoryUsageResult";
 import type { ModelListResult } from "./ModelListResult";
 import type { ProjectRef } from "./ProjectRef";
 import type { ProposalDecideParams } from "./ProposalDecideParams";
@@ -65,6 +66,7 @@ export type Methods = {
   "session/rewind": { params: SessionRewindParams; result: SessionRewindResult };
   "session/changes": { params: SessionChangesParams; result: SessionChangesResult };
   "session/commands": { params: SessionRef; result: SessionCommandsResult };
+  "memory/usage": { params: ProjectRef; result: MemoryUsageResult };
   "learning/open": { params: ProjectRef; result: SessionInfo };
   "learning/run": { params: LearningRunParams; result: Appended };
   "learning/signals": { params: LearningSignalsParams; result: LearningSignalsResult };
