@@ -76,7 +76,10 @@ pub fn check(p: &Proposal, known: &[String], shown: Option<&str>) -> Vec<Finding
                 MemoryOp::Remove { .. } => ("bullet", ""),
             }
         }
-        Change::Skill { content, .. } | Change::Command { content, .. } | Change::Check { content, .. } => {
+        Change::Skill { content, .. }
+        | Change::Command { content, .. }
+        | Change::Check { content, .. }
+        | Change::Rule { content, .. } => {
             let limit = crate::file_limit(&artifact);
             if content.len() > limit {
                 found.push(Finding::new(
@@ -230,6 +233,11 @@ fn form(p: &Proposal) -> Vec<String> {
     }
     if let Change::Command { content, .. } = &p.change
         && let Err(problems) = crate::command_file::parse(content, true)
+    {
+        out.extend(problems);
+    }
+    if let Change::Rule { content, .. } = &p.change
+        && let Err(problems) = crate::rule_file::parse(content, true)
     {
         out.extend(problems);
     }

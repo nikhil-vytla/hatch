@@ -198,6 +198,8 @@ export function describe(entry: Entry, options: DescribeOptions = {}): Line[] {
       return note("faint", `Model: ${e.model}`);
     case "compacted":
       return note("faint", "Summarized the conversation so far to keep it within the model's context.");
+    case "ruleLoaded":
+      return note("muted", `rule ${e.name} (${e.file})`);
     case "checksReported":
       return note("danger", e.text.split("\n")[0] ?? "A check failed; the agent was told.");
     case "layoutProposed":

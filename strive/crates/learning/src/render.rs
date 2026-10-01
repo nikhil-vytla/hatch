@@ -91,6 +91,7 @@ fn block(entry: &Entry, starts: &HashMap<u64, (u64, &EffectRecord)>, blob: Blob)
         Event::AssistantMessage { text, .. } if text.trim().is_empty() => String::new(),
         Event::AssistantMessage { text, .. } => format!("{at} agent: {}", cut(text.trim(), REPLY)),
         Event::EffectStarted { record, .. } => format!("{at} {}", record_text(record, blob)),
+        Event::RuleLoaded { name, file, .. } => format!("{at} strive gave the agent the rule {name} ({file})"),
         Event::ChecksReported { text, .. } => {
             format!("{at} strive told the agent its checks failed: {}", cut(text, REPLY))
         }

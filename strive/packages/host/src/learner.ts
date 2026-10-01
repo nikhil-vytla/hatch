@@ -61,6 +61,12 @@ strive is a coding agent. Its work sessions in this project are journaled: every
   argument-hint: <optional: what to type after it, such as <pr number>>
   ---
   The prompt, written to the agent as the user would say it.
+- Rules: \`.strive/rules/<name>.md\`, guidance for one part of the project, given to the agent the first time in a session it reads or changes a file the rule's paths match. Prefer a rule to a memory bullet when the lesson applies only to some files (the API handlers, the migrations), so sessions that never touch them aren't told it. A rule without paths is for every session; a memory bullet is usually better for that. Its file is frontmatter, then the guidance:
+  ---
+  description: <what it covers, one line>
+  paths: <comma-separated globs, such as src/api/**/*.ts, src/routes.ts>
+  ---
+  The guidance, as specific as a memory bullet.
 
 # What is worth learning
 
@@ -170,6 +176,7 @@ export function learnerPrompt(config: AgentConfig): string {
   for (const [kind, title] of [
     ["check", "Checks"],
     ["command", "Slash commands"],
+    ["rule", "Rules"],
   ] as const) {
     const files = (config.learnedFiles ?? []).flatMap((f) =>
       f.artifact.kind === kind ? [{ name: f.artifact.name, text: f.text }] : [],
@@ -193,6 +200,8 @@ const SUMMARIZE = [
 
 const CHECK_NAME = "The check's file under .strive/checks, without .md: 1 to 40 of a-z, 0-9 and -";
 
+const RULE_NAME = "The rule's file under .strive/rules, without .md: 1 to 40 of a-z, 0-9 and -";
+
 const COMMAND_NAME =
   "The command, typed as /name: its file under .strive/commands, without .md; 1 to 40 of a-z, 0-9 and -";
 
@@ -205,6 +214,7 @@ function artifactSchema() {
     }),
     Type.Object({ kind: Type.Literal("check"), name: Type.String({ description: CHECK_NAME }) }),
     Type.Object({ kind: Type.Literal("command"), name: Type.String({ description: COMMAND_NAME }) }),
+    Type.Object({ kind: Type.Literal("rule"), name: Type.String({ description: RULE_NAME }) }),
   ]);
 }
 
@@ -239,6 +249,11 @@ function changeSchema() {
       kind: Type.Literal("command"),
       name: Type.String({ description: COMMAND_NAME }),
       content: Type.String({ description: "The command's whole file: optional frontmatter, then its prompt" }),
+    }),
+    Type.Object({
+      kind: Type.Literal("rule"),
+      name: Type.String({ description: RULE_NAME }),
+      content: Type.String({ description: "The rule's whole file: frontmatter (description, paths), then guidance" }),
     }),
   ]);
 }
@@ -450,7 +465,7 @@ class Learner {
 
     const text = learnedFile(this.config, artifact)?.text;
 
-    if (artifact.kind === "check" || artifact.kind === "command") {
+    if (artifact.kind === "check" || artifact.kind === "command" || artifact.kind === "rule") {
       const at = join(this.config.cwd, `.strive/${artifact.kind}s`, `${artifact.name}.md`);
 
       return text === undefined

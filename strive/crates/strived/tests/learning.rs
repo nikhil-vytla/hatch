@@ -1553,3 +1553,24 @@ fn a_command_is_proposed_accepted_and_rolled_back_as_a_whole_file() {
     assert!(rollback(&env, &cwd, p).get("error").is_none());
     assert!(!cwd.join(".strive/commands/review.md").exists(), "it didn't exist before");
 }
+
+/// A rule (ADR-0025) is proposed, accepted and rolled back as a skill is,
+/// and once accepted it comes with the files it covers.
+#[test]
+fn a_rule_is_proposed_accepted_and_rolled_back_as_a_whole_file() {
+    let env = Env::new();
+    let cwd = project();
+    let work = work_session(&env, &cwd);
+    let (mut host, id) = learner(&env, &cwd);
+    let rule = |content: &str| proposing(&json!({"kind": "rule", "name": "api", "content": content}), &work);
+    let p = propose(&mut host, &id, &rule("---\npaths: src/api/**\n---\nValidate every input.\n"));
+    assert_eq!(status(&env, &cwd, p), "ready");
+    assert!(decide(&env, &cwd, p, "accept").get("error").is_none());
+    fs::create_dir_all(cwd.join("src/api")).unwrap();
+    fs::write(cwd.join("src/api/a.ts"), "export {}\n").unwrap();
+    let read = common::slow_rpc(&env)
+        .ok("effect/run", &json!({"id": work, "callId": "c", "request": {"kind": "read", "path": "src/api/a.ts"}}));
+    assert!(read["text"].as_str().unwrap().contains("Validate every input."), "{read}");
+    assert!(rollback(&env, &cwd, p).get("error").is_none());
+    assert!(!cwd.join(".strive/rules/api.md").exists(), "it didn't exist before");
+}

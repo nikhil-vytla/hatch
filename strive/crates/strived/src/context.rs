@@ -34,6 +34,7 @@ const IMPORT_DEPTH: usize = 5;
 const INSTRUCTION_FILES: [&str; 2] = ["AGENTS.md", "CLAUDE.md"];
 const CLAUDE_SKILLS: &str = ".claude/skills";
 const CLAUDE_COMMANDS: &str = ".claude/commands";
+const CLAUDE_RULES: &str = ".claude/rules";
 
 /// What changing a file on the list does, for the person asked about it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -55,12 +56,14 @@ pub enum Shapes {
 /// may start in any of its directories. Nothing else in a project is loaded.
 /// strive's home adds only its `AGENTS.md` and `skills`, and the agent can't
 /// write anything there.
-pub const SHAPING: [(&str, Shapes); 9] = [
+pub const SHAPING: [(&str, Shapes); 11] = [
     (INSTRUCTION_FILES[0], Shapes::Instructions),
     (INSTRUCTION_FILES[1], Shapes::Instructions),
     (CLAUDE_SKILLS, Shapes::Skills),
     (CLAUDE_COMMANDS, Shapes::Skills),
+    (CLAUDE_RULES, Shapes::Skills),
     (strive_learning::COMMANDS_DIR, Shapes::Learned),
+    (strive_learning::RULES_DIR, Shapes::Learned),
     (strive_learning::MEMORY_PATH, Shapes::Learned),
     (strive_learning::SKILLS_DIR, Shapes::Learned),
     (strive_learning::CHECKS_DIR, Shapes::Learned),
@@ -280,10 +283,72 @@ fn instructions(workspace: &Path, strive_home: &Path, at: &Anchors, found: &mut 
         total += text.len();
         out.push(InstructionFile { path: path.display().to_string(), text });
     }
+    // Rules without paths are for every session, after the instruction files.
+    for rule in rules_at(workspace, at).into_iter().filter(|r| r.paths.is_empty()) {
+        if total + rule.body.len() > TOTAL_LIMIT {
+            break;
+        }
+        total += rule.body.len();
+        out.push(InstructionFile { path: rule.file.display().to_string(), text: rule.body });
+    }
     if let Some(memory) = memory(workspace, at).filter(|m| total + m.text.len() <= TOTAL_LIMIT) {
         out.push(memory);
     }
     out
+}
+
+/// A rule as loaded (ADR-0025).
+pub struct Rule {
+    pub name: String,
+    /// Its file, as the agent is told it.
+    pub file: PathBuf,
+    /// Globs relative to the workspace; empty for every session.
+    pub paths: Vec<String>,
+    pub body: String,
+}
+
+/// The project's rules: `.strive/rules` (reached without a symlink, and read
+/// strictly), then `.claude/rules` (read leniently). The first of a name wins.
+pub fn rules(workspace: &Path, strive_home: &Path) -> Vec<Rule> {
+    rules_at(workspace, &Anchors::new(workspace, strive_home))
+}
+
+fn rules_at(workspace: &Path, at: &Anchors) -> Vec<Rule> {
+    let learned = workspace.join(strive_learning::RULES_DIR);
+    let mut found: Vec<Rule> = Vec::new();
+    for root in [learned.clone(), workspace.join(CLAUDE_RULES)] {
+        for name in md_names(&root) {
+            if found.iter().any(|r| r.name == name) {
+                continue;
+            }
+            let file = root.join(format!("{name}.md"));
+            let real = if root == learned {
+                really_at(workspace, &Path::new(strive_learning::RULES_DIR).join(format!("{name}.md")))
+            } else {
+                file.canonicalize().ok()
+            };
+            let Some(text) = real.filter(|r| at.listed(r)).and_then(|r| read_whole(&r, strive_learning::RULE_LIMIT))
+            else {
+                continue;
+            };
+            let Ok(r) = strive_learning::rule_file::parse(&text, root == learned) else { continue };
+            found.push(Rule { name, file, paths: r.paths, body: r.body });
+        }
+    }
+    found
+}
+
+/// The names of the `.md` files in `dir` that name a command, check or
+/// rule (1 to 40 of `a-z`, `0-9` and `-`), sorted.
+fn md_names(dir: &Path) -> Vec<String> {
+    let Ok(entries) = fs::read_dir(dir) else { return Vec::new() };
+    let mut names: Vec<String> = entries
+        .filter_map(Result::ok)
+        .filter_map(|e| e.file_name().to_str().and_then(|n| n.strip_suffix(".md")).map(str::to_string))
+        .filter(|n| strive_learning::valid_skill_name(n))
+        .collect();
+    names.sort();
+    names
 }
 
 /// How the agent is told what `.strive/memory.md` is.
@@ -323,24 +388,14 @@ pub fn learned(workspace: &Path, strive_home: &Path) -> Vec<(Artifact, String)> 
         names.sort();
         artifacts.extend(names.into_iter().map(|name| Artifact::Skill { name }));
     }
-    if let Ok(entries) = fs::read_dir(workspace.join(strive_learning::COMMANDS_DIR)) {
-        let mut names: Vec<String> = entries
-            .filter_map(Result::ok)
-            .filter_map(|e| e.file_name().to_str().and_then(|n| n.strip_suffix(".md")).map(str::to_string))
-            .filter(|n| strive_learning::valid_skill_name(n))
-            .collect();
-        names.sort();
-        artifacts.extend(names.into_iter().map(|name| Artifact::Command { name }));
-    }
-    if let Ok(entries) = fs::read_dir(workspace.join(strive_learning::CHECKS_DIR)) {
-        let mut names: Vec<String> = entries
-            .filter_map(Result::ok)
-            .filter_map(|e| e.file_name().to_str().and_then(|n| n.strip_suffix(".md")).map(str::to_string))
-            .filter(|n| strive_learning::valid_skill_name(n))
-            .collect();
-        names.sort();
-        artifacts.extend(names.into_iter().map(|name| Artifact::Check { name }));
-    }
+    artifacts.extend(
+        md_names(&workspace.join(strive_learning::COMMANDS_DIR)).into_iter().map(|name| Artifact::Command { name }),
+    );
+    artifacts.extend(
+        md_names(&workspace.join(strive_learning::CHECKS_DIR)).into_iter().map(|name| Artifact::Check { name }),
+    );
+    artifacts
+        .extend(md_names(&workspace.join(strive_learning::RULES_DIR)).into_iter().map(|name| Artifact::Rule { name }));
     // None of strive's home, not even its global skills: a proposal can't
     // write there (a project at `~` has it as its `.strive`).
     let home = strive_home.canonicalize().unwrap_or_else(|_| strive_home.to_path_buf());

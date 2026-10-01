@@ -19,6 +19,7 @@ mod fold;
 pub mod judge;
 pub mod memory;
 pub mod render;
+pub mod rule_file;
 pub mod signals;
 pub mod stale;
 pub mod triggers;
@@ -46,6 +47,10 @@ pub const CHECK_LIMIT: usize = 4 * 1024;
 pub const COMMANDS_DIR: &str = ".strive/commands";
 /// The most a command's file may hold, in bytes.
 pub const COMMAND_LIMIT: usize = 16 * 1024;
+/// Where rules live, relative to the project: `<name>.md` each (ADR-0025).
+pub const RULES_DIR: &str = ".strive/rules";
+/// The most a rule's file may hold, in bytes.
+pub const RULE_LIMIT: usize = 16 * 1024;
 
 /// Every check a proposal goes through, in order. A proposal is ready once
 /// each has a verdict and the static one didn't fail: the judge advises, and
@@ -87,6 +92,10 @@ pub fn relative_path(artifact: &Artifact) -> Result<String, String> {
             Err(format!("the check name {name:?} isn't 1 to {SKILL_NAME_LIMIT} of a-z, 0-9 and -"))
         }
         Artifact::Command { name } if valid_skill_name(name) => Ok(format!("{COMMANDS_DIR}/{name}.md")),
+        Artifact::Rule { name } if valid_skill_name(name) => Ok(format!("{RULES_DIR}/{name}.md")),
+        Artifact::Rule { name } => {
+            Err(format!("the rule name {name:?} isn't 1 to {SKILL_NAME_LIMIT} of a-z, 0-9 and -"))
+        }
         Artifact::Command { name } => {
             Err(format!("the command name {name:?} isn't 1 to {SKILL_NAME_LIMIT} of a-z, 0-9 and -"))
         }
@@ -113,6 +122,7 @@ pub fn file_limit(artifact: &Artifact) -> usize {
         Artifact::Skill { .. } => SKILL_LIMIT,
         Artifact::Check { .. } => CHECK_LIMIT,
         Artifact::Command { .. } => COMMAND_LIMIT,
+        Artifact::Rule { .. } => RULE_LIMIT,
     }
 }
 
@@ -123,5 +133,6 @@ pub fn describe(artifact: &Artifact) -> String {
         Artifact::Skill { name } => format!("skill {name}"),
         Artifact::Check { name } => format!("check {name}"),
         Artifact::Command { name } => format!("command /{name}"),
+        Artifact::Rule { name } => format!("rule {name}"),
     }
 }

@@ -468,7 +468,7 @@ fn undo(change: &Change, applied: &strive_learning::Applied, id: u64, now: Optio
                 None => Ok(Undo::Done),
             }
         }
-        Change::Skill { .. } | Change::Check { .. } | Change::Command { .. } => {
+        Change::Skill { .. } | Change::Check { .. } | Change::Command { .. } | Change::Rule { .. } => {
             let now = now.map(strive_journal::cas::digest);
             if now == Some(applied.after) {
                 Ok(Undo::Restore(applied.before))
@@ -782,7 +782,10 @@ async fn apply(state: &State, sid: &SessionId, cwd: &str, f: &Folded, by: String
                 }
             }
         }
-        Change::Skill { content, .. } | Change::Check { content, .. } | Change::Command { content, .. } => {
+        Change::Skill { content, .. }
+        | Change::Check { content, .. }
+        | Change::Command { content, .. }
+        | Change::Rule { content, .. } => {
             let after = state.cas.put(content.as_bytes()).map_err(|e| internal(&e))?;
             let applied = Event::ProposalApplied { proposal: id, before: f.state.before, after, bullet: None };
             if before == f.state.before {

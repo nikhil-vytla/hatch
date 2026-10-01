@@ -521,13 +521,11 @@ fn an_effect_cancelled_before_it_runs_does_nothing() {
 fn stopping_the_daemon_stops_its_running_commands() {
     let w = Ws::new();
     let mut c = w.env.rpc();
-    let params = json!({"id": w.id, "callId": "call_1", "request": {"kind": "bash", "command": "sleep 2; echo late > late.txt"}});
+    let params = json!({"id": w.id, "callId": "call_1", "request": {"kind": "bash", "command": "touch started; sleep 2; echo late > late.txt"}});
     let running = std::thread::spawn(move || c.call("effect/run", &params));
-    common::wait_for("the command to start", Duration::from_secs(5), || {
-        let r = w.env.rpc().ok("session/read", &json!({"id": w.id}));
-        r["entries"].as_array().unwrap().iter().any(|e| e["event"]["type"] == "effectStarted")
-    });
-    std::thread::sleep(Duration::from_millis(200));
+    // Running, not only journaled as started: a stop before the command
+    // begins refuses it instead ("interrupted before it ran").
+    common::wait_for("the command to run", Duration::from_secs(10), || w.path("started").exists());
     w.env.stop();
     let _ = running.join();
     std::thread::sleep(Duration::from_millis(2500));
