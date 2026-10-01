@@ -56,7 +56,7 @@ function MusicFigure() {
         <rect key={note.id} x={44 + note.beat * 36} y={145 - (note.midi! - 60) * 5}
           width={Math.max(4, note.duration * 36 - 4)} height={9} rx={2} />
       ))}
-      <text x="44" y="183">STARTER MELODY / FIRST PHRASE</text>
+      <text x="44" y="183">Starter melody, first phrase</text>
     </svg>
   );
 }

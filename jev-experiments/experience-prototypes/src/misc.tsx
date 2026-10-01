@@ -94,7 +94,7 @@ export function Logos({ result }: { result: any }) {
             {mark(spec.structure)}
           </motion.div>
           <h2>{brief}</h2>
-          <span>ONE IDEA, A FAMILY OF MARKS</span>
+          <span>One idea, a family of marks</span>
         </div>
         <div className="logo-family">
           {["single", "paired", "nested", "orbit"].map((v) => (

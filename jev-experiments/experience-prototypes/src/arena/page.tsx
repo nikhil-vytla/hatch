@@ -111,14 +111,12 @@ function Overview({ index }: { index: ArenaIndex }) {
         </p>
       </header>
       <ol className="toc">
-        {index.cards.map((card, i) => (
+        {index.cards.map((card) => (
           <li key={card.id}>
             <a href={viewHash({ card: card.id })}>
               <Sketch card={card} />
               <span>
-                <span className="kicker">
-                  Fig. {i + 1} · {FAMILY[card.family]}
-                </span>
+                <span className="kicker">{FAMILY[card.family]}</span>
                 <h2>{card.title}</h2>
                 <span className="toc-insight">{card.insight ?? card.question}</span>
               </span>
@@ -135,7 +133,7 @@ function KeyNumbers({ model: m }: { model: CardModel }) {
 
   return (
     <section className="margin-block">
-      <h2 className="kicker">Best in this figure</h2>
+      <h2 className="kicker">Best here</h2>
       <ul className="keys">
         {m.tiles.map(({ metric, winners, estimate }) => (
           <li key={metric.id}>

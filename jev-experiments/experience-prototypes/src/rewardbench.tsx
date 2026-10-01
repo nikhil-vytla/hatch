@@ -154,7 +154,7 @@ export function RewardBench({ result }: { result: any }) {
     <div className="rewardbench-workspace">
       <section className="benchmark-overview">
         <div className="benchmark-mission">
-          <span className="eyebrow">JEV AS A REWARD MODEL</span>
+          <span className="eyebrow">Jev as a reward model</span>
           <h2>Recognize the better answer.</h2>
           <p>
             Ai2 supplies the prompts, candidate responses, and preferred-answer
@@ -285,8 +285,8 @@ export function RewardBench({ result }: { result: any }) {
                   <div className="question-card">
                     <span className="eyebrow">
                       {row.prompt_omission
-                        ? "PROMPT OMITTED"
-                        : "THE USER'S REQUEST"}
+                        ? "Prompt omitted"
+                        : "The user's request"}
                     </span>
                     <p>{row.prompt}</p>
                   </div>

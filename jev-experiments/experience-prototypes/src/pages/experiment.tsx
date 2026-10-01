@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { ArrowLeft, FlaskConical } from "lucide-react";
-import { experiments, lookup, retiredScene, type Experiment } from "../catalog";
+import { lookup, retiredScene, type Experiment } from "../catalog";
 import { CapabilityInspector } from "../../../capability-atlas-2026-09-22/capability-inspector";
 import { Pane, Notice } from "../shared";
 import { Provenance } from "../provenance";
@@ -230,10 +230,7 @@ function LiveExperimentPage({ id }: { id: string }) {
         </section>
       </> : <><section className="detail-heading">
         <div>
-          <span className="eyebrow">
-            EXPERIMENT {String(experiments.indexOf(exp) + 1).padStart(2, "0")} /{" "}
-            {exp.category.toUpperCase()}
-          </span>
+          <span className="eyebrow">{exp.category}</span>
           <h1>{exp.title}</h1>
           <p>{exp.description}</p>
         </div>

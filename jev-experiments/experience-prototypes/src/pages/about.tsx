@@ -23,7 +23,7 @@ export function AboutPage() {
         </dl>
         <h2>Made with, learned from</h2>
         <p>The site pairs a working instrument with a readable notebook. Its interaction references include <a href="https://www.redblobgames.com/">Amit Patel's Red Blob Games</a>, <a href="https://worrydream.com/ExplorableExplanations/">Bret Victor's explorable explanations</a> and <a href="https://brainfunctioncollapse.com/">Wojciech Dobry's experiments</a>. Credits below distinguish the original models, adapted methods and interface references.</p>
-        <p>Type is set in Geist and Geist Mono; Georgia appears only inside scene illustrations. The figures use the experiments' own code and data; selected scene illustrations are drawn in SVG. Motion follows the system's reduced-motion preference.</p>
+        <p>Type is set in Bricolage Grotesque and Nunito, with Geist Mono for code; Georgia appears only inside scene illustrations. The figures use the experiments' own code and data; selected scene illustrations are drawn in SVG. Motion follows the system's reduced-motion preference.</p>
         <BuilderCredits />
         <div className="about-reading-links">
           <a href="#/notes">Read the notes <ArrowUpRight size={16} /></a>

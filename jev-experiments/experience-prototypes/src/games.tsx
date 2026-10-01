@@ -171,7 +171,7 @@ export function Games({ result }: { result: any }) {
       <div className="artifact-column">
         <div className="game-stage">
           <div className="game-mission">
-            <span>MISSION / {env.includes("DoorKey") ? "DOOR & KEY" : "EMPTY ROOM"}</span>
+            <span>Mission: {env.includes("DoorKey") ? "Door & key" : "Empty room"}</span>
             <h2>{state?.mission ?? "Find the way to the goal"}</h2>
           </div>
           <GameGrid state={state} />

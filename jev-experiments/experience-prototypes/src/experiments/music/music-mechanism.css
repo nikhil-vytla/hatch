@@ -25,7 +25,7 @@
   display: flex;
   justify-content: space-between;
   gap: 12px;
-  font: 12px/1.5 var(--mono);
+  font: 700 12px/1.5 var(--mono);
   color: var(--muted);
   flex-wrap: wrap;
 }
@@ -111,7 +111,7 @@
   color: var(--muted);
 }
 .ma-mechanism-leaps strong {
-  font: 17px/1.5 var(--mono);
+  font: 700 17px/1.5 var(--mono);
 }
 .ma-mechanism-receipt {
   margin: 20px 0;
@@ -125,7 +125,7 @@
   grid-template-columns: minmax(70px, 1fr) minmax(70px, 2fr) 58px;
   gap: 10px;
   align-items: center;
-  font: 12px/1.8 var(--mono);
+  font: 700 12px/1.8 var(--mono);
   margin: 7px 0;
 }
 .ma-mechanism-probabilities meter {
@@ -146,7 +146,7 @@
 .ma-mechanism pre {
   max-width: 100%;
   overflow: auto;
-  font: 12px/1.6 var(--mono);
+  font: 700 12px/1.6 var(--mono);
   background: var(--bg);
   padding: 16px;
   border: 1px solid var(--line);
@@ -174,7 +174,7 @@
   color: var(--muted);
 }
 .ma-mechanism-versions strong {
-  font: 25px/1.3 var(--mono);
+  font: 700 25px/1.3 var(--mono);
 }
 .ma-mechanism-bars {
   display: grid;
@@ -266,6 +266,6 @@
 }
 .ma-boundary-scores dd {
   margin: 6px 0 0;
-  font: 13px/1.7 var(--mono);
+  font: 700 13px/1.7 var(--mono);
   overflow-wrap: anywhere;
 }

@@ -20,14 +20,23 @@ if (location.hash.startsWith("#/daily")) history.replaceState(null, "", "#/decid
 const NotesIndex = lazy(() => import("./notes").then(m => ({ default: m.NotesIndex })));
 const ExperimentNote = lazy(() => import("./notes").then(m => ({ default: m.ExperimentNote })));
 
+/** The Toy Box face, the site's mark. */
+function Brandmark() {
+  return (
+    <svg className="brandmark" viewBox="0 0 100 100" aria-hidden="true">
+      <rect x="8" y="8" width="84" height="84" rx="30" fill="#f0532d" stroke="#17140f" strokeWidth="7" />
+      <circle cx="37" cy="46" r="8" fill="#17140f" />
+      <circle cx="64" cy="46" r="8" fill="#17140f" />
+      <path d="M34 66 Q50 76 66 66" stroke="#17140f" strokeWidth="7" fill="none" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 function Header({ route }: { route: string }) {
   const settings = useRef<HTMLDetailsElement>(null);
   const settingsTrigger = useRef<HTMLElement>(null);
   const keyDialog = useRef<HTMLElement>(null);
-  const [theme, setTheme] = useState(
-      localStorage.getItem("jev-theme") ?? "system",
-    ),
-    [open, setOpen] = useState(false),
+  const [open, setOpen] = useState(false),
     [key, setKey] = useState(""),
     [connected, setConnected] = useState(!!getApiKey());
   const close = () => {
@@ -68,26 +77,11 @@ function Header({ route }: { route: string }) {
     window.addEventListener("keydown", dismiss);
     return () => window.removeEventListener("keydown", dismiss);
   }, [open]);
-  useEffect(() => {
-    const media = matchMedia("(prefers-color-scheme:dark)");
-    const apply = () => {
-      document.documentElement.dataset.theme =
-        theme === "system" ? (media.matches ? "dark" : "light") : theme;
-      localStorage.setItem("jev-theme", theme);
-    };
-    apply();
-    media.addEventListener("change", apply);
-    return () => media.removeEventListener("change", apply);
-  }, [theme]);
   return (
     <>
       <header className="site-header">
         <a href="#/" className="brand">
-          <span className="brandmark">
-            {Array.from({ length: 9 }, (_, i) => (
-              <i key={i} />
-            ))}
-          </span>
+          <Brandmark />
           <strong>jev</strong>
           <span className="brand-edition">experiments & notes</span>
         </a>
@@ -106,14 +100,7 @@ function Header({ route }: { route: string }) {
           }}>
             <summary ref={settingsTrigger} aria-label="Settings"><Settings2 size={17} aria-hidden="true"/><span>Settings</span></summary>
             <div className="header-settings-panel">
-              <label className="theme-select">
-                <span>Theme</span>
-                <select aria-label="Color theme" value={theme} onChange={(event) => setTheme(event.target.value)}>
-                  <option value="system">Auto</option>
-                  <option value="light">Light</option>
-                  <option value="dark">Dark</option>
-                </select>
-              </label>
+              <p className="header-settings-note">Recorded answers need no key. Add yours to ask Jev live.</p>
               <button className={"key-button " + (connected ? "connected" : "")}
                 aria-label={connected ? "API key added" : "Connect live"}
                 onClick={() => { if (settings.current) settings.current.open = false; setOpen(true); }}>
@@ -137,7 +124,7 @@ function Header({ route }: { route: string }) {
             <button className="close-button" aria-label="Close" onClick={close}>
               <X size={18} />
             </button>
-            <span className="eyebrow">LIVE EXPERIMENTS</span>
+            <span className="eyebrow">Live experiments</span>
             <h2 id="token-title">Try it with your key.</h2>
             <p>
               Enter your Vercel AI Gateway API key to run these experiments with
@@ -308,6 +295,7 @@ function App() {
       ) : id || route.startsWith("#/notes") ? null : <PlayPage />}
       <footer className="site-footer">
         <a className="brand" href="#/">
+          <Brandmark />
           <strong>jev</strong>
           <span>experiments & notes</span>
         </a>
