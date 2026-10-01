@@ -260,7 +260,7 @@ fn a_sound_proposal_passes_the_judge_on_the_learning_sessions_budget() {
     let finished = j.events(&learning, "modelCallFinished");
     assert_eq!(finished.len(), 1);
     assert!(finished[0]["outcome"]["costUsdMicros"].as_u64().unwrap() > 0, "{finished:?}");
-    assert!(j.events(&cited, "modelCallStarted").is_empty());
+    assert_eq!(j.events(&cited, "modelCallStarted"), [] as [Value; 0]);
 
     // A reviewer reads the verdict in a line; with --full, each criterion on
     // its own line under the gate's, and the held-out session by its title.

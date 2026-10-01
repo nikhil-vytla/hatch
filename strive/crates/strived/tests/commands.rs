@@ -90,7 +90,7 @@ fn a_command_reached_through_a_symlink_isnt_offered() {
     w.write("docs/review.md", "Review.\n");
     fs::create_dir_all(w.root.join(".strive/commands")).unwrap();
     std::os::unix::fs::symlink(w.root.join("docs/review.md"), w.root.join(".strive/commands/review.md")).unwrap();
-    assert!(w.commands().is_empty());
+    assert_eq!(w.commands(), [] as [Value; 0]);
     assert_eq!(w.prompt("/review")["text"], "/review");
 }
 

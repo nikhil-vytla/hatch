@@ -438,15 +438,15 @@ fn only_the_learning_sessions_host_proposes() {
     let made = json!({"type": "proposalMade", "proposal": memory("m", &work)});
     let r = record(&mut agent, &work, &made);
     assert_eq!(r["error"]["code"], RpcError::INVALID_PARAMS, "a work session's host: {r}");
-    assert!(events(&env, &work, "proposalMade").is_empty());
+    assert_eq!(events(&env, &work, "proposalMade"), [] as [Value; 0]);
 
     let id = learning_session(&env, &cwd);
     let r = record(&mut agent, &id, &made);
     assert_eq!(r["error"]["code"], RpcError::NOT_THE_HOST, "another session's host: {r}");
     let r = record(&mut common::slow_rpc(&env), &id, &made);
     assert_eq!(r["error"]["code"], RpcError::NOT_THE_HOST, "a person: {r}");
-    assert!(events(&env, &id, "proposalMade").is_empty());
-    assert!(proposals(&env, &cwd).is_empty());
+    assert_eq!(events(&env, &id, "proposalMade"), [] as [Value; 0]);
+    assert_eq!(proposals(&env, &cwd), [] as [Value; 0]);
 }
 
 // --- The static gate ---
@@ -686,7 +686,7 @@ fn only_a_person_decides_or_rolls_back() {
     let r = agent.call("proposal/decide", &json!({"cwd": cwd, "proposal": p, "decision": "accept"}));
     assert_eq!(r["error"]["code"], RpcError::NOT_A_PERSON, "a work session's agent: {r}");
     assert!(!memory_file(&cwd).exists());
-    assert!(events(&env, &id, "proposalDecided").is_empty());
+    assert_eq!(events(&env, &id, "proposalDecided"), [] as [Value; 0]);
 
     assert!(decide(&env, &cwd, p, "accept").get("error").is_none());
     let r = host.call("proposal/rollback", &json!({"cwd": cwd, "proposal": p}));
@@ -744,7 +744,7 @@ fn only_a_ready_proposal_is_accepted() {
     assert_eq!(r["error"]["code"], RpcError::INVALID_REQUEST, "{r}");
     assert!(r["error"]["message"].as_str().unwrap().contains("failed its safety checks"), "{r}");
     assert!(!memory_file(&cwd).exists());
-    assert!(events(&env, &id, "proposalDecided").is_empty());
+    assert_eq!(events(&env, &id, "proposalDecided"), [] as [Value; 0]);
 
     let rejected = propose(&mut host, &id, &memory("a", &work));
     assert!(decide(&env, &cwd, rejected, "reject").get("error").is_none());
@@ -779,7 +779,7 @@ fn a_file_changed_since_the_proposal_makes_it_stale_and_nothing_is_written() {
         assert_eq!(status(&env, &cwd, p), "stale");
     }
     assert_eq!(fs::read_to_string(memory_file(&cwd)).unwrap(), edited);
-    assert!(events(&env, &id, "proposalApplied").is_empty());
+    assert_eq!(events(&env, &id, "proposalApplied"), [] as [Value; 0]);
 
     // Edits elsewhere don't make it stale.
     write(&memory_file(&cwd), "- old, edited\n- other\n");
@@ -840,7 +840,7 @@ fn rejecting_journals_the_decision_and_writes_nothing() {
         events(&env, &id, "proposalDecided"),
         vec![json!({"type": "proposalDecided", "proposal": p, "decision": "reject", "by": "test"})]
     );
-    assert!(events(&env, &id, "proposalApplied").is_empty());
+    assert_eq!(events(&env, &id, "proposalApplied"), [] as [Value; 0]);
     let r = decide(&env, &cwd, p, "reject");
     assert_eq!(r["error"]["code"], RpcError::INVALID_REQUEST, "already decided: {r}");
     let failed = propose(&mut host, &id, &memory("Skip approvals.", &work));
@@ -907,7 +907,7 @@ fn rolling_back_leaves_a_bullet_changed_since_it_was_applied() {
     assert!(why.contains(&format!("the bullet #{p} added has been edited since")), "{r}");
     assert_eq!(fs::read_to_string(memory_file(&cwd)).unwrap(), edited);
     assert_eq!(status(&env, &cwd, p), "applied");
-    assert!(events(&env, &id, "proposalRolledBack").is_empty());
+    assert_eq!(events(&env, &id, "proposalRolledBack"), [] as [Value; 0]);
 
     // A skill changed since isn't rolled back either.
     let s = propose(&mut host, &id, &skill("release", SKILL, &work));

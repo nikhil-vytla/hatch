@@ -20,7 +20,7 @@ fn a_check_says_what_to_run_when_and_why() {
 #[test]
 fn without_paths_or_a_timeout_it_runs_on_any_change_for_two_minutes() {
     let c = parse("---\nname: t\ndescription: d\nrun: ./dev test\n---\n").unwrap();
-    assert!(c.paths.is_empty());
+    assert_eq!(c.paths, [] as [String; 0]);
     assert_eq!(c.timeout_secs, DEFAULT_TIMEOUT_SECS);
     assert_eq!(c.body, "");
 }
@@ -49,14 +49,14 @@ fn each_required_field_is_named_when_missing() {
 
 #[test]
 fn paths_stay_in_the_project_and_timeouts_are_bounded() {
-    assert!(!problems("---\nname: t\ndescription: d\nrun: x\npaths: ../other/**\n---\n").is_empty());
-    assert!(!problems("---\nname: t\ndescription: d\nrun: x\npaths: /etc/**\n---\n").is_empty());
+    assert_ne!(problems("---\nname: t\ndescription: d\nrun: x\npaths: ../other/**\n---\n"), [] as [String; 0]);
+    assert_ne!(problems("---\nname: t\ndescription: d\nrun: x\npaths: /etc/**\n---\n"), [] as [String; 0]);
     for bad in ["0", "601", "soon"] {
         let p = problems(&format!("---\nname: t\ndescription: d\nrun: x\ntimeout: {bad}\n---\n"));
         assert!(p.iter().any(|p| p.contains("timeout")), "{bad}: {p:?}");
     }
     let long = "x".repeat(501);
-    assert!(!problems(&format!("---\nname: t\ndescription: d\nrun: {long}\n---\n")).is_empty());
+    assert_ne!(problems(&format!("---\nname: t\ndescription: d\nrun: {long}\n---\n")), [] as [String; 0]);
 }
 
 fn proposal(name: &str, content: &str) -> Proposal {
