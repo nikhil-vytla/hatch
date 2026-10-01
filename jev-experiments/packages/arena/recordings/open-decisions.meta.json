@@ -1,0 +1,50 @@
+{
+ "schema": "open-decisions.meta/1",
+ "method": {
+  "source": "https://github.com/sgl-project/sglang",
+  "commit": "99c9d65b32c25e760abb79e5d2c260838973dce0",
+  "files": [
+   "python/sglang/srt/entrypoints/openai/serving_decisions.py",
+   "python/sglang/srt/entrypoints/systemone/serving.py",
+   "python/sglang/srt/entrypoints/systemone/protocol.py"
+  ],
+  "prompt_format_version": 1,
+  "temperature": 1.0,
+  "prefix_cache": "none (each question is a fresh prefill, as --disable-radix-cache)",
+  "logits": "answer position only (backbone over the prompt, then the LM head on the last position); max |\u0394logit| vs the full call 0.125 on a 2,800-token prompt, from quantised matmul kernels",
+  "server": "packages/arena/open-decisions/server.py, one request at a time"
+ },
+ "machine": {
+  "chip": "Apple M4 Max",
+  "memoryGiB": 48.0,
+  "platform": "macOS-26.6.2-arm64-arm-64bit"
+ },
+ "versions": {
+  "python": "3.12.10",
+  "mlx": "0.32.3",
+  "mlx_lm": "0.32.0",
+  "transformers": "5.18.0"
+ },
+ "not_used": "No Jev output was used to train, select or tune anything.",
+ "sglang": {
+  "contestant": "sglang-l4.qwen3-4b",
+  "server": {
+   "version": "0.5.6.post3.dev11485+g9c3262d85",
+   "model_path": "Qwen/Qwen3-4B-Instruct-2507",
+   "dtype": "auto",
+   "disable_radix_cache": true,
+   "attention_backend": "triton",
+   "sampling_backend": "pytorch",
+   "mem_fraction_static": 0.8,
+   "disable_cuda_graph": false,
+   "tp_size": 1,
+   "context_length": null
+  },
+  "torch": "2.13.0+cu130",
+  "gpu": "NVIDIA L4 (23 GB)",
+  "route": "/v1/systemone, model \"default\"",
+  "latency": "round trip from the Mac through a coder port-forward tunnel; SGLang reports no server time",
+  "note": "FlashInfer's JIT failed on the box (system nvcc lacks --compress-mode=size), so attention is Triton.",
+  "prompt_parity": "prompt token ids from return_prompt_token_ids identical to server.py on a yes/no and a choice question"
+ }
+}

@@ -28,7 +28,8 @@ describe("arena data build", () => {
   test("publishes a small index whose numbers match the recordings", async () => {
     const out = mkdtempSync(join(tmpdir(), "arena-"));
     const index = await buildArena(out);
-    expect(readFileSync(join(out, "index.json")).length).toBeLessThan(120_000);
+    // Slices grow by about 3.5 KB per contestant; the open-decisions models brought it to ~143 KB.
+    expect(readFileSync(join(out, "index.json")).length).toBeLessThan(160_000);
 
     const card = (id: string) =>
       present(

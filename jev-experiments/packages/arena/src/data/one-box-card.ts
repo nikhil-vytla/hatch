@@ -23,6 +23,7 @@ import {
   type Policy,
 } from "../one-box/replay";
 import { bootstrapMany } from "./bootstrap";
+import { OPEN_MODELS } from "../../open-decisions/models";
 import { PALETTE } from "./palette";
 import type { Card, CardContestant, Estimate, MetricDef, RunSet } from "./schema";
 
@@ -81,6 +82,20 @@ const RECORDED = new Map<string, Who>(
       policy: "one local call per question",
       color: PALETTE.laya,
     },
+    // Open chat models answering through SGLang's decision method, ported to MLX.
+    ...Object.fromEntries(
+      OPEN_MODELS.map((m) => [
+        m.id,
+        {
+          name: `${m.name} (${m.quantisation})`,
+          short: m.name,
+          kind: "local" as const,
+          model: m.repo,
+          policy: `all 14 questions in one request per prefix, ${m.method}`,
+          color: m.color,
+        },
+      ]),
+    ),
   } satisfies Record<string, Who>),
 );
 
@@ -96,7 +111,8 @@ type Recording = { id: string; file: string; answers: Map<string, Answered>; rec
 
 function recordings(dir: string): Recording[] {
   const files = readdirSync(dir).flatMap((f) => {
-    const m = /^one-box(?:\.([\w-]+))?\.jsonl(\.gz)?$/.exec(f);
+    // Ids may contain dots (qwen3.5-0.8b); the lazy match leaves ".jsonl" for the suffix.
+    const m = /^one-box(?:\.([\w.-]+?))?\.jsonl(\.gz)?$/.exec(f);
 
     return m ? [{ f, id: m[1] ?? "", gz: Boolean(m[2]) }] : [];
   });

@@ -2,7 +2,7 @@
  * Contestant colours, one light and one dark value each. Every value keeps at
  * least 3:1 against every page surface of its theme (WCAG non-text contrast).
  * Hue carries identity: green Jev, blue Laya, rust Qwen, violet small models
- * and robustness conditions. Neutral grey is reserved for code players.
+ * and robustness conditions, crimson open models on SGLang's decision method. Neutral grey is reserved for code players.
  * The site is light only (Toy Box: cream page, white cards, soft cream wells);
  * the dark values stay for the arena's own exports.
  */
@@ -25,6 +25,11 @@ export const PALETTE = {
   qwenSand: { light: "#80531f", dark: "#dcb27f" },
   qwenPlum: { light: "#843c62", dark: "#e0a0c3" },
   small: { light: "#6e3f96", dark: "#c7a0e6" },
+  // Open chat models answering through SGLang's decision method.
+  open: { light: "#b02a4a", dark: "#f29bb0" },
+  openDeep: { light: "#7d1d36", dark: "#f7b9c7" },
+  openRose: { light: "#9a2f7a", dark: "#e9a2d6" },
+  openWine: { light: "#6d2350", dark: "#d9a3c2" },
   code: { light: "#5b5b5b", dark: "#b8b8b8" },
   codeMid: { light: "#6f6f6f", dark: "#a0a0a0" },
   codeLight: { light: "#848484", dark: "#8c8c8c" },
