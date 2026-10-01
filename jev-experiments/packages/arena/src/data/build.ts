@@ -1536,7 +1536,7 @@ const INSIGHTS = new Map(
     "typed-decisions":
       "Jev agrees with the reference most often and its stated confidence tracks how often it agrees. Qwen3-4B, scored on its label probabilities, is often confident and wrong.",
     "one-box":
-      "Jev's box ends on the right card for 94% of the 50 held-out phrases (98% of the 150 development ones), against 70% for Laya, 62% for Shapeshift's keyword rules and 30% for a tiny model distilled from Jev, and it commits the fewest wrong cards on the way. Keeping the latest answer gets Jev to the right card sooner but makes the box change about twice as often. Nothing was tuned before the held-out run. The phrases were written by a model that never saw any contestant, which may still favour a model.",
+      "Jev's box ends on the right card for 94% of the 50 held-out phrases (98% of the 150 development ones), against 70% for Laya and 62% for Shapeshift's keyword rules, and it commits the fewest wrong cards on the way. Keeping the latest answer gets Jev to the right card sooner but makes the box change about twice as often. Nothing was tuned before the held-out run. The phrases were written by a model that never saw any contestant, which may still favour a model.",
     cafe: "Jev never served a drink that breaks a stated requirement. The keyword reader, written after reading these exact cases, gets more preferences exactly right but breaks a requirement in 3.9% of cases.",
   }),
 );

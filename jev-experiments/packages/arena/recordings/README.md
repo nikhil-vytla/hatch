@@ -126,9 +126,8 @@ Compare these numbers with TypeSafe's only as "Jev through the gateway, around t
 
 ### One box held-out result (scored once, 26 Sep 2026)
 
-Run after Jev, Laya and the tiny model were all recorded, with nothing tuned: the calm-UI
-thresholds and keyword rules are Shapeshift's, the tiny model trained on development prefixes
-only (held-out prefixes excluded), and Laya and Jev are zero-shot.
+Run after Jev and Laya were both recorded, with nothing tuned: the calm-UI thresholds and
+keyword rules are Shapeshift's, and Laya and Jev are zero-shot.
 `bun packages/arena/scripts/one-box-compare.ts cancel heldout`, 50 phrases, upstream's
 cancel-on-keystroke policy (95% case-bootstrap interval from the arena card):
 
@@ -137,12 +136,16 @@ cancel-on-keystroke policy (95% case-bootstrap interval from the arena card):
 | Jev | 94.0% (86–100) | 98.0% | 0.02 | 1.22 |
 | Laya (intent asked in 3 groups) | 70.0% (56–82) | 80.0% | 0.04 | 1.98 |
 | Keyword classifier | 62.0% (48–76) | 66.0% | 0.20 | 1.92 |
-| Tiny model (distilled from Jev) | 30.0% (18–44) | 36.0% | 0.10 | 1.48 |
 
 Under keep-the-latest, final cards are unchanged and the boxes change more (Jev 3.14,
 Laya 5.70 per phrase). The development split gave the same order (Jev 98.0%, keyword 67.3%,
-Laya 64.7%, tiny 26.7%); Laya and the keyword classifier swap places between splits and
+Laya 64.7%); Laya and the keyword classifier swap places between splits and
 their intervals overlap on both.
+
+A fourth contestant, a tiny classifier distilled from Jev's recorded answers, was removed on
+30 Sep 2026. TypeSafe's Master Customer Agreement §2.3(b) forbids using its output to
+distil a model or to train one to imitate it. Its weights, training scripts and recording are
+gone from this tree. A free student for these games should learn from an open teacher instead.
 
 ## Breaking hard questions into small ones (decompose.jsonl, 26 Sep 2026)
 
