@@ -1,6 +1,6 @@
 # ADR-0027: Code extensions: tools the agent writes, run in the command sandbox
 
-Status: accepted and built (2026-10-01), but for safe mode. Hooks are ADR-0028. The extension plan's second milestone, after
+Status: accepted and built (2026-10-01). Hooks are ADR-0028. The extension plan's second milestone, after
 the declarative extensions (ADR-0023 to ADR-0025).
 
 ## Context
@@ -83,7 +83,10 @@ test` as an ordinary command.
 
 ### Safe mode, and one that keeps failing
 
-`strive --safe` (and a setting) loads no extensions. An extension whose
+`strive --safe` (and `"extensions": false` in settings) starts a session
+that loads no extensions: its host is given none of their tools, a call to
+one is refused, and no hook runs. The session's journal records it, so it
+stays safe when resumed. An extension whose
 calls fail, time out or crash three times in a session is left out for the
 rest of it, and the person is told, with rollback one step away.
 

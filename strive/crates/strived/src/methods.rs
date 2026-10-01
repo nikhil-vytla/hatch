@@ -461,12 +461,16 @@ async fn load_context(
     let home = state.home.root.canonicalize().map_err(|e| internal(&e))?;
     let workspace = std::path::PathBuf::from(&info.cwd);
     let learning = info.kind == Some(SessionKind::Learning);
-    let (ctx, learned) = tokio::task::spawn_blocking(move || {
+    let (mut ctx, learned) = tokio::task::spawn_blocking(move || {
         let learned = learning.then(|| crate::context::learned(&workspace, &home));
         (crate::context::load(&workspace, &home), learned)
     })
     .await
     .map_err(|e| internal(&e))?;
+    if info.safe && !ctx.extensions.is_empty() {
+        let names: Vec<String> = ctx.extensions.drain(..).map(|e| e.info.name).collect();
+        ctx.skipped.push(format!("Safe mode: this session runs no extensions, so {} weren't loaded", names.join(", ")));
+    }
     // What the learner is shown is journaled: its proposals are checked
     // against, and written only over, these same files.
     let shown = learned
@@ -798,6 +802,12 @@ async fn route_effect(state: &Arc<State>, method: &str, params: Value) -> Reply 
                 unconfined: state.settings.sandbox == crate::settings::SandboxSetting::Off,
                 imports,
             };
+            if let (true, EffectRequest::Extension { name, .. }) = (info.safe, &request) {
+                return Err(RpcError::new(
+                    RpcError::INVALID_REQUEST,
+                    format!("the extension {name} can't run: this session is in safe mode, which runs no extensions"),
+                ));
+            }
             let asked = request.clone();
             let (request, record, check) = prepare(state, &info.cwd, &scope, request).await?;
             let Some(_running) = state.sessions.begin_effect() else {
@@ -807,7 +817,7 @@ async fn route_effect(state: &Arc<State>, method: &str, params: Value) -> Reply 
             let effect =
                 state.sessions.start_effect(&sid, call_id.clone(), record.clone()).await.map_err(session_error);
             let prepared = Prepared { asked, request, record, check };
-            let result = run_effect(state, &sid, &info.cwd, scope, prepared, effect, &cancelled).await;
+            let result = run_effect(state, &sid, &info, scope, prepared, effect, &cancelled).await;
             state.sessions.forget_cancel(&sid, &call_id);
             result
         }
@@ -995,7 +1005,7 @@ struct Accepting {
 async fn run_effect(
     state: &Arc<State>,
     sid: &SessionId,
-    cwd: &str,
+    info: &strive_proto::SessionInfo,
     scope: crate::effects::Scope,
     prepared: Prepared,
     effect: std::result::Result<u64, RpcError>,
@@ -1015,7 +1025,7 @@ async fn run_effect(
             }
             _ => crate::effects::gate(&scope, &request, mode, &allowed),
         };
-        let (gate, hooked) = crate::hooks::stricter(state, cwd, &scope, &asked, &allowed, gate).await;
+        let (gate, hooked) = crate::hooks::stricter(state, info, &scope, &asked, &allowed, gate).await;
         let refusal = match gate {
             crate::effects::Gate::Allow => None,
             crate::effects::Gate::Deny(why) => Some(why),
@@ -1110,13 +1120,19 @@ async fn run_effect(
 async fn route_session(state: &Arc<State>, conn: &Arc<Conn>, method: &str, params: Value) -> Reply {
     match method {
         SessionCreate::NAME => {
-            let SessionCreateParams { cwd } = parse::<SessionCreate>(params)?;
+            let SessionCreateParams { cwd, safe } = parse::<SessionCreate>(params)?;
             // Kept as its real path, so a later swap of any part shows (see `workspace_of`).
             let cwd = std::path::Path::new(&cwd).canonicalize().map_or(cwd, |p| p.display().to_string());
             reply::<SessionCreate>(
                 state
                     .sessions
-                    .create(cwd, state.settings.budget.limits(), state.settings.approvals, None)
+                    .create(
+                        cwd,
+                        state.settings.budget.limits(),
+                        state.settings.approvals,
+                        None,
+                        safe || !state.settings.extensions,
+                    )
                     .await
                     .map_err(session_error)?,
             )

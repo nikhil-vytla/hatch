@@ -156,3 +156,21 @@ fn a_hook_that_throws_is_a_failure() {
     let r = w.bash("c1", "echo hi");
     assert!(reason(&r).contains("guard's hook failed: it exited 1"), "{r}");
 }
+
+#[test]
+fn a_session_in_safe_mode_runs_no_hooks() {
+    if !sandboxed() {
+        eprintln!("no usable sandbox on this machine");
+        return;
+    }
+    let w = Ws::new();
+    let _ = w.accepted(GUARD);
+    let safe =
+        w.env.rpc().ok("session/create", &json!({"cwd": w.root, "safe": true}))["id"].as_str().unwrap().to_string();
+    w.env.rpc().ok("session/approvals", &json!({"id": safe, "mode": "fullAuto"}));
+    let r = w.env.rpc().ok(
+        "effect/run",
+        &json!({"id": safe, "callId": "c1", "request": {"kind": "bash", "command": "echo git push"}}),
+    );
+    assert_eq!(r["text"], "git push\n", "{r}");
+}

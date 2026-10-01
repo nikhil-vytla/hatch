@@ -47,7 +47,7 @@ fn statuses(events: Vec<Event>) -> Vec<(u64, ProposalStatus)> {
 }
 
 fn started() -> Event {
-    Event::SessionStarted { format: 1, cwd: "/p".into(), strive_version: "0".into(), kind: None }
+    Event::SessionStarted { format: 1, cwd: "/p".into(), strive_version: "0".into(), kind: None, safe: false }
 }
 
 #[test]

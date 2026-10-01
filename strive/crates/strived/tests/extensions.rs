@@ -339,3 +339,52 @@ fn an_extension_changed_since_it_was_proposed_is_stale() {
     assert_eq!(w.proposal(id)["status"], "stale");
     assert!(fs::read_to_string(w.root.join(".strive/extensions/shout/index.ts")).unwrap().contains("by hand"));
 }
+
+#[test]
+fn a_session_in_safe_mode_is_given_no_extensions_and_runs_none() {
+    let w = Ws::new();
+    w.shout("");
+    let safe = w.env.rpc().ok("session/create", &json!({"cwd": w.root, "safe": true}));
+    assert_eq!(safe["safe"], true, "{safe}");
+    let id = safe["id"].as_str().unwrap();
+    let config = w.env.rpc().ok("host/register", &json!({"id": id}));
+    assert_eq!(config["extensions"], json!([]), "{config}");
+    let r = w.env.rpc().ok("session/read", &json!({"id": id}));
+    let loaded =
+        r["entries"].as_array().unwrap().iter().map(|e| &e["event"]).find(|e| e["type"] == "contextLoaded").unwrap();
+    assert_eq!(loaded["extensions"].as_array().map_or(0, Vec::len), 0, "{loaded}");
+    assert!(
+        loaded["skipped"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|s| s.as_str().unwrap().contains("Safe mode") && s.as_str().unwrap().contains("shout")),
+        "{loaded}"
+    );
+    let ran = w.env.rpc().call(
+        "effect/run",
+        &json!({"id": id, "callId": "c", "request": {"kind": "extension", "name": "shout", "tool": "loud", "arguments": {"text": "hi"}}}),
+    );
+    assert!(ran["error"]["message"].as_str().unwrap().contains("this session is in safe mode"), "{ran}");
+    // It stays safe when listed again, as its journal says.
+    let listed = w.env.rpc().ok("session/list", &json!({"cwd": w.root}));
+    let found = listed["sessions"].as_array().unwrap().iter().find(|s| s["id"] == id).unwrap().clone();
+    assert_eq!(found["safe"], true, "{listed}");
+    // A session created without it isn't.
+    assert!(
+        w.env.rpc().ok("session/list", &json!({"cwd": w.root}))["sessions"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|s| s["id"] == w.id.as_str() && s.get("safe").is_none())
+    );
+}
+
+#[test]
+fn with_extensions_off_in_settings_every_new_session_is_in_safe_mode() {
+    let env = Env::new();
+    fs::write(env.home.path().join("settings.json"), "{\"extensions\": false}").unwrap();
+    let dir = tempfile::Builder::new().prefix("strv-ext").tempdir_in("/tmp").unwrap();
+    let created = env.rpc().ok("session/create", &json!({"cwd": dir.path()}));
+    assert_eq!(created["safe"], true, "{created}");
+}

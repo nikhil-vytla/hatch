@@ -13,7 +13,7 @@ fn key() -> Key {
 }
 
 fn started() -> Event {
-    Event::SessionStarted { format: 1, cwd: "/r".into(), strive_version: "0.3.0".into(), kind: None }
+    Event::SessionStarted { format: 1, cwd: "/r".into(), strive_version: "0.3.0".into(), kind: None, safe: false }
 }
 
 fn msg(text: &str) -> Event {

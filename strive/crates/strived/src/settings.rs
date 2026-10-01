@@ -55,6 +55,14 @@ pub struct Settings {
     /// as Claude Code's `mcpServers`.
     #[serde(default)]
     pub mcp_servers: BTreeMap<String, McpServerSetting>,
+    /// Whether sessions run the project's extensions (ADR-0027); off, every
+    /// new session starts in safe mode, as `strive --safe` does.
+    #[serde(default = "default_extensions")]
+    pub extensions: bool,
+}
+
+fn default_extensions() -> bool {
+    true
 }
 
 /// Automatic learning (ADR-0020).

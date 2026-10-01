@@ -36,7 +36,10 @@ pub fn open(home: &Home, session: &Session) -> Result<()> {
     let mut c = Command::new(&cmd[0]);
     c.args(&cmd[1..]).arg("--cwd").arg(std::env::current_dir()?);
     match session {
-        Session::New => {}
+        Session::New { safe: false } => {}
+        Session::New { safe: true } => {
+            c.arg("--safe");
+        }
         Session::Continue => {
             c.arg("--continue");
         }

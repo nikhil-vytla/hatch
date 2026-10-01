@@ -330,6 +330,7 @@ impl Sessions {
         limits: Limits,
         mode: ApprovalMode,
         kind: Option<SessionKind>,
+        safe: bool,
     ) -> Result<SessionInfo> {
         let id = {
             let mut g = crate::sync::lock(&self.ids);
@@ -338,6 +339,7 @@ impl Sessions {
         let ts = epoch_ms();
         let first = Event::SessionStarted {
             kind,
+            safe,
             format: FORMAT,
             cwd: cwd.clone(),
             strive_version: env!("CARGO_PKG_VERSION").into(),
@@ -365,6 +367,7 @@ impl Sessions {
             title: None,
             last_active_ms: Some(ts),
             kind,
+            safe,
         };
         let (tx, thread) = spawn_writer(journal, entries, self.verifier(&id));
         live.insert(id, Live { info: info.clone(), tx, thread });
@@ -1376,7 +1379,7 @@ fn peek_info(id: &SessionId, dir: &Path) -> Option<SessionInfo> {
         .and_then(|d| u64::try_from(d.as_millis()).ok());
     let mut lines = io::BufReader::new(f).lines();
     let first: Entry = serde_json::from_str(lines.next()?.ok()?.trim_end()).ok()?;
-    let Event::SessionStarted { cwd, kind, .. } = first.event else { return None };
+    let Event::SessionStarted { cwd, kind, safe, .. } = first.event else { return None };
     let title = lines.take(PEEK_LINES).map_while(std::result::Result::ok).find_map(
         |line| match serde_json::from_str::<Entry>(line.trim_end()).ok()?.event {
             Event::UserMessage { text, command: None } => Some(shorten(&text)),
@@ -1386,7 +1389,15 @@ fn peek_info(id: &SessionId, dir: &Path) -> Option<SessionInfo> {
             _ => None,
         },
     );
-    Some(SessionInfo { id: id.as_str().to_string(), cwd, created_at_ms: first.ts_ms, title, last_active_ms, kind })
+    Some(SessionInfo {
+        id: id.as_str().to_string(),
+        cwd,
+        created_at_ms: first.ts_ms,
+        title,
+        last_active_ms,
+        kind,
+        safe,
+    })
 }
 
 /// One line of at most `TITLE_CHARS`, cut at a word where it can be.

@@ -9,4 +9,8 @@ title?: string,
 /**
  * When its journal last changed.
  */
-lastActiveMs?: number, kind?: SessionKind, };
+lastActiveMs?: number, kind?: SessionKind, 
+/**
+ * Started in safe mode: no extension's tools or hooks run in it.
+ */
+safe?: boolean, };

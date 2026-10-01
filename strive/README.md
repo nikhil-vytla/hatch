@@ -28,6 +28,7 @@ cd any/repository
 strive                # opens the TUI in a new session; the per-user daemon starts on its own
 strive -c             # continue the latest session in this directory
 strive -r ID          # resume a session by id
+strive --safe         # a new session in safe mode: no extension's tools or hooks run (also for app and run)
 strive sessions       # sessions started here, newest first (--all for every directory)
 strive log [ID]       # a session's journal (default: the latest here)
 strive verify [ID]    # check a journal is intact; --all checks every session
@@ -72,7 +73,8 @@ or for new sessions in `~/.strive/settings.json`:
 Prices are dollars per million tokens. A model without a known price is
 refused rather than guessed. `mcpServers` takes the same shape as Claude
 Code's (stdio servers). Each tool call asks first unless approvals are
-full-auto.
+full-auto. `"extensions": false` starts every new session in safe mode, as
+`strive --safe` does.
 
 The agent follows the project's `AGENTS.md` (or `CLAUDE.md`) files and
 knows its skills (`SKILL.md` under `.strive/skills`, `.claude/skills` or

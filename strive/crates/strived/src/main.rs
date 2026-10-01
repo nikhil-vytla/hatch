@@ -57,6 +57,9 @@ struct Cli {
     /// Resume a session by id (see `strive sessions`).
     #[arg(short = 'r', long, value_name = "ID")]
     resume: Option<String>,
+    /// Start a new session in safe mode: no extension's tools or hooks run in it.
+    #[arg(long, conflicts_with_all = ["continue_latest", "resume"])]
+    safe: bool,
     #[command(subcommand)]
     command: Option<Cmd>,
 }
@@ -78,6 +81,9 @@ enum Cmd {
         /// The session's spending limit, in dollars.
         #[arg(long, value_name = "USD")]
         budget: Option<f64>,
+        /// Safe mode: no extension's tools or hooks run in the session.
+        #[arg(long)]
+        safe: bool,
     },
     /// Open the desktop app on a new session in this directory.
     App {
@@ -87,6 +93,9 @@ enum Cmd {
         /// Resume a session by id.
         #[arg(short = 'r', long, value_name = "ID")]
         resume: Option<String>,
+        /// Start a new session in safe mode: no extension's tools or hooks run in it.
+        #[arg(long, conflicts_with_all = ["continue_latest", "resume"])]
+        safe: bool,
     },
     /// Show the daemon's status.
     Status {
@@ -227,12 +236,12 @@ async fn run(cli: Cli) -> Result<ExitCode> {
             let session = match (cli.continue_latest, cli.resume) {
                 (_, Some(id)) => tui::Session::Resume(id),
                 (true, None) => tui::Session::Continue,
-                (false, None) => tui::Session::New,
+                (false, None) => tui::Session::New { safe: cli.safe },
             };
             tui::exec(&home, &session)?;
             unreachable!("exec returns only on error")
         }
-        Some(Cmd::Run { task, json, approvals, budget }) => {
+        Some(Cmd::Run { task, json, approvals, budget, safe }) => {
             let task = match task.as_deref() {
                 None | Some("-") => std::io::read_to_string(std::io::stdin())?,
                 Some(t) => t.to_string(),
@@ -252,15 +261,16 @@ async fn run(cli: Cli) -> Result<ExitCode> {
                 json,
                 approvals,
                 budget_usd: budget,
+                safe,
             };
             run::run(&mut c, opts).await
         }
-        Some(Cmd::App { continue_latest, resume }) => {
+        Some(Cmd::App { continue_latest, resume, safe }) => {
             launch::ensure(&home, "strive-app").await?;
             let session = match (continue_latest, resume) {
                 (_, Some(id)) => tui::Session::Resume(id),
                 (true, None) => tui::Session::Continue,
-                (false, None) => tui::Session::New,
+                (false, None) => tui::Session::New { safe },
             };
             desktop::open(&home, &session)?;
             println!("opened the desktop app");
