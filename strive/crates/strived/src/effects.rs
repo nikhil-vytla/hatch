@@ -175,12 +175,12 @@ pub fn gate(scope: &Scope, request: &EffectRequest, mode: ApprovalMode, allowed:
 
 /// The gate for a check's command (ADR-0023). One a person accepted in this
 /// exact form (`accepted`: an applied proposal's content, or content a
-/// person allowed before) runs in the sandbox in every mode; one no one has
-/// asks, as does any without a sandbox. Allowing it for the session allows
-/// its file (`path`), never full-auto.
-pub fn check_gate(scope: &Scope, name: &str, command: &str, accepted: bool, path: &Path) -> (Gate, Target) {
+/// person allowed for the session) runs in the sandbox in every mode; one
+/// no one has asks, as does any without a sandbox. Allowing it for the
+/// session grants `allowance`: this check, as it is now, for the session.
+pub fn check_gate(scope: &Scope, name: &str, command: &str, accepted: bool, allowance: &Path) -> (Gate, Target) {
     let sandboxed = !scope.unconfined && sandbox_available();
-    let file = Some(path.to_path_buf());
+    let file = Some(allowance.to_path_buf());
     let gate = if !sandboxed && !scope.unconfined {
         Gate::Ask(format!("run the check {name} without a sandbox: {command}"), file)
     } else if !accepted {

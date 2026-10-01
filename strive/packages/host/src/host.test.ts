@@ -1,7 +1,7 @@
 // The agent loop end to end: real daemon, real host (started by the daemon),
 // real gateway and effects, and a scripted model at the network boundary.
 import { afterEach, expect, setDefaultTimeout, test } from "bun:test";
-import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { type Entry, type Event, StriveClient } from "@strive/protocol";
 import { FakeAnthropic, type ScriptedReply, startDaemon, type TestDaemon } from "@strive/testkit";
@@ -377,14 +377,26 @@ test("summarizing before a turn is part of the turn: it can be interrupted, and 
   }
 });
 
-/** Writes a check and allows it, as a person answering its first ask would. */
 function writeCheck(cwd: string, name: string, run: string, paths?: string) {
   mkdirSync(join(cwd, ".strive/checks"), { recursive: true });
   const scope = paths === undefined ? "" : `paths: ${paths}\n`;
-  const content = `---\nname: ${name}\ndescription: ${name} passes\nrun: ${run}\n${scope}---\nb.txt marks the work done.\n`;
-  writeFileSync(join(cwd, ".strive/checks", `${name}.md`), content);
-  const digest = `sha256:${new Bun.CryptoHasher("sha256").update(content).digest("hex")}`;
-  appendFileSync(join(daemon!.home, "allowed-checks.jsonl"), `${JSON.stringify({ cwd, name, digest })}\n`);
+  writeFileSync(
+    join(cwd, ".strive/checks", `${name}.md`),
+    `---\nname: ${name}\ndescription: ${name} passes\nrun: ${run}\n${scope}---\nb.txt marks the work done.\n`,
+  );
+}
+
+/** A person attached to the session, who allows each check for the session when asked. */
+async function allowChecks(id: string) {
+  const person = await connect();
+
+  person.on("session/entry", ({ entry }) => {
+    const e = entry.event;
+
+    if (e.type === "approvalRequested" && e.sessionFile?.startsWith("check:"))
+      void person.request("approval/respond", { id, effect: e.effect, decision: "allowSession" });
+  });
+  await person.request("session/attach", { id });
 }
 
 const checkRuns = (e: Event[]) =>
@@ -400,6 +412,7 @@ test("a failing check goes back to the agent, which fixes it before the turn end
   ]);
 
   writeCheck(cwd, "done", "test -f b.txt");
+  await allowChecks(id);
 
   await client.request("session/prompt", { id, text: "make a.txt" });
   const e = await waitFor(client, id, turnsEnded(1));
@@ -438,6 +451,7 @@ test("checks run only when a file they cover changed", async () => {
 
   writeCheck(cwd, "src", "false", "src/**");
   writeCheck(cwd, "docs", "true", "docs/**");
+  await allowChecks(id);
 
   await client.request("session/prompt", { id, text: "look around" });
   await waitFor(client, id, turnsEnded(1));
@@ -458,6 +472,7 @@ test("a check that keeps failing ends the turn after the last round, as it is", 
   ]);
 
   writeCheck(cwd, "never", "false");
+  await allowChecks(id);
 
   await client.request("session/prompt", { id, text: "make a.txt" });
   const e = await waitFor(client, id, turnsEnded(1));

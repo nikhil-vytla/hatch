@@ -1267,6 +1267,12 @@ pub enum Event {
         turn: u64,
         reason: TurnEnd,
     },
+    /// What the host told the agent after a round of checks failed
+    /// (ADR-0023): the turn goes on from this, live and on resume.
+    ChecksReported {
+        turn: u64,
+        text: String,
+    },
     /// The project context an agent host was given when it started, and a
     /// learning session's host again as each run starts (`host/context`).
     ContextLoaded {

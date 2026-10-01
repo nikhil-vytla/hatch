@@ -103,6 +103,9 @@ pub fn describe(e: &Entry) -> String {
         }
         Event::TurnStarted { turn, .. } => format!("turn {turn} started"),
         Event::LayoutProposed { label, .. } => format!("agent proposed a layout change: {label}"),
+        Event::ChecksReported { turn, text } => {
+            format!("turn {turn}: checks failed, the agent was told\n  {}", text.lines().next().unwrap_or_default())
+        }
         Event::LearnRequested { trigger: Some(t), .. } => {
             format!("automatic learning run, {}", crate::review::trigger_text(t))
         }

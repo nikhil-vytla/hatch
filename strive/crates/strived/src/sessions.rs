@@ -1017,7 +1017,7 @@ impl Writer {
                 }
                 Ok(())
             }
-            Event::TurnEnded { turn, .. } if self.open_turn != Some(*turn) => {
+            Event::TurnEnded { turn, .. } | Event::ChecksReported { turn, .. } if self.open_turn != Some(*turn) => {
                 Err(format!("turn {turn} isn't the open turn"))
             }
             _ => Ok(()),

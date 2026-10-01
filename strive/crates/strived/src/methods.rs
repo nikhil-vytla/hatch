@@ -349,7 +349,7 @@ fn host_may_record(event: &Event, kind: SessionKind) -> bool {
         | Event::AssistantMessage { .. }
         | Event::TurnEnded { .. }
         | Event::Compacted { .. } => true,
-        Event::LayoutProposed { .. } => kind == SessionKind::Work,
+        Event::LayoutProposed { .. } | Event::ChecksReported { .. } => kind == SessionKind::Work,
         // Only the learner proposes; a work session's agent changing what
         // every later agent is given would skip review.
         Event::ProposalMade { .. } => kind == SessionKind::Learning,
@@ -557,7 +557,7 @@ async fn route_host(state: &Arc<State>, conn: &Arc<Conn>, method: &str, params: 
                     RpcError::INVALID_PARAMS,
                     match kind {
                         SessionKind::Work => {
-                            "a host records only turns, assistant messages, summaries and layout proposals"
+                            "a host records only turns, assistant messages, summaries, check reports and layout proposals"
                         }
                         SessionKind::Learning => {
                             "a learning session's host records only turns, assistant messages, summaries and proposals"
@@ -746,7 +746,7 @@ async fn route_effect(state: &Arc<State>, method: &str, params: Value) -> Reply 
                             RpcError::new(RpcError::INVALID_PARAMS, format!("the check {name} can't run: {why}"))
                         })?;
                     let digest = strive_journal::cas::digest(text.as_bytes());
-                    let accepted = crate::checks::accepted(state, &info.cwd, &name, &digest);
+                    let proposed = crate::checks::proposed(state, &info.cwd, &name, &digest);
                     let timeout_ms = found.timeout_secs * 1000;
                     let record = strive_proto::EffectRecord::Check {
                         name: name.clone(),
@@ -754,8 +754,7 @@ async fn route_effect(state: &Arc<State>, method: &str, params: Value) -> Reply 
                         timeout_ms,
                         note: found.body,
                     };
-                    let path = scope.workspace.join(strive_learning::CHECKS_DIR).join(format!("{name}.md"));
-                    let check = CheckRun { name, cwd: info.cwd.clone(), path, digest, accepted };
+                    let check = CheckRun { allowance: crate::checks::allowance(&name, &digest), name, proposed };
                     (EffectRequest::Bash { command: found.run, timeout_ms: Some(timeout_ms) }, record, Some(check))
                 }
                 request => {
@@ -822,14 +821,12 @@ struct Prepared {
     check: Option<CheckRun>,
 }
 
-/// A check about to run (ADR-0023), and whether a person accepted its file's
-/// content; if not, a person's allow is remembered for that content.
+/// A check about to run (ADR-0023): whether an applied proposal holds its
+/// content, and the session allowance that would cover it as it is.
 struct CheckRun {
     name: String,
-    cwd: String,
-    path: std::path::PathBuf,
-    digest: strive_proto::Digest,
-    accepted: bool,
+    proposed: bool,
+    allowance: std::path::PathBuf,
 }
 
 /// Gates, performs and journals one effect the session has started.
@@ -850,7 +847,8 @@ async fn run_effect(
         let cancel = cancelled.clone();
         let (gate, target) = match (&check, &request) {
             (Some(c), EffectRequest::Bash { command, .. }) => {
-                crate::effects::check_gate(&scope, &c.name, command, c.accepted, &c.path)
+                let accepted = c.proposed || allowed.contains(&c.allowance);
+                crate::effects::check_gate(&scope, &c.name, command, accepted, &c.allowance)
             }
             _ => crate::effects::gate(&scope, &request, mode, &allowed),
         };
@@ -883,14 +881,7 @@ async fn run_effect(
                     )),
                     Answer::Cancelled => Some(format!("interrupted: {what}")),
                     Answer::Decided(Decision::Deny) => Some(format!("declined: {what}")),
-                    Answer::Decided(Decision::Allow | Decision::AllowSession) => {
-                        if let Some(c) = check.as_ref().filter(|c| !c.accepted)
-                            && let Err(e) = crate::checks::allow(&state.home.root, &c.cwd, &c.name, c.digest)
-                        {
-                            crate::log!("couldn't remember that the check {} was allowed: {e}", c.name);
-                        }
-                        None
-                    }
+                    Answer::Decided(Decision::Allow | Decision::AllowSession) => None,
                 }
             }
         };

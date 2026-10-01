@@ -1489,7 +1489,7 @@ function Approval({ tool, session }: { tool: Tool; session: SessionActions }) {
         {tool.approval?.oneFile ? (
           <button
             type="button"
-            title="Later changes to this file don't ask again in this session"
+            title={`Allows ${tool.approval.allowance}; nothing else stops asking`}
             onClick={() => session.decide(tool.effect, "allowSession")}
           >
             Allow for this session

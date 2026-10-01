@@ -70,8 +70,7 @@ function howItFailed(outcome: EffectOutcome): string {
 
 /**
  * What the agent is told after a round of checks (ADR-0023), or nothing
- * when every one passed. The same text live and on resume: it is made from
- * the journaled runs alone.
+ * when none found anything to fix. The host journals it as it tells it.
  */
 export function checkReport(runs: CheckRun[]): string | undefined {
   const failed = runs.filter(checkFailed);
@@ -138,8 +137,6 @@ export async function rebuild(
 
   const records = new Map<number, { callId: string; record: EffectRecord }>();
   const results = new Map<string, { text: string; isError: boolean; ts: number }>();
-  // Each check's run, by the seq of the entry that finished it.
-  const checks = new Map<number, CheckRun>();
   const gates = new Map<number, StaticGate>();
 
   for (const { event: e } of all) {
@@ -163,8 +160,9 @@ export async function rebuild(
       if (!started) continue;
       const output = e.outcome.kind === "done" ? await blob(e.outcome.output) : "";
 
-      if (isCheckCall(started.callId)) checks.set(seq, { record: started.record, outcome: e.outcome, output });
-      else results.set(started.callId, { ...resultText(started.record, e.outcome, output), ts: tsMs });
+      // A check's run is told to the agent by the report journaled after it, if any.
+      if (!isCheckCall(started.callId))
+        results.set(started.callId, { ...resultText(started.record, e.outcome, output), ts: tsMs });
     }
   }
 
@@ -200,10 +198,6 @@ export async function rebuild(
   // turn, together with any sent after this one ends.
   let inTurn = false;
   let held: { seq: number; message: Message }[] = [];
-  // The latest round of checks in this turn: told to the agent only if a
-  // reply follows it, as it was live (the last round is never told).
-  let round: CheckRun[] = [];
-  let roundTs = 0;
   // Every entry passes through, so a request's text knows the request before it.
   const prompts = new PromptReader();
 
@@ -220,18 +214,15 @@ export async function rebuild(
     if (!kept.has(entry)) continue;
     const { event: e, tsMs, seq } = entry;
 
-    const run = checks.get(seq);
-
-    if (run) {
-      round.push(run);
-      roundTs = tsMs;
-    } else if (e.type === "turnStarted") {
+    if (e.type === "turnStarted") {
       release(e.throughSeq);
       inTurn = true;
-      round = [];
     } else if (e.type === "turnEnded") {
       inTurn = false;
-      round = [];
+    } else if (e.type === "checksReported") {
+      // What the host told the agent after its checks failed, where it was told.
+      close();
+      messages.push({ role: "user", content: e.text, timestamp: tsMs });
     } else if (prompt !== undefined) {
       held.push({ seq, message: { role: "user", content: prompt, timestamp: tsMs } });
     } else if (e.type === "assistantMessage") {
@@ -243,10 +234,6 @@ export async function rebuild(
       // Without turn markers, a reply answers the prompts before it.
       if (inTurn) close();
       else release();
-      const report = checkReport(round);
-      round = [];
-
-      if (report !== undefined) messages.push({ role: "user", content: report, timestamp: roundTs });
       messages.push(reply);
       // Providers drop an aborted or failed reply when it is sent back, so
       // results for its calls would answer calls the model never sees.

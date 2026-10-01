@@ -84,7 +84,7 @@ toolCalls: Array<ToolCall>,
 /**
  * The message exactly as the agent keeps it, fed back on resume.
  */
-message: unknown, } | { "type": "turnEnded", turn: number, reason: TurnEnd, } | { "type": "contextLoaded", instructions: Array<ContextFile>, skills: Array<string>, 
+message: unknown, } | { "type": "turnEnded", turn: number, reason: TurnEnd, } | { "type": "checksReported", turn: number, text: string, } | { "type": "contextLoaded", instructions: Array<ContextFile>, skills: Array<string>, 
 /**
  * The checks loaded, by name (ADR-0023).
  */

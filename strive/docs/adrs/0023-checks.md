@@ -61,10 +61,12 @@ command.
 
 - A check runs without asking, in every mode, only in a form a person
   accepted: the content of an applied check proposal, or content a person
-  allowed when asked. A check in any other form asks, naming its command,
-  and an allow is remembered for that content (in strive's home, which no
-  effect can write); a change to the file asks again. The file alone
-  doesn't show a person wrote it: on Linux the sandbox makes
+  allowed for the session when asked. A check in any other form asks,
+  naming its command. "Allow" runs it that once; "allow for the session"
+  covers this check as it is now, in this session only (a session
+  allowance, journaled with the request), never full-auto; a change to the
+  file asks again. Lasting acceptance is a proposal a person accepts. The
+  file alone doesn't show a person wrote it: on Linux the sandbox makes
   `.strive/checks` read-only only where it exists, so a command could
   create one in a project without it. Without a sandbox a check asks, as
   any command does.
@@ -78,9 +80,9 @@ command.
 When a check fails (a nonzero exit, or its time limit), the host tells the agent
 which, with the end of its output and the check's body, and the turn goes
 on. After 2 such rounds the turn ends as it is; the journal shows the
-failed check. The report is built from the journaled effects by one
-function, live and on resume, so a resumed session sees what a running one
-saw.
+failed check. The host journals the report (`checksReported`) before the
+agent sees it, and a resumed conversation has it where it was, so a host
+that stops between the two resumes with the agent told.
 
 ### Checks are proposed like skills
 

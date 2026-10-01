@@ -14,6 +14,17 @@ export type Line = { kind: LineKind; tone: Tone; text: string };
 
 export const MODE_NAMES = { ask: "ask", autoEdit: "auto-edit", fullAuto: "full-auto" } as const;
 
+/**
+ * What allowing an approval for the session covers, from its request's
+ * `sessionFile`: that file, a check as it is now (ADR-0023), or, with none,
+ * everything (full-auto).
+ */
+export function sessionAllowance(sessionFile: string | undefined): string {
+  if (sessionFile === undefined) return "everything (full-auto)";
+
+  return sessionFile.startsWith("check:") ? "this check, as it is now, for the session" : "this file for the session";
+}
+
 export type DescribeOptions = {
   /** The user's home directory, shown as `~` in paths. */
   home?: string;
@@ -180,6 +191,8 @@ export function describe(entry: Entry, options: DescribeOptions = {}): Line[] {
       return note("faint", `Model: ${e.model}`);
     case "compacted":
       return note("faint", "Summarized the conversation so far to keep it within the model's context.");
+    case "checksReported":
+      return note("danger", e.text.split("\n")[0] ?? "A check failed; the agent was told.");
     case "layoutProposed":
       return note(
         "accent",

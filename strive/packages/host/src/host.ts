@@ -667,6 +667,9 @@ export class Host {
 
         if (report === undefined || round > CHECK_ROUNDS || signal.aborted) break;
 
+        // Journaled before the agent sees it, so a host that stops between
+        // resumes with the agent told.
+        await this.record({ type: "checksReported", turn: this.turn, text: report });
         reason = await this.ask([{ role: "user", content: report, timestamp: Date.now() }]);
       }
     } catch (e) {

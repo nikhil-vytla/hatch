@@ -136,6 +136,7 @@ pub fn fold(entries: &[Entry]) -> Vec<Folded> {
             | Event::LearnSkipped { .. }
             | Event::LearnDismissed { .. }
             | Event::LayoutProposed { .. }
+            | Event::ChecksReported { .. }
             | Event::Compacted { .. }
             | Event::ModelSet { .. } => {}
         }
