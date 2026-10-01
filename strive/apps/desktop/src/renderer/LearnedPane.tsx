@@ -5,6 +5,7 @@ import type {
   BulletEdit,
   Evidence,
   GateOutcome,
+  BulletUsage,
   MemoryItem,
   ProposalDecision,
   ProposalState,
@@ -43,6 +44,8 @@ type Props = {
   skipped?: SkippedRun;
   /** The project's memory as every session reads it now. */
   memory: MemoryItem[];
+  /** How each bullet fared in recent sessions (`memory/usage`). */
+  usage: BulletUsage[];
   run?: Run;
   /** This project's work sessions. */
   sessions: SessionInfo[];
@@ -202,7 +205,25 @@ function Skipped({ skipped }: { skipped?: SkippedRun }) {
 }
 
 /** The memory as every session reads it now, each bullet with the proposal that last wrote it. */
-function MemoryNow({ memory, proposals, onSelect }: Pick<Props, "memory" | "proposals" | "onSelect">) {
+/** How a bullet fared, in a few words, beside it. */
+function Used({ usage }: { usage: BulletUsage | undefined }) {
+  if (usage === undefined) return null;
+
+  const latest = usage.notes.at(-1);
+
+  const counts =
+    usage.cited === 0
+      ? `given ${usage.sessions}, never cited`
+      : `given ${usage.sessions} · cited ${usage.cited} · ${usage.trouble === 0 ? "no trouble after" : `trouble after ${usage.trouble}`}`;
+
+  return (
+    <span className="used faint small" title={latest ? `latest: ${latest.what}` : undefined}>
+      {counts}
+    </span>
+  );
+}
+
+function MemoryNow({ memory, usage, proposals, onSelect }: Pick<Props, "memory" | "usage" | "proposals" | "onSelect">) {
   const [open, setOpen] = useState(false);
   const bullets = memory.filter((i) => i.kind === "bullet");
 
@@ -244,6 +265,7 @@ function MemoryNow({ memory, proposals, onSelect }: Pick<Props, "memory" | "prop
                   )}
                   {item.outsideReview && <span className="badge status-stale">changed outside review</span>}
                 </span>
+                <Used usage={usage.find((u) => u.bullet === item.source)} />
               </li>
             ),
           )}
@@ -253,7 +275,7 @@ function MemoryNow({ memory, proposals, onSelect }: Pick<Props, "memory" | "prop
   );
 }
 
-function List({ proposals, outsideReview, skipped, run, onSelect, learn, memory }: Props) {
+function List({ proposals, outsideReview, skipped, run, onSelect, learn, memory, usage }: Props) {
   const now = Date.now();
 
   if (proposals === undefined) return <div className="changes-body" />;
@@ -263,7 +285,7 @@ function List({ proposals, outsideReview, skipped, run, onSelect, learn, memory 
       {run?.running && <Learning run={run} />}
       <OutsideReview paths={outsideReview} />
       <Skipped skipped={skipped} />
-      <MemoryNow memory={memory} proposals={proposals} onSelect={onSelect} />
+      <MemoryNow memory={memory} usage={usage} proposals={proposals} onSelect={onSelect} />
       {proposals.length === 0 ? (
         <div className="learned-empty">
           <div className="mark">

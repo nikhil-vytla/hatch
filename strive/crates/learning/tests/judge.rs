@@ -183,7 +183,9 @@ fn the_request_forces_the_verdict_tool_and_carries_the_proposal_as_data() {
     assert_eq!(doc["proposal"]["path"], ".strive/memory.md");
     assert_eq!(doc["proposal"]["evidence"], json!([{"session": "s1", "entries": [3], "note": "it failed"}]));
     assert_eq!(doc["current_file"], "# Memory\n- Old memory.\n- Kept. <!-- strive:#5 -->\n");
-    assert_eq!(doc["resulting_file"], format!("# Memory\n- {bullet}\n- Kept.\n"), "as sessions read it");
+    // As sessions read it: each sourced bullet labelled for citing, the new
+    // one with no id yet.
+    assert_eq!(doc["resulting_file"], format!("# Memory\n- [m0] {bullet}\n- [m5] Kept.\n"), "as sessions read it");
     assert_eq!(doc["learned_files"][0]["path"], ".strive/skills/x/SKILL.md");
     assert_eq!(doc["cited_sessions"], json!([{"id": "s1", "journal": "#3 user: hi"}]));
     assert_eq!(doc["held_out_sessions"][0]["id"], "s2");

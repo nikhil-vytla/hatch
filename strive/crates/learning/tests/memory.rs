@@ -127,13 +127,15 @@ fn only_a_trailing_strive_comment_with_a_number_is_a_source() {
     assert_eq!(memory::source("x <!-- strive:#12 -->"), None, "not a bullet");
 }
 
+/// Sessions see each sourced bullet's source as a label to cite (`[m4]`),
+/// in place of the comment; everything a person wrote stays as it is.
 #[test]
 fn sessions_are_given_bullets_without_their_source_comments() {
     let file = "# Memory\r\n- Use bun. <!-- strive:#4 -->\r\n  * Nested <!-- strive:#9 -->\n- Mine <!-- a note -->  \n\
                 ```\n- x <!-- strive:#5 -->\n```\n- Last <!-- strive:#6 -->";
     assert_eq!(
         parse(file).for_sessions(),
-        "# Memory\r\n- Use bun.\r\n  * Nested\n- Mine <!-- a note -->  \n```\n- x <!-- strive:#5 -->\n```\n- Last",
+        "# Memory\r\n- [m4] Use bun.\r\n  * [m9] Nested\n- Mine <!-- a note -->  \n```\n- x <!-- strive:#5 -->\n```\n- [m6] Last",
         "a person's lines exactly as written"
     );
 }

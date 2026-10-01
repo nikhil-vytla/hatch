@@ -45,6 +45,7 @@ const ALLOWED: ReadonlySet<MethodName> = new Set<MethodName>([
   "proposal/list",
   "proposal/decide",
   "proposal/rollback",
+  "memory/usage",
   "learning/run",
   "learning/signals",
   "learning/dismiss",
@@ -56,6 +57,7 @@ const UNBOUND: ReadonlySet<MethodName> = new Set<MethodName>(["daemon/status", "
 /** Allowed requests about the window's project rather than its session: learning, and what it proposed. */
 const PROJECT: ReadonlySet<MethodName> = new Set<MethodName>([
   "proposal/list",
+  "memory/usage",
   "proposal/decide",
   "proposal/rollback",
   "learning/run",

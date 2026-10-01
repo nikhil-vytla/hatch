@@ -183,7 +183,11 @@ Confining the host process to the daemon's socket and gateway is planned.
   `~/.strive/skills`.
 - **Memory:** `.strive/memory.md`, the last instruction file, labeled as
   memory a person reviewed. Its `@` lines stay text. The same rules
-  apply: regular files only, never from strive's home.
+  apply: regular files only, never from strive's home. Each sourced bullet
+  is given as `[mN]`, and the agent is asked to cite one it acts on as
+  `[uses mN]`; `memory/usage` tallies, per bullet, the sessions given it,
+  the turns citing it, and the trouble after
+  ([ADR-0026](adrs/0026-bullet-use.md)).
 - **Checks** ([ADR-0023](adrs/0023-checks.md)): `.strive/checks/<name>.md`
   each, frontmatter naming the command (`run`) and the paths it covers. The
   host is given each check's name and paths, not its command. A file that

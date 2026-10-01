@@ -170,9 +170,14 @@ impl Memory {
         let mut out = String::new();
         for l in &self.lines {
             match &l.bullet {
-                Some(b) if b.source.is_some() => {
+                // Its source as a label the agent cites (`[uses m42]`), in
+                // place of the comment it can't see.
+                Some(Bullet { source: Some(source), text, .. }) => {
                     out.push_str(l.prefix());
-                    out.push_str(&b.text);
+                    out.push_str("[m");
+                    out.push_str(&source.to_string());
+                    out.push_str("] ");
+                    out.push_str(text);
                 }
                 _ => out.push_str(&l.body),
             }

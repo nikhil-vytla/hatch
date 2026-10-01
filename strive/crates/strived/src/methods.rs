@@ -238,7 +238,7 @@ async fn route(state: &Arc<State>, conn: &Arc<Conn>, method: &str, params: Value
         }
         m if m.starts_with("effect/") => route_effect(state, m, params).await,
         m if m.starts_with("host/") => route_host(state, conn, m, params).await,
-        m if m.starts_with("learning/") || m.starts_with("proposal/") => {
+        m if m.starts_with("learning/") || m.starts_with("proposal/") || m.starts_with("memory/") => {
             crate::learning::route(state, conn, m, params).await
         }
         ApprovalRespond::NAME => {

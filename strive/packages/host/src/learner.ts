@@ -9,6 +9,7 @@ import type { AgentTool } from "@earendil-works/pi-agent-core";
 import {
   type AgentConfig,
   type Artifact,
+  type BulletUsage,
   describeError,
   type Entry,
   type LearnedFile,
@@ -76,7 +77,8 @@ What the next sessions need to know, or what cost a session time and will come u
 - a correction the user made: "no, use X", "don't touch Y", a declined approval followed by another approach, an interrupt followed by a redirect;
 - a command that failed and was later fixed: the working form, and why the first one failed;
 - a convention discovered the hard way: a layout, tool, naming or test rule the agent found only by failing;
-- a multi-step procedure that recurs (a release, a migration, regenerating code): a candidate skill.
+- a multi-step procedure that recurs (a release, a migration, regenerating code): a candidate skill;
+- a bullet that isn't working, from how it fared (shown under each bullet below): one given to many sessions and never cited may say nothing the agent acts on, and one followed by trouble after its cites (a correction, a failed check) may be wrong. Read the noted entries before you propose to change or remove it: a cite is the agent's own word, and trouble may have another cause.
 
 # What isn't
 
@@ -127,31 +129,58 @@ function learnedFile(config: AgentConfig, artifact: Artifact): LearnedFile | und
   );
 }
 
-/** Memory as its bullets, each with its source, and its other lines as they are. */
-export function memoryItems(items: MemoryItem[]): string {
+/**
+ * Memory as its bullets, each with its source and, from `memory/usage`, how
+ * it fared in recent sessions; its other lines as they are.
+ */
+export function memoryItems(items: MemoryItem[], usage: BulletUsage[] = []): string {
   return items
-    .map((i) =>
-      i.kind === "line" ? i.text : `- [${i.source === undefined ? "hand-written" : `#${i.source}`}] ${i.text}`,
-    )
+    .map((i) => {
+      if (i.kind === "line") return i.text;
+
+      const line = `- [${i.source === undefined ? "hand-written" : `#${i.source}`}] ${i.text}`;
+      const used = usage.find((u) => u.bullet === i.source);
+
+      return used === undefined ? line : `${line}\n  (${usedText(used)})`;
+    })
     .join("\n")
     .trim();
 }
 
+/** How a bullet fared, in a few words: given, cited, and the latest trouble after a cite. */
+function usedText(u: BulletUsage): string {
+  const given = `given to ${u.sessions} session${u.sessions === 1 ? "" : "s"}`;
+
+  if (u.cited === 0) return `${given}, never cited`;
+
+  const latest = u.notes.at(-1);
+
+  const trouble =
+    u.trouble === 0
+      ? "no trouble after"
+      : `trouble after ${u.trouble}${latest ? `, latest: ${latest.what} (session ${latest.session} #${latest.seq})` : ""}`;
+
+  return `${given}, cited in ${u.cited} turn${u.cited === 1 ? "" : "s"}, ${trouble}`;
+}
+
 /** The memory as the learner is shown it; undefined if there is none. */
-function memoryShown(config: AgentConfig): string | undefined {
+function memoryShown(config: AgentConfig, usage: BulletUsage[] = []): string | undefined {
   const file = learnedFile(config, { kind: "memory" });
 
   if (file === undefined) return undefined;
 
-  return memoryItems(file.items ?? []);
+  return memoryItems(file.items ?? [], usage);
 }
 
-/** The learner's system prompt: its rules, then the project's current memory, instructions and skills. */
-export function learnerPrompt(config: AgentConfig): string {
+/**
+ * The learner's system prompt: its rules, then the project's current memory
+ * (with how each bullet fared, given `usage`), instructions and skills.
+ */
+export function learnerPrompt(config: AgentConfig, usage: BulletUsage[] = []): string {
   const memoryPath = join(config.cwd, MEMORY);
   // The memory as it is on disk, bullet by bullet, not as sessions load it:
   // they see it under a label that isn't part of the file.
-  const memory = memoryShown(config);
+  const memory = memoryShown(config, usage);
   const others = config.instructions.filter((f) => f.path !== memoryPath);
   const parts = [RULES.replace("{cwd}", config.cwd)];
 
@@ -311,7 +340,13 @@ class Learner {
     const { instructions, skills, learnedFiles } = await this.client.request("host/context", { id: this.sessionId });
     this.config = { ...this.config, instructions, skills, learnedFiles };
 
-    return learnerPrompt(this.config);
+    // How each bullet fared is a hint, so not having it is no reason to stop.
+    const usage = await this.client
+      .request("memory/usage", { cwd: this.config.cwd })
+      .then((r) => r.bullets)
+      .catch(() => []);
+
+    return learnerPrompt(this.config, usage);
   }
 
   onEntry(entry: Entry) {

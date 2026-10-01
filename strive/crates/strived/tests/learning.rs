@@ -1127,8 +1127,8 @@ fn review_shows_the_memory_with_each_bullets_source() {
     assert_ne!(code, 0, "not with an id: {err}");
 }
 
-/// Sessions are given memory without its source comments; the learner is
-/// shown them.
+/// Sessions are given memory without its source comments, each sourced
+/// bullet labelled `[mN]` to cite; the learner is shown the comments.
 #[test]
 fn work_sessions_are_given_memory_without_its_source_comments() {
     let env = Env::new();
@@ -1137,7 +1137,8 @@ fn work_sessions_are_given_memory_without_its_source_comments() {
     let work = work_session(&env, &cwd);
     let config = common::slow_rpc(&env).ok("host/register", &json!({"id": work}));
     let text = config["instructions"][0]["text"].as_str().unwrap();
-    assert!(text.ends_with("\n\n- Use bun.\n- Mine.\n"), "{text}");
+    assert!(text.ends_with("\n\n- [m4] Use bun.\n- Mine.\n"), "{text}");
+    assert!(text.contains("[uses mN]"), "sessions are asked to cite: {text}");
     let id = learning_session(&env, &cwd);
     let config = common::slow_rpc(&env).ok("host/register", &json!({"id": id}));
     assert_eq!(config["learnedFiles"][0]["text"], "- Use bun. <!-- strive:#4 -->\n- Mine.\n");
@@ -1573,4 +1574,75 @@ fn a_rule_is_proposed_accepted_and_rolled_back_as_a_whole_file() {
     assert!(read["text"].as_str().unwrap().contains("Validate every input."), "{read}");
     assert!(rollback(&env, &cwd, p).get("error").is_none());
     assert!(!cwd.join(".strive/rules/api.md").exists(), "it didn't exist before");
+}
+
+/// `memory/usage`: which bullets the project's sessions were given, which
+/// their agents cited, and what followed.
+#[test]
+fn memory_usage_counts_the_bullets_given_cited_and_what_followed() {
+    let env = Env::new();
+    let cwd = project();
+    write(&memory_file(&cwd), "- Use bun. <!-- strive:#4 -->\n- Lock with ./dev lock. <!-- strive:#7 -->\n- Mine.\n");
+    let work = work_session(&env, &cwd);
+    let mut host = common::slow_rpc(&env);
+    host.ok("host/register", &json!({"id": work}));
+    let turn = |host: &mut Rpc, n: u64, reply: &str| {
+        host.ok("host/record", &json!({"id": work, "event": {"type": "turnStarted", "turn": n}}));
+        host.ok(
+            "host/record",
+            &json!({"id": work, "event": {"type": "assistantMessage", "turn": n, "text": reply, "toolCalls": [], "message": {}}}),
+        );
+        host.ok(
+            "host/record",
+            &json!({"id": work, "event": {"type": "turnEnded", "turn": n, "reason": {"kind": "done"}}}),
+        );
+    };
+    turn(&mut host, 1, "Ran the tests with bun [uses m4].");
+    common::slow_rpc(&env).ok("session/prompt", &json!({"id": work, "text": "no, that's wrong, use npm here"}));
+    let usage = common::slow_rpc(&env).ok("memory/usage", &json!({"cwd": cwd}));
+    assert_eq!(usage["sessions"], 1);
+    let bullets = usage["bullets"].as_array().unwrap();
+    let of = |id: u64| bullets.iter().find(|b| b["bullet"] == id).unwrap_or_else(|| panic!("no #{id}: {usage}"));
+    assert_eq!(
+        (of(4)["sessions"].as_u64(), of(4)["cited"].as_u64(), of(4)["trouble"].as_u64()),
+        (Some(1), Some(1), Some(1))
+    );
+    assert!(of(4)["notes"][0]["what"].as_str().unwrap().starts_with("the user corrected it"), "{usage}");
+    assert_eq!((of(7)["sessions"].as_u64(), of(7)["cited"].as_u64()), (Some(1), Some(0)));
+    assert_eq!(bullets.len(), 2, "a hand-written bullet has no id to cite");
+    // And a person sees it beside each bullet.
+    let review = env.strive_in(&cwd, &["review", "--memory"]);
+    let out = String::from_utf8_lossy(&review.stdout);
+    assert!(out.contains("given 1, cited 1, trouble after 1"), "{out}");
+    assert!(out.contains("latest: the user corrected it: no, that's wrong, use npm here"), "{out}");
+    assert!(out.contains("given 1, never cited"), "{out}");
+}
+
+/// A bullet's latest trouble is the newest session's, whichever order the
+/// sessions are listed in.
+#[test]
+fn memory_usage_keeps_a_bullets_troubles_oldest_first() {
+    let env = Env::new();
+    let cwd = project();
+    write(&memory_file(&cwd), "- Use bun. <!-- strive:#4 -->\n");
+    for correction in ["no, wrong in the older one", "no, wrong in the newer one"] {
+        let work = work_session(&env, &cwd);
+        let mut host = common::slow_rpc(&env);
+        host.ok("host/register", &json!({"id": work}));
+        for event in [
+            json!({"type": "turnStarted", "turn": 1}),
+            json!({"type": "assistantMessage", "turn": 1, "text": "Done [uses m4].", "toolCalls": [], "message": {}}),
+            json!({"type": "turnEnded", "turn": 1, "reason": {"kind": "done"}}),
+        ] {
+            host.ok("host/record", &json!({"id": work, "event": event}));
+        }
+        common::slow_rpc(&env).ok("session/prompt", &json!({"id": work, "text": correction}));
+        drop(host);
+        // Later activity for the second session: `last_active` is in milliseconds.
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    let usage = common::slow_rpc(&env).ok("memory/usage", &json!({"cwd": cwd}));
+    let notes = usage["bullets"][0]["notes"].as_array().unwrap();
+    assert_eq!(notes.len(), 2, "{usage}");
+    assert!(notes[1]["what"].as_str().unwrap().contains("newer one"), "the newest last: {usage}");
 }

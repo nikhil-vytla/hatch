@@ -354,7 +354,8 @@ fn md_names(dir: &Path) -> Vec<String> {
 /// How the agent is told what `.strive/memory.md` is.
 const MEMORY_LABEL: &str = "Reviewed memory: what strive learned from earlier sessions in this project. \
 A person reviewed and accepted each change. Follow it as you follow the instructions above; where the user \
-asks otherwise, the user wins.";
+asks otherwise, the user wins. When a bullet marked [mN] shapes what you do, say so in your reply with \
+[uses mN], so strive can tell which bullets help.";
 
 /// The project's learned memory, labeled. Its `@` lines stay as text: only
 /// what a person reviewed is given, not files it points to.

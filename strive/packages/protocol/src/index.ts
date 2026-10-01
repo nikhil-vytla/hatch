@@ -16,6 +16,8 @@ export type * from "./generated/BlobGetParams";
 
 export type * from "./generated/BlobGetResult";
 
+export type * from "./generated/BulletUsage";
+
 export type * from "./generated/CallOutcome";
 
 export type * from "./generated/CheckInfo";
@@ -130,6 +132,8 @@ export type * from "./generated/BulletEdit";
 
 export type * from "./generated/MemoryItem";
 
+export type * from "./generated/MemoryUsageResult";
+
 export type * from "./generated/LearnerContext";
 
 export type * from "./generated/LearningDismissParams";
@@ -193,6 +197,8 @@ export type * from "./generated/ToolCall";
 export type * from "./generated/TurnEnd";
 
 export type * from "./generated/Usage";
+
+export type * from "./generated/UsageNote";
 
 export { type MethodName, type Methods, PROTOCOL_VERSION } from "./generated/Methods";
 

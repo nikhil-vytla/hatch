@@ -23,6 +23,7 @@ pub mod rule_file;
 pub mod signals;
 pub mod stale;
 pub mod triggers;
+pub mod usage;
 
 pub use checks::{Finding, Rule, check, frontmatter, verdict};
 pub use fold::{Applied, Folded, fold};

@@ -85,6 +85,7 @@ methods! {
     SessionRewind = "session/rewind" (SessionRewindParams) -> SessionRewindResult;
     SessionChanges = "session/changes" (SessionChangesParams) -> SessionChangesResult;
     SessionCommands = "session/commands" (SessionRef) -> SessionCommandsResult;
+    MemoryUsage = "memory/usage" (ProjectRef) -> MemoryUsageResult;
     LearningOpen = "learning/open" (ProjectRef) -> SessionInfo;
     LearningRun = "learning/run" (LearningRunParams) -> Appended;
     LearningSignals = "learning/signals" (LearningSignalsParams) -> LearningSignalsResult;
@@ -1480,6 +1481,50 @@ pub struct McpStatus {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub error: Option<String>,
+}
+
+/// How one memory bullet fared in a project's work sessions: given, cited
+/// by the agent (`[uses mN]`), and what followed a cite.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct BulletUsage {
+    /// The proposal that wrote it.
+    pub bullet: u64,
+    /// Sessions it was given to.
+    pub sessions: u64,
+    /// Turns that cited it.
+    pub cited: u64,
+    /// Of those, ones that ended done with nothing gone wrong after.
+    pub clean: u64,
+    /// Ones followed by trouble: a correction, a rewind, a declined
+    /// approval, a failed check, or a turn that didn't end done.
+    pub trouble: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub last_cited_ms: Option<u64>,
+    /// The latest troubles, each where it was, for a person to look at.
+    pub notes: Vec<UsageNote>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct UsageNote {
+    pub session: String,
+    pub seq: u64,
+    /// When it happened: notes are kept in this order, latest last.
+    pub at_ms: u64,
+    pub what: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct MemoryUsageResult {
+    pub bullets: Vec<BulletUsage>,
+    /// How many work sessions were read for it, latest first.
+    pub sessions: u64,
 }
 
 /// A slash command a person ran (ADR-0024).

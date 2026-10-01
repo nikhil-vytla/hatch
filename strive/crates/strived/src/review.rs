@@ -546,25 +546,55 @@ fn bullet_diff(edit: &BulletEdit) -> Vec<String> {
 /// each bullet with the proposal that last wrote it, or "hand-written".
 pub async fn memory(c: &mut Client) -> Result<ExitCode> {
     let cwd = cwd()?;
-    let items = c.request::<ProposalList>(ProjectRef { cwd }).await?.memory;
+    let items = c.request::<ProposalList>(ProjectRef { cwd: cwd.clone() }).await?.memory;
     if items.is_empty() {
         println!("{} has nothing yet; an accepted memory proposal writes it", strive_learning::MEMORY_PATH);
         return Ok(ExitCode::SUCCESS);
     }
+    let usage = c.request::<strive_proto::MemoryUsage>(ProjectRef { cwd }).await?;
     println!("{}, as every session reads it now:", strive_learning::MEMORY_PATH);
     for item in &items {
         let line = match item {
             MemoryItem::Bullet { text, source, outside_review } => {
                 let who = source.map_or_else(|| "hand-written".to_string(), |n| format!("#{n}"));
                 let mark = if *outside_review { "  [changed outside review]" } else { "" };
-                format!("  {who:<13} {text:?}{mark}")
+                let used = source.and_then(|n| usage.bullets.iter().find(|u| u.bullet == n));
+                format!("  {who:<13} {text:?}{mark}{}", used.map(used_text).unwrap_or_default())
             }
             MemoryItem::Line { text } if text.trim().is_empty() => String::new(),
             MemoryItem::Line { text } => format!("  {:<13} {text}", ""),
         };
         println!("{}", crate::terminal::visible(line.trim_end()));
     }
+    if usage.bullets.iter().any(|u| u.sessions > 0) {
+        println!(
+            "\nGiven and cited: in the latest {} work session(s). A cite is the agent's own word that a bullet \
+             shaped what it did; trouble is what strive saw after: a correction, a rewind, a declined approval, a \
+             failed check, or a turn that didn't finish.",
+            usage.sessions
+        );
+    }
     Ok(ExitCode::SUCCESS)
+}
+
+/// How a bullet fared, after its line: given, cited, and the latest trouble.
+fn used_text(u: &strive_proto::BulletUsage) -> String {
+    let mut out = match (u.cited, u.trouble) {
+        (0, _) => format!("\n                given {}, never cited", u.sessions),
+        (c, 0) => format!("\n                given {}, cited {c}, no trouble after", u.sessions),
+        (c, t) => format!("\n                given {}, cited {c}, trouble after {t}", u.sessions),
+    };
+    if let Some(n) = u.notes.last() {
+        let _ = std::fmt::Write::write_fmt(
+            &mut out,
+            format_args!("\n                latest: {} (session {}, #{})", n.what, short(&n.session), n.seq),
+        );
+    }
+    out
+}
+
+fn short(session: &str) -> &str {
+    session.get(session.len().saturating_sub(6)..).unwrap_or(session)
 }
 
 /// Lines around each change that a diff keeps.

@@ -17,9 +17,9 @@ use strive_proto::rpc::RpcError;
 use strive_proto::{
     Appended, Artifact, Change, Digest, Entry, Event, Evidence, Gate, LearnSignal, LearningDismiss,
     LearningDismissParams, LearningOpen, LearningRun, LearningRunParams, LearningSignals, LearningSignalsParams,
-    LearningSignalsResult, MemoryItem, Method, ProjectRef, Proposal, ProposalDecide, ProposalDecideParams,
-    ProposalDecision, ProposalList, ProposalListResult, ProposalRef, ProposalRollback, ProposalStatus, SessionInfo,
-    SessionKind, StaleMention, Verdict,
+    LearningSignalsResult, MemoryItem, MemoryUsage, MemoryUsageResult, Method, ProjectRef, Proposal, ProposalDecide,
+    ProposalDecideParams, ProposalDecision, ProposalList, ProposalListResult, ProposalRef, ProposalRollback,
+    ProposalStatus, SessionInfo, SessionKind, StaleMention, Verdict,
 };
 
 use crate::methods::{Conn, Reply, client_name, internal, parse, reply, require_person, session_error};
@@ -69,6 +69,13 @@ pub async fn route(state: &Arc<State>, conn: &Arc<Conn>, method: &str, params: V
             let LearningDismissParams { cwd, session, through } = parse::<LearningDismiss>(params)?;
             dismiss(state, &project(&cwd)?, &session, through).await
         }
+        MemoryUsage::NAME => {
+            let ProjectRef { cwd } = parse::<MemoryUsage>(params)?;
+            let cwd = project(&cwd)?;
+            let state = state.clone();
+            let result = tokio::task::spawn_blocking(move || usage(&state, &cwd)).await.map_err(|e| internal(&e))?;
+            reply::<MemoryUsage>(result?)
+        }
         ProposalList::NAME => {
             let ProjectRef { cwd } = parse::<ProposalList>(params)?;
             let cwd = project(&cwd)?;
@@ -106,6 +113,40 @@ pub async fn route(state: &Arc<State>, conn: &Arc<Conn>, method: &str, params: V
         }
         other => Err(RpcError::new(RpcError::METHOD_NOT_FOUND, format!("unknown method {other}"))),
     }
+}
+
+/// The latest work sessions `memory/usage` reads.
+const USAGE_SESSIONS: usize = 100;
+
+/// How each memory bullet fared in the project's latest work sessions:
+/// given (by the memory each session's agent was told, `contextLoaded`),
+/// cited, and what followed a cite.
+fn usage(state: &State, cwd: &str) -> Result<MemoryUsageResult, RpcError> {
+    let (mut work, _) = state.sessions.list(Some(cwd), SessionKind::Work).map_err(|e| internal(&e))?;
+    // The latest sessions; a bullet's notes are kept by when each trouble
+    // happened, whatever order they're tallied in.
+    work.sort_by_key(|s| std::cmp::Reverse(s.last_active_ms));
+    work.truncate(USAGE_SESSIONS);
+    let mut out = std::collections::BTreeMap::new();
+    for s in &work {
+        let Some(sid) = crate::sessions::SessionId::parse(&s.id) else { continue };
+        let Ok(entries) = journal(state, &sid) else { continue };
+        // The memory as this session's agent was told it, the last time it was loaded.
+        let memory = entries.iter().rev().find_map(|e| match &e.event {
+            Event::ContextLoaded { instructions, .. } => {
+                instructions.iter().find(|f| f.path.ends_with(strive_learning::MEMORY_PATH)).map(|f| f.digest)
+            }
+            _ => None,
+        });
+        let given = memory
+            .and_then(|d| state.cas.get(&d).ok())
+            .map(|b| strive_learning::usage::given(&String::from_utf8_lossy(&b)))
+            .unwrap_or_default();
+        if !given.is_empty() {
+            strive_learning::usage::tally(&s.id, &entries, &given, &mut out);
+        }
+    }
+    Ok(MemoryUsageResult { bullets: out.into_values().collect(), sessions: work.len() as u64 })
 }
 
 fn refused(why: impl Into<String>) -> RpcError {
