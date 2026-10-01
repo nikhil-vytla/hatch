@@ -3524,9 +3524,27 @@ nav a {
   padding: 10px 12px;
   border-bottom: 2.5px solid var(--outline);
 }
+/* Labels wrap so the numbers fit; values stay on one line. */
+.model-table thead th,
+.model-table tbody th {
+  white-space: normal;
+  min-width: 9ch;
+}
 .model-table tbody th {
   font-weight: 700;
   border-bottom: 1.5px solid var(--line);
+}
+@media (max-width: 600px) {
+  .model-table {
+    font-size: 14px;
+  }
+  .model-table th,
+  .model-table td {
+    padding: 9px 8px;
+  }
+  .model-table td:first-child {
+    min-width: 0;
+  }
 }
 .model-table td {
   padding: 13px 12px;
