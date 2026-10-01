@@ -1,0 +1,340 @@
+/* The reef, in the Toy Box identity (tokens from .toybox in style.css). */
+.reef {
+  display: grid;
+  gap: 16px;
+  padding: 4px 0 40px;
+  background: transparent;
+}
+.reef-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: end;
+}
+.reef-lede {
+  margin: 0;
+  max-width: 56ch;
+  font-size: 18px;
+  color: var(--tb-muted);
+}
+.reef-models,
+.reef-events {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.reef-models button,
+.reef-events button,
+.reef-go,
+.reef-win button {
+  font: 800 15px/1.1 var(--tb-body);
+  color: var(--tb-ink);
+  background: #fff;
+  border: 2.5px solid var(--tb-ink);
+  border-radius: 999px;
+  padding: 9px 16px;
+  cursor: pointer;
+  box-shadow: 3px 3px 0 var(--tb-ink);
+}
+.reef-models button small {
+  display: block;
+  font-weight: 600;
+  font-size: 12px;
+  color: var(--tb-muted);
+}
+.reef-models button[aria-pressed="true"] {
+  background: var(--tb-ink);
+  color: var(--tb-sun);
+}
+.reef-models button[aria-pressed="true"] small {
+  color: #f3e6c8;
+}
+.reef-events button:nth-child(1) {
+  background: var(--tb-tomato);
+  color: #fff;
+}
+.reef-events button:nth-child(2) {
+  background: var(--tb-sun);
+}
+.reef-events button:nth-child(3) {
+  background: var(--tb-sky);
+}
+.reef-events button:nth-child(4) {
+  background: var(--tb-mint);
+}
+.reef-events button:nth-child(5) {
+  background: #3b3530;
+  color: #fff;
+}
+.reef-events button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.reef-models button:active,
+.reef-events button:active,
+.reef-go:active {
+  transform: translate(2px, 2px);
+  box-shadow: 1px 1px 0 var(--tb-ink);
+}
+.reef-stage {
+  position: relative;
+}
+.reef-canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 960 / 560;
+  border: 3px solid var(--tb-ink);
+  border-radius: 22px;
+  box-shadow: 6px 6px 0 var(--tb-ink);
+  cursor: pointer;
+  background: #4aa8e8;
+}
+.reef-banner {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  margin: 0;
+  background: var(--tb-sun);
+  border: 2.5px solid var(--tb-ink);
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-weight: 800;
+  white-space: nowrap;
+  box-shadow: 3px 3px 0 var(--tb-ink);
+}
+.reef-hint {
+  margin: 10px 0 0;
+  font-weight: 700;
+  color: var(--tb-muted);
+  font-size: 15px;
+}
+.reef-note {
+  margin: 0;
+  font-weight: 700;
+}
+.reef-link {
+  font: inherit;
+  color: var(--tb-tomato-ink);
+  background: none;
+  border: 0;
+  padding: 0;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.reef-panels {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+.reef-card {
+  background: #fff;
+  border: 3px solid var(--tb-ink);
+  border-radius: 20px;
+  box-shadow: 5px 5px 0 var(--tb-ink);
+  padding: 16px;
+}
+.reef-card h3 {
+  font: 800 20px/1.1 var(--tb-display);
+  margin: 0 0 10px;
+}
+.reef-big {
+  font: 800 40px/1 var(--tb-display);
+  margin: 0 0 4px;
+}
+.reef-big small {
+  font: 700 15px var(--tb-body);
+}
+.reef-fine {
+  font-size: 14px;
+  color: var(--tb-muted);
+  margin: 8px 0;
+}
+.reef-bar {
+  display: grid;
+  grid-template-columns: 116px minmax(0, 1fr) 44px;
+  gap: 8px;
+  align-items: center;
+  font-size: 14px;
+  font-weight: 700;
+  margin: 4px 0;
+}
+.reef-bar i {
+  display: block;
+  height: 10px;
+  border: 2px solid var(--tb-ink);
+  border-radius: 999px;
+  background: var(--tb-bg);
+  overflow: hidden;
+}
+.reef-bar b {
+  display: block;
+  height: 100%;
+  background: var(--tb-sky);
+  transition: width 0.3s;
+}
+.reef-bar i.on b {
+  background: var(--tb-sun);
+}
+.reef-bar i.energy b {
+  background: var(--tb-mint);
+}
+.reef-bar i.stale b {
+  background: #b9b4aa;
+}
+.reef-bar em {
+  font-style: normal;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.reef-traits {
+  margin-top: 8px;
+}
+.reef-lens {
+  display: flex;
+  gap: 8px;
+  align-items: start;
+  font-size: 14px;
+  font-weight: 700;
+  margin-top: 10px;
+}
+.reef-spark {
+  width: 100%;
+  height: 60px;
+  background: var(--tb-bg);
+  border: 2px solid var(--tb-ink);
+  border-radius: 12px;
+}
+.reef-spark polyline {
+  fill: none;
+  stroke-width: 2.5;
+}
+.reef-spark-fish {
+  stroke: #1f5fbf;
+}
+.reef-spark-sharks {
+  stroke: var(--tb-tomato);
+}
+.reef-inspector header {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+}
+.reef-inspector header button {
+  font: 800 20px/1 var(--tb-body);
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+.reef-inspector h3 small {
+  font: 700 14px var(--tb-body);
+  color: var(--tb-muted);
+}
+.reef-now {
+  display: grid;
+  gap: 2px;
+  margin: 0 0 8px;
+}
+.reef-now b {
+  font: 800 18px var(--tb-display);
+}
+.reef-fresh {
+  font-size: 13px;
+  font-weight: 700;
+  color: #1d6b45;
+}
+.reef-stale {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--tb-tomato-ink);
+}
+.reef-win {
+  background: var(--tb-sun);
+  max-width: 460px;
+  transform: rotate(-1deg);
+  animation: reef-pop 0.45s cubic-bezier(0.3, 1.8, 0.5, 1);
+}
+.reef-win b {
+  display: block;
+  font: 800 24px/1.1 var(--tb-display);
+}
+.reef-win p {
+  margin: 6px 0 10px;
+  font-weight: 700;
+}
+.reef-win button {
+  background: var(--tb-ink);
+  color: var(--tb-sun);
+  box-shadow: none;
+}
+@keyframes reef-pop {
+  from {
+    transform: rotate(-6deg) scale(0.5);
+    opacity: 0;
+  }
+}
+.reef-race {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+.reef-race h3 {
+  font: 800 18px var(--tb-display);
+  margin: 0 0 8px;
+}
+.reef-race-clock {
+  top: auto;
+  bottom: -18px;
+}
+.reef-go {
+  background: var(--tb-sun);
+  margin-top: 6px;
+}
+.reef-table {
+  overflow-x: auto;
+}
+.reef-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+.reef-table th,
+.reef-table td {
+  text-align: left;
+  padding: 4px 6px;
+  border-bottom: 2px solid var(--tb-bg);
+  font-variant-numeric: tabular-nums;
+}
+.reef-more summary {
+  font-weight: 800;
+  cursor: pointer;
+}
+.reef-more p {
+  max-width: 72ch;
+}
+@media (prefers-reduced-motion: reduce) {
+  .reef-win {
+    animation: none;
+  }
+}
+@media (max-width: 900px) {
+  .reef-panels {
+    grid-template-columns: 1fr;
+  }
+  .reef-race {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 520px) {
+  .reef-banner {
+    font-size: 13px;
+    padding: 4px 10px;
+  }
+  .reef-bar {
+    grid-template-columns: 92px minmax(0, 1fr) 40px;
+  }
+}

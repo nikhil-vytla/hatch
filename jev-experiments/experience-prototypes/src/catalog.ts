@@ -184,6 +184,7 @@ export const experiments = [
     "How far does one sentence travel when everyone decides for themselves?",
   ),
   e("win-over", "", "Who can you win over?", "Games & simulations", "You're new in town with until 5 pm. Say anything; 48 residents judge it, and gossip does the rest.", "Can fast typed judgments make a town react to what you actually say?"),
+  e("ocean", "", "The reef", "Games & simulations", "120 fish, each deciding for itself. Heat the water and see who makes it.", "Does how fast a model decides change who survives?"),
   e("ghost-brush", "live-worlds", "Ghost Brush", "Creative tools", "Draw a gesture. Give it a feeling. Follow another line.", "Can a typed style judgment turn a procedural brush into a semantic instrument?"),
 ];
 export const categories = [
