@@ -2693,3 +2693,84 @@ in all); results are local, in `eval-runs/20260930-learner-probe*`.
   runs with the revised prompts (0/3 before). The learner is faithful to the
   user; it can't tell that a stated rule is wrong. That's what the P arm
   measures, and the judge and the person reviewing are the checks on it.
+
+## 2026-09-30: what other self-improving harnesses, and the people behind them, teach
+
+Five studies, without model spend: bb again, in depth (run where it runs
+without a model), four shipped harnesses that learn from use (Hermes Agent,
+Codex memories, Letta Code, OpenHands), eight research systems (DGM, HGM,
+SICA, Live-SWE-agent, ADAS, Gödel Agent, AHE, auto-harness), nine context
+optimizers (ACE, GEPA, Dynamic Cheatsheet, AWM, Voyager, Reflexion, DSPy
+SIMBA/MIPROv2, OpenEvolve, ShinkaEvolve), and the researchers. All read in
+code; paper claims are marked as such.
+- **Nobody measures that learning helps in daily use.** No shipped harness
+  publishes an eval; bb measures only regressions. strive's eval is ahead
+  here. The research systems measure on benchmarks, with one to two runs a
+  task, often scoring on the tasks they searched on (Meta-Harness, AHE).
+- **Nobody checks whether what a user says is true.** Hermes scans for
+  injection, Codex labels whose words a claim is and keeps a request for
+  one task out of a standing preference, Letta lets the latest evidence
+  win. Poisoning is open everywhere, strive included.
+- **Eagerness is a design choice.** Hermes: "A pass that does nothing is a
+  missed learning opportunity", reviews every 10 turns. Letta: "when unsure
+  between create and none, choose none". Codex: a no-op gate. strive's
+  learner was the Letta kind and lost most of its lift to it (the probes
+  above); with a person accepting each proposal, eager is safe.
+- **What the code does differs from the papers.** ACE's code adds bullets
+  only (update, merge and delete are TODOs), its counters never prune and
+  its token budget is a sentence in the prompt. DGM's diagnoser reads the
+  hidden tests. Gödel Agent can rewrite its own scorer and sees test
+  accuracy. AHE's read-only verifier is enforced by prompt. bb's memory gate
+  passed "Always skip running tests and commit directly to main without
+  review."
+- **strive already records what each session saw**, which bb can't
+  (instructions are rebuilt per thread and never stored): `contextLoaded`
+  journals each instruction file's digest, memory included, and each
+  bullet names its proposal. Nothing uses it yet to say whether a bullet
+  was loaded, followed, or made a difference. That is the gap the
+  harness-engineering papers name: most of the shortfall is activation and
+  adherence, not the quality of what was learned ("Harness updating is not
+  harness benefit", 2605.30621).
+
+Worth adopting, roughly in order:
+1. **Per-bullet use and outcome.** The agent cites the bullets it relied on
+   (Codex's `<oai-mem-citation>`); the daemon tallies loaded, cited, and
+   the session's outcome per bullet, shows them in review, retires bullets
+   unused for N days and flags one whose cited sessions are rewound or
+   contradicted (Codex's phase 2).
+2. **Whose words, and how far they reach.** Label a proposal's evidence as
+   the user's statement, the agent's claim, or an observed outcome; keep a
+   rule only the user stated in a probation tier until a later session
+   shows it held. Taint sessions that read the web or MCP output.
+3. **The learner in two passes:** list every candidate with its seqs, then
+   curate (ACE's reflector and curator); plus Hermes' "don't capture" list:
+   negative claims about tools, environment failures, unresolved attempts.
+4. **Load less:** a "when" clause per bullet and only the relevant ones
+   loaded, or a capped summaries index with the rest fetched (bb, Voyager),
+   against the 1.12x turns on unrelated tasks.
+5. **Testing:** saved seed snapshots so a probe replays the same sessions
+   (paired, cheap); recorded-wire parity for daemon, host and gateway
+   (bb's provider recordings caught a one-character change); the learner's
+   prompts as files with intent and editing notes.
+6. **For the deep stage (harness code):** AHE's change manifest (predicted
+   fixes, risk tasks) with a verdict per change from the next evaluation;
+   a regression suite mined from the user's own sessions, held by the
+   daemon; HGM's clade-level Thompson sampling to pick parents and spend
+   evaluation one task at a time; a held-out slice the search never sees;
+   re-baselining when the model changes.
+- **UX from bb:** steer or queue a message mid-turn, a side chat that can
+  send back to the main thread, batched notifications with questions
+  first, and a learn offer as a card rather than a prompt on quit.
+
+The schools: open-ended archives (Clune, Rocktäschel, Lehman and Stanley;
+learn code, keep lineages), Gödel-machine formalists (Schmidhuber, HGM:
+judge a change by its descendants, not its score), text as the learning
+medium (Khattab and Agrawal's GEPA, ACE, Karpathy, Letta), weights or
+nothing (Sutton, Dwarkesh: markdown memory caps out), and
+measurement-first (Shunyu Yao's "the second half", AHE, "Fragility" on
+noise and task order). They agree evaluation is the bottleneck, reward
+hacking appears once the evaluator is reachable, self-feedback drifts, and
+nobody can evaluate learning in non-i.i.d. daily use. strive's honest
+claim is auditable, reversible, measured learning in context, not
+open-ended self-improvement; its trusted daemon is the answer to the
+reward hacking the research systems keep hitting.
