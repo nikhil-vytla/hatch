@@ -88,9 +88,9 @@
 }
 .experiment-notes .note-kicker {
   font-size: 12px;
-  letter-spacing: 0.055em;
-  text-transform: uppercase;
+  letter-spacing: 0;
   color: var(--note-muted);
+  font-weight: 800;
 }
 .note-meta {
   color: var(--note-muted);

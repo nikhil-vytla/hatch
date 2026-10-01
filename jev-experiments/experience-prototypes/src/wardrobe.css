@@ -13,8 +13,8 @@
   padding: 8px 5px 36px;
 }
 .wardrobe-eyebrow {
-  font: 10px var(--mono);
-  letter-spacing: 0.14em;
+  font: 700 12px var(--mono);
+  letter-spacing: 0;
   color: var(--muted);
 }
 .wardrobe-header h2 {
@@ -67,8 +67,8 @@
   display: flex;
   justify-content: space-between;
   color: #48483c;
-  font: 9px var(--mono);
-  letter-spacing: 0.03em;
+  font: 700 12px var(--mono);
+  letter-spacing: 0;
   background: #f6f4ebb8;
   padding: 9px 11px;
   border-radius: 20px;
@@ -122,9 +122,8 @@
 }
 .wardrobe-stage-caption span {
   display: block;
-  font: 9px var(--mono);
-  text-transform: uppercase;
-  letter-spacing: 0.09em;
+  font: 700 12px var(--mono);
+  letter-spacing: 0;
   margin-bottom: 5px;
 }
 .wardrobe-stage-caption strong {
@@ -171,7 +170,7 @@
 .wardrobe-provenance {
   border: 1px solid var(--line);
   border-radius: 20px;
-  font: 9px var(--mono);
+  font: 700 12px var(--mono);
   padding: 6px 9px;
   white-space: nowrap;
 }
@@ -205,7 +204,7 @@
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  font: 9px var(--mono);
+  font: 700 12px var(--mono);
   color: var(--muted);
 }
 .wardrobe-progress > span.done {
@@ -214,8 +213,8 @@
   color: var(--surface);
 }
 .wardrobe-progress small {
-  font: 9px var(--mono);
-  letter-spacing: 0.06em;
+  font: 700 12px var(--mono);
+  letter-spacing: 0;
   margin-left: 4px;
   color: var(--muted);
 }
@@ -398,9 +397,8 @@
 }
 .wardrobe-adjust > div > span,
 .wardrobe-adjust > label {
-  font: 8px var(--mono);
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
+  font: 700 12px var(--mono);
+  letter-spacing: 0;
 }
 .wardrobe-swatches {
   display: flex;
@@ -472,8 +470,8 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
-  font: 9px var(--mono);
-  letter-spacing: 0.04em;
+  font: 700 12px var(--mono);
+  letter-spacing: 0;
   margin: 0 0 13px;
 }
 .wardrobe-connect input:not([type="checkbox"]),
@@ -545,7 +543,7 @@
 .wardrobe-inspector pre {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-  font: 10px/1.65 var(--mono);
+  font: 700 12px/1.65 var(--mono);
   max-height: 300px;
   overflow: auto;
   background: var(--soft);

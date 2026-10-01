@@ -1,11 +1,12 @@
 /* Decide: one call at a time; blind until you pick, then everyone's answers. */
 .decide {
-  --opt-0: #c2410c;
-  --opt-1: #2563eb;
-  --opt-2: #047857;
-  --shadow-border:
-    0 0 0 1px oklch(0 0 0 / 0.07), 0 1px 2px -1px oklch(0 0 0 / 0.06),
-    0 2px 4px 0 oklch(0 0 0 / 0.04);
+  /* Option colours tell one call's options apart; white text clears AA on each. */
+  --opt-0: #c43a17;
+  --opt-1: #1f4fbf;
+  --opt-2: #6b3fa0;
+  --right: var(--mint);
+  --wrong: #ffd0c2;
+  --shadow-border: 0 0 0 2.5px var(--outline);
   max-width: 880px;
   margin: 0 auto;
   padding: 40px 24px 96px;
@@ -18,27 +19,25 @@
   outline: none;
 }
 .decide h1 {
-  font: 600 clamp(32px, 5vw, 52px) / 1.05 var(--display);
-  letter-spacing: -0.015em;
+  font: 800 clamp(40px, 6vw, 72px) / 1 var(--display);
+  letter-spacing: -0.03em;
   margin: 0 0 14px;
   text-wrap: balance;
 }
 .decide h2 {
-  font: 600 clamp(24px, 3.4vw, 32px) / 1.2 var(--display);
+  font: 800 clamp(26px, 3.6vw, 34px) / 1.15 var(--display);
   margin: 0 0 16px;
   text-wrap: balance;
 }
 .decide h3 {
-  font: 500 12px/1.4 var(--mono);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font: 800 14px/1.4 var(--sans);
+  letter-spacing: 0;
   color: var(--muted);
   margin: 0 0 8px;
 }
 .decide .kicker {
-  font: 500 12px/1.4 var(--mono);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font: 800 14px/1.4 var(--sans);
+  letter-spacing: 0;
   color: var(--muted);
   margin: 0 0 8px;
 }
@@ -56,14 +55,15 @@
 }
 .decide button {
   font: inherit;
-  font-size: 14px;
+  font-size: 15px;
+  font-weight: 800;
   min-height: 40px;
-  padding: 0 14px;
-  border: 0;
-  border-radius: 6px;
+  padding: 0 16px;
+  border: 2.5px solid var(--outline);
+  border-radius: 999px;
   background: var(--surface);
   color: var(--ink);
-  box-shadow: var(--shadow-border);
+  box-shadow: 3px 3px 0 var(--outline);
   cursor: pointer;
   transition: scale 150ms;
 }
@@ -80,8 +80,9 @@
 }
 .dc-card {
   background: var(--surface);
-  border-radius: 10px;
-  box-shadow: var(--shadow-border);
+  border: 3px solid var(--outline);
+  border-radius: 22px;
+  box-shadow: 6px 6px 0 var(--outline);
   padding: 24px;
 }
 .dc-state {
@@ -103,15 +104,17 @@
   background: var(--soft);
 }
 .dc-state dt {
-  font: 500 12px/1.6 var(--mono);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  font: 800 14px/1.6 var(--sans);
+  letter-spacing: 0;
   color: var(--muted);
 }
 .dc-state dd {
   margin: 0;
   font-size: 16px;
   line-height: 1.5;
+}
+.dc-card > p.small {
+  margin: -8px 0 16px;
 }
 .dc-options {
   display: grid;
@@ -120,12 +123,12 @@
 }
 .decide .dc-option {
   min-height: 72px;
-  font-size: 19px;
-  font-weight: 500;
-  border-radius: 10px;
+  font: 800 21px/1.2 var(--display);
+  border-radius: 18px;
   color: #fff;
   background: var(--opt-0);
-  border: 0;
+  border: 3px solid var(--outline);
+  box-shadow: 4px 4px 0 var(--outline);
   transition:
     transform 120ms,
     opacity 120ms;
@@ -146,8 +149,9 @@
 .decide .dc-option[data-mine="true"] {
   opacity: 1;
   box-shadow:
-    0 0 0 3px var(--bg),
-    0 0 0 5px var(--ink);
+    4px 4px 0 var(--outline),
+    0 0 0 3px var(--sun),
+    0 0 0 6px var(--outline);
 }
 .dc-reveal {
   display: grid;
@@ -156,7 +160,7 @@
 }
 .dc-block {
   background: var(--surface);
-  border-radius: 10px;
+  border-radius: 18px;
   box-shadow: var(--shadow-border);
   padding: 18px 20px;
 }
@@ -168,11 +172,12 @@
   margin: 0;
   padding: 14px 18px;
   border-radius: 10px;
-  background: color-mix(in oklab, var(--opt-0) 14%, var(--bg));
+  background: var(--wrong);
+  border: 2.5px solid var(--outline);
   line-height: 1.5;
 }
 .dc-truth[data-right="true"] {
-  background: color-mix(in oklab, var(--opt-2) 16%, var(--bg));
+  background: var(--right);
 }
 .dc-split {
   display: flex;
@@ -224,8 +229,7 @@
 }
 .dc-table thead th {
   font: 500 12px/1.4 var(--mono);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0;
   color: var(--muted);
 }
 .dc-table tbody th {
@@ -248,9 +252,8 @@
   content: "▾ ";
 }
 .dc-group {
-  font: 500 11px var(--mono);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  font: 500 13px var(--mono);
+  letter-spacing: 0;
   color: var(--muted);
   margin-right: 4px;
 }
@@ -262,9 +265,8 @@
   background: var(--soft);
 }
 .dc-code-label {
-  font: 500 11px var(--mono);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  font: 500 13px var(--mono);
+  letter-spacing: 0;
   color: var(--muted);
   margin: 8px 0 4px;
 }
@@ -273,7 +275,7 @@
   padding: 10px 12px;
   background: var(--bg);
   border-radius: 6px;
-  font: 12px/1.5 var(--mono);
+  font: 700 12px/1.5 var(--mono);
   overflow-x: auto;
   max-height: 320px;
 }
@@ -323,7 +325,7 @@
   white-space: nowrap;
 }
 .dc-table td[data-right="true"] {
-  background: color-mix(in oklab, var(--opt-2) 14%, transparent);
+  background: var(--right);
 }
 .dc-bar {
   height: 10px;
@@ -383,6 +385,6 @@
   padding: 10px 12px;
   background: var(--bg);
   border-radius: 6px;
-  font: 12px/1.5 var(--mono);
+  font: 700 12px/1.5 var(--mono);
   overflow-x: auto;
 }

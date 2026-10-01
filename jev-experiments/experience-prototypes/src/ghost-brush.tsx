@@ -104,7 +104,7 @@ export function GhostBrush(_props: { result?: unknown } = {}) {
             {keyboardPen.visible && <g className="gb-keyboard-cursor" transform={`translate(${keyboardPen.x} ${keyboardPen.y})`}><path d="M-8 0H8M0-8V8" stroke={current.ink} strokeWidth="2" /><circle r="12" fill="none" stroke={current.ink} strokeDasharray={keyboardPen.down ? undefined : "3 3"} /></g>}
           </svg>
           {!session.cursor && !session.active && <div className="gb-paper-invitation" aria-hidden="true"><span>Make a mark</span><p>A loop, a scribble, a wandering line.</p><div className="gb-invitation-line"><Sample stroke={demo} id={session.brushId} /></div></div>}
-          <div className="gb-paper-caption">ORIGINAL PROCEDURAL INK <span>{WIDTH} × {HEIGHT}</span></div>
+          <div className="gb-paper-caption">Original procedural ink <span>{WIDTH} × {HEIGHT}</span></div>
         </div>
         <div className="gb-tools">
           <div><button title="Undo stroke" aria-label="Undo stroke" disabled={!session.cursor || !!session.active} onClick={() => dispatch({ type: "rewind", cursor: session.cursor - 1 })}><Undo2 size={17} /></button><button title="Redo stroke" aria-label="Redo stroke" disabled={session.cursor >= session.strokes.length || !!session.active} onClick={() => dispatch({ type: "rewind", cursor: session.cursor + 1 })}><Redo2 size={17} /></button><button onClick={drawExample} disabled={!!session.active || session.cursor >= 80}>Draw a sample</button><button onClick={() => dispatch({ type: "clear" })} disabled={!session.strokes.length || !!session.active}><Eraser size={15} /> Fresh sheet</button></div>

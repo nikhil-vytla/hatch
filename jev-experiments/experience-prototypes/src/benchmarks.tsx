@@ -122,7 +122,7 @@ export function Benchmarks({ id, result }: { id: string; result: any }) {
             >
               <div className="question-card">
                 <span className="eyebrow">
-                  {id === "judge" ? "THE QUESTION" : "THE REQUEST"}
+                  {id === "judge" ? "The question" : "The request"}
                 </span>
                 <p>{row.question ?? row.prompt ?? row.text ?? row.case}</p>
                 {row.variant && (

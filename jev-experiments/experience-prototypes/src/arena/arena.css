@@ -13,17 +13,16 @@
 }
 
 .arena {
-  --radius: 4px;
-  --shadow-border:
-    0 0 0 1px oklch(0 0 0 / 0.07), 0 1px 2px -1px oklch(0 0 0 / 0.06),
-    0 2px 4px 0 oklch(0 0 0 / 0.04);
-  --shadow-raised: 0 0 0 1px oklch(0 0 0 / 0.08), 0 8px 24px -6px oklch(0 0 0 / 0.16);
+  --radius: 12px;
+  /* Toy Box: ink outlines; raised things get the offset sticker shadow. */
+  --shadow-border: 0 0 0 2px var(--outline);
+  --shadow-raised: 0 0 0 2.5px var(--outline), 5px 5px 0 2.5px var(--outline);
   --press: cubic-bezier(0.2, 0, 0, 1);
   max-width: 1200px;
   margin: 0 auto;
   padding: 40px 24px 96px;
   color: var(--ink);
-  font-size: 14px;
+  font-size: 15px;
 }
 :root[data-theme="dark"] .arena {
   --shadow-border: 0 0 0 1px oklch(1 0 0 / 0.09);
@@ -60,15 +59,14 @@
   font-size: 12px;
 }
 .arena .kicker {
-  font: 500 12px/1.4 var(--mono);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font: 800 14px/1.4 var(--sans);
+  letter-spacing: 0;
   color: var(--muted);
   margin: 0 0 8px;
 }
 .arena .notice {
-  font-size: 14px;
-  background: color-mix(in oklab, var(--gold) 14%, var(--surface));
+  font-size: 15px;
+  background: color-mix(in oklab, var(--sun) 35%, var(--surface));
   border-radius: var(--radius);
   padding: 10px 12px;
   margin: 12px 0 0;
@@ -88,12 +86,11 @@
 /* ---------------------------------------------------------------- overview */
 .masthead {
   padding-bottom: 32px;
-  margin-bottom: 8px;
-  border-bottom: 1px solid var(--ink);
+  margin-bottom: 24px;
 }
 .masthead h1 {
-  font: 600 clamp(36px, 5.2vw, 58px) / 1.05 var(--display);
-  letter-spacing: -0.015em;
+  font: 800 clamp(40px, 5.8vw, 76px) / 1 var(--display);
+  letter-spacing: -0.03em;
   margin: 0 0 16px;
 }
 .masthead > * {
@@ -109,26 +106,32 @@
   list-style: none;
   padding: 0;
   margin: 0;
+  display: grid;
+  gap: 16px;
 }
 .toc a {
   display: grid;
   grid-template-columns: 180px minmax(0, 1fr);
   gap: 28px;
   align-items: center;
-  padding: 24px 0;
-  border-bottom: 1px solid var(--line);
+  padding: 18px 22px;
+  background: var(--surface);
+  border: 2.5px solid var(--outline);
+  border-radius: 20px;
   color: var(--ink);
   text-decoration: none;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+.toc a:hover,
+.toc a:focus-visible {
+  color: var(--ink);
+  transform: translate(-2px, -2px);
+  box-shadow: 5px 5px 0 var(--outline);
 }
 .toc h2 {
-  font: 600 26px/1.2 var(--display);
+  font: 800 26px/1.15 var(--display);
+  letter-spacing: -0.02em;
   margin: 0 0 8px;
-}
-.toc a:hover h2,
-.toc a:focus-visible h2 {
-  text-decoration: underline;
-  text-decoration-thickness: from-font;
-  text-underline-offset: 4px;
 }
 .toc-insight {
   display: block;
@@ -142,8 +145,9 @@
   height: auto;
 }
 .sketch-frame {
-  fill: var(--surface);
-  stroke: var(--line);
+  fill: var(--bg);
+  stroke: var(--outline);
+  stroke-width: 2;
 }
 .sketch-bar {
   fill: var(--c);
@@ -157,9 +161,8 @@
   display: inline-flex;
   align-items: center;
   min-height: 44px;
-  font: 500 12px var(--mono);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font: 800 15px var(--sans);
+  letter-spacing: 0;
   color: var(--coral);
 }
 .columns {
@@ -171,8 +174,8 @@
   min-width: 0;
 }
 .entry h1 {
-  font: 600 clamp(32px, 4.4vw, 52px) / 1.05 var(--display);
-  letter-spacing: -0.015em;
+  font: 800 clamp(34px, 4.6vw, 58px) / 1.02 var(--display);
+  letter-spacing: -0.025em;
   margin: 0 0 16px;
 }
 .arena h1[tabindex="-1"]:focus {
@@ -187,8 +190,10 @@
   line-height: 1.55;
   max-width: 68ch;
   margin: 16px 0 0;
-  padding-left: 14px;
-  border-left: 2px solid var(--coral);
+  padding: 10px 14px;
+  background: var(--sun);
+  border: 2.5px solid var(--outline);
+  border-radius: 14px;
 }
 
 .figure {
@@ -227,39 +232,34 @@
 .tabs {
   display: inline-flex;
   flex-wrap: wrap;
-  gap: 2px;
-  padding: 3px;
-  background: var(--soft);
-  border-radius: 6px;
+  gap: 8px;
 }
 .tab {
   font-family: inherit;
   font-size: 14px;
-  font-weight: 500;
+  font-weight: 800;
   min-height: 40px;
-  padding: 0 14px;
-  border: 0;
-  border-radius: var(--radius);
-  background: none;
-  color: var(--muted);
+  padding: 0 16px;
+  border: 2.5px solid var(--outline);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink);
   cursor: pointer;
 }
 .tab:hover {
-  color: var(--ink);
+  background: var(--sun);
 }
 .tab[data-state="active"] {
-  background: var(--surface);
-  color: var(--ink);
-  box-shadow: var(--shadow-border);
+  background: var(--ink);
+  color: var(--sun);
 }
 .measure {
   display: grid;
   gap: 4px;
 }
 .measure > span {
-  font: 500 12px var(--mono);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font: 800 14px var(--sans);
+  letter-spacing: 0;
   color: var(--muted);
 }
 .measure select,
@@ -269,7 +269,7 @@
   font-size: 14px;
   min-height: 40px;
   padding: 0 10px;
-  border: 1px solid var(--line);
+  border: 2.5px solid var(--outline);
   border-radius: var(--radius);
   background: var(--surface);
   color: var(--ink);
@@ -304,10 +304,11 @@
 }
 .swatch {
   display: inline-block;
-  width: 10px;
-  height: 10px;
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
   background: var(--c);
+  box-shadow: 0 0 0 1.5px var(--outline);
   flex: none;
 }
 [data-kind="code"] .swatch {
@@ -341,12 +342,13 @@
 .add {
   min-height: 40px;
   padding: 0 16px;
-  border: 1px dashed color-mix(in oklab, var(--ink) 40%, var(--line));
+  border: 2.5px dashed var(--outline);
   border-radius: 999px;
-  background: none;
+  background: var(--sun);
   color: var(--ink);
   font: inherit;
   font-size: 14px;
+  font-weight: 800;
   cursor: pointer;
 }
 .add:disabled {
@@ -361,7 +363,7 @@
   white-space: nowrap;
 }
 .picker-count {
-  font: 12px var(--mono);
+  font: 700 12px var(--mono);
   color: var(--muted);
 }
 .picker-popover {
@@ -394,9 +396,8 @@
   margin-top: 6px;
 }
 .picker-group [cmdk-group-heading] {
-  font: 500 12px var(--mono);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font: 800 14px var(--sans);
+  letter-spacing: 0;
   color: var(--muted);
   padding: 12px 8px 4px;
 }
@@ -537,7 +538,7 @@
 }
 .bar-detail {
   grid-column: 2 / 4;
-  font: 12px var(--mono);
+  font: 700 12px var(--mono);
   color: var(--muted);
   max-height: 0;
   overflow: hidden;
@@ -556,7 +557,7 @@
   position: relative;
   height: 22px;
   border-top: 1px solid var(--line);
-  font: 12px var(--mono);
+  font: 700 12px var(--mono);
   color: var(--muted);
   font-variant-numeric: tabular-nums;
 }
@@ -574,7 +575,7 @@
 }
 .bar-better {
   padding-top: 4px;
-  font: 12px var(--mono);
+  font: 700 12px var(--mono);
   font-style: normal;
   color: var(--ink);
   white-space: nowrap;
@@ -593,11 +594,11 @@
 .scatter .tick text,
 .calibration .tick text {
   fill: var(--muted);
-  font: 12px var(--mono);
+  font: 700 12px var(--mono);
 }
 .scatter .axis-title {
   fill: var(--ink);
-  font: 12px var(--mono);
+  font: 700 12px var(--mono);
 }
 .scatter .frontier {
   fill: none;
@@ -676,8 +677,7 @@
 }
 .results thead th {
   font: 500 12px var(--mono);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  letter-spacing: 0;
   color: var(--muted);
   max-width: 16ch;
   white-space: normal;
@@ -800,7 +800,7 @@ th[aria-sort="descending"] .sort {
   align-items: center;
 }
 .case pre {
-  font: 12px/1.5 var(--mono);
+  font: 700 12px/1.5 var(--mono);
   max-height: 240px;
   overflow: auto;
   background: var(--bg);
@@ -924,7 +924,7 @@ th[aria-sort="descending"] .sort {
   cursor: default;
 }
 .watch-clock {
-  font: 12px var(--mono);
+  font: 700 12px var(--mono);
   color: var(--muted);
   margin-left: auto;
   font-variant-numeric: tabular-nums;
@@ -1076,8 +1076,7 @@ th[aria-sort="descending"] .sort {
   background: none;
   color: var(--coral);
   font: 500 12px var(--mono);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  letter-spacing: 0;
   cursor: pointer;
 }
 .toast {
@@ -1202,7 +1201,7 @@ th[aria-sort="descending"] .sort {
 }
 .ob-waiting {
   margin: 0;
-  font: 12px var(--mono);
+  font: 700 12px var(--mono);
   color: var(--muted);
 }
 .ob-card {
@@ -1232,7 +1231,7 @@ th[aria-sort="descending"] .sort {
 }
 .ob-card-note {
   grid-column: 2;
-  font: 12px var(--mono);
+  font: 700 12px var(--mono);
   color: var(--muted);
 }
 .ob-card[data-wrong="true"] .ob-card-note {
@@ -1266,7 +1265,7 @@ th[aria-sort="descending"] .sort {
   justify-content: center;
   overflow: hidden;
   white-space: nowrap;
-  font: 11px var(--mono);
+  font: 700 13px var(--mono);
   border-right: 1px solid var(--bg);
 }
 .ob-seg[data-k="input"] {
@@ -1552,7 +1551,7 @@ th[aria-sort="descending"] .sort {
   margin: 0 0 6px;
 }
 .cf-detail pre {
-  font: 12px/1.5 var(--mono);
+  font: 700 12px/1.5 var(--mono);
   max-height: 220px;
   overflow: auto;
 }
@@ -1591,7 +1590,7 @@ th[aria-sort="descending"] .sort {
 }
 .cf-curve text {
   fill: var(--muted);
-  font: 12px var(--mono);
+  font: 700 12px var(--mono);
 }
 .cf-series polyline {
   fill: none;
@@ -1605,7 +1604,7 @@ th[aria-sort="descending"] .sort {
 /* ---------------------------------------------------------------- write a contestant */
 .ct-editor textarea {
   width: 100%;
-  font: 13px/1.55 var(--mono);
+  font: 700 13px/1.55 var(--mono);
   padding: 12px 14px;
   border: 1px solid var(--line);
   border-radius: var(--radius);

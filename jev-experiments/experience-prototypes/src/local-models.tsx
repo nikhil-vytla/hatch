@@ -97,7 +97,7 @@ export function LocalModels({ result: r }: { result: any }) {
     <div className="local-models">
       <div className="local-overview">
         <div>
-          <span className="eyebrow">APPLE SILICON / RECORDED MEASUREMENTS</span>
+          <span className="eyebrow">Apple silicon / recorded measurements</span>
           <h2>How small can a useful decision model be?</h2>
           <p>
             Three ways to turn text into probabilities: read a language model’s
@@ -127,7 +127,7 @@ export function LocalModels({ result: r }: { result: any }) {
       </div>
       <div className="local-methods">
         <article>
-          <span className="method-number">01 / FIRST TOKEN</span>
+          <span className="method-number">First token</span>
           <h3>Shared state, separate questions</h3>
           <p>
             Encode the state once, copy its prompt cache for each question, and
@@ -136,7 +136,7 @@ export function LocalModels({ result: r }: { result: any }) {
           </p>
         </article>
         <article>
-          <span className="method-number">02 / OPTION TEXT</span>
+          <span className="method-number">Option text</span>
           <h3>Score the whole answer</h3>
           <p>
             Read the likelihood of every token in each option. Mean token
@@ -145,7 +145,7 @@ export function LocalModels({ result: r }: { result: any }) {
           </p>
         </article>
         <article>
-          <span className="method-number">03 / TRAINED HEAD</span>
+          <span className="method-number">Trained head</span>
           <h3>Specialize an encoder</h3>
           <p>
             Port Laya’s encoder and scorer to native MLX, freeze the encoder,
@@ -168,11 +168,11 @@ export function LocalModels({ result: r }: { result: any }) {
           <table className="model-table">
             <thead>
               <tr>
-                <th>MODEL / METHOD</th>
-                <th>TEACHER AGREEMENT ↑</th>
-                <th>SOFT-LABEL KL ↓</th>
-                <th>BRIER ↓</th>
-                <th>WARM CASE TIME</th>
+                <th>Model / method</th>
+                <th>Teacher agreement ↑</th>
+                <th>Soft-label KL ↓</th>
+                <th>Brier ↓</th>
+                <th>Warm case time</th>
               </tr>
             </thead>
             <tbody>
@@ -504,10 +504,10 @@ export function LocalModels({ result: r }: { result: any }) {
           <table className="model-table">
             <thead>
               <tr>
-                <th>WORKFLOW</th>
-                <th>TEACHER AGREEMENT</th>
+                <th>Workflow</th>
+                <th>Teacher agreement</th>
                 <th>KL</th>
-                <th>BRIER</th>
+                <th>Brier</th>
               </tr>
             </thead>
             <tbody>
@@ -529,10 +529,10 @@ export function LocalModels({ result: r }: { result: any }) {
           <table className="model-table">
             <thead>
               <tr>
-                <th>MODEL</th>
+                <th>Model</th>
                 <th>ECE ↓</th>
-                <th>SCORE MAE ↓</th>
-                <th>PEAK MLX MEMORY</th>
+                <th>Score MAE ↓</th>
+                <th>Peak MLX memory</th>
               </tr>
             </thead>
             <tbody>
@@ -585,7 +585,7 @@ export function ResearchMap({ result: r }: { result: any }) {
     <div>
       <div className="local-overview">
         <div>
-          <span className="eyebrow">RESEARCH MAP / NEXT QUESTIONS</span>
+          <span className="eyebrow">Research map / next questions</span>
           <h2>Give each experiment something to prove.</h2>
           <p>
             Benchmarks test a specific capability. Product experiments test

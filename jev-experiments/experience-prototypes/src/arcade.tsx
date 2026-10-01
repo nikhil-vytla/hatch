@@ -320,10 +320,10 @@ export function Arcade({ game, result }: { game: Game; result: any }) {
               <div>
                 <small>
                   {mode === "replay"
-                    ? "RECORDED RUN"
+                    ? "Recorded run"
                     : mode === "live"
-                      ? "LIVE JEV"
-                      : "YOUR CONTROLS"}
+                      ? "Live Jev"
+                      : "Your controls"}
                 </small>
                 <strong>{busy ? "Choosing…" : `Move ${state.tick}`}</strong>
               </div>
