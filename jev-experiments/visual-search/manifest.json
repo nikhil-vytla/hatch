@@ -1,5 +1,5 @@
 {
-  "version": "visual-search-v1",
+  "version": "visual-search-v2",
   "model": "typesafe-ai/jev",
   "score_range": [
     0,
@@ -9,7 +9,7 @@
     "metadata",
     "caption"
   ],
-  "work_count": 204,
+  "work_count": 208,
   "presets": [
     {
       "id": "quiet-water",
@@ -78,9 +78,9 @@
   "max_batch_bytes": 44000,
   "query_limit_chars": 800,
   "independent_questions": "Each question carries one artwork's exact evidence. All questions in a batch share only the search query and fixed policy. Metadata-only and caption-assisted modes differ by the museum_caption field. Collection source-topic labels and image pixels are never model inputs.",
-  "interpretation": "Exploratory relevance judgments, not independent relevance labels or calibrated probabilities. No accuracy, recall or model-superiority claim is made. All 204 works are scored in each mode for every saved query.",
-  "collection_sha256": "b2cbd8d3bbc160eddbcaba9b9d02f55f26fd4e2ba41df2224a0d14dac2dc844c",
-  "protocol_sha256": "42302a59358e2f93a35d788e19b3d06503fca297f60f37e3eb21fdcbd1d301a9",
-  "planned_scores": 2448,
-  "frozen_at": "2026-09-20"
+  "interpretation": "Exploratory relevance judgments, not independent relevance labels or calibrated probabilities. No accuracy, recall or model-superiority claim is made. All 208 works are scored in each mode for every saved query.",
+  "collection_sha256": "2b1751040e8630629c88097c33ba1528029a1963df4e92aca6b2275552017e0f",
+  "protocol_sha256": "9d42cbb2917eec4b894a7643da8034aa3458ba7529e9ef36808c9786ab97fbd4",
+  "planned_scores": 2496,
+  "frozen_at": "2026-10-01"
 }
