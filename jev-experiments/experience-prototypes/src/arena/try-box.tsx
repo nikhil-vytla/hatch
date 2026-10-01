@@ -1,7 +1,7 @@
 /**
  * One box, live: type into the box and every contestant that can run in the browser answers
- * as you go, under the same calm rules as the recorded replays. The keyword classifier and the
- * tiny model run here, after upstream's 120 ms debounce. Jev runs through the gateway with your
+ * as you go, under the same calm rules as the recorded replays. The keyword classifier runs
+ * here, after upstream's 120 ms debounce. Jev runs through the gateway with your
  * key, but a key allows only a couple dozen answers a minute, far fewer than a keystroke each,
  * so live Jev asks when you pause (PAUSE_MS) with at most one request in flight. Laya runs only
  * on a Mac, so it has no live lane. Nothing typed here is stored.
@@ -16,12 +16,11 @@ import { EvaluationError, getApiKey, run } from "../api";
 import { colorVars, type CardModel } from "./model";
 import { fromCalm, Shown } from "./one-box-ui";
 
-type LaneId = "jev" | "tiny" | "keyword";
+type LaneId = "jev" | "keyword";
 
 /** Which card contestant each live lane borrows its name and colour from. */
 const CONTESTANT: Record<LaneId, string> = {
   jev: "jev@cancel",
-  tiny: "tiny@cancel",
   keyword: "code.keyword",
 };
 
@@ -46,19 +45,15 @@ const EXAMPLES = [
   "how many days until thanksgiving",
 ];
 
-type TinyAnswers = (text: string) => Parameters<typeof toReading>[0];
-
 export function TryBox({ model: m }: { model: CardModel }) {
   const [text, setText] = useState("");
   const hasKey = Boolean(getApiKey());
 
   const [lanes, setLanes] = useState<Record<LaneId, Lane>>({
     jev: fresh(hasKey ? "" : "Connect your AI Gateway key in Settings to run Jev live."),
-    tiny: fresh("Loading the model…"),
     keyword: fresh(),
   });
 
-  const tiny = useRef<TinyAnswers | null>(null);
   const timers = useRef(new Map<LaneId, ReturnType<typeof setTimeout>>());
 
   const jev = useRef<{ controller: AbortController | null; queued: string | null }>({
@@ -67,21 +62,6 @@ export function TryBox({ model: m }: { model: CardModel }) {
   });
 
   const typer = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  // The tiny model's weights are 1.5 MB, so they load only when this view opens.
-  useEffect(() => {
-    let alive = true;
-
-    void import("../../../packages/arena/src/one-box/tiny").then((t) => {
-      if (!alive) return;
-      tiny.current = t.tinyAnswers;
-      setLanes((l) => ({ ...l, tiny: { ...l.tiny, note: "" } }));
-    });
-
-    return () => {
-      alive = false;
-    };
-  }, []);
 
   const apply = (id: LaneId, reading: Reading, forText: string, ms: number, note = "") =>
     setLanes((l) => ({
@@ -149,7 +129,7 @@ export function TryBox({ model: m }: { model: CardModel }) {
     setText(text);
     const blank = normalizeKey(text).length < 2;
 
-    for (const id of ["jev", "tiny", "keyword"] as const) {
+    for (const id of ["jev", "keyword"] as const) {
       clearTimeout(timers.current.get(id));
 
       if (blank) {
@@ -175,12 +155,7 @@ export function TryBox({ model: m }: { model: CardModel }) {
 
             const started = performance.now();
 
-            if (id === "keyword")
-              return apply(id, keyword(text), text, performance.now() - started);
-            const answers = tiny.current;
-
-            if (answers)
-              apply(id, toReading(answers(text)).reading, text, performance.now() - started);
+            apply(id, keyword(text), text, performance.now() - started);
           },
           id === "jev" ? PAUSE_MS : TYPING.debounceMs,
         ),
@@ -216,7 +191,7 @@ export function TryBox({ model: m }: { model: CardModel }) {
   return (
     <div className="ob-try">
       <p className="ob-try-rules muted small">
-        The keyword rules and the tiny model answer {TYPING.debounceMs} ms after each keystroke, in
+        The keyword rules answer {TYPING.debounceMs} ms after each keystroke, in
         your browser. Jev asks when you pause for {PAUSE_MS} ms, one request at a time: a key allows
         a couple dozen answers a minute, not one per keystroke. Nothing you type is stored.
       </p>
@@ -246,7 +221,7 @@ export function TryBox({ model: m }: { model: CardModel }) {
       </div>
 
       <div className="ob-lanes">
-        {(["jev", "tiny", "keyword"] as const).map((id) => {
+        {(["jev", "keyword"] as const).map((id) => {
           const cid = CONTESTANT[id];
           const c = m.contestant(cid);
           const lane = lanes[id];

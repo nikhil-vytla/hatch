@@ -278,7 +278,7 @@ export function caption(m: CardModel) {
     case "dial":
       return "Everything the contestant is less sure of than the cutoff goes to a person; the rest goes through. A confidence you can route on trades volume for reliability as the cutoff rises. One that carries no signal stays flat.";
     case "try":
-      return "Your text goes to every contestant that can run here, under the same calm rules. The keyword rules and the tiny model run in your browser; Jev runs live with your key. Laya runs only on a Mac, so it has no live lane.";
+      return "Your text goes to every contestant that can run here, under the same calm rules. The keyword rules run in your browser; Jev runs live with your key. Laya runs only on a Mac, so it has no live lane.";
     case "typing":
       return "Each box receives the same keystrokes at the same pace. The strip under each box shows everything it showed over the phrase; the line marks now.";
     case "board":

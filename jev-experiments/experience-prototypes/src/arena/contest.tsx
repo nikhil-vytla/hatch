@@ -37,8 +37,8 @@ export function answer(state, questions) {
 }
 `;
 
-/** The four contestants to beat, in order. */
-const BOSSES = ["code.keyword", "tiny@cancel", "laya@cancel", "jev@cancel"];
+/** The contestants to beat, in order. */
+const BOSSES = ["code.keyword", "laya@cancel", "jev@cancel"];
 
 type Result = { ok: true; run: EntryRun; ms: number } | { ok: false; error: string };
 

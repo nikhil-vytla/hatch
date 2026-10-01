@@ -35,7 +35,6 @@ const doc = phrasesSchema.parse(
 const NAMES = new Map([
   ["jev", "Jev (recorded)"],
   ["laya", "Laya (local, intent in 3 groups)"],
-  ["tiny", "Tiny model"],
 ]);
 
 const recordings = new Map<string, { answers: Map<string, Answered>; dropped: number }>();
