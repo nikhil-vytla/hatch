@@ -20,7 +20,13 @@ struct Journal {
 impl Journal {
     fn new() -> Self {
         let mut j = Self::default();
-        j.events.push(Event::SessionStarted { format: 1, cwd: "/p".into(), strive_version: "0".into(), kind: None });
+        j.events.push(Event::SessionStarted {
+            format: 1,
+            cwd: "/p".into(),
+            strive_version: "0".into(),
+            kind: None,
+            safe: false,
+        });
         j
     }
     fn push(&mut self, event: Event) -> u64 {

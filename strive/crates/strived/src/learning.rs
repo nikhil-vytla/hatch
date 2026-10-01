@@ -180,7 +180,13 @@ async fn open(state: &State, cwd: &str) -> Result<SessionInfo, RpcError> {
     }
     state
         .sessions
-        .create(cwd.to_string(), state.settings.budget.limits(), state.settings.approvals, Some(SessionKind::Learning))
+        .create(
+            cwd.to_string(),
+            state.settings.budget.limits(),
+            state.settings.approvals,
+            Some(SessionKind::Learning),
+            false,
+        )
         .await
         .map_err(session_error)
 }

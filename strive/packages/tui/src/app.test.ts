@@ -209,6 +209,7 @@ test("STRIVE_SESSION values map to session modes", () => {
   expect(parseSessionMode(undefined)).toBe("new");
   expect(parseSessionMode("new")).toBe("new");
   expect(parseSessionMode("continue")).toBe("continue");
+  expect(parseSessionMode("safe")).toBe("safe");
   expect(parseSessionMode("01J8ZZZZZZZZZZZZZZZZZZZZZZ")).toEqual({ resume: "01J8ZZZZZZZZZZZZZZZZZZZZZZ" });
 });
 

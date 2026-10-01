@@ -30,7 +30,11 @@ format: number, cwd: string, striveVersion: string,
 /**
  * What the session is for; a work session when absent.
  */
-kind?: SessionKind, } | { "type": "userMessage", text: string, 
+kind?: SessionKind, 
+/**
+ * Started in safe mode: no extension's tools or hooks run in it.
+ */
+safe?: boolean, } | { "type": "userMessage", text: string, 
 /**
  * The slash command this prompt expanded (ADR-0024): what the
  * person typed was `/name arguments`, and `text` is what it stands for.

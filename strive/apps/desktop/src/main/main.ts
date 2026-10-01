@@ -66,7 +66,8 @@ const PROJECT: ReadonlySet<MethodName> = new Set<MethodName>([
   "learning/dismiss",
 ]);
 
-type Mode = { kind: "new" } | { kind: "continue" } | { kind: "resume"; id: string };
+/** `safe`: a new session runs no extensions. */
+type Mode = { kind: "new"; safe: boolean } | { kind: "continue" } | { kind: "resume"; id: string };
 
 type Args = { socket: string; cwd: string; mode: Mode };
 
@@ -87,7 +88,9 @@ function parseArgs(argv: string[]): Parsed {
 
   const mode: Mode = resume
     ? { kind: "resume", id: resume }
-    : { kind: argv.includes("--continue") ? "continue" : "new" };
+    : argv.includes("--continue")
+      ? { kind: "continue" }
+      : { kind: "new", safe: argv.includes("--safe") };
 
   return { ok: true, args: { socket, cwd: flag("--cwd") ?? process.cwd(), mode } };
 }
@@ -101,7 +104,9 @@ async function openSession(client: StriveClient, args: Args): Promise<SessionInf
     if (sessions[0]) return sessions[0].id;
   }
 
-  return (await client.request("session/create", { cwd: args.cwd })).id;
+  const safe = args.mode.kind === "new" && args.mode.safe;
+
+  return (await client.request("session/create", { cwd: args.cwd, safe })).id;
 }
 
 /** Where the build put the preload script and renderer (bundling fixes `__dirname` at the source). */

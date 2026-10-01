@@ -86,16 +86,16 @@ enum Said {
 /// `gate` for `request` (as the host asked for it), made stricter by the
 /// project's accepted hooks: a refusal if one denies it, a question if one
 /// asks or fails. Never less strict than `gate`. Whether a hook changed it
-/// comes with it.
+/// comes with it. A session in safe mode runs none.
 pub async fn stricter(
     state: &State,
-    cwd: &str,
+    session: &strive_proto::SessionInfo,
     scope: &Scope,
     request: &EffectRequest,
     allowed: &[PathBuf],
     gate: Gate,
 ) -> (Gate, bool) {
-    if matches!(gate, Gate::Deny(_)) {
+    if session.safe || matches!(gate, Gate::Deny(_)) {
         return (gate, false);
     }
     let kind = kind(request);
@@ -108,7 +108,7 @@ pub async fn stricter(
     for e in extensions.iter().filter(|e| e.hooks.iter().any(|h| h.sees(kind))) {
         let name = e.info.name.clone();
         let digest = strive_journal::cas::digest(&strive_learning::extension_dir::canonical(&e.files));
-        let accepted = crate::extensions::proposed(state, cwd, &name, &digest)
+        let accepted = crate::extensions::proposed(state, &session.cwd, &name, &digest)
             || allowed.contains(&crate::extensions::allowance(&name, &digest));
         if !accepted {
             continue;

@@ -228,6 +228,10 @@ Confining the host process to the daemon's socket and gateway is planned.
     has it. A hook answers `deny` (refused), `ask` (a person is asked,
     even in full-auto) or nothing; it can't allow or rewrite. A hook that
     fails asks, every time, so an agent can't turn one off by making it fail.
+  - **Safe mode:** a session created with `safe` (`strive --safe`, or
+    `"extensions": false` in settings) records it in `sessionStarted`. Its
+    host is given no extensions (`contextLoaded` notes the ones left out),
+    an `extension` effect is refused, and no hook runs.
 - **Imports:** a line `@path` in an instruction file, outside a code
   block, inlines that file if its real path is in the project (under its
   root, not in strive's home), up to five imports deep, and not as a

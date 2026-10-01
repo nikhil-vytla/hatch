@@ -220,6 +220,10 @@ pub struct SessionInfo {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub kind: Option<SessionKind>,
+    /// Started in safe mode: no extension's tools or hooks run in it.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    #[ts(as = "Option<bool>", optional)]
+    pub safe: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
@@ -227,6 +231,11 @@ pub struct SessionInfo {
 #[ts(export)]
 pub struct SessionCreateParams {
     pub cwd: String,
+    /// Safe mode: the session runs no extension's tools or hooks
+    /// (ADR-0027), as when the `extensions` setting is off.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    #[ts(as = "Option<bool>", optional)]
+    pub safe: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
@@ -1197,6 +1206,10 @@ pub enum Event {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         #[ts(optional)]
         kind: Option<SessionKind>,
+        /// Started in safe mode: no extension's tools or hooks run in it.
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        #[ts(as = "Option<bool>", optional)]
+        safe: bool,
     },
     UserMessage {
         text: String,

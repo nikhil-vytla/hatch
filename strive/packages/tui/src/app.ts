@@ -76,15 +76,20 @@ function hasProblem(data: unknown): data is { problem: string } {
 }
 
 /** Which session to open: `new`, `continue` (latest in this directory), or an id. */
-export type SessionMode = "new" | "continue" | { resume: string };
+/** `safe`: a new session in safe mode, which runs no extensions. */
+export type SessionMode = "new" | "safe" | "continue" | { resume: string };
 
 export function parseSessionMode(raw: string | undefined): SessionMode {
   if (!raw || raw === "new") return "new";
 
-  if (raw === "continue") return "continue";
+  if (raw === "continue" || raw === "safe") return raw;
 
   return { resume: raw };
 }
+
+/** The session `mode` resumes, if it resumes one. */
+const resumedId = (mode: SessionMode) =>
+  mode === "new" || mode === "safe" || mode === "continue" ? undefined : mode.resume;
 
 const tilde = (p: string) => (p.startsWith(homedir()) ? `~${p.slice(homedir().length)}` : p);
 
@@ -291,7 +296,9 @@ export class App {
   }
 
   private async chooseSession(mode: SessionMode): Promise<string> {
-    if (mode !== "new" && mode !== "continue") return mode.resume;
+    const resumed = resumedId(mode);
+
+    if (resumed) return resumed;
 
     if (mode === "continue") {
       const { sessions } = await this.client.request("session/list", { cwd: this.cwd });
@@ -299,11 +306,11 @@ export class App {
       if (sessions[0]) return sessions[0].id;
     }
 
-    return (await this.client.request("session/create", { cwd: this.cwd })).id;
+    return (await this.client.request("session/create", { cwd: this.cwd, safe: mode === "safe" })).id;
   }
 
   private explainOpenError(cause: unknown, mode: SessionMode): string {
-    const id = mode !== "new" && mode !== "continue" ? mode.resume : "this session";
+    const id = resumedId(mode) ?? "this session";
 
     if (!(cause instanceof ServerError)) return `Could not open the session: ${describeError(cause)}`;
 

@@ -27,9 +27,9 @@ pub fn locate() -> Result<Vec<String>> {
 }
 
 /// Which session the TUI opens. Passed as `STRIVE_SESSION`: `new`,
-/// `continue`, or a session id.
+/// `safe` (a new one in safe mode), `continue`, or a session id.
 pub enum Session {
-    New,
+    New { safe: bool },
     Continue,
     Resume(String),
 }
@@ -49,7 +49,8 @@ pub fn exec(home: &Home, session: &Session) -> Result<()> {
         .env(
             "STRIVE_SESSION",
             match session {
-                Session::New => "new",
+                Session::New { safe: false } => "new",
+                Session::New { safe: true } => "safe",
                 Session::Continue => "continue",
                 Session::Resume(id) => id,
             },
