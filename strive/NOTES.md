@@ -2774,3 +2774,38 @@ nobody can evaluate learning in non-i.i.d. daily use. strive's honest
 claim is auditable, reversible, measured learning in context, not
 open-ended self-improvement; its trusted daemon is the answer to the
 reward hacking the research systems keep hitting.
+
+## 2026-09-30: declarative extensions: checks and slash commands (ADR-0023, ADR-0024)
+
+The first milestone of the extension plan (NOTES above: bb, exo and Prime
+Agent let the agent extend its harness, with no containment): artifacts
+that change what strive does without a new way of running code, each a
+whole-file `Change` through the proposal pipeline.
+- **Checks** (`.strive/checks/<name>.md`, PR #128): a command the daemon
+  runs after a turn that changed matching files; a failure goes back to the
+  agent, at most twice a turn. The host names the check and the daemon
+  reads the command from the file, so a host can't choose it.
+  - Three review rounds shaped it. A check runs unasked only in a form a
+    person accepted: an applied proposal's content, or content allowed for
+    the session. The file alone doesn't show a person wrote it: on Linux
+    bubblewrap makes `.strive/checks` read-only only where it exists, so a
+    command could plant one. An allow covers exactly what the prompt says
+    (once, or this check as it is now for the session, never full-auto),
+    and the report is journaled before the agent sees it, so a host that
+    stops in between resumes with the agent told.
+  - Mutation testing found the limits untested at their boundaries
+    (500-character run line, 4 KiB file); tests now sit on each.
+- **Slash commands** (`.strive/commands/<name>.md`, Claude Code's format):
+  the daemon expands `/name arguments` in `session/prompt` and journals the
+  prompt with what was typed. `.claude/commands` is read too, leniently;
+  strive's own are read strictly, so a typo in a field doesn't silently
+  change a command.
+- **A pre-existing race, found on the way:** `agent.test.ts`'s "Esc
+  interrupts it" fails about 1 run in 6-8 under load, on main too. Timing
+  Esc to "Interrupted." under load is bimodal: about 0.2 s, or about 10.2 s,
+  the fake model's delay, so sometimes the interrupt doesn't end the model
+  call and the turn waits for the reply. pi-agent-core makes its abort
+  controller synchronously and the host doesn't await between its last
+  abort check and `agent.prompt`, so the gap is likely in how the abort
+  reaches a request still waiting for response headers (the fake holds
+  them for the whole delay). Not fixed yet.

@@ -21,7 +21,8 @@ pub fn parse(text: &str, strict: bool) -> Result<CommandFile, Vec<String>> {
         None => ("", text),
         Some(rest) => match rest.find("\n---") {
             None => return Err(vec!["the command's frontmatter has no closing ---".into()]),
-            Some(end) => (&rest[..end], rest[end + 4..].strip_prefix('\n').unwrap_or(&rest[end + 4..])),
+            // The body is trimmed below, so the closing line's newline goes with it.
+            Some(end) => (&rest[..end], &rest[end + 4..]),
         },
     };
     let mut problems = Vec::new();
@@ -70,24 +71,24 @@ pub fn expand(body: &str, arguments: &str) -> String {
     let words: Vec<&str> = arguments.split_whitespace().collect();
     let mut out = String::with_capacity(body.len() + arguments.len());
     let mut placed = false;
-    let mut rest = body;
-    while let Some(at) = rest.find('$') {
-        out.push_str(&rest[..at]);
-        let after = &rest[at + 1..];
-        if let Some(tail) = after.strip_prefix("ARGUMENTS") {
+    // Each piece after a `$` starts with what that `$` names, if anything.
+    let mut pieces = body.split('$');
+    out.push_str(pieces.next().unwrap_or_default());
+    for piece in pieces {
+        if let Some(tail) = piece.strip_prefix("ARGUMENTS") {
             out.push_str(arguments);
+            out.push_str(tail);
             placed = true;
-            rest = tail;
-        } else if let Some(d) = after.chars().next().and_then(|c| c.to_digit(10)).filter(|d| *d >= 1) {
+        } else if let Some(d) = piece.chars().next().and_then(|c| c.to_digit(10)).filter(|d| *d >= 1) {
             out.push_str(words.get(d as usize - 1).copied().unwrap_or(""));
+            // An ASCII digit is one byte.
+            out.push_str(&piece[1..]);
             placed = true;
-            rest = &after[1..];
         } else {
             out.push('$');
-            rest = after;
+            out.push_str(piece);
         }
     }
-    out.push_str(rest);
     if !placed && !arguments.is_empty() {
         out.push_str("\n\n");
         out.push_str(arguments);

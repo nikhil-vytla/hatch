@@ -35,7 +35,7 @@ pub fn parse(text: &str) -> Result<CheckFile, Vec<String>> {
         return Err(vec!["the check's frontmatter has no closing ---".into()]);
     };
     let (block, after) = (&rest[..end], &rest[end + 4..]);
-    let body = after.strip_prefix('\n').unwrap_or(after).trim().to_string();
+    let body = after.trim().to_string();
     let mut problems = Vec::new();
     let mut seen: Vec<(&str, String)> = Vec::new();
     for line in block.lines().filter(|l| !l.trim().is_empty()) {
