@@ -175,7 +175,7 @@ export const experiments = [
   e("visual-search", "visual-search", "The visual archive", "Creative tools", "Search 204 public-domain artworks by subject, mood and detail.", "What can Jev find through museum metadata and captions?"),
   e("wardrobe", "wardrobe", "A change of clothes", "Creative tools", "A spoken edit becomes a wardrobe choice, then a moving image.", "Can small semantic decisions keep a video try-on coherent across edits?"),
   e("icon-studio", "icon-studio", "A symbol for an idea", "Creative tools", "Find an icon by meaning, then try it in a real interface.", "Can Jev choose a useful visual metaphor from 1,703 library icons?"),
-  e("crowd", "live-worlds", "The square at five", "Games & simulations", "A small town keeps moving while its residents make up their minds.", "Can a sentence change many independent decisions in a living world?"),
+  e("crowd", "live-worlds", "The square at five", "Games & simulations", "Pin a notice in a small town and watch twelve residents decide, read by a free model in your browser.", "Can a sentence change many independent decisions in a living world?"),
   e("ghost-brush", "live-worlds", "Ghost Brush", "Creative tools", "Draw a gesture. Give it a feeling. Follow another line.", "Can a typed style judgment turn a procedural brush into a semantic instrument?"),
 ];
 export const categories = [

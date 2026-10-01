@@ -4,6 +4,9 @@ export type PlaceId =
   "cafe" | "bakery" | "library" | "garden" | "stage" | "fountain";
 export type Controller = "needs" | "notice" | "jev" | "human";
 export type Source = "needs" | "notice" | "jev" | "human";
+/** Which model fills the "jev" controller slot: Jev through the gateway, or a small model in the browser. */
+export type Model = "jev" | "browser";
+export const modelName = (m: Model | undefined) => (m === "browser" ? "MobileBERT" : "Jev");
 export type Needs = { hunger: number; rest: number; company: number };
 export type Place = {
   id: PlaceId;
@@ -187,6 +190,8 @@ export type Resident = {
   intentVersion: number;
   source: Source;
   provenance: "local" | "live" | "recorded" | "human";
+  /** Which model made the last model decision for this resident. */
+  model?: Model;
   thought: string;
   reaction: string;
   arrivedAt: number;
@@ -227,6 +232,8 @@ export type World = {
   time: number;
   tick: number;
   controller: Controller;
+  /** Which model answers when the controller is "jev"; Jev when absent. */
+  model?: Model;
   modelMode: "live" | "recorded";
   assisted: boolean;
   notice: string;
@@ -396,14 +403,16 @@ export function setController(
   w: World,
   controller: Controller,
   assisted = w.assisted,
+  model: Model = w.model ?? "jev",
 ) {
   w.epoch++;
   w.controller = controller;
   w.assisted = assisted;
+  w.model = model;
   addEvent(
     w,
     "controller",
-    `${controller === "jev" ? "Jev" : controller === "notice" ? "Local notice rules" : controller === "needs" ? "Needs policy" : "Human control"} · ${assisted ? "fallback on" : "fallback off"}`,
+    `${controller === "jev" ? modelName(model) : controller === "notice" ? "Local notice rules" : controller === "needs" ? "Needs policy" : "Human control"} · ${assisted ? "fallback on" : "fallback off"}`,
   );
 }
 export function setNotice(w: World, text: string) {
@@ -519,7 +528,7 @@ export function chooseFallback(w: World, r: Resident) {
     r.thought =
       w.controller === "human"
         ? "Waiting for your direction."
-        : "Waiting for a new Jev destination.";
+        : `Waiting for a new ${modelName(w.model)} destination.`;
     return;
   }
   const source = w.controller === "notice" ? "notice" : "needs",
@@ -731,7 +740,8 @@ export function applyReply(w: World, t: Ticket, answers: Reply) {
       r.intentVersion++;
       r.source = "jev";
       r.provenance = w.modelMode ?? "live";
-      r.thought = "Jev chose to keep this plan.";
+      r.model = w.model ?? "jev";
+      r.thought = `${modelName(w.model)} chose to keep this plan.`;
       r.plannedAt = w.time;
       if (!r.target) r.humanUntil = w.time + 6;
     } else {
@@ -744,8 +754,9 @@ export function applyReply(w: World, t: Ticket, answers: Reply) {
         r,
         choice.value as PlaceId,
         "jev",
-        `Jev matched the notice to ${r.name}'s preferences.`,
+        `${modelName(w.model)} matched the notice to ${r.name}'s preferences.`,
       );
+      r.model = w.model ?? "jev";
     }
     r.reaction =
       typeof reaction?.value === "string" &&
@@ -884,8 +895,8 @@ export function compareJev(from: Checkpoint, id: string): Pair {
   const p = forkPair(from, id, "Jev · fallback comparison");
   p.b = copy(p.a);
   p.b.id = id + ":B";
-  setController(p.a, "jev", false);
-  setController(p.b, "jev", true);
+  setController(p.a, "jev", false, "jev");
+  setController(p.b, "jev", true, "jev");
   return p;
 }
 export function welfare(w: World) {
@@ -917,6 +928,7 @@ export function replayPlan(
     w.id = id + ":" + lane;
     w.epoch++;
     w.controller = "jev";
+    w.model = "jev";
     w.assisted = lane === "B";
     w.modelMode = "recorded";
     w.metrics.liveAccepted = 0;
