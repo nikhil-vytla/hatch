@@ -473,10 +473,10 @@
   color: var(--cafe-muted);
 }
 .cafe-eyebrow {
-  font-size: 12px;
-  letter-spacing: 1.6px;
+  font-size: 13px;
+  letter-spacing: 0;
   color: var(--cafe-muted);
-  font-weight: 500;
+  font-weight: 700;
 }
 .cafe-menu-grid {
   display: grid;
