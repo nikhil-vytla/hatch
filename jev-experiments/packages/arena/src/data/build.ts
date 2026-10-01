@@ -37,6 +37,7 @@ import {
 } from "../../../../cafe-jev/engine";
 import { keywordAnswers, priorAnswers, tokensFor } from "../cafe-baselines";
 import { oneBoxCard } from "./one-box-card";
+import { OPEN_MODELS, openModel } from "../../open-decisions/models";
 
 // ---------------------------------------------------------------- inputs
 // Every recording and study file is parsed here. Where a chunk echoes its input,
@@ -266,11 +267,70 @@ const perSeed = (values: { item: string; value: number }[], of?: number): Estima
 type Estimates = Card["results"][string];
 
 // ---------------------------------------------------------------- the typed-decisions study
+const openRowSchema = z.looseObject({
+  id: z.string(),
+  status: z.string(),
+  at: z.string().optional(),
+  serverMs: z.number().optional(),
+  answers: z.record(z.string(), z.looseObject({ probabilities: z.record(z.string(), z.number()).nullish() })).optional(),
+});
+
+/**
+ * Adds the open models recorded through SGLang's decision method (open-decisions/record.ts typed)
+ * to the study, each only when all of its cases answered. Returns their recording files and dates.
+ */
+function withOpenModels(doc: z.infer<typeof studySchema>) {
+  const added: { id: string; file: string; recordedAt: string }[] = [];
+
+  for (const m of OPEN_MODELS) {
+    const file = `packages/arena/recordings/open-decisions.typed.${m.id}.jsonl`;
+    const path = resolve(here, "../..", file);
+
+    if (!existsSync(path)) continue;
+
+    const rows = new Map<string, z.infer<typeof openRowSchema>>();
+
+    for (const line of readFileSync(path, "utf8").split("\n")) {
+      if (!line.trim()) continue;
+
+      const row = openRowSchema.parse(JSON.parse(line));
+
+      if (row.status === "ok") rows.set(row.id, row);
+    }
+
+    if (doc.cases.some((c) => !rows.has(c.id))) continue;
+
+    const id = `open.${m.id}`;
+    const times = doc.cases.map((c) => rows.get(c.id)?.serverMs ?? 0).sort((a, b) => a - b);
+
+    doc.models.push({
+      id,
+      name: `${m.name} (${m.quantisation}) · ${m.method}`,
+      url: `https://huggingface.co/${m.repo}`,
+      case_latency_ms: { median: times[Math.floor(times.length / 2)] },
+    });
+
+    for (const c of doc.cases)
+      for (const q of c.questions) {
+        const p = rows.get(c.id)?.answers?.[q.key]?.probabilities ?? {};
+
+        q.predictions[id] = q.keys.map((k) => p[k] ?? 0);
+      }
+
+    const dates = [...rows.values()].map((r) => r.at ?? "").sort();
+
+    added.push({ id, file, recordedAt: (dates.at(-1) ?? "").slice(0, 10) });
+  }
+
+  return added;
+}
+
 function studyCard(out: string): Card {
   const doc = studySchema.parse(
     readJson(resolve(here, "../../experience-prototypes/public/data/local-models.json")).result,
   );
 
+  const openFiles = withOpenModels(doc);
   const models = doc.models;
 
   const kind = (id: string): CardContestant["kind"] =>
@@ -288,7 +348,9 @@ function studyCard(out: string): Card {
       "SmolLM2-360M-Instruct": COLORS.smol,
       "train-prior": COLORS.code,
       uniform: COLORS.code3,
-    })[id] ?? COLORS.code2;
+    })[id] ??
+    openModel(id.replace(/^open\./, ""))?.color ??
+    COLORS.code2;
 
   const rs = runSet(
     "2026-09-20-typed-decisions",
@@ -301,6 +363,21 @@ function studyCard(out: string): Card {
       reference: "mean-of-3-teacher-samples",
     },
     ["experience-prototypes/public/data/local-models.json"],
+  );
+
+  // The same cases, questions and reference, asked later through SGLang's decision method.
+  const rsOpen = runSet(
+    "2026-10-01-typed-decisions-open",
+    `Typed Decisions test split, ${openFiles.length} open models via SGLang's decision method`,
+    openFiles.map((o) => o.recordedAt).sort().at(-1) ?? "2026-10-01",
+    {
+      benchmark: "typed-decisions",
+      split: "test",
+      revision: doc.provenance.revision,
+      reference: "mean-of-3-teacher-samples",
+      method: "sglang-systemone-prompt-format-1",
+    },
+    openFiles.map((o) => o.file),
   );
 
   const metrics: MetricDef[] = [
@@ -537,15 +614,18 @@ function studyCard(out: string): Card {
       model: m.url ? m.name.split(" · ")[0] : undefined,
       policy: m.name.split(" · ")[1],
       color: color(m.id),
-      default: defaults.has(m.id),
-      runSets: [rs.id],
+      default: defaults.has(m.id) || m.id === "open.qwen3-4b",
+      runSets: [openFiles.some((o) => o.id === m.id) ? rsOpen.id : rs.id],
     })),
     results,
     slices,
     provenance: `Agreement with a soft reference · ${doc.cases.length} cases × 5 questions · Typed Decisions test split (${doc.provenance.license}, rev ${doc.provenance.revision.slice(0, 7)}) · local models on ${doc.hardware}, Jev via AI Gateway · recorded 20 Sep 2026 · 95% case-bootstrap intervals`,
     chunks: { preds, targets: "typed-decisions.targets.json", cases: "typed-decisions.cases.json" },
     lenses: ["bars", "room", "dial", "scatter", "reliability", "table", "case"],
-    protocolGroups: [{ hash: rs.protocolHash, label: rs.label, runSets: [rs.id] }],
+    protocolGroups: [
+      { hash: rs.protocolHash, label: rs.label, runSets: [rs.id] },
+      ...(openFiles.length ? [{ hash: rsOpen.protocolHash, label: rsOpen.label, runSets: [rsOpen.id] }] : []),
+    ],
   };
 }
 
