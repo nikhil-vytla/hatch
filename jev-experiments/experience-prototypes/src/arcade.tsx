@@ -309,7 +309,7 @@ export function Arcade({ game, result }: { game: Game; result: any }) {
             <div className="arcade-hud">
               <div>
                 <small>
-                  {game === "snake" ? "SNAKE / SURVIVAL" : "ORBITAL / RESCUE"}
+                  {game === "snake" ? "Snake · survival" : "Orbital · rescue"}
                 </small>
                 <strong>
                   {game === "snake"
