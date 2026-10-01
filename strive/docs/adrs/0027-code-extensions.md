@@ -1,6 +1,6 @@
 # ADR-0027: Code extensions: tools the agent writes, run in the command sandbox
 
-Status: accepted and built (2026-10-01), but for safe mode and hooks. The extension plan's second milestone, after
+Status: accepted and built (2026-10-01), but for safe mode. Hooks are ADR-0028. The extension plan's second milestone, after
 the declarative extensions (ADR-0023 to ADR-0025).
 
 ## Context

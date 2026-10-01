@@ -220,6 +220,14 @@ Confining the host process to the daemon's socket and gateway is planned.
     sandbox, in a directory of its own: the `tests` gate, which fails the
     proposal as the static gate does. Accept and rollback replace the
     directory as one value (its files, by path).
+  - **Hooks** ([ADR-0028](adrs/0028-hooks.md)): an extension's manifest
+    may declare `hooks: [{"event": "tool_call", "tools": [kinds]}]`. For
+    each effect a work session asks for, after the approval gate, the
+    daemon runs each accepted extension's `hooks.tool_call` that sees its
+    kind, in the sandbox for at most 10 s, on the request as the protocol
+    has it. A hook answers `deny` (refused), `ask` (a person is asked,
+    even in full-auto) or nothing; it can't allow or rewrite. A hook that
+    fails asks, every time, so an agent can't turn one off by making it fail.
 - **Imports:** a line `@path` in an instruction file, outside a code
   block, inlines that file if its real path is in the project (under its
   root, not in strive's home), up to five imports deep, and not as a

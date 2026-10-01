@@ -280,6 +280,7 @@ function proposeExtension(client: StriveClient, sessionId: string): AgentTool<ty
       "Propose an extension you drafted, when the user asked you for a tool: strive's own tools are extensions, TypeScript in .strive/extensions/<name>/ that the agent calls as ext__<name>__<tool>.",
       `Draft it first in ${DRAFTS}/<name>/: extension.json ({"name", "description", "tools": [{"name", "description", "parameters": a JSON Schema object}]}), index.ts (export const tools = { <tool>: async (args) => string }), and *.test.ts files (bun test) that show it works. Run \`bun test ${DRAFTS}/<name>\` yourself first.`,
       "Each tool runs as a command in the sandbox: no network, and only the workspace to read and write.",
+      'For a guard the user asked for ("ask before any git push"), declare "hooks": [{"event": "tool_call", "tools": ["bash", "write", ...]}] and export const hooks = { tool_call: async (call) => ({ decision: "ask" | "deny", reason }) or undefined }; call is the request ({kind: "bash", command} and so on). A hook can only ask or refuse, never allow.',
       "The daemon checks the files, runs the tests, and a person accepts or rejects it in `strive review` or the desktop app; nothing runs as an extension until then.",
     ].join(" "),
     parameters: ProposeExtensionParams,

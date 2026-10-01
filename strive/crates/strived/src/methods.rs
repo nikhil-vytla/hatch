@@ -798,6 +798,7 @@ async fn route_effect(state: &Arc<State>, method: &str, params: Value) -> Reply 
                 unconfined: state.settings.sandbox == crate::settings::SandboxSetting::Off,
                 imports,
             };
+            let asked = request.clone();
             let (request, record, check) = prepare(state, &info.cwd, &scope, request).await?;
             let Some(_running) = state.sessions.begin_effect() else {
                 return Err(RpcError::new(RpcError::INTERNAL_ERROR, "the daemon is stopping"));
@@ -805,7 +806,8 @@ async fn route_effect(state: &Arc<State>, method: &str, params: Value) -> Reply 
             let cancelled = state.sessions.cancel_flag(&sid, &call_id);
             let effect =
                 state.sessions.start_effect(&sid, call_id.clone(), record.clone()).await.map_err(session_error);
-            let result = run_effect(state, &sid, scope, Prepared { request, record, check }, effect, &cancelled).await;
+            let prepared = Prepared { asked, request, record, check };
+            let result = run_effect(state, &sid, &info.cwd, scope, prepared, effect, &cancelled).await;
             state.sessions.forget_cancel(&sid, &call_id);
             result
         }
@@ -904,6 +906,8 @@ async fn rules_for(
 /// An effect as `effect/run` has it ready: what to perform, as journaled,
 /// and the check it is, if it is one (which has its own gate).
 struct Prepared {
+    /// The request as the host made it, as hooks see it (ADR-0028).
+    asked: EffectRequest,
     request: EffectRequest,
     record: strive_proto::EffectRecord,
     check: Option<Accepting>,
@@ -991,12 +995,13 @@ struct Accepting {
 async fn run_effect(
     state: &Arc<State>,
     sid: &SessionId,
+    cwd: &str,
     scope: crate::effects::Scope,
     prepared: Prepared,
     effect: std::result::Result<u64, RpcError>,
     cancelled: &Arc<std::sync::atomic::AtomicBool>,
 ) -> Reply {
-    let Prepared { request, record, check } = prepared;
+    let Prepared { asked, request, record, check } = prepared;
     let effect = effect?;
     let sid = sid.clone();
     {
@@ -1010,6 +1015,7 @@ async fn run_effect(
             }
             _ => crate::effects::gate(&scope, &request, mode, &allowed),
         };
+        let (gate, hooked) = crate::hooks::stricter(state, cwd, &scope, &asked, &allowed, gate).await;
         let refusal = match gate {
             crate::effects::Gate::Allow => None,
             crate::effects::Gate::Deny(why) => Some(why),
@@ -1024,6 +1030,7 @@ async fn run_effect(
                     // Suggest full-auto only where it would have let this run.
                     Answer::NoOne
                         if check.is_none()
+                            && !hooked
                             && matches!(
                                 crate::effects::gate(&scope, &request, strive_proto::ApprovalMode::FullAuto, &allowed)
                                     .0,

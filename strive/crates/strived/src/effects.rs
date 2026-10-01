@@ -27,6 +27,7 @@ use strive_proto::{ApprovalMode, EffectRequest};
 use crate::context::Shapes;
 
 /// Where an effect runs.
+#[derive(Clone)]
 pub struct Scope {
     /// The session's directory, canonical.
     pub workspace: PathBuf,

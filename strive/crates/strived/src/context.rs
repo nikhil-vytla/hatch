@@ -111,6 +111,7 @@ struct Found {
 /// A path in the project an instruction file imports, whether or not it
 /// was inlined: guarded as the instruction file is, since what is there
 /// (or is put there) is told to later sessions.
+#[derive(Clone)]
 pub struct Import {
     pub path: PathBuf,
     /// The importing file, as shown to a person.
@@ -304,6 +305,8 @@ fn instructions(workspace: &Path, strive_home: &Path, at: &Anchors, found: &mut 
 pub struct Extension {
     pub info: ExtensionInfo,
     pub files: Vec<strive_learning::extension_dir::File>,
+    /// What it runs before tool calls (ADR-0028).
+    pub hooks: Vec<strive_learning::extension_dir::Hook>,
 }
 
 /// The project's extensions, each `.strive/extensions/<name>/` reached
@@ -372,7 +375,8 @@ pub fn extension(workspace: &Path, name: &str) -> Result<Extension, String> {
         .into_iter()
         .map(|t| ExtensionTool { name: t.name, description: t.description, parameters: t.parameters })
         .collect();
-    Ok(Extension { info: ExtensionInfo { name: name.to_string(), description: manifest.description, tools }, files })
+    let info = ExtensionInfo { name: name.to_string(), description: manifest.description, tools };
+    Ok(Extension { info, files, hooks: manifest.hooks })
 }
 
 /// A rule as loaded (ADR-0025).

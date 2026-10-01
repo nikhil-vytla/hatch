@@ -537,6 +537,15 @@ fn tools_text(files: &[strive_proto::ExtensionFile]) -> Vec<String> {
     for t in m["tools"].as_array().into_iter().flatten() {
         out.push(format!("  tool {}: {}", t["name"].as_str().unwrap_or("?"), t["description"].as_str().unwrap_or("")));
     }
+    for h in m["hooks"].as_array().into_iter().flatten() {
+        let sees = h["tools"].as_array().map_or_else(
+            || "each tool call".to_string(),
+            |k| {
+                format!("each {} call", k.iter().filter_map(serde_json::Value::as_str).collect::<Vec<_>>().join(" or "))
+            },
+        );
+        out.push(format!("  hook: runs before {sees}, and may ask a person about it or refuse it"));
+    }
     out
 }
 
