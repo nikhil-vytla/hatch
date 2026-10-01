@@ -175,6 +175,14 @@ export const experiments = [
   e("visual-search", "visual-search", "The visual archive", "Creative tools", "Search 204 public-domain artworks by subject, mood and detail.", "What can Jev find through museum metadata and captions?"),
   e("wardrobe", "wardrobe", "A change of clothes", "Creative tools", "A spoken edit becomes a wardrobe choice, then a moving image.", "Can small semantic decisions keep a video try-on coherent across edits?"),
   e("icon-studio", "icon-studio", "A symbol for an idea", "Creative tools", "Find an icon by meaning, then try it in a real interface.", "Can Jev choose a useful visual metaphor from 1,703 library icons?"),
+  e(
+    "rumour-mill",
+    "",
+    "The rumour mill",
+    "Games & simulations",
+    "Pin a rumour on one street. Watch 4,000 neighbours pass it on, or argue it down.",
+    "How far does one sentence travel when everyone decides for themselves?",
+  ),
   e("crowd", "live-worlds", "The square at five", "Games & simulations", "A small town keeps moving while its residents make up their minds.", "Can a sentence change many independent decisions in a living world?"),
   e("ghost-brush", "live-worlds", "Ghost Brush", "Creative tools", "Draw a gesture. Give it a feeling. Follow another line.", "Can a typed style judgment turn a procedural brush into a semantic instrument?"),
 ];

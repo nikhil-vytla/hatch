@@ -30,6 +30,7 @@ const Wardrobe = lazy(() => import("../wardrobe").then(m => ({ default: m.Wardro
 const IconStudio = lazy(() => import("../icon-studio").then(m => ({ default: m.IconStudio })));
 const TetrisExperience = lazy(() => import("../tetris-experience").then(m => ({ default: m.TetrisExperience })));
 const GhostBrush = lazy(() => import("../ghost-brush").then(m => ({ default: m.GhostBrush })));
+const RumourMill = lazy(() => import("../rumour-mill").then(m => ({ default: m.RumourMill })));
 const LiveCrowd = lazy(() => import("../live-crowd").then(m => ({ default: m.LiveCrowd })));
 const DrawingFraming = lazy(() => import("../outcome-framing").then(m => ({ default: m.DrawingFraming })));
 const ArcadeScene = lazy(() => import("../arcade-scene").then(m => ({ default: m.ArcadeScene })));
@@ -96,6 +97,8 @@ function View({
       return <GhostBrush />;
     case "crowd":
       return <LiveCrowd />;
+    case "rumour-mill":
+      return <RumourMill />;
     case "routing":
       return <ModelRoutingLab />;
     case "classify":
@@ -177,7 +180,7 @@ function LiveExperimentPage({ id }: { id: string }) {
     setRecord(null);
     setError("");
     setAboutOpen(false);
-    if (id === "routing" || id === "decoy") {
+    if (id === "routing" || id === "decoy" || id === "rumour-mill") {
       setRecord({ result: {} });
       return () => {
         alive = false;
