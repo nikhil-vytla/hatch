@@ -35,5 +35,7 @@ jobs:
         run: bun test jev-experiments/packages/arena
       - name: Live worlds (the square, Tetris, Ghost Brush)
         run: bun test jev-experiments/live-worlds
+      - name: Catalog links and app units
+        run: bun test jev-experiments/experience-prototypes/src
       - name: Verify public record integrity
         run: bun run jev-experiments/roadmap/verification/publication.ts

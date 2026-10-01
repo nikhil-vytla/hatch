@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { ArrowLeft, FlaskConical } from "lucide-react";
-import { lookup, retiredScene, type Experiment } from "../catalog";
+import { experiments, lookup, retiredScene, type Experiment } from "../catalog";
 import { CapabilityInspector } from "../../../capability-atlas-2026-09-22/capability-inspector";
 import { Pane, Notice } from "../shared";
 import { Provenance } from "../provenance";
@@ -162,8 +162,26 @@ function RetiredScene({ id }: { id: string }) {
   );
 }
 
+/** A link to a scene that never existed: say so, instead of quietly showing the first scene. */
+function UnknownScene({ id }: { id: string }) {
+  return (
+    <section className="experiment-page retired-scene">
+      <Pane title="No experiment here">
+        <p>
+          There is no experiment called “{id}”. It may have been renamed, or the link has a typo.
+        </p>
+        <p>
+          <a href="#/">All experiments</a>
+        </p>
+      </Pane>
+    </section>
+  );
+}
+
 export function ExperimentPage({ id }: { id: string }) {
-  return retiredScene(id) ? <RetiredScene id={id} /> : <LiveExperimentPage id={id} />;
+  if (retiredScene(id)) return <RetiredScene id={id} />;
+
+  return experiments.some((e) => e.id === id) ? <LiveExperimentPage id={id} /> : <UnknownScene id={id} />;
 }
 
 function LiveExperimentPage({ id }: { id: string }) {
