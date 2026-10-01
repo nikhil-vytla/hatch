@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import type { Entry, Event } from "@strive/protocol";
-import { budgetText, describe } from "./describe";
+import { budgetText, describe, sessionAllowance } from "./describe";
 
 const entry = (event: Event): Entry => ({ seq: 1, tsMs: 0, event });
 
@@ -128,4 +128,11 @@ test("budgets read as dollars, tokens, both, or unlimited", () => {
   expect(budgetText(undefined, 1000)).toBe("1000 tokens");
   expect(budgetText(1, 10)).toBe("$0.0001 and 10 tokens");
   expect(budgetText()).toBe("unlimited");
+});
+
+test("allowing for the session names what it covers", () => {
+  expect(sessionAllowance(undefined)).toBe("everything (full-auto)");
+  expect(sessionAllowance("check:tests:sha256:ab")).toBe("this check, as it is now, for the session");
+  expect(sessionAllowance("extension:shout:sha256:ab")).toBe("this extension, as it is now, for the session");
+  expect(sessionAllowance("/p/AGENTS.md")).toBe("this file for the session");
 });

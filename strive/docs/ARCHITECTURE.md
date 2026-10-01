@@ -25,7 +25,8 @@ calls go through the daemon's gateway. Why: [ADR-0015](adrs/0015-rebuild-daemon-
 | `crates/learning` | Trusted learning's pure parts: where proposals write, the static gate's text checks, proposal status, the judge's rubric, memory's named paths, the triggers' pre-filter |
 | `crates/strived` | The `strive` binary: CLI, launcher, daemon, sessions |
 | `packages/protocol` | Generated TS types + the typed socket client |
-| `packages/tui` | The terminal client; its binary also runs the agent host |
+| `packages/tui` | The terminal client; its binary also runs the agent host and the ACP bridge |
+| `packages/acp` | The ACP bridge (`strive acp`): an editor's Agent Client Protocol to a daemon client |
 | `packages/host` | The agent host: pi-agent-core loop, tools as daemon effects |
 | `packages/testkit` | Test helpers: a scratch-home daemon and a virtual terminal |
 
@@ -653,6 +654,25 @@ now (`proposal/list`'s `memory`), each bullet with its source (`#42`) or
 "hand-written", as the desktop's "What every session reads now" does; `--full` adds why, the
 prediction, the evidence, the signs the run was given and each check's
 detail. Sessions are named by their titles, not their ids.
+
+## Editors (ACP)
+
+`strive acp` ([ADR-0029](adrs/0029-acp-server.md)) starts the daemon and
+execs `strive-tui acp`, which speaks the Agent Client Protocol on stdio
+(`@agentclientprotocol/sdk`) and is an ordinary client of the daemon,
+attached as a person's. The agent loop stays in the host the daemon starts.
+- **Sessions:** `session/new` creates a strive session in the editor's
+  `cwd`; `session/load` attaches to one and replays it (prompts, replies,
+  tool calls). Approval modes are its ACP modes (`session/set_mode`).
+- **Prompts:** text, with embedded resources inlined under their URI and
+  links named; images are refused. A prompt answers when the turn that
+  took it ends (`throughSeq`, or a turn journaled after it): `end_turn`,
+  or `cancelled` when `session/cancel` interrupted it.
+- **Updates:** deltas become `agent_message_chunk`s (only what's new),
+  effects `tool_call`s and `tool_call_update`s, and an approval a
+  `session/request_permission`, withdrawn if another client answers first.
+- **Not taken:** the editor's file system and terminal (effects run in the
+  daemon's sandbox, on disk) and its MCP servers (the first reply says so).
 
 ## The desktop app
 

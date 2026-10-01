@@ -34,6 +34,19 @@ pub enum Session {
     Resume(String),
 }
 
+/// Replaces this process with the ACP bridge (ADR-0029), which speaks the
+/// Agent Client Protocol on this process's stdio. Only returns on failure.
+pub fn exec_acp(home: &Home) -> Result<()> {
+    let cmd = locate()?;
+    let err = Command::new(&cmd[0])
+        .args(&cmd[1..])
+        .arg("acp")
+        .env("STRIVE_SOCKET", home.socket())
+        .env("STRIVE_VERSION", env!("CARGO_PKG_VERSION"))
+        .exec();
+    bail!("starting the ACP bridge ({}): {err}", cmd.join(" "))
+}
+
 /// Replaces this process with the TUI. Only returns on failure.
 pub fn exec(home: &Home, session: &Session) -> Result<()> {
     if !std::io::stdin().is_terminal() || !std::io::stdout().is_terminal() {

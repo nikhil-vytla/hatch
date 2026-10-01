@@ -2809,3 +2809,34 @@ whole-file `Change` through the proposal pipeline.
   abort check and `agent.prompt`, so the gap is likely in how the abort
   reaches a request still waiting for response headers (the fake holds
   them for the whole delay). Not fixed yet.
+
+## 2026-10-01: proposing extensions, hooks, safe mode, `strive acp`
+
+- **Proposing extensions** (PR #146): `propose_extension` turns a
+  work session's draft into a proposal, with a tests gate (`bun test` in
+  the sandbox). Mutation testing in CI found `relative_path`'s name check
+  for extensions untested; a test now sits on it.
+- **Hooks** (ADR-0028): run by the daemon after the approval gate, so
+  the host can't skip them.
+  - The first design dropped a hook after three failures, as tools are
+    dropped. Reviewing for ways around it showed that lets an unattended
+    agent switch a guard off: three calls the hook chokes on, each refused
+    because no one is there, and the guard is gone. A failing hook now asks
+    every time, and the question says rolling the extension back stops it.
+  - Linux limits one argument to 128 KiB (`MAX_ARG_STRLEN`), and a hook's
+    command reaches `bash -c` as one argument, so a call is shown to a hook
+    as at most 32 KiB of JSON (64 KiB hex-encoded). Text past that is left
+    out and the call says `truncated`; a hook that cares can ask.
+- **Safe mode**: `sessionStarted.safe`, so a resumed session stays
+  safe. `strive --safe` conflicts with `-c` and `-r`, since an existing
+  session's mode is fixed when it starts.
+- **`strive acp`** (ADR-0029): `@agentclientprotocol/sdk` 1.6.0 (with
+  zod 4.6.5, its peer). The SDK's in-memory `agent.connect(client)` lets
+  the tests drive the bridge as an editor would, on a real daemon and
+  host; one more test runs the `strive acp` binary over stdio.
+  - `session/delta` carries the reply so far, not an increment, so the
+    bridge sends only what's new, and resets at each model call.
+  - A prompt's turn is the first `turnStarted` whose `throughSeq` covers
+    the prompt's seq, or, without one, the first journaled after it.
+  - Allowing "for the session" with no `sessionFile` switches the session
+    to full-auto; the editor's option says so in its name.

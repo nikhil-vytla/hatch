@@ -97,6 +97,9 @@ enum Cmd {
         #[arg(long, conflicts_with_all = ["continue_latest", "resume"])]
         safe: bool,
     },
+    /// Speak the Agent Client Protocol on stdio, so an editor that speaks it
+    /// runs strive sessions: give the editor `strive acp` as its agent command.
+    Acp,
     /// Show the daemon's status.
     Status {
         #[arg(long)]
@@ -275,6 +278,11 @@ async fn run(cli: Cli) -> Result<ExitCode> {
             desktop::open(&home, &session)?;
             println!("opened the desktop app");
             Ok(ExitCode::SUCCESS)
+        }
+        Some(Cmd::Acp) => {
+            launch::ensure(&home, "strive-acp").await?;
+            tui::exec_acp(&home)?;
+            unreachable!("exec returns only on error")
         }
         Some(Cmd::Log { id, json }) => commands::log(&mut launch::ensure(&home, "strive-log").await?.0, id, json).await,
         Some(Cmd::Verify { id, all }) => {

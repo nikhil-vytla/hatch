@@ -1,9 +1,15 @@
 #!/usr/bin/env bun
 // Entry point. `strive` starts the daemon and execs this with STRIVE_SOCKET
-// set; the daemon runs `strive-tui host --session ID` to host an agent. One
-// binary, so one embedded runtime.
+// set; the daemon runs `strive-tui host --session ID` to host an agent, and
+// `strive acp` runs `strive-tui acp` for an editor. One binary, so one
+// embedded runtime.
 if (process.argv[2] === "host") {
   await import("@strive/host/main");
+  await new Promise(() => {});
+}
+
+if (process.argv[2] === "acp") {
+  await import("@strive/acp/main");
   await new Promise(() => {});
 }
 
