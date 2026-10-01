@@ -1,7 +1,8 @@
 /**
- * The reef: a living ocean where every small fish decides for itself what to do next. A free
- * model runs in the visitor's browser by default; Jev runs on the visitor's own key. The race
- * puts the free model against a recorded Jev run on the same reef and the same heatwave.
+ * The reef: a living ocean where every small fish decides for itself what to do next. By default
+ * a tiny policy evolved inside this reef decides for every fish, ten times a second, free.
+ * MobileBERT (in the browser) and Jev (on the visitor's own key) are the alternatives. The race
+ * puts the chosen decider against a recorded Jev run on the same reef and the same heatwave.
  */
 import { useEffect, useRef, useState } from "react";
 import {
@@ -26,12 +27,17 @@ import {
 } from "../../live-worlds/ocean/engine";
 import { BROWSER_MODEL, fromJev, JEV_BATCH, JEV_MODEL, jevRequest, USD_PER_TOKEN } from "../../live-worlds/ocean/models";
 import { paint, hitFish, VIEW } from "../../live-worlds/ocean/render";
+import { decideAll, POLICY_NAME, WEIGHT_COUNT } from "../../live-worlds/ocean/policy";
+import evolved from "../../live-worlds/ocean/policy.json";
 import { parseRecording, RACE, replayer, type Recording } from "../../live-worlds/ocean/replay";
 import type { Decision } from "../../live-worlds/ocean/engine";
 import { getApiKey, run } from "./api";
 import "./ocean-reef.css";
 
-type Model = "browser" | "jev";
+type Model = "evolved" | "browser" | "jev";
+
+/** The evolved policy decides every live fish every this many ticks: ten times a second. */
+const POLICY_EVERY = 3;
 type Race = {
   live: World;
   rep: ReturnType<typeof replayer>;
@@ -207,12 +213,14 @@ export function OceanReef() {
   const race = useRef<Race | null>(null);
   const recording = useRef<Recording | null>(null);
   const generation = useRef(0);
-  const times = useRef<number[]>([]);
   const latencies = useRef<number[]>([]);
+  /** [ms, decisions] samples of the decided world, for decisions a second. */
+  const counts = useRef<[number, number][]>([]);
+  const policyMicros = useRef<number[]>([]);
   const spent = useRef(0);
   const fps = useRef(0);
   const [, setVersion] = useState(0);
-  const [model, setModel] = useState<Model>("browser");
+  const [model, setModel] = useState<Model>("evolved");
   const [running, setRunning] = useState(true);
   const [lens, setLens] = useState(false);
   const [selected, setSelected] = useState<number | null>(null);
@@ -222,11 +230,23 @@ export function OceanReef() {
   const [raceState, setRaceState] = useState<"idle" | "loading" | "running" | "done">("idle");
   const [baseline, setBaseline] = useState<{ alive: number; survived: number; cohort: number } | null>(null);
   const runningRef = useRef(running);
+  const modelRef = useRef(model);
 
   runningRef.current = running;
+  modelRef.current = model;
   onDownload = (p) => setDownload(p);
 
   const target = () => race.current?.live ?? world.current;
+
+  /** Every live fish, decided now by the evolved policy; times it per fish. */
+  const decideEvolved = (w: World) => {
+    const t = performance.now();
+    const ds = decideAll(w, evolved);
+
+    applyDecisions(w, ds);
+
+    if (ds.length) policyMicros.current = [...policyMicros.current.slice(-59), ((performance.now() - t) * 1000) / ds.length];
+  };
 
   // The world clock and painting.
   useEffect(() => {
@@ -264,6 +284,8 @@ export function OceanReef() {
               trigger(r.live, "heatwave");
             }
 
+            if (modelRef.current === "evolved" && r.live.tick % POLICY_EVERY === 0) decideEvolved(r.live);
+
             advance(r.live);
             r.rep.step();
 
@@ -276,7 +298,11 @@ export function OceanReef() {
               r.done = true;
               setRaceState("done");
             }
-          } else advance(world.current);
+          } else {
+            if (modelRef.current === "evolved" && world.current.tick % POLICY_EVERY === 0) decideEvolved(world.current);
+
+            advance(world.current);
+          }
         }
 
         if (acc > STEP * 6) acc = 0;
@@ -300,6 +326,7 @@ export function OceanReef() {
 
       if (now - lastUi > 250) {
         lastUi = now;
+        counts.current = [...counts.current.filter(([t]) => t > now - 5000), [now, (race.current?.live ?? world.current).decisions]];
         setVersion((v) => v + 1);
       }
 
@@ -317,8 +344,11 @@ export function OceanReef() {
     const gen = ++generation.current;
     const live = () => gen === generation.current;
 
-    times.current = [];
     latencies.current = [];
+    counts.current = [];
+
+    // The evolved policy runs inside the clock loop; nothing to wait for here.
+    if (model === "evolved") return;
 
     const loop = async () => {
       while (live()) {
@@ -345,12 +375,11 @@ export function OceanReef() {
 
           if (d && target() === w) {
             applyDecisions(w, [d]);
-            times.current.push(performance.now());
             latencies.current.push(d.latencyMs ?? 0);
           }
         } else {
           if (!getApiKey()) {
-            setError("Add your gateway key in Settings to run Jev. The free model keeps working without one.");
+            setError("Add your gateway key in Settings to run Jev. The free deciders keep working without one.");
             return;
           }
 
@@ -372,11 +401,6 @@ export function OceanReef() {
             if (target() === w) applyDecisions(w, ds);
 
             spent.current += (res.usage?.input_tokens ?? 0) * USD_PER_TOKEN;
-
-            const now = performance.now();
-
-            for (let i = 0; i < ds.length; i++) times.current.push(now);
-
             latencies.current.push(res.latency_ms ?? 0);
           } catch (e) {
             setError(e instanceof Error ? e.message : "Jev could not be reached.");
@@ -384,9 +408,6 @@ export function OceanReef() {
           }
         }
 
-        const cut = performance.now() - 5000;
-
-        times.current = times.current.filter((t) => t > cut);
         latencies.current = latencies.current.slice(-60);
       }
     };
@@ -400,13 +421,15 @@ export function OceanReef() {
 
   const w = race.current?.live ?? world.current;
   const alive = w.fish.filter((f) => f.alive);
-  const rate = times.current.length / 5;
+  const c = counts.current;
+  const rate = c.length > 1 ? ((c[c.length - 1][1] - c[0][1]) * 1000) / Math.max(1, c[c.length - 1][0] - c[0][0]) : 0;
+  const micros = policyMicros.current.length ? [...policyMicros.current].sort((a, b) => a - b)[Math.floor(policyMicros.current.length / 2)] : null;
   const median = latencies.current.length ? [...latencies.current].sort((a, b) => a - b)[Math.floor(latencies.current.length / 2)] : null;
   const means = traitMeans(w);
   const active = world.current.events.find((e) => world.current.time < e.end + 10 && !e.reported);
   const outcome = world.current.outcomes.at(-1);
   const sel = selected === null ? null : world.current.fish.find((f) => f.id === selected) ?? null;
-  const decider = model === "browser" ? BROWSER_MODEL : JEV_MODEL;
+  const decider = model === "evolved" ? POLICY_NAME : model === "browser" ? BROWSER_MODEL : JEV_MODEL;
 
   const startRace = async () => {
     setRaceState("loading");
@@ -472,6 +495,9 @@ export function OceanReef() {
           {alive.length} fish choose what to do next from what they can see: school, eat, hide, flee or warn the others.
         </p>
         <div className="reef-models" role="group" aria-label="Who decides">
+          <button type="button" aria-pressed={model === "evolved"} onClick={() => setModel("evolved")}>
+            {POLICY_NAME} <small>{WEIGHT_COUNT} weights, free</small>
+          </button>
           <button type="button" aria-pressed={model === "browser"} onClick={() => setModel("browser")}>
             {BROWSER_MODEL} <small>in your browser, free</small>
           </button>
@@ -482,7 +508,7 @@ export function OceanReef() {
               setError("");
 
               if (!getApiKey()) {
-                setError("Add your gateway key in Settings to run Jev. The free model keeps working without one.");
+                setError("Add your gateway key in Settings to run Jev. The free deciders keep working without one.");
 
                 return;
               }
@@ -563,7 +589,7 @@ export function OceanReef() {
         <div className="reef-race">
           <div>
             <h3>
-              {decider} {model === "browser" ? "in your browser, live" : "on your key, live"}
+              {decider} {model === "jev" ? "on your key, live" : "in your browser, live"}
             </h3>
             <canvas ref={raceLeft} width={VIEW.width} height={VIEW.height} className="reef-canvas" aria-label="The reef on your model" />
           </div>
@@ -585,7 +611,8 @@ export function OceanReef() {
           </p>
           <p className="reef-fine">
             {decider}
-            {median !== null ? ` · median ${median} ms ${model === "jev" ? "per batch of up to 40 fish" : "per fish"}` : ""}
+            {model === "evolved" && micros !== null ? ` · ${micros < 10 ? micros.toFixed(1) : micros.toFixed(0)} µs per fish, every fish ten times a second` : ""}
+            {model !== "evolved" && median !== null ? ` · median ${median} ms ${model === "jev" ? "per batch of up to 40 fish" : "per fish"}` : ""}
             {download !== null ? ` · downloading the model (27 MB, once) ${download}%` : ""}
             {model === "jev" ? ` · $${spent.current.toFixed(4)} so far` : " · $0"}
           </p>
@@ -678,6 +705,15 @@ export function OceanReef() {
         <p>
           Jev gets up to 40 fish per request, each as its own typed choice. {BROWSER_MODEL} (27 MB, running in a worker in
           your browser) reads one fish at a time: its view is the premise, each action a hypothesis.
+        </p>
+        <p>
+          The default decider is a tiny policy evolved inside this reef: {WEIGHT_COUNT} weights, trained only on how many
+          fish survive, never on any model's answers. On 20 test reefs it never trained on, it kept 89% of fish alive
+          through a heatwave and 82% through a fishing net, against 79% and 9% when nobody decides and 78% and 4% for{" "}
+          {BROWSER_MODEL} at the 5 decisions a second it manages in a browser. A short hand-written rule still does
+          better on heatwaves (94%), nets (85%) and oil spills (90%; the policy never saw oil and kept 85%). Speed matters
+          as much as the decider: held to 5 decisions a second, the evolved policy keeps only 57% through a heatwave,
+          fewer than leaving every fish alone. Full numbers are in live-worlds/ocean/heldout.json.
         </p>
         <p>
           On 1 Oct 2026 the race reef ran once on Jev: 148 requests, $0.038, about 92 decisions a second. 98 of 110 fish

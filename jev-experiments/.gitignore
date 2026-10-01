@@ -24,3 +24,4 @@ packages/arena/recordings/checkable.jsonl
 packages/arena/recordings/judgement.jsonl
 packages/arena/sealed/
 packages/node_modules
+live-worlds/node_modules
