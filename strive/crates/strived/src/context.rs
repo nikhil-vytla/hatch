@@ -164,23 +164,22 @@ fn checks(workspace: &Path, at: &Anchors, skipped: &mut Vec<String>) -> Vec<Chec
     let mut out = Vec::new();
     for name in names {
         match check_at(workspace, at, &name) {
-            Ok(c) => out.push(CheckInfo { name: c.name, description: c.description, paths: c.paths }),
+            Ok((c, _)) => out.push(CheckInfo { name: c.name, description: c.description, paths: c.paths }),
             Err(why) => skipped.push(format!("{}/{name}.md was not loaded: {why}", strive_learning::CHECKS_DIR)),
         }
     }
     out
 }
 
+/// A check as its file says now, and the file's text.
+type Check = (strive_learning::check_file::CheckFile, String);
+
 /// The check `name` as its file says now, for the daemon to run.
-pub fn check(
-    workspace: &Path,
-    strive_home: &Path,
-    name: &str,
-) -> Result<strive_learning::check_file::CheckFile, String> {
+pub fn check(workspace: &Path, strive_home: &Path, name: &str) -> Result<Check, String> {
     check_at(workspace, &Anchors::new(workspace, strive_home), name)
 }
 
-fn check_at(workspace: &Path, at: &Anchors, name: &str) -> Result<strive_learning::check_file::CheckFile, String> {
+fn check_at(workspace: &Path, at: &Anchors, name: &str) -> Result<Check, String> {
     let artifact = Artifact::Check { name: name.to_string() };
     let relative = strive_learning::relative_path(&artifact)?;
     // Reviewed as learned files are, so reached without a symlink.
@@ -194,7 +193,7 @@ fn check_at(workspace: &Path, at: &Anchors, name: &str) -> Result<strive_learnin
     if c.name != name {
         return Err(format!("its frontmatter names it {:?}", c.name));
     }
-    Ok(c)
+    Ok((c, text))
 }
 
 /// What the project's instruction files import, as `load` finds it. Only

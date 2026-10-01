@@ -1,7 +1,7 @@
 // The agent loop end to end: real daemon, real host (started by the daemon),
 // real gateway and effects, and a scripted model at the network boundary.
 import { afterEach, expect, setDefaultTimeout, test } from "bun:test";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { type Entry, type Event, StriveClient } from "@strive/protocol";
 import { FakeAnthropic, type ScriptedReply, startDaemon, type TestDaemon } from "@strive/testkit";
@@ -377,13 +377,14 @@ test("summarizing before a turn is part of the turn: it can be interrupted, and 
   }
 });
 
+/** Writes a check and allows it, as a person answering its first ask would. */
 function writeCheck(cwd: string, name: string, run: string, paths?: string) {
   mkdirSync(join(cwd, ".strive/checks"), { recursive: true });
   const scope = paths === undefined ? "" : `paths: ${paths}\n`;
-  writeFileSync(
-    join(cwd, ".strive/checks", `${name}.md`),
-    `---\nname: ${name}\ndescription: ${name} passes\nrun: ${run}\n${scope}---\nb.txt marks the work done.\n`,
-  );
+  const content = `---\nname: ${name}\ndescription: ${name} passes\nrun: ${run}\n${scope}---\nb.txt marks the work done.\n`;
+  writeFileSync(join(cwd, ".strive/checks", `${name}.md`), content);
+  const digest = `sha256:${new Bun.CryptoHasher("sha256").update(content).digest("hex")}`;
+  appendFileSync(join(daemon!.home, "allowed-checks.jsonl"), `${JSON.stringify({ cwd, name, digest })}\n`);
 }
 
 const checkRuns = (e: Event[]) =>
@@ -464,5 +465,22 @@ test("a check that keeps failing ends the turn after the last round, as it is", 
   // Checked after each answer; told twice, then the turn ends.
   expect(checkRuns(e)).toHaveLength(CHECK_ROUNDS + 1);
   expect(fake!.requests).toHaveLength(2 + CHECK_ROUNDS);
+  expect(e.at(-1)).toEqual({ type: "turnEnded", turn: 1, reason: { kind: "done" } });
+});
+
+test("a check no one has accepted isn't sent to the agent, which can't fix that", async () => {
+  const { client, id, cwd } = await setup([
+    { toolCalls: [{ id: "toolu_1", name: "write", input: { path: "a.txt", content: "a" } }] },
+    { text: "Done." },
+  ]);
+
+  mkdirSync(join(cwd, ".strive/checks"), { recursive: true });
+  writeFileSync(join(cwd, ".strive/checks/new.md"), "---\nname: new\ndescription: d\nrun: false\n---\n");
+  await client.request("session/prompt", { id, text: "make a.txt" });
+  const e = await waitFor(client, id, turnsEnded(1));
+
+  // Asked, and with no one attached to answer, refused: the turn just ends.
+  expect(checkRuns(e)).toHaveLength(1);
+  expect(fake!.requests).toHaveLength(2);
   expect(e.at(-1)).toEqual({ type: "turnEnded", turn: 1, reason: { kind: "done" } });
 });

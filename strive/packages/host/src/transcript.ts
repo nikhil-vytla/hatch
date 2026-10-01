@@ -46,19 +46,23 @@ const CHECK_OUTPUT = 4000;
 
 export type CheckRun = { record: EffectRecord; outcome: EffectOutcome; output: string };
 
-/** Whether a check's run failed: refused, killed by its time limit, or a nonzero exit. */
+/**
+ * Whether a check found something for the agent to fix: a nonzero exit, or
+ * its time limit. One that didn't run (a person hasn't accepted it, or the
+ * daemon stopped) isn't the agent's to fix, so it isn't told.
+ */
 export function checkFailed(run: CheckRun): boolean {
-  return run.outcome.kind !== "done" || run.outcome.exitCode !== 0;
+  return run.outcome.kind === "done" && run.outcome.exitCode !== 0;
 }
 
 function howItFailed(outcome: EffectOutcome): string {
   switch (outcome.kind) {
-    case "refused":
-      return `it couldn't run: ${outcome.reason}`;
-    case "interrupted":
-      return "the daemon stopped while it ran";
     case "done":
       return outcome.exitCode === undefined ? "it ran out of time" : `exit ${outcome.exitCode}`;
+    case "refused":
+      return `it didn't run: ${outcome.reason}`;
+    case "interrupted":
+      return "the daemon stopped while it ran";
     default:
       return outcome satisfies never;
   }

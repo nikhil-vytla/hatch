@@ -1517,9 +1517,18 @@ fn a_check_is_proposed_accepted_and_rolled_back_as_a_whole_file() {
     assert!(decide(&env, &cwd, p, "accept").get("error").is_none());
     let file = cwd.join(".strive/checks/host-tests.md");
     assert_eq!(fs::read_to_string(&file).unwrap(), CHECK);
-    // A work session's host is now told it applies.
+    // A work session's host is now told it applies, and it runs without
+    // asking even in ask mode: a person accepted this content.
     let config = common::slow_rpc(&env).ok("host/register", &json!({"id": work}));
     assert_eq!(config["checks"][0]["name"], "host-tests");
+    common::slow_rpc(&env).ok("session/approvals", &json!({"id": work, "mode": "ask"}));
+    let ran = common::slow_rpc(&env).ok(
+        "effect/run",
+        &json!({"id": work, "callId": "check:1:1:host-tests", "request": {"kind": "check", "name": "host-tests"}}),
+    );
+    // It ran (here bun finds no tests); with no one attached, an ask would be refused.
+    assert_eq!(ran["outcome"]["kind"], "done", "{ran}");
+    assert_eq!(ran["record"]["command"], "bun test packages/host");
     assert!(rollback(&env, &cwd, p).get("error").is_none());
     assert!(!file.exists(), "it didn't exist before");
 }

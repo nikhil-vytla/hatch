@@ -59,16 +59,23 @@ loading, and runs its `run` line as a command effect, journaled as a
 `check` record with the exact command. The host never supplies the
 command.
 
-- A check runs without asking, in every mode, when the sandbox is
-  available: a person accepted that exact command, by writing the file or
-  accepting the proposal that wrote it. Without a sandbox it asks, as any
-  command does.
+- A check runs without asking, in every mode, only in a form a person
+  accepted: the content of an applied check proposal, or content a person
+  allowed when asked. A check in any other form asks, naming its command,
+  and an allow is remembered for that content (in strive's home, which no
+  effect can write); a change to the file asks again. The file alone
+  doesn't show a person wrote it: on Linux the sandbox makes
+  `.strive/checks` read-only only where it exists, so a command could
+  create one in a project without it. Without a sandbox a check asks, as
+  any command does.
+- A check that doesn't run (no one accepted it, or the daemon stopped)
+  isn't the agent's to fix, so it isn't sent back.
 - What applies is decided from the turn's changes against its checkpoint
   (`session/changes`), so a command's edits count as much as the agent's.
 
 ### A failed check goes back to the agent
 
-When a check fails (refused, or a nonzero exit), the host tells the agent
+When a check fails (a nonzero exit, or its time limit), the host tells the agent
 which, with the end of its output and the check's body, and the turn goes
 on. After 2 such rounds the turn ends as it is; the journal shows the
 failed check. The report is built from the journaled effects by one
@@ -98,7 +105,8 @@ or one the agent ran to find its own mistake.
 
 - A learned rule can become something the daemon enforces rather than
   advice, and the eval can measure the difference (a check arm).
-- An agent can't weaken a check: editing one asks a person, and the
-  command run is the file's, not the host's.
+- An agent can't weaken or plant a check: editing one asks a person, a
+  form no person accepted asks before it runs, and the command run is the
+  file's, not the host's.
 - A turn that changes files costs the checks' run time. A slow check is
   the person's choice; its timeout bounds it.

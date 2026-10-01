@@ -46,22 +46,67 @@ fn check(name: &str, run: &str) -> String {
     format!("---\nname: {name}\ndescription: {name} passes\nrun: {run}\n---\n")
 }
 
+/// The next approval request an attached client sees.
+fn next_request(c: &mut common::Rpc) -> Value {
+    loop {
+        let n = c.notification();
+        let e = &n["params"]["entry"]["event"];
+        if e["type"] == "approvalRequested" {
+            return e.clone();
+        }
+    }
+}
+
 #[test]
-fn a_check_runs_its_files_command_without_asking_even_in_ask_mode() {
+fn a_check_no_one_accepted_asks_once_then_runs_without_asking_until_it_changes() {
     let w = Ws::new();
     w.write(".strive/checks/t.md", &check("t", "echo checked; exit 3"));
     w.mode("ask");
+    // Nobody is attached to say a person wrote it, so it doesn't run.
     let r = w.run(&json!({"kind": "check", "name": "t"}));
-    assert_eq!(r["result"]["outcome"]["exitCode"], 3, "{r}");
-    assert_eq!(r["result"]["text"], "checked\n");
-    let events = w.events();
-    assert!(!events.iter().any(|e| e["type"] == "approvalRequested"));
-    // The journal holds the command that ran, read from the file.
-    let started = events.iter().find(|e| e["type"] == "effectStarted").unwrap();
+    let reason = r["result"]["outcome"]["reason"].as_str().unwrap();
+    assert!(reason.contains("no one has accepted in this form yet"), "{r}");
+    assert!(reason.contains("even in full-auto"), "full-auto wouldn't let it run: {reason}");
+
+    // A person allows it once...
+    let mut ui = w.env.rpc();
+    ui.ok("session/attach", &json!({"id": w.id}));
+    let (env, id) = (w.env.rpc(), w.id.clone());
+    let pending = std::thread::spawn(move || {
+        let mut c = env;
+        c.ok("effect/run", &json!({"id": id, "callId": "check:1:2:t", "request": {"kind": "check", "name": "t"}}))
+    });
+    let asked = next_request(&mut ui);
+    assert!(asked["description"].as_str().unwrap().starts_with("run the check t, which no one has accepted"));
+    let effect = asked["effect"].clone();
+    ui.ok("approval/respond", &json!({"id": w.id, "effect": effect, "decision": "allow"}));
+    let ran = pending.join().unwrap();
+    assert_eq!(ran["outcome"]["exitCode"], 3, "{ran}");
+    assert_eq!(ran["text"], "checked\n");
+    // ...and the journal holds the command that ran, read from the file.
     assert_eq!(
-        started["record"],
+        ran["record"],
         json!({"kind": "check", "name": "t", "command": "echo checked; exit 3", "timeoutMs": 120_000, "note": ""})
     );
+
+    // From then on, in any session of the project, it runs without asking.
+    let other = w.env.rpc().ok("session/create", &json!({"cwd": w.root}))["id"].as_str().unwrap().to_string();
+    w.env.rpc().ok("session/approvals", &json!({"id": other, "mode": "ask"}));
+    let again = w
+        .env
+        .rpc()
+        .ok("effect/run", &json!({"id": other, "callId": "check:1:1:t", "request": {"kind": "check", "name": "t"}}));
+    assert_eq!(again["outcome"]["exitCode"], 3, "{again}");
+
+    // A changed file is a check no one has accepted yet (asked in the
+    // session no client is attached to, so refused at once).
+    w.write(".strive/checks/t.md", &check("t", "echo changed"));
+    let changed = w
+        .env
+        .rpc()
+        .ok("effect/run", &json!({"id": other, "callId": "check:1:2:t", "request": {"kind": "check", "name": "t"}}));
+    assert!(changed["outcome"]["reason"].as_str().unwrap().contains("no one has accepted"), "{changed}");
+    drop(ui);
 }
 
 #[test]

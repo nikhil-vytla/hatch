@@ -761,11 +761,13 @@ that file (see "What shapes a session").
 **Checks** ([ADR-0023](adrs/0023-checks.md)) run at the end of a turn that
 changed files: the host names each check whose paths match a file changed
 since the turn's checkpoint, and the daemon reads its command from its file
-and runs it, journaled as a `check` effect with that command. In the
-sandbox a check doesn't ask in any mode: a person accepted that exact
-command. Without one it asks. A failed check goes back to the agent, at
-most twice a turn; the report is made from the journaled runs, so a resumed
-session is told what a running one was.
+and runs it, journaled as a `check` effect with that command. A check
+runs without asking, in any mode, only in a form a person accepted: an
+applied check proposal's content, or content a person allowed when asked
+(remembered in `~/.strive/allowed-checks.jsonl`). Any other form asks, as
+does any check without a sandbox. A failed check goes back to the agent,
+at most twice a turn; the report is made from the journaled runs, so a
+resumed session is told what a running one was.
 
 **Checkpoints** snapshot the workspace before each prompt, into a shadow
 git repository in the session's directory. The user's own repository,

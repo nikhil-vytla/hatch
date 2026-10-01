@@ -739,12 +739,14 @@ async fn route_effect(state: &Arc<State>, method: &str, params: Value) -> Reply 
             let (request, record, check) = match request {
                 EffectRequest::Check { name } => {
                     let (ws, home, n) = (scope.workspace.clone(), scope.strive_home.clone(), name.clone());
-                    let found = tokio::task::spawn_blocking(move || crate::context::check(&ws, &home, &n))
+                    let (found, text) = tokio::task::spawn_blocking(move || crate::context::check(&ws, &home, &n))
                         .await
                         .map_err(|e| internal(&e))?
                         .map_err(|why| {
                             RpcError::new(RpcError::INVALID_PARAMS, format!("the check {name} can't run: {why}"))
                         })?;
+                    let digest = strive_journal::cas::digest(text.as_bytes());
+                    let accepted = crate::checks::accepted(state, &info.cwd, &name, &digest);
                     let timeout_ms = found.timeout_secs * 1000;
                     let record = strive_proto::EffectRecord::Check {
                         name: name.clone(),
@@ -752,7 +754,9 @@ async fn route_effect(state: &Arc<State>, method: &str, params: Value) -> Reply 
                         timeout_ms,
                         note: found.body,
                     };
-                    (EffectRequest::Bash { command: found.run, timeout_ms: Some(timeout_ms) }, record, Some(name))
+                    let path = scope.workspace.join(strive_learning::CHECKS_DIR).join(format!("{name}.md"));
+                    let check = CheckRun { name, cwd: info.cwd.clone(), path, digest, accepted };
+                    (EffectRequest::Bash { command: found.run, timeout_ms: Some(timeout_ms) }, record, Some(check))
                 }
                 request => {
                     let record = crate::effects::record(&state.cas, &request).map_err(|e| internal(&e))?;
@@ -815,7 +819,17 @@ async fn call_mcp(
 struct Prepared {
     request: EffectRequest,
     record: strive_proto::EffectRecord,
-    check: Option<String>,
+    check: Option<CheckRun>,
+}
+
+/// A check about to run (ADR-0023), and whether a person accepted its file's
+/// content; if not, a person's allow is remembered for that content.
+struct CheckRun {
+    name: String,
+    cwd: String,
+    path: std::path::PathBuf,
+    digest: strive_proto::Digest,
+    accepted: bool,
 }
 
 /// Gates, performs and journals one effect the session has started.
@@ -835,7 +849,9 @@ async fn run_effect(
         let (mode, allowed) = state.sessions.approvals(&sid).await.map_err(session_error)?;
         let cancel = cancelled.clone();
         let (gate, target) = match (&check, &request) {
-            (Some(name), EffectRequest::Bash { command, .. }) => crate::effects::check_gate(&scope, name, command),
+            (Some(c), EffectRequest::Bash { command, .. }) => {
+                crate::effects::check_gate(&scope, &c.name, command, c.accepted, &c.path)
+            }
             _ => crate::effects::gate(&scope, &request, mode, &allowed),
         };
         let refusal = match gate {
@@ -851,10 +867,12 @@ async fn run_effect(
                 {
                     // Suggest full-auto only where it would have let this run.
                     Answer::NoOne
-                        if matches!(
-                            crate::effects::gate(&scope, &request, strive_proto::ApprovalMode::FullAuto, &allowed).0,
-                            crate::effects::Gate::Allow
-                        ) =>
+                        if check.is_none()
+                            && matches!(
+                                crate::effects::gate(&scope, &request, strive_proto::ApprovalMode::FullAuto, &allowed)
+                                    .0,
+                                crate::effects::Gate::Allow
+                            ) =>
                     {
                         Some(format!(
                             "{what} needs approval, but no client is attached to give it; use full-auto approvals for unattended runs"
@@ -865,7 +883,14 @@ async fn run_effect(
                     )),
                     Answer::Cancelled => Some(format!("interrupted: {what}")),
                     Answer::Decided(Decision::Deny) => Some(format!("declined: {what}")),
-                    Answer::Decided(Decision::Allow | Decision::AllowSession) => None,
+                    Answer::Decided(Decision::Allow | Decision::AllowSession) => {
+                        if let Some(c) = check.as_ref().filter(|c| !c.accepted)
+                            && let Err(e) = crate::checks::allow(&state.home.root, &c.cwd, &c.name, c.digest)
+                        {
+                            crate::log!("couldn't remember that the check {} was allowed: {e}", c.name);
+                        }
+                        None
+                    }
                 }
             }
         };
