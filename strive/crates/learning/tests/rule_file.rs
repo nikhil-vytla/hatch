@@ -12,7 +12,7 @@ fn paths_are_inline_or_a_yaml_list_and_a_rule_without_them_is_for_every_session(
     assert_eq!((inline.description.as_deref(), inline.body.as_str()), (Some("API"), "Validate input."));
     let listed = parse("---\npaths:\n  - \"tests/**/*.py\"\n  - conftest.py\n---\nUse fixtures.\n", true).unwrap();
     assert_eq!(listed.paths, ["tests/**/*.py", "conftest.py"]);
-    assert!(parse("Prefer small functions.\n", true).unwrap().paths.is_empty());
+    assert_eq!(parse("Prefer small functions.\n", true).unwrap().paths, Vec::<String>::new());
 }
 
 #[test]
@@ -52,7 +52,7 @@ fn a_rule_proposal_is_gated_on_its_file_as_strict_loading_reads_it() {
         prediction: "API changes validate their input".into(),
     };
     let rules = |c: &str| check(&proposal(c), &[], None).into_iter().map(|f| f.rule).collect::<Vec<_>>();
-    assert!(rules("---\npaths: src/api/**\n---\nValidate input.\n").is_empty());
+    assert_eq!(rules("---\npaths: src/api/**\n---\nValidate input.\n"), Vec::<Rule>::new());
     assert!(rules("---\nglobs: src/**\n---\nValidate.\n").contains(&Rule::Form));
     let sized = |n: usize| format!("Use {}.", "x".repeat(n - "Use .".len()));
     assert!(!rules(&sized(16 * 1024)).contains(&Rule::Size));
