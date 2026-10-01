@@ -372,9 +372,9 @@
     {
       "name": "visual-search",
       "source": "../visual-search/results.jsonl",
-      "sourceSha256": "9ab7b35a502bcabc7e6ebeb15c9426cdc7a8db2c6df9b8f35601179452a89895",
-      "publicSha256": "45c91efb05d66046a5e862888a469ed0faa96496ef66d1dedbd7e3f026caf089",
-      "publicBytes": 309579,
+      "sourceSha256": "e4b1e45af99a9b38b453e1307dc34ee0ba30aa02a9bf22e7957c804fe328e372",
+      "publicSha256": "bd83e203180aa710ee990d554968ccc075136eeb0b302e629a3ad09c1fe4706a",
+      "publicBytes": 312000,
       "comparison": "original-record",
       "recipe": "readRecord + enrichProvenance + availability"
     },
