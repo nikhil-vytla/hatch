@@ -879,7 +879,7 @@ export function Beverage({ result }: { result: any }) {
           <section className="cafe-menu" aria-label="Drink menu">
             <div className="cafe-section-heading">
               <div>
-                <span className="cafe-eyebrow">THE MENU</span>
+                <span className="cafe-eyebrow">The menu</span>
                 <h3>What sounds good?</h3>
               </div>
               <span>{feasible.length} recipes fit</span>
@@ -1097,7 +1097,7 @@ export function Beverage({ result }: { result: any }) {
 
         <aside className="cafe-order">
           <div className="cafe-order-heading">
-            <span className="cafe-eyebrow">YOUR LITTLE PICK-ME-UP</span>
+            <span className="cafe-eyebrow">Your little pick-me-up</span>
             <h2>{scene.confirmed ? "Made for you." : "Make it yours."}</h2>
             <p>
               {scene.confirmed
@@ -1368,7 +1368,7 @@ export function Beverage({ result }: { result: any }) {
       )}
       <div className="cafe-understanding">
         <div>
-          <span className="cafe-eyebrow">WHAT WE HEARD</span>
+          <span className="cafe-eyebrow">What we heard</span>
           <span>
             {scene.source === "manual"
               ? "Explicit menu choices"
