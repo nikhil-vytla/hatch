@@ -5,7 +5,6 @@
  * browser; Jev runs on your own key.
  */
 import { useEffect, useRef, useState } from "react";
-import type { ZeroShot } from "../../packages/arena/src/decide/nli";
 import { Brain, type Backend } from "../../live-worlds/win-over/brain";
 import {
   advance,
@@ -24,6 +23,8 @@ import {
 } from "../../live-worlds/win-over/engine";
 import { camera, hitResident, paint, toWorld } from "../../live-worlds/win-over/render";
 import recorded from "../../live-worlds/win-over/recorded.json";
+import { STUDENT_NAME } from "../../live-worlds/free-model/runtime";
+import studentLines from "../../live-worlds/free-model/recorded-lines.json";
 import { getApiKey, run } from "./api";
 import "./fool-jev.css";
 import "./win-over.css";
@@ -56,52 +57,41 @@ function openSettings() {
   details.querySelector("summary")?.focus();
 }
 
-/** The in-browser classifier, behind one shared worker; resolves when the model answers. */
-function localClassifier(onProgress: (text: string) => void): {
-  classify: ZeroShot;
-  warm: () => void;
-} {
-  const worker = new Worker(new URL("./win-over.worker.ts", import.meta.url), { type: "module" });
-  const waiting = new Map<
-    number,
-    { resolve: (r: { labels: string[]; scores: number[] }) => void; reject: (e: Error) => void }
-  >();
+/** The free model's text encoder (MiniLM), behind one shared worker. */
+function localEmbedder(onProgress: (text: string) => void) {
+  const worker = new Worker(new URL("./minilm.worker.ts", import.meta.url), { type: "module" });
+  const waiting = new Map<string, { resolve: (v: number[]) => void; reject: (e: Error) => void }>();
   let next = 1;
 
   worker.onmessage = (e: MessageEvent) => {
     const m = e.data;
 
     if (m.type === "download") {
-      onProgress(`Loading the free model (27 MB, once) · ${m.percent}%`);
+      onProgress(`Loading the free model (23 MB, once) · ${m.percent}%`);
 
       return;
     }
-
-    if (m.type === "ready") onProgress("");
 
     const job = waiting.get(m.id);
 
     if (!job) return;
 
     waiting.delete(m.id);
+    onProgress("");
 
     if (m.type === "error") job.reject(new Error(m.message));
-    else if (m.type === "answer") job.resolve({ labels: m.labels, scores: m.scores });
-    else job.resolve({ labels: [], scores: [] });
+    else job.resolve(m.vector);
   };
 
-  const send = (msg: object) =>
-    new Promise<{ labels: string[]; scores: number[] }>((resolve, reject) => {
-      const id = next++;
+  const embed = (text: string) =>
+    new Promise<number[]>((resolve, reject) => {
+      const id = `e${next++}`;
 
       waiting.set(id, { resolve, reject });
-      worker.postMessage({ id, ...msg });
+      worker.postMessage({ id, text });
     });
 
-  return {
-    classify: (premise, labels, options) => send({ premise, labels, options }),
-    warm: () => void send({ warm: true }),
-  };
+  return { embed, warm: () => void embed("Hello.").catch(() => {}) };
 }
 
 const jevBackend: Backend = {
@@ -134,9 +124,9 @@ export function WinOver() {
   const view = () => camera(world.current, (canvas.current?.clientWidth ?? 900) < 640 ? 2 : 1);
 
   useEffect(() => {
-    const lc = localClassifier(setLoading);
+    const lc = localEmbedder(setLoading);
 
-    local.current = { kind: "local", name: "MobileBERT", classify: lc.classify };
+    local.current = { kind: "student", name: STUDENT_NAME, embed: lc.embed };
     brain.current = new Brain(() => world.current, local.current);
     lc.warm();
 
@@ -529,43 +519,51 @@ export function WinOver() {
       </div>
 
       <details className="fj-heard">
-        <summary>The same lines, two models (recorded {recorded.recordedOn})</summary>
+        <summary>The same lines, three models (recorded {recorded.recordedOn})</summary>
         <p className="fj-fine">
           We said each line to the same {recorded.listeners.length} residents (
-          {recorded.listeners.join(", ")}) and asked both models. MobileBERT ran on a laptop; Jev
-          ran through the gateway ({recorded.jev.calls} calls, {recorded.jev.medianMs} ms median, $
-          {recorded.jev.costUsd.toFixed(4)} total).
+          {recorded.listeners.join(", ")}). {STUDENT_NAME} is today's free model; MobileBERT was
+          the free model before it; Jev ran through the gateway ({recorded.jev.calls} calls,{" "}
+          {recorded.jev.medianMs} ms median, ${recorded.jev.costUsd.toFixed(4)} total).
         </p>
         <div className="model-table-wrap">
           <table className="model-table">
             <thead>
               <tr>
                 <th scope="col">Line</th>
+                <th scope="col">{STUDENT_NAME} took it as</th>
                 <th scope="col">MobileBERT took it as</th>
                 <th scope="col">Jev took it as</th>
-                <th scope="col">MobileBERT: they…</th>
+                <th scope="col">{STUDENT_NAME}: they…</th>
                 <th scope="col">Jev: they…</th>
               </tr>
             </thead>
             <tbody>
-              {recorded.lines.map((l) => (
-                <tr key={l.text}>
-                  <th scope="row">"{l.text}"</th>
-                  <td>{l.mobilebert.intent}</td>
-                  <td>{l.jev.intent}</td>
-                  <td>{l.mobilebert.actions}</td>
-                  <td>{l.jev.actions}</td>
-                </tr>
-              ))}
+              {recorded.lines.map((l) => {
+                const st = studentLines.lines.find((x) => x.text === l.text)?.student;
+
+                return (
+                  <tr key={l.text}>
+                    <th scope="row">"{l.text}"</th>
+                    <td>{st?.intent ?? "—"}</td>
+                    <td>{l.mobilebert.intent}</td>
+                    <td>{l.jev.intent}</td>
+                    <td>{st?.actions ?? "—"}</td>
+                    <td>{l.jev.actions}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
         <p className="fj-fine">{recorded.verdict}</p>
         <p className="fj-fine">
-          Residents are fictional and their tastes are random. A small classifier answers each
-          judgment as a zero-shot entailment, judging the line once and each listener's reaction
-          once; Jev gets the same questions in one batched call. Code walks people around, decides
-          who's in earshot and keeps score.
+          Residents are fictional and their tastes are random. The free model is a small network
+          trained for this game: it embeds each line once in your browser (MiniLM, 23 MB) and
+          answers every listener from that in about a millisecond. It learned from an open-weights
+          model, Qwen3.8-2.4T-A95B, never from Jev; Jev's answers above are only shown, not used.
+          Jev gets the same questions in one batched call. Code walks people around, decides who's
+          in earshot and keeps score.
         </p>
       </details>
     </div>

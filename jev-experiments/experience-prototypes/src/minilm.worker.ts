@@ -1,7 +1,8 @@
 /// <reference lib="webworker" />
 /**
- * Embeds a visitor's own rumour with all-MiniLM-L6-v2 in the browser, the same model and
- * settings that produced live-worlds/rumour/vectors.json for the presets.
+ * Embeds text with all-MiniLM-L6-v2 in the browser: a rumour for the rumour mill, a line for
+ * Who can you win over?. Same model and settings as live-worlds/rumour/vectors.json and the free
+ * model's training data (live-worlds/free-model), so the small networks see what they trained on.
  */
 import { env, pipeline } from "@huggingface/transformers";
 import { EMBED_MODEL } from "../../live-worlds/rumour/similarity";

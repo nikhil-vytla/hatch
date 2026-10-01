@@ -3,11 +3,15 @@
  * it asks a model and applies answers whenever they arrive. One job runs at a time, newest lines
  * before old gossip, and stale gossip is dropped rather than letting the queue grow.
  *
- * Two backends answer the same requests:
+ * Three backends answer the same questions:
+ * - student: the small model trained for this game (live-worlds/free-model); the line is embedded
+ *   once in the browser and every listener is answered from it;
  * - local: a zero-shot classifier in the browser, one request at a time, applied as each lands;
  * - jev: everything in a job merged into one batched call (on the visitor's own key).
  */
 import type { ZeroShot } from "../../packages/arena/src/decide/nli";
+import { eventText } from "../free-model/features";
+import { judgeGossip, judgeLine, judgeReaction } from "../free-model/runtime";
 import {
   answerLocally,
   gossipRequest,
@@ -25,6 +29,7 @@ import { applyGossip, applyHear, goal, markBusy, type Meeting, type Resident, ty
 export type JevReply = { answers: Record<string, Answer>; latency_ms?: number; usage?: { input_tokens?: number } | null };
 
 export type Backend =
+  | { kind: "student"; name: string; embed: (text: string) => Promise<ArrayLike<number>> }
   | { kind: "local"; name: string; classify: ZeroShot }
   | { kind: "jev"; name: string; ask: (state: unknown, questions: Record<string, unknown>) => Promise<JevReply> };
 
@@ -108,6 +113,23 @@ export class Brain {
     const g = goal(w.goal ?? "gig");
     const b = this.backend;
 
+    if (b.kind === "student") {
+      const started = now();
+      const emb = await b.embed(eventText(event));
+      const line = judgeLine(emb, event);
+
+      for (const [i, r] of listeners.entries()) {
+        const t = now();
+        const reaction = judgeReaction(emb, event, line, r, g);
+        // The embedding is computed once; its time is charged to the first listener.
+        const ms = Math.round(now() - t + (i === 0 ? t - started : 0));
+
+        applyHear(this.world(), r, toHearDecision(line, reaction, event, b.name, ms, this.world().t));
+      }
+
+      return;
+    }
+
     if (b.kind === "local") {
       let started = now();
       const line = await answerLocally(b.classify, lineRequest(event));
@@ -141,6 +163,16 @@ export class Brain {
 
   private async runGossip(meetings: Meeting[]) {
     const b = this.backend;
+
+    if (b.kind === "student") {
+      for (const m of meetings) {
+        const started = now();
+
+        applyGossip(this.world(), m, toGossipDecision(judgeGossip(m), m.rumour.says, b.name, Math.round(now() - started), this.world().t));
+      }
+
+      return;
+    }
 
     if (b.kind === "local") {
       for (const m of meetings) {
