@@ -78,7 +78,7 @@
 .cafe-mode button {
   border-radius: 22px;
   padding: 7px 13px;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--cafe-muted);
 }
 .cafe-mode button.active {
@@ -124,7 +124,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 8px;
+  font-size: 12px;
   letter-spacing: 1.8px;
   color: #827b68;
 }
@@ -135,7 +135,7 @@
   padding: 5px 8px;
   border: 1px solid #cec8b5;
   border-radius: 20px;
-  font-size: 9px;
+  font-size: 12px;
   letter-spacing: 0.1px;
   color: #5e6550;
   background: #ffffff66;
@@ -379,7 +379,7 @@
   right: 18px;
 }
 .cafe-drink-label > span {
-  font-size: 8px;
+  font-size: 12px;
   letter-spacing: 1.7px;
   color: #6e543b;
 }
@@ -390,7 +390,7 @@
   color: #4a3d2e;
 }
 .cafe-drink-label p {
-  font-size: 10px;
+  font-size: 12px;
   color: #735c44;
 }
 .cafe-visit-bar {
@@ -404,13 +404,13 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  font-size: 10px;
+  font-size: 12px;
   color: var(--cafe-muted);
 }
 .cafe-visit-bar select {
   background: transparent;
   padding: 5px 25px 5px 8px;
-  font-size: 11px;
+  font-size: 12px;
   border: 1px solid var(--cafe-line);
   border-radius: 6px;
 }
@@ -423,7 +423,7 @@
   align-items: center;
   gap: 5px;
   padding: 5px 0;
-  font-size: 10px;
+  font-size: 12px;
   color: var(--cafe-muted);
 }
 .cafe-icon-button:hover {
@@ -444,16 +444,16 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  font-size: 10px;
+  font-size: 12px;
 }
 .cafe-replay-control select {
   padding: 4px 7px;
-  font-size: 11px;
+  font-size: 12px;
   max-width: 190px;
   background: var(--cafe-cream);
 }
 .cafe-replay-control > span {
-  font-size: 9px;
+  font-size: 12px;
   color: var(--cafe-muted);
   max-width: 112px;
   line-height: 1.4;
@@ -469,11 +469,11 @@
   margin-top: 1px;
 }
 .cafe-section-heading > span {
-  font-size: 10px;
+  font-size: 12px;
   color: var(--cafe-muted);
 }
 .cafe-eyebrow {
-  font-size: 8px;
+  font-size: 12px;
   letter-spacing: 1.6px;
   color: var(--cafe-muted);
   font-weight: 500;
@@ -536,27 +536,27 @@
   place-items: center;
 }
 .cafe-menu-card > strong {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   display: block;
   line-height: 1.3;
   margin-bottom: 4px;
 }
 .cafe-menu-card > p {
-  font-size: 9px;
+  font-size: 12px;
   line-height: 1.45;
   color: var(--cafe-muted);
   min-height: 27px;
 }
 .cafe-menu-card > span {
-  font-size: 10px;
+  font-size: 12px;
   display: block;
   margin-top: 7px;
   color: var(--cafe-green);
 }
 .cafe-menu-card > small {
   display: block;
-  font-size: 8px;
+  font-size: 12px;
   color: var(--cafe-muted);
   line-height: 1.45;
   margin-top: 5px;
@@ -587,7 +587,7 @@
   margin: 2px 0 5px;
 }
 .cafe-barista p {
-  font-size: 10px;
+  font-size: 12px;
   color: var(--cafe-muted);
 }
 .cafe-answer-chips {
@@ -604,7 +604,7 @@
   background: var(--cafe-paper);
   border-radius: 22px;
   padding: 8px 13px;
-  font-size: 11px;
+  font-size: 12px;
 }
 .cafe-answer-chips button:hover {
   border-color: var(--cafe-green);
@@ -618,7 +618,7 @@
   background: var(--cafe-paper);
 }
 .cafe-say > label {
-  font-size: 10px;
+  font-size: 12px;
   display: block;
   margin-bottom: 6px;
 }
@@ -640,7 +640,7 @@
   margin-top: 10px;
 }
 .cafe-say > div > span {
-  font-size: 9px;
+  font-size: 12px;
   color: var(--cafe-muted);
   max-width: 240px;
 }
@@ -653,7 +653,7 @@
   color: #fffdf1 !important;
   border-radius: 8px;
   padding: 11px 15px;
-  font-size: 11px;
+  font-size: 12px;
   white-space: nowrap;
 }
 .cafe-primary:hover {
@@ -663,7 +663,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 10px;
+  font-size: 12px;
   color: var(--cafe-muted);
   margin: 15px 0 0;
   padding: 5px 0;
@@ -682,12 +682,12 @@
 }
 .cafe-preferences label > span {
   display: block;
-  font-size: 9px;
+  font-size: 12px;
   margin-bottom: 5px;
 }
 .cafe-preferences select {
   width: 100%;
-  font-size: 11px;
+  font-size: 12px;
   padding: 7px;
   background: var(--cafe-paper);
   border-color: var(--cafe-line);
@@ -702,17 +702,17 @@
   border: 1px solid var(--cafe-line);
   border-radius: 8px;
   padding: 9px 12px;
-  font-size: 10px;
+  font-size: 12px;
   text-align: left;
   background: var(--cafe-paper);
 }
 .cafe-substitutions span {
   display: block;
   color: var(--cafe-muted);
-  font-size: 9px;
+  font-size: 12px;
 }
 .cafe-substitutions p {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--cafe-muted);
 }
 .cafe-order {
@@ -735,7 +735,7 @@
   color: var(--cafe-ink);
 }
 .cafe-order-heading p {
-  font-size: 10px;
+  font-size: 12px;
   color: var(--cafe-muted);
   line-height: 1.6;
 }
@@ -761,7 +761,7 @@
   text-transform: capitalize;
 }
 .cafe-order-name p {
-  font-size: 9px;
+  font-size: 12px;
   color: var(--cafe-muted);
   margin-top: 4px;
 }
@@ -772,7 +772,7 @@
   min-width: 0;
 }
 .cafe-customize legend {
-  font-size: 10px;
+  font-size: 12px;
   margin-bottom: 6px;
   font-weight: 500;
 }
@@ -782,7 +782,7 @@
   flex-wrap: wrap;
 }
 .cafe-customize button {
-  font-size: 10px;
+  font-size: 12px;
   border: 1px solid var(--cafe-line);
   border-radius: 6px;
   padding: 6px 10px;
@@ -796,11 +796,11 @@
   color: var(--cafe-green);
 }
 .cafe-customize button small {
-  font-size: 7px;
+  font-size: 12px;
   text-transform: none;
 }
 .cafe-customize-note {
-  font-size: 9px;
+  font-size: 12px;
   line-height: 1.55;
   color: var(--cafe-muted);
   margin-top: 14px;
@@ -834,13 +834,13 @@
   color: var(--cafe-green);
 }
 .cafe-receipt > p {
-  font-size: 7px;
+  font-size: 12px;
   letter-spacing: 1px;
   margin: 6px 0 14px;
 }
 .cafe-receipt dl {
   margin: 0;
-  font-size: 9px;
+  font-size: 12px;
 }
 .cafe-receipt dl > div {
   display: flex;
@@ -858,13 +858,13 @@
   border-top: 1px dashed var(--cafe-line);
   padding-top: 10px;
   margin-top: 9px;
-  font-size: 11px;
+  font-size: 12px;
 }
 .cafe-total strong {
   font-weight: 500;
 }
 .cafe-receipt > small {
-  font-size: 8px;
+  font-size: 12px;
   display: block;
   margin-top: 10px;
   color: var(--cafe-muted);
@@ -875,7 +875,7 @@
   padding: 13px;
 }
 .cafe-fiction {
-  font-size: 9px;
+  font-size: 12px;
   line-height: 1.55;
   text-align: center;
   color: var(--cafe-muted);
@@ -899,7 +899,7 @@
   margin-bottom: 23px;
 }
 .cafe-empty-order > div > span {
-  font-size: 8px;
+  font-size: 12px;
   letter-spacing: 1.3px;
 }
 .cafe-empty-order h3 {
@@ -907,7 +907,7 @@
   margin: 0 0 8px;
 }
 .cafe-empty-order p {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--cafe-muted);
 }
 .cafe-order-complete {
@@ -916,7 +916,7 @@
   gap: 8px;
   padding: 12px 0 3px;
   color: var(--cafe-green);
-  font-size: 11px;
+  font-size: 12px;
 }
 .cafe-order-complete > svg {
   flex-shrink: 0;
@@ -931,11 +931,11 @@
   justify-content: space-between;
   align-items: center;
   width: 100%;
-  font-size: 10px;
+  font-size: 12px;
   text-align: left;
 }
 .cafe-goal > div p {
-  font-size: 9px;
+  font-size: 12px;
   color: var(--cafe-muted);
   margin: 8px 0;
 }
@@ -945,7 +945,7 @@
   border-radius: 4px;
   margin: 5px 0;
   padding: 4px 7px;
-  font-size: 9px;
+  font-size: 12px;
   color: var(--cafe-green);
 }
 .cafe-goal > div span.missed {
@@ -953,7 +953,7 @@
   background: #b66b4810;
 }
 .cafe-goal small {
-  font-size: 9px;
+  font-size: 12px;
   color: var(--cafe-muted);
 }
 .cafe-alert {
@@ -985,7 +985,7 @@
   margin-bottom: 10px;
 }
 .cafe-understanding > div:first-child > span:last-child {
-  font-size: 9px;
+  font-size: 12px;
   color: var(--cafe-muted);
 }
 .cafe-understanding-chips {
@@ -997,7 +997,7 @@
 .cafe-understanding-chips > span {
   border: 1px solid var(--cafe-line);
   border-radius: 6px;
-  font-size: 10px;
+  font-size: 12px;
   display: flex;
   align-items: center;
   gap: 5px;
@@ -1019,7 +1019,7 @@
   font-weight: 800;
 }
 .cafe-understanding-chips > small {
-  font-size: 9px;
+  font-size: 12px;
   color: var(--cafe-muted);
 }
 .cafe-understanding-chips > span.conflict {
@@ -1029,7 +1029,7 @@
 .cafe-guard-note {
   display: flex;
   gap: 8px;
-  font-size: 10px;
+  font-size: 12px;
   background: var(--cafe-cream);
   padding: 10px 13px;
   border-radius: 8px;
@@ -1054,7 +1054,7 @@
 }
 .cafe-inspector > summary > span {
   font-family: inherit;
-  font-size: 10px;
+  font-size: 12px;
   color: var(--cafe-muted);
   margin-left: 12px;
 }
@@ -1073,7 +1073,7 @@
   margin: 0;
 }
 .cafe-inspector li {
-  font-size: 11px;
+  font-size: 12px;
   margin-bottom: 13px;
 }
 .cafe-inspector li > span {
@@ -1083,13 +1083,13 @@
   font-weight: 800;
 }
 .cafe-inspector p {
-  font-size: 11px;
+  font-size: 12px;
   margin: 4px 0 9px;
 }
 .cafe-inspector pre {
   max-height: 340px;
   overflow: auto;
-  font: 9px/1.7 var(--mono, monospace);
+  font: 12px/1.7 var(--mono, monospace);
   background: var(--cafe-cream);
   padding: 12px;
   border-radius: 7px;
@@ -1097,7 +1097,7 @@
   overflow-wrap: anywhere;
 }
 .cafe-inspector section > details > summary {
-  font-size: 10px;
+  font-size: 12px;
   cursor: pointer;
 }
 .cafe-timeline {
@@ -1107,7 +1107,7 @@
   gap: 6px;
 }
 .cafe-timeline button {
-  font-size: 10px;
+  font-size: 12px;
   text-align: left;
   border: 1px solid var(--cafe-line);
   padding: 5px 9px;
@@ -1235,7 +1235,7 @@
     font-size: 23px;
   }
   .cafe-mode button {
-    font-size: 10px;
+    font-size: 12px;
     padding: 6px 9px;
   }
   .cafe-layout {
@@ -1335,7 +1335,7 @@
   .cafe-scene-top {
     left: 13px;
     right: 13px;
-    font-size: 6px;
+    font-size: 12px;
     letter-spacing: 1.1px;
   }
   .cafe-scene-top > span:first-child {
@@ -1343,7 +1343,7 @@
     line-height: 1.8;
   }
   .cafe-source {
-    font-size: 8px;
+    font-size: 12px;
   }
   .cafe-window {
     width: 111px;
@@ -1400,10 +1400,10 @@
     padding: 6px 6px 9px;
   }
   .cafe-menu-card > strong {
-    font-size: 11px;
+    font-size: 12px;
   }
   .cafe-menu-card > p {
-    font-size: 9px;
+    font-size: 12px;
   }
   .cafe-menu-illustration {
     height: 85px;
@@ -1412,18 +1412,18 @@
     gap: 9px;
   }
   .cafe-visit-bar label {
-    font-size: 9px;
+    font-size: 12px;
     gap: 5px;
   }
   .cafe-visit-bar select {
     max-width: 128px;
-    font-size: 10px;
+    font-size: 12px;
   }
   .cafe-visit-bar > div {
     gap: 8px;
   }
   .cafe-icon-button {
-    font-size: 9px;
+    font-size: 12px;
     gap: 3px;
   }
   .cafe-icon-button svg {
@@ -1447,7 +1447,7 @@
     font-size: 21px;
   }
   .cafe-barista p {
-    font-size: 10px;
+    font-size: 12px;
   }
   .cafe-answer-chips {
     margin-left: 0;
@@ -1457,18 +1457,18 @@
   }
   .cafe-say > div > span {
     max-width: 150px;
-    font-size: 9px;
+    font-size: 12px;
   }
   .cafe-say .cafe-primary {
     padding: 10px;
-    font-size: 10px;
+    font-size: 12px;
   }
   .cafe-order {
     padding: 20px 17px;
   }
   .cafe-customize button {
     padding: 6px 9px;
-    font-size: 10px;
+    font-size: 12px;
     min-width: 41px;
   }
   .cafe-customize {
@@ -1479,23 +1479,23 @@
   }
   .cafe-inspector > summary > span {
     display: block;
-    font-size: 9px;
+    font-size: 12px;
     margin: 4px 0 0 16px;
   }
   .cafe-inspector-grid {
     padding: 2px 14px 15px;
   }
   .cafe-understanding-chips > span {
-    font-size: 9px;
+    font-size: 12px;
   }
   .cafe-understanding-chips i {
-    font-size: 6px;
+    font-size: 12px;
   }
   .cafe-guard-note {
-    font-size: 10px;
+    font-size: 12px;
   }
   .cafe-understanding > div:first-child > span:last-child {
-    font-size: 8px;
+    font-size: 12px;
   }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -1514,15 +1514,15 @@
   font-size: 12px;
 }
 .cafe-menu-card > p {
-  font-size: 10px;
+  font-size: 12px;
 }
 .cafe-menu-card > small {
-  font-size: 9px;
+  font-size: 12px;
 }
 .cafe-customize-note,
 .cafe-fiction {
-  font-size: 10px;
+  font-size: 12px;
 }
 .cafe-receipt dl {
-  font-size: 10px;
+  font-size: 12px;
 }
