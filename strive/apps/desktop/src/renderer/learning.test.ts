@@ -1,6 +1,16 @@
 import { expect, test } from "bun:test";
-import type { Entry, Event, Proposal, ProposalState } from "@strive/protocol";
-import { fileHistory, judgeAdvice, latestRun, readJudge } from "./learning";
+import type { Change, Entry, Event, Proposal, ProposalState } from "@strive/protocol";
+import {
+  artifactName,
+  artifactOf,
+  artifactPath,
+  changedText,
+  fileHistory,
+  judgeAdvice,
+  latestRun,
+  readJudge,
+  replacedText,
+} from "./learning";
 
 const PROPOSAL: Proposal = {
   change: { kind: "memory", op: "add", text: "Run `bun test src`." },
@@ -169,4 +179,34 @@ test("a judge fail is advice: the failed criteria's reasons, or the detail's fir
   ]);
   expect(judgeAdvice(state([{ gate: "judge", verdict: "pass", detail: judged }]))).toBeUndefined();
   expect(judgeAdvice(state([{ gate: "static", verdict: "fail", detail: "x" }]))).toBeUndefined();
+});
+
+test("each kind of learned artifact is named and placed as the daemon writes it", () => {
+  const cases: [Change, string, string][] = [
+    [{ kind: "memory", op: "add", text: "x" }, "memory", ".strive/memory.md"],
+    [{ kind: "skill", name: "release", content: "" }, "skill release", ".strive/skills/release/SKILL.md"],
+    [{ kind: "check", name: "host", content: "" }, "check host", ".strive/checks/host.md"],
+    [{ kind: "command", name: "review", content: "" }, "command /review", ".strive/commands/review.md"],
+    [{ kind: "rule", name: "api", content: "" }, "rule api", ".strive/rules/api.md"],
+    [{ kind: "extension", name: "shout", files: [] }, "extension shout", ".strive/extensions/shout"],
+  ];
+
+  for (const [change, name, path] of cases) {
+    expect([artifactName(artifactOf(change)), artifactPath(artifactOf(change))]).toEqual([name, path]);
+  }
+});
+
+test("an extension's files are shown together, as the review page shows them", () => {
+  const change: Change = {
+    kind: "extension",
+    name: "shout",
+    files: [
+      { path: "index.ts", content: "export {};\n" },
+      { path: "extension.json", content: "{}" },
+    ],
+  };
+
+  expect(changedText(change)).toBe("=== extension.json ===\n{}\n\n=== index.ts ===\nexport {};");
+  expect(replacedText(change, JSON.stringify([{ path: "index.ts", content: "old\n" }]))).toBe("=== index.ts ===\nold");
+  expect(replacedText(change, "")).toBe("");
 });

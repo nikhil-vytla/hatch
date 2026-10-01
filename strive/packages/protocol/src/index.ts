@@ -54,11 +54,17 @@ export type * from "./generated/Entry";
 
 export type * from "./generated/Event";
 
+export type * from "./generated/ExtensionFile";
+
 export type * from "./generated/ExtensionInfo";
+
+export type * from "./generated/ExtensionProposed";
 
 export type * from "./generated/ExtensionTool";
 
 export type * from "./generated/GatewayInfo";
+
+export type * from "./generated/HostProposeExtensionParams";
 
 export type * from "./generated/HostRecordParams";
 

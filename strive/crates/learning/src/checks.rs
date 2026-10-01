@@ -67,6 +67,11 @@ pub fn check(p: &Proposal, known: &[String], shown: Option<&str>) -> Vec<Finding
     if let Err(why) = crate::relative_path(&artifact) {
         found.push(Finding::new(Rule::Path, why));
     }
+    // An extension's files, one after another, for the text checks below.
+    let files = match &p.change {
+        Change::Extension { files, .. } => crate::extension_dir::shown(files),
+        _ => String::new(),
+    };
     // What the agent is given: the bullet's text, or the skill's.
     let (what, given) = match &p.change {
         Change::Memory(op) => {
@@ -88,6 +93,20 @@ pub fn check(p: &Proposal, known: &[String], shown: Option<&str>) -> Vec<Finding
                 ));
             }
             ("content", content.as_str())
+        }
+        Change::Extension { name, files: list } => {
+            // Its size and form, as the loader reads them.
+            if let Err(problems) = crate::extension_dir::parse(name, list) {
+                for d in problems {
+                    let rule = if d.contains("the limit is") || d.contains("files; at most") {
+                        Rule::Size
+                    } else {
+                        Rule::Form
+                    };
+                    found.push(Finding::new(rule, d));
+                }
+            }
+            ("files", files.as_str())
         }
     };
     found.extend(form(p).into_iter().map(|d| Finding::new(Rule::Form, d)));

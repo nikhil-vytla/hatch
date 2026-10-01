@@ -244,6 +244,10 @@ function artifactSchema() {
     Type.Object({ kind: Type.Literal("check"), name: Type.String({ description: CHECK_NAME }) }),
     Type.Object({ kind: Type.Literal("command"), name: Type.String({ description: COMMAND_NAME }) }),
     Type.Object({ kind: Type.Literal("rule"), name: Type.String({ description: RULE_NAME }) }),
+    Type.Object({
+      kind: Type.Literal("extension"),
+      name: Type.String({ description: "The extension's directory under .strive/extensions" }),
+    }),
   ]);
 }
 
@@ -283,6 +287,19 @@ function changeSchema() {
       kind: Type.Literal("rule"),
       name: Type.String({ description: RULE_NAME }),
       content: Type.String({ description: "The rule's whole file: frontmatter (description, paths), then guidance" }),
+    }),
+    Type.Object({
+      kind: Type.Literal("extension"),
+      name: Type.String({
+        description: "The extension's directory under .strive/extensions: 1 to 40 of a-z, 0-9 and -",
+      }),
+      files: Type.Array(
+        Type.Object({
+          path: Type.String({ description: "Its path inside the extension's directory" }),
+          content: Type.String(),
+        }),
+        { description: "Every file: extension.json, index.ts, and *.test.ts the daemon runs" },
+      ),
     }),
   ]);
 }

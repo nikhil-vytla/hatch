@@ -182,6 +182,7 @@ fn resulting(change: &Change, current: Option<&str>) -> Option<String> {
         | Change::Check { content, .. }
         | Change::Command { content, .. }
         | Change::Rule { content, .. } => Some(content.clone()),
+        Change::Extension { files, .. } => Some(crate::extension_dir::shown(files)),
     }
 }
 

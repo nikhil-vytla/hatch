@@ -97,6 +97,7 @@ methods! {
     HostContext = "host/context" (SessionRef) -> LearnerContext;
     HostRecord = "host/record" (HostRecordParams) -> Appended;
     HostStream = "host/stream" (HostStreamParams) -> Empty;
+    HostProposeExtension = "host/proposeExtension" (HostProposeExtensionParams) -> ExtensionProposed;
     SessionInterrupt = "session/interrupt" (SessionRef) -> Empty;
     ModelList = "model/list" (Empty) -> ModelListResult;
     SessionModel = "session/model" (SessionModelParams) -> Appended;
@@ -688,6 +689,7 @@ pub enum Artifact {
     Check { name: String },
     Command { name: String },
     Rule { name: String },
+    Extension { name: String },
 }
 
 /// What a proposal does (ADR-0022): one operation on one memory bullet, or
@@ -718,6 +720,20 @@ pub enum Change {
         name: String,
         content: String,
     },
+    /// An extension's whole directory (ADR-0027): every file, by its path in it.
+    Extension {
+        name: String,
+        files: Vec<ExtensionFile>,
+    },
+}
+
+/// One file of an extension, by its path inside the extension's directory.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct ExtensionFile {
+    pub path: String,
+    pub content: String,
 }
 
 impl Change {
@@ -729,6 +745,7 @@ impl Change {
             Change::Check { name, .. } => Artifact::Check { name: name.clone() },
             Change::Command { name, .. } => Artifact::Command { name: name.clone() },
             Change::Rule { name, .. } => Artifact::Rule { name: name.clone() },
+            Change::Extension { name, .. } => Artifact::Extension { name: name.clone() },
         }
     }
 }
@@ -827,6 +844,9 @@ pub enum Gate {
     /// A model, outside the learner's authority, judging it against
     /// sessions the learner didn't see.
     Judge,
+    /// An extension's own tests, run by the daemon in the sandbox
+    /// (ADR-0027); only extensions have it.
+    Tests,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
@@ -1564,6 +1584,29 @@ pub struct CommandInfo {
 #[ts(export)]
 pub struct SessionCommandsResult {
     pub commands: Vec<CommandInfo>,
+}
+
+/// A work session's proposal of the extension it drafted in
+/// `.strive/drafts/extensions/<name>`, as a person asked (ADR-0027).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct HostProposeExtensionParams {
+    pub id: String,
+    pub name: String,
+    pub summary: String,
+    pub rationale: String,
+    pub prediction: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct ExtensionProposed {
+    /// The proposal's id, in the project's learning session.
+    pub proposal: u64,
+    /// The gates that have a verdict already.
+    pub gates: Vec<GateOutcome>,
 }
 
 /// An extension as a host is given it: what it is and the tools it declares.

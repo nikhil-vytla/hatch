@@ -311,20 +311,118 @@ pub async fn propose(
         ));
     }
     let lock = state.learning.project(sid);
-    let _held = lock.lock().await;
+    let held = lock.lock().await;
     let entries = journal(state, sid)?;
     let before = match strive_learning::relative_path(&proposal.change.artifact()) {
         Ok(rel) => shown(&entries, &rel),
         Err(_) => None,
     };
+    drop(held);
+    record(state, sid, cwd, call_id, proposal, before).await
+}
+
+/// A work session's proposal of the extension it drafted, as a person asked
+/// (ADR-0027): the draft's files as the change, the latest prompt as the
+/// evidence, and the extension's directory as it is now as what it replaces.
+pub async fn propose_extension(
+    state: &Arc<State>,
+    work: &SessionId,
+    cwd: &str,
+    draft: strive_proto::HostProposeExtensionParams,
+) -> Result<(u64, Vec<strive_proto::GateOutcome>), RpcError> {
+    let strive_proto::HostProposeExtensionParams { name, summary, rationale, prediction, .. } = draft;
+    if !strive_learning::valid_skill_name(&name) {
+        return Err(refused(format!("the extension name {name:?} isn't 1 to 40 of a-z, 0-9 and -")));
+    }
+    let home = state.home.root.canonicalize().map_err(|e| internal(&e))?;
+    let rel = format!("{}/{name}", strive_learning::DRAFTS_DIR);
+    let (dir, shown_rel) = (Path::new(cwd).join(&rel), rel.clone());
+    let cwd_owned = cwd.to_string();
+    let files = tokio::task::spawn_blocking(move || {
+        located(&home, &cwd_owned, &dir, &shown_rel)?;
+        read_tree(&dir, &shown_rel)
+    })
+    .await
+    .map_err(|e| internal(&e))?
+    .map_err(refused)?
+    .ok_or_else(|| refused(format!("there's no draft at {rel}; write the extension there first")))?;
+    let asked = journal(state, work)?
+        .iter()
+        .rev()
+        .find(|e| matches!(e.event, Event::UserMessage { .. }))
+        .map(|e| e.seq)
+        .ok_or_else(|| refused("a person hasn't asked for anything in this session yet"))?;
+    let installed = format!("{}/{name}", strive_learning::EXTENSIONS_DIR);
+    let now = file_now(state, cwd, &installed).await?.map_err(refused)?;
+    let before = now.map(|b| state.cas.put(&b)).transpose().map_err(|e| internal(&e))?;
+    let proposal = Proposal {
+        change: Change::Extension { name, files },
+        summary,
+        rationale,
+        evidence: vec![Evidence {
+            session: work.as_str().to_string(),
+            seqs: vec![asked],
+            note: "the person asked for this extension here".into(),
+        }],
+        prediction,
+    };
+    let learning = open_id(state, cwd).await?;
+    let written = record(state, &learning, cwd, None, proposal, before).await?;
+    let id = written.first().map_or(0, |e| e.seq);
+    let gates = written
+        .iter()
+        .filter_map(|e| match &e.event {
+            Event::GateFinished { gate, verdict, detail, .. } => {
+                Some(strive_proto::GateOutcome { gate: *gate, verdict: *verdict, detail: detail.clone() })
+            }
+            _ => None,
+        })
+        .collect();
+    Ok((id, gates))
+}
+
+/// Gates and journals a proposal over `before`, the file (or extension) as
+/// its proposer saw it. An extension's tests run first, outside the
+/// project's lock: they depend on its files alone.
+async fn record(
+    state: &Arc<State>,
+    sid: &SessionId,
+    cwd: &str,
+    call_id: Option<String>,
+    proposal: Proposal,
+    before: Option<Digest>,
+) -> Result<Vec<Entry>, RpcError> {
+    let tests = match &proposal.change {
+        Change::Extension { files, .. } => {
+            let (files, home) = (files.clone(), state.home.root.canonicalize().map_err(|e| internal(&e))?);
+            let unconfined = state.settings.sandbox == crate::settings::SandboxSetting::Off;
+            Some(
+                tokio::task::spawn_blocking(move || crate::extensions::tests(&files, &home, unconfined))
+                    .await
+                    .map_err(|e| internal(&e))?,
+            )
+        }
+        _ => None,
+    };
+    let lock = state.learning.project(sid);
+    let _held = lock.lock().await;
+    let entries = journal(state, sid)?;
     let findings = static_gate(state, cwd, &proposal, before).await?;
     let (verdict, detail) = strive_learning::verdict(&findings);
     let made = crate::judge::Made { proposal: &proposal, before, at_ms: crate::server::epoch_ms() };
     let mut gates = vec![(Gate::Static, verdict, detail)];
+    let tests_failed = tests.as_ref().is_some_and(|(v, _)| *v == Verdict::Fail);
+    if let Some((v, why)) = tests {
+        gates.push((Gate::Tests, v, why));
+    }
     let mut call = None;
-    match judge_plan(state, cwd, verdict, &made, &entries) {
-        crate::judge::Plan::Now(v, why) => gates.push((Gate::Judge, v, why)),
-        crate::judge::Plan::Call(c) => call = Some(c),
+    if tests_failed {
+        gates.push((Gate::Judge, Verdict::Skipped, "not run: its tests failed".into()));
+    } else {
+        match judge_plan(state, cwd, verdict, &made, &entries) {
+            crate::judge::Plan::Now(v, why) => gates.push((Gate::Judge, v, why)),
+            crate::judge::Plan::Call(c) => call = Some(c),
+        }
     }
     let made = Event::ProposalMade { call_id, proposal, before };
     let written = state.sessions.propose(sid, made, gates).await.map_err(session_error)?;
@@ -509,7 +607,11 @@ fn undo(change: &Change, applied: &strive_learning::Applied, id: u64, now: Optio
                 None => Ok(Undo::Done),
             }
         }
-        Change::Skill { .. } | Change::Check { .. } | Change::Command { .. } | Change::Rule { .. } => {
+        Change::Skill { .. }
+        | Change::Check { .. }
+        | Change::Command { .. }
+        | Change::Rule { .. }
+        | Change::Extension { .. } => {
             let now = now.map(strive_journal::cas::digest);
             if now == Some(applied.after) {
                 Ok(Undo::Restore(applied.before))
@@ -590,10 +692,84 @@ pub async fn file_now(state: &State, cwd: &str, rel: &str) -> Result<Result<Opti
     tokio::task::spawn_blocking(move || {
         let path = Path::new(&cwd).join(&rel);
         located(&home, &cwd, &path, &rel)?;
+        // An extension is a directory (ADR-0027), read as one value: its files, by path.
+        if rel.starts_with(strive_learning::EXTENSIONS_DIR) {
+            return Ok(read_tree(&path, &rel)?.map(|f| strive_learning::extension_dir::canonical(&f)));
+        }
         read_now(&path, &rel)
     })
     .await
     .map_err(|e| internal(&e))
+}
+
+/// An extension's files, by path, read without following symlinks; none if
+/// its directory is absent.
+fn read_tree(dir: &Path, rel: &str) -> Result<Option<Vec<strive_learning::extension_dir::File>>, String> {
+    use strive_learning::extension_dir::{FILES, File};
+    match std::fs::symlink_metadata(dir) {
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(e) => return Err(format!("can't read {rel}: {e}")),
+        Ok(m) if !m.is_dir() => return Err(format!("{rel} isn't a directory")),
+        Ok(_) => {}
+    }
+    let mut files = Vec::new();
+    let mut stack = vec![dir.to_path_buf()];
+    while let Some(at) = stack.pop() {
+        for entry in std::fs::read_dir(&at).map_err(|e| format!("can't read {rel}: {e}"))? {
+            let path = entry.map_err(|e| format!("can't read {rel}: {e}"))?.path();
+            let shown = path.strip_prefix(dir).unwrap_or(&path).display().to_string();
+            let meta = std::fs::symlink_metadata(&path).map_err(|e| format!("can't read {rel}/{shown}: {e}"))?;
+            if meta.is_dir() {
+                stack.push(path);
+            } else {
+                let bytes = read_now(&path, &format!("{rel}/{shown}"))?.unwrap_or_default();
+                let content = String::from_utf8(bytes).map_err(|_| format!("{rel}/{shown} isn't UTF-8 text"))?;
+                files.push(File { path: shown, content });
+            }
+            if files.len() + stack.len() > FILES {
+                return Err(format!("{rel} has more than {FILES} files; trim it by hand first"));
+            }
+        }
+    }
+    files.sort_by(|a, b| a.path.cmp(&b.path));
+    Ok(Some(files))
+}
+
+/// Replaces an extension's directory with `files` (canonical bytes), or with
+/// none removes it, without following symlinks.
+fn write_tree(dir: &Path, rel: &str, bytes: Option<&[u8]>) -> Result<(), String> {
+    use strive_learning::extension_dir::File;
+    let new: Vec<File> = match bytes {
+        Some(b) => serde_json::from_slice(b).map_err(|e| format!("{rel}'s files don't read: {e}"))?,
+        None => Vec::new(),
+    };
+    let old = read_tree(dir, rel)?.unwrap_or_default();
+    for f in old.iter().filter(|o| !new.iter().any(|n| n.path == o.path)) {
+        write_now(&dir.join(&f.path), &format!("{rel}/{}", f.path), None)?;
+    }
+    for f in &new {
+        write_now(&dir.join(&f.path), &format!("{rel}/{}", f.path), Some(f.content.as_bytes()))?;
+    }
+    // Directories left empty go too, deepest first; one that isn't empty stays.
+    let mut dirs: Vec<PathBuf> = old.iter().filter_map(|f| dir.join(&f.path).parent().map(Path::to_path_buf)).collect();
+    if bytes.is_none() {
+        dirs.push(dir.to_path_buf());
+    }
+    dirs.sort_by_key(|d| std::cmp::Reverse(d.components().count()));
+    for d in dirs.into_iter().filter(|d| d.starts_with(dir)) {
+        let _ = std::fs::remove_dir(d);
+    }
+    Ok(())
+}
+
+/// Writes what an accept or a rollback leaves at `rel`: a file, or an
+/// extension's directory.
+fn write_artifact(path: &Path, rel: &str, bytes: Option<&[u8]>) -> Result<(), String> {
+    if rel.starts_with(strive_learning::EXTENSIONS_DIR) {
+        write_tree(path, rel, bytes)
+    } else {
+        write_now(path, rel, bytes)
+    }
 }
 
 /// Whether the file's path stays inside the project's `.strive/` with
@@ -823,14 +999,16 @@ async fn apply(state: &State, sid: &SessionId, cwd: &str, f: &Folded, by: String
                 }
             }
         }
-        Change::Skill { content, .. }
-        | Change::Check { content, .. }
-        | Change::Command { content, .. }
-        | Change::Rule { content, .. } => {
-            let after = state.cas.put(content.as_bytes()).map_err(|e| internal(&e))?;
+        Change::Skill { .. }
+        | Change::Check { .. }
+        | Change::Command { .. }
+        | Change::Rule { .. }
+        | Change::Extension { .. } => {
+            let content = whole(&f.state.proposal.change);
+            let after = state.cas.put(&content).map_err(|e| internal(&e))?;
             let applied = Event::ProposalApplied { proposal: id, before: f.state.before, after, bullet: None };
             if before == f.state.before {
-                (Some(content.clone().into_bytes()), Some(applied))
+                (Some(content), Some(applied))
             } else if before == Some(after) {
                 // The file is written and journals come after it, so a crash
                 // between leaves the proposal's content with nothing recorded:
@@ -843,13 +1021,26 @@ async fn apply(state: &State, sid: &SessionId, cwd: &str, f: &Folded, by: String
         }
     };
     if let Some(bytes) = write {
-        tokio::task::spawn_blocking(move || write_now(&path, &rel, Some(&bytes)))
+        tokio::task::spawn_blocking(move || write_artifact(&path, &rel, Some(&bytes)))
             .await
             .map_err(|e| internal(&e))?
             .map_err(|why| refused(format!("{why}; nothing was written")))?;
     }
     events.extend(applied);
     state.sessions.append(sid, events).await.map_err(session_error)
+}
+
+/// What a whole-file change writes: the file's text, or an extension's
+/// files as one value (their canonical bytes). Memory changes one bullet.
+fn whole(change: &Change) -> Vec<u8> {
+    match change {
+        Change::Skill { content, .. }
+        | Change::Check { content, .. }
+        | Change::Command { content, .. }
+        | Change::Rule { content, .. } => content.clone().into_bytes(),
+        Change::Extension { files, .. } => strive_learning::extension_dir::canonical(files),
+        Change::Memory(_) => Vec::new(),
+    }
 }
 
 /// Undoes an applied proposal: a memory proposal's bullet put back as it
@@ -890,7 +1081,7 @@ async fn rollback(state: &Arc<State>, cwd: &str, id: u64, by: String) -> Reply {
         }
     };
     if let Some(bytes) = write {
-        tokio::task::spawn_blocking(move || write_now(&path, &rel, bytes.as_deref()))
+        tokio::task::spawn_blocking(move || write_artifact(&path, &rel, bytes.as_deref()))
             .await
             .map_err(|e| internal(&e))?
             .map_err(|why| refused(format!("{why}; nothing was rolled back")))?;

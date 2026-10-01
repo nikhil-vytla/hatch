@@ -6,4 +6,4 @@
  * a check `.strive/checks/<name>.md` (ADR-0023), a slash command
  * `.strive/commands/<name>.md` (ADR-0024).
  */
-export type Artifact = { "kind": "memory" } | { "kind": "skill", name: string, } | { "kind": "check", name: string, } | { "kind": "command", name: string, } | { "kind": "rule", name: string, };
+export type Artifact = { "kind": "memory" } | { "kind": "skill", name: string, } | { "kind": "check", name: string, } | { "kind": "command", name: string, } | { "kind": "rule", name: string, } | { "kind": "extension", name: string, };

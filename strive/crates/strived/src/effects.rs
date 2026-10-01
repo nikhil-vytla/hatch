@@ -737,7 +737,7 @@ enum Ended {
     Cancelled,
 }
 
-fn bash(scope: &Scope, command: &str, timeout_ms: u64, sandboxed: bool, cancelled: &AtomicBool) -> Result {
+pub fn bash(scope: &Scope, command: &str, timeout_ms: u64, sandboxed: bool, cancelled: &AtomicBool) -> Result {
     // Without a sandbox the gate always asks, so reaching here unconfined
     // means a person approved exactly that.
     let mut cmd = if sandboxed {
