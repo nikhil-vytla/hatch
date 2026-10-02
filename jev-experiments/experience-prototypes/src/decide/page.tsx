@@ -17,6 +17,7 @@ import {
 import type { Dist, WireAnswer } from "../../../packages/arena/src/decide/combine";
 import { combine, wireAnswerSchema } from "../../../packages/arena/src/decide/combine";
 import { getApiKey, run as runJev } from "../api";
+import { fromLive, Receipt, type ReceiptData } from "../receipt";
 import { z } from "zod";
 import type { Combine } from "../../../packages/arena/src/decide/deck";
 import "./decide.css";
@@ -296,6 +297,17 @@ function Reveal({ d, data, mine }: { d: DecideDecision; data: DecideData; mine: 
                 </span>
               </p>
               <Split d={d} dist={r.dist} mine={mine} />
+              <Receipt
+                data={{
+                  mode: "recorded",
+                  ms: r.latencyMs,
+                  questions: Object.keys(neutral.request.questions).length,
+                  costUsd: r.costUsd,
+                  at: r.at,
+                  model: c.model,
+                  raw: { request: neutral.request, response: { answers: r.answers } },
+                }}
+              />
             </div>
           );
         })}
@@ -408,7 +420,7 @@ function Reveal({ d, data, mine }: { d: DecideDecision; data: DecideData; mine: 
 
 const answersSchema = z.object({ answers: z.record(z.string(), wireAnswerSchema) });
 
-type Asked = { status: "idle" | "running" | "done" | "error"; dist?: Dist; message?: string };
+type Asked = { status: "idle" | "running" | "done" | "error"; dist?: Dist; message?: string; receipt?: ReceiptData };
 
 /**
  * The visitor writes their own wording of the plain question. Jev runs it live with the
@@ -447,9 +459,10 @@ function YourWording({ d, data }: { d: DecideDecision; data: DecideData }) {
     setJev({ status: "running" });
 
     try {
-      const body = answersSchema.parse(await runJev(request.state, request.questions));
+      const raw: unknown = await runJev(request.state, request.questions);
+      const body = answersSchema.parse(raw);
 
-      setJev({ status: "done", dist: toDist(body.answers) });
+      setJev({ status: "done", dist: toDist(body.answers), receipt: fromLive(raw, request) });
     } catch (e) {
       setJev({ status: "error", message: e instanceof Error ? e.message : String(e) });
     }
@@ -515,6 +528,7 @@ function YourWording({ d, data }: { d: DecideDecision; data: DecideData }) {
                 <b>Jev, your wording</b>
               </p>
               <Split d={d} dist={jev.dist} />
+              {jev.receipt && <Receipt data={jev.receipt} />}
             </div>
           )}
           {nli && (

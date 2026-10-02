@@ -7,6 +7,9 @@ const resultSchema = z.object({
   dist: z.record(z.string(), z.number()),
   answers: z.record(z.string(), wireAnswerSchema),
   latencyMs: z.number().nullable(),
+  // Optional so a decide.json built before the receipt still parses.
+  at: z.string().nullable().optional(),
+  costUsd: z.number().nullable().optional(),
 });
 
 const setupSchema = z.object({

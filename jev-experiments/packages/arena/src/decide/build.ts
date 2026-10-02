@@ -38,10 +38,18 @@ const rowSchema = z.object({
   latencyMs: z.number().nullable().optional(),
   model: z.string().optional(),
   at: z.string().optional(),
+  costUsd: z.number().nullable().optional(),
   answers: z.record(z.string(), wireAnswerSchema).optional(),
 });
 
-export type Result = { dist: Dist; answers: Record<string, WireAnswer>; latencyMs: number | null };
+export type Result = {
+  dist: Dist;
+  answers: Record<string, WireAnswer>;
+  latencyMs: number | null;
+  /** When this answer was recorded, and what it cost if the recorder logged it. */
+  at: string | null;
+  costUsd: number | null;
+};
 
 function readRows(path: string) {
   if (!existsSync(path)) return new Map<string, z.infer<typeof rowSchema>>();
@@ -79,6 +87,8 @@ export function buildDecide(root: string, outDir: string) {
             dist: combine(s.combine, d.options, row.answers),
             answers: row.answers,
             latencyMs: row.latencyMs ?? null,
+            at: row.at ?? null,
+            costUsd: row.costUsd ?? null,
           };
 
           return [[c.id, result]];

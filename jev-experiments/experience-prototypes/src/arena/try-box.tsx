@@ -13,6 +13,7 @@ import { keyword } from "../../../packages/arena/src/one-box/keyword";
 import { QUESTIONS, type Reading } from "../../../packages/arena/src/one-box/questions";
 import { normalizeKey, TYPING } from "../../../packages/arena/src/one-box/replay";
 import { EvaluationError, getApiKey, run } from "../api";
+import { fromLive, Receipt, type ReceiptData } from "../receipt";
 import { colorVars, type CardModel } from "./model";
 import { fromCalm, Shown } from "./one-box-ui";
 
@@ -33,6 +34,8 @@ type Lane = {
   lastMs: number | null;
   requests: number;
   note: string;
+  /** The last live answer's receipt (Jev only). */
+  receipt?: ReceiptData;
 };
 
 const fresh = (note = ""): Lane => ({ calm: START, lastMs: null, requests: 0, note });
@@ -63,7 +66,7 @@ export function TryBox({ model: m }: { model: CardModel }) {
 
   const typer = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const apply = (id: LaneId, reading: Reading, forText: string, ms: number, note = "") =>
+  const apply = (id: LaneId, reading: Reading, forText: string, ms: number, note = "", receipt?: ReceiptData) =>
     setLanes((l) => ({
       ...l,
       [id]: {
@@ -71,6 +74,7 @@ export function TryBox({ model: m }: { model: CardModel }) {
         lastMs: ms,
         requests: l[id].requests + 1,
         note,
+        receipt: receipt ?? l[id].receipt,
       },
     }));
 
@@ -103,6 +107,7 @@ export function TryBox({ model: m }: { model: CardModel }) {
           ask,
           Math.round(performance.now() - started),
           dropped.length ? `The gateway dropped ${dropped.join(" and ")}.` : "",
+          fromLive(body, { state: { text: ask }, questions: QUESTIONS }),
         );
       })
       .catch((error: Error) => {
@@ -246,6 +251,7 @@ export function TryBox({ model: m }: { model: CardModel }) {
               <p className="ob-lane-note muted small">
                 {lane.note || (lane.requests ? `${lane.requests} answers` : "")}
               </p>
+              {id === "jev" && lane.receipt && <Receipt data={lane.receipt} />}
             </article>
           );
         })}

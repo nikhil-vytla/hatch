@@ -26,6 +26,7 @@ import recorded from "../../live-worlds/win-over/recorded.json";
 import { STUDENT_NAME } from "../../live-worlds/free-model/runtime";
 import studentLines from "../../live-worlds/free-model/recorded-lines.json";
 import { getApiKey, run } from "./api";
+import { Receipt } from "./receipt";
 import "./fool-jev.css";
 import "./win-over.css";
 
@@ -490,11 +491,17 @@ export function WinOver() {
                           <dd>{pct(person.last.passOn)}</dd>
                         </>
                       )}
-                      <dt>Decided by</dt>
-                      <dd>
-                        {person.last.model}, {person.last.ms} ms
-                      </dd>
                     </dl>
+                  ) : null}
+                  {person.last ? (
+                    <Receipt
+                      label="Decided by"
+                      data={{
+                        mode: person.last.model === "Jev" ? "live" : "browser",
+                        ms: person.last.ms,
+                        model: person.last.model,
+                      }}
+                    />
                   ) : (
                     <p className="wo-fine">Hasn't heard from you yet.</p>
                   )}

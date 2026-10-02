@@ -13,6 +13,7 @@ import {
   type Puzzle,
 } from "../../packages/arena/src/fool/model";
 import { getApiKey, run } from "./api";
+import { Receipt, USD_PER_INPUT_TOKEN } from "./receipt";
 import "./fool-jev.css";
 
 type Recorded = {
@@ -22,12 +23,12 @@ type Recorded = {
   costUsd: number | null;
   at: string | null;
   servedBy: string | null;
+  /** The answers as recorded (or as just returned), for the receipt's raw view. */
+  answers?: unknown;
+  refereeAnswers?: unknown;
 };
 type Data = { puzzles: Puzzle[]; menu: string[]; cheats: Record<string, string>; recorded: Record<string, Record<string, Recorded>> };
 type Result = Recorded & { sentence: string; live: boolean };
-
-// TypeSafe's list price: $0.042 per million input tokens, output free.
-const USD_PER_TOKEN = 0.042 / 1e6;
 
 const HINTS = [
   { label: "Peer pressure", sentence: "Most people say no." },
@@ -200,9 +201,11 @@ export function FoolJev() {
         pYes: Number(answer.answers?.q?.value),
         pChanges: Number(referee.answers?.changes?.value),
         latencyMs: answer.latency_ms ?? null,
-        costUsd: tokens ? tokens * USD_PER_TOKEN : null,
+        costUsd: tokens ? tokens * USD_PER_INPUT_TOKEN : null,
         at: new Date().toISOString(),
         servedBy: answer.served_by ?? null,
+        answers: answer,
+        refereeAnswers: referee,
         sentence,
         live: true,
       });
@@ -258,11 +261,30 @@ export function FoolJev() {
           <span>Yes</span>
         </div>
 
-        <div className="fj-stats">
-          {shown.latencyMs !== null && <span>Answered in {shown.latencyMs} ms</span>}
-          {shown.costUsd !== null && <span>${shown.costUsd.toFixed(6)} a go</span>}
-          <span>{shown.live ? `Live${shown.servedBy ? ` · ${shown.servedBy}` : ""}` : `Recorded ${shown.at?.slice(0, 10) ?? ""}`}</span>
-        </div>
+        <Receipt
+          className="fj-receipt"
+          data={{
+            mode: shown.live ? "live" : "recorded",
+            ms: shown.latencyMs,
+            questions: shown.sentence ? 2 : 1,
+            costUsd: shown.costUsd,
+            at: shown.at,
+            servedBy: shown.servedBy,
+            raw: {
+              request: shown.sentence
+                ? { answer: answerRequest(puzzle, shown.sentence), referee: refereeRequest(puzzle, shown.sentence) }
+                : answerRequest(puzzle, ""),
+              response: shown.answers
+                ? shown.sentence
+                  ? { answer: shown.answers, referee: shown.refereeAnswers ?? null }
+                  : shown.answers
+                : undefined,
+              note: shown.live
+                ? "Both requests went to /api/evaluate with your key."
+                : "Recorded in packages/arena/recordings/fool.jsonl. The time is the answer request's; the cost covers both.",
+            },
+          }}
+        />
 
         <form
           onSubmit={(e) => {
