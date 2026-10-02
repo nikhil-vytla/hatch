@@ -83,11 +83,47 @@ ended with the agent saying it had succeeded, without checking its result
 against the task's stated criteria: a token count off by 20%, one of two
 winning chess moves, repository tests still failing.
 
+## Learning from one trial to the next
+
+With `--ak learn_dir=DIR` (and `-n 1`), each trial starts from the strive
+home and learned files the last trial left in DIR. Before its task, it runs
+the learner on the last trial's session. The learner gets a note (`strive
+learn --note`) saying only whether that task's checks passed, never what
+they test. The trial then accepts the proposals that pass strive's gates,
+as the eval does. `learner_budget_usd` caps the learner's runs together.
+
+The first learning run (2026-10-02) used the pilot's 10 tasks in Harbor's
+order, Haiku 4.5, a $1 cap per task and $2 for the learner. It took 48
+minutes and cost $2.58 ($2.14 tasks, $0.44 learner). It passed **4 of 10,
+the same 4 tasks as the pilot without learning**. The learner proposed 5
+memory bullets and all were accepted. The first was narrow (image
+thresholds, after the chess task). The rest were about verifying work
+before claiming it's done, which is the failure the pilot showed:
+
+- read the documentation and confirm what the data means before
+  calculating;
+- give tests a checkable exit status, not only printed output;
+- make tests strict enough to catch errors;
+- check the actual output, not only exit codes, before claiming completion.
+
+That run doesn't settle whether learning helps. It had two faults in the
+adapter, both fixed since:
+
+- Tasks run in different directories (`/app`, `/app/personal-site`,
+  `/workspace`). Learned memory was lost at the first task outside `/app`,
+  and the learner refused sessions from another directory. So the
+  memory was in only 5 of the 10 sessions, and the learner didn't run for
+  3 trials.
+- A trial that ran out of time (crack-7z-hash) was killed before it saved
+  its state. Its bullet was lost, and the next trial learned from the
+  trial before it again.
+
+Where the memory was loaded, the agent never cited a bullet (`[uses mN]`).
+So there's no sign yet that it acted on them.
+
 ## Not yet
 
-- Learning across trials. Each container starts empty, so strive learns
-  nothing from one task to the next. Exo's ordered datasets (`task_order.json`)
-  show one way to do this: one task at a time, with the learned state carried
-  between trials.
+- A rerun with the fixes, and with more tasks or attempts. Ten tasks, once
+  each, can't show a difference of a few tasks.
 - Harbor's ATIF trajectory. Harbor gets usage, but not a step-by-step
   trajectory converted from strive's journal.

@@ -2857,3 +2857,18 @@ whole-file `Change` through the proposal pipeline.
   ("check the stated success criteria before saying it's done") is the
   obvious first thing to measure, once trials can carry learned state
   from one to the next.
+- First learning run on Harbor (10 tasks, $2.58): 4 of 10, the same as
+  without learning. The learner's lessons moved toward "verify before
+  claiming done", but the agent never cited them. The run found three
+  faults:
+  - learned files lived under the task's directory, which varies between
+    tasks;
+  - a timed-out trial was killed before saving;
+  - the daemon inherited its launcher's directory, and every host it
+    started failed once that directory was removed. That one is a strive
+    bug, which `tests/hosts.rs` now covers.
+- `a_prompt_before_the_idle_time_is_up_puts_the_scan_off` failed once
+  under the full `check.sh` load. It passed 5 of 5 alone and 3 of 3 with
+  its whole suite. The race is the one its comment describes: the
+  follow-up prompt's git checkpoint can push it past the 6-second idle
+  window. This change didn't cause it.
