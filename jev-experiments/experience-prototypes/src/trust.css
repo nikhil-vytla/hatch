@@ -52,6 +52,16 @@ button > .mode-tag {
 .mode-tag.mode-needs-key {
   color: var(--coral);
 }
+/* A shared "Run with Jev" button with its tag beside it. */
+.run-button {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+}
+.run-button > .mode-tag {
+  margin-top: 0;
+}
 
 .session-meter {
   display: grid;

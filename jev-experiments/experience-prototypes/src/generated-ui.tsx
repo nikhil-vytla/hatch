@@ -14,6 +14,7 @@ import {
 import { Sparkles, Check, GitBranch, RotateCcw } from "lucide-react";
 import { uiCatalog, uiInitial, exampleSpec } from "./ui-catalog";
 import { getApiKey, download, readResponse, requireKey } from "./api";
+import { fromRecorded, Receipt, type ReceiptData } from "./receipt";
 import {
   Pane,
   Field,
@@ -154,6 +155,16 @@ function StateObserver({ onState }: { onState: (s: any) => void }) {
   }, [value, onState]);
   return null;
 }
+/**
+ * A composition's receipt: the stream reports its elapsed time (and input tokens when the
+ * gateway returned them). The steps are the build, not separate requests, so no question count.
+ */
+const compositionReceipt = (event: any, mode: "recorded" | "live"): ReceiptData => {
+  const r = fromRecorded({ latency_ms: event.elapsedMs, usage: { input_tokens: event.inputTokens } }, { mode });
+
+  return { ...r, at: mode === "live" ? new Date().toISOString() : null, raw: { response: { ...event, spec: undefined }, note: "The interface spec itself is in the state panel." } };
+};
+
 export function GeneratedUI({ record }: { record: any }) {
   const [domain, setDomain] = useState("settings"),
     [prompt, setPrompt] = useState(
@@ -171,6 +182,7 @@ export function GeneratedUI({ record }: { record: any }) {
     [notice, setNotice] = useState(""),
     [steps, setSteps] = useState<any[]>([]),
     [source, setSource] = useState("Prepared interface"),
+    [composed, setComposed] = useState<ReceiptData | null>(null),
     [epoch, setEpoch] = useState(0),
     [replaying, setReplaying] = useState(false);
   const requestVersion = useRef(0);
@@ -196,6 +208,7 @@ export function GeneratedUI({ record }: { record: any }) {
       setActive(0);
       setSource("Recorded Jev composition");
       setSteps(r.steps);
+      setComposed(compositionReceipt(r, "recorded"));
       setEpoch((x) => x + 1);
     }
   }, [record, domain]);
@@ -295,6 +308,7 @@ export function GeneratedUI({ record }: { record: any }) {
       if(version!==requestVersion.current)return;
       if (!complete) { setSource("Partial composition"); setNotice("The stream ended before completion. The visible partial interface is preserved; it is not a completed run."); }
       if (final?.spec) {
+        setComposed(compositionReceipt(final, "live"));
         setVersions((v) => [
           ...v,
           {
@@ -358,6 +372,7 @@ export function GeneratedUI({ record }: { record: any }) {
             )}
           </div>
         </div>
+        {composed && <Receipt data={composed} />}
         {notice && <Notice>{notice}</Notice>}
         {shortlist.length>0&&<Pane title="Your shortlist">{shortlist.map(name=><Button key={name} secondary onClick={()=>setShortlist(items=>items.filter(item=>item!==name))}>{name} · Remove</Button>)}</Pane>}
         <div className="version-strip">

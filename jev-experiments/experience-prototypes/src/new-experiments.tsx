@@ -18,13 +18,13 @@ import {
   type ColumnDef,
 } from "@tanstack/react-table";
 import { run, choice, judge, pretty, percent, download } from "./api";
+import { fromLive, fromLiveBatches, fromRecorded, Receipt } from "./receipt";
 import {
   Button,
   RunButton,
   Pane,
   Field,
   Pills,
-  Notice,
   State,
   useRun,
   ErrorText,
@@ -80,6 +80,10 @@ export function pasteQuestions(
     ]),
   );
 }
+/** A recorded preset is one saved response; a live paste may be several batched requests. */
+const pasteReceipt = (last: any) =>
+  last.source === "live" ? fromLiveBatches(last.responses ?? [], last.request) : fromRecorded(last);
+
 export function Paste({ record }: { record: any }) {
   const [preset, setPreset] = useState<keyof typeof pasteSources>("Conference"),
     [source, setSource] = useState(pasteSources.Conference),
@@ -320,14 +324,7 @@ export function Paste({ record }: { record: any }) {
             onClick={() => void findSuggestions()}
           />
           <ErrorText error={error} />
-          {last && (
-            <Notice>
-              {last.source === "live"
-                ? "Live Jev decisions"
-                : "Recorded Jev decisions"}{" "}
-              · {Math.round(last.latency_ms ?? 0)} ms
-            </Notice>
-          )}
+          {last && <Receipt data={pasteReceipt(last)} />}
           <State
             value={{ facts, fields, suggestions, filled: values, run: last }}
           />
@@ -569,11 +566,7 @@ export function SemanticTable({ record }: { record: any }) {
             }
           />
           <ErrorText error={error} />
-          {last && (
-            <Notice>
-              {Object.keys(last.answers).length} judgments from one request.
-            </Notice>
-          )}
+          {last && <Receipt data={last === record ? fromRecorded(last) : fromLive(last)} />}
           <Button
             secondary
             onClick={() =>
@@ -771,6 +764,7 @@ export function UndoExperiment({ record }: { record: any }) {
               : `Undo ${chosen.length} selected changes`}
           </Button>
           <ErrorText error={error} />
+          {last && <Receipt data={last === record ? fromRecorded(last) : fromLive(last)} />}
           <State
             value={{
               request: query,
@@ -940,6 +934,7 @@ export function Changes({ record }: { record: any }) {
             }
           />
           <ErrorText error={error} />
+          {last && <Receipt data={last === record ? fromRecorded(last) : fromLive(last)} />}
           <State
             value={{
               before: impactFacts,
