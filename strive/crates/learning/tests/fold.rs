@@ -254,6 +254,7 @@ fn a_proposal_from_a_yes_to_the_offer_carries_the_signs_it_named() {
         detail: "no, use bun".into(),
     };
     let asked = |offer: Option<bool>| Event::LearnRequested {
+        note: None,
         sessions: vec!["A".into()],
         trigger: None,
         signals: Some(vec![sign.clone()]),

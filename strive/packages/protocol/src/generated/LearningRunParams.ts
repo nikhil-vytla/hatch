@@ -9,4 +9,9 @@ sessions?: Array<string>,
  * Set when the person is saying yes to the offer to learn from a
  * session with signs (ADR-0020), so review can say where a run came from.
  */
-offer?: boolean, };
+offer?: boolean, 
+/**
+ * What the person says about the sessions, such as how they turned
+ * out; the learner reads it as theirs.
+ */
+note?: string, };

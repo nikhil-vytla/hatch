@@ -306,7 +306,7 @@ fn trigger(signals: Vec<(&str, u64)>) -> LearnTrigger {
 }
 
 fn requested(trigger: Option<LearnTrigger>) -> Event {
-    Event::LearnRequested { sessions: vec!["A".into()], trigger, signals: None, offer: None }
+    Event::LearnRequested { sessions: vec!["A".into()], trigger, signals: None, offer: None, note: None }
 }
 
 #[test]
@@ -462,7 +462,13 @@ fn a_command_that_only_passed_or_is_too_long_to_be_a_check_is_no_sign() {
 fn signs_a_person_asked_about_or_dismissed_are_dealt_with_too() {
     let signs = |session: &str, seq: u64| Some(trigger(vec![(session, seq)]).signals);
     let mut j = Journal::new();
-    j.push(Event::LearnRequested { sessions: vec!["A".into()], trigger: None, signals: signs("A", 9), offer: None });
+    j.push(Event::LearnRequested {
+        sessions: vec!["A".into()],
+        trigger: None,
+        signals: signs("A", 9),
+        offer: None,
+        note: None,
+    });
     j.push(Event::LearnDismissed { session: "B".into(), through: 15 });
     // A later dismissal below a request's signs doesn't lower the mark.
     j.push(Event::LearnDismissed { session: "A".into(), through: 5 });

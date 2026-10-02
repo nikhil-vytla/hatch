@@ -30,7 +30,12 @@ pub enum Action {
     Rollback,
 }
 
-pub async fn learn(c: &mut Client, home: &std::path::Path, sessions: Vec<String>) -> Result<ExitCode> {
+pub async fn learn(
+    c: &mut Client,
+    home: &std::path::Path,
+    sessions: Vec<String>,
+    note: Option<String>,
+) -> Result<ExitCode> {
     let cwd = cwd()?;
     let learning = c.request::<LearningOpen>(ProjectRef { cwd: cwd.clone() }).await?;
     let id = learning.id;
@@ -45,7 +50,8 @@ pub async fn learn(c: &mut Client, home: &std::path::Path, sessions: Vec<String>
         n => format!("studying {n} sessions…"),
     };
     let sessions = (!sessions.is_empty()).then_some(sessions);
-    let asked = c.request::<LearningRun>(LearningRunParams { cwd: cwd.clone(), sessions, offer: None }).await?.seq;
+    let asked =
+        c.request::<LearningRun>(LearningRunParams { cwd: cwd.clone(), sessions, offer: None, note }).await?.seq;
     println!("{studying}");
     eprintln!("strive: `strive log {id}` shows the learner's steps");
     let follow =
@@ -194,6 +200,13 @@ fn origin(p: &ProposalState, titles: &Titles) -> String {
         (None, Some(s)) => format!("you said yes to the end-of-session offer{}", signs(s)),
         (None, None) => "asked with `strive learn`".into(),
     }
+}
+
+/// The project's proposals as the daemon lists them, as one line of JSON, for scripts.
+pub async fn list_json(c: &mut Client) -> Result<ExitCode> {
+    let listed = c.request::<ProposalList>(ProjectRef { cwd: cwd()? }).await?;
+    println!("{}", serde_json::to_string(&listed)?);
+    Ok(ExitCode::SUCCESS)
 }
 
 pub async fn review(c: &mut Client, id: Option<u64>, action: Option<Action>, full: bool) -> Result<ExitCode> {

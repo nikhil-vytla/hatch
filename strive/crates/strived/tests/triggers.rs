@@ -704,3 +704,34 @@ fn no_offer_when_learning_ask_is_false_or_the_learner_has_no_key() {
         assert_eq!((&r["summary"], &r["ask"]), (&json!("a correction"), &json!(false)), "{settings} key {key}: {r}");
     }
 }
+
+#[test]
+fn a_persons_note_goes_with_their_request_and_a_long_one_is_refused() {
+    let env = daemon(&json!({"mode": "off"}), true);
+    let cwd = project();
+    common::slow_rpc(&env)
+        .ok("learning/run", &json!({"cwd": cwd, "note": "  the tests failed after it said it was done \n"}));
+    let asked = wait_events(&env, &cwd, "learnRequested", 1);
+    assert_eq!(asked[0]["note"], "the tests failed after it said it was done", "{asked:?}");
+    // Nothing said is no note.
+    common::slow_rpc(&env).ok("learning/run", &json!({"cwd": cwd, "note": "   "}));
+    let asked = wait_events(&env, &cwd, "learnRequested", 2);
+    assert!(asked[1].get("note").is_none(), "{asked:?}");
+    let r = common::slow_rpc(&env).call("learning/run", &json!({"cwd": cwd, "note": "x".repeat(2001)}));
+    assert!(r["error"]["message"].as_str().unwrap().contains("at most 2000 characters"), "{r}");
+    assert_eq!(wait_events(&env, &cwd, "learnRequested", 2).len(), 2, "a refused request isn't journaled");
+}
+
+#[test]
+fn review_json_lists_the_proposals_as_the_daemon_does() {
+    let env = daemon(&json!({"mode": "off"}), true);
+    let cwd = project();
+    let mut w = Work::new(&env, &cwd);
+    w.exchange("run the tests", &done());
+    common::slow_rpc(&env).ok("learning/run", &json!({"cwd": cwd, "sessions": [w.id]}));
+    let made = Learner::new(&env, &cwd).turn(&[memory(&w.id)]);
+    let listed: Value = serde_json::from_str(review(&env, &cwd, &["review", "--json"]).trim()).unwrap();
+    let daemon = common::slow_rpc(&env).ok("proposal/list", &json!({"cwd": cwd}));
+    assert_eq!(listed["proposals"][0]["id"], made[0], "{listed}");
+    assert_eq!(listed["proposals"], daemon["proposals"]);
+}

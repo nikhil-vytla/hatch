@@ -144,6 +144,9 @@ enum Cmd {
         /// A work session to study (repeatable); default: those since it last looked.
         #[arg(long = "session", value_name = "ID")]
         sessions: Vec<String>,
+        /// What to tell the learner about the sessions, such as how they turned out.
+        #[arg(long, value_name = "TEXT")]
+        note: Option<String>,
     },
     /// List the learner's proposals here; with an id, show one (its diff
     /// and checks), or accept, reject or roll it back.
@@ -158,6 +161,9 @@ enum Cmd {
         /// the proposal that last wrote it.
         #[arg(long, conflicts_with = "id")]
         memory: bool,
+        /// Print the proposals as JSON, as the daemon lists them.
+        #[arg(long, conflicts_with_all = ["id", "memory"])]
+        json: bool,
     },
     /// Run the daemon in the foreground (normally started for you).
     #[command(hide = true)]
@@ -295,13 +301,16 @@ async fn run(cli: Cli) -> Result<ExitCode> {
         Some(Cmd::Sessions { all, json }) => {
             commands::sessions(&mut launch::ensure(&home, "strive-sessions").await?.0, all, json).await
         }
-        Some(Cmd::Learn { sessions }) => {
-            review::learn(&mut launch::ensure(&home, "strive-learn").await?.0, &home.root, sessions).await
+        Some(Cmd::Learn { sessions, note }) => {
+            review::learn(&mut launch::ensure(&home, "strive-learn").await?.0, &home.root, sessions, note).await
+        }
+        Some(Cmd::Review { json: true, .. }) => {
+            review::list_json(&mut launch::ensure(&home, "strive-review").await?.0).await
         }
         Some(Cmd::Review { memory: true, .. }) => {
             review::memory(&mut launch::ensure(&home, "strive-review").await?.0).await
         }
-        Some(Cmd::Review { id, action, full, memory: false }) => {
+        Some(Cmd::Review { id, action, full, memory: false, json: false }) => {
             let action = action.map(|a| match a.as_str() {
                 "accept" => review::Action::Accept,
                 "reject" => review::Action::Reject,

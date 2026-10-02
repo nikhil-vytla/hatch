@@ -380,6 +380,16 @@ test("a person's request made from the offer to learn names the session's signs 
   expect(prompt).not.toContain("Nobody asked");
 });
 
+test("a person's note with their request reaches the learner as theirs", async () => {
+  const note = "an automated check found the task not done";
+  const asked: Entry = { seq: 2, tsMs: T0, event: { type: "learnRequested", sessions: [W1], note } };
+  const { model } = await learn({ history: [started, asked], script: [{ text: "Nothing worth it." }] });
+  const prompt = JSON.stringify(model.requests[0].messages[0].content);
+
+  expect(prompt).toContain(`Study these work sessions: ${W1}.`);
+  expect(prompt).toContain(`The user says about them: ${note}`);
+});
+
 test("the learner never runs a file or shell effect, even when the model asks for one", async () => {
   const mcp = { server: "fs", name: "write", description: "writes", inputSchema: { type: "object" } };
 

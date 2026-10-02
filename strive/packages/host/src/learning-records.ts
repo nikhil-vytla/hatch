@@ -29,6 +29,7 @@ export function requestText(
   sinceMs: number | undefined,
   trigger?: LearnTrigger,
   signals?: LearnSignal[],
+  note?: string,
 ): string {
   const which =
     sessions.length > 0
@@ -37,7 +38,9 @@ export function requestText(
         ? "Study this project's work sessions. You haven't looked at this project before."
         : `Study this project's work sessions active since ${when(sinceMs)}, when you last looked.`;
 
-  const ask = `${which} Propose what the next sessions here should know, or nothing if nothing is worth it.`;
+  const asked = `${which} Propose what the next sessions here should know, or nothing if nothing is worth it.`;
+  // The person's own words about the sessions, which the journal may not show (how they turned out).
+  const ask = note ? `${asked}\nThe user says about them: ${note}` : asked;
   const listed = trigger?.signals ?? signals ?? [];
 
   if (listed.length === 0) return ask;
@@ -69,7 +72,7 @@ export class PromptReader {
     if (e.type === "userMessage") return e.text;
 
     if (e.type !== "learnRequested") return undefined;
-    const text = requestText(e.sessions, this.lastRequestMs, e.trigger, e.signals);
+    const text = requestText(e.sessions, this.lastRequestMs, e.trigger, e.signals, e.note);
     this.lastRequestMs = entry.tsMs;
 
     return text;

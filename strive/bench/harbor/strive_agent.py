@@ -9,10 +9,18 @@ exact cost are reported to Harbor.
 
     PYTHONPATH=bench/harbor harbor run -t hello-world/hello-world \\
         -a strive_agent:Strive -m anthropic/claude-haiku-4-5
+
+With `--ak learn_dir=DIR`, trials learn from one another, in the order
+Harbor runs them (use `-n 1`). Each trial starts from the strive home and
+the learned files (`.strive/` in the task's directory) the last one left in
+DIR. Before its own task, it asks the learner to study the last trial's
+session, telling it only whether that task's checks passed, and accepts the
+proposals that pass strive's gates, as a person reviewing them would.
 """
 
 import json
 import os
+import re
 import shlex
 import tempfile
 from pathlib import Path
@@ -26,28 +34,94 @@ REMOTE_BIN = "/opt/strive"
 REMOTE_HOME = "/tmp/strive-home"
 LOGS = "/logs/agent"
 JOURNAL = "strive.jsonl"
+LEARNER = "learner.jsonl"
+# What a trial leaves for the next, in its logs and in `learn_dir`.
+STATE = "strive-state.tgz"
+LAST = "last.json"
+
+# What the learner is told about the last trial: its outcome, not its tests.
+PASSED = "An automated check of this session's task found it done: the task's own tests passed."
+FAILED = (
+    "An automated check of this session's task found it not done: the task's own tests failed, "
+    "though the session ended as if it had finished."
+)
+
+
+def journal_events(path: Path) -> list[dict]:
+    """The events in `strive run --json`'s output (an entry per line) or `strive log --json`'s (one object)."""
+    if not path.is_file():
+        return []
+    text = path.read_text()
+    try:
+        whole = json.loads(text)
+    except json.JSONDecodeError:
+        whole = None
+    if isinstance(whole, dict) and isinstance(whole.get("entries"), list):
+        entries = whole["entries"]
+    else:
+        entries = []
+        for line in text.splitlines():
+            try:
+                entries.append(json.loads(line))
+            except json.JSONDecodeError:
+                continue
+    return [e["event"] for e in entries if isinstance(e, dict) and isinstance(e.get("event"), dict)]
+
+
+def since_last_request(events: list[dict]) -> list[dict]:
+    """A learning session's events from its latest `learnRequested` on: the learner's last run."""
+    starts = [i for i, e in enumerate(events) if e.get("type") == "learnRequested"]
+    return events[starts[-1] :] if starts else []
+
+
+def journal_usage(events: list[dict]) -> dict:
+    """Model calls, tokens and exact cost in a journal's events, and how its last turn ended."""
+    usage = {"calls": 0, "input": 0, "output": 0, "cached": 0, "cost_micros": 0, "turn_end": None}
+    for event in events:
+        if event.get("type") == "modelCallFinished":
+            outcome = event.get("outcome", {})
+            tokens = outcome.get("usage") or {}
+            usage["calls"] += 1
+            usage["input"] += tokens.get("input", 0)
+            usage["output"] += tokens.get("output", 0)
+            usage["cached"] += tokens.get("cacheRead", 0) + tokens.get("cacheWrite", 0) + tokens.get("cacheWriteLong", 0)
+            usage["cost_micros"] += outcome.get("costUsdMicros", 0)
+        elif event.get("type") == "turnEnded":
+            usage["turn_end"] = event.get("reason")
+    return usage
 
 
 class Strive(BaseInstalledAgent):
     """One strive session per trial.
 
-    Agent kwargs (`--ak`): `budget_usd` (the session's spending limit,
-    default 2), `binaries` (a directory holding `strive` and `strive-tui`
-    per architecture as `linux-arm64` and `linux-amd64`; default strive's
-    `target`). Each trial's container starts empty, so nothing is learned
-    from one trial to the next.
+    Agent kwargs (`--ak`):
+    - `budget_usd`: each task's spending limit (default 2).
+    - `learner_budget_usd`: the learner's, for all its runs together, since
+      its session carries from trial to trial (default 3).
+    - `binaries`: a directory holding `strive` and `strive-tui` per
+      architecture, as `linux-arm64` and `linux-amd64` (default strive's
+      `target`).
+    - `learn_dir`: see the module's note. Without it, nothing is learned
+      from one trial to the next.
     """
 
     def __init__(
         self,
         logs_dir: Path,
         budget_usd: float | str = 2.0,
+        learner_budget_usd: float | str = 3.0,
         binaries: str | None = None,
+        learn_dir: str | None = None,
         **kwargs,
     ):
         super().__init__(logs_dir, **kwargs)
         self.budget_usd = float(budget_usd)
+        self.learner_budget_usd = float(learner_budget_usd)
         self.binaries = Path(binaries) if binaries else STRIVE_ROOT / "target"
+        self.learn_dir = Path(learn_dir).expanduser().resolve() if learn_dir else None
+        self._workspace: str | None = None
+        self._session: str | None = None
+        self._learned: list[dict] = []
 
     @staticmethod
     def name() -> str:
@@ -66,12 +140,20 @@ class Strive(BaseInstalledAgent):
         settings: dict = {
             "sandbox": "off",
             "approvals": "fullAuto",
-            "budget": {"usd": self.budget_usd},
+            # New sessions' limit: the learner's. Each task's own is given to `strive run`.
+            "budget": {"usd": self.learner_budget_usd},
+            # The learner runs only when this adapter asks it to.
             "learning": {"mode": "off", "ask": False},
         }
         if model := self._model():
             settings["model"] = model
         return settings
+
+    def _last(self) -> dict | None:
+        """The last trial's session and its trial directory, if a trial left them."""
+        if self.learn_dir is None or not (self.learn_dir / LAST).is_file():
+            return None
+        return json.loads((self.learn_dir / LAST).read_text())
 
     async def install(self, environment: BaseEnvironment) -> None:
         machine = (await self.exec_as_root(environment, command="uname -m")).stdout.strip()
@@ -81,21 +163,35 @@ class Strive(BaseInstalledAgent):
         built = self.binaries / f"linux-{arch}"
         for exe in ("strive", "strive-tui"):
             if not (built / exe).is_file():
-                raise RuntimeError(
-                    f"{built / exe} is missing; run bench/harbor/build-linux.sh {arch}"
-                )
+                raise RuntimeError(f"{built / exe} is missing; run bench/harbor/build-linux.sh {arch}")
+        self._workspace = (await self.exec_as_agent(environment, command="pwd")).stdout.strip()
         await self.exec_as_root(environment, command=f"mkdir -p {REMOTE_BIN} {REMOTE_HOME}")
         for exe in ("strive", "strive-tui"):
             await environment.upload_file(built / exe, f"{REMOTE_BIN}/{exe}")
+        if self.learn_dir is not None and (self.learn_dir / STATE).is_file():
+            # The home (its key, sessions and the learner's journal) and the learned files.
+            await environment.upload_file(self.learn_dir / STATE, f"/tmp/{STATE}")
+            await self.exec_as_root(environment, command=f"tar xzf /tmp/{STATE} -C / && rm /tmp/{STATE}")
         with tempfile.TemporaryDirectory(prefix="strive-harbor-") as tmp:
             settings = Path(tmp) / "settings.json"
             settings.write_text(json.dumps(self._settings(), indent=2))
             await environment.upload_file(settings, f"{REMOTE_HOME}/settings.json")
+        ws = shlex.quote(self._workspace)
+        # Learned files stay out of a task's git status, which some tasks check.
+        exclude = (
+            f" && if [ -d {ws}/.git ]; then grep -qx '.strive/' {ws}/.git/info/exclude 2>/dev/null"
+            f" || echo '.strive/' >> {ws}/.git/info/exclude; fi"
+        )
         owner = environment.default_user
-        chown = f" && chown -R {shlex.quote(str(owner))} {REMOTE_HOME}" if owner is not None else ""
+        chown = (
+            f" && chown -R {shlex.quote(str(owner))} {REMOTE_HOME}"
+            f" && if [ -d {ws}/.strive ]; then chown -R {shlex.quote(str(owner))} {ws}/.strive; fi"
+            if owner is not None
+            else ""
+        )
         await self.exec_as_root(
             environment,
-            command=f"chmod 755 {REMOTE_BIN}/strive {REMOTE_BIN}/strive-tui{chown}",
+            command=f"chmod 755 {REMOTE_BIN}/strive {REMOTE_BIN}/strive-tui{exclude}{chown}",
         )
 
     def _env(self) -> dict[str, str]:
@@ -111,52 +207,95 @@ class Strive(BaseInstalledAgent):
                 env[name] = value
         return env
 
+    async def _strive(self, environment: BaseEnvironment, command: str) -> str:
+        """Runs a strive command in the task's directory; its output, whatever its exit."""
+        result = await self.exec_as_agent(
+            environment,
+            command=f"{command} 2>&1; echo \"[exit $?]\"",
+            env=self._env(),
+            cwd=self._workspace,
+        )
+        return result.stdout or ""
+
+    @staticmethod
+    def _json(output: str):
+        """What a `--json` command printed, before the exit line `_strive` adds; None if it isn't JSON."""
+        body = output.rsplit("[exit ", 1)[0]
+        try:
+            return json.loads(body)
+        except json.JSONDecodeError:
+            return None
+
+    async def _learn(self, environment: BaseEnvironment, last: dict) -> None:
+        """The learner on the last trial's session, told its outcome; what passed the gates, accepted."""
+        reward = Path(last["trial_dir"]) / "verifier" / "reward.txt"
+        passed = reward.is_file() and float(reward.read_text().strip() or 0) >= 1.0
+        note = PASSED if passed else FAILED
+        out = await self._strive(
+            environment, f"strive learn --session {shlex.quote(last['session'])} --note {shlex.quote(note)}"
+        )
+        (self.logs_dir / "learner.out").write_text(out)
+        if found := re.search(r"strive log ([0-9A-Z]{26})", out):
+            await self._strive(environment, f"strive log {found.group(1)} --json > {LOGS}/{LEARNER}")
+        listed = self._json(await self._strive(environment, "strive review --json"))
+        proposals = listed.get("proposals", []) if isinstance(listed, dict) else []
+        for p in proposals:
+            if p.get("status") != "ready":
+                continue
+            decided = await self._strive(environment, f"strive review {int(p['id'])} accept")
+            self._learned.append(
+                {
+                    "proposal": p["id"],
+                    "summary": p.get("proposal", {}).get("summary"),
+                    "artifact": p.get("proposal", {}).get("artifact"),
+                    "accepted": "[exit 0]" in decided,
+                    "after": "passed" if passed else "failed",
+                }
+            )
+
     @with_prompt_template
     async def run(self, instruction: str, environment: BaseEnvironment, context: AgentContext) -> None:
-        run = (
-            f"strive run {shlex.quote(instruction)} --approvals full-auto"
-            f" --budget {self.budget_usd} --json > {LOGS}/{JOURNAL} 2> {LOGS}/strive.stderr"
-        )
-        # The verifier scores the trial; how strive's run ended is recorded, not raised.
-        await self.exec_as_agent(
+        if last := self._last():
+            await self._learn(environment, last)
+        await self._strive(
             environment,
-            command=(
-                f"{run}; echo $? > {LOGS}/strive.exit;"
-                f" strive stop >/dev/null 2>&1;"
-                f" cp -r {REMOTE_HOME}/sessions {LOGS}/strive-sessions 2>/dev/null; true"
-            ),
-            env=self._env(),
+            f"strive run {shlex.quote(instruction)} --approvals full-auto"
+            f" --budget {self.budget_usd} --json > {LOGS}/{JOURNAL} 2> {LOGS}/strive.stderr;"
+            f" echo $? > {LOGS}/strive.exit",
+        )
+        # Newest first: the session this trial's task just ran in.
+        listed = self._json(await self._strive(environment, "strive sessions --json"))
+        self._session = listed[0]["id"] if isinstance(listed, list) and listed else None
+        learned = shlex.quote(f"{(self._workspace or '').lstrip('/')}/.strive")
+        # Stopped first, so the journals are whole; the socket is left behind.
+        await self._strive(
+            environment,
+            f"strive stop >/dev/null; cp -r {REMOTE_HOME}/sessions {LOGS}/strive-sessions;"
+            f" cd / && paths=tmp/strive-home && if [ -d {learned} ]; then paths=\"$paths {learned}\"; fi"
+            f" && tar czf {LOGS}/{STATE} --exclude=tmp/strive-home/run $paths",
         )
 
     def populate_context_post_run(self, context: AgentContext) -> None:
-        journal = self.logs_dir / JOURNAL
-        if not journal.is_file():
-            return
-        tokens_in = tokens_out = cached = cost_micros = calls = 0
-        ended = None
-        for line in journal.read_text().splitlines():
-            try:
-                event = json.loads(line).get("event", {})
-            except json.JSONDecodeError:
-                continue
-            if event.get("type") == "modelCallFinished":
-                outcome = event.get("outcome", {})
-                usage = outcome.get("usage") or {}
-                calls += 1
-                tokens_in += usage.get("input", 0)
-                tokens_out += usage.get("output", 0)
-                cached += usage.get("cacheRead", 0) + usage.get("cacheWrite", 0) + usage.get("cacheWriteLong", 0)
-                cost_micros += outcome.get("costUsdMicros", 0)
-            elif event.get("type") == "turnEnded":
-                ended = event.get("reason")
-        context.n_input_tokens = tokens_in
-        context.n_output_tokens = tokens_out
-        context.n_cache_tokens = cached
-        context.cost_usd = cost_micros / 1_000_000
+        task = journal_usage(journal_events(self.logs_dir / JOURNAL))
+        learner = journal_usage(since_last_request(journal_events(self.logs_dir / LEARNER)))
+        context.n_input_tokens = task["input"] + learner["input"]
+        context.n_output_tokens = task["output"] + learner["output"]
+        context.n_cache_tokens = task["cached"] + learner["cached"]
+        context.cost_usd = (task["cost_micros"] + learner["cost_micros"]) / 1_000_000
         exit_file = self.logs_dir / "strive.exit"
         context.metadata = {
             **(context.metadata or {}),
-            "strive_model_calls": calls,
-            "strive_turn_end": ended,
+            "strive_model_calls": task["calls"],
+            "strive_turn_end": task["turn_end"],
             "strive_exit": exit_file.read_text().strip() if exit_file.is_file() else None,
+            "strive_task_cost_usd": task["cost_micros"] / 1_000_000,
+            "strive_learner_cost_usd": learner["cost_micros"] / 1_000_000,
+            "strive_learned": self._learned,
         }
+        state = self.logs_dir / STATE
+        if self.learn_dir is not None and state.is_file() and self._session:
+            self.learn_dir.mkdir(parents=True, exist_ok=True)
+            (self.learn_dir / STATE).write_bytes(state.read_bytes())
+            (self.learn_dir / LAST).write_text(
+                json.dumps({"session": self._session, "trial_dir": str(self.logs_dir.parent)}, indent=2)
+            )

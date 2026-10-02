@@ -138,7 +138,11 @@ signals?: Array<LearnSignal>,
  * Set when the person said yes to the offer to learn from a
  * session with signs (ADR-0020), rather than asking on their own.
  */
-offer?: boolean, } | { "type": "learnDismissed", session: string, through: number, } | { "type": "learnSkipped", trigger: LearnTrigger, reason: string, } | { "type": "proposalMade", 
+offer?: boolean, 
+/**
+ * What the person said about the sessions when asking.
+ */
+note?: string, } | { "type": "learnDismissed", session: string, through: number, } | { "type": "learnSkipped", trigger: LearnTrigger, reason: string, } | { "type": "proposalMade", 
 /**
  * The learner's tool call that made it, whose result it is.
  */
