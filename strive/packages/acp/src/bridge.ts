@@ -68,6 +68,9 @@ export function toolCall(record: EffectRecord, cwd: string): Pick<acp.ToolCall, 
   }
 }
 
+/** The most of a tool call's output an editor is sent. */
+export const OUTPUT_LIMIT = 20_000;
+
 /** An effect's end, as its tool call's last update says it. */
 export type Finished = { status: acp.ToolCallStatus; text: string };
 
@@ -127,6 +130,12 @@ class Session {
 
   mode: ApprovalMode = "ask";
 
+  /**
+   * Updates go out in journal order through this chain, so an effect's
+   * output, fetched from the daemon, isn't overtaken by what follows it.
+   */
+  private sent: Promise<void> = Promise.resolve();
+
   constructor(
     readonly id: string,
     readonly cwd: string,
@@ -135,7 +144,35 @@ class Session {
   ) {}
 
   private update(update: acp.SessionUpdate) {
-    this.editor.notify("session/update", { sessionId: this.id, update }).catch(() => undefined);
+    this.later(async () => update);
+  }
+
+  /** An update made when its turn in the chain comes. */
+  private later(make: () => Promise<acp.SessionUpdate>) {
+    this.sent = this.sent
+      .then(async () => this.editor.notify("session/update", { sessionId: this.id, update: await make() }))
+      .catch(() => undefined);
+  }
+
+  /** Once every update so far has gone out. */
+  flushed(): Promise<void> {
+    return this.sent;
+  }
+
+  /** What an effect printed or read, as the daemon kept it; its ending if it kept none. */
+  private async output(e: Extract<Entry["event"], { type: "effectFinished" }>): Promise<string> {
+    const { text } = finished(e.outcome);
+
+    if (e.outcome.kind !== "done") return text;
+
+    try {
+      const blob = await this.daemon.request("blob/get", { digest: e.outcome.output });
+      const shown = blob.text.length > OUTPUT_LIMIT ? `${blob.text.slice(0, OUTPUT_LIMIT)}\n[…cut]` : blob.text;
+
+      return shown.trim() ? `${shown.trimEnd()}\n\n(${text})` : text;
+    } catch {
+      return text;
+    }
   }
 
   say(text: string) {
@@ -188,14 +225,15 @@ class Session {
         });
         break;
       case "effectFinished": {
-        const { status, text } = finished(e.outcome);
+        const { status } = finished(e.outcome);
+        const toolCallId = this.calls.get(e.effect) ?? `effect-${e.effect}`;
 
-        this.update({
+        this.later(async () => ({
           sessionUpdate: "tool_call_update",
-          toolCallId: this.calls.get(e.effect) ?? `effect-${e.effect}`,
+          toolCallId,
           status,
-          content: [{ type: "content", content: { type: "text", text } }],
-        });
+          content: [{ type: "content", content: { type: "text", text: await this.output(e) } }],
+        }));
         break;
       }
 
@@ -255,7 +293,8 @@ class Session {
 
     if (reason) {
       this.waiting = undefined;
-      w.resolve({ stopReason: stopReason(reason) });
+      // The turn's updates reach the editor before its answer does.
+      this.flushed().then(() => w.resolve({ stopReason: stopReason(reason) }));
     }
   }
 
@@ -324,6 +363,7 @@ export function bridge(daemon: StriveClient, version: string): acp.AgentApp {
     const s = new Session(info.id, info.cwd, daemon, editor);
 
     for (const e of entries) s.entry(e, true);
+    await s.flushed();
     sessions.set(info.id, s);
 
     if (mcpServers.length > 0) {

@@ -670,7 +670,8 @@ attached as a person's. The agent loop stays in the host the daemon starts.
   took it ends (`throughSeq`, or a turn journaled after it): `end_turn`,
   or `cancelled` when `session/cancel` interrupted it.
 - **Updates:** deltas become `agent_message_chunk`s (only what's new),
-  effects `tool_call`s and `tool_call_update`s, and an approval a
+  effects `tool_call`s and `tool_call_update`s (with the output, read by
+  digest with `blob/get`, in journal order), and an approval a
   `session/request_permission`, withdrawn if another client answers first.
 - **Not taken:** the editor's file system and terminal (effects run in the
   daemon's sandbox, on disk) and its MCP servers (the first reply says so).
