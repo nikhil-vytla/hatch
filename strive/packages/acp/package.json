@@ -1,0 +1,19 @@
+{
+  "name": "@strive/acp",
+  "version": "0.3.0-dev",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@agentclientprotocol/sdk": "1.6.0",
+    "@strive/protocol": "workspace:*",
+    "@strive/view": "workspace:*",
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "@strive/testkit": "workspace:*"
+  },
+  "exports": {
+    "./main": "./src/main.ts",
+    ".": "./src/bridge.ts"
+  }
+}

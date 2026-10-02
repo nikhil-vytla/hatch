@@ -16,13 +16,17 @@ export const MODE_NAMES = { ask: "ask", autoEdit: "auto-edit", fullAuto: "full-a
 
 /**
  * What allowing an approval for the session covers, from its request's
- * `sessionFile`: that file, a check as it is now (ADR-0023), or, with none,
- * everything (full-auto).
+ * `sessionFile`: that file, a check (ADR-0023) or an extension (ADR-0027)
+ * as it is now, or, with none, everything (full-auto).
  */
 export function sessionAllowance(sessionFile: string | undefined): string {
   if (sessionFile === undefined) return "everything (full-auto)";
 
-  return sessionFile.startsWith("check:") ? "this check, as it is now, for the session" : "this file for the session";
+  if (sessionFile.startsWith("check:")) return "this check, as it is now, for the session";
+
+  if (sessionFile.startsWith("extension:")) return "this extension, as it is now, for the session";
+
+  return "this file for the session";
 }
 
 export type DescribeOptions = {

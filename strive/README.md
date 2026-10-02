@@ -38,6 +38,7 @@ strive doctor         # checks sandbox, git, credentials and the daemon
 strive status         # daemon pid, uptime, clients
 strive stop           # stop the daemon (it also exits when idle)
 strive app            # the desktop app on a new session here (-c and -r as for strive)
+strive acp            # the Agent Client Protocol on stdio, for editors (below)
 strive run "fix the failing test" --approvals full-auto --json
                       # one task, headless; exits 0 done, 1 failed, 3 timed out, 4 interrupted
 strive learn          # ask this project's learner to study its sessions (--session ID for chosen ones)
@@ -75,6 +76,17 @@ refused rather than guessed. `mcpServers` takes the same shape as Claude
 Code's (stdio servers). Each tool call asks first unless approvals are
 full-auto. `"extensions": false` starts every new session in safe mode, as
 `strive --safe` does.
+
+Editors that speak the Agent Client Protocol (Zed, JetBrains IDEs and
+others) run strive as an agent with `strive acp`. In Zed's settings:
+
+```json
+{ "agent_servers": { "strive": { "type": "custom", "command": "strive", "args": ["acp"] } } }
+```
+
+A session started in an editor is an ordinary strive session: the editor
+shows its replies and tool calls and asks you about approvals, and
+`strive -r ID` continues it in the terminal.
 
 The agent follows the project's `AGENTS.md` (or `CLAUDE.md`) files and
 knows its skills (`SKILL.md` under `.strive/skills`, `.claude/skills` or
