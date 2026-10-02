@@ -4,6 +4,7 @@ import { experiments, lookup, retiredScene, type Experiment } from "../catalog";
 import { CapabilityInspector } from "../../../capability-atlas-2026-09-22/capability-inspector";
 import { Pane, Notice } from "../shared";
 import { Provenance } from "../provenance";
+import { HeadlineStrip } from "../headline-strip";
 import { experimentNotes } from "../notes/manifest";
 import "./experiment.css";
 
@@ -271,6 +272,7 @@ function LiveExperimentPage({ id }: { id: string }) {
         <Provenance result={record.result ?? {}} />
       )}
       </>}
+      <HeadlineStrip id={id} title={exp.title} />
       {error && <Notice error>{error}</Notice>}
       {record ? (
         <Suspense

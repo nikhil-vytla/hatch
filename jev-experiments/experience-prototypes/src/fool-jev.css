@@ -313,6 +313,14 @@
 }
 .home-findings h2 {
   font: 800 40px/1 var(--tb-display);
+  margin: 0;
+}
+.home-findings-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   margin: 0 0 20px;
 }
 .home-findings ol {
