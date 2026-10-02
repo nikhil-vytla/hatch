@@ -150,6 +150,7 @@ async fn scan_and_ask(state: &Arc<State>, cwd: &str, work: &SessionId, kind: Tri
         return Ok(());
     }
     let asked = Event::LearnRequested {
+        note: None,
         sessions: vec![work.as_str().to_string()],
         trigger: Some(trigger),
         signals: None,

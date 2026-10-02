@@ -621,6 +621,11 @@ pub struct LearningRunParams {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub offer: Option<bool>,
+    /// What the person says about the sessions, such as how they turned
+    /// out; the learner reads it as theirs.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub note: Option<String>,
 }
 
 /// A work session of the project, to ask about its signs (ADR-0020).
@@ -1391,6 +1396,10 @@ pub enum Event {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         #[ts(optional)]
         offer: Option<bool>,
+        /// What the person said about the sessions when asking.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[ts(optional)]
+        note: Option<String>,
     },
     /// A person declined to learn from a work session (ADR-0020): its signs
     /// up to `through` aren't offered again, and no trigger acts on them.

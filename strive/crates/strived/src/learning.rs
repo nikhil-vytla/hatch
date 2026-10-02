@@ -57,8 +57,15 @@ pub async fn route(state: &Arc<State>, conn: &Arc<Conn>, method: &str, params: V
         LearningRun::NAME => {
             // Asking spends the learning session's budget: a person's call.
             require_person(conn)?;
-            let LearningRunParams { cwd, sessions, offer } = parse::<LearningRun>(params)?;
-            run(state, &project(&cwd)?, sessions.unwrap_or_default(), offer.filter(|o| *o)).await
+            let LearningRunParams { cwd, sessions, offer, note } = parse::<LearningRun>(params)?;
+            let note = note.map(|n| n.trim().to_string()).filter(|n| !n.is_empty());
+            if note.as_ref().is_some_and(|n| n.chars().count() > NOTE_LIMIT) {
+                return Err(RpcError::new(
+                    RpcError::INVALID_PARAMS,
+                    format!("a note for the learner is at most {NOTE_LIMIT} characters"),
+                ));
+            }
+            run(state, &project(&cwd)?, sessions.unwrap_or_default(), offer.filter(|o| *o), note).await
         }
         LearningSignals::NAME => {
             let LearningSignalsParams { cwd, session } = parse::<LearningSignals>(params)?;
@@ -215,7 +222,10 @@ fn invalid(why: String) -> RpcError {
     RpcError::new(RpcError::INVALID_PARAMS, why)
 }
 
-async fn run(state: &Arc<State>, cwd: &str, sessions: Vec<String>, offer: Option<bool>) -> Reply {
+/// The longest note a person may give the learner with a request.
+const NOTE_LIMIT: usize = 2000;
+
+async fn run(state: &Arc<State>, cwd: &str, sessions: Vec<String>, offer: Option<bool>, note: Option<String>) -> Reply {
     let works = sessions.iter().map(|s| work_session(state, cwd, s).map_err(invalid)).collect::<Result<Vec<_>, _>>()?;
     let sid = learning_id(&open(state, cwd).await?)?;
     // The named sessions' signs go with the request: the learner reads them
@@ -230,7 +240,7 @@ async fn run(state: &Arc<State>, cwd: &str, sessions: Vec<String>, offer: Option
     let signals = (!found.is_empty()).then_some(found);
     let entries = state
         .sessions
-        .append(&sid, vec![Event::LearnRequested { sessions, trigger: None, signals, offer }])
+        .append(&sid, vec![Event::LearnRequested { sessions, trigger: None, signals, offer, note }])
         .await
         .map_err(session_error)?;
     state.hosts.ensure(&sid, &state.home.socket(), &state.sessions.session_dir(&sid).join("host.log"));
