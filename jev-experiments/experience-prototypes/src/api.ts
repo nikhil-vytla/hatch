@@ -1,9 +1,24 @@
+import { useSyncExternalStore } from "react";
+import { recordCall } from "./session-meter";
+
 // Deliberately in memory. Reloading or disconnecting forgets the key.
 let apiKey = "";
+const keyListeners = new Set<() => void>();
 export const getApiKey = () => apiKey;
 export const setApiKey = (value: string) => {
   apiKey = value.trim();
+  for (const l of keyListeners) l();
 };
+/** Whether a key is connected, re-rendering when it's added or removed. */
+export const useHasKey = () =>
+  useSyncExternalStore(
+    (l) => {
+      keyListeners.add(l);
+      return () => keyListeners.delete(l);
+    },
+    () => apiKey !== "",
+    () => false,
+  );
 if (typeof sessionStorage !== "undefined") {
   sessionStorage.removeItem("jev-live-token");
   sessionStorage.removeItem("lab-token");
@@ -50,7 +65,15 @@ export async function run(
     body: JSON.stringify({ state, questions }),
     signal,
   });
-  const body = await readResponse(response);
+  // The request reached the server, so it counts on the session meter whatever came back.
+  let body;
+  try {
+    body = await readResponse(response);
+  } catch (e) {
+    recordCall(false);
+    throw e;
+  }
+  recordCall(response.ok, body);
   if (!response.ok)
     throw new EvaluationError(body.error ?? "The run could not complete.", response.status, body);
   return body;

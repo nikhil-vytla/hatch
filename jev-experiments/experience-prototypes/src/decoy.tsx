@@ -5,6 +5,7 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import { Receipt } from "./receipt";
+import { ModeTag } from "./trust";
 import { Fold, Notice, Pane, Pills } from "./shared";
 
 type Scenario = { id: string; context: string; question: string; a: string; b: string; aDecoy: string; bDecoy: string };
@@ -110,6 +111,7 @@ export function Decoy() {
           {SETS.map((s) => (
             <button key={s.id} type="button" className={set === s.id ? "active" : ""} aria-pressed={set === s.id} onClick={() => setSet(s.id)}>
               {s.label}
+              <ModeTag mode="recorded" />
             </button>
           ))}
         </div>

@@ -27,6 +27,7 @@ import { STUDENT_NAME } from "../../live-worlds/free-model/runtime";
 import studentLines from "../../live-worlds/free-model/recorded-lines.json";
 import { getApiKey, run } from "./api";
 import { Receipt } from "./receipt";
+import { KeyTag, ModeTag } from "./trust";
 import "./fool-jev.css";
 import "./win-over.css";
 
@@ -397,6 +398,7 @@ export function WinOver() {
                   Say it
                 </button>
               </div>
+              {model === "jev" ? <KeyTag /> : <ModeTag mode="browser" />}
             </form>
             <div className="fj-hints wo-actions">
               {LINES.map((l) => (

@@ -14,6 +14,7 @@ import {
 } from "../../packages/arena/src/fool/model";
 import { getApiKey, run } from "./api";
 import { Receipt, USD_PER_INPUT_TOKEN } from "./receipt";
+import { KeyTag, ModeTag } from "./trust";
 import "./fool-jev.css";
 
 type Recorded = {
@@ -310,6 +311,9 @@ export function FoolJev() {
               Ask
             </button>
           </div>
+          {cleanSentence(text) && (
+            heard.has(normal(text)) ? <ModeTag mode="recorded" /> : <KeyTag />
+          )}
         </form>
 
         <div className="fj-hints">
@@ -323,6 +327,7 @@ export function FoolJev() {
               }}
             >
               {h.label}
+              <ModeTag mode="recorded" />
             </button>
           ))}
         </div>
@@ -363,7 +368,9 @@ export function FoolJev() {
       </div>
 
       <details className="fj-heard">
-        <summary>Lines Jev has already heard ({heard.size})</summary>
+        <summary>
+          Lines Jev has already heard ({heard.size}) <ModeTag mode="recorded" />
+        </summary>
         <div className="fj-hints">
           {[...heard.values()].map((s) => (
             <button
