@@ -15,6 +15,8 @@ export const headlineFor = (id: string) => headlines.scenes.find((h) => h.id ===
 
 export const homeHeadline = () => headlines.home;
 
+export const cardLineFor = (id: string) => headlines.cards.find((c) => c.id === id) ?? null;
+
 const SITE = "https://jev-experiments.vercel.app";
 
 export function ShareCardButton({ id, title, share }: { id: string; title: string; share: Share }) {

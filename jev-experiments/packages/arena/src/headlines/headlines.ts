@@ -29,8 +29,55 @@ export type Finding = { n: string; title: string; body: string; href?: string };
 
 export type HomeHeadline = Headline & { findings: Finding[] };
 
-/** headlines.json: one headline per scene that has one, and the home findings. */
-export type Headlines = { scenes: Headline[]; home: HomeHeadline | null };
+/** One collection card's result: the scene's headline line, or how much its record holds. */
+export type CardLine = { id: string; line: string; fromHeadline: boolean };
+
+/** headlines.json: one headline per scene that has one, the home findings, and a line per card. */
+export type Headlines = { scenes: Headline[]; home: HomeHeadline | null; cards: CardLine[] };
+
+/** A published record's result, as far as counting its recorded answers goes. */
+export type RecordResult = {
+  availability?: { completed?: number; completed_decisions?: number };
+  rows?: { error?: unknown }[];
+  episodes?: object[];
+  cases?: { questions?: object[] }[];
+  /** Jev's wire answers by question id; only the keys are counted. */
+  answers?: Record<string, { type?: string }>;
+};
+
+/**
+ * How much a record holds, in its own unit. Records differ: game runs keep episodes, studies keep
+ * cases (of questions), and request-based records count their completed answers or rows.
+ */
+export function recordCount(r: RecordResult): { n: number; unit: string } | null {
+  const a = r.availability;
+
+  if (a?.completed_decisions) return { n: a.completed_decisions, unit: "decisions" };
+
+  if (r.episodes?.length) return { n: r.episodes.length, unit: "episodes" };
+
+  const questions = r.cases?.reduce((s, c) => s + (c.questions?.length ?? 0), 0) ?? 0;
+
+  if (questions) return { n: questions, unit: "questions" };
+
+  if (a?.completed) return { n: a.completed, unit: "answers" };
+
+  if (r.cases?.length) return { n: r.cases.length, unit: "cases" };
+
+  if (r.rows?.length) return { n: r.rows.filter((x) => !x.error).length, unit: "answers" };
+
+  if (r.answers) return { n: Object.keys(r.answers).length, unit: "answers" };
+
+  return null;
+}
+
+export function cardLine(id: string, headline: Headline | undefined, record: RecordResult | null): CardLine | null {
+  if (headline) return { id, line: headline.line, fromHeadline: true };
+
+  const c = record ? recordCount(record) : null;
+
+  return c && c.n > 0 ? { id, line: `${count(c.n)} recorded ${c.n === 1 ? c.unit.replace(/s$/, "") : c.unit}`, fromHeadline: false } : null;
+}
 
 export const pct0 = (x: number) => `${Math.round(x * 100)}%`;
 

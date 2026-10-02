@@ -137,6 +137,19 @@ describe.skipIf(!ready)("headline strips match their data", () => {
     expect(h.stats[1].value).toBe(c.believe.toLocaleString("en-US"));
   });
 
+  test("collection cards: headline lines where there's a strip, record counts elsewhere", () => {
+    const card = (id: string) => computed?.cards.find((c) => c.id === id);
+    const record = (name: string) => json(join(app, `public/data/${name}.json`)).result;
+
+    expect(card("decoy")?.line).toBe(scene("decoy").line);
+    expect(card("visual-search")?.line).toBe(`${record("visual-search").availability.completed.toLocaleString("en-US")} recorded answers`);
+    expect(card("rewardbench2")?.line).toBe(`${record("rewardbench2").rows.filter((r: { error?: unknown }) => !r.error).length.toLocaleString("en-US")} recorded answers`);
+
+    const questions = record("local-models").cases.reduce((s: number, c: { questions: unknown[] }) => s + c.questions.length, 0);
+
+    expect(card("local-models")?.line).toBe(`${questions.toLocaleString("en-US")} recorded questions`);
+  });
+
   test("home: the doubt flips, rewording and calibration, counted from the records", () => {
     const fool = json(join(app, "public/fool/fool.json"));
 
