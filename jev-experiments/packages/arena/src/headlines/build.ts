@@ -9,8 +9,10 @@ import { join } from "node:path";
 import { scamComparison, type RecordedRow } from "../../../../live-worlds/rumour/compare";
 import type { Vectors } from "../../../../live-worlds/rumour/similarity";
 import { createTown } from "../../../../live-worlds/rumour/town";
+import { experiments } from "../../../../experience-prototypes/src/catalog";
 import {
   answerKeyHeadline,
+  cardLine,
   decoyHeadline,
   handoffHeadline,
   homeHeadline,
@@ -26,6 +28,7 @@ import {
   type IntentRow,
   type OpenDecisionsData,
   type ProseResults,
+  type RecordResult,
 } from "./headlines";
 import type { Question } from "../answer-key/model";
 
@@ -50,6 +53,8 @@ export type HeadlineInputs = {
   weights: number | null;
   freeModel: FreeModelResults | null;
   rumour: { vectors: Vectors; messages: Record<string, number[]>; rows: RecordedRow[] } | null;
+  /** Every catalog scene and its published record's result, for the collection cards. */
+  records: { id: string; result: RecordResult | null }[];
 };
 
 /** Reads every input; `lab` is jev-experiments/, `app` is experience-prototypes/ after prepare. */
@@ -82,6 +87,7 @@ export function loadHeadlineInputs(lab: string, app: string): HeadlineInputs {
     weights: policy?.weights.length ?? null,
     freeModel,
     rumour: vectors && rows.length ? { vectors: { anchors: vectors.anchors, archetypes: vectors.archetypes, places: vectors.places }, messages: vectors.messages, rows } : null,
+    records: experiments.map((e) => ({ id: e.id, result: e.data ? (read<{ result?: RecordResult }>(join(app, `public/data/${e.data}.json`))?.result ?? null) : null })),
   };
 }
 
@@ -94,17 +100,20 @@ function rumour(r: NonNullable<HeadlineInputs["rumour"]>) {
 }
 
 export function headlinesFrom(i: HeadlineInputs): Headlines {
+  const scenes = [
+    i.prose ? decoyHeadline(i.prose.decoy) : null,
+    i.questions ? answerKeyHeadline(i.questions) : null,
+    i.banking ? handoffHeadline(i.banking) : null,
+    i.openDecisions ? openDecisionsHeadline(i.openDecisions) : null,
+    i.heldout && i.weights ? reefHeadline(i.heldout, i.weights) : null,
+    i.freeModel ? winOverHeadline(i.freeModel) : null,
+    i.rumour ? rumour(i.rumour) : null,
+  ].filter((h) => h !== null);
+
   return {
-    scenes: [
-      i.prose ? decoyHeadline(i.prose.decoy) : null,
-      i.questions ? answerKeyHeadline(i.questions) : null,
-      i.banking ? handoffHeadline(i.banking) : null,
-      i.openDecisions ? openDecisionsHeadline(i.openDecisions) : null,
-      i.heldout && i.weights ? reefHeadline(i.heldout, i.weights) : null,
-      i.freeModel ? winOverHeadline(i.freeModel) : null,
-      i.rumour ? rumour(i.rumour) : null,
-    ].filter((h) => h !== null),
+    scenes,
     home: i.fool && i.prose ? homeHeadline(i.fool, i.prose, i.prose.decoy) : null,
+    cards: i.records.flatMap((r) => cardLine(r.id, scenes.find((h) => h.id === r.id), r.result) ?? []),
   };
 }
 

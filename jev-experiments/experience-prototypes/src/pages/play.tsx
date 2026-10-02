@@ -5,12 +5,34 @@ import { experimentNotes } from "../notes/manifest";
 import { MiniExperimentPreview } from "../live-world-preview";
 import { starterScore } from "../../../music-arranger-v2/engine";
 import { FoolJev } from "../fool-jev";
-import { homeHeadline, ShareCardButton } from "../headline-strip";
+import { cardLineFor, homeHeadline, ShareCardButton } from "../headline-strip";
+import { DIAGRAMS, diagramText, SceneDiagram } from "../scene-diagrams";
 import "./play.css";
 
 
 /** What the prose studies and Fool Jev found, verdict first, computed at build time from their records. */
 const home = homeHeadline();
+
+/** How the scene asks Jev, drawn small, with the same thing in words for screen readers. */
+function CardDiagram({ id }: { id: string }) {
+  const d = DIAGRAMS[id];
+
+  if (!d) return null;
+
+  return (
+    <span className="card-diagram">
+      <SceneDiagram id={id} />
+      <span className="sr-only">{diagramText(d)}</span>
+    </span>
+  );
+}
+
+/** One real result: the scene's headline line, or how many recorded answers it holds. */
+function CardResult({ id }: { id: string }) {
+  const c = cardLineFor(id);
+
+  return c ? <p className={c.fromHeadline ? "card-result" : "card-result card-result-count"}>{c.line}</p> : null;
+}
 
 const scenes = [
   { id: "music", action: "Play a phrase. Keep the part you like.", label: "Sound & composition" },
@@ -105,9 +127,11 @@ export function PlayPage() {
                   <MiniExperimentPreview kind={scene.id === "win-over" ? "crowd" : scene.id} />
                 )}
               </div>
+              <CardDiagram id={scene.id} />
               <p className="play-kicker">{scene.label}</p>
               <h3>{lookup(scene.id).title}<ArrowUpRight size={18} /></h3>
-              <p>{scene.action}</p>
+              <p className="play-scene-action">{scene.action}</p>
+              <CardResult id={scene.id} />
             </a>
           ))}
         </div>
@@ -156,8 +180,10 @@ export function PlayPage() {
         <div className="play-catalog-list">
           {matches.map((experiment) => (
             <a key={experiment.id} href={`#experiment/${experiment.id}`}>
+              <CardDiagram id={experiment.id} />
               <span className="play-catalog-category">{experiment.category}</span>
               <h3>{experiment.title}</h3>
+              <CardResult id={experiment.id} />
               <p>{experiment.description}</p>
               <ArrowUpRight size={17} aria-hidden="true" />
             </a>
