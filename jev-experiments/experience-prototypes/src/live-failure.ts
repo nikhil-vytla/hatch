@@ -1,5 +1,7 @@
 /**
- * What went wrong with a live Jev call, in plain words, and what to do next. Every live control
+ * What went wrong with a live Jev call, in plain words, and what to do next. These messages say
+ * only what happened; what is still on screen depends on the scene, so each scene states that
+ * itself (LiveFailure's `fallback`). Every live control
  * shows failures through this, so a missing key, a rejected key, a rate limit, a spent budget
  * and a dropped connection each read the same way everywhere.
  */
@@ -20,12 +22,12 @@ export type Failure = {
 type Thrown = { name?: string; message?: string; status?: number; response?: unknown };
 
 const TEXT: Record<FailureKind, { title: string; message: string; retryable: boolean }> = {
-  "no-key": { title: "No key connected.", message: "Add your gateway key in Settings to ask Jev live. Recorded answers still work.", retryable: false },
-  "bad-key": { title: "Your key was rejected.", message: "Check it in Settings, or replace it. Recorded answers still work.", retryable: false },
+  "no-key": { title: "No key connected.", message: "Add your gateway key in Settings to ask Jev live.", retryable: false },
+  "bad-key": { title: "Your key was rejected.", message: "Check it in Settings, or replace it.", retryable: false },
   "rate-limited": { title: "Jev is busy (rate limited).", message: "Try again in a moment.", retryable: true },
   budget: { title: "Your gateway budget ran out.", message: "Add credit or raise the limit in Vercel AI Gateway, then try again.", retryable: false },
   unavailable: { title: "Jev didn't answer.", message: "It's unavailable right now; try again shortly.", retryable: true },
-  offline: { title: "Can't reach Jev.", message: "Check your connection. Recorded answers still work.", retryable: true },
+  offline: { title: "Can't reach Jev.", message: "Check your connection.", retryable: true },
   cancelled: { title: "Cancelled.", message: "", retryable: true },
   error: { title: "That run didn't complete.", message: "", retryable: true },
 };
