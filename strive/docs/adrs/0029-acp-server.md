@@ -37,7 +37,10 @@ The bridge uses `@agentclientprotocol/sdk`, pinned, and ships in the
 - `session/cancel` interrupts the turn.
 - The reply streams as `agent_message_chunk`s. Each effect is a
   `tool_call` with its kind (`read`, `edit`, `execute`, `other`) and the
-  file it touches, and a `tool_call_update` when it finishes.
+  file it touches, and a `tool_call_update` with its output when it
+  finishes. Updates go out in journal order, so an output read from the
+  daemon isn't overtaken by what follows it, and a prompt answers only
+  after its turn's updates.
 - An approval is a `session/request_permission` with allow once, allow
   for the session (when the daemon offers it), and reject. An editor
   that cancels the prompt declines.
@@ -59,6 +62,6 @@ The bridge uses `@agentclientprotocol/sdk`, pinned, and ships in the
   (Zed: `"type": "custom", "command": "strive", "args": ["acp"]`).
 - The journal, budgets, sandbox and learning are the same for an editor's
   session as for any other.
-- An editor sees what strive's protocol carries. A tool call's output
-  isn't in the journal, so the editor is told how it ended (its exit code,
-  or why it was refused), not its full text.
+- An editor sees a tool call's output as the agent was given it: the
+  journal names it by digest and the bridge reads it with `blob/get`
+  (the first 20,000 characters), followed by how it ended.

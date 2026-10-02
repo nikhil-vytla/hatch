@@ -105,6 +105,8 @@ test("a prompt runs a turn: the editor sees the tool call and the reply, and the
   const done = e.updates.find((u) => u.sessionUpdate === "tool_call_update");
 
   expect(done).toMatchObject({ toolCallId: "toolu_1", status: "completed" });
+  // What the effect gave the agent, fetched from the daemon, not only how it ended.
+  expect(JSON.stringify(done)).toContain("wrote hello.txt (2 bytes)");
 });
 
 test("an approval is the editor's permission request, and what it chooses is the daemon's answer", async () => {
@@ -139,6 +141,15 @@ test("an approval is the editor's permission request, and what it chooses is the
     ["toolu_1", "completed"],
     ["toolu_2", "failed"],
   ]);
+
+  const shown = e.updates.flatMap((u) =>
+    u.sessionUpdate === "tool_call_update"
+      ? (u.content ?? []).flatMap((c) => (c.type === "content" && c.content.type === "text" ? [c.content.text] : []))
+      : [],
+  );
+
+  expect(shown[0]).toBe("allowed\n\n(exited 0)");
+  expect(shown[1]).toStartWith("declined: run: echo declined");
 });
 
 test("cancelling interrupts the turn, and the prompt ends cancelled", async () => {
