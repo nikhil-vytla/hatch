@@ -15,6 +15,8 @@ type Row = {
   at?: string;
   latencyMs?: number;
   servedBy?: string;
+  inputTokens?: number;
+  costUsd?: number;
   answers?: { q?: { probabilities?: Record<string, number> } };
 };
 
@@ -67,6 +69,10 @@ export function buildDecoy(dir: string, outDir: string) {
         at: row.at,
         latencyMs: row.latencyMs ?? null,
         servedBy: row.servedBy ?? null,
+        inputTokens: row.inputTokens ?? null,
+        costUsd: row.costUsd ?? null,
+        // The answer exactly as recorded, wire option names included, for the receipt's raw view.
+        answers: row.answers,
       },
     ];
   });

@@ -131,20 +131,8 @@
 .fj-no {
   color: var(--tb-tomato-ink);
 }
-.fj-stats {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin: 12px 0 16px;
-}
-.fj-stats span {
-  background: var(--tb-bg);
-  border: 2px dashed var(--tb-ink);
-  border-radius: 12px;
-  padding: 4px 10px;
-  font-weight: 700;
-  font-size: 15px;
-  font-variant-numeric: tabular-nums;
+.fj-receipt {
+  margin: 10px 0 16px;
 }
 .fj label {
   display: block;
