@@ -14,7 +14,6 @@ import {
   pin,
   position,
   settled,
-  simulate,
   Status,
   waitingProfiles,
   type Counts,
@@ -23,7 +22,13 @@ import {
 } from "../../live-worlds/rumour/engine";
 import { PRESETS } from "../../live-worlds/rumour/presets";
 import { allProfiles, jevRequest, toDist, type Dist, type MessageKind, type Profile } from "../../live-worlds/rumour/profiles";
-import { features, profileDist, type Vectors } from "../../live-worlds/rumour/similarity";
+import type { Vectors } from "../../live-worlds/rumour/similarity";
+import {
+  freeAnswers as sharedFreeAnswers,
+  recordedAnswers as sharedRecordedAnswers,
+  scamComparison,
+  type RecordedRow,
+} from "../../live-worlds/rumour/compare";
 import { placeIn } from "../../live-worlds/rumour/places";
 import { ARCHETYPES, createTown, PLACES, VIEW, type PlaceId, type Town } from "../../live-worlds/rumour/town";
 import vectorsDoc from "../../live-worlds/rumour/vectors.json";
@@ -53,7 +58,6 @@ const vectors: Vectors = {
 
 const presetVectors: Record<string, number[]> = vectorsDoc.messages;
 
-type RecordedRow = { kind: MessageKind; latencyMs: number; answers: Record<string, { probabilities?: Record<string, number> } | null> };
 
 const recorded: RecordedRow[] = recordedRaw
   .trim()
@@ -70,24 +74,9 @@ const COLOURS = {
 };
 
 
-function freeAnswers(vector: number[], kind: MessageKind, place: PlaceId | null) {
-  const f = features(vector, vectors);
+const freeAnswers = (vector: number[], kind: MessageKind, place: PlaceId | null) => sharedFreeAnswers(vector, vectors, kind, place);
 
-  return new Map(allProfiles(kind).map((p) => [p.key, profileDist(f, p, kind, place)]));
-}
-
-function recordedAnswers(kind: MessageKind) {
-  const m = new Map<string, Dist>();
-
-  for (const row of recorded.filter((r) => r.kind === kind))
-    for (const [k, a] of Object.entries(row.answers)) {
-      const d = toDist(a?.probabilities);
-
-      if (d) m.set(k, d);
-    }
-
-  return m;
-}
+const recordedAnswers = (kind: MessageKind) => sharedRecordedAnswers(recorded, kind);
 
 type Stats = { model: ModelId; calls: number; ms: number[]; tokens: number; scoredIn: number | null };
 
@@ -179,10 +168,6 @@ function colourOf(w: World, id: number) {
   return t.action[id] === "argue" ? COLOURS.argue : COLOURS.ignore;
 }
 
-/** Believers over time for one model's answers, simulated instantly on the same town and seed. */
-function curveFor(town: Town, preset: (typeof PRESETS)[number], answers: Map<string, Dist>) {
-  return simulate(town, "rumour", preset.text, preset.place, preset.block, answers, 1, 60).curve;
-}
 
 function Curve({ lines }: { lines: { name: string; colour: string; points: { t: number; believe: number }[] }[] }) {
   const w = 320;
@@ -238,14 +223,9 @@ export function RumourMill() {
   const recordedOk = presetId === "scam" && isPreset;
 
   const compare = useMemo(() => {
-    const scam = PRESETS.find((p) => p.id === "scam");
+    const c = scamComparison(town, vectors, presetVectors, recorded);
 
-    if (!scam) return null;
-
-    return {
-      free: curveFor(town, scam, freeAnswers(presetVectors[scam.text], "rumour", scam.place)),
-      jev: curveFor(town, scam, recordedAnswers("rumour")),
-    };
+    return c ? { free: c.free.curve, jev: c.jev.curve } : null;
   }, [town]);
 
   // Jev, live: ask for profiles as residents start waiting on them, a batch at a time.

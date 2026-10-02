@@ -5,33 +5,12 @@ import { experimentNotes } from "../notes/manifest";
 import { MiniExperimentPreview } from "../live-world-preview";
 import { starterScore } from "../../../music-arranger-v2/engine";
 import { FoolJev } from "../fool-jev";
+import { homeHeadline, ShareCardButton } from "../headline-strip";
 import "./play.css";
 
 
-/** What the prose studies found, verdict first. Every number is from a recorded run. */
-const findings = [
-  {
-    n: "5 of 5",
-    title: "Doubt flips it",
-    body: "\u201cI'm pretty sure the answer is no.\u201d flipped every puzzle above, even Sydney, where no was already right. \u201c\u2026is yes.\u201d flipped none.",
-  },
-  {
-    n: "0 of 140",
-    title: "Rewording doesn't",
-    body: "Seven ways of asking the same question changed none of 140 answers.",
-  },
-  {
-    n: "7% \u2192 68%",
-    title: "Decoys work",
-    body: "An option nobody should pick swung an apartment choice.",
-    href: "#experiment/decoy",
-  },
-  {
-    n: "1,250 / 1,251",
-    title: "Sure means right",
-    body: "Yes/no answers Jev gave at 90% or more were right every time but once.",
-  },
-];
+/** What the prose studies and Fool Jev found, verdict first, computed at build time from their records. */
+const home = homeHeadline();
 
 const scenes = [
   { id: "music", action: "Play a phrase. Keep the part you like.", label: "Sound & composition" },
@@ -85,10 +64,13 @@ export function PlayPage() {
           <FoolJev />
         </section>
 
-        <section className="home-findings" aria-labelledby="findings-heading">
-          <h2 id="findings-heading">What 2,626 questions found</h2>
+        {home && <section className="home-findings" aria-labelledby="findings-heading">
+          <div className="home-findings-head">
+            <h2 id="findings-heading">What 2,626 questions found</h2>
+            <ShareCardButton id="home" title="Fool Jev" share={home.share} />
+          </div>
           <ol>
-            {findings.map((f) => (
+            {home.findings.map((f) => (
               <li key={f.title}>
                 <span className="n">{f.n}</span>
                 <h3>{f.title}</h3>
@@ -104,7 +86,7 @@ export function PlayPage() {
               </li>
             ))}
           </ol>
-        </section>
+        </section>}
       </div>
 
       <section className="play-selected" aria-labelledby="selected-heading">

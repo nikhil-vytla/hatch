@@ -4,18 +4,9 @@
  * against one model's answers, and watch the ranking move while nobody's answers change.
  */
 import { useMemo, useState } from "react";
-import { rank, type Key, type Question } from "../../packages/arena/src/answer-key/model";
+import { KEY_MODELS as MODELS, rank, type Key, type Question } from "../../packages/arena/src/answer-key/model";
 import { Receipt } from "./receipt";
 import { Pane, Pills } from "./shared";
-
-/** One model per family, so the consensus doesn't count Laya three times. */
-const MODELS: { id: string; name: string }[] = [
-  { id: "jev", name: "Jev" },
-  { id: "Qwen3-4B-Instruct-2507-4bit", name: "Qwen3-4B" },
-  { id: "laya-tuned", name: "Laya (fine-tuned)" },
-  { id: "Qwen3-0.6B-4bit", name: "Qwen3-0.6B" },
-  { id: "SmolLM2-360M-Instruct", name: "SmolLM2-360M" },
-];
 
 const KEYS: { label: string; key: Key; about: string }[] = [
   {

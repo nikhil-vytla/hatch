@@ -62,3 +62,12 @@ export function rank(questions: Question[], key: Key, models: string[]): Ranked[
     .sort((a, b) => b.agreement - a.agreement)
     .map((r, i) => ({ ...r, rank: i + 1 }));
 }
+
+/** One model per family, so the consensus doesn't count Laya three times. */
+export const KEY_MODELS: { id: string; name: string }[] = [
+  { id: "jev", name: "Jev" },
+  { id: "Qwen3-4B-Instruct-2507-4bit", name: "Qwen3-4B" },
+  { id: "laya-tuned", name: "Laya (fine-tuned)" },
+  { id: "Qwen3-0.6B-4bit", name: "Qwen3-0.6B" },
+  { id: "SmolLM2-360M-Instruct", name: "SmolLM2-360M" },
+];
