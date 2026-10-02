@@ -12,8 +12,9 @@ import { calm, START, type Calm } from "../../../packages/arena/src/one-box/calm
 import { keyword } from "../../../packages/arena/src/one-box/keyword";
 import { QUESTIONS, type Reading } from "../../../packages/arena/src/one-box/questions";
 import { normalizeKey, TYPING } from "../../../packages/arena/src/one-box/replay";
-import { EvaluationError, getApiKey, run } from "../api";
+import { EvaluationError, run, useHasKey } from "../api";
 import { fromLive, Receipt, type ReceiptData } from "../receipt";
+import { ModeTag } from "../trust";
 import { colorVars, type CardModel } from "./model";
 import { fromCalm, Shown } from "./one-box-ui";
 
@@ -24,6 +25,8 @@ const CONTESTANT: Record<LaneId, string> = {
   jev: "jev@cancel",
   keyword: "code.keyword",
 };
+
+const NO_KEY_NOTE = "Connect your AI Gateway key in Settings to run Jev live.";
 
 /** Live Jev waits for a pause this long before asking. */
 const PAUSE_MS = 400;
@@ -50,10 +53,11 @@ const EXAMPLES = [
 
 export function TryBox({ model: m }: { model: CardModel }) {
   const [text, setText] = useState("");
-  const hasKey = Boolean(getApiKey());
+  // Re-renders when a key is connected, so the Jev lane and the tags follow it.
+  const hasKey = useHasKey();
 
   const [lanes, setLanes] = useState<Record<LaneId, Lane>>({
-    jev: fresh(hasKey ? "" : "Connect your AI Gateway key in Settings to run Jev live."),
+    jev: fresh(hasKey ? "" : NO_KEY_NOTE),
     keyword: fresh(),
   });
 
@@ -221,6 +225,7 @@ export function TryBox({ model: m }: { model: CardModel }) {
         {EXAMPLES.map((e) => (
           <button key={e} type="button" onClick={() => typeOut(e)}>
             {e}
+            <ModeTag mode={hasKey ? "live" : "browser"} />
           </button>
         ))}
       </div>
@@ -249,7 +254,8 @@ export function TryBox({ model: m }: { model: CardModel }) {
                 <Shown state={fromCalm(lane.calm.shown)} />
               </div>
               <p className="ob-lane-note muted small">
-                {lane.note || (lane.requests ? `${lane.requests} answers` : "")}
+                {(id === "jev" && hasKey && lane.note === NO_KEY_NOTE ? "" : lane.note) ||
+                  (lane.requests ? `${lane.requests} answers` : "")}
               </p>
               {id === "jev" && lane.receipt && <Receipt data={lane.receipt} />}
             </article>

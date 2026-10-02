@@ -18,6 +18,7 @@ import type { Dist, WireAnswer } from "../../../packages/arena/src/decide/combin
 import { combine, wireAnswerSchema } from "../../../packages/arena/src/decide/combine";
 import { getApiKey, run as runJev } from "../api";
 import { fromLive, Receipt, type ReceiptData } from "../receipt";
+import { KeyTag, ModeTag } from "../trust";
 import { z } from "zod";
 import type { Combine } from "../../../packages/arena/src/decide/deck";
 import "./decide.css";
@@ -395,6 +396,7 @@ function Reveal({ d, data, mine }: { d: DecideDecision; data: DecideData; mine: 
           {live.status === "idle" && (
             <button type="button" onClick={() => run()}>
               Run MobileBERT in your browser (about 50 MB, downloaded once)
+              <ModeTag mode="browser" />
             </button>
           )}
           {live.status === "loading" && (
@@ -499,6 +501,7 @@ function YourWording({ d, data }: { d: DecideDecision; data: DecideData }) {
           onClick={() => void askJev()}
         >
           {jev.status === "running" ? "Asking Jev…" : "Ask Jev with your key"}
+          <KeyTag />
         </button>
         <button
           type="button"
@@ -506,6 +509,7 @@ function YourWording({ d, data }: { d: DecideDecision; data: DecideData }) {
           onClick={() => run([{ id: "custom", request }])}
         >
           Ask MobileBERT in your browser
+          <ModeTag mode="browser" />
         </button>
       </div>
       <p className="muted small">
