@@ -22,6 +22,7 @@ import { buildDecide } from "../../packages/arena/src/decide/build";
 import { buildDecoy } from "../../packages/arena/prose/decoy-build";
 import { buildFool } from "../../packages/arena/src/fool/build";
 import { buildOpenDecisions } from "../../packages/arena/open-decisions/build";
+import { buildHeadlines } from "../../packages/arena/src/headlines/build";
 const lab = resolve(".."),
   dest = resolve("public/data");
 const publication: Record<string, string> = JSON.parse(
@@ -144,3 +145,5 @@ buildOpenDecisions(resolve("../packages/arena"), resolve("."), resolve("public/o
 // The reef's recorded Jev run, still gzipped: the page decompresses it in the browser.
 mkdirSync(resolve("public/ocean"), { recursive: true });
 copyFileSync(resolve("../live-worlds/ocean/recordings/jev-heatwave.jsonl.gz"), resolve("public/ocean/jev-heatwave.jsonl.gz"));
+// Headline numbers, computed from the files above; last, so every input exists.
+buildHeadlines(lab, resolve("."), resolve("../packages/arena/src/headlines"));
