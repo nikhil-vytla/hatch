@@ -5,6 +5,7 @@
  */
 import { useMemo, useState } from "react";
 import { rank, type Key, type Question } from "../../packages/arena/src/answer-key/model";
+import { Receipt } from "./receipt";
 import { Pane, Pills } from "./shared";
 
 /** One model per family, so the consensus doesn't count Laya three times. */
@@ -92,6 +93,20 @@ export function AnswerKey({ result }: { result: any }) {
             </tbody>
           </table>
         </div>
+        {questions[0] && (
+          <Receipt
+            label="Source"
+            data={{
+              mode: "recorded",
+              questions: questions.length,
+              raw: {
+                request: { state: result.cases[0].state, question: result.cases[0].questions[0].instructions },
+                response: { target: questions[0].target, predictions: questions[0].predictions },
+                note: `The first of ${questions.length.toLocaleString()} recorded questions, as published in /data/local-models.json. This record kept each model's probabilities, not per-request time or cost.`,
+              },
+            }}
+          />
+        )}
       </Pane>
       <p className="fine">
         Against the teacher, Jev leads Qwen3-4B by about 19 points. Against the other models averaged, Qwen3-4B comes

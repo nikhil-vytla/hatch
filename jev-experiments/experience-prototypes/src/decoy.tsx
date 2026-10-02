@@ -4,6 +4,7 @@
  * number is Jev's recorded answer from the prose studies (30 Sep 2026); nothing here calls a model.
  */
 import { useEffect, useMemo, useState } from "react";
+import { Receipt } from "./receipt";
 import { Fold, Notice, Pane, Pills } from "./shared";
 
 type Scenario = { id: string; context: string; question: string; a: string; b: string; aDecoy: string; bDecoy: string };
@@ -18,8 +19,14 @@ type Recorded = {
   probabilities: Record<string, number>;
   at?: string;
   servedBy: string | null;
+  latencyMs?: number | null;
+  inputTokens?: number | null;
+  costUsd?: number | null;
+  answers?: unknown;
 };
 type Data = { scenarios: Scenario[]; recorded: Recorded[] };
+
+const ORDER_LABEL: Record<Order, string> = { forward: "A listed first", reversed: "A listed last" };
 
 const TITLES: Record<string, string> = {
   apartment: "Apartment",
@@ -121,6 +128,30 @@ export function Decoy() {
                 <b>{p === null ? "not recorded" : `Jev: ${pct(p)}`}</b>
               </div>
             );
+          })}
+        </div>
+        <div className="receipts">
+          {orders.flatMap((o) => {
+            const r = rows.get(`decoy:${scenario.id}:${set}:${o}`);
+
+            return r
+              ? [
+                  <Receipt
+                    key={o}
+                    label={ORDER_LABEL[o]}
+                    data={{
+                      mode: "recorded",
+                      ms: r.latencyMs,
+                      questions: 1,
+                      inputTokens: r.inputTokens,
+                      costUsd: r.costUsd,
+                      at: r.at,
+                      servedBy: r.servedBy,
+                      raw: { request: r.request, response: r.answers ? { answers: r.answers } : undefined },
+                    }}
+                  />,
+                ]
+              : [];
           })}
         </div>
       </Pane>

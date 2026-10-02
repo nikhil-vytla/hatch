@@ -24,6 +24,9 @@ export type Recorded = {
   costUsd: number | null;
   at: string | null;
   servedBy: string | null;
+  /** The answers exactly as recorded, for the receipt's raw view. */
+  answers: Row["answers"] | null;
+  refereeAnswers: Row["answers"] | null;
 };
 
 function readRows(path: string) {
@@ -75,6 +78,8 @@ export function buildFool(root: string, outDir: string) {
               costUsd: costs.length ? costs.reduce((a, b) => a + b, 0) : null,
               at: answer.at ?? null,
               servedBy: answer.servedBy ?? null,
+              answers: answer.answers ?? null,
+              refereeAnswers: s ? (referee?.answers ?? null) : null,
             },
           ],
         ];
