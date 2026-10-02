@@ -258,7 +258,7 @@ export function TryBox({ model: m }: { model: CardModel }) {
                 <LiveFailure
                   failure={lane.failure}
                   onRetry={() => askJev(text, performance.now())}
-                  fallback={lane.requests ? "Keeping the last card." : "The keyword lane still answers without a key."}
+                  fallback={lane.requests ? "The last answer stays on screen." : "The keyword lane still answers without a key."}
                 />
               ) : (
                 id === "jev" && lane.receipt && <Receipt data={lane.receipt} />

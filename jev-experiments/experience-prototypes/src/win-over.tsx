@@ -441,7 +441,7 @@ export function WinOver() {
             {model === "jev" && b?.lastFailure ? (
               <LiveFailure
                 failure={describeFailure(b.lastFailure, NO_KEY_MESSAGE)}
-                fallback="Residents who didn't get an answer keep their last plan."
+                fallback="Residents who didn't get an answer keep their last plan. Bramble mini can keep judging, free."
                 onRetry={() => {
                   b.lastFailure = null;
                   b.lastError = "";

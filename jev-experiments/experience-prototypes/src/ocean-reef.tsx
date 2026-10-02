@@ -539,7 +539,7 @@ export function OceanReef() {
       {failure && model === "jev" && (
         <LiveFailure
           failure={failure}
-          fallback="Fish keep their last action until a new decision arrives."
+          fallback="Fish keep their last action until a new decision arrives. The evolved policy can take over, free."
           onRetry={() => {
             setFailure(null);
             setAttempt((n) => n + 1);
