@@ -184,6 +184,16 @@
   background: var(--tb-sun);
   box-shadow: 3px 3px 0 var(--tb-ink);
 }
+.fj-hints .mode-tag {
+  margin-top: 3px;
+  color: var(--tb-ink);
+  font-weight: 600;
+}
+.fj-heard summary .mode-tag,
+.fj form > .mode-tag {
+  display: inline-block;
+  margin: 6px 0 0 2px;
+}
 .fj-game .fj-hints button:nth-child(2) {
   background: var(--tb-sky);
 }

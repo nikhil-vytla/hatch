@@ -34,6 +34,7 @@ import { ARCHETYPES, createTown, PLACES, VIEW, type PlaceId, type Town } from ".
 import vectorsDoc from "../../live-worlds/rumour/vectors.json";
 import recordedRaw from "../../live-worlds/rumour/jev-scam.jsonl?raw";
 import { getApiKey, run } from "./api";
+import { KeyTag, ModeTag } from "./trust";
 import "./rumour-mill.css";
 
 type ModelId = "free" | "jev" | "recorded";
@@ -597,6 +598,7 @@ export function RumourMill() {
           {PRESETS.map((p) => (
             <button key={p.id} type="button" aria-pressed={presetId === p.id && isPreset} onClick={() => choosePreset(p.id)}>
               {p.label}
+              {model === "jev" ? <KeyTag /> : <ModeTag mode={model === "recorded" ? "recorded" : "browser"} />}
             </button>
           ))}
         </div>

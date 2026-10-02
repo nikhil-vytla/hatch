@@ -5,6 +5,7 @@ import { ArrowUpRight, ArrowRight, KeyRound, Settings2, X } from "lucide-react";
 import { lookup, retiredScene } from "./catalog";
 import { Button, Field } from "./shared";
 import { getApiKey, setApiKey } from "./api";
+import { SessionMeter } from "./trust";
 import { BuilderCredits } from "../../roadmap/credits";
 import { PlayPage } from "./pages/play";
 import "./style.css";
@@ -107,10 +108,16 @@ function Header({ route }: { route: string }) {
                 <KeyRound size={14} aria-hidden="true"/>
                 <span>{connected ? "API key added" : "Connect live"}</span>
               </button>
+              <SessionMeter connected={connected} />
             </div>
           </details>
         </nav>
       </header>
+      {connected && (
+        <div className="session-strip">
+          <SessionMeter connected compact />
+        </div>
+      )}
       {open && (
         <div className="modal-backdrop" onClick={close}>
           <section
