@@ -16,9 +16,10 @@ import {
 } from "../../../packages/arena/src/decide/data";
 import type { Dist, WireAnswer } from "../../../packages/arena/src/decide/combine";
 import { combine, wireAnswerSchema } from "../../../packages/arena/src/decide/combine";
-import { getApiKey, run as runJev } from "../api";
+import { EvaluationError, getApiKey, NO_KEY_MESSAGE, run as runJev } from "../api";
+import { describeFailure, type Failure } from "../live-failure";
 import { fromLive, Receipt, type ReceiptData } from "../receipt";
-import { KeyTag, ModeTag } from "../trust";
+import { KeyTag, LiveFailure, ModeTag } from "../trust";
 import { z } from "zod";
 import type { Combine } from "../../../packages/arena/src/decide/deck";
 import "./decide.css";
@@ -422,7 +423,7 @@ function Reveal({ d, data, mine }: { d: DecideDecision; data: DecideData; mine: 
 
 const answersSchema = z.object({ answers: z.record(z.string(), wireAnswerSchema) });
 
-type Asked = { status: "idle" | "running" | "done" | "error"; dist?: Dist; message?: string; receipt?: ReceiptData };
+type Asked = { status: "idle" | "running" | "done" | "error"; dist?: Dist; failure?: Failure; receipt?: ReceiptData };
 
 /**
  * The visitor writes their own wording of the plain question. Jev runs it live with the
@@ -449,11 +450,7 @@ function YourWording({ d, data }: { d: DecideDecision; data: DecideData }) {
   const askJev = async () => {
     // The key lives in Settings and can arrive after this panel rendered, so check it now.
     if (!getApiKey()) {
-      setJev({
-        status: "error",
-        message:
-          "Connect your AI Gateway key in Settings to run Jev live. It stays in this tab and is billed to you, not the site.",
-      });
+      setJev({ status: "error", failure: describeFailure(new EvaluationError(NO_KEY_MESSAGE, 401, null), NO_KEY_MESSAGE) });
 
       return;
     }
@@ -466,7 +463,7 @@ function YourWording({ d, data }: { d: DecideDecision; data: DecideData }) {
 
       setJev({ status: "done", dist: toDist(body.answers), receipt: fromLive(raw, request) });
     } catch (e) {
-      setJev({ status: "error", message: e instanceof Error ? e.message : String(e) });
+      setJev({ status: "error", failure: describeFailure(e, NO_KEY_MESSAGE) });
     }
   };
 
@@ -516,7 +513,13 @@ function YourWording({ d, data }: { d: DecideDecision; data: DecideData }) {
         Jev runs with the AI Gateway key you connect in Settings. It stays in this tab, and the
         request is billed to you, not the site.
       </p>
-      {jev.status === "error" && <p className="notice">{jev.message}</p>}
+      {jev.status === "error" && jev.failure && (
+        <LiveFailure
+          failure={jev.failure}
+          onRetry={() => void askJev()}
+          fallback="The recorded answers above still stand, and MobileBERT can try your wording in your browser."
+        />
+      )}
       {live.status === "loading" && (
         <p className="muted small">Downloading MobileBERT… {live.percent ?? 0}%</p>
       )}

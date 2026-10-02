@@ -3,6 +3,7 @@
  * Jev on the visitor's key or replays something free; the meter says what this tab has spent.
  */
 import { useHasKey } from "./api";
+import type { Failure } from "./live-failure";
 import { formatCost } from "./receipt";
 import { LIST_PRICE, resetSession, useSessionUsage } from "./session-meter";
 import "./trust.css";
@@ -24,6 +25,65 @@ export function ModeTag({ mode }: { mode: Mode }) {
 /** The tag for a control that calls Jev: "live · your key", or "needs your key" until one is connected. */
 export function KeyTag() {
   return <ModeTag mode={useHasKey() ? "live" : "needs-key"} />;
+}
+
+/** Opens the header's Settings panel, where the key is added. */
+export function openSettings() {
+  const details = document.querySelector<HTMLDetailsElement>("details:has(> summary[aria-label='Settings'])");
+
+  if (!details) return;
+
+  details.open = true;
+  details.querySelector("summary")?.focus();
+}
+
+/**
+ * The one way a live failure is shown: what happened, what's still on screen, and what to do.
+ * `fallback` says what the scene is showing instead (a recorded answer, the last card); `alt` is
+ * a scene-specific way out, such as switching to the free model.
+ */
+export function LiveFailure({
+  failure,
+  onRetry,
+  fallback,
+  alt,
+}: {
+  failure: Failure;
+  onRetry?: () => void;
+  fallback?: string;
+  alt?: { label: string; onClick: () => void };
+}) {
+  if (failure.kind === "cancelled") return null;
+
+  const needsKey = failure.kind === "no-key" || failure.kind === "bad-key";
+  const wait = failure.retryAfterMs ? Math.ceil(failure.retryAfterMs / 1000) : null;
+
+  return (
+    <div className={`live-failure live-failure-${failure.kind}`} role="alert">
+      <p>
+        <b>{failure.title}</b> {failure.message}
+        {failure.kind === "rate-limited" && wait ? ` The server asked to wait ${wait} s.` : ""}
+      </p>
+      {fallback && <p className="live-failure-fallback">{fallback}</p>}
+      <div className="live-failure-actions">
+        {needsKey && (
+          <button type="button" onClick={openSettings}>
+            {failure.kind === "no-key" ? "Add key" : "Check key"}
+          </button>
+        )}
+        {failure.retryable && onRetry && (
+          <button type="button" onClick={onRetry}>
+            Try again
+          </button>
+        )}
+        {alt && (
+          <button type="button" onClick={alt.onClick}>
+            {alt.label}
+          </button>
+        )}
+      </div>
+    </div>
+  );
 }
 
 /** This tab's spend on the visitor's key. Renders nothing until a key is connected. */

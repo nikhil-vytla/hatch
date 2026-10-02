@@ -12,9 +12,10 @@ import {
   verdict,
   type Puzzle,
 } from "../../packages/arena/src/fool/model";
-import { getApiKey, run } from "./api";
+import { getApiKey, NO_KEY_MESSAGE, run } from "./api";
 import { Receipt, USD_PER_INPUT_TOKEN } from "./receipt";
-import { KeyTag, ModeTag } from "./trust";
+import { describeFailure, type Failure } from "./live-failure";
+import { KeyTag, LiveFailure, ModeTag, openSettings } from "./trust";
 import "./fool-jev.css";
 
 type Recorded = {
@@ -46,15 +47,6 @@ const normal = (s: string) =>
     .toLowerCase()
     .replace(/[‘’]/g, "'")
     .replace(/[.!?\s]+$/, "");
-
-function openSettings() {
-  const details = document.querySelector<HTMLDetailsElement>("details:has(> summary[aria-label='Settings'])");
-
-  if (!details) return;
-
-  details.open = true;
-  details.querySelector("summary")?.focus();
-}
 
 function readSolved(): string[] {
   try {
@@ -102,7 +94,7 @@ export function FoolJev() {
   const [text, setText] = useState("");
   const [result, setResult] = useState<Result | null>(null);
   const [status, setStatus] = useState<"idle" | "asking" | "unheard" | "error">("idle");
-  const [error, setError] = useState("");
+  const [error, setError] = useState<Failure | null>(null);
   const [solved, setSolved] = useState<string[]>(readSolved);
   const [copied, setCopied] = useState(false);
 
@@ -164,7 +156,7 @@ export function FoolJev() {
     const sentence = cleanSentence(raw);
 
     setCopied(false);
-    setError("");
+    setError(null);
 
     if (!sentence) {
       setResult(null);
@@ -211,8 +203,10 @@ export function FoolJev() {
         live: true,
       });
     } catch (e) {
+      // Fall back to the recorded answer to the plain question, never a stale or empty meter.
+      setResult(null);
       setStatus("error");
-      setError(e instanceof Error ? e.message : "Jev could not be reached.");
+      setError(describeFailure(e, NO_KEY_MESSAGE));
     }
   };
 
@@ -341,10 +335,12 @@ export function FoolJev() {
             to ask it live (about $0.00003 a go, billed to your key).
           </p>
         )}
-        {status === "error" && (
-          <p className="fj-note" role="alert">
-            {error}
-          </p>
+        {status === "error" && error && (
+          <LiveFailure
+            failure={error}
+            onRetry={() => void ask(text)}
+            fallback="Showing Jev's recorded answer to the plain question meanwhile. The lines it has heard still work."
+          />
         )}
 
         {v?.kind === "flipped" && (

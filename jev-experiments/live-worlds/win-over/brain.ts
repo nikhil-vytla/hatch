@@ -47,6 +47,8 @@ export class Brain {
   costUsd = 0;
   calls = 0;
   lastError = "";
+  /** The last failed request's error, so the page can say what went wrong and offer a way out. */
+  lastFailure: unknown = null;
 
   constructor(
     private world: () => World,
@@ -95,8 +97,10 @@ export class Brain {
           else await this.runGossip(job.meetings);
 
           this.lastError = "";
+          this.lastFailure = null;
         } catch (e) {
           this.lastError = e instanceof Error ? e.message : String(e);
+          this.lastFailure = e;
 
           for (const r of job.kind === "hear" ? job.listeners : job.meetings.map((m) => m.listener)) r.busy = false;
         }
