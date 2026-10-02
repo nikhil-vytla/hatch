@@ -11,6 +11,7 @@ import {
   ArrowUp,
 } from "lucide-react";
 import { Pane, Field, Button, Pills, Stat, State } from "./shared";
+import { fromRecorded, Receipt } from "./receipt";
 export function GameGrid({
   state,
   small = false,
@@ -295,6 +296,8 @@ export function Games({ result }: { result: any }) {
                 </div>
               ))}
           </div>
+          {/* Only steps where Jev was asked: cached steps and code baselines made no request. */}
+          {entry && !entry.cache_hit && entry.latency_ms ? <Receipt label="This step" data={fromRecorded(entry)} /> : null}
           <p className="fine">
             {episodes.length} completed episodes, including unsuccessful
             attempts. {interrupted.length} interrupted episode is excluded from

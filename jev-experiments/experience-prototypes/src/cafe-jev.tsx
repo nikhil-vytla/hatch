@@ -15,6 +15,8 @@ import {
   SlidersHorizontal,
 } from "lucide-react";
 import { getApiKey, run } from "./api";
+import { fromLive, fromRecorded, Receipt } from "./receipt";
+import { KeyTag, ModeTag } from "./trust";
 import {
   CONTRACT_VERSION,
   MENU_REVISION,
@@ -872,7 +874,9 @@ export function Beverage({ result }: { result: any }) {
                     ))}
                 </select>
               </label>
-              <span>{totalRecorded} genuine Jev cases. No key needed.</span>
+              <span>
+                {totalRecorded} genuine Jev cases. No key needed. <ModeTag mode="recorded" />
+              </span>
             </div>
           )}
 
@@ -1046,9 +1050,14 @@ export function Beverage({ result }: { result: any }) {
                       : scene.response
                         ? "Ask Jev again"
                         : "Ask Jev"}
+                    <KeyTag />
                   </button>
                 </div>
               </div>
+            )}
+            {/* After a manual edit the drink on screen is the visitor's, not Jev's, so no receipt. */}
+            {scene.response && (scene.source === "live" || scene.source === "recorded") && (
+              <Receipt data={scene.source === "live" ? fromLive(scene.response) : fromRecorded(scene.response)} />
             )}
             <button
               className="cafe-preference-toggle"

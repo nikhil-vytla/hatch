@@ -12,6 +12,7 @@ import { Pane, Button, Stat, Fold, State as StateView, Notice } from "./shared";
 
 const OrbitalScene = lazy(() => import("./orbital-scene"));
 import { run, getApiKey } from "./api";
+import { fromLive, fromRecorded, Receipt } from "./receipt";
 import {
   initial,
   step as advance,
@@ -207,6 +208,7 @@ export function Arcade({ game, result }: { game: Game; result: any }) {
             probabilities: a.probabilities,
             source: "typesafe-ai/jev",
             latency_ms: r.latency_ms,
+            response: r,
           },
         ];
       });
@@ -458,6 +460,13 @@ export function Arcade({ game, result }: { game: Game; result: any }) {
                 </p>
               )}
             </div>
+            {/* Only moves Jev made: the greedy rule and manual play send no request. */}
+            {mode !== "manual" && action?.latency_ms ? (
+              <Receipt
+                label="This move"
+                data={action.response ? fromLive(action.response) : fromRecorded(action)}
+              />
+            ) : null}
             <StateView
               title="What the model sees"
               value={observe(action?.state ?? state)}

@@ -4,6 +4,7 @@
  * with the exact request and response one click away. Every field is optional and is left out
  * when the record doesn't have it; nothing here is estimated or invented.
  */
+import { createContext, useContext } from "react";
 import "./receipt.css";
 
 /** TypeSafe's list price for Jev: $0.042 per million input tokens, output free. */
@@ -100,8 +101,72 @@ export function fromLive(body: unknown, request?: unknown): ReceiptData {
   };
 }
 
+/**
+ * One receipt for a live run made of several requests (a scene that asks in batches): time,
+ * questions and tokens summed, host from the first response. Missing fields stay missing.
+ */
+export function fromLiveBatches(bodies: unknown[], request?: unknown): ReceiptData {
+  const one = bodies.map((b) => fromLive(b));
+  const sum = (pick: (r: ReceiptData) => number | null | undefined) => {
+    const xs = one.map(pick).filter((x): x is number => typeof x === "number" && Number.isFinite(x));
+
+    return xs.length ? xs.reduce((a, b) => a + b, 0) : null;
+  };
+
+  return {
+    mode: "live",
+    ms: sum((r) => r.ms),
+    questions: sum((r) => r.questions),
+    inputTokens: sum((r) => r.inputTokens),
+    at: new Date().toISOString(),
+    servedBy: one.find((r) => r.servedBy)?.servedBy ?? null,
+    raw: { request, response: bodies.length === 1 ? bodies[0] : bodies },
+  };
+}
+
+const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : null);
+
+const str = (v: unknown) => (typeof v === "string" && v ? v : null);
+
+/**
+ * A receipt from one recorded response or row, whatever the scene's record calls its fields:
+ * `latency_ms`/`latencyMs`, `cost_usd`/`costUsd`, `usage.input_tokens`, `served_by`/`servedBy`,
+ * `at`/`recorded_at`, and the question count from `question_count`, `batchQuestions`,
+ * `batch_size` or the number of `answers`. Anything the object lacks stays out. `extra`
+ * supplies what lives elsewhere in the record (usually the run's date) or overrides.
+ */
+export function fromRecorded(obj: unknown, extra: Partial<ReceiptData> = {}): ReceiptData {
+  const o = (obj && typeof obj === "object" ? obj : {}) as Record<string, unknown>;
+  const usage = (o.usage && typeof o.usage === "object" ? o.usage : {}) as Record<string, unknown>;
+  const answers = o.answers && typeof o.answers === "object" && !Array.isArray(o.answers) ? Object.keys(o.answers).length : null;
+
+  return {
+    mode: "recorded",
+    ms: num(o.latency_ms) ?? num(o.latencyMs),
+    questions: num(o.question_count) ?? num(o.batchQuestions) ?? num(o.batch_size) ?? answers,
+    inputTokens: num(usage.input_tokens),
+    // A Jev call is never free: early recordings logged 0 because the gateway didn't report cost
+    // yet, so a recorded 0 means unknown, not $0.
+    costUsd: num(o.cost_usd) || num(o.costUsd) || null,
+    at: str(o.at) ?? str(o.recorded_at),
+    servedBy: str(o.served_by) ?? str(o.servedBy),
+    raw: { response: obj },
+    ...extra,
+  };
+}
+
+/**
+ * The date of the record a scene is showing (its manifest's start). A recorded receipt whose row
+ * has no timestamp of its own shows this instead, so scenes don't have to thread it through.
+ */
+export const RecordDate = createContext<string | null>(null);
+
+// Scenes say for themselves whether an answer is recorded or live (fromRecorded or fromLive):
+// a recorded response often carries `source: "live"` because it was live when it was captured.
+
 export function Receipt({ data, label, className = "" }: { data: ReceiptData; label?: string; className?: string }) {
-  const parts = receiptParts(data);
+  const recordDate = useContext(RecordDate);
+  const parts = receiptParts(data.mode === "recorded" && !data.at && recordDate ? { ...data, at: recordDate } : data);
 
   return (
     <div className={`receipt ${className}`.trim()}>

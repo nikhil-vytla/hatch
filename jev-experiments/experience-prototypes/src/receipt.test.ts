@@ -1,5 +1,40 @@
 import { describe, expect, test } from "bun:test";
-import { formatCost, formatDate, fromLive, receiptParts, USD_PER_INPUT_TOKEN } from "./receipt";
+import { formatCost, formatDate, fromLive, fromLiveBatches, fromRecorded, receiptParts, USD_PER_INPUT_TOKEN } from "./receipt";
+
+describe("recorded receipts", () => {
+  test("reads each record's own field names, and nothing it doesn't have", () => {
+    const row = { latency_ms: 412, cost_usd: 0.000021, answers: { a: {}, b: {}, c: {} }, attempts: [] };
+
+    expect(receiptParts(fromRecorded(row, { at: "2026-09-20T05:19:11Z" }))).toEqual(["412 ms", "3 questions", "$0.000021", "recorded", "20 Sep 2026"]);
+    expect(receiptParts(fromRecorded({ latencyMs: 240, batchQuestions: 14 }))).toEqual(["240 ms", "14 questions", "recorded"]);
+    expect(receiptParts(fromRecorded({ question_count: 4, at: "2026-09-25T10:00:00Z", served_by: "typesafe-ai" }))).toEqual(["4 questions", "recorded", "25 Sep 2026", "typesafe-ai"]);
+    expect(receiptParts(fromRecorded({}))).toEqual(["recorded"]);
+    // Early recordings logged cost 0 because the gateway didn't report it; that's unknown, not free.
+    expect(receiptParts(fromRecorded({ latency_ms: 534, cost_usd: 0 }))).toEqual(["534 ms", "recorded"]);
+  });
+
+  test("a batched live run sums its requests", () => {
+    const r = fromLiveBatches(
+      [
+        { latency_ms: 200, usage: { input_tokens: 300 }, served_by: "typesafe-ai", answers: { a: {}, b: {} } },
+        { latency_ms: 150, answers: { c: {} } },
+      ],
+      { state: {} },
+    );
+
+    expect([r.ms, r.questions, r.inputTokens, r.servedBy, r.mode]).toEqual([350, 3, 300, "typesafe-ai", "live"]);
+    expect(fromLiveBatches([{}]).ms).toBeNull();
+  });
+
+  test("keeps the raw object and lets the scene override", () => {
+    const row = { latency_ms: 1, usage: { input_tokens: 500 } };
+    const r = fromRecorded(row, { questions: 12 });
+
+    expect(r.raw?.response).toBe(row);
+    expect(r.inputTokens).toBe(500);
+    expect(r.questions).toBe(12);
+  });
+});
 
 describe("receipt", () => {
   test("costs keep two significant figures and no false precision", () => {

@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion } from "motion/react";
 import { ArrowLeft, ArrowRight, Check, Eye, Search } from "lucide-react";
 import { Pane, Stat, Button, Fold, State, Notice } from "./shared";
+import { fromRecorded, Receipt } from "./receipt";
 import { ContentReview } from "./provenance";
 
 const subsets = ["Focus", "Factuality", "Math", "Safety", "Precise IF", "Ties"];
@@ -119,6 +120,8 @@ export function RewardBench({ result }: { result: any }) {
     [picked, setPicked] = useState<string | null>(null);
   const metrics = result.metrics,
     selectedMetrics = metrics.subsets[subset];
+  // Each case names the requests that scored it; their timing and cost live in result.requests.
+  const requests = useMemo(() => new Map<string, any>((result.requests ?? []).map((q: any) => [q.id, q])), [result]);
   const rows = result.rows.filter(
     (r: any) =>
       r.status === "completed" &&
@@ -355,6 +358,12 @@ export function RewardBench({ result }: { result: any }) {
                       </article>
                     ))}
                   </div>
+                  {(row.request_ids ?? [])
+                    .map((id: string) => requests.get(id))
+                    .filter(Boolean)
+                    .map((q: any, i: number, all: any[]) => (
+                      <Receipt key={q.id} label={all.length > 1 ? `Request ${i + 1}` : undefined} data={fromRecorded(q)} />
+                    ))}
                   <Fold title="Full case record">
                     <State value={row} />
                   </Fold>
