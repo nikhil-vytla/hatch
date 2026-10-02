@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { download, pretty, percent } from "./api";
+import { KeyTag } from "./trust";
 export function Button({
   children,
   onClick,
@@ -42,11 +43,15 @@ export function RunButton({
   onClick: () => void;
   label?: string;
 }) {
+  // Every RunButton calls Jev on the visitor's key, so it says so.
   return (
-    <Button onClick={onClick} disabled={busy}>
-      {busy ? <LoaderCircle size={15} className="spin" /> : <Play size={14} />}{" "}
-      {busy ? "Working through it…" : label}
-    </Button>
+    <span className="run-button">
+      <Button onClick={onClick} disabled={busy}>
+        {busy ? <LoaderCircle size={15} className="spin" /> : <Play size={14} />}{" "}
+        {busy ? "Working through it…" : label}
+      </Button>
+      <KeyTag />
+    </span>
   );
 }
 export function Notice({

@@ -18,6 +18,7 @@ import {
   Availability,
 } from "./shared";
 import { run, choice, judge, pretty, percent } from "./api";
+import { fromLive, fromRecorded, Receipt } from "./receipt";
 import { drinkMenu } from "./journeys";
 const routes = {
   calculator: "Exact arithmetic and conversions",
@@ -484,6 +485,8 @@ export function AgentExperiment({ id, result }: { id: string; result: any }) {
           </Field>
           <ErrorText error={error} />
           {modelProb && <Bars values={modelProb} selected={output} />}
+          {/* A recorded example is one of the record's rows; anything else came from a live run here. */}
+          {row && row.latency_ms ? <Receipt data={rows.includes(row) ? fromRecorded(row) : fromLive(row)} /> : null}
           <Availability rows={all} result={result} />
           <State value={row} />
         </Pane>

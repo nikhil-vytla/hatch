@@ -14,8 +14,10 @@ import {
   Fold,
 } from "./shared";
 import { pretty, percent } from "./api";
+import { fromRecorded, Receipt } from "./receipt";
 import { ContentReview } from "./provenance";
-export function Benchmarks({ id, result }: { id: string; result: any }) {
+/** `recordedAt` dates the receipts when this record isn't the page's own (the Stability tab). */
+export function Benchmarks({ id, result, recordedAt }: { id: string; result: any; recordedAt?: string }) {
   const [dataset, setDataset] = useState("banking77"),
     [index, setIndex] = useState(0),
     [filter, setFilter] = useState("All results"),
@@ -242,6 +244,7 @@ export function Benchmarks({ id, result }: { id: string; result: any }) {
                   </div>
                 </div>
               )}
+              {row.latency_ms ? <Receipt label="This case" data={fromRecorded(row, recordedAt ? { at: recordedAt } : {})} /> : null}
               <Fold title="Source and case details">
                 <p>
                   Case: {row.id ?? row.pair_id}.{" "}

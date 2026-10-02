@@ -6,6 +6,7 @@ import { Pane, Notice } from "../shared";
 import { Provenance } from "../provenance";
 import { HeadlineStrip } from "../headline-strip";
 import { experimentNotes } from "../notes/manifest";
+import { RecordDate } from "../receipt";
 import "./experiment.css";
 
 const sceneEntries = new Set(["tetris", "win-over", "music", "routing", "visual-search"]);
@@ -282,12 +283,14 @@ function LiveExperimentPage({ id }: { id: string }) {
             </div>
           }
         >
-          <View
-            key={id}
-            exp={exp}
-            result={record.result ?? {}}
-            composition={composition}
-          />
+          <RecordDate.Provider value={String(record.manifest?.created ?? record.manifest?.prepared_at ?? "") || null}>
+            <View
+              key={id}
+              exp={exp}
+              result={record.result ?? {}}
+              composition={composition}
+            />
+          </RecordDate.Provider>
         </Suspense>
       ) : (
         <div className="loading-stage">

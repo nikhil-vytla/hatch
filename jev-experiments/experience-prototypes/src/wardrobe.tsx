@@ -17,6 +17,7 @@ import {
   X,
 } from "lucide-react";
 import { getApiKey, run } from "./api";
+import { fromLive, fromRecorded, Receipt } from "./receipt";
 import {
   CATALOG,
   COLORS,
@@ -66,6 +67,8 @@ export function Wardrobe({ result }: { result: any }) {
     [history, setHistory] = useState<Outfit[]>([]),
     historyRef = useRef<Outfit[]>([]),
     [turns, setTurns] = useState<Turn[]>([]);
+  // The latest turn Jev answered (manual edits made no request).
+  const lastJevTurn = [...turns].reverse().find((t) => t.raw && t.provenance !== "manual");
   const [transcriptSource, setTranscriptSource] = useState("typed"),
     [text, setText] = useState(""),
     [busy, setBusy] = useState(false),
@@ -795,6 +798,12 @@ export function Wardrobe({ result }: { result: any }) {
             <Sparkles size={17} />
             <p>{message}</p>
           </div>
+          {lastJevTurn && (
+            <Receipt
+              label="Last change"
+              data={lastJevTurn.provenance === "live-jev" ? fromLive(lastJevTurn.raw) : fromRecorded(lastJevTurn.raw)}
+            />
+          )}
           <div className="wardrobe-history-actions">
             <button onClick={undo} disabled={!history.length}>
               <Undo2 size={14} />

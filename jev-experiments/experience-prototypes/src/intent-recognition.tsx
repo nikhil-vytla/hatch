@@ -182,7 +182,7 @@ export function IntentRecognition({ result }: { result: any }) {
         (robustness.record ? (
           <>
             <Stability result={robustness.record.result} />
-            <Benchmarks id="robustness" result={robustness.record.result} />
+            <Benchmarks id="robustness" result={robustness.record.result} recordedAt={robustness.record.manifest?.created} />
           </>
         ) : (
           <Notice>
