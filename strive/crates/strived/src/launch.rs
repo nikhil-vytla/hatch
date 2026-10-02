@@ -85,8 +85,13 @@ fn is_protocol_mismatch(e: &anyhow::Error) -> bool {
 
 fn spawn(home: &Home) -> Result<Child> {
     let log = OpenOptions::new().create(true).append(true).open(home.log()).context("opening the daemon log")?;
+    // Not in the directory of whatever command started it, which may be
+    // removed while it runs: the hosts it starts would inherit a deleted
+    // directory and fail to start. So its home is passed whole.
     Command::new(std::env::current_exe()?)
         .arg("daemon")
+        .current_dir("/")
+        .env("STRIVE_HOME", std::path::absolute(&home.root)?)
         .stdin(Stdio::null())
         .stdout(log.try_clone()?)
         .stderr(log)

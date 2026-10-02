@@ -265,3 +265,22 @@ fn a_host_that_sends_invalid_utf8_is_cleaned_up() {
     });
     drop((r, s));
 }
+
+#[test]
+fn hosts_start_after_the_directory_that_started_the_daemon_is_removed() {
+    use std::os::unix::fs::PermissionsExt as _;
+    let scratch = tempfile::Builder::new().prefix("strv-cwd").tempdir_in("/tmp").unwrap();
+    let (script, noted) = (scratch.path().join("host.sh"), scratch.path().join("pwd"));
+    // A host that notes where it started, then exits.
+    std::fs::write(&script, format!("#!/bin/sh\npwd > {}\n", noted.display())).unwrap();
+    std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o755)).unwrap();
+    let env = Env::with_vars(&[("STRIVE_HOST", &script.display().to_string())]);
+    let launched_from = tempfile::Builder::new().prefix("strv-launch").tempdir_in("/tmp").unwrap();
+    assert!(env.strive_in(launched_from.path(), &["status"]).status.success());
+    drop(launched_from);
+    let project = tempfile::Builder::new().prefix("strv-proj").tempdir_in("/tmp").unwrap();
+    let id = env.rpc().ok("session/create", &json!({"cwd": project.path()}))["id"].as_str().unwrap().to_string();
+    env.rpc().ok("session/prompt", &json!({"id": id, "text": "hi"}));
+    common::wait_for("the host to start", Duration::from_secs(20), || noted.exists());
+    assert_eq!(std::fs::read_to_string(&noted).unwrap(), "/\n");
+}
