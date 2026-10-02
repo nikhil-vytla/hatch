@@ -39,8 +39,10 @@ export function openSettings() {
 
 /**
  * The one way a live failure is shown: what happened, what's still on screen, and what to do.
- * `fallback` says what the scene is showing instead (a recorded answer, the last card); `alt` is
- * a scene-specific way out, such as switching to the free model.
+ * `fallback` is required: one sentence saying what this scene is still showing or doing (a
+ * recorded answer, the last card, fish keeping their last action). The shared failure messages
+ * never claim a fallback, so this sentence is the only place that does. `alt` is a scene-specific
+ * way out, such as switching to the free model.
  */
 export function LiveFailure({
   failure,
@@ -50,7 +52,7 @@ export function LiveFailure({
 }: {
   failure: Failure;
   onRetry?: () => void;
-  fallback?: string;
+  fallback: string;
   alt?: { label: string; onClick: () => void };
 }) {
   if (failure.kind === "cancelled") return null;
@@ -64,7 +66,7 @@ export function LiveFailure({
         <b>{failure.title}</b> {failure.message}
         {failure.kind === "rate-limited" && wait ? ` The server asked to wait ${wait} s.` : ""}
       </p>
-      {fallback && <p className="live-failure-fallback">{fallback}</p>}
+      <p className="live-failure-fallback">{fallback}</p>
       <div className="live-failure-actions">
         {needsKey && (
           <button type="button" onClick={openSettings}>

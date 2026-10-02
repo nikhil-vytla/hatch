@@ -700,7 +700,7 @@ export function RumourMill() {
           {failure && model === "jev" ? (
             <LiveFailure
               failure={failure}
-              fallback="Residents still waiting on Jev stay 'thinking'; everyone else keeps what they decided."
+              fallback="Residents still waiting on Jev stay 'thinking'; everyone else keeps what they decided. The free in-browser model can keep the rumour moving."
               onRetry={() => {
                 pausedUntil.current = 0;
                 setFailure(null);

@@ -339,7 +339,7 @@ export function FoolJev() {
           <LiveFailure
             failure={error}
             onRetry={() => void ask(text)}
-            fallback="Showing Jev's recorded answer to the plain question meanwhile. The lines it has heard still work."
+            fallback="Showing Jev's recorded answer to the plain question meanwhile. Recorded lines still work."
           />
         )}
 
