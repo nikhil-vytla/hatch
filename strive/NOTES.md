@@ -2840,3 +2840,20 @@ whole-file `Change` through the proposal pipeline.
     the prompt's seq, or, without one, the first journaled after it.
   - Allowing "for the session" with no `sessionFile` switches the session
     to full-auto; the editor's option says so in its name.
+
+## 2026-10-02: strive on Harbor
+
+- `bench/harbor`: a Harbor installed agent and Linux builds. The free
+  scripted-model check passes hello-world. The first try at a real
+  Terminal-Bench 2 task failed in the adapter's own check: the prebuilt
+  images are amd64, so on Apple silicon they need the amd64 build, under
+  Rosetta. Rust builds on bullseye (glibc 2.31) because two tasks use
+  `debian:bullseye-slim`.
+- `/adapters/` is in `.gitignore` (Python leftovers live there), so the
+  adapter is in `bench/`.
+- The pilot (10 tasks, Haiku 4.5, $1.90; see `bench/harbor/README.md`)
+  passed 4 of 10. The failures share one habit: the agent declares success
+  without checking the task's criteria. A rule the learner could propose
+  ("check the stated success criteria before saying it's done") is the
+  obvious first thing to measure, once trials can carry learned state
+  from one to the next.

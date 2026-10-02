@@ -56,6 +56,33 @@ That run should report reward 1.0, 2 model calls, and $0.0024. The cost is
 what the fake usage would cost at Haiku's prices; nothing is billed. Use
 `host.docker.internal` with Docker.
 
+## Pilot (2026-10-02)
+
+10 Terminal-Bench 2 tasks (the 4 easy ones and 6 medium ones with a
+15-minute limit), Claude Haiku 4.5, $1 cap per task, 3 at a time on Podman
+(Apple silicon, amd64 images under Rosetta). It took 18.5 minutes and cost
+$1.90.
+
+| Task | Difficulty | Reward | Calls | Cost |
+| --- | --- | --- | --- | --- |
+| fix-git | easy | 1 | 10 | $0.03 |
+| prove-plus-comm | easy | 1 | 38 | $0.10 |
+| cobol-modernization | easy | 1 | 47 | $0.18 |
+| overfull-hbox | easy | 0 | 49 | $0.20 |
+| build-pmars | medium | 1 | 37 | $0.17 |
+| count-dataset-tokens | medium | 0 | 14 | $0.05 |
+| chess-best-move | medium | 0 | 46 | $0.25 |
+| build-cython-ext | medium | 0 | 64 | $0.28 |
+| adaptive-rejection-sampler | medium | 0 | 62 | $0.49 |
+| crack-7z-hash | medium | 0 | 58 | $0.15 (hit the 15-minute limit) |
+
+That's 4 of 10 tasks passed (3 of 4 easy, 1 of 6 medium). It averaged
+$0.19 a task, and no task came near its cap. Each call cost $0.0045, and
+most input was read from the cache. Every failure that finished its turn
+ended with the agent saying it had succeeded, without checking its result
+against the task's stated criteria: a token count off by 20%, one of two
+winning chess moves, repository tests still failing.
+
 ## Not yet
 
 - Learning across trials. Each container starts empty, so strive learns
