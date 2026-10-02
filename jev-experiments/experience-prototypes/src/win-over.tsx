@@ -25,9 +25,10 @@ import { camera, hitResident, paint, toWorld } from "../../live-worlds/win-over/
 import recorded from "../../live-worlds/win-over/recorded.json";
 import { STUDENT_NAME } from "../../live-worlds/free-model/runtime";
 import studentLines from "../../live-worlds/free-model/recorded-lines.json";
-import { getApiKey, run } from "./api";
+import { getApiKey, NO_KEY_MESSAGE, run } from "./api";
+import { describeFailure } from "./live-failure";
 import { Receipt } from "./receipt";
-import { KeyTag, ModeTag } from "./trust";
+import { KeyTag, LiveFailure, ModeTag, openSettings } from "./trust";
 import "./fool-jev.css";
 import "./win-over.css";
 
@@ -48,16 +49,6 @@ const MOOD_WORDS = [
 
 const pct = (n: number | undefined) => (n === undefined ? "—" : `${Math.round(n * 100)}%`);
 
-function openSettings() {
-  const details = document.querySelector<HTMLDetailsElement>(
-    "details:has(> summary[aria-label='Settings'])",
-  );
-
-  if (!details) return;
-
-  details.open = true;
-  details.querySelector("summary")?.focus();
-}
 
 /** The free model's text encoder (MiniLM), behind one shared worker. */
 function localEmbedder(onProgress: (text: string) => void) {
@@ -445,8 +436,20 @@ export function WinOver() {
               <button type="button" aria-pressed={model === "jev"} onClick={() => choose("jev")}>
                 Jev (your key)
               </button>
-              <span className="wo-fine">{loading || b?.lastError || note}</span>
+              <span className="wo-fine">{loading || (model === "jev" && b?.lastFailure ? "" : b?.lastError) || note}</span>
             </div>
+            {model === "jev" && b?.lastFailure ? (
+              <LiveFailure
+                failure={describeFailure(b.lastFailure, NO_KEY_MESSAGE)}
+                fallback="Residents who didn't get an answer keep their last plan."
+                onRetry={() => {
+                  b.lastFailure = null;
+                  b.lastError = "";
+                  setTick((t) => t + 1);
+                }}
+                alt={{ label: "Use the free model", onClick: () => choose("local") }}
+              />
+            ) : null}
           </div>
 
           <div className="wo-panels">

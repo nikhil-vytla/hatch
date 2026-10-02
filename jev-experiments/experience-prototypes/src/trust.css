@@ -1,3 +1,42 @@
+/* Live failures: one shape for every live control. */
+.live-failure {
+  display: grid;
+  gap: 6px;
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 2px solid var(--ink);
+  border-radius: 12px;
+  background: var(--soft);
+  font-size: 15px;
+  line-height: 1.45;
+  color: var(--ink);
+}
+.live-failure p {
+  margin: 0;
+}
+.live-failure-fallback {
+  color: var(--muted);
+  font-size: 14px;
+}
+.live-failure-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.live-failure-actions:empty {
+  display: none;
+}
+.live-failure-actions button {
+  min-height: 36px;
+  padding: 6px 14px;
+  font: 800 14px/1 var(--sans, Nunito, system-ui, sans-serif);
+  color: var(--ink);
+  background: var(--surface);
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  cursor: pointer;
+}
+
 /* Mode tags on controls, and the session meter. */
 .mode-tag {
   display: block;

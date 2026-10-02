@@ -31,7 +31,9 @@ import { decideAll, POLICY_NAME, WEIGHT_COUNT } from "../../live-worlds/ocean/po
 import evolved from "../../live-worlds/ocean/policy.json";
 import { parseRecording, RACE, replayer, type Recording } from "../../live-worlds/ocean/replay";
 import type { Decision } from "../../live-worlds/ocean/engine";
-import { getApiKey, run } from "./api";
+import { getApiKey, NO_KEY_MESSAGE, run } from "./api";
+import { describeFailure, type Failure } from "./live-failure";
+import { LiveFailure } from "./trust";
 import "./ocean-reef.css";
 
 type Model = "evolved" | "browser" | "jev";
@@ -226,6 +228,9 @@ export function OceanReef() {
   const [selected, setSelected] = useState<number | null>(null);
   const [download, setDownload] = useState<number | null>(null);
   const [error, setError] = useState("");
+  /** Why live Jev stopped, and a counter that restarts its loop on "Try again". */
+  const [failure, setFailure] = useState<Failure | null>(null);
+  const [attempt, setAttempt] = useState(0);
   const [copied, setCopied] = useState(false);
   const [raceState, setRaceState] = useState<"idle" | "loading" | "running" | "done">("idle");
   const [baseline, setBaseline] = useState<{ alive: number; survived: number; cohort: number } | null>(null);
@@ -400,11 +405,21 @@ export function OceanReef() {
 
             if (target() === w) applyDecisions(w, ds);
 
+            setFailure(null);
             spent.current += (res.usage?.input_tokens ?? 0) * USD_PER_TOKEN;
             latencies.current.push(res.latency_ms ?? 0);
           } catch (e) {
-            setError(e instanceof Error ? e.message : "Jev could not be reached.");
-            await new Promise((r) => setTimeout(r, 2000));
+            const f = describeFailure(e, NO_KEY_MESSAGE);
+
+            if (f.kind === "cancelled") return;
+
+            setFailure(f);
+
+            // Fish keep their last action meanwhile. A rejected key or a spent budget won't fix
+            // itself, so stop asking until the visitor acts; otherwise wait as long as asked.
+            if (!f.retryable) return;
+
+            await new Promise((r) => setTimeout(r, f.retryAfterMs ?? 2000));
           }
         }
 
@@ -417,7 +432,7 @@ export function OceanReef() {
     return () => {
       generation.current++;
     };
-  }, [model, raceState === "running"]);
+  }, [model, raceState === "running", attempt]);
 
   const w = race.current?.live ?? world.current;
   const alive = w.fish.filter((f) => f.alive);
@@ -520,6 +535,18 @@ export function OceanReef() {
           </button>
         </div>
       </div>
+
+      {failure && model === "jev" && (
+        <LiveFailure
+          failure={failure}
+          fallback="Fish keep their last action until a new decision arrives."
+          onRetry={() => {
+            setFailure(null);
+            setAttempt((n) => n + 1);
+          }}
+          alt={{ label: "Use the evolved policy", onClick: () => setModel("evolved") }}
+        />
+      )}
 
       {error && (
         <p className="reef-note" role="alert">

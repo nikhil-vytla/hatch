@@ -33,8 +33,9 @@ import { placeIn } from "../../live-worlds/rumour/places";
 import { ARCHETYPES, createTown, PLACES, VIEW, type PlaceId, type Town } from "../../live-worlds/rumour/town";
 import vectorsDoc from "../../live-worlds/rumour/vectors.json";
 import recordedRaw from "../../live-worlds/rumour/jev-scam.jsonl?raw";
-import { getApiKey, run } from "./api";
-import { KeyTag, ModeTag } from "./trust";
+import { getApiKey, NO_KEY_MESSAGE, run } from "./api";
+import { describeFailure, type Failure } from "./live-failure";
+import { KeyTag, LiveFailure, ModeTag } from "./trust";
 import "./rumour-mill.css";
 
 type ModelId = "free" | "jev" | "recorded";
@@ -218,6 +219,9 @@ export function RumourMill() {
   const runId = useRef(0);
   const requested = useRef<Record<MessageKind, Set<string>>>({ rumour: new Set(), counter: new Set() });
   const inFlight = useRef(0);
+  /** No Jev requests before this time (performance.now()); Infinity after a failure retrying can't fix. */
+  const pausedUntil = useRef(0);
+  const [failure, setFailure] = useState<Failure | null>(null);
 
   const preset = PRESETS.find((p) => p.id === presetId);
   const isPreset = !!preset && text === preset.text;
@@ -233,7 +237,7 @@ export function RumourMill() {
   const pump = (kind: MessageKind, t: Track, id: number) => {
     const w = worldRef.current;
 
-    if (runId.current !== id || inFlight.current >= 3) return;
+    if (runId.current !== id || inFlight.current >= 3 || performance.now() < pausedUntil.current) return;
 
     const keys = waitingProfiles(w, t).filter((k) => !requested.current[kind].has(k));
 
@@ -255,6 +259,8 @@ export function RumourMill() {
       .then((r) => {
         if (runId.current !== id) return;
 
+        setFailure(null);
+
         for (const [i, p] of batch.entries()) {
           const d = toDist(r.answers?.[`p${i}`]?.probabilities);
 
@@ -269,7 +275,12 @@ export function RumourMill() {
 
         for (const p of batch) requested.current[kind].delete(p.key);
 
-        setNote(e instanceof Error ? e.message : "Jev could not be reached.");
+        // Hold every request until it could work: the server's delay if retrying helps, else until
+        // the visitor acts. Without this, each frame re-asked and a bad key became a request storm.
+        const f = describeFailure(e, NO_KEY_MESSAGE);
+
+        pausedUntil.current = f.retryable ? performance.now() + (f.retryAfterMs ?? 5000) : Infinity;
+        setFailure(f);
       })
       .finally(() => {
         inFlight.current--;
@@ -686,10 +697,22 @@ export function RumourMill() {
             </button>
           </form>
 
-          {note && (
-            <p className="rm-note" role="status">
-              {note}
-            </p>
+          {failure && model === "jev" ? (
+            <LiveFailure
+              failure={failure}
+              fallback="Residents still waiting on Jev stay 'thinking'; everyone else keeps what they decided."
+              onRetry={() => {
+                pausedUntil.current = 0;
+                setFailure(null);
+              }}
+              alt={{ label: "Use the free model", onClick: () => setModel("free") }}
+            />
+          ) : (
+            note && (
+              <p className="rm-note" role="status">
+                {note}
+              </p>
+            )
           )}
 
           {sel && selTrack && (

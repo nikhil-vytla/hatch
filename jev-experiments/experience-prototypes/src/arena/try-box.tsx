@@ -12,9 +12,10 @@ import { calm, START, type Calm } from "../../../packages/arena/src/one-box/calm
 import { keyword } from "../../../packages/arena/src/one-box/keyword";
 import { QUESTIONS, type Reading } from "../../../packages/arena/src/one-box/questions";
 import { normalizeKey, TYPING } from "../../../packages/arena/src/one-box/replay";
-import { EvaluationError, run, useHasKey } from "../api";
+import { NO_KEY_MESSAGE, run, useHasKey } from "../api";
+import { describeFailure, type Failure } from "../live-failure";
 import { fromLive, Receipt, type ReceiptData } from "../receipt";
-import { ModeTag } from "../trust";
+import { LiveFailure, ModeTag } from "../trust";
 import { colorVars, type CardModel } from "./model";
 import { fromCalm, Shown } from "./one-box-ui";
 
@@ -39,6 +40,8 @@ type Lane = {
   note: string;
   /** The last live answer's receipt (Jev only). */
   receipt?: ReceiptData;
+  /** Why the last live request failed, until the next one succeeds. */
+  failure?: Failure;
 };
 
 const fresh = (note = ""): Lane => ({ calm: START, lastMs: null, requests: 0, note });
@@ -79,11 +82,9 @@ export function TryBox({ model: m }: { model: CardModel }) {
         requests: l[id].requests + 1,
         note,
         receipt: receipt ?? l[id].receipt,
+        failure: undefined,
       },
     }));
-
-  const noteFor = (id: LaneId, note: string) =>
-    setLanes((l) => ({ ...l, [id]: { ...l[id], note } }));
 
   /** Asks Jev about `ask`; under "latest", asks again for the newest text when it lands. */
   const askJev = (ask: string, started: number) => {
@@ -116,12 +117,8 @@ export function TryBox({ model: m }: { model: CardModel }) {
       })
       .catch((error: Error) => {
         if (controller.signal.aborted) return;
-        noteFor(
-          "jev",
-          error instanceof EvaluationError && error.status === 503
-            ? "Jev is busy; keeping the last card."
-            : error.message,
-        );
+        // The box keeps its last card; the lane says why it didn't change.
+        setLanes((l) => ({ ...l, jev: { ...l.jev, note: "", failure: describeFailure(error, NO_KEY_MESSAGE) } }));
       })
       .finally(() => {
         if (state.controller !== controller) return;
@@ -257,7 +254,15 @@ export function TryBox({ model: m }: { model: CardModel }) {
                 {(id === "jev" && hasKey && lane.note === NO_KEY_NOTE ? "" : lane.note) ||
                   (lane.requests ? `${lane.requests} answers` : "")}
               </p>
-              {id === "jev" && lane.receipt && <Receipt data={lane.receipt} />}
+              {id === "jev" && lane.failure ? (
+                <LiveFailure
+                  failure={lane.failure}
+                  onRetry={() => askJev(text, performance.now())}
+                  fallback={lane.requests ? "Keeping the last card." : "The keyword lane still answers without a key."}
+                />
+              ) : (
+                id === "jev" && lane.receipt && <Receipt data={lane.receipt} />
+              )}
             </article>
           );
         })}
