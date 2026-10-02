@@ -23,6 +23,8 @@ import os
 import re
 import shlex
 import tempfile
+import time
+import tomllib
 from pathlib import Path
 
 from harbor.agents.installed.base import BaseInstalledAgent, with_prompt_template
@@ -38,6 +40,12 @@ LEARNER = "learner.jsonl"
 # What a trial leaves for the next, in its logs and in `learn_dir`.
 STATE = "strive-state.tgz"
 LAST = "last.json"
+# Where the learned files (a task directory's `.strive/`) wait between
+# trials: tasks run in different directories, so not under any of them.
+CARRIED = "/tmp/strive-learned"
+
+# Left of the agent's time for saving what this trial learned, after its task.
+SAVE_SECONDS = 90
 
 # What the learner is told about the last trial: its outcome, not its tests.
 PASSED = "An automated check of this session's task found it done: the task's own tests passed."
@@ -149,6 +157,21 @@ class Strive(BaseInstalledAgent):
             settings["model"] = model
         return settings
 
+    def _agent_seconds(self) -> float | None:
+        """This trial's agent time limit, from its task and its job's multipliers; None if unknown."""
+        try:
+            trial = json.loads((self.logs_dir.parent / "config.json").read_text())
+            task = tomllib.loads((Path(trial["task"]["path"]) / "task.toml").read_text())
+            seconds = float(task["agent"]["timeout_sec"])
+        except (OSError, KeyError, TypeError, ValueError, json.JSONDecodeError, tomllib.TOMLDecodeError):
+            return None
+        try:
+            job = json.loads((self.logs_dir.parent.parent / "config.json").read_text())
+        except (OSError, json.JSONDecodeError):
+            job = {}
+        multiplier = job.get("agent_timeout_multiplier") or job.get("timeout_multiplier") or 1.0
+        return seconds * float(multiplier)
+
     def _last(self) -> dict | None:
         """The last trial's session and its trial directory, if a trial left them."""
         if self.learn_dir is None or not (self.learn_dir / LAST).is_file():
@@ -177,6 +200,11 @@ class Strive(BaseInstalledAgent):
             settings.write_text(json.dumps(self._settings(), indent=2))
             await environment.upload_file(settings, f"{REMOTE_HOME}/settings.json")
         ws = shlex.quote(self._workspace)
+        carry = (
+            f" && if [ -d {CARRIED} ]; then rm -rf {ws}/.strive && cp -r {CARRIED} {ws}/.strive; fi"
+            if self.learn_dir is not None
+            else ""
+        )
         # Learned files stay out of a task's git status, which some tasks check.
         exclude = (
             f" && if [ -d {ws}/.git ]; then grep -qx '.strive/' {ws}/.git/info/exclude 2>/dev/null"
@@ -191,7 +219,7 @@ class Strive(BaseInstalledAgent):
         )
         await self.exec_as_root(
             environment,
-            command=f"chmod 755 {REMOTE_BIN}/strive {REMOTE_BIN}/strive-tui{exclude}{chown}",
+            command=f"chmod 755 {REMOTE_BIN}/strive {REMOTE_BIN}/strive-tui{carry}{exclude}{chown}",
         )
 
     def _env(self) -> dict[str, str]:
@@ -207,13 +235,13 @@ class Strive(BaseInstalledAgent):
                 env[name] = value
         return env
 
-    async def _strive(self, environment: BaseEnvironment, command: str) -> str:
-        """Runs a strive command in the task's directory; its output, whatever its exit."""
+    async def _strive(self, environment: BaseEnvironment, command: str, cwd: str | None = None) -> str:
+        """Runs a strive command in the task's directory (or `cwd`); its output, whatever its exit."""
         result = await self.exec_as_agent(
             environment,
             command=f"{command} 2>&1; echo \"[exit $?]\"",
             env=self._env(),
-            cwd=self._workspace,
+            cwd=cwd or self._workspace,
         )
         return result.stdout or ""
 
@@ -227,22 +255,44 @@ class Strive(BaseInstalledAgent):
             return None
 
     async def _learn(self, environment: BaseEnvironment, last: dict) -> None:
-        """The learner on the last trial's session, told its outcome; what passed the gates, accepted."""
+        """The learner on the last trial's session, told its outcome; what passed the gates, accepted.
+
+        strive learns per project directory and the learner studies only
+        that directory's sessions, so it runs where the last task did. If
+        that directory isn't in this task's container, it is made for the
+        learner, with the learned files, and removed after, so it can't
+        change what this task's checks see.
+        """
         reward = Path(last["trial_dir"]) / "verifier" / "reward.txt"
         passed = reward.is_file() and float(reward.read_text().strip() or 0) >= 1.0
         note = PASSED if passed else FAILED
+        there = last.get("cwd") or self._workspace or "/"
+        elsewhere = there != self._workspace
+        created = ""
+        if elsewhere:
+            made = await self.exec_as_root(
+                environment,
+                command=(
+                    f"p={shlex.quote(there)}; top=$p; while [ ! -d \"$(dirname \"$top\")\" ]; do top=$(dirname \"$top\"); done;"
+                    f" if [ -d \"$p\" ]; then echo; else mkdir -p \"$p\" && echo \"$top\"; fi;"
+                    f" rm -rf \"$p/.strive\"; if [ -d {CARRIED} ]; then cp -r {CARRIED} \"$p/.strive\"; fi"
+                ),
+            )
+            created = (made.stdout or "").strip()
         out = await self._strive(
-            environment, f"strive learn --session {shlex.quote(last['session'])} --note {shlex.quote(note)}"
+            environment,
+            f"strive learn --session {shlex.quote(last['session'])} --note {shlex.quote(note)}",
+            cwd=there,
         )
         (self.logs_dir / "learner.out").write_text(out)
         if found := re.search(r"strive log ([0-9A-Z]{26})", out):
             await self._strive(environment, f"strive log {found.group(1)} --json > {LOGS}/{LEARNER}")
-        listed = self._json(await self._strive(environment, "strive review --json"))
+        listed = self._json(await self._strive(environment, "strive review --json", cwd=there))
         proposals = listed.get("proposals", []) if isinstance(listed, dict) else []
         for p in proposals:
             if p.get("status") != "ready":
                 continue
-            decided = await self._strive(environment, f"strive review {int(p['id'])} accept")
+            decided = await self._strive(environment, f"strive review {int(p['id'])} accept", cwd=there)
             self._learned.append(
                 {
                     "proposal": p["id"],
@@ -252,26 +302,42 @@ class Strive(BaseInstalledAgent):
                     "after": "passed" if passed else "failed",
                 }
             )
+        if elsewhere:
+            ws, p = shlex.quote(self._workspace or "/"), shlex.quote(there)
+            # What the learner left there is this task's learned files now.
+            remove = f" && rm -rf {shlex.quote(created)}" if created else ""
+            await self.exec_as_root(
+                environment,
+                command=f"rm -rf {ws}/.strive; if [ -d {p}/.strive ]; then cp -r {p}/.strive {ws}/.strive; fi{remove}",
+            )
 
     @with_prompt_template
     async def run(self, instruction: str, environment: BaseEnvironment, context: AgentContext) -> None:
+        started = time.monotonic()
         if last := self._last():
             await self._learn(environment, last)
+        # A task that runs out of time is interrupted before Harbor's limit,
+        # so what this trial learned is still saved for the next.
+        limit = ""
+        if self.learn_dir is not None and (seconds := self._agent_seconds()):
+            left = int(seconds - (time.monotonic() - started) - SAVE_SECONDS)
+            limit = f"timeout -s INT -k 30 {max(left, 30)} "
         await self._strive(
             environment,
-            f"strive run {shlex.quote(instruction)} --approvals full-auto"
+            f"{limit}strive run {shlex.quote(instruction)} --approvals full-auto"
             f" --budget {self.budget_usd} --json > {LOGS}/{JOURNAL} 2> {LOGS}/strive.stderr;"
             f" echo $? > {LOGS}/strive.exit",
         )
         # Newest first: the session this trial's task just ran in.
         listed = self._json(await self._strive(environment, "strive sessions --json"))
         self._session = listed[0]["id"] if isinstance(listed, list) and listed else None
-        learned = shlex.quote(f"{(self._workspace or '').lstrip('/')}/.strive")
+        learned = shlex.quote(f"{self._workspace or ''}/.strive")
         # Stopped first, so the journals are whole; the socket is left behind.
         await self._strive(
             environment,
             f"strive stop >/dev/null; cp -r {REMOTE_HOME}/sessions {LOGS}/strive-sessions;"
-            f" cd / && paths=tmp/strive-home && if [ -d {learned} ]; then paths=\"$paths {learned}\"; fi"
+            f" rm -rf {CARRIED}; if [ -d {learned} ]; then cp -r {learned} {CARRIED}; fi;"
+            f" cd / && paths=tmp/strive-home && if [ -d {CARRIED} ]; then paths=\"$paths {CARRIED.lstrip('/')}\"; fi"
             f" && tar czf {LOGS}/{STATE} --exclude=tmp/strive-home/run $paths",
         )
 
@@ -297,5 +363,8 @@ class Strive(BaseInstalledAgent):
             self.learn_dir.mkdir(parents=True, exist_ok=True)
             (self.learn_dir / STATE).write_bytes(state.read_bytes())
             (self.learn_dir / LAST).write_text(
-                json.dumps({"session": self._session, "trial_dir": str(self.logs_dir.parent)}, indent=2)
+                json.dumps(
+                    {"session": self._session, "trial_dir": str(self.logs_dir.parent), "cwd": self._workspace},
+                    indent=2,
+                )
             )

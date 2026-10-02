@@ -7,16 +7,25 @@
 //   bun bench/harbor/smoke-model.ts &
 //   STRIVE_UPSTREAM_ANTHROPIC=http://host.containers.internal:PORT ANTHROPIC_API_KEY=sk-smoke \
 //     PYTHONPATH=bench/harbor harbor run -t hello-world/hello-world -a strive_agent:Strive
+//
+// SMOKE_DELAY_MS=N holds the agent's replies (not the learner's) N ms, to
+// check that a task that runs out of time still saves what was learned.
 import { FakeAnthropic } from "../../packages/testkit/src/fake-anthropic";
 
-const fake = new FakeAnthropic((request) =>
-  JSON.stringify(request.messages.at(-1)?.content).includes("tool_result")
-    ? { text: "Wrote hello.txt.", inputTokens: 1200, outputTokens: 8 }
+const delayMs = Number(process.env.SMOKE_DELAY_MS ?? 0);
+
+const fake = new FakeAnthropic((request) => {
+  const agent = JSON.stringify(request.system ?? "").includes("a coding agent working in");
+  const held = agent && delayMs > 0 ? { delayMs } : {};
+
+  return JSON.stringify(request.messages.at(-1)?.content).includes("tool_result")
+    ? { text: "Wrote hello.txt.", inputTokens: 1200, outputTokens: 8, ...held }
     : {
         toolCalls: [{ id: "toolu_smoke", name: "bash", input: { command: "echo 'Hello, world!' > hello.txt" } }],
         inputTokens: 1000,
         outputTokens: 30,
-      },
-).start();
+        ...held,
+      };
+}).start();
 
 console.log(new URL(fake.url).port);
