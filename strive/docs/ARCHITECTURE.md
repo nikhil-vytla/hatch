@@ -26,6 +26,7 @@ calls go through the daemon's gateway. Why: [ADR-0015](adrs/0015-rebuild-daemon-
 | `crates/strived` | The `strive` binary: CLI, launcher, daemon, sessions |
 | `packages/protocol` | Generated TS types + the typed socket client |
 | `packages/tui` | The terminal client; its binary also runs the agent host and the ACP bridge |
+| `bench/harbor` | strive as a [Harbor](https://github.com/harbor-framework/harbor) agent, for Terminal-Bench 2.0 and Harbor's other benchmarks |
 | `packages/acp` | The ACP bridge (`strive acp`): an editor's Agent Client Protocol to a daemon client |
 | `packages/host` | The agent host: pi-agent-core loop, tools as daemon effects |
 | `packages/testkit` | Test helpers: a scratch-home daemon and a virtual terminal |
