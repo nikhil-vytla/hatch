@@ -31,6 +31,30 @@ export function Provenance({ result }: { result: any }) {
   );
 }
 
+/** One line under a scene's title naming the external dataset; the full card is in the evidence fold. */
+export function SourceCredit({ result }: { result: any }) {
+  const source = result.provenance;
+
+  if (!source) return null;
+
+  const sources = Array.isArray(source) ? source : [source];
+
+  return (
+    <p className="scene-head-source">
+      Data:{" "}
+      {sources.map((s: any, i: number) => (
+        <span key={s.name}>
+          {i > 0 && ", "}
+          <a href={s.url} target="_blank" rel="noreferrer">
+            {s.name}
+          </a>
+          {s.license ? ` (${s.license})` : ""}
+        </span>
+      ))}
+    </p>
+  );
+}
+
 export function ContentReview({
   notice,
   children,

@@ -420,47 +420,6 @@ nav a {
   align-items: center;
   gap: 6px;
 }
-.detail-heading {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 48px;
-  padding: 28px 0 32px;
-  margin-bottom: 28px;
-}
-.detail-heading h1 {
-  font: 800 clamp(38px, 4.6vw, 64px)/1 var(--display);
-  letter-spacing: -0.03em;
-  margin: 10px 0 14px;
-}
-.detail-heading > div > p {
-  color: var(--muted);
-  font-size: 19px;
-  font-weight: 600;
-  max-width: 52ch;
-}
-.experiment-question {
-  max-width: 360px;
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  padding: 14px 16px;
-  background: var(--sky);
-  border: 2.5px solid var(--outline);
-  border-radius: var(--radius);
-  box-shadow: var(--sticker);
-  transform: rotate(1deg);
-}
-.experiment-question svg {
-  color: var(--ink);
-  margin-top: 3px;
-}
-.experiment-question p {
-  font-size: 15px !important;
-  font-weight: 700;
-  color: var(--ink);
-  line-height: 1.4;
-}
 .workbench {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 308px;
@@ -853,9 +812,6 @@ nav a {
   gap: 18px;
   align-items: center;
   font-size: 12px;
-}
-.variant-notebook .detail-heading {
-  padding-bottom: 25px;
 }
 .variant-notebook .notebook-intro {
   display: block;
@@ -2398,9 +2354,6 @@ nav a {
   .pane {
     padding: 18px;
   }
-  .experiment-question {
-    max-width: 250px;
-  }
   .answer-pair,
   .writer-candidates {
     grid-template-columns: 1fr;
@@ -2453,25 +2406,6 @@ nav a {
   }
   .breadcrumbs {
     padding-top: 22px;
-  }
-  .detail-heading {
-    display: block;
-    padding: 28px 0 24px;
-    margin-bottom: 22px;
-  }
-  .detail-heading h1 {
-    font-size: 36px;
-  }
-  .detail-heading > div > p {
-    font-size: 13px;
-  }
-  .experiment-question {
-    max-width: none;
-    margin-top: 20px;
-    gap: 9px;
-  }
-  .experiment-question p {
-    font-size: 12px !important;
   }
   .workbench,
   .variant-comparison .workbench {
@@ -3819,14 +3753,6 @@ nav a {
   .research-card {
     padding: 20px;
   }
-}
-.published-experiment .detail-heading {
-  padding: 22px 0 23px;
-  margin-bottom: 22px;
-}
-.published-experiment .detail-heading h1 {
-  font-size: 36px;
-  margin: 9px 0;
 }
 .published-experiment .breadcrumbs {
   padding-top: 20px;
