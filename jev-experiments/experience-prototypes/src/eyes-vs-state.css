@@ -1,0 +1,161 @@
+/* Eyes against state: two Snake lanes side by side, a cost table, an evidence fold. */
+.ev {
+  display: grid;
+  gap: 18px;
+}
+.ev-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  align-items: end;
+}
+.ev-controls label {
+  display: grid;
+  gap: 4px;
+  font: 700 13px var(--sans);
+}
+.ev-controls .ev-check-label {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.ev-controls select,
+.ev-controls button,
+.ev-check button {
+  font: 700 14px var(--sans);
+  min-height: 40px;
+  padding: 6px 12px;
+  border: 2px solid var(--ink);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--ink);
+}
+.ev-controls button,
+.ev-check button {
+  cursor: pointer;
+  box-shadow: 3px 3px 0 var(--ink);
+}
+.ev-controls input[type="range"] {
+  flex: 1 1 160px;
+  min-width: 140px;
+  accent-color: var(--accent);
+}
+.ev-lanes {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+.ev-lane {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+  padding: 16px;
+  background: var(--surface);
+  border: 3px solid var(--ink);
+  border-radius: 20px;
+  box-shadow: var(--sticker);
+}
+.ev-lane h3 {
+  margin: 0;
+  font: 800 19px/1.2 var(--display);
+}
+.ev-lane.is-over .ev-board {
+  opacity: 0.55;
+}
+.ev-board {
+  width: 100%;
+  max-width: 320px;
+  aspect-ratio: 1;
+  border: 2px solid var(--ink);
+  border-radius: 10px;
+  image-rendering: pixelated;
+}
+.ev-status {
+  margin: 0;
+  font: 700 15px var(--sans);
+  font-variant-numeric: tabular-nums;
+}
+.ev-fine {
+  margin: 0;
+  font-size: 14px;
+  color: var(--muted);
+}
+.ev-probs {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+.ev-probs li {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr) 48px;
+  gap: 8px;
+  align-items: center;
+  font: 600 14px var(--sans);
+}
+.ev-probs i {
+  display: block;
+  height: 10px;
+  border-radius: 6px;
+  background: var(--soft);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.ev-probs li.is-chosen i {
+  background: var(--accent);
+}
+.ev-probs li.is-chosen span,
+.ev-probs li.is-chosen b {
+  color: var(--accent);
+}
+.ev-probs b {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.ev-cost {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  background: var(--sun);
+  border: 3px solid var(--ink);
+  border-radius: 20px;
+}
+.ev-cost h3 {
+  margin: 0;
+  font: 800 20px/1.2 var(--display);
+}
+.ev-table-wrap {
+  overflow-x: auto;
+}
+.ev-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  background: var(--surface);
+  border-radius: 12px;
+}
+.ev-table th,
+.ev-table td {
+  text-align: left;
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--line);
+  font-variant-numeric: tabular-nums;
+}
+.ev-table thead th {
+  font-weight: 800;
+}
+.ev-callout {
+  margin: 0;
+  font: 600 15px/1.45 var(--sans);
+  max-width: 78ch;
+}
+.ev-check {
+  display: grid;
+  gap: 6px;
+  justify-items: start;
+}
+@media (max-width: 720px) {
+  .ev-lanes {
+    grid-template-columns: 1fr;
+  }
+}

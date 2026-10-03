@@ -285,3 +285,14 @@
     box-shadow: none;
   }
 }
+
+/* A prompt quoted verbatim in an evidence drawer. */
+.fmt-prompt {
+  white-space: pre-wrap;
+  margin: 8px 0 0;
+  padding: 10px 12px;
+  font: 13px/1.45 var(--code);
+  background: var(--soft);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}

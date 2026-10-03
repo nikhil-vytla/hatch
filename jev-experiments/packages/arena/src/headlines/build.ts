@@ -14,6 +14,7 @@ import {
   answerKeyHeadline,
   cardLine,
   decoyHeadline,
+  eyesHeadline,
   handoffHeadline,
   homeHeadline,
   openDecisionsHeadline,
@@ -22,6 +23,7 @@ import {
   sentryHeadline,
   winOverHeadline,
   type DecoyResults,
+  type EyesSummary,
   type FoolData,
   type FreeModelResults,
   type Headlines,
@@ -56,6 +58,7 @@ export type HeadlineInputs = {
   freeModel: FreeModelResults | null;
   sentry: SentryCompare | null;
   rumour: { vectors: Vectors; messages: Record<string, number[]>; rows: RecordedRow[] } | null;
+  eyes: EyesSummary | null;
   /** Every catalog scene and its published record's result, for the collection cards. */
   records: { id: string; result: RecordResult | null }[];
 };
@@ -73,6 +76,7 @@ export function loadHeadlineInputs(lab: string, app: string): HeadlineInputs {
   const sentry = read<SentryCompare>(join(lab, "live-worlds/sentry/compare.json"));
   const vectors = read<Vectors & { messages: Record<string, number[]> }>(join(lab, "live-worlds/rumour/vectors.json"));
   const scam = join(lab, "live-worlds/rumour/jev-scam.jsonl");
+  const eyes = read<EyesSummary>(join(app, "public/eyes/eyes.json"));
 
   const rows: RecordedRow[] = existsSync(scam)
     ? readFileSync(scam, "utf8")
@@ -92,6 +96,7 @@ export function loadHeadlineInputs(lab: string, app: string): HeadlineInputs {
     freeModel,
     sentry,
     rumour: vectors && rows.length ? { vectors: { anchors: vectors.anchors, archetypes: vectors.archetypes, places: vectors.places }, messages: vectors.messages, rows } : null,
+    eyes,
     records: experiments.map((e) => ({ id: e.id, result: e.data ? (read<{ result?: RecordResult }>(join(app, `public/data/${e.data}.json`))?.result ?? null) : null })),
   };
 }
@@ -114,6 +119,7 @@ export function headlinesFrom(i: HeadlineInputs): Headlines {
     i.freeModel ? winOverHeadline(i.freeModel) : null,
     i.sentry ? sentryHeadline(i.sentry) : null,
     i.rumour ? rumour(i.rumour) : null,
+    i.eyes ? eyesHeadline(i.eyes) : null,
   ].filter((h) => h !== null);
 
   return {
