@@ -1,14 +1,6 @@
 .od > * + * {
   margin-top: 16px;
 }
-.od .od-sub {
-  margin-top: 8px;
-}
-.od-verdict {
-  font: 800 clamp(20px, 2.4vw, 28px)/1.25 var(--display);
-  max-width: 46ch;
-  margin: 0;
-}
 .od-steps {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

@@ -9,6 +9,9 @@ import { experimentNotes } from "../notes/manifest";
 import { RecordDate } from "../receipt";
 import "./experiment.css";
 
+/** Game pages: the headline result comes after the game, so play starts first. Benchmark pages lead with it. */
+const STRIP_AFTER = new Set(["ocean", "win-over", "rumour-mill"]);
+
 const Paste = lazy(() => import("../new-experiments").then(m => ({ default: m.Paste })));
 const LayoutStudy = lazy(() => import("../layout-study").then(m => ({ default: m.LayoutStudy })));
 const JudgmentsScene = lazy(() => import("../judgments-scene").then(m => ({ default: m.JudgmentsScene })));
@@ -256,7 +259,7 @@ function LiveExperimentPage({ id }: { id: string }) {
         <CapabilityInspector key={id} id={id} />
         {record && exp.id !== "local-models" && <Provenance result={record.result ?? {}} />}
       </section>
-      <HeadlineStrip id={id} title={exp.title} />
+      {!STRIP_AFTER.has(id) && <HeadlineStrip id={id} title={exp.title} />}
       {error && <Notice error>{error}</Notice>}
       {record ? (
         <Suspense
@@ -280,6 +283,7 @@ function LiveExperimentPage({ id }: { id: string }) {
           <span className="loader" /> Opening the experiment…
         </div>
       )}
+      {STRIP_AFTER.has(id) && record && <HeadlineStrip id={id} title={exp.title} />}
       {record?.manifest && exp.id !== "local-models" && (
         <p className="record-footer">
           {/* Older records name their date prepared_at; say only what's there. */}
