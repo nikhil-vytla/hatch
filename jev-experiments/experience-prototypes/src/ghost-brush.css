@@ -3,3 +3,5 @@
 .gb-recorded{margin-top:15px;border-top:1px dashed var(--gb-line);padding-top:12px}.gb-recorded>span{display:block;font-size:12px;color:var(--muted);margin-bottom:8px}.gb-recorded>div{display:flex;gap:7px}.gb-recorded button{display:flex;gap:8px;align-items:center;border:0;padding:6px 9px;background:color-mix(in srgb,var(--gb-teal) 8%,transparent);color:var(--gb-teal);border-radius:4px;font-size:12px}.gb-recorded small{display:block;font-size:12px;line-height:1.6;color:var(--muted);margin-top:8px}
 
 .gb-prior-phrase{display:block;margin-top:6px;color:var(--ink)}
+.gb-recorded.gb-recorded-first{margin:0 0 15px;border-top:0;padding-top:0;border-bottom:1px dashed var(--gb-line);padding-bottom:12px}
+.gb-recorded button.gb-primary{background:var(--gb-teal);color:var(--on-accent);padding:8px 12px}
