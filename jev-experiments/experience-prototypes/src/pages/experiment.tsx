@@ -39,7 +39,6 @@ const RumourMill = lazy(() => import("../rumour-mill").then(m => ({ default: m.R
 const WinOver = lazy(() => import("../win-over").then(m => ({ default: m.WinOver })));
 const DrawingFraming = lazy(() => import("../outcome-framing").then(m => ({ default: m.DrawingFraming })));
 const ArcadeScene = lazy(() => import("../arcade-scene").then(m => ({ default: m.ArcadeScene })));
-const ModelRoutingLab = lazy(() => import("../../../roadmap/routing/ModelRoutingLab").then(m => ({ default: m.ModelRoutingLab })));
 
 const cache = new Map<string, any>();
 async function load(name: string) {
@@ -104,8 +103,6 @@ function View({
       return <RumourMill />;
     case "win-over":
       return <WinOver />;
-    case "routing":
-      return <ModelRoutingLab />;
     case "classify":
       return <IntentRecognition result={result} />;
     case "handoff":
@@ -206,7 +203,7 @@ function LiveExperimentPage({ id }: { id: string }) {
     setRecord(null);
     setError("");
     setAboutOpen(false);
-    if (id === "routing" || id === "decoy" || id === "rumour-mill" || id === "win-over" || id === "ocean" || id === "open-decisions") {
+    if (id === "decoy" || id === "rumour-mill" || id === "win-over" || id === "ocean" || id === "open-decisions") {
       setRecord({ result: {} });
       return () => {
         alive = false;

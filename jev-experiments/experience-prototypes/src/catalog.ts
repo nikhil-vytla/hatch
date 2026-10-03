@@ -83,14 +83,6 @@ export const experiments = [
     "Can we match preferences without inventing menu facts?",
   ),
   e(
-    "routing",
-    "routing",
-    "Model Routing Lab",
-    "Agents & tooling",
-    "Inspect a route, set your preferences, and delegate a bounded task.",
-    "Can task classification improve model selection under fixed permissions and spending limits?",
-  ),
-  e(
     "verify",
     "verify",
     "Agent verifier",
@@ -222,6 +214,13 @@ export type Retired = {
 };
 
 export const retired: Record<string, Retired> = {
+  routing: {
+    title: "Model Routing Lab",
+    reason: "Its sliders moved configured quality, price and latency values, not measured ones, so it could not show what routing on Jev's labels actually buys. The note keeps the recorded comparison.",
+    record: "routing",
+    retiredOn: "2 Oct 2026",
+    instead: { href: "#/notes/four-classifiers-one-route", label: "Four classifiers, one route" },
+  },
   crowd: {
     title: "The square at five",
     reason: "Twelve residents decided only when you posted a notice, and most kept their plans. Its free in-browser model now runs a town that judges everything you say.",

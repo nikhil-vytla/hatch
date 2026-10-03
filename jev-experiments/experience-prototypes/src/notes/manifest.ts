@@ -20,6 +20,11 @@ export const experimentNotes = [
     mode: "Recorded model run",
     date: "2026-09-22",
     scene: "crowd",
+    // Teaches a scene that has been retired; the page stays reachable, the listings drop it.
+    retired: {
+      on: "2 Oct 2026",
+      reason: "It explains The square at five, which was retired; Who can you win over? replaced it.",
+    },
   },
   {
     slug: "four-classifiers-one-route",
@@ -46,3 +51,8 @@ export const experimentNotes = [
 ] as const;
 
 export type Note = (typeof experimentNotes)[number];
+
+/** The notes to list: retired ones keep their pages but leave the indexes. */
+export const listedNotes = experimentNotes.filter((note) => !("retired" in note));
+
+export const noteRetirement = (note: Note) => ("retired" in note ? note.retired : null);
