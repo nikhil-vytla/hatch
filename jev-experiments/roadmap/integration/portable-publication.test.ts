@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { derivePortableRecord, digest } from "./portable-records";
 import { buildPortableIndex } from "./portable-index";
-import { preparePublicHarnessEvidence } from "../../capability-atlas-2026-09-22/publication-projection";
+import { preparePublicHarnessEvidence } from "./publication-projection";
 function fixture() {
  const root = mkdtempSync(join(tmpdir(), "retained-record-test-")), lab = join(root, "lab"), evidence = join(lab, "roadmap/integration/evidence"), folder = join(evidence, "codex");
  mkdirSync(folder, { recursive: true });

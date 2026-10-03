@@ -15,8 +15,7 @@ import { projectRewardBenchDocument, splitRewardBench } from "./benchmark-public
 import { enrichProvenance } from "./provenance";
 import { prepareJudgmentReliability } from "../../judgment-reliability/prepare";
 import { prepareLiveWorlds } from "../../live-worlds/prepare";
-import { preparePublicHarnessEvidence } from "../../capability-atlas-2026-09-22/publication-projection";
-import { prepareCapabilityAtlas } from "../../capability-atlas-2026-09-22/prepare-atlas";
+import { preparePublicHarnessEvidence } from "../../roadmap/integration/publication-projection";
 import { buildArena } from "../../packages/arena/src/data/build";
 import { buildDecide } from "../../packages/arena/src/decide/build";
 import { buildDecoy } from "../../packages/arena/prose/decoy-build";
@@ -30,7 +29,6 @@ const publication: Record<string, string> = JSON.parse(
 );
 mkdirSync(dest, { recursive: true });
 preparePublicHarnessEvidence(lab, resolve("public/routing-evidence"));
-prepareCapabilityAtlas(lab, resolve("public"));
 const hasSources = existsSync("results") || existsSync(resolve(lab, "results"));
 if (hasSources) {
   prepareLiveWorlds();

@@ -1,7 +1,6 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import { experiments, lookup, retiredScene, type Experiment } from "../catalog";
-import { CapabilityInspector } from "../../../capability-atlas-2026-09-22/capability-inspector";
 import { Pane, Notice } from "../shared";
 import { Provenance, SourceCredit } from "../provenance";
 import { HeadlineStrip } from "../headline-strip";
@@ -253,7 +252,6 @@ function LiveExperimentPage({ id }: { id: string }) {
       </header>
       <section id="experiment-background" className="scene-head-evidence" hidden={!aboutOpen} aria-label="About this experiment">
         {note && <p><a href={`#/notes/${note.slug}`}>Read the note: {note.title} →</a></p>}
-        <CapabilityInspector key={id} id={id} />
         {record && exp.id !== "local-models" && <Provenance result={record.result ?? {}} />}
       </section>
       {!STRIP_AFTER.has(id) && <HeadlineStrip id={id} title={exp.title} />}
