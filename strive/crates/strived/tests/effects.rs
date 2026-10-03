@@ -244,18 +244,18 @@ fn every_effect_is_journaled_with_its_payloads_in_the_content_store() {
     let mut w = Ws::new();
     w.run(json!({"kind": "write", "path": "a.txt", "content": "hello"}));
     let e = w.events();
-    let n = e.len();
-    assert_eq!(e[n - 2]["type"], "effectStarted");
-    assert_eq!(e[n - 2]["effect"], 1);
-    assert_eq!(e[n - 2]["callId"], "call_1");
+    let of = |kind: &str| e.iter().find(|x| x["type"] == kind).unwrap_or_else(|| panic!("no {kind}"));
+    let started = of("effectStarted");
+    assert_eq!((&started["effect"], &started["callId"]), (&json!(1), &json!("call_1")));
     assert_eq!(
-        e[n - 2]["record"],
+        started["record"],
         json!({"kind": "write", "path": "a.txt", "bytes": 5,
                "content": "sha256:2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"})
     );
-    assert_eq!(e[n - 1]["type"], "effectFinished");
-    assert_eq!(e[n - 1]["outcome"]["kind"], "done");
-    let out = w.c.ok("blob/get", &json!({"digest": e[n - 1]["outcome"]["output"]}));
+    assert_eq!(of("effectCleared")["effect"], 1);
+    let finished = of("effectFinished");
+    assert_eq!(finished["outcome"]["kind"], "done");
+    let out = w.c.ok("blob/get", &json!({"digest": finished["outcome"]["output"]}));
     assert_eq!(out["text"], "wrote a.txt (5 bytes)");
 }
 

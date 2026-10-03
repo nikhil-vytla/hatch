@@ -85,7 +85,7 @@ fn a_command_waits_for_an_attached_client_to_allow_it() {
     let r = pending.join().unwrap();
     assert_eq!(r["text"], "hi\n");
     let kinds: Vec<Value> = w.events().iter().skip(3).map(|e| e["type"].clone()).collect();
-    assert_eq!(kinds, vec!["effectStarted", "approvalRequested", "approvalDecided", "effectFinished"]);
+    assert_eq!(kinds, vec!["effectStarted", "approvalRequested", "approvalDecided", "effectCleared", "effectFinished"]);
     assert_eq!(w.events()[5], json!({"type": "approvalDecided", "effect": 1, "decision": "allow", "by": "test"}));
 }
 

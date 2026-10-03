@@ -749,6 +749,28 @@ Writes replace files atomically, each through its own temporary file.
 - an MCP call is cancelled at the server too;
 - one not yet running doesn't run.
 
+**After a crash** ([ADR-0030](adrs/0030-durability-lessons-from-pi-durable.md)):
+- **Journaled while running.** Each hook's answer is journaled as
+  `hookDecided`: the extension, its files' digest, and what it said. Once
+  the gate, the hooks and any person allow an effect, `effectCleared` is
+  journaled just before it runs.
+- **On reopening.** Recovery closes every effect a crash cut off as
+  `interrupted`.
+- **When the session's host next registers.** The daemon runs again each
+  effect the journal shows was cleared and is safe to repeat, and journals
+  how it ended as `effectRerun`. The host gives the agent that outcome, not
+  the interruption. The safe ones:
+  - a read;
+  - a write, since the same content again leaves the same file;
+  - an edit whose file shows whether it landed. If the old text is there
+    once and the new text isn't, it runs. If the new text is there, it
+    counts as done.
+- **On the recorded decisions.** A rerun asks nothing again and runs no
+  hook again. Its path is resolved and checked again, and a path that's
+  now refused stays interrupted.
+- **Never repeated:** commands, MCP calls, extensions and checks, which
+  may have done their work, or half of it.
+
 Shutdown refuses new effects and rewinds, cancels running effects, and
 waits for their ends to be journaled. Only then does it stop the session
 writers and release ownership. If work hasn't settled within 10s, the

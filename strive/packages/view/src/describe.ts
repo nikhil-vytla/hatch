@@ -183,6 +183,22 @@ export function describe(entry: Entry, options: DescribeOptions = {}): Line[] {
           return e.outcome satisfies never;
       }
 
+    case "effectRerun":
+      switch (e.outcome.kind) {
+        case "done":
+          return note("faint", "Run again after the daemon stopped: done.");
+        case "refused":
+          return note("danger", `Run again after the daemon stopped: refused: ${e.outcome.reason}`);
+        case "interrupted":
+          return note("danger", "Run again after the daemon stopped, and interrupted again.");
+        default:
+          return e.outcome satisfies never;
+      }
+
+    // What a hook said shows in the question it asked, or the refusal.
+    case "hookDecided":
+    case "effectCleared":
+      return [];
     case "approvalModeSet":
       return note("faint", `Approvals: ${MODE_NAMES[e.mode]}`);
     case "checkpointed":

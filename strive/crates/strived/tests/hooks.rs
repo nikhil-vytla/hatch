@@ -174,3 +174,36 @@ fn a_session_in_safe_mode_runs_no_hooks() {
     );
     assert_eq!(r["text"], "git push\n", "{r}");
 }
+
+#[test]
+fn each_hooks_answer_is_journaled_and_only_a_call_allowed_to_run_is_cleared() {
+    if !sandboxed() {
+        eprintln!("no usable sandbox on this machine");
+        return;
+    }
+    let w = Ws::new();
+    let _ = w.accepted(GUARD);
+    let fine = w.bash("c1", "echo fine")["effect"].as_u64().unwrap();
+    let pushed = w.bash("c2", "echo git push")["effect"].as_u64().unwrap();
+    let r = w.env.rpc().ok("session/read", &json!({"id": w.id}));
+    let events: Vec<Value> = r["entries"].as_array().unwrap().iter().map(|e| e["event"].clone()).collect();
+    let of = |kind: &str, effect: u64| {
+        events.iter().filter(|e| e["type"] == kind && e["effect"] == effect).cloned().collect::<Vec<_>>()
+    };
+
+    let said = of("hookDecided", fine);
+    assert_eq!(
+        (said.len(), &said[0]["extension"], &said[0]["answer"]),
+        (1, &json!("guard"), &json!("nothing")),
+        "{said:?}"
+    );
+    assert!(said[0]["digest"].as_str().unwrap().starts_with("sha256:"));
+    assert_eq!(of("effectCleared", fine).len(), 1);
+    // Journaled before it ran, so a crash in between shows it was running.
+    let at = |kind: &str| events.iter().position(|e| e["type"] == kind && e["effect"] == fine).unwrap();
+    assert!(at("hookDecided") < at("effectCleared") && at("effectCleared") < at("effectFinished"));
+
+    let refused = of("hookDecided", pushed);
+    assert_eq!((&refused[0]["answer"], &refused[0]["reason"]), (&json!("deny"), &json!("pushing leaves this machine")));
+    assert_eq!(of("effectCleared", pushed), Vec::<Value>::new(), "a refused call never ran");
+}

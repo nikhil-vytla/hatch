@@ -25,6 +25,7 @@ mod mcp;
 mod methods;
 mod paths;
 mod pinned;
+mod rerun;
 mod review;
 mod run;
 

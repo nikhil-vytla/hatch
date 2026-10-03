@@ -5,8 +5,8 @@ use std::process::ExitCode;
 use anyhow::{Result, anyhow};
 use strive_budget::format_usd;
 use strive_proto::{
-    ApprovalMode, CallOutcome, Decision, EffectOutcome, EffectRecord, Entry, Event, ProposalDecision, SessionInfo,
-    SessionList, SessionListParams, SessionRead, SessionReadResult, SessionRef, TurnEnd,
+    ApprovalMode, CallOutcome, Decision, EffectOutcome, EffectRecord, Entry, Event, HookAnswer, ProposalDecision,
+    SessionInfo, SessionList, SessionListParams, SessionRead, SessionReadResult, SessionRef, TurnEnd,
 };
 
 use crate::client::{Client, ServerError};
@@ -98,6 +98,22 @@ pub fn describe(e: &Entry) -> String {
             }
             EffectOutcome::Refused { reason } => format!("effect {effect} refused: {reason}"),
             EffectOutcome::Interrupted => format!("effect {effect} interrupted: the daemon stopped while it ran"),
+        },
+        Event::HookDecided { effect, extension, answer, reason, .. } => {
+            let said = match answer {
+                HookAnswer::Nothing => "let it be",
+                HookAnswer::Ask => "asked about it",
+                HookAnswer::Deny => "refused it",
+                HookAnswer::Failed => "failed",
+            };
+            let why = reason.as_deref().map(|r| format!(": {r}")).unwrap_or_default();
+            format!("{extension}'s hook {said} (effect {effect}){why}")
+        }
+        Event::EffectCleared { effect } => format!("effect {effect} allowed; running"),
+        Event::EffectRerun { effect, outcome, .. } => match outcome {
+            EffectOutcome::Done { .. } => format!("effect {effect} run again after a crash: done"),
+            EffectOutcome::Refused { reason } => format!("effect {effect} run again after a crash: refused: {reason}"),
+            EffectOutcome::Interrupted => format!("effect {effect} run again after a crash: interrupted"),
         },
         Event::ApprovalModeSet { mode } => format!("approvals: {}", mode_name(*mode)),
         Event::Checkpointed { checkpoint, .. } => format!("checkpoint {checkpoint}: files saved"),

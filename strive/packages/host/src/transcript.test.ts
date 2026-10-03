@@ -115,6 +115,25 @@ test("refused and interrupted effects are errors the model can read", async () =
   ]);
 });
 
+test("an effect run again after a crash gives its tool call that result, not the interruption", async () => {
+  const entries = [
+    assistant("", [{ id: "r", name: "read" }]),
+    effect(1, "r", "read"),
+    at({ type: "effectCleared", effect: 1 }),
+    at({ type: "effectFinished", effect: 1, outcome: { kind: "interrupted" }, durationMs: 0 }),
+    at({
+      type: "effectRerun",
+      effect: 1,
+      outcome: { kind: "done", output: "sha256:out1", truncated: false },
+      durationMs: 3,
+    }),
+  ];
+
+  const [, result] = await rebuild(entries, blob);
+
+  expect(result).toMatchObject({ toolCallId: "r", isError: false, content: [{ type: "text", text: "file text" }] });
+});
+
 test("a tool call that never ran still gets a result, so the transcript stays valid", async () => {
   const entries = [
     assistant("", [{ id: "x", name: "write" }]),

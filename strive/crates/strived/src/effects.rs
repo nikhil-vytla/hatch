@@ -539,6 +539,29 @@ fn edit(p: &Path, shown: &str, old: &str, new: &str) -> Result {
     }
 }
 
+/// An edit a crash cut off while it ran, done again only where the file
+/// shows whether it landed (ADR-0030). It is done again if its old text is
+/// there once and its new text isn't. It landed if its new text is there,
+/// and the old text isn't (unless the new text holds the old). `None` when
+/// the file doesn't say, and for an edit that deletes, whose landing leaves
+/// nothing to see.
+pub fn rerun_edit(target: &Target, shown: &str, old: &str, new: &str) -> Option<Result> {
+    let p = target.path.as_deref()?;
+    let (dir, name) = crate::pinned::parent(p, false).ok()?;
+    let (mut f, _) = dir.open_regular(&name).ok()?;
+    let mut text = String::new();
+    f.read_to_string(&mut text).ok()?;
+    if old.is_empty() || new.is_empty() {
+        return None;
+    }
+    let (olds, has_new) = (text.matches(old).count(), text.contains(new));
+    let landed = has_new && (olds == 0 || new.contains(old));
+    if landed {
+        return Some(Result::Done { text: format!("edited {shown}"), exit_code: None, truncated: false });
+    }
+    (olds == 1 && !has_new).then(|| edit(p, shown, old, new))
+}
+
 /// The user's own temp directory (`confstr(_CS_DARWIN_USER_TEMP_DIR)`),
 /// asked of `getconf` once, since the crate forbids `unsafe`.
 fn user_temp_dir() -> Option<PathBuf> {

@@ -154,7 +154,8 @@ export async function rebuild(
     if (e.type === "proposalMade" && e.callId !== undefined)
       results.set(e.callId, { ...proposalResult(seq, gates.get(seq)), ts: tsMs });
 
-    if (e.type === "effectFinished") {
+    // After a crash, a cut-off effect run again (ADR-0030): its outcome replaces "interrupted".
+    if (e.type === "effectFinished" || e.type === "effectRerun") {
       const started = records.get(e.effect);
 
       if (!started) continue;
