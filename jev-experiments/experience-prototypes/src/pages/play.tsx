@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { ArrowDown, ArrowUpRight, Search } from "lucide-react";
 import { experiments, categories, lookup } from "../catalog";
-import { experimentNotes } from "../notes/manifest";
+import { listedNotes } from "../notes/manifest";
 import { MiniExperimentPreview } from "../live-world-preview";
 import { starterScore } from "../../../music-arranger-v2/engine";
 import { FoolJev } from "../fool-jev";
@@ -146,7 +146,7 @@ export function PlayPage() {
           <a href="#/notes">All notes <ArrowUpRight size={15} /></a>
         </div>
         <ol>
-          {experimentNotes.map((note) => (
+          {listedNotes.map((note) => (
             <li key={note.slug}>
               <span className="play-note-number" aria-hidden="true">{note.number}</span>
               <a href={`#/notes/${note.slug}`}>

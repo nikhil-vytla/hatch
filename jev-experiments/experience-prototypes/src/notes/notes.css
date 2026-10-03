@@ -851,3 +851,11 @@
     scroll-behavior: auto !important;
   }
 }
+.note-retired {
+  margin: 12px 0;
+  padding: 12px 16px;
+  border: 2px solid var(--outline);
+  border-radius: var(--radius);
+  background: var(--soft);
+  font-weight: 700;
+}

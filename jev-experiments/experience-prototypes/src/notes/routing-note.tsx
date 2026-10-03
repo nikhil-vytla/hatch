@@ -170,10 +170,11 @@ export function RoutingNote() {
           lower configured price supports a savings claim.
         </p>
         <p>
-          <a href="#experiment/routing">Open Model Routing Lab</a> to follow a
-          full recorded task, inspect eligibility and change the selection
-          preferences. A preference is allowed to trade off. A permission or
-          spending limit is not.
+          The Model Routing Lab scene that let you change these preferences has
+          been retired: its sliders moved configured, not measured, values.{" "}
+          <a href="#experiment/routing">Why, and its recorded run →</a> The
+          principle stands: a preference is allowed to trade off; a permission
+          or spending limit is not.
         </p>
       </div>
       <aside className="note-references">
