@@ -18,6 +18,7 @@ still hold.
 | [0027](0027-code-extensions.md) | Code extensions: tools the agent writes, run in the command sandbox, accepted by a person | Accepted, built |
 | [0028](0028-hooks.md) | Hooks: an accepted extension's code before each tool call, which may only ask or refuse | Accepted, built |
 | [0029](0029-acp-server.md) | `strive acp`: editors drive a strive session over the Agent Client Protocol | Accepted, built |
+| [0031](0031-vendor-engines.md) | Vendor engines: Claude Code and Codex run a session's turns, gated by the daemon, model calls through its gateway | Proposed |
 | [0030](0030-durability-lessons-from-pi-durable.md) | Four durability changes learned from pi-durable: safe reruns, cut-off replies kept, hook answers recorded, idempotent prompts and forks | Accepted; all but 2.3 built |
 | [0019](0019-predictions-checked.md) | Predictions are checked by a watch the daemon evaluates | Superseded (deleted 2026-09-28) |
 | [0018](0018-replay-gate.md) | The replay gate runs past tasks again in scratch copies | Superseded (deleted 2026-09-28) |
