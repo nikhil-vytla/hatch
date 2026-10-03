@@ -219,6 +219,26 @@ test("the window's own fonts load under its CSP", async () => {
   assert.match(family, /^"?Geist"?,/);
 });
 
+test("a fork opens with its parent's conversation up to where it forked, and says so", async () => {
+  const cwd = realpathSync(mkdtempSync(join(tmpdir(), "strv-desk-fork-")));
+  const rpc = await Rpc.open();
+  const created = await rpc.call("session/create", { cwd });
+  const id = JSON.parse(JSON.stringify(created.result)).id;
+
+  await rpc.call("session/prompt", { id, text: "the first task" });
+  const second = await rpc.call("session/prompt", { id, text: "the second task" });
+  const at = JSON.parse(JSON.stringify(second.result)).seq - 1;
+  const fork = await rpc.call("session/fork", { id, at });
+  const forkId = JSON.parse(JSON.stringify(fork.result)).id;
+  const userData = mkdtempSync(join(tmpdir(), "strv-desk-data-"));
+  const app = await launch([`--user-data-dir=${userData}`, "--cwd", cwd, "--resume", forkId]);
+  const page = await app.firstWindow();
+
+  await page.getByText(`Forked from session ${id}`).waitFor();
+  await page.locator(".msg.user", { hasText: "the first task" }).waitFor();
+  assert.equal(await page.locator(".msg.user", { hasText: "the second task" }).count(), 0);
+});
+
 test("a new session starts from the sidebar, and the old one is a click away", async () => {
   const { page } = await openApp();
   await page.getByPlaceholder("Ask strive to do anything…").fill("the first task");

@@ -24,6 +24,7 @@ import {
   type StriveClient,
 } from "@strive/protocol";
 import {
+  ancestry,
   describe as describeLines,
   formatUsd,
   type Line,
@@ -32,7 +33,6 @@ import {
   Spend,
   sessionAllowance,
 } from "@strive/view";
-import { ancestry } from "@strive/host/transcript";
 import { editorTheme, style } from "./theme";
 
 export { formatUsd, MODE_NAMES };

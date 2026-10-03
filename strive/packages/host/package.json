@@ -5,6 +5,7 @@
   "type": "module",
   "dependencies": {
     "@strive/protocol": "workspace:*",
+    "@strive/view": "workspace:*",
     "@earendil-works/pi-ai": "1.0.0",
     "@earendil-works/pi-agent-core": "1.0.0",
     "valibot": "1.5.0"
@@ -13,7 +14,6 @@
     "@strive/testkit": "workspace:*"
   },
   "exports": {
-    "./main": "./src/main.ts",
-    "./transcript": "./src/transcript.ts"
+    "./main": "./src/main.ts"
   }
 }

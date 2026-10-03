@@ -3,6 +3,7 @@
 // closes this one, so the session left behind no longer counts the window
 // as a person who can answer its approvals.
 import { type Digest, type Entry, type Event, StriveClient } from "@strive/protocol";
+import { ancestry } from "@strive/view";
 import type { Opened, StriveEvent } from "../shared/bridge";
 
 export class Connection {
@@ -39,9 +40,12 @@ export class Connection {
     client.on("session/interrupt", (params) => deliver({ method: "session/interrupt", params }));
 
     const { session, entries } = await client.request("session/attach", { id });
-    conn = new Connection(client, id, { init, session, entries, home, platform: process.platform });
+    const read = async (sid: string) => (await client.request("session/read", { id: sid })).entries;
+    const earlier = await ancestry(entries, read);
 
-    for (const entry of entries) conn.note(entry.event);
+    conn = new Connection(client, id, { init, session, entries, earlier, home, platform: process.platform });
+
+    for (const entry of [...earlier.flatMap((part) => part.entries), ...entries]) conn.note(entry.event);
 
     // Entries notified while the attach was on its way belong to the snapshot too.
     for (const event of held) conn.deliver(event);

@@ -15,11 +15,11 @@ import {
   type StriveClient,
   type TurnEnd,
 } from "@strive/protocol";
+import { ancestry } from "@strive/view";
 import { createStriveModels, model, textOf } from "./gateway";
 import { learnerMode } from "./learner";
 import { PromptReader } from "./learning-records";
 import {
-  ancestry,
   type CheckRun,
   checkCallId,
   checkReport,
