@@ -53,6 +53,34 @@ export function agreement(questions: Question[], key: Key, model: string) {
   return questions.length ? same / questions.length : 0;
 }
 
+export type Interval = { estimate: number; low: number; high: number; clusters: number };
+
+/**
+ * Agreement with a 95% interval that treats each case as a cluster: the questions in one case share
+ * their facts, so they aren't independent. Cluster-robust variance of the ratio estimator.
+ */
+export function clusteredAgreement(cases: Question[][], key: Key, model: string): Interval {
+  const counts = cases.map((qs) => {
+    const answers = keyAnswers(qs, key, model);
+
+    const k = qs.filter((q, i) => q.predictions[model] && topIndex(q.predictions[model]) === answers[i]).length;
+
+    return { k, n: qs.length };
+  });
+
+  const n = counts.reduce((s, c) => s + c.n, 0);
+
+  const estimate = n ? counts.reduce((s, c) => s + c.k, 0) / n : 0;
+
+  const c = counts.length;
+
+  const spread = counts.reduce((s, x) => s + (x.k - estimate * x.n) ** 2, 0);
+
+  const half = c > 1 && n ? 1.96 * Math.sqrt((c / (c - 1)) * spread) / n : 0;
+
+  return { estimate, low: Math.max(0, estimate - half), high: Math.min(1, estimate + half), clusters: c };
+}
+
 export type Ranked = { model: string; agreement: number; rank: number };
 
 /** Models ranked by agreement with the key; a model is never graded against its own answers. */

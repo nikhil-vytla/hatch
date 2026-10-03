@@ -190,6 +190,12 @@ export function buildOpenDecisions(root: string, app: string, outDir: string) {
       })
     : [];
 
+  // When the open models were asked, from the rows' own timestamps, for the page's citation.
+  const asked = ["typed", "intent", "fool"]
+    .flatMap((kind) => OPEN_MODELS.flatMap((m) => rows(rec(`open-decisions.${kind}.${m.id}.jsonl`))))
+    .flatMap((r) => (r.at ? [String(r.at)] : []))
+    .sort();
+
   mkdirSync(outDir, { recursive: true });
   writeFileSync(
     join(outDir, "open-decisions.json"),
@@ -203,6 +209,7 @@ export function buildOpenDecisions(root: string, app: string, outDir: string) {
       oneBox,
       latency: { open: latency, jevBatch14Ms: median(jevBox), jevBatch14P95: p95(jevBox), jevN: jevBox.length },
       meta,
+      recorded: asked.length ? { first: asked[0], last: asked[asked.length - 1] } : null,
     }) + "\n",
   );
 

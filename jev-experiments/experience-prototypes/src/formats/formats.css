@@ -162,9 +162,13 @@
 
 /* Report */
 .fmt-report {
-  max-width: 960px;
-  margin: 0 auto;
   padding: 8px 0 48px;
+}
+/* Prose keeps a reading width; a scene in the results keeps the page's full width. */
+.fmt-report > section:not(.fmt-results),
+.fmt-report > .fmt-cite,
+.fmt-results > .fmt-table-wrap {
+  max-width: 960px;
 }
 .fmt-abstract {
   padding: 16px 20px;

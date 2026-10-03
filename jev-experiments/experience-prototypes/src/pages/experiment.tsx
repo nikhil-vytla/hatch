@@ -8,6 +8,7 @@ import { experimentNotes } from "../notes/manifest";
 import { RecordDate } from "../receipt";
 import { EvidenceDrawer } from "../formats/evidence-drawer";
 import { GAME_PAGES, gameEvidence } from "../formats/game-evidence";
+import { REPORT_PAGES } from "../formats/report-pages";
 import "./experiment.css";
 
 /** Game pages: the headline result comes after the game, so play starts first. Benchmark pages lead with it. */
@@ -26,7 +27,8 @@ const ProseArticle = lazy(() => import("../formats/prose-article").then(m => ({ 
 const ScreenSentry = lazy(() => import("../screen-sentry").then(m => ({ default: m.ScreenSentry })));
 const OpenDecisions = lazy(() => import("../open-decisions").then(m => ({ default: m.OpenDecisions })));
 const OceanReef = lazy(() => import("../ocean-reef").then(m => ({ default: m.OceanReef })));
-const AnswerKey = lazy(() => import("../answer-key").then(m => ({ default: m.AnswerKey })));
+const AnswerKeyReport = lazy(() => import("../formats/reports").then(m => ({ default: m.AnswerKeyReport })));
+const BenchmarkReport = lazy(() => import("../formats/reports").then(m => ({ default: m.BenchmarkReport })));
 const RewardBench = lazy(() => import("../rewardbench").then(m => ({ default: m.RewardBench })));
 const LocalModels = lazy(() => import("../local-models").then(m => ({ default: m.LocalModels })));
 const AgentExperiment = lazy(() => import("../agent-experiments").then(m => ({ default: m.AgentExperiment })));
@@ -69,9 +71,13 @@ function View({
     case "snake":
       return <ArcadeScene result={result} />;
     case "local-models":
-      return <LocalModels result={result} />;
+      return (
+        <BenchmarkReport id="local-models" result={result}>
+          <LocalModels result={result} />
+        </BenchmarkReport>
+      );
     case "answer-key":
-      return <AnswerKey result={result} />;
+      return <AnswerKeyReport result={result} />;
     case "paste":
       return <Paste record={result} />;
     case "semantic-table":
@@ -90,7 +96,11 @@ function View({
     case "beverage":
       return <Beverage result={result} />;
     case "judge":
-      return <JudgeBench result={result} />;
+      return (
+        <BenchmarkReport id="judge" result={result}>
+          <JudgeBench result={result} />
+        </BenchmarkReport>
+      );
     case "tetris":
       return <TetrisExperience result={result} />;
     case "drawing-framing":
@@ -110,7 +120,11 @@ function View({
     case "who-said-that":
       return <WhoSaidThat />;
     case "classify":
-      return <IntentRecognition result={result} />;
+      return (
+        <BenchmarkReport id="classify" result={result}>
+          <IntentRecognition result={result} />
+        </BenchmarkReport>
+      );
     case "handoff":
       return <Handoff result={result} />;
     case "ocean":
@@ -122,9 +136,17 @@ function View({
     case "screen-sentry":
       return <ScreenSentry />;
     case "open-decisions":
-      return <OpenDecisions />;
+      return (
+        <BenchmarkReport id="open-decisions" result={result}>
+          <OpenDecisions />
+        </BenchmarkReport>
+      );
     case "rewardbench2":
-      return <RewardBench result={result} />;
+      return (
+        <BenchmarkReport id="rewardbench2" result={result}>
+          <RewardBench result={result} />
+        </BenchmarkReport>
+      );
       return <Learning id={exp.id} result={result} />;
     case "verify":
     case "search":
@@ -315,7 +337,8 @@ function LiveExperimentPage({ id }: { id: string }) {
         </div>
       )}
       {STRIP_AFTER.has(id) && record && <HeadlineStrip id={id} title={exp.title} />}
-      {record?.manifest && exp.id !== "local-models" && (
+      {/* Report pages give their data and date in their own Data and Cite sections. */}
+      {record?.manifest && !REPORT_PAGES.has(id) && (
         <p className="record-footer">
           {/* Older records name their date prepared_at; say only what's there. */}
           {(() => {
