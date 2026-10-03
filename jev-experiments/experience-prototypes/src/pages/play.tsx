@@ -89,6 +89,7 @@ export function PlayPage() {
         {home && <section className="home-findings" aria-labelledby="findings-heading">
           <div className="home-findings-head">
             <h2 id="findings-heading">What 2,626 questions found</h2>
+            <a href="#experiment/prose">Read the study</a>
             <ShareCardButton id="home" title="Fool Jev" share={home.share} />
           </div>
           <ol>
