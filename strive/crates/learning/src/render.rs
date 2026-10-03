@@ -7,7 +7,7 @@
 
 use std::collections::HashMap;
 
-use strive_proto::{Decision, Digest, EffectOutcome, EffectRecord, Entry, Event, TurnEnd};
+use strive_proto::{Decision, Digest, EffectOutcome, EffectRecord, Entry, Event, HookAnswer, TurnEnd};
 
 /// How much of one prompt, reply or output a block holds, in characters.
 const PROMPT: usize = 3000;
@@ -103,6 +103,25 @@ fn block(entry: &Entry, starts: &HashMap<u64, (u64, &EffectRecord)>, blob: Blob)
             let of = start.map_or_else(|| format!("effect {effect}"), |(seq, _)| format!("#{seq}"));
             format!("{at} result of {of}: {}", outcome_text(start.map(|(_, r)| *r), outcome, blob))
         }
+        Event::EffectRerun { effect, outcome, .. } => {
+            let start = starts.get(effect);
+            let of = start.map_or_else(|| format!("effect {effect}"), |(seq, _)| format!("#{seq}"));
+            format!(
+                "{at} a crash cut off {of}; strive ran it again: {}",
+                outcome_text(start.map(|(_, r)| *r), outcome, blob)
+            )
+        }
+        Event::HookDecided { extension, answer, reason, .. } => {
+            let said = match answer {
+                // A hook that let the call be tells a reader nothing.
+                HookAnswer::Nothing => return String::new(),
+                HookAnswer::Ask => "asked a person about it",
+                HookAnswer::Deny => "refused it",
+                HookAnswer::Failed => "failed",
+            };
+            let why = reason.as_deref().map(|r| format!(": {}", cut(r, REPLY))).unwrap_or_default();
+            format!("{at} {extension}'s hook {said}{why}")
+        }
         Event::ApprovalRequested { description, .. } => format!("{at} asked for approval: {description}"),
         Event::ApprovalDecided { decision, by, .. } => {
             let d = match decision {
@@ -128,7 +147,8 @@ fn block(entry: &Entry, starts: &HashMap<u64, (u64, &EffectRecord)>, blob: Blob)
             let skills = if skills.is_empty() { "none".to_string() } else { skills.join(", ") };
             format!("{at} loaded {files}; skills: {skills}")
         }
-        Event::SessionStarted { .. }
+        Event::EffectCleared { .. }
+        | Event::SessionStarted { .. }
         | Event::Recovered { .. }
         | Event::BudgetSet { .. }
         | Event::ModelCallStarted { .. }

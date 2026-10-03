@@ -397,6 +397,9 @@ impl Ledger {
                 | Event::Recovered { .. }
                 | Event::EffectStarted { .. }
                 | Event::EffectFinished { .. }
+                | Event::HookDecided { .. }
+                | Event::EffectCleared { .. }
+                | Event::EffectRerun { .. }
                 | Event::ApprovalModeSet { .. }
                 | Event::ApprovalRequested { .. }
                 | Event::ApprovalDecided { .. }

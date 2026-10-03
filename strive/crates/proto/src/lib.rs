@@ -1274,6 +1274,31 @@ pub enum Event {
         outcome: EffectOutcome,
         duration_ms: u64,
     },
+    /// A hook (ADR-0028) answered about effect `effect`: the extension
+    /// whose hook it was, the digest of that extension's files, and what it
+    /// said (ADR-0030).
+    HookDecided {
+        effect: u64,
+        extension: String,
+        digest: Digest,
+        answer: HookAnswer,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[ts(optional)]
+        reason: Option<String>,
+    },
+    /// The gate, the hooks and any person allowed effect `effect`, and it
+    /// runs next: one a crash cuts off after this was cut off while
+    /// running (ADR-0030).
+    EffectCleared {
+        effect: u64,
+    },
+    /// A crash cut off effect `effect` while it ran, and the daemon ran it
+    /// again, as one safe to repeat (ADR-0030): how it ended this time.
+    EffectRerun {
+        effect: u64,
+        outcome: EffectOutcome,
+        duration_ms: u64,
+    },
     /// What the agent may do without asking, from here on.
     ApprovalModeSet {
         mode: ApprovalMode,
@@ -1820,6 +1845,19 @@ pub enum EffectRecord {
         #[serde(default)]
         note: String,
     },
+}
+
+/// What a hook said about an effect (ADR-0028).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub enum HookAnswer {
+    /// It let the gate's decision stand.
+    Nothing,
+    Ask,
+    Deny,
+    /// It crashed, ran out of time or answered something else, which counts as `ask`.
+    Failed,
 }
 
 /// How an effect ended. `output` is what the agent is shown.

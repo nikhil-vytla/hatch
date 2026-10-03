@@ -9,6 +9,7 @@ import type { Digest } from "./Digest";
 import type { EffectOutcome } from "./EffectOutcome";
 import type { EffectRecord } from "./EffectRecord";
 import type { Gate } from "./Gate";
+import type { HookAnswer } from "./HookAnswer";
 import type { LearnSignal } from "./LearnSignal";
 import type { LearnTrigger } from "./LearnTrigger";
 import type { McpStatus } from "./McpStatus";
@@ -63,7 +64,7 @@ effect: number,
 /**
  * The model's tool call this effect serves.
  */
-callId: string, record: EffectRecord, } | { "type": "effectFinished", effect: number, outcome: EffectOutcome, durationMs: number, } | { "type": "approvalModeSet", mode: ApprovalMode, } | { "type": "approvalRequested", effect: number, description: string, 
+callId: string, record: EffectRecord, } | { "type": "effectFinished", effect: number, outcome: EffectOutcome, durationMs: number, } | { "type": "hookDecided", effect: number, extension: string, digest: Digest, answer: HookAnswer, reason?: string, } | { "type": "effectCleared", effect: number, } | { "type": "effectRerun", effect: number, outcome: EffectOutcome, durationMs: number, } | { "type": "approvalModeSet", mode: ApprovalMode, } | { "type": "approvalRequested", effect: number, description: string, 
 /**
  * The instruction file (or file one imports) the effect changes,
  * where allowing for the session allows later changes to this

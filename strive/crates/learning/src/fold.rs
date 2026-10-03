@@ -124,6 +124,9 @@ pub fn fold(entries: &[Entry]) -> Vec<Folded> {
             | Event::ModelCallFinished { .. }
             | Event::EffectStarted { .. }
             | Event::EffectFinished { .. }
+            | Event::HookDecided { .. }
+            | Event::EffectCleared { .. }
+            | Event::EffectRerun { .. }
             | Event::ApprovalModeSet { .. }
             | Event::ApprovalRequested { .. }
             | Event::ApprovalDecided { .. }

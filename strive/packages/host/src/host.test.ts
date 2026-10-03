@@ -101,6 +101,7 @@ test("a prompt runs a turn in which the model writes a file and answers", async 
     "modelCallFinished",
     "assistantMessage",
     "effectStarted",
+    "effectCleared",
     "effectFinished",
     "modelCallStarted",
     "modelCallFinished",

@@ -113,6 +113,24 @@ async function block(entry: Entry, effects: Map<number, Effect>, ran: Set<string
       return `${at} result of ${of}: ${outcomeText(effect?.record, e.outcome, output)}`;
     }
 
+    case "effectRerun": {
+      const effect = effects.get(e.effect);
+      const output = e.outcome.kind === "done" ? await blob(e.outcome.output) : "";
+      const of = effect === undefined ? `effect ${e.effect}` : `#${effect.start.seq}`;
+
+      return `${at} a crash cut off ${of}; strive ran it again: ${outcomeText(effect?.record, e.outcome, output)}`;
+    }
+
+    case "hookDecided": {
+      // A hook that let the call be tells a reader nothing.
+      if (e.answer === "nothing") return "";
+      const said = { ask: "asked a person about it", deny: "refused it", failed: "failed" }[e.answer];
+
+      return `${at} ${e.extension}'s hook ${said}${e.reason ? `: ${cut(e.reason, LIMITS.reply)}` : ""}`;
+    }
+
+    case "effectCleared":
+      return "";
     case "approvalRequested":
       return `${at} asked for approval: ${e.description}`;
     case "approvalDecided":

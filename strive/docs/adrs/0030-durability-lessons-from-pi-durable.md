@@ -1,6 +1,6 @@
 # ADR-0030: Four durability changes, learned from pi-durable
 
-Status: proposed (2026-10-02). Nothing here is built yet.
+Status: accepted (2026-10-02). Changes 1 and 3 are built; 2 and 4 aren't yet.
 
 ## Context
 
@@ -49,8 +49,22 @@ do, so the policy lives in the daemon, per kind:
   interrupted, as now;
 - `bash`, `mcp`, `extension` and any check are **unsafe**, as now.
 
-On resume, the daemon reruns a safe effect, journaled as a new attempt of
-the same effect with its own outcome, and closes the rest as now. MCP
+**Built.** It runs again only an effect the journal shows was cleared:
+`effectCleared` is journaled just before an effect runs, once the gate,
+the hooks and any person have allowed it. So a crash caught while asking
+a person never leads to a run no one approved.
+
+Recovery still closes every cut-off effect as `interrupted`, because that
+was true when the daemon reopened. Then, when the session's host next
+registers (before it reads the journal), the daemon runs the safe ones
+again and journals each outcome as `effectRerun`. The host gives the agent
+that outcome in place of the interruption.
+
+A rerun resolves and checks its path again, and a path that's now refused
+stays interrupted. An edit is judged landed by its new text being there
+(alone, or with the old text where the new text holds the old one), and
+runs again only if the old text is there once and the new isn't. An edit
+that deletes stays interrupted, since its landing leaves nothing to see. MCP
 tools could later opt in through MCP's `idempotentHint` annotation, which
 strive's client doesn't read today. That would only apply to a server
 whose annotations a person trusts in settings, since a server's
@@ -111,10 +125,11 @@ nothing needs a memo yet. But change 1 makes reruns real. A safe effect
 rerun after a crash would run its hooks again, and the hook's code may
 have changed since.
 
-**Proposal.** A new journal event, `hookDecided {effect, extension,
+**Built.** It is a new journal event, `hookDecided {effect, extension,
 digest, answer, reason}`. The daemon journals it for every hook that sees
-an effect, including "nothing". When an effect reruns (change 1), the
-daemon uses the recorded answers rather than running the hooks again. A
+an effect, including "nothing". When an effect reruns (change 1), no hook
+runs again: the `effectCleared` that a rerun requires was journaled only
+after every hook had answered. A
 rerun is the same decision about the same call. A replay of the session
 (the replay gate, if it returns) can check the recorded answers against
 the hook's code at that digest. This settles ADR-0028's open item.

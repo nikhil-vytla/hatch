@@ -364,6 +364,9 @@ fn host_may_record(event: &Event, kind: SessionKind) -> bool {
         | Event::ModelCallFinished { .. }
         | Event::EffectStarted { .. }
         | Event::EffectFinished { .. }
+        | Event::HookDecided { .. }
+        | Event::EffectCleared { .. }
+        | Event::EffectRerun { .. }
         | Event::ApprovalModeSet { .. }
         | Event::ApprovalRequested { .. }
         | Event::ApprovalDecided { .. }
@@ -546,6 +549,12 @@ async fn route_host(state: &Arc<State>, conn: &Arc<Conn>, method: &str, params: 
             let SessionRef { id } = parse::<HostRegister>(params)?;
             let sid = session_id(&id)?;
             let claimed = claim_host(state, conn, &sid)?;
+            // Before the host reads the journal, so it sees how they ended.
+            match crate::rerun::after_crash(state, &sid).await {
+                Ok(0) => {}
+                Ok(n) => crate::log!("ran {n} effect(s) of session {} again after a crash", sid.as_str()),
+                Err(e) => crate::log!("could not run session {}'s cut-off effects again: {}", sid.as_str(), e.message),
+            }
             let config = host_config(state, &sid).await;
             if config.is_err() && claimed {
                 release_host(state, conn);
@@ -1001,6 +1010,43 @@ struct Accepting {
     allowance: std::path::PathBuf,
 }
 
+/// A file a read or change touches, for the rules it brings (ADR-0025): it,
+/// the workspace and strive's home.
+fn ruled(
+    request: &EffectRequest,
+    target: &crate::effects::Target,
+    scope: &crate::effects::Scope,
+) -> Option<(std::path::PathBuf, std::path::PathBuf, std::path::PathBuf)> {
+    match (request, target.path()) {
+        (EffectRequest::Read { .. } | EffectRequest::Write { .. } | EffectRequest::Edit { .. }, Some(p)) => {
+            Some((p.to_path_buf(), scope.workspace.clone(), scope.strive_home.clone()))
+        }
+        _ => None,
+    }
+}
+
+/// Appends `events` to the session's journal, if there are any.
+async fn journal(state: &State, sid: &SessionId, events: Vec<Event>) -> Result<(), RpcError> {
+    if !events.is_empty() {
+        state.sessions.append(sid, events).await.map_err(session_error)?;
+    }
+    Ok(())
+}
+
+/// The hooks' answers about `effect`, as the journal records them.
+fn hook_events(effect: u64, decided: Vec<crate::hooks::Decided>) -> Vec<Event> {
+    decided
+        .into_iter()
+        .map(|d| Event::HookDecided {
+            effect,
+            extension: d.extension,
+            digest: d.digest,
+            answer: d.answer,
+            reason: d.reason,
+        })
+        .collect()
+}
+
 /// Gates, performs and journals one effect the session has started.
 async fn run_effect(
     state: &Arc<State>,
@@ -1025,7 +1071,9 @@ async fn run_effect(
             }
             _ => crate::effects::gate(&scope, &request, mode, &allowed),
         };
-        let (gate, hooked) = crate::hooks::stricter(state, info, &scope, &asked, &allowed, gate).await;
+        let crate::hooks::Hooked { gate, changed: hooked, decided } =
+            crate::hooks::stricter(state, info, &scope, &asked, &allowed, gate).await;
+        journal(state, &sid, hook_events(effect, decided)).await?;
         let refusal = match gate {
             crate::effects::Gate::Allow => None,
             crate::effects::Gate::Deny(why) => Some(why),
@@ -1060,16 +1108,12 @@ async fn run_effect(
                 }
             }
         };
-        // A file a read or change touches, for the rules it brings (ADR-0025).
-        let ruled = match (&request, target.path()) {
-            (EffectRequest::Read { .. } | EffectRequest::Write { .. } | EffectRequest::Edit { .. }, Some(p)) => {
-                Some((p.to_path_buf(), scope.workspace.clone(), scope.strive_home.clone()))
-            }
-            _ => None,
-        };
+        let ruled = ruled(&request, &target, &scope);
         let result = if let Some(why) = refusal {
             crate::effects::Result::Refused(why)
         } else {
+            // Before it runs: a crash from here on cut it off while running (ADR-0030).
+            journal(state, &sid, vec![Event::EffectCleared { effect }]).await?;
             // Held while the effect runs, so no rewind of its directory races
             // it; a destination outside the workspace is held too.
             let mut paths = vec![scope.workspace.clone()];

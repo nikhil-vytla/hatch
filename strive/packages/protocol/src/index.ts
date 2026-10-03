@@ -40,6 +40,8 @@ export type * from "./generated/EffectCancelParams";
 
 export type * from "./generated/EffectOutcome";
 
+export type * from "./generated/HookAnswer";
+
 export type * from "./generated/EffectRecord";
 
 export type * from "./generated/EffectRequest";

@@ -6,7 +6,7 @@ use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 
 use serde_json::Value;
-use strive_proto::EffectRequest;
+use strive_proto::{EffectRequest, HookAnswer};
 
 use crate::effects::{Gate, Scope};
 use crate::server::State;
@@ -83,10 +83,27 @@ enum Said {
     Deny(String),
 }
 
+/// What one hook answered, for the journal (ADR-0030).
+pub struct Decided {
+    pub extension: String,
+    pub digest: strive_proto::Digest,
+    pub answer: HookAnswer,
+    pub reason: Option<String>,
+}
+
+/// The gate once the hooks have had their say.
+pub struct Hooked {
+    pub gate: Gate,
+    /// A hook made it stricter.
+    pub changed: bool,
+    /// Every hook that ran, in order, and what it answered.
+    pub decided: Vec<Decided>,
+}
+
 /// `gate` for `request` (as the host asked for it), made stricter by the
 /// project's accepted hooks: a refusal if one denies it, a question if one
-/// asks or fails. Never less strict than `gate`. Whether a hook changed it
-/// comes with it. A session in safe mode runs none.
+/// asks or fails. Never less strict than `gate`. A session in safe mode
+/// runs none.
 pub async fn stricter(
     state: &State,
     session: &strive_proto::SessionInfo,
@@ -94,16 +111,18 @@ pub async fn stricter(
     request: &EffectRequest,
     allowed: &[PathBuf],
     gate: Gate,
-) -> (Gate, bool) {
+) -> Hooked {
+    let unchanged = |gate| Hooked { gate, changed: false, decided: Vec::new() };
     if session.safe || matches!(gate, Gate::Deny(_)) {
-        return (gate, false);
+        return unchanged(gate);
     }
     let kind = kind(request);
     let ws = scope.workspace.clone();
     let Ok(extensions) = tokio::task::spawn_blocking(move || crate::context::extensions(&ws, &mut Vec::new())).await
     else {
-        return (gate, false);
+        return unchanged(gate);
     };
+    let mut decided = Vec::new();
     let mut asks = Vec::new();
     for e in extensions.iter().filter(|e| e.hooks.iter().any(|h| h.sees(kind))) {
         let name = e.info.name.clone();
@@ -114,24 +133,37 @@ pub async fn stricter(
             continue;
         }
         let Some(shown) = call(request) else {
-            asks.push(format!("the call is too large for {name}'s hook to see"));
+            let why = format!("the call is too large for {name}'s hook to see");
+            decided.push(Decided { extension: name, digest, answer: HookAnswer::Ask, reason: Some(why.clone()) });
+            asks.push(why);
             continue;
         };
         let dir = scope.workspace.join(strive_learning::EXTENSIONS_DIR).join(&name);
         let scope = scope.clone();
         let answered =
             tokio::task::spawn_blocking(move || run(&scope, &dir, &shown)).await.unwrap_or_else(|e| Err(e.to_string()));
-        match answered {
-            Ok(Said::Nothing) => {}
-            Ok(Said::Ask(why)) => asks.push(format!("{name}'s hook asks: {why}")),
-            Ok(Said::Deny(why)) => return (Gate::Deny(format!("{name}'s hook refused this: {why}")), true),
+        let (answer, reason) = match answered {
+            Ok(Said::Nothing) => (HookAnswer::Nothing, None),
+            Ok(Said::Ask(why)) => {
+                asks.push(format!("{name}'s hook asks: {why}"));
+                (HookAnswer::Ask, Some(why))
+            }
+            Ok(Said::Deny(why)) => {
+                let gate = Gate::Deny(format!("{name}'s hook refused this: {why}"));
+                decided.push(Decided { extension: name, digest, answer: HookAnswer::Deny, reason: Some(why) });
+                return Hooked { gate, changed: true, decided };
+            }
             // Every time: leaving out a hook that keeps failing would let
             // through what it might refuse, and the agent can make it fail.
-            Err(why) => asks.push(format!("{name}'s hook failed: {why}; rolling {name} back stops it")),
-        }
+            Err(why) => {
+                asks.push(format!("{name}'s hook failed: {why}; rolling {name} back stops it"));
+                (HookAnswer::Failed, Some(why))
+            }
+        };
+        decided.push(Decided { extension: name, digest, answer, reason });
     }
     if asks.is_empty() {
-        return (gate, false);
+        return Hooked { gate, changed: false, decided };
     }
     let because = asks.join("; ");
     let gate = match gate {
@@ -139,7 +171,7 @@ pub async fn stricter(
         Gate::Ask(what, file) => Gate::Ask(format!("{what} ({because})"), file),
         Gate::Deny(why) => Gate::Deny(why),
     };
-    (gate, true)
+    Hooked { gate, changed: true, decided }
 }
 
 /// Runs the hook in `dir` on `call`, in the sandbox.
