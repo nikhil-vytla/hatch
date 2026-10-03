@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { agreement, keyAnswers, rank, topIndex } from "./model";
+import { agreement, clusteredAgreement, keyAnswers, rank, topIndex } from "./model";
 
 // Model a always matches the teacher; b, c and d agree with each other, never with the teacher.
 const qs = [
@@ -35,6 +35,26 @@ describe("answer key", () => {
     expect(
       rank(qs, { kind: "model", model: "a" }, all).map((r) => r.model),
     ).not.toContain("a");
+  });
+
+  test("clustered agreement matches the plain share and widens when cases disagree", () => {
+    const teacher = { kind: "teacher" as const };
+
+    // a matches the teacher everywhere: estimate 1, no spread.
+    const sure = clusteredAgreement([qs, qs], teacher, "a");
+
+    expect(sure.estimate).toBe(agreement([...qs, ...qs], teacher, "a"));
+    expect([sure.low, sure.high, sure.clusters]).toEqual([1, 1, 2]);
+
+    // One case all right, one all wrong: the estimate is a half and the interval is wide.
+    const right = { target: [1, 0], predictions: { m: [0.9, 0.1] } };
+
+    const wrong = { target: [1, 0], predictions: { m: [0.1, 0.9] } };
+
+    const mixed = clusteredAgreement([[right, right], [wrong, wrong]], teacher, "m");
+
+    expect(mixed.estimate).toBe(0.5);
+    expect(mixed.high - mixed.low).toBeGreaterThan(0.5);
   });
 
   test("topIndex keeps the first of a tie", () => {
