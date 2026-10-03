@@ -20,6 +20,7 @@ const Learning = lazy(() => import("../benchmarks").then(m => ({ default: m.Lear
 const IntentRecognition = lazy(() => import("../intent-recognition").then(m => ({ default: m.IntentRecognition })));
 const Handoff = lazy(() => import("../handoff").then(m => ({ default: m.Handoff })));
 const Decoy = lazy(() => import("../decoy").then(m => ({ default: m.Decoy })));
+const ScreenSentry = lazy(() => import("../screen-sentry.proto").then(m => ({ default: m.ScreenSentry })));
 const OpenDecisions = lazy(() => import("../open-decisions").then(m => ({ default: m.OpenDecisions })));
 const OceanReef = lazy(() => import("../ocean-reef").then(m => ({ default: m.OceanReef })));
 const AnswerKey = lazy(() => import("../answer-key").then(m => ({ default: m.AnswerKey })));
@@ -113,6 +114,8 @@ function View({
       return <OceanReef />;
     case "decoy":
       return <Decoy />;
+    case "screen-sentry":
+      return <ScreenSentry />;
     case "open-decisions":
       return <OpenDecisions />;
     case "rewardbench2":
@@ -206,7 +209,7 @@ function LiveExperimentPage({ id }: { id: string }) {
     setRecord(null);
     setError("");
     setAboutOpen(false);
-    if (id === "routing" || id === "decoy" || id === "rumour-mill" || id === "win-over" || id === "ocean" || id === "open-decisions") {
+    if (id === "routing" || id === "decoy" || id === "rumour-mill" || id === "win-over" || id === "ocean" || id === "open-decisions" || id === "screen-sentry") {
       setRecord({ result: {} });
       return () => {
         alive = false;

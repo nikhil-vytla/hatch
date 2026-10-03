@@ -123,6 +123,14 @@ export const experiments = [
     "When should software act on Jev's answer, and when should it ask a person?",
   ),
   e(
+    "screen-sentry",
+    "",
+    "Screen sentry (prototype)",
+    "Agents & tooling",
+    "Plant traps in a web page. A sentry checks every block so your AI helper finishes the job without being hijacked.",
+    "Can a fast check on every block of a page stop an AI helper from following hidden instructions?",
+  ),
+  e(
     "open-decisions",
     "",
     "Open decisions",

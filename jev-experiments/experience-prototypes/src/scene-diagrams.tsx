@@ -16,6 +16,7 @@ export const DIAGRAMS: Record<string, Diagram> = {
   search: { from: ["query", "sources"], to: "which answers" },
   classify: { from: ["request"], to: "1 of 77 intents" },
   handoff: { from: ["answer", "confidence"], to: "act or ask" },
+  "screen-sentry": { from: ["page block"], to: "hijack risk" },
   "open-decisions": { from: ["prompt"], to: "label odds" },
   decoy: { from: ["A", "B", "A′"], to: "choice" },
   judge: { from: ["answer A", "answer B"], to: "which is better" },
