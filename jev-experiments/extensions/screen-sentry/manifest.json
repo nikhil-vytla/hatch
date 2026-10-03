@@ -1,0 +1,12 @@
+{
+  "manifest_version": 3,
+  "name": "Screen sentry",
+  "version": "0.2.0",
+  "description": "Outlines text on any page that looks like an instruction aimed at an AI assistant, so a browsing helper can skip it. Scoring runs on this device.",
+  "action": { "default_popup": "popup.html", "default_title": "Screen sentry" },
+  "options_page": "options.html",
+  "background": { "service_worker": "dist/background.js" },
+  "content_scripts": [{ "matches": ["<all_urls>"], "js": ["dist/content.js"], "run_at": "document_idle" }],
+  "permissions": ["storage"],
+  "host_permissions": ["https://ai-gateway.vercel.sh/*"]
+}
