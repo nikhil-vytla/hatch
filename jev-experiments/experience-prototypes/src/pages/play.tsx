@@ -195,7 +195,6 @@ export function PlayPage() {
             <button onClick={() => { setQuery(""); setCategory("All"); }}>Clear filters</button>
           </div>
         )}
-        <a className="play-atlas-link" href="/capabilities.html">See how each experiment uses Jev <ArrowUpRight size={16} /></a>
       </section>
     </main>
   );

@@ -20,7 +20,6 @@ describe("gzip-published", () => {
     expect(hit("/assets/index-abc.js")).toBe(false);
     expect(hit("/decide/decide.json")).toBe(true);
     expect(hit("/arena/index.json")).toBe(true);
-    expect(hit("/capability-build.json")).toBe(false);
   });
 
   test("compresses matching files in place, once", () => {

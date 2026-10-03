@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { derivePortableRecord, decodePortableRecord, digest, type Harness } from "./portable-records";
 import { buildPortableIndex } from "./portable-index";
-import { preparePublicHarnessEvidence } from "../../capability-atlas-2026-09-22/publication-projection";
+import { preparePublicHarnessEvidence } from "./publication-projection";
 const physical = "/example/fixture/sum.ts", uri = "record://fixture/sum.ts";
 const jsonl = (events: unknown[]) => events.map((event) => JSON.stringify(event)).join("\n") + "\n";
 function events(harness: "opencode" | "claude"): any[] {

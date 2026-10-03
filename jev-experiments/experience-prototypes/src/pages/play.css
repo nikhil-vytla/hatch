@@ -16,8 +16,7 @@
   color: var(--coral);
   font-style: normal;
 }
-.play-section-heading > a,
-.play-atlas-link {
+.play-section-heading > a {
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -30,8 +29,7 @@
   border: 2.5px solid var(--outline);
   border-radius: 999px;
 }
-.play-section-heading > a:hover,
-.play-atlas-link:hover {
+.play-section-heading > a:hover {
   color: var(--ink);
   background: var(--sun);
 }
@@ -329,9 +327,6 @@
   font-size: 14px;
   line-height: 1.45;
   color: var(--muted);
-}
-.play-atlas-link {
-  margin-top: 22px;
 }
 .play-no-results {
   padding: 28px 0;

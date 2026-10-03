@@ -50,11 +50,11 @@ jobs:
 
       # Formerly Jev playground
       - name: Verify source controls, note figures and metadata
-        run: bun test jev-experiments/release-implementation-2026-09-22/source-code/source.test.ts jev-experiments/release-implementation-2026-09-22/source-revision/revision.test.ts jev-experiments/release-implementation-2026-09-22/notes jev-experiments/music-arranger-v2/engine.test.ts jev-experiments/capability-atlas-2026-09-22/prepare-atlas.test.ts
+        run: bun test jev-experiments/release-implementation-2026-09-22/source-code/source.test.ts jev-experiments/release-implementation-2026-09-22/source-revision/revision.test.ts jev-experiments/release-implementation-2026-09-22/notes jev-experiments/music-arranger-v2/engine.test.ts
 
       # Formerly Jev portable evidence
       - name: Verify portable records, indexes and publication projections
-        run: bun test jev-experiments/roadmap/integration/portable-records.test.ts jev-experiments/roadmap/integration/portable-clients.test.ts jev-experiments/roadmap/integration/portable-publication.test.ts jev-experiments/capability-atlas-2026-09-22/publication-projection.test.ts
+        run: bun test jev-experiments/roadmap/integration/portable-records.test.ts jev-experiments/roadmap/integration/portable-clients.test.ts jev-experiments/roadmap/integration/portable-publication.test.ts jev-experiments/roadmap/integration/publication-projection.test.ts
       - name: Rebuild the archive evidence index
         run: python3 jev-experiments/roadmap/integration/evidence_index.py
 
