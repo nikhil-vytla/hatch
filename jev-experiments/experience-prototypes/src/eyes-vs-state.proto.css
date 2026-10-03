@@ -1,0 +1,206 @@
+/* PROTOTYPE styles for Eyes against state (branch proto/eyes-vs-state). */
+.ev {
+  display: grid;
+  gap: 16px;
+  padding-bottom: 90px;
+}
+.ev-proto {
+  justify-self: start;
+  font: 800 13px var(--sans);
+  background: var(--sun);
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  padding: 4px 12px;
+  margin: 0;
+}
+.ev-title {
+  font: 800 34px/1.05 var(--display);
+  margin: 0;
+}
+.ev-lede {
+  margin: 0;
+  max-width: 62ch;
+  font-size: 17px;
+}
+.ev-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  align-items: end;
+}
+.ev-controls label {
+  display: grid;
+  gap: 4px;
+  font: 700 13px var(--sans);
+}
+.ev-controls select,
+.ev-controls button,
+.ev-probe button,
+.ev-toggle button,
+.ev-misreads button,
+.ev-bar button {
+  font: 700 14px var(--sans);
+  border: 2px solid var(--ink);
+  border-radius: 12px;
+  background: #fff;
+  color: var(--ink);
+  padding: 8px 12px;
+  min-height: 40px;
+  cursor: pointer;
+}
+.ev-whatif input {
+  width: 200px;
+}
+.ev-lanes {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) minmax(0, 0.9fr);
+  gap: 14px;
+  align-items: start;
+}
+.ev-lane,
+.ev-single,
+.ev-replay,
+.ev-cost {
+  border: 3px solid var(--ink);
+  border-radius: 20px;
+  background: #fff;
+  padding: 14px;
+  box-shadow: 4px 4px 0 var(--ink);
+}
+.ev-lane h3,
+.ev-cost h3 {
+  font: 800 17px var(--display);
+  margin: 0 0 10px;
+}
+.ev-lane-empty {
+  background: var(--soft);
+  border-style: dashed;
+  box-shadow: none;
+}
+.ev-pair {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 96px;
+  gap: 10px;
+  align-items: start;
+}
+.ev-board {
+  width: 100%;
+  max-width: 320px;
+  display: block;
+}
+.ev-floor {
+  fill: #fff4e0;
+  stroke: var(--ink);
+  stroke-width: 3;
+}
+.ev-body {
+  fill: #2f9e6e;
+}
+.ev-head {
+  fill: var(--ink);
+}
+.ev-food {
+  fill: #f0532d;
+}
+.ev-ghost {
+  fill: rgba(240, 83, 45, 0.18);
+  stroke: #c0260a;
+  stroke-width: 2.5;
+  stroke-dasharray: 4 3;
+}
+.ev-camera {
+  width: 96px;
+  height: 96px;
+  image-rendering: pixelated;
+  border: 2px solid var(--ink);
+  border-radius: 8px;
+}
+.ev-stat {
+  margin: 8px 0 0;
+  font: 600 14px var(--sans);
+  font-variant-numeric: tabular-nums;
+}
+.ev-cost {
+  background: var(--sun);
+}
+.ev-cost-line {
+  margin: 0;
+  font-size: 19px;
+}
+.ev-fine {
+  margin: 4px 0 0;
+  font-size: 14px;
+  color: var(--muted);
+  max-width: 72ch;
+}
+.ev-toggle {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.ev-toggle button[aria-pressed="true"],
+.ev-bar button[aria-pressed="true"] {
+  background: var(--ink);
+  color: var(--sun);
+}
+.ev-single {
+  max-width: 520px;
+}
+.ev-replay input[type="range"] {
+  width: 100%;
+  margin-top: 10px;
+}
+.ev-misreads {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 6px;
+  max-height: 280px;
+  overflow: auto;
+  font-size: 14px;
+}
+.ev-probe small {
+  display: block;
+  font-weight: 600;
+  color: var(--muted);
+}
+.ev-table {
+  border-collapse: collapse;
+  margin-top: 8px;
+  font-size: 14px;
+}
+.ev-table th,
+.ev-table td {
+  border-bottom: 1px solid var(--line);
+  padding: 4px 10px;
+  text-align: left;
+}
+.ev-bar {
+  position: fixed;
+  left: 50%;
+  bottom: 16px;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 8px;
+  padding: 8px;
+  background: var(--sun);
+  border: 3px solid var(--ink);
+  border-radius: 999px;
+  box-shadow: 4px 4px 0 var(--ink);
+  z-index: 50;
+}
+@media (max-width: 900px) {
+  .ev-lanes {
+    grid-template-columns: 1fr;
+  }
+  .ev-bar {
+    left: 8px;
+    right: 8px;
+    transform: none;
+    overflow-x: auto;
+    border-radius: 18px;
+  }
+  .ev-bar button {
+    white-space: nowrap;
+  }
+}

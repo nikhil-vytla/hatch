@@ -155,6 +155,14 @@ export const experiments = [
     "Can Jev recognize the preferred answers across six kinds of judgment?",
   ),
   e(
+    "eyes",
+    "",
+    "Eyes against state (prototype)",
+    "Games & simulations",
+    "The same Snake game read two ways: from the game's facts, and from what a camera sees.",
+    "What does it cost a decision model to look at the screen instead of reading the state?",
+  ),
+  e(
     "snake",
     "arcade",
     "Arcade: Snake and Orbital rescue",

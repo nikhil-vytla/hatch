@@ -206,7 +206,8 @@ function App() {
       "/routing": "#experiment/routing",
     }[location.pathname.replace(/\/$/, "")] ??
       "");
-  const sceneId = (value: string) => value.startsWith("#experiment/") ? value.split("/")[1] : null;
+  // Prototypes put their variant after "?" (e.g. #experiment/eyes?v=b); the scene id ignores it.
+  const sceneId = (value: string) => value.startsWith("#experiment/") ? value.split("/")[1].split("?")[0] : null;
   const [navigation, setNavigation] = useState(() => {
     const route = pathRoute();
     return { route, scene: sceneId(route) };
