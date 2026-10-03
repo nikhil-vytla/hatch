@@ -1,0 +1,308 @@
+{
+ "design-meeting": {
+  "free": {
+   "counts": {
+    "speakers": 3,
+    "conversations": 2,
+    "topics": 2
+   },
+   "truth": {
+    "speakers": 4,
+    "conversations": 1,
+    "topics": 3
+   },
+   "online": {
+    "words": 202,
+    "missed": 0,
+    "speaker": {
+     "right": 169,
+     "total": 202,
+     "share": 0.8366336633663366
+    },
+    "conversation": {
+     "right": 177,
+     "total": 202,
+     "share": 0.8762376237623762
+    },
+    "topic": {
+     "right": 117,
+     "total": 202,
+     "share": 0.5792079207920792
+    }
+   },
+   "revised": {
+    "words": 202,
+    "missed": 0,
+    "speaker": {
+     "right": 178,
+     "total": 202,
+     "share": 0.8811881188118812
+    },
+    "conversation": {
+     "right": 188,
+     "total": 202,
+     "share": 0.9306930693069307
+    },
+    "topic": {
+     "right": 117,
+     "total": 202,
+     "share": 0.5792079207920792
+    }
+   }
+  },
+  "jev": {
+   "counts": {
+    "speakers": 4,
+    "conversations": 1,
+    "topics": 2
+   },
+   "truth": {
+    "speakers": 4,
+    "conversations": 1,
+    "topics": 3
+   },
+   "online": {
+    "words": 202,
+    "missed": 0,
+    "speaker": {
+     "right": 169,
+     "total": 202,
+     "share": 0.8366336633663366
+    },
+    "conversation": {
+     "right": 193,
+     "total": 202,
+     "share": 0.9554455445544554
+    },
+    "topic": {
+     "right": 101,
+     "total": 202,
+     "share": 0.5
+    }
+   },
+   "revised": {
+    "words": 202,
+    "missed": 0,
+    "speaker": {
+     "right": 172,
+     "total": 202,
+     "share": 0.8514851485148515
+    },
+    "conversation": {
+     "right": 202,
+     "total": 202,
+     "share": 1
+    },
+    "topic": {
+     "right": 101,
+     "total": 202,
+     "share": 0.5
+    }
+   }
+  }
+ },
+ "two-tables": {
+  "free": {
+   "counts": {
+    "speakers": 2,
+    "conversations": 2,
+    "topics": 2
+   },
+   "truth": {
+    "speakers": 5,
+    "conversations": 2,
+    "topics": 4
+   },
+   "online": {
+    "words": 382,
+    "missed": 64,
+    "speaker": {
+     "right": 177,
+     "total": 382,
+     "share": 0.46335078534031415
+    },
+    "conversation": {
+     "right": 317,
+     "total": 382,
+     "share": 0.8298429319371727
+    },
+    "topic": {
+     "right": 191,
+     "total": 382,
+     "share": 0.5
+    }
+   },
+   "revised": {
+    "words": 382,
+    "missed": 64,
+    "speaker": {
+     "right": 175,
+     "total": 382,
+     "share": 0.4581151832460733
+    },
+    "conversation": {
+     "right": 318,
+     "total": 382,
+     "share": 0.8324607329842932
+    },
+    "topic": {
+     "right": 191,
+     "total": 382,
+     "share": 0.5
+    }
+   }
+  },
+  "jev": {
+   "counts": {
+    "speakers": 2,
+    "conversations": 2,
+    "topics": 2
+   },
+   "truth": {
+    "speakers": 5,
+    "conversations": 2,
+    "topics": 4
+   },
+   "online": {
+    "words": 382,
+    "missed": 64,
+    "speaker": {
+     "right": 177,
+     "total": 382,
+     "share": 0.46335078534031415
+    },
+    "conversation": {
+     "right": 317,
+     "total": 382,
+     "share": 0.8298429319371727
+    },
+    "topic": {
+     "right": 191,
+     "total": 382,
+     "share": 0.5
+    }
+   },
+   "revised": {
+    "words": 382,
+    "missed": 64,
+    "speaker": {
+     "right": 175,
+     "total": 382,
+     "share": 0.4581151832460733
+    },
+    "conversation": {
+     "right": 318,
+     "total": 382,
+     "share": 0.8324607329842932
+    },
+    "topic": {
+     "right": 191,
+     "total": 382,
+     "share": 0.5
+    }
+   }
+  }
+ },
+ "topic-change": {
+  "free": {
+   "counts": {
+    "speakers": 3,
+    "conversations": 1,
+    "topics": 1
+   },
+   "truth": {
+    "speakers": 3,
+    "conversations": 1,
+    "topics": 3
+   },
+   "online": {
+    "words": 237,
+    "missed": 1,
+    "speaker": {
+     "right": 226,
+     "total": 237,
+     "share": 0.9535864978902954
+    },
+    "conversation": {
+     "right": 233,
+     "total": 237,
+     "share": 0.9831223628691983
+    },
+    "topic": {
+     "right": 156,
+     "total": 237,
+     "share": 0.6582278481012658
+    }
+   },
+   "revised": {
+    "words": 237,
+    "missed": 1,
+    "speaker": {
+     "right": 234,
+     "total": 237,
+     "share": 0.9873417721518988
+    },
+    "conversation": {
+     "right": 236,
+     "total": 237,
+     "share": 0.9957805907172996
+    },
+    "topic": {
+     "right": 156,
+     "total": 237,
+     "share": 0.6582278481012658
+    }
+   }
+  },
+  "jev": {
+   "counts": {
+    "speakers": 3,
+    "conversations": 1,
+    "topics": 1
+   },
+   "truth": {
+    "speakers": 3,
+    "conversations": 1,
+    "topics": 3
+   },
+   "online": {
+    "words": 237,
+    "missed": 1,
+    "speaker": {
+     "right": 230,
+     "total": 237,
+     "share": 0.9704641350210971
+    },
+    "conversation": {
+     "right": 233,
+     "total": 237,
+     "share": 0.9831223628691983
+    },
+    "topic": {
+     "right": 156,
+     "total": 237,
+     "share": 0.6582278481012658
+    }
+   },
+   "revised": {
+    "words": 237,
+    "missed": 1,
+    "speaker": {
+     "right": 234,
+     "total": 237,
+     "share": 0.9873417721518988
+    },
+    "conversation": {
+     "right": 236,
+     "total": 237,
+     "share": 0.9957805907172996
+    },
+    "topic": {
+     "right": 156,
+     "total": 237,
+     "share": 0.6582278481012658
+    }
+   }
+  }
+ }
+}

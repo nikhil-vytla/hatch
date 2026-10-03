@@ -186,6 +186,7 @@ export const experiments = [
   e("win-over", "", "Who can you win over?", "Games & simulations", "You're new in town with until 5 pm. Say anything; 48 residents judge it, and gossip does the rest.", "Can fast typed judgments make a town react to what you actually say?"),
   e("ocean", "", "The reef", "Games & simulations", "120 fish, each deciding for itself. Heat the water and see who makes it.", "Does how fast a model decides change who survives?"),
   e("screen-sentry", "", "Screen sentry", "Agents & tooling", "Plant traps in a web page. A sentry checks every block so your AI helper finishes the job without being hijacked.", "Can a fast check on every block of a page stop an AI helper from following hidden instructions?"),
+  e("who-said-that", "", "Who said that?", "Games & simulations", "Real meetings, real voices. Watch every line find its speaker, its conversation and its topic.", "Can typed decisions over voice, level and words sort a room into speakers and conversations, and show why?"),
   e("ghost-brush", "live-worlds", "Ghost Brush", "Creative tools", "Draw a gesture. Give it a feeling. Follow another line.", "Can a typed style judgment turn a procedural brush into a semantic instrument?"),
 ];
 export const categories = [
