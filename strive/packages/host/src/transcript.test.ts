@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import type { Entry, Event } from "@strive/protocol";
-import { rebuild } from "./transcript";
+import { CUT_OFF, rebuild, replyText } from "./transcript";
 
 let seq = 0;
 
@@ -375,4 +375,99 @@ test("a check run no report followed isn't told to the agent", async () => {
   ];
 
   expect((await rebuild(entries, blob)).map((m) => m.role)).toEqual(["user", "assistant"]);
+});
+
+const sse = (...texts: string[]) =>
+  texts
+    .map(
+      (text) =>
+        `event: content_block_delta\ndata: ${JSON.stringify({ type: "content_block_delta", index: 0, delta: { type: "text_delta", text } })}\n\n`,
+    )
+    .join("");
+
+const call = (n: number, request: string, response?: string) => [
+  at({
+    type: "modelCallStarted",
+    call: n,
+    provider: "anthropic",
+    model: "claude-haiku-4-5",
+    request,
+    reservedUsdMicros: 1,
+    reservedTokens: 1,
+  }),
+  at({
+    type: "modelCallFinished",
+    call: n,
+    outcome: { kind: "broken", reason: "the client went away", costUsdMicros: 1, tokens: 1 },
+    response,
+    durationMs: 1,
+  }),
+];
+
+blobs.set("sha256:agent", JSON.stringify({ tools: [{ name: "read" }], messages: [] }));
+
+blobs.set("sha256:summary", JSON.stringify({ messages: [] }));
+
+blobs.set(
+  "sha256:judge",
+  JSON.stringify({ tools: [{ name: "verdict" }], tool_choice: { type: "tool", name: "verdict" } }),
+);
+
+blobs.set("sha256:cut", sse("I'll fix the ", "failing test by"));
+
+test("a reply given but never recorded, as when the host stopped, is told on resume as it was given", async () => {
+  const entries = [
+    at({ type: "userMessage", text: "fix the test" }),
+    at({ type: "turnStarted", turn: 1 }),
+    ...call(1, "sha256:agent", "sha256:cut"),
+    at({ type: "turnEnded", turn: 1, reason: { kind: "failed", error: "the agent host stopped during this turn" } }),
+    at({ type: "userMessage", text: "go on" }),
+  ];
+
+  const messages = await rebuild(entries, blob);
+
+  expect(messages.map((m) => m.role)).toEqual(["user", "user", "user"]);
+  expect(messages[1]).toMatchObject({ content: `${CUT_OFF}\n\nI'll fix the failing test by` });
+  expect(messages[2]).toMatchObject({ content: "go on" });
+});
+
+test("a recorded reply, a summary's call and the judge's are not told again", async () => {
+  const recorded = [
+    at({ type: "userMessage", text: "hi" }),
+    at({ type: "turnStarted", turn: 1 }),
+    ...call(1, "sha256:agent", "sha256:cut"),
+    assistant("I'll fix the failing test by"),
+    at({ type: "turnEnded", turn: 1, reason: { kind: "done" } }),
+  ];
+
+  expect((await rebuild(recorded, blob)).map((m) => m.role)).toEqual(["user", "assistant"]);
+
+  for (const request of ["sha256:summary", "sha256:judge"]) {
+    const entries = [
+      at({ type: "userMessage", text: "hi" }),
+      at({ type: "turnStarted", turn: 1 }),
+      ...call(1, request, "sha256:cut"),
+      at({ type: "turnEnded", turn: 1, reason: { kind: "failed", error: "stopped" } }),
+    ];
+
+    expect((await rebuild(entries, blob)).map((m) => m.role)).toEqual(["user"]);
+  }
+});
+
+test("a reply's text is read from each provider's stream, and from a whole response", () => {
+  expect(replyText(sse("a", "b"))).toBe("ab");
+
+  const chat = ["Hel", "lo"]
+    .map((c) => `data: ${JSON.stringify({ choices: [{ delta: { content: c } }] })}\n\n`)
+    .join("");
+
+  expect(replyText(`${chat}data: [DONE]\n\n`)).toBe("Hello");
+
+  const responses = ["Hi", " there"]
+    .map((d) => `data: ${JSON.stringify({ type: "response.output_text.delta", delta: d })}\n\n`)
+    .join("");
+
+  expect(replyText(responses)).toBe("Hi there");
+  expect(replyText(JSON.stringify({ content: [{ type: "text", text: "whole" }, { type: "tool_use" }] }))).toBe("whole");
+  expect(replyText("not a response")).toBe("");
 });

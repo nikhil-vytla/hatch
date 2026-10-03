@@ -1,6 +1,6 @@
 # ADR-0030: Four durability changes, learned from pi-durable
 
-Status: accepted (2026-10-02). Changes 1, 3 and 4.1 are built; 2 and 4.2 aren't yet.
+Status: accepted (2026-10-02). Changes 1, 2.1, 3 and 4.1 are built; 2.3 and 4.2 aren't yet.
 
 ## Context
 
@@ -105,6 +105,21 @@ an aborted entry, and the next request carries it.
    call. Recovery then has something to decode. That costs a write per
    half-second of streaming, and no fsync, since the journal's commit is
    what counts.
+
+**Built (steps 1 and 2), differently in two ways.**
+- **The host decodes, not the gateway.** It already rebuilds the
+  conversation from the journal, and it reads only bytes the daemon kept,
+  so this needs no daemon change. It decodes Anthropic Messages and OpenAI
+  Chat and Responses streams, and whole responses.
+- **The reply comes back as a note, not as an assistant message.** An
+  assistant message needs provider-specific fields, and pi drops one
+  marked aborted when it sends it back. So the model gets a note in the
+  user's turn that says the reply was never recorded and quotes it up to
+  where it stopped. Nothing pretends to be the provider's output.
+
+A call counts only if it ran in a turn and its request offered tools and
+let the model choose among them. A summary offers none and the judge
+forces its one, so neither is told again.
 
 **Cost.** Moderate. Step 1 is most of the value and needs no new events.
 Step 3 touches the gateway's hot path, so it gets a benchmark against

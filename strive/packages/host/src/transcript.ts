@@ -4,6 +4,7 @@
 // effect records (what actually ran), never from the host.
 import type { AssistantMessage, Message, ToolResultMessage } from "@earendil-works/pi-ai";
 import type { EffectOutcome, EffectRecord, Entry } from "@strive/protocol";
+import * as v from "valibot";
 import { PromptReader, proposalResult, type StaticGate } from "./learning-records";
 
 /** What propose_layout tells the model, live and on resume. */
@@ -114,6 +115,87 @@ function isAssistantMessage(v: unknown): v is AssistantMessage {
   );
 }
 
+/** What precedes a reply that was given but never recorded, when it's told on resume. */
+export const CUT_OFF =
+  "[strive: the agent host stopped while you were replying, so this reply was never recorded. Here it is as you gave it, up to where it stopped. Any tool calls in it did not run.]";
+
+/** `text` as JSON that `schema` accepts, or undefined. */
+function parsed<T extends v.GenericSchema>(schema: T, text: string): v.InferOutput<T> | undefined {
+  try {
+    const r = v.safeParse(schema, JSON.parse(text));
+
+    return r.success ? r.output : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+// What a reply's text is in each provider's wire format; anything else in a
+// response says nothing about it.
+const ReplyPart = v.union([
+  // Anthropic Messages, streamed.
+  v.object({
+    type: v.literal("content_block_delta"),
+    delta: v.object({ type: v.literal("text_delta"), text: v.string() }),
+  }),
+  // OpenAI Responses, streamed.
+  v.object({ type: v.literal("response.output_text.delta"), delta: v.string() }),
+  // OpenAI Chat, streamed and whole.
+  v.object({ choices: v.tupleWithRest([v.object({ delta: v.object({ content: v.string() }) })], v.unknown()) }),
+  v.object({ choices: v.tupleWithRest([v.object({ message: v.object({ content: v.string() }) })], v.unknown()) }),
+  // Anthropic Messages, whole.
+  v.object({ content: v.array(v.object({ type: v.string(), text: v.optional(v.string()) })) }),
+]);
+
+const Request = v.object({
+  tools: v.optional(v.array(v.unknown())),
+  tool_choice: v.optional(v.object({ type: v.string() })),
+});
+
+/** One parsed piece of a response's text. */
+function partText(part: v.InferOutput<typeof ReplyPart>): string {
+  if ("choices" in part) {
+    const [first] = part.choices;
+
+    return "delta" in first ? first.delta.content : first.message.content;
+  }
+
+  if ("content" in part) return part.content.map((c) => (c.type === "text" ? (c.text ?? "") : "")).join("");
+
+  return part.type === "response.output_text.delta" ? part.delta : part.delta.text;
+}
+
+/**
+ * The text of a model's reply from the bytes the gateway kept: a stream's
+ * text deltas (Anthropic Messages, OpenAI Chat or Responses), or a whole
+ * response's text. Whatever was received before it stopped.
+ */
+export function replyText(raw: string): string {
+  const pieces = raw.includes("data:")
+    ? raw
+        .split("\n")
+        .filter((l) => l.startsWith("data:"))
+        .map((l) => l.slice(5).trim())
+    : [raw];
+
+  return pieces
+    .map((piece) => parsed(ReplyPart, piece))
+    .map((part) => (part ? partText(part) : ""))
+    .join("");
+}
+
+/**
+ * Whether a request is one of the agent's own turns: it offers tools and
+ * lets the model choose among them. A summary offers none, and the judge
+ * forces its one.
+ */
+export function isAgentRequest(raw: string): boolean {
+  const body = parsed(Request, raw);
+  const choice = body?.tool_choice?.type;
+
+  return (body?.tools?.length ?? 0) > 0 && choice !== "tool" && choice !== "function";
+}
+
 /** On resume, what a tool call with nothing in the journal is told, by tool name. */
 export type Unjournaled = (toolName: string) => ToolResultText | undefined;
 
@@ -201,6 +283,23 @@ export async function rebuild(
   let held: { seq: number; message: Message }[] = [];
   // Every entry passes through, so a request's text knows the request before it.
   const prompts = new PromptReader();
+  // The agent's model calls in this turn, and the last one to finish with a
+  // response but no reply recorded after it (ADR-0030): told on resume.
+  const requests = new Map<number, string>();
+  let unrecorded: { response: string; request: string; ts: number } | undefined;
+
+  const recover = async () => {
+    const lost = unrecorded;
+
+    unrecorded = undefined;
+
+    if (!lost || !isAgentRequest(await blob(lost.request))) return;
+    const text = replyText(await blob(lost.response)).trim();
+
+    if (!text) return;
+    close();
+    messages.push({ role: "user", content: `${CUT_OFF}\n\n${text}`, timestamp: lost.ts });
+  };
 
   /** Releases held prompts up to `through` (all of them without it). */
   const release = (through = Number.POSITIVE_INFINITY) => {
@@ -215,7 +314,15 @@ export async function rebuild(
     if (!kept.has(entry)) continue;
     const { event: e, tsMs, seq } = entry;
 
-    if (e.type === "turnStarted") {
+    if (e.type === "modelCallStarted" || e.type === "turnEnded") await recover();
+
+    if (e.type === "modelCallStarted" && inTurn) {
+      requests.set(e.call, e.request);
+    } else if (e.type === "modelCallFinished") {
+      const request = requests.get(e.call);
+
+      if (request && e.response) unrecorded = { response: e.response, request, ts: tsMs };
+    } else if (e.type === "turnStarted") {
       release(e.throughSeq);
       inTurn = true;
     } else if (e.type === "turnEnded") {
@@ -231,6 +338,7 @@ export async function rebuild(
 
       // A host wrote it, and a host can be wrong: what isn't a reply is left out.
       if (!isAssistantMessage(reply)) continue;
+      unrecorded = undefined;
 
       // Without turn markers, a reply answers the prompts before it.
       if (inTurn) close();
@@ -243,6 +351,7 @@ export async function rebuild(
     }
   }
 
+  await recover();
   release();
 
   return messages;
