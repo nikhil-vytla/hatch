@@ -3,7 +3,7 @@
  * trained on dataset labels, not Jev's answers, and its yes/no head got worse; this says both.
  */
 import { useEffect, useState } from "react";
-import { percent } from "./api";
+import { percent, fetchJson } from "./api";
 import { Fold, Notice } from "./shared";
 
 type Task = { accuracy: number; brier: number };
@@ -19,8 +19,7 @@ export function SmolLMPilot() {
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
-    fetch("/data/replica.json")
-      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+    fetchJson("/data/replica.json")
       .then((d) => setRecord(d.result))
       .catch(() => setFailed(true));
   }, []);

@@ -6,6 +6,7 @@
 import { useEffect, useState } from "react";
 import { Changes, SemanticTable, UndoExperiment } from "./new-experiments";
 import { Notice, Pills } from "./shared";
+import { fetchJson } from "./api";
 
 const TABS = ["Semantic spreadsheet", "Intent-based undo", "Change impact"] as const;
 
@@ -23,9 +24,7 @@ const load = (name: string) => {
   if (!cache.has(name))
     cache.set(
       name,
-      fetch(`/data/${name}.json`).then((r) =>
-        r.ok ? r.json() : Promise.reject(new Error(String(r.status))),
-      ),
+      fetchJson(`/data/${name}.json`),
     );
 
   return cache.get(name) as Promise<any>;
