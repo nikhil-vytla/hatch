@@ -61,6 +61,7 @@ function TrainingCurve({ curve }: { curve: any[] }) {
   );
 }
 export function LocalModels({ result: r }: { result: any }) {
+  const [part, setPart] = useState<"inspect" | "report">("inspect");
   const [model, setModel] = useState("laya-tuned"),
     [group, setGroup] = useState("all"),
     [caseIndex, setCaseIndex] = useState(0),
@@ -125,7 +126,12 @@ export function LocalModels({ result: r }: { result: any }) {
           />
         </div>
       </div>
-      {/* Inspect a decision first; the methods and measurements follow. */}
+      {/* The scene shows decisions first; the methods, training, export and pilot are one tab away. */}
+      <div className="pills local-parts" role="tablist" aria-label="Decision models on a Mac">
+        <button type="button" role="tab" aria-selected={part === "inspect"} className={part === "inspect" ? "active" : ""} onClick={() => setPart("inspect")}>Inspect the decisions</button>
+        <button type="button" role="tab" aria-selected={part === "report"} className={part === "report" ? "active" : ""} onClick={() => setPart("report")}>Full report: methods, training, export and pilot</button>
+      </div>
+      {part === "inspect" && <>
       <Pane
         title="Inspect every decision"
         sub={`${rows.length} cases`}
@@ -289,35 +295,6 @@ export function LocalModels({ result: r }: { result: any }) {
           their uncertainty is visible above.
         </p>
       </Pane>
-      <div className="local-methods">
-        <article>
-          <span className="method-number">First token</span>
-          <h3>Shared state, separate questions</h3>
-          <p>
-            Encode the state once, copy its prompt cache for each question, and
-            read the logits for verified single-token labels. This adapts Eric
-            Zhang’s approach to MLX. Branches run sequentially here.
-          </p>
-        </article>
-        <article>
-          <span className="method-number">Option text</span>
-          <h3>Score the whole answer</h3>
-          <p>
-            Read the likelihood of every token in each option. Mean token
-            likelihood reduces the automatic preference for short strings.
-            Compare it with label scoring on the same Qwen 0.6B weights.
-          </p>
-        </article>
-        <article>
-          <span className="method-number">Trained head</span>
-          <h3>Specialize an encoder</h3>
-          <p>
-            Port Laya’s encoder and scorer to native MLX, freeze the encoder,
-            and train the decision head. Export the selected model to Core ML
-            and check real predictions against MLX.
-          </p>
-        </article>
-      </div>
       <Pane
         title="Same test cases, different approaches"
         sub="Click a model to inspect its answers"
@@ -416,6 +393,37 @@ export function LocalModels({ result: r }: { result: any }) {
           </p>
         </Fold>
       </Pane>
+      </>}
+      {part === "report" && <>
+      <div className="local-methods">
+        <article>
+          <span className="method-number">First token</span>
+          <h3>Shared state, separate questions</h3>
+          <p>
+            Encode the state once, copy its prompt cache for each question, and
+            read the logits for verified single-token labels. This adapts Eric
+            Zhang’s approach to MLX. Branches run sequentially here.
+          </p>
+        </article>
+        <article>
+          <span className="method-number">Option text</span>
+          <h3>Score the whole answer</h3>
+          <p>
+            Read the likelihood of every token in each option. Mean token
+            likelihood reduces the automatic preference for short strings.
+            Compare it with label scoring on the same Qwen 0.6B weights.
+          </p>
+        </article>
+        <article>
+          <span className="method-number">Trained head</span>
+          <h3>Specialize an encoder</h3>
+          <p>
+            Port Laya’s encoder and scorer to native MLX, freeze the encoder,
+            and train the decision head. Export the selected model to Core ML
+            and check real predictions against MLX.
+          </p>
+        </article>
+      </div>
       <div className="training-panels">
         <Pane title="What training changed" sub="Validation only">
           <TrainingCurve curve={train.curve} />
@@ -571,6 +579,7 @@ export function LocalModels({ result: r }: { result: any }) {
           .
         </p>
       </Fold>
+      </>}
     </div>
   );
 }
