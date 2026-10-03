@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { SOURCE_COMMIT, MODELS, PROTOCOL, hash, payload, tasks, encodedQuestions, POLICY_STATE, type Pair } from "./protocol";
 import { analysisMetadata } from "./clustering";
 const here = dirname(fileURLToPath(import.meta.url));
-const prior = JSON.parse(readFileSync(resolve(here, "../ifeval-review/content-audit/audit.json"), "utf8"));
+const prior = JSON.parse(readFileSync(resolve(here, "../archive/ifeval-review/content-audit/audit.json"), "utf8"));
 const findings: any[] = Object.values(prior).flatMap((v: any) => Array.isArray(v) ? v : []).filter((v: any) => v?.dataset === "judge");
 const sourceFiles: any[] = [], pairs: Pair[] = [];
 for (const model of MODELS) {
