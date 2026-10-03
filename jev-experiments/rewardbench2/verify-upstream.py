@@ -1,5 +1,6 @@
 """Compare our recorded Ties metric with the unmodified pinned upstream functions."""
 import ast
+import gzip
 import json
 import hashlib
 import sys
@@ -19,7 +20,14 @@ functions = [node for node in tree.body if isinstance(node, ast.FunctionDef)
 assert len(functions) == 3
 exec(compile(ast.Module(body=functions, type_ignores=[]), str(source), "exec"))
 
-lines = [json.loads(line) for line in (root / "results.jsonl").read_text().strip().split("\n")]
+def read_record_text(path: Path) -> str:
+    """The recording is committed gzipped; an uncompressed working copy wins when present."""
+    if path.exists():
+        return path.read_text()
+    return gzip.decompress(path.with_name(path.name + ".gz").read_bytes()).decode("utf8")
+
+
+lines = [json.loads(line) for line in read_record_text(root / "results.jsonl").strip().split("\n")]
 result = lines[0]["document"]["result"]
 rows = [entry["value"] for entry in lines[1:] if entry["path"] == ["result", "rows"]]
 ties = [row for row in rows if row["subset"] == "Ties"]

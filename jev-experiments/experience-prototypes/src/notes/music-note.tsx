@@ -175,7 +175,7 @@ export function MusicNote({ note }: { note: Note }) {
           ·{" "}
           <a
             href={repoSource(
-              "jev-experiments/music-arranger-v2/music-v2.jsonl",
+              "jev-experiments/music-arranger-v2/music-v2.jsonl.gz",
             )}
           >
             Retained model requests and answers
