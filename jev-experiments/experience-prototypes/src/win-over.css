@@ -16,12 +16,6 @@
   margin: 0 0 6px;
   letter-spacing: -0.02em;
 }
-.wo-sub {
-  margin: 0;
-  font-size: 17px;
-  color: var(--tb-muted);
-  max-width: 46ch;
-}
 .wo-hud {
   display: flex;
   flex-wrap: wrap;

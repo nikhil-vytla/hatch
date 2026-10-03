@@ -264,12 +264,6 @@ export function WinOver() {
   return (
     <div className="toybox wo">
       <div className="wo-top">
-        <div>
-          <p className="wo-sub">
-            You're new in Bramble Square and you have until 5 pm. Everyone in earshot judges what
-            you say.
-          </p>
-        </div>
         <div className="wo-hud" aria-live="polite">
           <span className="wo-clock">{w.goal ? clock(w) : "1:00 pm"}</span>
           {g && (
