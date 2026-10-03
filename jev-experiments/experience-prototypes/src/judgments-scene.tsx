@@ -57,7 +57,7 @@ export function JudgmentsScene({ record }: { record: any }) {
 
   return (
     <div className="judgments-scene">
-      <Pills values={[...TABS]} value={tab} onChange={(v) => setTab(v as Tab)} />
+      <Pills label="View" values={[...TABS]} value={tab} onChange={(v) => setTab(v as Tab)} />
       {!current ? (
         <Notice>{failed === DATA[tab] ? "This recording could not be loaded." : "Loading…"}</Notice>
       ) : tab === "Semantic spreadsheet" ? (

@@ -505,7 +505,10 @@ nav a {
   border: 2.5px solid var(--outline);
   border-radius: 999px;
   background: var(--surface);
-  text-transform: capitalize;
+}
+/* Sentence case: lift a lowercase id's first letter, and leave written labels as written. */
+.pills button::first-letter {
+  text-transform: uppercase;
 }
 .pills button:hover {
   background: var(--sun);

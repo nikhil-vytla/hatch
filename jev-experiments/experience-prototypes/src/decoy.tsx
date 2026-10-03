@@ -103,7 +103,7 @@ export function Decoy() {
 
   return (
     <div className="decoy">
-      <Pills values={data.scenarios.map((s) => TITLES[s.id] ?? s.id)} value={TITLES[scenario.id] ?? scenario.id} onChange={(v) => setScenarioId(data.scenarios.find((s) => (TITLES[s.id] ?? s.id) === v)?.id ?? "apartment")} />
+      <Pills label="Scenario" values={data.scenarios.map((s) => TITLES[s.id] ?? s.id)} value={TITLES[scenario.id] ?? scenario.id} onChange={(v) => setScenarioId(data.scenarios.find((s) => (TITLES[s.id] ?? s.id) === v)?.id ?? "apartment")} />
 
       <Pane title={scenario.question} sub={scenario.context}>
         <div className="decoy-sets" role="group" aria-label="Which options Jev sees">
@@ -178,7 +178,7 @@ export function Decoy() {
           look better, and a worse B makes B look better. People do this too; it's called the decoy or attraction
           effect (Huber, Payne &amp; Puto, 1982).
         </p>
-        <Pills values={ORDERS} value={order} onChange={setOrder} />
+        <Pills label="Listing order" values={ORDERS} value={order} onChange={setOrder} />
         <p className="fine">
           Jev was asked each set twice, once in each order. Where options sit in the list matters too, so the average
           of both orders is the fairest single number.
