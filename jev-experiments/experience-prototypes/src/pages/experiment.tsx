@@ -6,6 +6,8 @@ import { Provenance, SourceCredit } from "../provenance";
 import { HeadlineStrip } from "../headline-strip";
 import { experimentNotes } from "../notes/manifest";
 import { RecordDate } from "../receipt";
+import { EvidenceDrawer } from "../formats/evidence-drawer";
+import { GAME_PAGES, gameEvidence } from "../formats/game-evidence";
 import "./experiment.css";
 
 /** Game pages: the headline result comes after the game, so play starts first. Benchmark pages lead with it. */
@@ -195,6 +197,8 @@ function LiveExperimentPage({ id }: { id: string }) {
     [composition, setComposition] = useState<any>(null),
     [error, setError] = useState(""),
     [aboutOpen, setAboutOpen] = useState(false);
+  // Game pages keep play first and open their evidence in a drawer instead of the inline fold.
+  const drawer = GAME_PAGES.has(id);
   const record = recordSlot?.id === id ? recordSlot.value : null;
   const loadedRecord = useRef(recordSlot);
   loadedRecord.current = recordSlot;
@@ -238,6 +242,17 @@ function LiveExperimentPage({ id }: { id: string }) {
       .catch(() => {});
     return () => { alive = false; };
   }, [id, composition]);
+  const about = (
+    <>
+      {note && <p><a href={`#/notes/${note.slug}`}>Read the note: {note.title} →</a></p>}
+      {record && exp.id !== "local-models" && <Provenance result={record.result ?? {}} />}
+    </>
+  );
+  const downloadLink = (
+    <a href={`/data/${id === "ui" ? "composed-ui" : exp.data}.json`} download>
+      Download evidence ↓
+    </a>
+  );
   return (
     <section className="detail published-experiment">
       <div className="breadcrumbs">
@@ -254,12 +269,24 @@ function LiveExperimentPage({ id }: { id: string }) {
           <p className="scene-head-question">{exp.question}</p>
           {record && <SourceCredit result={record.result ?? {}} />}
         </div>
-        <button type="button" aria-expanded={aboutOpen} aria-controls="experiment-background" onClick={() => setAboutOpen(open => !open)}>About & evidence</button>
+        {drawer ? (
+          <button type="button" aria-haspopup="dialog" aria-expanded={aboutOpen} onClick={() => setAboutOpen(true)}>About & evidence</button>
+        ) : (
+          <button type="button" aria-expanded={aboutOpen} aria-controls="experiment-background" onClick={() => setAboutOpen(open => !open)}>About & evidence</button>
+        )}
       </header>
-      <section id="experiment-background" className="scene-head-evidence" hidden={!aboutOpen} aria-label="About this experiment">
-        {note && <p><a href={`#/notes/${note.slug}`}>Read the note: {note.title} →</a></p>}
-        {record && exp.id !== "local-models" && <Provenance result={record.result ?? {}} />}
-      </section>
+      {drawer ? (
+        <EvidenceDrawer
+          open={aboutOpen}
+          onClose={() => setAboutOpen(false)}
+          title={exp.title}
+          tabs={gameEvidence(id, about, record?.manifest ? <p>{downloadLink}</p> : null)}
+        />
+      ) : (
+        <section id="experiment-background" className="scene-head-evidence" hidden={!aboutOpen} aria-label="About this experiment">
+          {about}
+        </section>
+      )}
       {!STRIP_AFTER.has(id) && <HeadlineStrip id={id} title={exp.title} />}
       {error && <Notice error>{error}</Notice>}
       {record ? (
@@ -294,12 +321,7 @@ function LiveExperimentPage({ id }: { id: string }) {
             return day ? `Recorded ${day} · ` : "Recorded run · ";
           })()}
           {record.manifest?.experiment ?? exp.id} ·{" "}
-          <a
-            href={`/data/${id === "ui" ? "composed-ui" : exp.data}.json`}
-            download
-          >
-            Download evidence ↓
-          </a>
+          {downloadLink}
         </p>
       )}
     </section>
