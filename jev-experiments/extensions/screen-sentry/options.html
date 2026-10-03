@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Screen sentry options</title>
+    <style>
+      body { max-width: 520px; margin: 32px auto; font: 15px/1.5 Nunito, system-ui, sans-serif; background: #fff4e0; color: #17140f; }
+      input { width: 100%; font: 15px system-ui; padding: 8px; border: 2px solid #17140f; border-radius: 10px; }
+      button { font: 700 14px system-ui; border: 2px solid #17140f; border-radius: 999px; padding: 6px 12px; margin: 10px 6px 0 0; cursor: pointer; }
+    </style>
+  </head>
+  <body>
+    <h1>Screen sentry (prototype)</h1>
+    <p>The sentry works without a key. To also ask Jev about flagged blocks, add your own Vercel AI Gateway key. It stays on this device and is sent only to <code>ai-gateway.vercel.sh</code>, and only when you press "Ask Jev".</p>
+    <label for="key">AI Gateway key</label>
+    <input id="key" type="password" autocomplete="off" />
+    <button id="save" type="button">Save</button>
+    <button id="clear" type="button">Remove key</button>
+    <p id="status"></p>
+    <script src="dist/options.js"></script>
+  </body>
+</html>
