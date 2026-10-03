@@ -131,6 +131,14 @@ export const experiments = [
     "Does an obviously worse option change Jev's choice between two good ones?",
   ),
   e(
+    "prose",
+    "",
+    "What moves a decision model?",
+    "Benchmarks",
+    "The same questions asked 78 ways. Rewording barely moves Jev; one kind of sentence does.",
+    "Which changes to a question move Jev's answer, and which don't?",
+  ),
+  e(
     "judge",
     "judgment-reliability",
     "JudgeBench",

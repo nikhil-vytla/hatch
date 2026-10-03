@@ -17,6 +17,7 @@ export const DIAGRAMS: Record<string, Diagram> = {
   handoff: { from: ["answer", "confidence"], to: "act or ask" },
   "open-decisions": { from: ["prompt"], to: "label odds" },
   decoy: { from: ["A", "B", "A′"], to: "choice" },
+  prose: { from: ["question", "78 rewordings"], to: "yes/no shift" },
   judge: { from: ["answer A", "answer B"], to: "which is better" },
   rewardbench2: { from: ["prompt", "answer"], to: "preferred?" },
   snake: { from: ["board"], to: "next move" },

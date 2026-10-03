@@ -30,7 +30,7 @@ type Data = { scenarios: Scenario[]; recorded: Recorded[] };
 
 const ORDER_LABEL: Record<Order, string> = { forward: "A listed first", reversed: "A listed last" };
 
-const TITLES: Record<string, string> = {
+export const TITLES: Record<string, string> = {
   apartment: "Apartment",
   laptop: "Laptop",
   job: "Job offer",
@@ -58,7 +58,11 @@ const pairShare = (p: Record<string, number>) => {
   return a + b > 0 ? a / (a + b) : 0.5;
 };
 
-export function Decoy() {
+/**
+ * `figure` keeps only what carries the finding: the scenario picker and A's share of the choice
+ * between A and B for each set. The article uses it as its hero; the full scene is the default.
+ */
+export function Decoy({ figure = false }: { figure?: boolean } = {}) {
   const [data, setData] = useState<Data | null>(null);
   const [failed, setFailed] = useState(false);
   const [scenarioId, setScenarioId] = useState("apartment");
@@ -105,7 +109,7 @@ export function Decoy() {
     <div className="decoy">
       <Pills label="Scenario" values={data.scenarios.map((s) => TITLES[s.id] ?? s.id)} value={TITLES[scenario.id] ?? scenario.id} onChange={(v) => setScenarioId(data.scenarios.find((s) => (TITLES[s.id] ?? s.id) === v)?.id ?? "apartment")} />
 
-      <Pane title={scenario.question} sub={scenario.context}>
+      {!figure && <Pane title={scenario.question} sub={scenario.context}>
         <div className="decoy-sets" role="group" aria-label="Which options Jev sees">
           {SETS.map((s) => (
             <button key={s.id} type="button" className={set === s.id ? "active" : ""} aria-pressed={set === s.id} onClick={() => setSet(s.id)}>
@@ -155,7 +159,7 @@ export function Decoy() {
               : [];
           })}
         </div>
-      </Pane>
+      </Pane>}
 
       <Pane title="A's share of the choice between A and B" sub="The decoy's own share left out">
         <div className="decoy-shift" aria-live="polite">
@@ -185,7 +189,7 @@ export function Decoy() {
         </p>
       </Pane>
 
-      <Fold title="All eight scenarios">
+      {!figure && <Fold title="All eight scenarios">
         <div className="model-table-wrap">
           <table className="model-table">
             <thead>
@@ -220,9 +224,9 @@ export function Decoy() {
           </a>
           .
         </p>
-      </Fold>
+      </Fold>}
 
-      {request && (
+      {!figure && request && (
         <Fold title="The exact request Jev saw">
           <p className="fine">
             {orders.length > 1 ? "Listed with A first. " : ""}Options appear under neutral names (Ash, Birch, Cedar) so
