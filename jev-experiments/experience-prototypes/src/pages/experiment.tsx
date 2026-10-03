@@ -1,15 +1,13 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
-import { ArrowLeft, FlaskConical } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { experiments, lookup, retiredScene, type Experiment } from "../catalog";
 import { CapabilityInspector } from "../../../capability-atlas-2026-09-22/capability-inspector";
 import { Pane, Notice } from "../shared";
-import { Provenance } from "../provenance";
+import { Provenance, SourceCredit } from "../provenance";
 import { HeadlineStrip } from "../headline-strip";
 import { experimentNotes } from "../notes/manifest";
 import { RecordDate } from "../receipt";
 import "./experiment.css";
-
-const sceneEntries = new Set(["tetris", "win-over", "music", "routing", "visual-search"]);
 
 const Paste = lazy(() => import("../new-experiments").then(m => ({ default: m.Paste })));
 const LayoutStudy = lazy(() => import("../layout-study").then(m => ({ default: m.LayoutStudy })));
@@ -192,7 +190,6 @@ function LiveExperimentPage({ id }: { id: string }) {
     [composition, setComposition] = useState<any>(null),
     [error, setError] = useState(""),
     [aboutOpen, setAboutOpen] = useState(false);
-  const sceneEntry = sceneEntries.has(id);
   const record = recordSlot?.id === id ? recordSlot.value : null;
   const loadedRecord = useRef(recordSlot);
   loadedRecord.current = recordSlot;
@@ -237,7 +234,7 @@ function LiveExperimentPage({ id }: { id: string }) {
     return () => { alive = false; };
   }, [id, composition]);
   return (
-    <section className={`detail published-experiment${sceneEntry ? " scene-entry" : ""}`}>
+    <section className="detail published-experiment">
       <div className="breadcrumbs">
         <a href="#/">
           <ArrowLeft size={13} /> All experiments
@@ -245,34 +242,20 @@ function LiveExperimentPage({ id }: { id: string }) {
         <span>/</span>
         <span>{exp.category}</span>
       </div>
-      {sceneEntry ? <>
-        <header className="scene-entry-heading">
-          <h1>{exp.title}</h1>
-          <button type="button" aria-expanded={aboutOpen} aria-controls="experiment-background" onClick={() => setAboutOpen(open => !open)}>About & evidence</button>
-        </header>
-        <section id="experiment-background" className="scene-entry-background" hidden={!aboutOpen} aria-label="About this experiment">
-          <p>{exp.description}</p>
-          <p className="scene-entry-question">{exp.question}</p>
-          {note && <p><a href={`#/notes/${note.slug}`}>Read the note: {note.title} →</a></p>}
-          <CapabilityInspector key={id} id={id} />
-          {record && <Provenance result={record.result ?? {}} />}
-        </section>
-      </> : <><section className="detail-heading">
+      <header className="scene-head">
         <div>
-          <span className="eyebrow">{exp.category}</span>
           <h1>{exp.title}</h1>
-          <p>{exp.description}</p>
+          <p className="scene-head-line">{exp.description}</p>
+          <p className="scene-head-question">{exp.question}</p>
+          {record && <SourceCredit result={record.result ?? {}} />}
         </div>
-        <div className="experiment-question">
-          <FlaskConical size={17} />
-          <p>{exp.question}</p>
-        </div>
+        <button type="button" aria-expanded={aboutOpen} aria-controls="experiment-background" onClick={() => setAboutOpen(open => !open)}>About & evidence</button>
+      </header>
+      <section id="experiment-background" className="scene-head-evidence" hidden={!aboutOpen} aria-label="About this experiment">
+        {note && <p><a href={`#/notes/${note.slug}`}>Read the note: {note.title} →</a></p>}
+        <CapabilityInspector key={id} id={id} />
+        {record && exp.id !== "local-models" && <Provenance result={record.result ?? {}} />}
       </section>
-      <CapabilityInspector key={id} id={id} />
-      {record && exp.id !== "local-models" && (
-        <Provenance result={record.result ?? {}} />
-      )}
-      </>}
       <HeadlineStrip id={id} title={exp.title} />
       {error && <Notice error>{error}</Notice>}
       {record ? (
