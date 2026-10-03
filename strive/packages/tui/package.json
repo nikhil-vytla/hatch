@@ -9,7 +9,7 @@
   "dependencies": {
     "@strive/acp": "workspace:*",
     "@strive/protocol": "workspace:*",
-    "@earendil-works/pi-tui": "0.87.1",
+    "@earendil-works/pi-tui": "1.0.0",
     "@strive/host": "workspace:*",
     "@strive/view": "workspace:*"
   },

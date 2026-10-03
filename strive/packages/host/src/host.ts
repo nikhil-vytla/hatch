@@ -2,7 +2,8 @@
 // Models are reached only through the daemon's gateway, and every tool is
 // an effect the daemon performs; the host holds no keys and touches no files.
 import { type ImageContent, type TextContent, Type } from "@earendil-works/pi-ai";
-import { Agent, type AgentMessage, type AgentTool, estimateContextTokens } from "@earendil-works/pi-agent-core";
+import { Agent, type AgentMessage, type AgentTool } from "@earendil-works/pi-agent-core";
+import { estimateContextTokens } from "@earendil-works/pi-ai/utils/estimate";
 import {
   type AgentConfig,
   describeError,
