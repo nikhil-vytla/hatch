@@ -10,6 +10,7 @@ import { counts, simulate } from "../../../../live-worlds/rumour/engine";
 import { SCAM } from "../../../../live-worlds/rumour/compare";
 import { allProfiles, toDist, type Dist } from "../../../../live-worlds/rumour/profiles";
 import { createTown } from "../../../../live-worlds/rumour/town";
+import { greedy, initial, step } from "../../../../local-models-and-games/arcade/engine";
 import { headlinesFrom, loadHeadlineInputs, RUMOUR_TOWN } from "./build";
 import { HANDOFF_THRESHOLD, SURE_NO, SURE_YES, type Headline } from "./headlines";
 
@@ -146,6 +147,51 @@ describe.skipIf(!ready)("headline strips match their data", () => {
 
     expect(h.stats[0].value).toBe(c.heard.toLocaleString("en-US"));
     expect(h.stats[1].value).toBe(c.believe.toLocaleString("en-US"));
+  });
+
+  test("eyes: games survived from pixels and from facts, replayed from the raw recordings", () => {
+    const rows = readFileSync(join(lab, "live-worlds/eyes/recordings/qwen3-vl-4b.v1.jsonl"), "utf8")
+      .trim()
+      .split("\n")
+      .map((l) => JSON.parse(l));
+
+    const seeds = [...new Set(rows.map((r) => r.seed))];
+    // A game from pixels survives only if its last recorded move doesn't end it.
+    let survived = 0;
+
+    for (const seed of seeds) {
+      let s = initial("snake", seed);
+
+      for (const r of rows.filter((x) => x.seed === seed).sort((x, y) => x.tick - y.tick)) {
+        s = r.move === "reverse" ? { ...s, status: "lost" as const } : step(s, r.move);
+
+        if (s.status !== "playing") break;
+      }
+
+      if (s.status !== "lost") survived++;
+    }
+
+    let factsSurvived = 0;
+
+    for (const seed of seeds) {
+      let s = initial("snake", seed);
+
+      while (s.status === "playing") s = step(s, greedy(s));
+
+      if (s.status !== "lost") factsSurvived++;
+    }
+
+    const perception = readFileSync(join(lab, "live-worlds/eyes/recordings/qwen3-vl-8b.perception.jsonl"), "utf8")
+      .trim()
+      .split("\n")
+      .map((l) => JSON.parse(l));
+
+    const right = perception.filter((r) => (r.p_yes >= 0.5) === r.truth).length;
+    const h = scene("eyes");
+
+    expect(h.stats[0].value).toBe(`${survived} of ${seeds.length}`);
+    expect(h.stats[1].value).toBe(`${factsSurvived} of ${seeds.length}`);
+    expect(h.stats[2].value).toBe(pct0(right / perception.length));
   });
 
   test("collection cards: headline lines where there's a strip, record counts elsewhere", () => {

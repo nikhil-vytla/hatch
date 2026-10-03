@@ -287,6 +287,48 @@ export function sentryHeadline(c: SentryCompare): Headline | null {
   };
 }
 
+// ---------- Eyes against state (Snake from pixels vs from the game's facts)
+
+/** The parts of public/eyes/eyes.json the headline reads (built by live-worlds/eyes/build.ts). */
+export type EyesSummary = {
+  greedy: { games: object[]; survived: number; medianMoves: number };
+  runs: { id: string; label: string; summary: { games: object[]; survived: number; medianMoves: number; medianMs: number | null } }[];
+  perception: { model: string; above: { asked: number; right: number }; right: { asked: number; right: number } } | null;
+};
+
+export function eyesHeadline(e: EyesSummary): Headline | null {
+  const runs = e.runs;
+
+  if (!runs.length) return null;
+
+  const first = runs[0].summary;
+  const games = first.games.length;
+  const lostAll = runs.every((r) => r.summary.survived === 0);
+  const longest = Math.max(...runs.map((r) => r.summary.medianMoves));
+  const p = e.perception;
+  const sees = p ? (p.above.right + p.right.right) / Math.max(1, p.above.asked + p.right.asked) : null;
+  const models = runs.map((r) => r.label).filter((l, i, all) => all.indexOf(l) === i && !l.includes(","));
+  const outcome = lostAll ? `lost every one of ${games} games` : `survived ${runs.map((r) => r.summary.survived).join(", ")} of ${games} games`;
+  const seeing = sees === null ? "" : ` The bigger model still read where the food was ${pct0(sees)} of the time.`;
+
+  return {
+    id: "eyes",
+    verdict: `Playing Snake from screenshots, ${models.join(" and ")} ${outcome}, a median of ${longest} moves in; reading the game's facts, a greedy rule survived ${e.greedy.survived} of ${e.greedy.games.length}.${seeing}`,
+    stats: [
+      { value: `${first.survived} of ${games}`, label: `games survived from pixels (${runs[0].label})` },
+      { value: `${e.greedy.survived} of ${e.greedy.games.length}`, label: "games survived from the facts (greedy rule)" },
+      ...(sees === null ? [] : [{ value: pct0(sees), label: "food direction read right from the image (8B)" }]),
+    ],
+    line: `${first.survived} of ${games} Snake games survived from pixels, ${e.greedy.survived} from facts`,
+    share: {
+      big: `${first.survived} of ${games}`,
+      ring: first.survived / games,
+      sentence: `An open vision model played Snake from screenshots: ${first.survived} of ${games} games survived. From the facts, a simple rule survived ${e.greedy.survived}.`,
+    },
+    source: "live-worlds/eyes/recordings (Qwen3-VL on an M4 Max), replayed on the same seeds",
+  };
+}
+
 // ---------- The rumour mill (the £500 scam, Jev's recorded answers vs the free model)
 
 export type SpreadCounts = { heard: number; believe: number };
