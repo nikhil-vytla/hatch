@@ -6,7 +6,8 @@
   "dependencies": {
     "@strive/protocol": "workspace:*",
     "@earendil-works/pi-ai": "1.0.0",
-    "@earendil-works/pi-agent-core": "1.0.0"
+    "@earendil-works/pi-agent-core": "1.0.0",
+    "valibot": "1.5.0"
   },
   "devDependencies": {
     "@strive/testkit": "workspace:*"

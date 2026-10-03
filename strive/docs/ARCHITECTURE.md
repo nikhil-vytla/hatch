@@ -286,7 +286,10 @@ results are rebuilt from the daemon's effect records, never from the host,
 and a tool call that never ran gets an explicit result.
 - A restarted host resumes the whole conversation.
 - A turn cut off by a host crash is closed as failed.
-- Live reply text travels as `session/delta` and is not journaled.
+- Live reply text travels as `session/delta` and is not journaled. A reply
+  the host never recorded (it stopped mid-turn) is still in the gateway's
+  response bytes. On resume it's decoded and given to the agent as a note
+  that quotes it (ADR-0030).
 - Only people, never hosts, can answer approvals.
 - A prompt may carry a `requestId` (ADR-0030). One sent again with an id
   the session already holds is answered with the first one's seq, and
