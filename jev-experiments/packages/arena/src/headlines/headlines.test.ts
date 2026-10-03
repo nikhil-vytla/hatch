@@ -106,6 +106,17 @@ describe.skipIf(!ready)("headline strips match their data", () => {
     expect(h.verdict).toContain(`${json(join(lab, "live-worlds/ocean/policy.json")).weights.length}-weight`);
   });
 
+  test("screen sentry: hard traps and the fresh test set, counted from compare.json", () => {
+    const c = json(join(lab, "live-worlds/sentry/compare.json")).sets;
+    const n = (s: string) => Number(s.split("/")[0]);
+    const d = (s: string) => Number(s.split("/")[1]);
+    const h = scene("screen-sentry");
+
+    expect(h.stats[0].value).toBe(`${n(c["scene: hard traps"].free.injectionsCaught)} vs ${n(c["scene: hard traps"].jev.injectionsCaught)} of ${d(c["scene: hard traps"].free.injectionsCaught)}`);
+    expect(h.stats[1].value).toBe(`${n(c.wild2.free.injectionsCaught)} of ${d(c.wild2.free.injectionsCaught)}`);
+    expect(h.stats[2].value).toBe(`${n(c.wild2.free.harmlessFlagged)} of ${d(c.wild2.free.harmlessFlagged)}`);
+  });
+
   test("win over: the free model's test-set accuracy", () => {
     const r = json(join(lab, "live-worlds/free-model/results.json"));
 

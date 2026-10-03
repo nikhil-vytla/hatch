@@ -19,6 +19,7 @@ import {
   openDecisionsHeadline,
   reefHeadline,
   rumourHeadline,
+  sentryHeadline,
   winOverHeadline,
   type DecoyResults,
   type FoolData,
@@ -29,6 +30,7 @@ import {
   type OpenDecisionsData,
   type ProseResults,
   type RecordResult,
+  type SentryCompare,
 } from "./headlines";
 import type { Question } from "../answer-key/model";
 
@@ -52,6 +54,7 @@ export type HeadlineInputs = {
   heldout: HeldoutRow[] | null;
   weights: number | null;
   freeModel: FreeModelResults | null;
+  sentry: SentryCompare | null;
   rumour: { vectors: Vectors; messages: Record<string, number[]>; rows: RecordedRow[] } | null;
   /** Every catalog scene and its published record's result, for the collection cards. */
   records: { id: string; result: RecordResult | null }[];
@@ -67,6 +70,7 @@ export function loadHeadlineInputs(lab: string, app: string): HeadlineInputs {
   const heldout = read<{ table: HeldoutRow[] }>(join(lab, "live-worlds/ocean/heldout.json"));
   const policy = read<{ weights: number[] }>(join(lab, "live-worlds/ocean/policy.json"));
   const freeModel = read<FreeModelResults>(join(lab, "live-worlds/free-model/results.json"));
+  const sentry = read<SentryCompare>(join(lab, "live-worlds/sentry/compare.json"));
   const vectors = read<Vectors & { messages: Record<string, number[]> }>(join(lab, "live-worlds/rumour/vectors.json"));
   const scam = join(lab, "live-worlds/rumour/jev-scam.jsonl");
 
@@ -86,6 +90,7 @@ export function loadHeadlineInputs(lab: string, app: string): HeadlineInputs {
     heldout: heldout?.table ?? null,
     weights: policy?.weights.length ?? null,
     freeModel,
+    sentry,
     rumour: vectors && rows.length ? { vectors: { anchors: vectors.anchors, archetypes: vectors.archetypes, places: vectors.places }, messages: vectors.messages, rows } : null,
     records: experiments.map((e) => ({ id: e.id, result: e.data ? (read<{ result?: RecordResult }>(join(app, `public/data/${e.data}.json`))?.result ?? null) : null })),
   };
@@ -107,6 +112,7 @@ export function headlinesFrom(i: HeadlineInputs): Headlines {
     i.openDecisions ? openDecisionsHeadline(i.openDecisions) : null,
     i.heldout && i.weights ? reefHeadline(i.heldout, i.weights) : null,
     i.freeModel ? winOverHeadline(i.freeModel) : null,
+    i.sentry ? sentryHeadline(i.sentry) : null,
     i.rumour ? rumour(i.rumour) : null,
   ].filter((h) => h !== null);
 
