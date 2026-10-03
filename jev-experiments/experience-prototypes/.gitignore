@@ -13,6 +13,7 @@ output/
 
 # Generated from original experiment sources by scripts/prepare.ts.
 public/judgment-reliability/
+public/rewardbench2/
 public/outcome-framing/
 public/visual-search/
 public/wardrobe/
