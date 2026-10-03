@@ -7,7 +7,8 @@ import { DIM, INTENTS, lineInput, profileInput, reactionInput, SAYS } from "./fe
 import goldLines from "./gold/win-over-lines.json";
 import { load, run, top, type NetFile } from "./model";
 import results from "./results.json";
-import { judgeGossip, judgeLine, profileDists, WEIGHT_BYTES } from "./runtime";
+import { judgeGossip, judgeLine, WEIGHT_BYTES } from "./runtime";
+import { PROFILE_WEIGHT_BYTES, profileDists } from "./runtime-rumour";
 import likeVectors from "./weights/like-vectors.json";
 
 const weights = (name: string) => JSON.parse(readFileSync(new URL(`./weights/${name}.json`, import.meta.url), "utf8")) as NetFile;
@@ -73,7 +74,7 @@ describe("free model inference", () => {
   });
 
   test("the trained weights stay small", () => {
-    expect(WEIGHT_BYTES).toBeLessThan(1_000_000);
+    expect(WEIGHT_BYTES + PROFILE_WEIGHT_BYTES).toBeLessThan(1_000_000);
   });
 });
 

@@ -25,7 +25,9 @@ export default defineConfig({
     dropUnusedOnnxWasm(),
     gzipPublishedPlugin(new URL("./vercel.json", import.meta.url).pathname),
   ],
-  worker: { plugins: () => [dropUnusedOnnxWasm()] },
+  // ES-module workers (every worker is created with { type: "module" }) can split chunks, so the
+  // three model workers share one transformers.js chunk (see src/transformers-lazy.ts).
+  worker: { format: "es", plugins: () => [dropUnusedOnnxWasm()] },
   resolve: { dedupe: ["react", "react-dom"] },
   server: { proxy: { "/api": `http://127.0.0.1:${process.env.JEV_API_PORT ?? 8793}` } },
   build: { chunkSizeWarningLimit: 1100 },

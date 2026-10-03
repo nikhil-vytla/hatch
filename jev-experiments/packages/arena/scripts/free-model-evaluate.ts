@@ -54,7 +54,8 @@ if (mode === "jobs") {
 // ---------- scoring ----------
 
 // Loaded here so writing the jobs works before any weights exist.
-const { judgeLine, profileDists } = await import("../../../live-worlds/free-model/runtime");
+const { judgeLine } = await import("../../../live-worlds/free-model/runtime");
+const { profileDists } = await import("../../../live-worlds/free-model/runtime-rumour");
 
 const readLabels = (d: string | undefined, name: string) =>
   d && existsSync(join(d, name))
