@@ -29,7 +29,7 @@ import {
   useRun,
   ErrorText,
 } from "./shared";
-import { extractLineFacts, fillEmpty, undoFill, pasteBatches, type Patch } from "../../quality-and-simulation-review/paste-transactions";
+import { extractLineFacts, fillEmpty, undoFill, pasteBatches, type Patch } from "./paste-transactions";
 export const pasteSources = {
   Conference:
     "Event: Small Worlds Conference\nOrganizer: Fieldwork Collective\nOrganizer address: 18 Pine Street, Portland\nVenue: Glasshouse Hall\nVenue address: 240 Oak Avenue, Seattle\nEvent date: October 12, 2026\nRegistration deadline: September 28, 2026\nContact email: hello@smallworlds.example\nStart time: 9:30 AM",
