@@ -30,6 +30,7 @@ export const DIAGRAMS: Record<string, Diagram> = {
   "rumour-mill": { from: ["rumour", "resident"], to: "share or argue" },
   "win-over": { from: ["your line", "listener"], to: "intent · mood · move" },
   ocean: { from: ["fish's view"], to: "next move" },
+  "who-said-that": { from: ["a line", "lines before"], to: "continues · replies" },
   "ghost-brush": { from: ["gesture", "feeling"], to: "brush style" },
   "screen-sentry": { from: ["page block"], to: "hijack risk" },
 };

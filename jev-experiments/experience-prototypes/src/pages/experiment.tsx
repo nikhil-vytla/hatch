@@ -38,6 +38,7 @@ const GhostBrush = lazy(() => import("../ghost-brush").then(m => ({ default: m.G
 const RumourMill = lazy(() => import("../rumour-mill").then(m => ({ default: m.RumourMill })));
 const WinOver = lazy(() => import("../win-over").then(m => ({ default: m.WinOver })));
 const DrawingFraming = lazy(() => import("../outcome-framing").then(m => ({ default: m.DrawingFraming })));
+const WhoSaidThat = lazy(() => import("../who-said-that").then(m => ({ default: m.WhoSaidThat })));
 const ArcadeScene = lazy(() => import("../arcade-scene").then(m => ({ default: m.ArcadeScene })));
 
 const cache = new Map<string, any>();
@@ -103,6 +104,8 @@ function View({
       return <RumourMill />;
     case "win-over":
       return <WinOver />;
+    case "who-said-that":
+      return <WhoSaidThat />;
     case "classify":
       return <IntentRecognition result={result} />;
     case "handoff":
@@ -205,7 +208,7 @@ function LiveExperimentPage({ id }: { id: string }) {
     setRecord(null);
     setError("");
     setAboutOpen(false);
-    if (id === "decoy" || id === "rumour-mill" || id === "win-over" || id === "ocean" || id === "open-decisions" || id === "screen-sentry") {
+    if (id === "decoy" || id === "rumour-mill" || id === "win-over" || id === "ocean" || id === "open-decisions" || id === "screen-sentry" || id === "who-said-that") {
       setRecord({ result: {} });
       return () => {
         alive = false;

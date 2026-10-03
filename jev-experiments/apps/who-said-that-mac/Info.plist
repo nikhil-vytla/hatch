@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleIdentifier</key><string>app.jev-experiments.who-said-that.prototype</string>
+  <key>CFBundleName</key><string>Who said that?</string>
+  <key>CFBundleExecutable</key><string>WhoSaidThat</string>
+  <key>CFBundlePackageType</key><string>APPL</string>
+  <key>CFBundleShortVersionString</key><string>0.1-prototype</string>
+  <key>LSMinimumSystemVersion</key><string>14.0</string>
+  <key>LSUIElement</key><true/>
+  <key>NSMicrophoneUsageDescription</key><string>Who said that? records you, your friend and your conversation to make a transcript on this Mac. Nothing is uploaded.</string>
+  <key>WSTRepo</key><string>__REPO__</string>
+  <key>WSTBun</key><string>__BUN__</string>
+</dict>
+</plist>
