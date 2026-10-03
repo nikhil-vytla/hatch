@@ -1,32 +1,34 @@
 # Jev experiments
 
-[Open the deployed laboratory](https://jev-experiments.vercel.app). It contains 25 visual experiment views, recorded evidence, editable live inputs, local model composition, and downloadable results. The app uses Bun, Vite, TypeScript, procedural SVG/canvas, Web Audio, and a Vercel function. The research runner uses Python. All implementation code in this folder is new; dependencies and fetched repositories are excluded.
+[Open the deployed laboratory](https://jev-experiments.vercel.app). It's a site of small experiments built on [Jev](https://docs.typesafe.ai/introduction), TypeSafe's typed decision model. Jev is text-only and returns choices, ordered scores and yes/no probabilities. It doesn't write a website, a caption or a paragraph. Those become possible when its decisions control another system, and that's the pattern here: Jev makes many bounded judgments while code does the rendering, simulation and bookkeeping.
 
-The useful pattern is to let Jev make many bounded judgments while other components do the writing, perception, rendering, training, and bookkeeping. Jev is text-only and returns choices, ordered scores, and yes/no probabilities. It does not directly generate a website, a caption, a waveform, or a paragraph. Those outputs become possible when its decisions control another system. [TypeSafe's documentation](https://docs.typesafe.ai/introduction) explains the underlying API contract.
+## What's on the site
 
-## What is built
+- **Home** leads with *Fool Jev* (add one sentence to change its mind) and the findings of the prose studies.
+- **Arena** compares contestants (Jev, local models, code baselines) on shared tasks, with charts you can re-axis.
+- **Decide** is a blind decision game: vote first, then see how recorded models and setups answered.
+- **Notes** are short interactive explainers.
+- **Scenes** are grouped as Productivity, Creative tools, Games & simulations, Agents & tooling, Benchmarks, and Training & local. The live list, and the retired scenes with their notices, are in [`experience-prototypes/src/catalog.ts`](experience-prototypes/src/catalog.ts).
 
-| Gallery views | What actually runs |
+Every Jev answer on the site is recorded by default, and live calls use the visitor's own gateway key. Each answer shows a receipt: time, questions, cost, recorded or live, date and host, plus the raw request and response. Jev's list price is $0.042 per million input tokens, with output free.
+
+Some scenes also run a free model in the browser: MobileBERT, MiniLM, Bramble mini (trained for Win over from an open teacher), and a policy evolved inside the reef. [TypeSafe's Master Customer Agreement](https://typesafe.ai/legal/mca) §2.3(b) forbids training a model to imitate Jev's output. So no model here is trained, selected or tuned on Jev's answers, and Jev results are shown only as comparisons. Three earlier experiments that did train on Jev's output (One box's tiny model, active labelling, learning from rewards) were removed in Sept–Oct 2026.
+
+## Where things live
+
+| Folder | What it holds |
 | --- | --- |
-| Procedural worlds, pixel drawing, logos | Jev selects scene attributes, 64 pixel colors, or a vector grammar; code renders the output and exposes probabilities. |
-| Generative UI, user journeys | Layout and field selection, revision checks, and a beverage flow that asks for clarification before confirmation. |
-| Music | Eight symbolic note and duration decisions, local synthesis, and MIDI export. |
-| Beverage ordering | Menu-grounded matching, preference extraction, conflict detection, and a local confirmation demo. |
-| Decision matrix | Separate rubric scores with immediately adjustable weights calculated in code. |
-| Navigation | MiniGrid random, visible BFS, reactive Jev, and Jev with action history, with step-by-step replay. |
-| Task routing, agent verifier, micro-agent | Bounded handler selection, completion-evidence checks, and a small route/retrieve/verify composition. |
-| Search, context protection | Document selection, relevance and injection judgments, source retention, and measurable context reduction. |
-| Classification, judging, robustness, latency | Public dataset comparisons, answer-order swaps, representation interventions, and state-size/question-count sweeps. |
-| Prompt optimization | Unchanged prompt, random mutation, hill climbing, OPRO-inspired proposals, and the real GEPA library. |
-| Labeling, reward training | A teacher-labeled local classifier and a linear policy trained with Jev rewards. Both export weights that run in the browser. |
-| Kev-style replication | A different backbone, SmolLM2-360M, with isolated question branches, LoRA, and a trained pointer head. |
-| Local writer plus Jev | Four Qwen3-0.6B candidates, Jev selection, official instruction checks, continuation steering, and a phrase-chain experiment. |
-| Vision plus Jev | Browser-local ViT-GPT2 captions an image; Jev evaluates the resulting text. |
-| Typed adapters | Pydantic, Zod, Rust Serde/Schemars, and Go JSON Schema plus validator. Values and probability evidence survive decoding. |
+| `experience-prototypes/` | The deployed app (Vite, React, TypeScript, Bun) and its API functions; Vercel's root directory |
+| `packages/arena/` | Arena cards, Decide, Fool Jev, prose studies, open decisions, and their recorders and tests |
+| `live-worlds/` | Simulations: win-over, rumour mill, reef, Ghost Brush, Tetris, and the free in-browser models |
+| `results/`, `*/results.jsonl` | Recorded evidence as `jev-records-v1` JSONL; `experience-prototypes/publication.json` lists what is public (see [`results/README.md`](results/README.md)) |
+| `src/jev_lab/`, `tests/` | The original Python research runner |
+| `adapters/` | Typed schema adapters for Python, TypeScript, Rust and Go |
+| `roadmap/` | Plans, routing and verification, including the publication-index check CI runs |
 
-Some views share a measured run: worlds and pixels, search and context, beverage and journeys. The 25 cards are not 25 independent benchmark datasets. The [source review](SOURCES.md) explains community precedents, including [aaazzam/jev](https://github.com/aaazzam/jev). The [idea garden](IDEA_GARDEN.md) proposes 20 further directions with concrete falsifiable tests.
+## Early lab findings (Sept 2026)
 
-## Findings
+These come from the Python runner's first study, before the site's current scenes. Newer findings are on the site itself and in [the prose studies](packages/arena/prose/README.md).
 
 The strongest lesson is to keep a simple baseline. On Banking77, trained TF-IDF plus logistic regression beat Jev. On CLINC, Jev's aggregate advantage came from recognizing out-of-scope requests, while the baseline remained stronger within known intents.
 
@@ -40,8 +42,6 @@ The strongest lesson is to keep a simple baseline. On Banking77, trained TF-IDF 
 | Archived writing pilot, IFEval checks | Jev selection passed 23/40 | First Qwen candidate 21/40; best-of-four oracle 30/40; Gemini Flash-Lite reference 35/40 |
 | RewardBench 2, current experiment 28 | 80.90% six-category mean; 1,865/1,865 cases complete | Supplied upstream labels; full scoring parity and content audit in the [report](rewardbench2/README.md) |
 | SmolLM2 decision model | Four-way choice 32.47% before, 66.23% after | 77 held-out records; yes/no stayed at 40.26%, score argmax rose from 33.77% to 45.45% |
-| Reward training | 63.75% independent menu accuracy after 240 updates | 44 successful training annotations; 80 held-out authored examples; a linear policy, not LLM RLHF |
-| Teacher labeling | Random acquisition 53.75%; uncertainty acquisition 52.50% | 32 attempted labels per method, shared initial eight, 80 held-out authored examples |
 
 The paired 95% bootstrap interval for Jev minus the baseline is -21.82 to -11.95 percentage points on Banking77 and +6.5 to +17.5 points on the chosen CLINC mixture. These intervals count request failures as incorrect and resample underlying cases. They do not remove sampling or dataset-design limitations.
 
@@ -65,7 +65,7 @@ All 240 navigation episodes completed. In the empty room, success was 70% for ra
 
 Navigation publication removes duplicated observations without dropping frames: `frame.state_id` indexes the result's `observations` array. This keeps the complete replay small enough to load comfortably. Local `runs/` files retain the original expanded traces.
 
-The shared SQLite ledger reserves each API attempt before sending it, enforces four in-flight requests, and stops at $25 conservatively accounted or 10,000 attempts. Unknown cost metadata remains reserved. Reported charges and conservative accounting are different numbers; the homepage displays both. Jev returned zero reported charges during the promotion, but many 429 errors returned no cost metadata. `jev-lab budget` shows the current local ledger.
+The runner's SQLite ledger reserves each API attempt before sending it, enforces four in-flight requests, and stops at $25 conservatively accounted or 10,000 attempts. Unknown cost metadata remains reserved. Jev reported zero charges during its launch promotion (until 25 Sep 2026), and many 429 errors returned no cost metadata. `jev-lab budget` shows the current local ledger.
 
 Early classification and judge rows recorded only the successful final attempt's latency. Their result files and UI explicitly say so, and `transport` reconstructs retry-aware durations from attempt timestamps. The latency sweep records gateway elapsed time, not pure inference time. The model alias did not reveal the underlying Jev version.
 
@@ -82,15 +82,7 @@ uv sync --extra dev --extra train
 .venv/bin/jev-lab serve
 ```
 
-In another terminal:
-
-```sh
-cd web
-bun install --frozen-lockfile
-bun run dev
-```
-
-The Vite development server proxies `/api/evaluate` to `127.0.0.1:8792`. Use its printed URL. The runner reads `AI_GATEWAY_API_KEY` from the environment or a literal assignment in `~/.zshrc`; it never executes that file. The key is never sent to the browser or written into results.
+The site itself runs from `experience-prototypes/` (`bun install --frozen-lockfile && bun start`; see its README). The older `web/` app this runner once served is no longer deployed. The runner reads `AI_GATEWAY_API_KEY` from the environment or a literal assignment in `~/.zshrc`; it never executes that file. The key is never sent to the browser or written into results.
 
 ```sh
 .venv/bin/jev-lab list
@@ -116,9 +108,9 @@ Typed adapter code lives under `adapters/`. Each compiler accepts a deliberate s
 
 ## Deployment and validation
 
-The production URL is [jev-experiments.vercel.app](https://jev-experiments.vercel.app), deployed from `experience-prototypes/`. Replay is public. Select **Connect live** and enter your own Vercel AI Gateway API key. The playground holds the key only in page memory, clearing it on reload or disconnect. Requests pass through the app to Vercel AI Gateway with that key; deployed handlers never fall back to an environment key. Live inputs are not added to the published benchmark.
+The production URL is [jev-experiments.vercel.app](https://jev-experiments.vercel.app), deployed from `experience-prototypes/` when `main` changes something under `jev-experiments/`. Replay is public. To run live, add your own Vercel AI Gateway API key in Settings. The playground holds the key only in page memory, clearing it on reload or disconnect. Requests pass through the app to Vercel AI Gateway with that key; deployed handlers never fall back to an environment key. Live inputs are not added to the published benchmark.
 
-The function validates request sizes, supported types, and returned distributions. There are no shared usage limits in this PR. The visitor's gateway account handles its own billing and provider limits. Recorded evidence is stored in JSONL and reconstructed into ordinary JSON for the site and downloads, with a reviewed publication manifest.
+The function validates request sizes, supported types, and returned distributions. There is no shared server key. The visitor's gateway account handles its own billing and provider limits. Recorded evidence is stored in JSONL and reconstructed into ordinary JSON for the site and downloads, with a reviewed publication manifest.
 
 ```sh
 cd experience-prototypes
@@ -129,12 +121,12 @@ bun scripts/cloudcheck.ts
 
 The deployment command uses Bun and pins the established Vercel project. No server-side model credentials are needed. `jev-lab deploy` delegates to the same command.
 
-Validation includes Python contract, budget, mask, reward-update, and sklearn/browser parity tests; TypeScript adapter tests and compilation; Rust and Go tests; and the production build. Browser checks exercised desktop/mobile layouts, local inference, local vision and writing, and interactive controls. Current merge-readiness checks cover caller-key isolation, missing-key rejection, malformed input, production inference, and JSONL reconstruction. See [NOTES.md](NOTES.md) for changes and observed failures, and [architecture decisions](agents/adrs/README.md) for the reasoning behind the experiment design.
+CI (`.github/workflows/jev-*.yml`) runs the Python contract, budget, mask and sklearn/browser parity tests; the TypeScript adapter tests and compilation; the Rust and Go tests; the app, arena and live-worlds Bun tests; the production build; and the publication-index check. See [NOTES.md](NOTES.md) for changes and observed failures, and [architecture decisions](agents/adrs/README.md) for the reasoning behind the experiment design.
 
 ```sh
 .venv/bin/pytest -q
 .venv/bin/ruff check src tests
-cd web
+cd experience-prototypes
 bun run build
 # In adapters/typescript: bun test && bunx tsc --noEmit
 # In adapters/rust: cargo test
