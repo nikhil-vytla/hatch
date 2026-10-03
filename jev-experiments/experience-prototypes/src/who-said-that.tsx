@@ -21,7 +21,6 @@ import {
   type Weights,
 } from "../../live-worlds/who-said-that/decide";
 import { freeAnswers, fromJev, jevRequest, LOOKBACK, type TextAnswers } from "../../live-worlds/who-said-that/questions";
-import results from "../../live-worlds/who-said-that/results.json";
 import { attribute, match, score, type Truth } from "../../live-worlds/who-said-that/score";
 import type { Heard } from "../../live-worlds/who-said-that/signals";
 import { markdown, renumber } from "../../live-worlds/who-said-that/transcript";
@@ -511,7 +510,6 @@ export function WhoSaidThat() {
   const replyEarlier = line ? Math.min(LOOKBACK, line.i) : 0;
   const recordedReceipt =
     effectiveLane === "jev" && recordedJev && line ? fromRecorded(recordedJev.receipts[line.i], { questions: line.i === 0 ? 2 : 3, raw: { request: jevRequest(heard, line.i), response: recordedJev.answers[line.i] } }) : null;
-  const res = results as Record<string, Record<"free" | "jev", { counts: Truth["counts"]; truth: Truth["counts"]; online: ReturnType<typeof score>; revised: ReturnType<typeof score> }>>;
 
   return (
     <div className="toybox wst">
@@ -828,120 +826,6 @@ export function WhoSaidThat() {
         )}
       </p>
 
-      <details className="wst-evidence">
-        <summary>Evidence: how it decides, the data, the results and the limits</summary>
-        <h4>How it decides</h4>
-        <p>
-          <b>Step one, signals (code and small models).</b> Speech is found where the level rises 6 dB above the recording's quiet
-          floor, cut into stretches of at most 5 s. Each stretch is transcribed by whisper-tiny.en, fingerprinted by Wespeaker's
-          CAM++ voice model and embedded for meaning by all-MiniLM-L6-v2. With a phone on each table, a frame only counts for a
-          phone when that phone hears it louder than the other.
-        </p>
-        <p>
-          <b>Step two, three text questions per line</b>, none of which depends on how anything has been grouped, so a recorded
-          answer stays valid whatever you toggle: does it continue the last line (yes/no)? which of the last six lines does it reply
-          to, if any (choice)? does it start a new topic (yes/no)? The free rules answer from word cues, timing and meaning
-          similarity; Jev answers from the words alone.
-        </p>
-        <p>
-          <b>Step three, three typed decisions per line</b>: which speaker (one so far, or someone new), which conversation (one so
-          far, or a new one), and a new topic or not. Each option's score is the sum of the signal pushes shown in the “why” panel,
-          then a softmax. Code keeps the voice prints, levels, phones, topics and counts. A speaker counts once they have two
-          lines, a conversation at three, a topic at two. Hindsight re-labels earlier lines against the final voice prints and
-          conversation topics.
-        </p>
-        <p>
-          The weights were set by hand on development windows (other stretches of the same meetings), then frozen before these three
-          scenarios were scored. Nothing was trained, and no Jev answer was used to set anything: Jev's answers are only shown and
-          scored.
-        </p>
-        <h4>Results (all signals on)</h4>
-        <table className="wst-table">
-          <thead>
-            <tr>
-              <th>Scenario</th>
-              <th>Text answers</th>
-              <th>Speakers · conv. · topics (corpus)</th>
-              <th>Speaker</th>
-              <th>Conversation</th>
-              <th>Topic</th>
-            </tr>
-          </thead>
-          <tbody>
-            {Object.entries(res).flatMap(([id, r]) =>
-              (["free", "jev"] as const).map((l) =>
-                r[l] ? (
-                  <tr key={`${id}-${l}`}>
-                    <td>{scenarios.find((s) => s.id === id)?.title ?? id}</td>
-                    <td>{l === "free" ? "Free rules" : "Jev, recorded"}</td>
-                    <td>
-                      {r[l].counts.speakers} · {r[l].counts.conversations} · {r[l].counts.topics} ({r[l].truth.speakers} · {r[l].truth.conversations} · {r[l].truth.topics})
-                    </td>
-                    <td>
-                      {percent(r[l].online.speaker.share)} <small>/ {percent(r[l].revised.speaker.share)}</small>
-                    </td>
-                    <td>
-                      {percent(r[l].online.conversation.share)} <small>/ {percent(r[l].revised.conversation.share)}</small>
-                    </td>
-                    <td>{percent(r[l].online.topic.share)}</td>
-                  </tr>
-                ) : null,
-              ),
-            )}
-          </tbody>
-        </table>
-        <p className="wst-note">
-          Share of the corpus's words whose label matches, after matching labels one to one; as decided / with hindsight. Words never
-          heard as speech count as wrong. Jev's recorded answers cost {formatCost(0.00288)} for 107 requests at list price.
-        </p>
-        <h4>What it can't do (yet)</h4>
-        <ul>
-          <li>whisper-tiny mishears overlapping and far-off speech, and every text answer inherits that.</li>
-          <li>Topics are undercounted: a 90 s window rarely holds enough lines to separate two related topics.</li>
-          <li>
-            With two tables, the phone a line was heard on is so strong a signal that each table's speakers merge into one (5
-            people come out as 2); switch “Loudness or microphone” off and it finds 5 speakers but mixes up the tables. When both
-            tables talk at once the quieter table's words are often lost: 64 of 382 words were never heard.
-          </li>
-          <li>On these scenarios Jev's text answers help most in the single meeting (it never invents a second conversation); on two tables, voice and phone level decide nearly everything, so it changes little.</li>
-          <li>Asked once about a whole transcript, Jev's conversation and topic counts are poor; the counts here come from code.</li>
-        </ul>
-        <h4>Data and models</h4>
-        <p>
-          Audio, words, speakers and topics: the{" "}
-          <a href="https://groups.inf.ed.ac.uk/ami/corpus/" target="_blank" rel="noreferrer">
-            AMI Meeting Corpus
-          </a>{" "}
-          (University of Edinburgh and partners),{" "}
-          <a href="https://groups.inf.ed.ac.uk/ami/corpus/license.shtml" target="_blank" rel="noreferrer">
-            CC BY 4.0
-          </a>
-          . {truth?.licence}{" "}
-          {truth?.source.map((s) => `${s.meeting} ${mmss(s.start)}–${mmss(s.end)} (${s.stream})`).join(" + ")}.
-        </p>
-        <p>
-          Models: whisper-tiny.en (MIT), all-MiniLM-L6-v2 (Apache-2.0), Wespeaker CAM++ trained on VoxCeleb (Apache-2.0), all run
-          on your device. Jev is TypeSafe's decision model.
-        </p>
-        <p>
-          <a href={`/who-said-that/${sid}.signals.json`} download>
-            Signals
-          </a>{" "}
-          ·{" "}
-          <a href={`/who-said-that/${sid}.truth.json`} download>
-            Answer key
-          </a>
-          {jev && (
-            <>
-              {" "}
-              ·{" "}
-              <a href={`/who-said-that/${sid}.jev.json`} download>
-                Jev's recorded answers
-              </a>
-            </>
-          )}
-        </p>
-      </details>
     </div>
   );
 }

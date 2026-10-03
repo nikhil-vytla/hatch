@@ -124,8 +124,7 @@
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
 }
 .wst-stage > section,
-.wst-signals,
-.wst-evidence {
+.wst-signals {
   background: #fff;
   border: 3px solid var(--tb-ink);
   border-radius: 20px;
@@ -436,26 +435,6 @@
   font-size: 13px;
   color: var(--tb-muted);
 }
-.wst-evidence summary {
-  font: 800 16px/1.2 var(--tb-display);
-  cursor: pointer;
-}
-.wst-evidence p,
-.wst-evidence li {
-  max-width: 80ch;
-  font-size: 14px;
-}
-.wst-table {
-  border-collapse: collapse;
-  font-size: 13px;
-  width: 100%;
-}
-.wst-table th,
-.wst-table td {
-  text-align: left;
-  padding: 4px 8px;
-  border-bottom: 1px solid #ddd;
-}
 @media (max-width: 900px) {
   .wst-stage,
   .wst-stage-2 {
@@ -478,9 +457,5 @@
   }
   .wst-columns {
     grid-template-columns: minmax(0, 1fr) !important;
-  }
-  .wst-table {
-    display: block;
-    overflow-x: auto;
   }
 }

@@ -308,7 +308,7 @@ function LiveExperimentPage({ id }: { id: string }) {
           open={aboutOpen}
           onClose={() => setAboutOpen(false)}
           title={exp.title}
-          tabs={gameEvidence(id, about, record?.manifest ? <p>{downloadLink}</p> : null)}
+          tabs={gameEvidence(id, note || record?.result?.provenance ? about : null, record?.manifest ? <p>{downloadLink}</p> : null)}
         />
       ) : (
         <section id="experiment-background" className="scene-head-evidence" hidden={!aboutOpen} aria-label="About this experiment">
