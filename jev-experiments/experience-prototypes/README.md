@@ -1,34 +1,20 @@
 # Jev experience prototypes
 
-[Open Jev experiments](https://jev-experiments.vercel.app). This is the deployed source for the experiment gallery around things people can manipulate, play, hear, compare, and inspect. It contains 29 experiment pages, shared light/dark/system themes, and three shareable layouts on the same routes.
+[Open Jev experiments](https://jev-experiments.vercel.app). This folder is the deployed app: the home toy, Arena, Decide, Notes and every experiment scene. Vercel's project root points here.
 
-The design question is whether an artifact-first studio, a controls-first comparison desk, or a narrative evidence notebook makes the experiments easier to understand. These are reviewable prototypes on `jev-experience-prototypes`. No winning layout has been selected yet.
+The live scenes and the retired ones (each with a notice saying why) are listed in [`src/catalog.ts`](src/catalog.ts); `src/pages/experiment.tsx` routes them. The site is light-only, in the Toy Box identity (`src/style.css`).
 
 ## Try these first
 
-- [Interfaces that listen](https://jev-experiments.vercel.app/#experiment/ui): replay a recorded construction, fill real fields, trigger local actions, compose another interface, or revise a version. Jev selects typed components through json-render. Layout and entrance animations reveal the changes. Account settings, apartment comparison, and event planning each have completed recorded builds.
-- [Paste what belongs](https://jev-experiments.vercel.app/#experiment/paste): follow source facts into destination fields, accept individual values, fill a form, undo, and distinguish personal from work or obsolete information. The downloadable [browser companion](https://jev-experiments.vercel.app/companion.zip) applies the same interaction to ordinary website forms. See [installation and limitations](extension/README.md).
-- [The next useful question](https://jev-experiments.vercel.app/#experiment/journeys): navigate a branching drink-order journey. One Jev request evaluated all 81 possible preference states. The independent menu filter checks compatibility and determines when a unique drink exists. No live token is needed to explore the recorded paths.
-- [A table that understands](https://jev-experiments.vercel.app/#experiment/semantic-table): ask a semantic question of eight complete support conversations, filter the answers, inspect the evidence, correct labels, and export the review.
-- [Undo what you meant](https://jev-experiments.vercel.app/#experiment/undo): select changes by meaning, review that selection, and animate their reversal without reverting unrelated changes.
-- [What changed that matters?](https://jev-experiments.vercel.app/#experiment/changes): alter a source fact and inspect which conclusions need review against an independent dependency list.
-- [Navigation replays](https://jev-experiments.vercel.app/#experiment/games): play and scrub actual MiniGrid traces, change policies and seeds, and inspect the agent's observation. There are 239 completed episodes, including unsuccessful episodes. One interrupted episode remains in the evidence download.
-- [Music](https://jev-experiments.vercel.app/#experiment/music): hear recorded Jev motifs in a four-part procedural arrangement, change tempo, mute parts, alter notes, request another arrangement, and export MIDI or JSON.
-- [Pixel compositions](https://jev-experiments.vercel.app/#experiment/pixels) and [animated worlds](https://jev-experiments.vercel.app/#experiment/worlds): Jev selects composition parameters; code supplies a visible drawing vocabulary. Palette, environment, density, motifs, and movement affect the render. These are constrained composition experiments, not unrestricted image generation.
-- [JudgeBench](https://jev-experiments.vercel.app/#experiment/judge): read the full question and both candidate answers before revealing the dataset label and Jev judgment. Search the cases or inspect only mistakes.
-- [RewardBench 2](https://jev-experiments.vercel.app/#experiment/rewardbench2) replaces the earlier language/IFEval experiment at position 28. Jev independently scores the supplied answers across six categories. The view shows full candidate text, upstream attribution, hidden-label reveals, category-specific scoring, pinned provenance, and explicit content notices. Reviewed text omissions preserve all case scores. See the [method and audit](../rewardbench2/README.md).
+- [Fool Jev](https://jev-experiments.vercel.app/#/): add one sentence to change Jev's mind about a question with fixed facts.
+- [Decide](https://jev-experiments.vercel.app/#/decide): vote blind on a judgement call, then see how recorded models and setups answered.
+- [The decoy](https://jev-experiments.vercel.app/#experiment/decoy): an option nobody should pick moves Jev's choice between two others.
+- [Who can you win over?](https://jev-experiments.vercel.app/#experiment/win-over), [the rumour mill](https://jev-experiments.vercel.app/#experiment/rumour-mill) and [the reef](https://jev-experiments.vercel.app/#experiment/ocean): simulations where many agents decide, run by free in-browser models, with Jev for comparison.
+- [Open decisions](https://jev-experiments.vercel.app/#experiment/open-decisions): small open Qwen models asked Jev's questions the way SGLang's `/v1/decisions` asks them.
+- [Smart paste](https://jev-experiments.vercel.app/#experiment/paste): match copied facts to form fields. The downloadable [browser companion](https://jev-experiments.vercel.app/companion.zip) does the same on ordinary websites; see [installation and limitations](extension/README.md).
+- [JudgeBench](https://jev-experiments.vercel.app/#experiment/judge) and [RewardBench 2](https://jev-experiments.vercel.app/#experiment/rewardbench2): read the full candidates before revealing the label and Jev's judgement. See the [RewardBench method and audit](../rewardbench2/README.md).
 
-## Compare the page layouts
-
-The state stays mounted while the layout changes. Use the floating bar or left/right arrow keys outside editing controls.
-
-| Layout | Link | Emphasis |
-| --- | --- | --- |
-| Studio | [Open](https://jev-experiments.vercel.app/?variant=studio#experiment/paste) | Large artifact, compact controls |
-| Comparison | [Open](https://jev-experiments.vercel.app/?variant=comparison#experiment/paste) | Controls first, followed by a full-width comparison |
-| Notebook | [Open](https://jev-experiments.vercel.app/?variant=notebook#experiment/paste) | Question first, stacked artifact and controls |
-
-The layout selector offers three views of the same experiments in the main application. All views share the same route and retain entered state.
+Every answer is recorded by default and carries a receipt. Buttons say "recorded · free" or "live · your key", and failures fall back to what's still on screen.
 
 ## What happens to failed runs
 
@@ -58,19 +44,17 @@ The API retry loop is bounded and the batch worker resumes from files. This prot
 - [Tone.js](https://tonejs.github.io/) supplies audio scheduling and synthesis; [@tonejs/midi](https://github.com/Tonejs/Midi) supplies MIDI encoding. Motion supplies animated layout changes. These libraries do the mechanical work; the model contributes bounded decisions.
 - [React Grab](https://www.react-grab.com/) is a useful follow-up for pointing a coding agent at a selected element's source. It was researched, not installed into the public app. Agentation and A2UI/AG-UI are adjacent options; an annotation or agent-event framework is not needed for these local artifact interactions yet.
 
-Jev is advertised as free on [Vercel Gateway](https://vercel.com/ai-gateway/models/jev) during a promotion ending September 25, 2026. Recovered successful calls reported zero cost. Unknown attempt costs remain unknown. The native response's billing metadata is preserved; no arbitrary per-call reserve is presented as actual spend. This pass uses Jev for new decisions and the previously recorded local-writer results for comparison; it does not launch a new Sonnet/Qwen generation job.
+Jev was free on [Vercel Gateway](https://vercel.com/ai-gateway/models/jev) during a launch promotion that ended on 25 Sep 2026, so calls recorded before then report zero cost. The receipt treats a recorded $0 as unknown. Its list price is now $0.042 per million input tokens, with output free. The native response's billing metadata is preserved, and no arbitrary per-call reserve is presented as actual spend.
 
 ## Honest limits and the next useful investigations
 
 The UI makes the experiments easier to inspect; it does not establish broad model quality. Eight authored support conversations are an interaction fixture, and 81 café states cover one finite menu. The journey audit checks valid stopping and unanswered questions in all 81 states, not globally optimal information gain. Generative UI still needs supplied text, data, components, and action bindings. Personal memory is explicitly entered local notes, not an agent that automatically knows a user's life.
 
-The learning pages expose the prior experiments' actual limits. Reward training is a small linear policy, with independent test accuracy shown next to teacher reward. The SmolLM2 replica has real parameter updates, trained on dataset labels rather than Jev's outputs, and its binary task performs poorly. Prompt search ties the unchanged prompt on the held-out set. The next substantial research work is a balanced multi-task student trained from an open teacher (TypeSafe's terms forbid distilling Jev's outputs), a larger multi-seed optimization study, and reward training evaluated by independent executable outcomes. None of those larger training studies is claimed as completed by this UI pass.
-
-Context filtering now makes kept and dropped text visible, but needs a downstream task-success comparison. Vision exposes the actual image and the failed caption, then lets a user repair the evidence passed to Jev. A stronger image-to-decision experiment should compare several vision encoders with independently labeled visual tasks.
+The SmolLM2 pilot (now inside Decision models on a Mac) has real parameter updates, trained on dataset labels rather than Jev's outputs, and its binary task performs poorly. Prompt search ties the unchanged prompt on the held-out set. TypeSafe's terms forbid distilling Jev's outputs, so free models here learn from open teachers or from the simulation itself.
 
 ## Run and deploy
 
-This folder is the current application source for the existing `jev-experiments` Vercel project. Deploy it to https://jev-experiments.vercel.app. The older `../web` folder is the preceding implementation.
+This folder is the application source for the `jev-experiments` Vercel project, deployed to https://jev-experiments.vercel.app when `main` changes something under `jev-experiments/`. The older `../web` folder is a previous implementation and isn't deployed.
 
 From this folder:
 
@@ -81,15 +65,13 @@ bun start
 
 The app runs on port 5191 and its API binds to `127.0.0.1:8793`. Recorded examples are public. Live calls accept the visitor's own [Vercel AI Gateway API key](https://vercel.com/docs/ai-gateway/authentication-and-byok/api-keys), kept only in browser memory until reload or disconnect. The app forwards that key per request to the fixed Jev endpoint without saving it. Deployed handlers never load environment credentials. Recording CLIs alone read `AI_GATEWAY_API_KEY` or the authorized literal assignment in zshrc. The companion explicitly saves the visitor's key in trusted extension storage and provides Disconnect.
 
-Evidence is committed as `jev-records-v1` JSONL. The first line holds document metadata with empty arrays; subsequent lines contain `{path, index, value}` entries, one array item per line. `scripts/records.ts` and `../src/jev_lab/records.py` reconstruct the original document. `publication.json` explicitly lists the 33 public results. `bun run build` emits ordinary `/data/*.json` files; UI rendering and JSON downloads retain complete evidence. Unlisted public data files fail the build.
+Evidence is committed as `jev-records-v1` JSONL. The first line holds document metadata with empty arrays; subsequent lines contain `{path, index, value}` entries, one array item per line. `scripts/records.ts` and `../src/jev_lab/records.py` reconstruct the original document. `publication.json` explicitly lists the public results. `bun run build` emits ordinary `/data/*.json` files; UI rendering and JSON downloads retain complete evidence. Unlisted public data files fail the build.
 
 ```sh
 bun run build
 bun test server
 bun run recover
 bun run record
-bun scripts/record-journeys.ts
-bun scripts/record-pixels.ts
 bun run deploy
 ```
 
@@ -99,12 +81,12 @@ Preparation reconstructs the files listed in `publication.json`, including full 
 
 ## Validation
 
-- TypeScript and Vite production build pass with Bun.
-- Seventeen focused tests pass, covering 127 assertions, including caller-key isolation, companion privacy, retries, and JSONL interoperability.
-- All 29 experiment pages opened in a real browser without JavaScript exceptions at desktop width. No horizontal overflow appeared at 1440px or 390px.
-- Real deployed checks returned 401 for anonymous calls, 400 for an invalid authenticated payload, and 200 for a live Jev judgment. A streamed interface revision finished in 832 ms, removed the requested switch, and preserved an edited form value; this is one observation, not a latency benchmark.
-- The evidence audit confirms all 200 JudgeBench cases include both full candidates and verifies original completed predictions were not replaced.
-- Music playback advanced and stopped in the browser; exported MIDI decoded into four tracks with 32 melody, 24 harmony, 8 bass, and 16 drum notes. The companion content script filled five fields and preserved a later manual edit on undo, using synthetic extension messaging.
-- Three recorded generated interfaces finish successfully. The browser companion is an unpacked prototype with installation instructions and two sample pages. Browser-specific installation and custom website widgets still need broader compatibility testing.
+CI runs on every pull request that touches `jev-experiments/`:
+- TypeScript, `bun run lint:arena` and the production build
+- the app, arena and live-worlds Bun tests
+- the Python tests
+- the publication-index check (`roadmap/verification/publication.ts`, then `git diff --exit-code`)
+
+Scene changes are also checked in headless Chromium at 1440 and 390 px against a local production preview.
 
 Sources and older study methods remain in the parent lab's `SOURCES.md` and `README.md`. This folder contains original prototype code, new decision records, derived recovery records, and investigation notes, not copies of downloaded repositories.
