@@ -31,6 +31,7 @@ export const DIAGRAMS: Record<string, Diagram> = {
   "win-over": { from: ["your line", "listener"], to: "intent · mood · move" },
   ocean: { from: ["fish's view"], to: "next move" },
   "ghost-brush": { from: ["gesture", "feeling"], to: "brush style" },
+  "screen-sentry": { from: ["page block"], to: "hijack risk" },
 };
 
 /** The diagram as words, for screen readers and search. */

@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Screen sentry</title>
+    <style>
+      body { width: 340px; margin: 0; padding: 14px; font: 14px/1.4 Nunito, system-ui, sans-serif; background: #fff4e0; color: #17140f; }
+      h1 { font: 800 18px system-ui, sans-serif; margin: 0 0 4px; }
+      .proto { font-size: 12px; color: #4a443a; margin: 0 0 10px; }
+      ol { padding-left: 18px; max-height: 240px; overflow: auto; }
+      li { margin-bottom: 6px; }
+      .where { font-size: 12px; background: #fbe9c9; border-radius: 999px; padding: 0 6px; }
+      button { font: 700 14px system-ui, sans-serif; border: 2px solid #17140f; border-radius: 999px; padding: 6px 12px; background: #17140f; color: #ffd23f; cursor: pointer; }
+      label { display: flex; gap: 6px; align-items: center; font-weight: 700; margin: 8px 0; }
+      #jev { font-size: 13px; }
+    </style>
+  </head>
+  <body>
+    <h1>Screen sentry</h1>
+    <p class="proto">Scoring runs on this device. Not published; a filter, not protection.</p>
+    <p id="summary">Scanning…</p>
+    <label><input id="enabled" type="checkbox" checked /> Outline suspicious blocks</label>
+    <ol id="list"></ol>
+    <button id="ask" type="button">Ask Jev about these (your key, optional)</button>
+    <p id="jev"></p>
+    <script src="dist/popup.js"></script>
+  </body>
+</html>

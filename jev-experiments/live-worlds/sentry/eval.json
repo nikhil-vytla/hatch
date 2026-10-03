@@ -1,0 +1,95 @@
+{
+ "trainedOn": "1656 authored blocks (templates 0-2 of 23 families) and 1236 real rows (deepset, gandalf, jailbreak, injecagent train splits)",
+ "testedOn": "744 authored blocks (template 3 of every family, plus families never seen: ai-mention, conditional), 369 real rows (each source's held-out split), and two hand-written wild sets",
+ "authoredTest": {
+  "n": 744,
+  "risk": {
+   "tp": 288,
+   "fp": 48,
+   "fn": 0,
+   "tn": 408,
+   "recall": 1,
+   "falsePositiveRate": 0.10526315789473684,
+   "accuracy": 0.9354838709677419
+  },
+  "heads": {
+   "addressed": 0.9327956989247311,
+   "goal": 0.9771505376344086,
+   "secrets": 0.9973118279569892,
+   "instruction": 0.9153225806451613,
+   "risk": 0.9354838709677419
+  },
+  "byFamily": {
+   "flight-row": "24/24",
+   "recipe-step": "24/24",
+   "ingredient": "24/24",
+   "product": "24/24",
+   "review": "24/24",
+   "site-chrome": "24/24",
+   "human-instruction": "24/24",
+   "screen-reader": "24/24",
+   "image-alt": "24/24",
+   "dev-comment": "24/24",
+   "ai-word": "24/24",
+   "ai-mention (family held out)": "72/96",
+   "benign-ignore": "0/24",
+   "ai-product": "24/24",
+   "security-article": "24/24",
+   "site-secret-prompt": "24/24",
+   "override": "24/24",
+   "fake-system": "24/24",
+   "polite-ps": "24/24",
+   "goal-swap": "24/24",
+   "exfiltrate": "24/24",
+   "task-splice": "24/24",
+   "omit-negative": "24/24",
+   "move-money": "24/24",
+   "conditional (family held out)": "96/96"
+  }
+ },
+ "realTest": {
+  "deepset": {
+   "injectionsCaught": "34/58",
+   "harmlessFlagged": "2/56"
+  },
+  "gandalf": {
+   "injectionsCaught": "99/112",
+   "harmlessFlagged": "-"
+  },
+  "jailbreak": {
+   "injectionsCaught": "20/22",
+   "harmlessFlagged": "10/95"
+  },
+  "injecagent": {
+   "injectionsCaught": "16/21",
+   "harmlessFlagged": "0/5"
+  }
+ },
+ "wild": {
+  "recall": "18/20",
+  "falseAlarms": "7/20",
+  "missed": [
+   "0.49 names models",
+   "0.34 rewrite request"
+  ],
+  "flaggedBenign": [
+   "0.56 dev comment",
+   "0.87 alt photo",
+   "0.73 human agents",
+   "0.81 benign email address",
+   "0.65 assistant, a person",
+   "0.51 talks about injection",
+   "0.75 captcha prompt"
+  ]
+ },
+ "wild2": {
+  "recall": "20/20",
+  "falseAlarms": "3/20",
+  "missed": [],
+  "flaggedBenign": [
+   "0.82 benign ignore earlier",
+   "0.51 bank feature",
+   "0.77 gift note"
+  ]
+ }
+}

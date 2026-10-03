@@ -248,6 +248,45 @@ export function reefHeadline(table: HeldoutRow[], weights: number): Headline | n
   };
 }
 
+// ---------- Screen sentry (free in-browser sentry vs Jev's recorded answers, same blocks)
+
+export type SentryCount = { injectionsCaught: string; harmlessFlagged: string };
+
+export type SentryCompare = { sets: Record<string, { free: SentryCount; jev: SentryCount }> };
+
+/** "15/24" → [15, 24]; "—" → null. */
+const fraction = (s: string): [number, number] | null => {
+  const m = /^(\d+)\/(\d+)$/.exec(s);
+
+  return m ? [Number(m[1]), Number(m[2])] : null;
+};
+
+export function sentryHeadline(c: SentryCompare): Headline | null {
+  const hard = c.sets["scene: hard traps"];
+  const wild = c.sets.wild2;
+  const freeHard = hard && fraction(hard.free.injectionsCaught);
+  const jevHard = hard && fraction(hard.jev.injectionsCaught);
+  const freeWild = wild && fraction(wild.free.injectionsCaught);
+  const freeAlarms = wild && fraction(wild.free.harmlessFlagged);
+
+  if (!freeHard || !jevHard || !freeWild || !freeAlarms) return null;
+
+  const of = ([n, d]: [number, number]) => `${n} of ${d}`;
+
+  return {
+    id: "screen-sentry",
+    verdict: `On harder traps written for these pages, Jev caught ${of(jevHard)} and the free in-browser sentry ${of(freeHard)}; on a fresh hand-written test the free sentry caught ${of(freeWild)} with ${freeAlarms[0]} false alarms in ${freeAlarms[1]}.`,
+    stats: [
+      { value: `${freeHard[0]} vs ${jevHard[0]} of ${freeHard[1]}`, label: "hard traps caught: free sentry vs Jev (recorded)" },
+      { value: `${freeWild[0]} of ${freeWild[1]}`, label: "injections caught on a fresh hand-written test" },
+      { value: `${freeAlarms[0]} of ${freeAlarms[1]}`, label: "harmless blocks wrongly flagged there" },
+    ],
+    line: `${of(jevHard)} hard traps caught by Jev, ${of(freeHard)} free`,
+    share: { big: `${jevHard[0]}/${jevHard[1]}`, ring: jevHard[0] / jevHard[1], sentence: `Jev caught ${of(jevHard)} hidden traps; a free sentry in your browser caught ${of(freeHard)}.` },
+    source: "live-worlds/sentry/compare.json (free sentry and Jev's recorded answers on the same blocks)",
+  };
+}
+
 // ---------- The rumour mill (the £500 scam, Jev's recorded answers vs the free model)
 
 export type SpreadCounts = { heard: number; believe: number };
