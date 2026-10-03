@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeftRight, ChevronLeft, ChevronRight, Download, Eye, ExternalLink, Expand, ShieldAlert } from "lucide-react";
 import { Button, Fold, Notice, Pane, Stat } from "./shared";
-import { download } from "./api";
+import { download, percent1 } from "./api";
 import { fromRecorded, Receipt } from "./receipt";
 import "./judgment-reliability.css";
-const pct = (x: number | null | undefined) => x == null ? "Unavailable" : `${(100 * x).toFixed(1)}%`;
+const pct = (x: number | null | undefined) => (x == null ? "Unavailable" : percent1(x));
 const num = (x: number | null | undefined) => x == null ? "—" : x.toFixed(3);
 const name = (v: string | null) => v === "A" ? "Answer 1" : v === "B" ? "Answer 2" : v === "tie" ? "Tie" : "Unavailable";
 const methodNames: Record<string, string> = { pairwise: "Pairwise choice", shared: "Pair-context scoring", isolated: "Isolated scoring" };

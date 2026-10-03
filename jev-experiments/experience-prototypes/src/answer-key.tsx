@@ -7,6 +7,7 @@ import { useMemo, useState } from "react";
 import { KEY_MODELS as MODELS, rank, type Key, type Question } from "../../packages/arena/src/answer-key/model";
 import { Receipt } from "./receipt";
 import { Pane, Pills } from "./shared";
+import { percent1 as pct } from "./api";
 
 const KEYS: { label: string; key: Key; about: string }[] = [
   {
@@ -29,7 +30,6 @@ const KEYS: { label: string; key: Key; about: string }[] = [
   },
 ];
 
-const pct = (n: number) => `${(n * 100).toFixed(1)}%`;
 
 export function AnswerKey({ result }: { result: any }) {
   const [label, setLabel] = useState(KEYS[1].label);

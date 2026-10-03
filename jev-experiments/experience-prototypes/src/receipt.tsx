@@ -6,9 +6,10 @@
  */
 import { createContext, useContext } from "react";
 import "./receipt.css";
+import { JEV_USD_PER_INPUT_TOKEN } from "../../packages/arena/src/jev-price";
 
-/** TypeSafe's list price for Jev: $0.042 per million input tokens, output free. */
-export const USD_PER_INPUT_TOKEN = 0.042 / 1e6;
+/** TypeSafe's list price for Jev, per input token (see packages/arena/src/jev-price.ts). */
+export const USD_PER_INPUT_TOKEN = JEV_USD_PER_INPUT_TOKEN;
 
 /** "recorded" replays a saved answer, "live" was just asked with the visitor's key, "browser" ran on this device. */
 export type ReceiptMode = "recorded" | "live" | "browser";

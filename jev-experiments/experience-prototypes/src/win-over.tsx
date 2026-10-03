@@ -25,7 +25,7 @@ import { camera, hitResident, paint, toWorld } from "../../live-worlds/win-over/
 import recorded from "../../live-worlds/win-over/recorded.json";
 import { STUDENT_NAME } from "../../live-worlds/free-model/runtime";
 import studentLines from "../../live-worlds/free-model/recorded-lines.json";
-import { getApiKey, NO_KEY_MESSAGE, run } from "./api";
+import { getApiKey, NO_KEY_MESSAGE, run, percent } from "./api";
 import { describeFailure } from "./live-failure";
 import { Receipt } from "./receipt";
 import { KeyTag, LiveFailure, ModeTag, openSettings } from "./trust";
@@ -47,7 +47,7 @@ const MOOD_WORDS = [
   "is fond of you",
 ];
 
-const pct = (n: number | undefined) => (n === undefined ? "—" : `${Math.round(n * 100)}%`);
+const pct = (n: number | undefined) => (n === undefined ? "—" : percent(n));
 
 
 /** The free model's text encoder (MiniLM), behind one shared worker. */

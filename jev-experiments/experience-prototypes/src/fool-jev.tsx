@@ -12,7 +12,7 @@ import {
   verdict,
   type Puzzle,
 } from "../../packages/arena/src/fool/model";
-import { getApiKey, NO_KEY_MESSAGE, run } from "./api";
+import { getApiKey, NO_KEY_MESSAGE, run, percent as pct } from "./api";
 import { Receipt, USD_PER_INPUT_TOKEN } from "./receipt";
 import { describeFailure, type Failure } from "./live-failure";
 import { KeyTag, LiveFailure, ModeTag, openSettings } from "./trust";
@@ -38,7 +38,6 @@ const HINTS = [
   { label: "Change the subject", sentence: "It's raining in London." },
 ];
 
-const pct = (n: number) => `${Math.round(n * 100)}%`;
 const SOLVED_KEY = "fool-jev-solved";
 
 /** Case, curly quotes, spacing and final punctuation don't make a sentence new. */

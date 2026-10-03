@@ -6,8 +6,8 @@
 import { useMemo, useState } from "react";
 import { calibration, type Bin } from "../../local-models-and-games/calibration";
 import { Pane, Stat } from "./shared";
+import { percent1 as pct } from "./api";
 
-const pct = (n: number) => `${(n * 100).toFixed(1)}%`;
 
 const fixed = (n: number, d = 3) => n.toFixed(d);
 
