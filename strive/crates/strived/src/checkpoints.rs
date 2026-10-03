@@ -127,8 +127,8 @@ impl Shadow {
             .collect())
     }
 
-    /// Saves the workspace as it is now and returns the commit.
-    pub fn snapshot(&self, message: &str) -> io::Result<String> {
+    /// Makes the repository if it isn't there yet.
+    fn init(&self) -> io::Result<()> {
         if !self.git_dir.join("HEAD").exists() {
             // git refuses to init with a work tree in the environment.
             let out = Command::new(&self.git)
@@ -148,6 +148,24 @@ impl Shadow {
             }
             self.run(&["config", "core.bare", "false"])?;
         }
+        Ok(())
+    }
+
+    /// Takes checkpoint `commit` from another session's repository at
+    /// `from` (a fork's parent, ADR-0030), so restoring it works here. Every
+    /// checkpoint is on that repository's `HEAD`, so fetching `HEAD` brings
+    /// it; a ref keeps it from being pruned.
+    pub fn import(&self, from: &Path, commit: &str) -> io::Result<()> {
+        self.init()?;
+        let from = from.to_str().ok_or_else(|| io::Error::other("the repository's path isn't UTF-8"))?;
+        self.run(&["fetch", "--no-tags", "-q", from, "+HEAD:refs/strive/parent"])?;
+        self.run(&["update-ref", &format!("refs/strive/forked/{commit}"), commit])?;
+        Ok(())
+    }
+
+    /// Saves the workspace as it is now and returns the commit.
+    pub fn snapshot(&self, message: &str) -> io::Result<String> {
+        self.init()?;
         let nested = self.nested_repositories()?;
         // Pointers saved by an earlier strive would be restored as empty
         // directories; drop them, and exclude them below with the rest.

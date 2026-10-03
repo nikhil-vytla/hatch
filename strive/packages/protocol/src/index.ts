@@ -110,6 +110,8 @@ export type * from "./generated/SessionDeltaNotification";
 
 export type * from "./generated/SessionEntryNotification";
 
+export type * from "./generated/SessionForkParams";
+
 export type * from "./generated/SessionInfo";
 
 export type * from "./generated/SessionInterruptNotification";

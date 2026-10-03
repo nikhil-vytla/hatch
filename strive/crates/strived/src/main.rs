@@ -116,6 +116,16 @@ enum Cmd {
         #[arg(long)]
         json: bool,
     },
+    /// Start a new session that goes on from a session's conversation at an
+    /// entry (default: the latest session here, at its last entry). Only the
+    /// conversation forks: files stay as they are, and `/rewind 1` in the
+    /// fork puts them back as they were at that entry.
+    Fork {
+        id: Option<String>,
+        /// The entry to fork at (see `strive log`); default: the last.
+        #[arg(long, value_name = "SEQ")]
+        at: Option<u64>,
+    },
     /// Check that session journals are intact. Exits 1 if any is not.
     Verify {
         id: Option<String>,
@@ -291,6 +301,7 @@ async fn run(cli: Cli) -> Result<ExitCode> {
             tui::exec_acp(&home)?;
             unreachable!("exec returns only on error")
         }
+        Some(Cmd::Fork { id, at }) => commands::fork(&mut launch::ensure(&home, "strive-fork").await?.0, id, at).await,
         Some(Cmd::Log { id, json }) => commands::log(&mut launch::ensure(&home, "strive-log").await?.0, id, json).await,
         Some(Cmd::Verify { id, all }) => {
             commands::verify(&mut launch::ensure(&home, "strive-verify").await?.0, id, all).await

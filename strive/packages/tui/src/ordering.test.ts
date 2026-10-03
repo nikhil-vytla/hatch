@@ -118,3 +118,43 @@ test("a prompt sent again after its saving wasn't confirmed keeps its request id
   expect(ids[2]).not.toBe(ids[0]!);
   expect(app.editor.getText()).toBe("");
 });
+
+test("/fork n goes on in a new session from before the nth prompt, shown with what came before", async () => {
+  const FORK = "01J8ZFORKAAAAAAAAAAAAAAAAA";
+  const parent = [started, message(2, "first"), message(3, "second")];
+
+  const forked: Entry[] = [
+    { ...started, event: { ...started.event } },
+    { seq: 2, tsMs: 0, event: { type: "forkedFrom", session: ID, seq: 2 } },
+  ];
+
+  const asked: { id: string; at?: number }[] = [];
+
+  const { term, app } = await open({
+    "session/attach": (p) => ({
+      result: p.id === FORK ? { session: { ...session, id: FORK }, entries: forked } : { session, entries: parent },
+    }),
+    "session/read": () => ({ result: { session, entries: parent, committed: 3, tornBytes: 0 } }),
+    "session/fork": (p) => {
+      asked.push(p);
+
+      return { result: { ...session, id: FORK } };
+    },
+  });
+
+  await term.waitFor("› second");
+  term.type("/fork");
+  await Bun.sleep(20);
+  term.type("\r");
+  await term.waitFor("2  second");
+  term.type("/fork 2");
+  await Bun.sleep(20);
+  term.type("\r");
+  const screen = await term.waitFor("Forked from session");
+
+  expect(asked).toEqual([{ id: ID, at: 2 }]);
+  expect(screen.some((l) => l.includes("› first"))).toBe(true);
+  expect(screen.some((l) => l.includes("› second"))).toBe(false);
+  // Back in the editor, to send again or change.
+  expect(app.editor.getText()).toBe("second");
+});

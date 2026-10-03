@@ -131,6 +131,8 @@ async function block(entry: Entry, effects: Map<number, Effect>, ran: Set<string
 
     case "effectCleared":
       return "";
+    case "forkedFrom":
+      return `${at} forked from session ${e.session} at its entry #${e.seq}; what came before is that session's`;
     case "approvalRequested":
       return `${at} asked for approval: ${e.description}`;
     case "approvalDecided":

@@ -195,6 +195,11 @@ export function describe(entry: Entry, options: DescribeOptions = {}): Line[] {
           return e.outcome satisfies never;
       }
 
+    case "forkedFrom":
+      return note(
+        "accent",
+        `Forked from session ${e.session} at entry ${e.seq}. The files are as they are now; /rewind 1 puts them back as they were then.`,
+      );
     // What a hook said shows in the question it asked, or the refusal.
     case "hookDecided":
     case "effectCleared":

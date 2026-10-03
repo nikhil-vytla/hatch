@@ -552,3 +552,24 @@ test("an extension that keeps failing is left out for the rest of the session", 
   expect(e.filter((x) => x.type === "effectStarted" && x.record.kind === "extension")).toHaveLength(3);
   expect(toolResult(fake!.requests[4])).toContain("left out for the rest of this session");
 });
+
+test("a fork goes on from its parent's conversation up to where it forked, without what came after", async () => {
+  const { client, id } = await setup([{ text: "first answer" }, { text: "second answer" }, { text: "forked answer" }]);
+
+  await client.request("session/prompt", { id, text: "first question" });
+  await waitFor(client, id, turnsEnded(1));
+  const { seq: second } = await client.request("session/prompt", { id, text: "second question" });
+
+  await waitFor(client, id, turnsEnded(2));
+  const fork = await client.request("session/fork", { id, at: second - 1 });
+
+  await client.request("session/prompt", { id: fork.id, text: "another question" });
+  await waitFor(client, fork.id, turnsEnded(1));
+  const sent = fake!.requests[2].messages.map((m: any) => [m.role, JSON.stringify(m.content)]);
+
+  expect(sent.map((s: string[]) => s[0])).toEqual(["user", "assistant", "user"]);
+  expect(sent[0][1]).toContain("first question");
+  expect(sent[1][1]).toContain("first answer");
+  expect(sent[2][1]).toContain("another question");
+  expect(JSON.stringify(sent)).not.toContain("second");
+});

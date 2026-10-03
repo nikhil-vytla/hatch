@@ -19,6 +19,7 @@ import { createStriveModels, model, textOf } from "./gateway";
 import { learnerMode } from "./learner";
 import { PromptReader } from "./learning-records";
 import {
+  ancestry,
   type CheckRun,
   checkCallId,
   checkReport,
@@ -529,7 +530,7 @@ export class Host {
         systemPrompt: this.mode.systemPrompt,
         model: model(this.config),
         tools: this.mode.tools,
-        messages: await rebuild(history, blob, this.mode.unjournaled),
+        messages: await this.conversation(history, blob),
       },
       streamFn: this.models.streamSimple.bind(this.models),
       toolExecution: "parallel",
@@ -596,6 +597,18 @@ export class Host {
 
   private noteCheckpoint(e: Entry) {
     if (e.event.type === "checkpointed") this.checkpoints.push({ seq: e.seq, checkpoint: e.event.checkpoint });
+  }
+
+  /** The conversation the agent goes on from: a fork's parents' up to where it forked, then its own. */
+  private async conversation(history: Entry[], blob: (digest: string) => Promise<string>) {
+    const read = async (id: string) => (await this.client.request("session/read", { id })).entries;
+    const earlier = await ancestry(history, read);
+
+    const parts = await Promise.all(
+      [...earlier.map((e) => e.entries), history].map((part) => rebuild(part, blob, this.mode.unjournaled)),
+    );
+
+    return parts.flat();
   }
 
   /** The checkpoint taken just before the prompt at `seq`, if there was one. */

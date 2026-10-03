@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import type { Entry, Event } from "@strive/protocol";
-import { CUT_OFF, rebuild, replyText } from "./transcript";
+import { ancestry, CUT_OFF, rebuild, replyText } from "./transcript";
 
 let seq = 0;
 
@@ -470,4 +470,21 @@ test("a reply's text is read from each provider's stream, and from a whole respo
   expect(replyText(responses)).toBe("Hi there");
   expect(replyText(JSON.stringify({ content: [{ type: "text", text: "whole" }, { type: "tool_use" }] }))).toBe("whole");
   expect(replyText("not a response")).toBe("");
+});
+
+test("a fork's parents are followed back, oldest first, and none past a summary", async () => {
+  const journals = new Map<string, Entry[]>([
+    ["A", [at({ type: "userMessage", text: "in A" }), at({ type: "userMessage", text: "after the fork" })]],
+    ["B", [at({ type: "forkedFrom", session: "A", seq: seq - 1 }), at({ type: "userMessage", text: "in B" })]],
+  ]);
+
+  const read = async (id: string) => journals.get(id)!;
+  const own = [at({ type: "forkedFrom", session: "B", seq }), at({ type: "userMessage", text: "mine" })];
+  const chain = await ancestry(own, read);
+
+  expect(chain.map((c) => c.session)).toEqual(["A", "B"]);
+  expect(chain[0]!.entries.map((e) => e.event)).toEqual([{ type: "userMessage", text: "in A" }]);
+  const summarized = [...own, at({ type: "compacted", uptoSeq: seq, summary: "all of it" })];
+
+  expect(await ancestry(summarized, read)).toEqual([]);
 });

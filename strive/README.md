@@ -28,6 +28,7 @@ cd any/repository
 strive                # opens the TUI in a new session; the per-user daemon starts on its own
 strive -c             # continue the latest session in this directory
 strive -r ID          # resume a session by id
+strive fork [ID]      # a new session that goes on from a session's conversation (--at SEQ; /fork n in the TUI)
 strive --safe         # a new session in safe mode: no extension's tools or hooks run (also for app and run)
 strive sessions       # sessions started here, newest first (--all for every directory)
 strive log [ID]       # a session's journal (default: the latest here)

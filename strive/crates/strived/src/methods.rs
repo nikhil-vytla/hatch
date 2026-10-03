@@ -32,7 +32,7 @@ use strive_proto::{ModelInfo, ModelList, ModelListResult, SessionModel, SessionM
 use strive_proto::{
     SessionChanges, SessionChangesParams, SessionChangesResult, SessionCommands, SessionCommandsResult,
 };
-use strive_proto::{SessionRewind, SessionRewindParams, SessionRewindResult};
+use strive_proto::{SessionFork, SessionForkParams, SessionRewind, SessionRewindParams, SessionRewindResult};
 
 /// Journals a priced model for the session's agent, before its first prompt.
 async fn choose_model(state: &Arc<State>, SessionModelParams { id, model }: SessionModelParams) -> Reply {
@@ -367,6 +367,7 @@ fn host_may_record(event: &Event, kind: SessionKind) -> bool {
         | Event::HookDecided { .. }
         | Event::EffectCleared { .. }
         | Event::EffectRerun { .. }
+        | Event::ForkedFrom { .. }
         | Event::ApprovalModeSet { .. }
         | Event::ApprovalRequested { .. }
         | Event::ApprovalDecided { .. }
@@ -749,6 +750,75 @@ async fn changes(state: &Arc<State>, id: &str, checkpoint: u64) -> Reply {
         .map_err(|e| internal(&e))?
         .map_err(|e| internal(&e))?;
     reply::<SessionChanges>(SessionChangesResult { files, more })
+}
+
+/// Forks session `id` at entry `at` (ADR-0030): a new work session whose
+/// conversation goes on from there, with the parent's approval mode, model
+/// and safe mode as they were then, and a budget of its own. Only the
+/// conversation forks. The files stay as they are, and the fork's first
+/// checkpoint is the parent's last one at or before `at`, so `/rewind 1`
+/// puts them back as they were.
+async fn fork(state: &Arc<State>, conn: &Conn, params: Value) -> Reply {
+    require_person(conn)?;
+    let SessionForkParams { id, at } = parse::<SessionFork>(params)?;
+    let sid = session_id(&id)?;
+    let info = state.sessions.info(&sid).await.map_err(session_error)?;
+    if info.kind == Some(SessionKind::Learning) {
+        return Err(RpcError::new(RpcError::INVALID_REQUEST, "only a work session can be forked"));
+    }
+    let (_, report) = state.sessions.read(&sid).map_err(session_error)?;
+    let last = report.entries.last().map_or(0, |e| e.seq);
+    let at = at.unwrap_or(last);
+    if at == 0 || at > last {
+        return Err(RpcError::new(
+            RpcError::INVALID_PARAMS,
+            format!("the session has entries 1 to {last}; it can't fork at {at}"),
+        ));
+    }
+    let before: Vec<&Event> = report.entries.iter().filter(|e| e.seq <= at).map(|e| &e.event).collect();
+    let mode = before
+        .iter()
+        .rev()
+        .find_map(|e| match e {
+            Event::ApprovalModeSet { mode } => Some(*mode),
+            _ => None,
+        })
+        .unwrap_or(state.settings.approvals);
+    let model = before.iter().rev().find_map(|e| match e {
+        Event::ModelSet { model } => Some(model.clone()),
+        _ => None,
+    });
+    let checkpoint = before.iter().rev().find_map(|e| match e {
+        Event::Checkpointed { commit, .. } => Some(commit.clone()),
+        _ => None,
+    });
+    let mut then = vec![Event::ForkedFrom { session: id.clone(), seq: at }];
+    then.extend(model.map(|model| Event::ModelSet { model }));
+    let forked = state
+        .sessions
+        .create(info.cwd.clone(), state.settings.budget.limits(), mode, None, info.safe, then)
+        .await
+        .map_err(session_error)?;
+    if let Some(commit) = checkpoint {
+        let fid = session_id(&forked.id)?;
+        let (from, to, workspace) =
+            (state.sessions.checkpoint_dir(&sid), state.sessions.checkpoint_dir(&fid), workspace_of(&info.cwd)?);
+        let imported = tokio::task::spawn_blocking(move || {
+            let shadow = crate::checkpoints::Shadow::new(&to, &workspace)
+                .ok_or_else(|| std::io::Error::other("checkpoints need git, which isn't available"))?;
+            shadow.import(&from, &commit).map(|()| commit)
+        })
+        .await
+        .map_err(|e| internal(&e))?;
+        match imported {
+            Ok(commit) => {
+                state.sessions.record_checkpoint(&fid, commit).await.map_err(session_error)?;
+            }
+            // The fork still goes on from the conversation; only `/rewind 1` is lost.
+            Err(e) => crate::log!("fork {} has no checkpoint of its parent's files: {e}", forked.id),
+        }
+    }
+    reply::<SessionFork>(forked)
 }
 
 async fn rewind(state: &Arc<State>, params: Value) -> Reply {
@@ -1202,6 +1272,7 @@ async fn route_session(state: &Arc<State>, conn: &Arc<Conn>, method: &str, param
                         state.settings.approvals,
                         None,
                         safe || !state.settings.extensions,
+                        Vec::new(),
                     )
                     .await
                     .map_err(session_error)?,
@@ -1249,6 +1320,7 @@ async fn route_session(state: &Arc<State>, conn: &Arc<Conn>, method: &str, param
             require_person(conn)?;
             rewind(state, params).await
         }
+        SessionFork::NAME => fork(state, conn, params).await,
         SessionCommands::NAME => list_commands(state, params).await,
         SessionChanges::NAME => {
             let SessionChangesParams { id, checkpoint } = parse::<SessionChanges>(params)?;

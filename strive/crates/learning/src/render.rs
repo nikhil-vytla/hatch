@@ -138,6 +138,9 @@ fn block(entry: &Entry, starts: &HashMap<u64, (u64, &EffectRecord)>, blob: Blob)
             TurnEnd::Failed { error } => format!("{at} turn {turn} failed: {error}"),
         },
         Event::Rewound { to, .. } => format!("{at} rewound the files to checkpoint {to}"),
+        Event::ForkedFrom { session, seq } => {
+            format!("{at} forked from session {session} at its entry #{seq}; what came before is that session's")
+        }
         Event::Compacted { upto_seq, summary } => {
             format!("{at} the conversation up to #{upto_seq} was summarized: {}", cut(summary, REPLY))
         }

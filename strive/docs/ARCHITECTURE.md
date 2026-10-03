@@ -291,6 +291,10 @@ and a tool call that never ran gets an explicit result.
   response bytes. On resume it's decoded and given to the agent as a note
   that quotes it (ADR-0030).
 - Only people, never hosts, can answer approvals.
+- `session/fork {id, at}` starts a session that goes on from another's
+  conversation at an entry (`forkedFrom`). The host rebuilds the parents'
+  part from their journals. Files stay as they are, and the fork's first
+  checkpoint is the parent's last one by then (ADR-0030).
 - A prompt may carry a `requestId` (ADR-0030). One sent again with an id
   the session already holds is answered with the first one's seq, and
   nothing is journaled.

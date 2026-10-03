@@ -6,7 +6,8 @@ use anyhow::{Result, anyhow};
 use strive_budget::format_usd;
 use strive_proto::{
     ApprovalMode, CallOutcome, Decision, EffectOutcome, EffectRecord, Entry, Event, HookAnswer, ProposalDecision,
-    SessionInfo, SessionList, SessionListParams, SessionRead, SessionReadResult, SessionRef, TurnEnd,
+    SessionFork, SessionForkParams, SessionInfo, SessionList, SessionListParams, SessionRead, SessionReadResult,
+    SessionRef, TurnEnd,
 };
 
 use crate::client::{Client, ServerError};
@@ -110,6 +111,7 @@ pub fn describe(e: &Entry) -> String {
             format!("{extension}'s hook {said} (effect {effect}){why}")
         }
         Event::EffectCleared { effect } => format!("effect {effect} allowed; running"),
+        Event::ForkedFrom { session, seq } => format!("forked from session {session} at its entry {seq}"),
         Event::EffectRerun { effect, outcome, .. } => match outcome {
             EffectOutcome::Done { .. } => format!("effect {effect} run again after a crash: done"),
             EffectOutcome::Refused { reason } => format!("effect {effect} run again after a crash: refused: {reason}"),
@@ -247,6 +249,18 @@ pub async fn log(c: &mut Client, id: Option<String>, json: bool) -> Result<ExitC
         }
     }
     Ok(if r.problem.is_some() { ExitCode::FAILURE } else { ExitCode::SUCCESS })
+}
+
+pub async fn fork(c: &mut Client, id: Option<String>, at: Option<u64>) -> Result<ExitCode> {
+    let id = resolve(c, id).await?;
+    let forked = c.request::<SessionFork>(SessionForkParams { id: id.clone(), at }).await?;
+    println!("{}", forked.id);
+    eprintln!(
+        "strive: forked session {id}{}; `strive -r {}` goes on from there. The files are as they are now: `/rewind 1` there puts them back as they were then.",
+        at.map(|a| format!(" at entry {a}")).unwrap_or_default(),
+        forked.id
+    );
+    Ok(ExitCode::SUCCESS)
 }
 
 pub async fn verify(c: &mut Client, id: Option<String>, all: bool) -> Result<ExitCode> {
