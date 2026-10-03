@@ -1,11 +1,11 @@
 import { test, expect } from "bun:test";
-import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { canonical, rank, official, transitions, compareVotes, range } from "./scoring";
 import { payload, tasks, hash, PROTOCOL, POLICY_STATE, encodedQuestions, type Pair } from "./protocol";
 import { buildCases, summarize } from "./analyze";
 import { sourceClusterKey, analysisMetadata } from "./clustering";
-const pairs: Pair[] = readFileSync(new URL("cases.jsonl", import.meta.url), "utf8").trim().split("\n").map(line => JSON.parse(line));
+import { readRecordText } from "../experience-prototypes/scripts/records";
+const pairs: Pair[] = readRecordText(new URL("cases.jsonl", import.meta.url)).trim().split("\n").map(line => JSON.parse(line));
 test("official upstream signed two-order rule including null and tie votes", () => {
   expect(official("A", "B", "A").outcome).toBe("correct");
   expect(official("A", "A", "A").outcome).toBe("tie");

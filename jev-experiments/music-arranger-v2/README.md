@@ -4,7 +4,7 @@ The replacement plays, draws and exports one eight-bar score. Six procedural phr
 
 ## What the recordings show
 
-All 14 authored cases completed: the eight original briefs and six additional explicit contour briefs, with one declared seed per brief. Each arrangement uses one global call and four sequential phrase calls. The 70 completed calls retain their exact input state, candidate events, answer distributions, provider attempts and final score in [music-v2.jsonl](music-v2.jsonl). Existing historical recordings were left intact; this is a new formulation, not a retroactive replacement of the original experiment.
+All 14 authored cases completed: the eight original briefs and six additional explicit contour briefs, with one declared seed per brief. Each arrangement uses one global call and four sequential phrase calls. The 70 completed calls retain their exact input state, candidate events, answer distributions, provider attempts and final score in [music-v2.jsonl.gz](music-v2.jsonl.gz) (committed gzipped). Existing historical recordings were left intact; this is a new formulation, not a retroactive replacement of the original experiment.
 
 Jev chose an arch for **31 of 32 phrases on the broad original briefs**. One phrase used a breath. The engine supplies six families, but contextual selection alone did not create much variety on these inputs.
 

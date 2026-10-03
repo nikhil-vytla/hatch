@@ -18,7 +18,7 @@ Every pending request carries a session and revision ticket. Draft edits, manual
 
 ## Recorded evidence
 
-[cafe.jsonl](cafe.jsonl) contains genuine responses from `typesafe-ai/jev` through the existing [Vercel AI Gateway](https://vercel.com/docs/ai-gateway) recording path. The declared set in [cases.ts](cases.ts) has 102 requests: all 81 partial states of the four core preferences and 21 cases covering customers, negation, ambiguity, soft preferences, contradictions, revisions, unsupported budgets and stock conflicts. The new customizable catalog has three impossible partial states; it should not be confused with the old eight-drink menu's 16 impossible partial states.
+[cafe.jsonl.gz](cafe.jsonl.gz) (committed gzipped; readers and `record.ts` handle it) contains genuine responses from `typesafe-ai/jev` through the existing [Vercel AI Gateway](https://vercel.com/docs/ai-gateway) recording path. The declared set in [cases.ts](cases.ts) has 102 requests: all 81 partial states of the four core preferences and 21 cases covering customers, negation, ambiguity, soft preferences, contradictions, revisions, unsupported budgets and stock conflicts. The new customizable catalog has three impossible partial states; it should not be confused with the old eight-drink menu's 16 impossible partial states.
 
 All 102 declared cases completed. Jev matched every annotated preference value and strength in 89 cases, including 77 of the 81 direct finite-state cases. Its extracted preferences produced the exact expected feasible set in 93 cases. It proposed an impossible drink family eight times; none of the suggestions admitted by the code violated an authored hard requirement in this fixture.
 

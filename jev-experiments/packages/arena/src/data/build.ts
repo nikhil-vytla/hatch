@@ -1448,7 +1448,7 @@ export function cafeCard(out: string): Card {
     "Café Jev, 102 authored cases",
     recordedOn,
     { benchmark: "cafe-jev", menu: doc.menuRevision, contract: "cafe-jev-turn-v1", cases: 102 },
-    ["cafe-jev/cafe.jsonl"],
+    ["cafe-jev/cafe.jsonl.gz"],
   );
 
   return {

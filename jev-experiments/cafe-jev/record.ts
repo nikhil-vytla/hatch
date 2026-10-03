@@ -1,4 +1,3 @@
-import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import {
   evaluate,
@@ -6,6 +5,7 @@ import {
 } from "../experience-prototypes/scripts/local-model";
 import {
   readRecord,
+  recordExists,
   writeRecord,
 } from "../experience-prototypes/scripts/records";
 import { CASES, comparePreferences } from "./cases";
@@ -20,7 +20,7 @@ import {
 } from "./engine";
 
 const output = fileURLToPath(new URL("./cafe.jsonl", import.meta.url));
-const previous = existsSync(output) ? readRecord(output) : null;
+const previous = recordExists(output) ? readRecord(output) : null;
 const rows: any[] = previous?.result?.rows ?? [];
 const failures: any[] = previous?.result?.providerFailures ?? [];
 const started = previous?.manifest?.created ?? new Date().toISOString();

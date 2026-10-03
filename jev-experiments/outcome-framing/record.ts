@@ -3,13 +3,13 @@ import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
 import { evaluate, GatewayError } from '../experience-prototypes/scripts/local-model';
-import { writeRecord } from '../experience-prototypes/scripts/records';
+import { unpackForAppend, writeRecord } from '../experience-prototypes/scripts/records';
 import { initial, act, chooseCode, modelPolicies, policies, decisionQuestion, sharedPolicy, features, type Policy, type GameState } from './tetris';
 import { SIZE, drawingCases, drawingMethods, drawingPayload, intensity, reference, drawingMetrics, type DrawingMethod } from './drawing';
 const here=dirname(fileURLToPath(import.meta.url));
 const mode=process.argv[2]??'prepare';
 const hash=(v:unknown)=>createHash('sha256').update(JSON.stringify(v)).digest('hex');
-const eventsFile=resolve(here,'events.jsonl');
+const eventsFile=unpackForAppend(resolve(here,'events.jsonl'));
 const events:any[]=existsSync(eventsFile)?readFileSync(eventsFile,'utf8').trim().split('\n').filter(Boolean).map(s=>JSON.parse(s)):[];
 const completed=new Map<string,any>();
 for(const e of events)if(e.kind==='response'){if(completed.has(e.id))throw Error(`Duplicate response ${e.id}`);completed.set(e.id,e);}

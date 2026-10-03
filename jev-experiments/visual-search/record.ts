@@ -1,11 +1,11 @@
 import { appendFileSync, readFileSync, existsSync, writeFileSync, openSync, closeSync, unlinkSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { resolve } from "node:path";
-import { readRecord } from "../experience-prototypes/scripts/records";
+import { readRecord, unpackForAppend } from "../experience-prototypes/scripts/records";
 import { evaluate, GatewayError } from "../experience-prototypes/scripts/local-model";
 import { PRESETS, PROTOCOL, makeBatches, readScores, type SearchMode, type Artwork, type SearchScores } from "./protocol";
 import { JEV_USD_PER_INPUT_TOKEN } from "../packages/arena/src/jev-price";
-const here = import.meta.dir, file = resolve(here, "events.jsonl"), hash = (s: string) => createHash("sha256").update(s).digest("hex");
+const here = import.meta.dir, file = unpackForAppend(resolve(here, "events.jsonl")), hash = (s: string) => createHash("sha256").update(s).digest("hex");
 const collectionText = readFileSync(resolve(here, "collection.jsonl"), "utf8"), collection = readRecord(resolve(here, "collection.jsonl")), works: Artwork[] = collection.result.works;
 const manifest = { ...PROTOCOL, collection_sha256: hash(collectionText), protocol_sha256: hash(JSON.stringify(PROTOCOL)), planned_scores: works.length * PRESETS.length * 2, frozen_at: "2026-10-01" };
 const manifestPath = resolve(here, "manifest.json"), expectedManifest = JSON.stringify(manifest, null, 2) + "\n";
