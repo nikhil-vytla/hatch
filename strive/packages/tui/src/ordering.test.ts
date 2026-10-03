@@ -83,3 +83,38 @@ test("a prompt the daemon fails to save is kept in the editor and the error is s
   await term.waitFor("Couldn't confirm your message was saved: No space left on device (os error 28)");
   expect(app.editor.getText()).toBe("my important prompt");
 });
+
+test("a prompt sent again after its saving wasn't confirmed keeps its request id", async () => {
+  const ids: (string | undefined)[] = [];
+
+  const { term, app } = await open({
+    "session/attach": () => ({ result: { session, entries: [started] } }),
+    "session/prompt": (p) => {
+      ids.push(p.requestId);
+
+      return ids.length === 1
+        ? { error: { code: -32603, message: "the connection dropped" } }
+        : { result: { seq: ids.length + 1 } };
+    },
+  });
+
+  await term.waitFor("Session started");
+  term.type("ship it");
+  await Bun.sleep(20);
+  term.type("\r");
+  await term.waitFor("Couldn't confirm your message was saved");
+  // Sent again as it was, from the editor it was kept in.
+  term.type("\r");
+
+  while (ids.length < 2) await Bun.sleep(10);
+  term.type("something else");
+  await Bun.sleep(20);
+  term.type("\r");
+
+  while (ids.length < 3) await Bun.sleep(10);
+
+  expect(ids[0]).toBeString();
+  expect(ids[1]).toBe(ids[0]!);
+  expect(ids[2]).not.toBe(ids[0]!);
+  expect(app.editor.getText()).toBe("");
+});

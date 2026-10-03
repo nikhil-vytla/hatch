@@ -423,7 +423,7 @@ export function bridge(daemon: StriveClient, version: string): acp.AgentApp {
       }
 
       try {
-        const { seq } = await daemon.request("session/prompt", { id: s.id, text });
+        const { seq } = await daemon.request("session/prompt", { id: s.id, text, requestId: crypto.randomUUID() });
 
         s.prompted(seq);
       } catch (e) {

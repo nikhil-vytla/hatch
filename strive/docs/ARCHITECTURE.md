@@ -288,6 +288,9 @@ and a tool call that never ran gets an explicit result.
 - A turn cut off by a host crash is closed as failed.
 - Live reply text travels as `session/delta` and is not journaled.
 - Only people, never hosts, can answer approvals.
+- A prompt may carry a `requestId` (ADR-0030). One sent again with an id
+  the session already holds is answered with the first one's seq, and
+  nothing is journaled.
 - `turnStarted` records the last prompt the turn took (`throughSeq`). A
   prompt sent while a turn runs is rebuilt after that turn's reply, and
   still runs if the host restarts first.

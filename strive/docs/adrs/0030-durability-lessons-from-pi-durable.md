@@ -1,6 +1,6 @@
 # ADR-0030: Four durability changes, learned from pi-durable
 
-Status: accepted (2026-10-02). Changes 1 and 3 are built; 2 and 4 aren't yet.
+Status: accepted (2026-10-02). Changes 1, 3 and 4.1 are built; 2 and 4.2 aren't yet.
 
 ## Context
 
@@ -162,6 +162,13 @@ Two things are missing:
    the session is answered with the first one's seq and journals nothing.
    The TUI, the desktop app and the ACP bridge (which has the editor's
    request) send one per prompt.
+
+   **Built.** The writer checks for the id and journals the prompt in one
+   step, so two copies sent at once journal one. The check reads the
+   journal, so it holds across restarts. A prompt sent again takes no
+   checkpoint. The TUI keeps a message's id when its saving isn't
+   confirmed and it's sent again as it was. `strive run` sends its one
+   prompt as `strive-run`. An id is 1 to 128 bytes.
 2. `session/fork {id, at}` creates a new session whose journal starts
    with a `forkedFrom {session, seq, digest}` entry. Its conversation
    rebuilds from the parent's entries up to `at` (verified against the

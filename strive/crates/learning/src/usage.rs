@@ -64,7 +64,7 @@ pub fn tally(session: &str, entries: &[Entry], given: &BTreeSet<u64>, out: &mut 
     };
     for e in entries {
         match &e.event {
-            Event::UserMessage { text, command } => {
+            Event::UserMessage { text, command, .. } => {
                 // The first prompt after a turn: a correction is trouble for what that turn cited.
                 let typed = command.as_ref().map_or(text.as_str(), |c| c.arguments.as_str());
                 if ended && crate::signals::is_correction(typed) {

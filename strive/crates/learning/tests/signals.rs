@@ -34,7 +34,7 @@ impl Journal {
         self.events.len() as u64
     }
     fn prompt(&mut self, text: &str) -> u64 {
-        self.push(Event::UserMessage { text: text.into(), command: None })
+        self.push(Event::UserMessage { text: text.into(), command: None, request_id: None })
     }
     fn turn(&mut self) {
         self.turn += 1;

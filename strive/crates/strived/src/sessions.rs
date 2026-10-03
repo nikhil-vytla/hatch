@@ -163,6 +163,7 @@ enum Cmd {
     Prompt {
         text: String,
         command: Option<strive_proto::CommandUse>,
+        request_id: Option<String>,
         commit: Option<String>,
         reply: oneshot::Sender<io::Result<Vec<Entry>>>,
     },
@@ -464,11 +465,12 @@ impl Sessions {
         id: &SessionId,
         text: String,
         command: Option<strive_proto::CommandUse>,
+        request_id: Option<String>,
         commit: Option<String>,
     ) -> Result<Vec<Entry>> {
         let (_, tx) = self.writer(id).await?;
         let (reply, rx) = oneshot::channel();
-        tx.send(Cmd::Prompt { text, command, commit, reply }).map_err(|_| writer_gone())?;
+        tx.send(Cmd::Prompt { text, command, request_id, commit, reply }).map_err(|_| writer_gone())?;
         Ok(rx.await.map_err(|_| writer_gone())??)
     }
 
@@ -1175,13 +1177,18 @@ impl Writer {
                 let e = Event::ModelCallFinished { call, outcome, response, duration_ms };
                 (vec![e], Box::new(move |r, _| drop(reply.send(r))))
             }
-            Cmd::Prompt { text, command, commit, reply } => {
+            Cmd::Prompt { text, command, request_id, commit, reply } => {
+                // Sent before under this id: the first one stands, and nothing more is journaled.
+                if let Some(first) = request_id.as_ref().and_then(|id| self.prompted_as(id)) {
+                    let _ = reply.send(Ok(vec![first]));
+                    return Staged::Handled;
+                }
                 let mut events = Vec::new();
                 if let Some(commit) = commit {
                     self.checkpoints.push(commit.clone());
                     events.push(Event::Checkpointed { checkpoint: self.checkpoints.len() as u64, commit });
                 }
-                events.push(Event::UserMessage { text, command });
+                events.push(Event::UserMessage { text, command, request_id });
                 self.prompted = true;
                 (events, Box::new(move |r, _| drop(reply.send(r))))
             }
@@ -1311,6 +1318,14 @@ impl Writer {
         true
     }
 
+    /// The prompt journaled under `request_id`, if one was.
+    fn prompted_as(&self, request_id: &str) -> Option<Entry> {
+        self.entries
+            .iter()
+            .find(|e| matches!(&e.event, Event::UserMessage { request_id: Some(r), .. } if r == request_id))
+            .cloned()
+    }
+
     /// Calls that started but never finished were cut off by a crash. Close
     /// each explicitly, charged its full reservation, then rebuild the
     /// ledger from the journal so it matches exactly.
@@ -1382,7 +1397,7 @@ fn peek_info(id: &SessionId, dir: &Path) -> Option<SessionInfo> {
     let Event::SessionStarted { cwd, kind, safe, .. } = first.event else { return None };
     let title = lines.take(PEEK_LINES).map_while(std::result::Result::ok).find_map(
         |line| match serde_json::from_str::<Entry>(line.trim_end()).ok()?.event {
-            Event::UserMessage { text, command: None } => Some(shorten(&text)),
+            Event::UserMessage { text, command: None, .. } => Some(shorten(&text)),
             Event::UserMessage { command: Some(c), .. } => {
                 Some(shorten(format!("/{} {}", c.name, c.arguments).trim_end()))
             }

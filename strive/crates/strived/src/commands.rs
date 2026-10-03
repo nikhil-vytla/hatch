@@ -57,7 +57,7 @@ fn clock(ms: u64) -> String {
 pub fn describe(e: &Entry) -> String {
     match &e.event {
         Event::SessionStarted { cwd, .. } => format!("started in {cwd}"),
-        Event::UserMessage { text, command: None } => format!("you: {text}"),
+        Event::UserMessage { text, command: None, .. } => format!("you: {text}"),
         Event::UserMessage { command: Some(c), .. } => {
             format!("you: /{} {}", c.name, c.arguments).trim_end().to_string()
         }

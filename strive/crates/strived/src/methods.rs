@@ -670,7 +670,13 @@ fn read(state: &State, params: Value) -> Reply {
 }
 
 async fn prompt(state: &Arc<State>, params: Value) -> Reply {
-    let SessionPromptParams { id, text } = parse::<SessionPrompt>(params)?;
+    let SessionPromptParams { id, text, request_id } = parse::<SessionPrompt>(params)?;
+    if request_id.as_ref().is_some_and(|r| r.is_empty() || r.len() > REQUEST_ID_LIMIT) {
+        return Err(RpcError::new(
+            RpcError::INVALID_PARAMS,
+            format!("a prompt's requestId is 1 to {REQUEST_ID_LIMIT} bytes"),
+        ));
+    }
     let sid = session_id(&id)?;
     let info = state.sessions.info(&sid).await.map_err(session_error)?;
     match info.kind.unwrap_or_default() {
@@ -696,10 +702,30 @@ async fn prompt(state: &Arc<State>, params: Value) -> Reply {
         }
         None => (text, None),
     };
-    let commit = checkpoint(state, &sid, &info.cwd, &format!("before: {text}")).await;
-    let entries = state.sessions.prompt(&sid, text, command, commit).await.map_err(session_error)?;
+    // A prompt sent again takes no checkpoint; the writer answers it with the first.
+    let sent = match &request_id {
+        Some(r) => already_prompted(state, &sid, r)?,
+        None => None,
+    };
+    let commit = match sent {
+        Some(_) => None,
+        None => checkpoint(state, &sid, &info.cwd, &format!("before: {text}")).await,
+    };
+    let entries = state.sessions.prompt(&sid, text, command, request_id, commit).await.map_err(session_error)?;
     state.hosts.ensure(&sid, &state.home.socket(), &state.sessions.session_dir(&sid).join("host.log"));
     reply::<SessionPrompt>(Appended { seq: entries.last().map_or(0, |e| e.seq) })
+}
+
+/// The longest id a client may name a prompt by.
+const REQUEST_ID_LIMIT: usize = 128;
+
+/// The seq of the prompt the session journaled under `request_id`, if any.
+fn already_prompted(state: &State, sid: &SessionId, request_id: &str) -> Result<Option<u64>, RpcError> {
+    let (_, report) = state.sessions.read(sid).map_err(session_error)?;
+    Ok(report.entries.iter().find_map(|e| match &e.event {
+        Event::UserMessage { request_id: Some(r), .. } if r == request_id => Some(e.seq),
+        _ => None,
+    }))
 }
 
 /// Files the changes view shows at most, and the most of each file's text.

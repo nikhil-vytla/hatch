@@ -23,7 +23,7 @@ impl Journal {
         self
     }
     fn prompt(&mut self, text: &str) -> &mut Self {
-        self.push(Event::UserMessage { text: text.into(), command: None })
+        self.push(Event::UserMessage { text: text.into(), command: None, request_id: None })
     }
     fn reply(&mut self, turn: u64, text: &str) -> &mut Self {
         self.push(Event::TurnStarted { turn, through_seq: None }).push(Event::AssistantMessage {

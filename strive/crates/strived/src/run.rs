@@ -63,7 +63,9 @@ pub async fn run(c: &mut Client, opts: Options) -> Result<ExitCode> {
         show(e, opts.json)?;
     }
     let shown = attached.entries.last().map_or(0, |e| e.seq);
-    let prompt = c.request::<SessionPrompt>(SessionPromptParams { id: id.clone(), text: opts.task }).await?.seq;
+    // A run sends its session one prompt, so one id names it.
+    let params = SessionPromptParams { id: id.clone(), text: opts.task, request_id: Some("strive-run".into()) };
+    let prompt = c.request::<SessionPrompt>(params).await?.seq;
     if !opts.json {
         eprintln!("strive: session {id} (strive log {id} shows it again)");
     }
