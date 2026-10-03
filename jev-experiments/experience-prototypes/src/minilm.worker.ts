@@ -4,10 +4,8 @@
  * Who can you win over?. Same model and settings as live-worlds/rumour/vectors.json and the free
  * model's training data (live-worlds/free-model), so the small networks see what they trained on.
  */
-import { env, pipeline } from "@huggingface/transformers";
 import { EMBED_MODEL } from "../../live-worlds/rumour/similarity";
-
-env.allowLocalModels = false;
+import { transformers } from "./transformers-lazy";
 
 type Extractor = (texts: string[], options: { pooling: "mean"; normalize: boolean }) => Promise<{ tolist: () => number[][] }>;
 
@@ -18,13 +16,15 @@ self.onmessage = async (event: MessageEvent<{ id: string; text: string }>) => {
 
   try {
     // SAFETY: transformers.js types the pipeline loosely; this is the feature-extraction call shape.
-    extractor ??= pipeline("feature-extraction", EMBED_MODEL, {
-      dtype: "q8",
-      // Only the weights file is worth reporting; the tokenizer and config files are tiny.
-      progress_callback: (p: { status: string; progress?: number; total?: number }) => {
-        if (p.status === "progress" && (p.total ?? 0) > 1e6) self.postMessage({ type: "download", id, percent: Math.round(p.progress ?? 0) });
-      },
-    }) as unknown as Promise<Extractor>;
+    extractor ??= transformers().then(({ pipeline }) =>
+      pipeline("feature-extraction", EMBED_MODEL, {
+        dtype: "q8",
+        // Only the weights file is worth reporting; the tokenizer and config files are tiny.
+        progress_callback: (p: { status: string; progress?: number; total?: number }) => {
+          if (p.status === "progress" && (p.total ?? 0) > 1e6) self.postMessage({ type: "download", id, percent: Math.round(p.progress ?? 0) });
+        },
+      }),
+    ) as unknown as Promise<Extractor>;
 
     const embed = await extractor;
     const started = performance.now();
