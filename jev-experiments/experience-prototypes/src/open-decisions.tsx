@@ -6,7 +6,7 @@
 import { useEffect, useState } from "react";
 import { Fold, Notice, Pane } from "./shared";
 import "./open-decisions.css";
-import { percent1 as pct } from "./api";
+import { percent1 as pct, fetchJson } from "./api";
 
 type Model = { id: string; name: string; repo: string; quantisation: string; licence: string; runtime: "mlx" | "sglang"; color: string };
 type Typed = { id: string; name: string; agreement: number; ece: number; brier: number; decisions: number };
@@ -41,8 +41,7 @@ export function OpenDecisions() {
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
-    fetch("/open-decisions/open-decisions.json")
-      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+    fetchJson("/open-decisions/open-decisions.json")
       .then(setData)
       .catch(() => setFailed(true));
   }, []);

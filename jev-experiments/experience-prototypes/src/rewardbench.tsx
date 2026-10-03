@@ -4,7 +4,7 @@ import { ArrowLeft, ArrowRight, Check, Eye, Search } from "lucide-react";
 import { Pane, Stat, Button, Fold, State, Notice } from "./shared";
 import { fromRecorded, Receipt } from "./receipt";
 import { ContentReview } from "./provenance";
-import { percent1 } from "./api";
+import { percent1, fetchJson } from "./api";
 
 const subsets = ["Focus", "Factuality", "Math", "Safety", "Precise IF", "Ties"];
 const descriptions: Record<string, string> = {
@@ -95,8 +95,7 @@ function useCaseTexts(file: string | undefined) {
     setTexts(null);
     const controller = new AbortController();
 
-    fetch(`/rewardbench2/cases/${encodeURIComponent(file)}`, { signal: controller.signal })
-      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+    fetchJson(`/rewardbench2/cases/${encodeURIComponent(file)}`, { signal: controller.signal })
       .then((body: { texts: string[] }) => {
         caseTexts.set(file, body.texts);
         setTexts(body.texts);
