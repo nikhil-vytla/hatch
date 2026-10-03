@@ -1114,45 +1114,6 @@
   border-radius: 5px;
   background: var(--cafe-cream);
 }
-:root[data-theme="dark"] .cafe-jev {
-  --cafe-tint: color-mix(in oklab, var(--accent) 16%, var(--surface));
-}
-:root[data-theme="dark"] .cafe-scene {
-  background: #2b2723;
-  border-color: #45403a;
-  color: #e7e0d4;
-}
-:root[data-theme="dark"] .cafe-scene-top {
-  color: #cfc8bc;
-}
-:root[data-theme="dark"] .cafe-source {
-  color: #e4e4e7;
-  background: #18181ba6;
-  border-color: #52525b;
-}
-:root[data-theme="dark"] .cafe-bubble {
-  background: #f3ecd9;
-  color: #453e2e;
-}
-:root[data-theme="dark"] .cafe-bubble:after {
-  background: #f3ecd9;
-}
-:root[data-theme="dark"] .cafe-window {
-  filter: brightness(0.68) saturate(0.75);
-}
-:root[data-theme="dark"] .cafe-counter {
-  filter: brightness(0.86);
-}
-:root[data-theme="dark"] .cafe-mode button.active,
-:root[data-theme="dark"] .cafe-primary {
-  color: var(--on-accent) !important;
-}
-:root[data-theme="dark"] .cafe-selected-check {
-  color: var(--on-accent);
-}
-:root[data-theme="dark"] .cafe-wall-art {
-  filter: brightness(0.77);
-}
 @media (min-width: 1250px) {
   .cafe-layout {
     grid-template-columns: minmax(0, 1fr) 314px;

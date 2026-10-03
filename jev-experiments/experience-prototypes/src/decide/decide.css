@@ -12,9 +12,6 @@
   padding: 40px 24px 96px;
   color: var(--ink);
 }
-:root[data-theme="dark"] .decide {
-  --shadow-border: 0 0 0 1px oklch(1 0 0 / 0.09);
-}
 .decide h1:focus {
   outline: none;
 }

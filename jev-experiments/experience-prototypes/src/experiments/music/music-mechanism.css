@@ -248,10 +248,6 @@
   --ma-accent: var(--accent);
   --ma-accent-soft: color-mix(in oklab, var(--accent) 10%, var(--surface));
 }
-:root[data-theme="dark"] .ma-boundary-figure {
-  --ma-accent: var(--accent);
-  --ma-accent-soft: color-mix(in oklab, var(--accent) 16%, var(--surface));
-}
 .ma-boundary-figure .ma-mechanism {
   padding: 12px 24px 22px;
 }

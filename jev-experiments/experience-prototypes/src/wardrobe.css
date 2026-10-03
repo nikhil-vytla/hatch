@@ -579,15 +579,6 @@
 .wardrobe-reference:not([src]) {
   display: none;
 }
-:root[data-theme="dark"] .wardrobe-header h2 em {
-  color: #c9ab8e;
-}
-:root[data-theme="dark"] .wardrobe-thumbnail {
-  background: #323730;
-}
-:root[data-theme="dark"] .wardrobe-stage {
-  --wd-paper: #c8c7b9;
-}
 @media (max-width: 900px) {
   .wardrobe-layout {
     gap: 22px;

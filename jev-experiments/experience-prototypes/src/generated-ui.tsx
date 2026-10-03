@@ -1,4 +1,4 @@
-import { compositionEvents } from "../../quality-and-simulation-review/composition-stream";
+import { compositionEvents } from "./composition-stream";
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
