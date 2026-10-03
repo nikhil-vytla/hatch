@@ -2898,3 +2898,62 @@ whole-file `Change` through the proposal pipeline.
 - `target/` reached 17 GB: on macOS each debug build's debug info stays in
   object files cargo never removes. Debug builds now keep line tables
   only, so it stays around 2 GB (PR #193).
+
+## 2026-10-03: how others embed vendor agents (for ADR-0031)
+
+- I checked source for Zed's ACP adapters, Vibe Kanban, Crystal, Sculptor,
+  Terragon, Claude Squad, Happy, agentapi, Harbor and Prime's verifiers,
+  plus the Claude Agent SDK and Codex app-server. Conductor and Amp are
+  checked from docs only. exo couldn't be verified.
+- **Who runs the tools:** everywhere, the vendor runs its own.
+  - Zed's Claude adapter replaced Read, Write, Edit and Bash with
+    editor-served tools from Sept 2025 to Feb 2026 (v0.4 to v0.17), then
+    reverted for fidelity ("less difference in behavior").
+  - Gemini CLI is the only vendor agent that sends file writes through its
+    ACP client.
+- **Gating:** through the vendor's structured channel (`canUseTool` or
+  stdio control, app-server approval requests, ACP `request_permission`).
+  The strongest is Prime's verifiers: Claude gets `permissions.ask: ["*"]`,
+  and Codex gets a fail-closed `PreToolUse` hook, because Codex asks only
+  when a command leaves its sandbox.
+- **Isolation:** worktrees (Vibe Kanban, Crystal, Sculptor, Claude Squad)
+  or containers and VMs (Terragon, Harbor, verifiers).
+- **Cost:** the vendor's estimate (`total_cost_usd`), or a proxy on the
+  model endpoint (verifiers, which can also rewrite tool results).
+  strive's gateway reserves before the call and journals exact bytes,
+  which none of them does.
+- The research clones are in `/tmp/engine-research/`.
+
+## 2026-10-03: tardigrade (clavia-labs/tardigrade)
+
+- A TS library for agent harnesses on an immutable event log, built on
+  Effect: `{view, effects} = f(event log)`.
+  - About 7 weeks old (0.41.2, 507 commits), mostly two authors, MIT.
+  - Its API is moving from "components" to "atoms".
+  - It has Quint/TLA+ models whose negative variants must produce
+    counterexamples.
+  - Its hosts are Bun, and Cloudflare Durable Objects (one SQLite store
+    per thread).
+- Ideas worth taking:
+  - **Parked effects:** approvals and child budget requests settle later
+    by a durable promise.
+  - **A watchdog:** recovery attempts are charged in advance, with a
+    no-progress counter, and the session parks as terminal after a limit.
+  - **A small formal model** of crash recovery, reruns and approval
+    clearing, with required counterexamples.
+  - **Property-checked trajectories** (`checkActor`, fast-check over event
+    invariants) as a possible gate for proposed extensions.
+  - **A child thread's placement** (`colocated` or `independent`) recorded
+    by the parent before the child exists, for when isolation brings child
+    sessions.
+  - **No hidden caps:** every limit can be overridden and is shown to the
+    model.
+- Not for strive:
+  - its Bun "sandbox", which shadows globals in a child process and is no
+    security boundary;
+  - its single trusted process;
+  - normalized events, with no wire bytes or hash chain.
+- It has no self-improvement. `docs/trace-review.md` (a reviewer agent that
+  turns traces into a failure-mode catalog and eval judges) is worth
+  reading for the learner.
+- The clone is in `/tmp/tardigrade-research/`.
