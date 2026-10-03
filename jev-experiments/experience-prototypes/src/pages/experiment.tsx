@@ -180,8 +180,37 @@ function UnknownScene({ id }: { id: string }) {
   );
 }
 
+// PROTOTYPE (proto/page-formats): ?format=article|report|game|off before the hash.
+const FormatProto = lazy(() => import("./formats.proto").then((m) => ({ default: m.FormatProto })));
+const FormatBar = lazy(() => import("./formats.proto").then((m) => ({ default: m.FormatBar })));
+
+function queryFormat() {
+  const f = new URLSearchParams(location.search).get("format");
+
+  return f === "article" || f === "report" || f === "game" || f === "off" ? f : null;
+}
+
 export function ExperimentPage({ id }: { id: string }) {
   if (retiredScene(id)) return <RetiredScene id={id} />;
+
+  const format = queryFormat();
+
+  if (format && format !== "off")
+    return (
+      <Suspense fallback={null}>
+        <FormatProto format={format} id={id} />
+      </Suspense>
+    );
+
+  if (format === "off")
+    return (
+      <>
+        <LiveExperimentPage id={id} />
+        <Suspense fallback={null}>
+          <FormatBar current="off" id={id} />
+        </Suspense>
+      </>
+    );
 
   return experiments.some((e) => e.id === id) ? <LiveExperimentPage id={id} /> : <UnknownScene id={id} />;
 }
