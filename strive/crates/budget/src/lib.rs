@@ -400,6 +400,7 @@ impl Ledger {
                 | Event::HookDecided { .. }
                 | Event::EffectCleared { .. }
                 | Event::EffectRerun { .. }
+                | Event::ForkedFrom { .. }
                 | Event::ApprovalModeSet { .. }
                 | Event::ApprovalRequested { .. }
                 | Event::ApprovalDecided { .. }

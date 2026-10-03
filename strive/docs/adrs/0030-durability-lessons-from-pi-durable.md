@@ -1,6 +1,6 @@
 # ADR-0030: Four durability changes, learned from pi-durable
 
-Status: accepted (2026-10-02). Changes 1, 2.1, 3 and 4.1 are built; 2.3 and 4.2 aren't yet.
+Status: accepted (2026-10-02). All but 2.3 (saving a reply's bytes while it streams) are built.
 
 ## Context
 
@@ -190,6 +190,25 @@ Two things are missing:
    digest), and its workspace starts from the nearest checkpoint at or
    before `at`. The parent is untouched. Budgets: the fork gets a fresh
    limit, and the parent's spend isn't charged twice.
+   **Built (2026-10-03), files decided as every other agent does.** Claude
+   Code, Codex, pi and OpenCode all fork the conversation only and leave
+   the files alone (`NOTES.md`). So `session/fork {id, at}` does the same.
+   - The fork's journal starts with `forkedFrom {session, seq}`. It takes
+     the parent's approval mode, model and safe mode as they were then,
+     and a budget of its own.
+   - Its first checkpoint is the parent's last one at or before `at`,
+     fetched into the fork's checkpoint repository. So `/rewind 1` there
+     puts the files back as they were then. That's the explicit step for
+     "back to there, files too".
+   - The host rebuilds a fork's conversation from its parents' journals up
+     to where each forked, then its own, each separately, so their seqs
+     never mix. A summary in a later part stops it going further back.
+   - `strive fork [ID] [--at SEQ]` is the CLI. In the TUI, `/fork` lists
+     the conversation's prompts, and `/fork n` goes on in a new session
+     from just before the nth, with it back in the editor.
+   - Not yet: the desktop app shows the fork's note but not its parents'
+     conversation, and an ACP `session/load` replays the fork's own
+     entries.
 3. Shared editing of documents, pi-durable's `Chord`, isn't needed.
    strive's shared state is the journal, which every client already
    follows from any seq.

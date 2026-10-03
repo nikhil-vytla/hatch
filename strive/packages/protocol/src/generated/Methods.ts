@@ -37,6 +37,7 @@ import type { SessionChangesParams } from "./SessionChangesParams";
 import type { SessionChangesResult } from "./SessionChangesResult";
 import type { SessionCommandsResult } from "./SessionCommandsResult";
 import type { SessionCreateParams } from "./SessionCreateParams";
+import type { SessionForkParams } from "./SessionForkParams";
 import type { SessionInfo } from "./SessionInfo";
 import type { SessionListParams } from "./SessionListParams";
 import type { SessionListResult } from "./SessionListResult";
@@ -66,6 +67,7 @@ export type Methods = {
   "session/approvals": { params: SessionApprovalsParams; result: Appended };
   "approval/respond": { params: ApprovalRespondParams; result: Empty };
   "session/rewind": { params: SessionRewindParams; result: SessionRewindResult };
+  "session/fork": { params: SessionForkParams; result: SessionInfo };
   "session/changes": { params: SessionChangesParams; result: SessionChangesResult };
   "session/commands": { params: SessionRef; result: SessionCommandsResult };
   "memory/usage": { params: ProjectRef; result: MemoryUsageResult };

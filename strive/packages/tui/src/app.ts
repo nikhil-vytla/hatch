@@ -32,6 +32,7 @@ import {
   Spend,
   sessionAllowance,
 } from "@strive/view";
+import { ancestry } from "@strive/host/transcript";
 import { editorTheme, style } from "./theme";
 
 export { formatUsd, MODE_NAMES };
@@ -39,6 +40,12 @@ export { formatUsd, MODE_NAMES };
 export const COMMANDS: SlashCommand[] = [
   { name: "status", description: "Show the daemon's status" },
   { name: "session", description: "Show this session's id and how to resume it" },
+  {
+    name: "fork",
+    description:
+      "Go on from before an earlier prompt in a new session: /fork lists them, /fork 2 forks before the second",
+    argumentHint: "<n>",
+  },
   {
     name: "budget",
     description: "Set this session's spending limit: /budget 10, or /budget off",
@@ -154,7 +161,9 @@ export class App {
   /** Checkpoints and what each was taken before. */
   private readonly checkpoints = new Map<number, string>();
   private awaitingPrompt?: number;
-  private readonly spend = new Spend();
+  private spend = new Spend();
+  /** Every prompt of the conversation shown, a fork's parents' included: where `/fork n` goes back to. */
+  private prompts: { session: string; seq: number; text: string }[] = [];
   private readonly offClose: () => void;
   private session?: SessionInfo;
   private lastSeq = 0;
@@ -258,6 +267,10 @@ export class App {
       const id = await this.chooseSession(mode);
       const { session, entries } = await this.client.request("session/attach", { id });
       this.session = session;
+      // A fork goes on from its parents' conversation: shown first, as it was.
+      const read = async (sid: string) => (await this.client.request("session/read", { id: sid })).entries;
+
+      for (const part of await ancestry(entries, read)) this.showEarlier(part.session, part.entries);
       const early = this.early.filter((n) => n.sessionId === session.id).map((n) => n.entry);
       this.early = [];
 
@@ -341,6 +354,16 @@ export class App {
     this.tui.requestRender();
   }
 
+  /** A fork's parent's entries, shown as they were: nothing here acts on them. */
+  private showEarlier(session: string, entries: Entry[]) {
+    for (const entry of entries) {
+      if (entry.event.type === "userMessage") this.prompts.push({ session, seq: entry.seq, text: entry.event.text });
+      const text = describe(entry);
+
+      if (text) this.say(text);
+    }
+  }
+
   private show(entry: Entry) {
     if (entry.seq <= this.lastSeq) return;
     this.lastSeq = entry.seq;
@@ -354,6 +377,9 @@ export class App {
       this.checkpoints.set(e.checkpoint, "");
       this.awaitingPrompt = e.checkpoint;
     }
+
+    if (e.type === "userMessage" && this.session)
+      this.prompts.push({ session: this.session.id, seq: entry.seq, text: e.text });
 
     if (e.type === "userMessage" && this.awaitingPrompt !== undefined) {
       this.checkpoints.set(this.awaitingPrompt, `before “${e.text}”`);
@@ -383,6 +409,60 @@ export class App {
     if (text) this.say(text);
     // Entries that add no line (a finished turn) still change the footer.
     this.tui.requestRender();
+  }
+
+  /**
+   * `/fork`: lists the conversation's prompts. `/fork n` goes on, in a new
+   * session, from just before the nth, and puts it back in the editor to
+   * send again or change (ADR-0030). The files stay as they are.
+   */
+  private async fork(arg: string | undefined) {
+    if (this.prompts.length === 0) {
+      this.say(style.muted("Nothing to fork from yet: send a prompt first."));
+
+      return;
+    }
+
+    const n = Number(arg);
+
+    if (!arg || !Number.isInteger(n) || n < 1 || n > this.prompts.length) {
+      this.say(this.prompts.map((p, i) => `${i + 1}  ${printable(p.text.split("\n")[0] ?? "")}`).join("\n"));
+      this.say(style.muted(`Go on from before one in a new session with /fork <1-${this.prompts.length}>.`));
+
+      return;
+    }
+
+    const target = this.prompts[n - 1];
+
+    if (!target) return;
+
+    try {
+      const forked = await this.client.request("session/fork", { id: target.session, at: target.seq - 1 });
+
+      await this.switchTo(forked.id);
+      this.editor.setText(target.text);
+    } catch (e) {
+      this.say(style.danger(`Couldn't fork: ${describeError(e)}`));
+    }
+  }
+
+  /** Shows session `id` in place of this one, as if the TUI had opened it. */
+  private async switchTo(id: string) {
+    this.transcript.clear();
+    this.pending.clear();
+    this.checkpoints.clear();
+    this.awaitingPrompt = undefined;
+    this.spend = new Spend();
+    this.prompts = [];
+    this.session = undefined;
+    this.lastSeq = 0;
+    this.early = [];
+    this.working = undefined;
+    this.unconfirmed = undefined;
+    this.live.setText("");
+    this.prompt.setText("");
+    this.editor.disableSubmit = true;
+    await this.open({ resume: id });
   }
 
   /**
@@ -557,6 +637,10 @@ export class App {
         return;
       }
 
+      case "fork":
+        await this.fork(text.slice(1).split(/\s+/)[1]);
+
+        return;
       case "session":
         this.say(
           `${style.muted("session")} ${this.session.id} · resume with ${style.accent(`strive -r ${this.session.id}`)}`,

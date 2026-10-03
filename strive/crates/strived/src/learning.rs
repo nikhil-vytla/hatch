@@ -193,6 +193,7 @@ async fn open(state: &State, cwd: &str) -> Result<SessionInfo, RpcError> {
             state.settings.approvals,
             Some(SessionKind::Learning),
             false,
+            Vec::new(),
         )
         .await
         .map_err(session_error)

@@ -83,6 +83,7 @@ methods! {
     SessionApprovals = "session/approvals" (SessionApprovalsParams) -> Appended;
             ApprovalRespond = "approval/respond" (ApprovalRespondParams) -> Empty;
     SessionRewind = "session/rewind" (SessionRewindParams) -> SessionRewindResult;
+    SessionFork = "session/fork" (SessionForkParams) -> SessionInfo;
     SessionChanges = "session/changes" (SessionChangesParams) -> SessionChangesResult;
     SessionCommands = "session/commands" (SessionRef) -> SessionCommandsResult;
     MemoryUsage = "memory/usage" (ProjectRef) -> MemoryUsageResult;
@@ -1121,6 +1122,20 @@ pub struct SessionRewindParams {
     pub checkpoint: u64,
 }
 
+/// A new session that goes on from session `id`'s conversation as it was
+/// at entry `at` (its last entry when absent), leaving `id` as it is
+/// (ADR-0030). Only the conversation forks: files stay as they are, and
+/// the fork's first checkpoint is the files as they were before that point.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct SessionForkParams {
+    pub id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub at: Option<u64>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
@@ -1521,6 +1536,12 @@ pub enum Event {
     /// Chosen before the first prompt, since the agent starts with it.
     ModelSet {
         model: String,
+    },
+    /// This session goes on from session `session`'s conversation up to and
+    /// including its entry `seq` (ADR-0030); that session is left as it is.
+    ForkedFrom {
+        session: String,
+        seq: u64,
     },
 }
 

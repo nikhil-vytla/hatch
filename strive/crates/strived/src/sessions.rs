@@ -332,6 +332,7 @@ impl Sessions {
         mode: ApprovalMode,
         kind: Option<SessionKind>,
         safe: bool,
+        then: Vec<Event>,
     ) -> Result<SessionInfo> {
         let id = {
             let mut g = crate::sync::lock(&self.ids);
@@ -354,7 +355,7 @@ impl Sessions {
         let (journal, entries) = tokio::task::spawn_blocking(move || {
             // Committed together: a session never exists without its budget
             // and approval mode.
-            let first = [first, budget, Event::ApprovalModeSet { mode }];
+            let first: Vec<Event> = [first, budget, Event::ApprovalModeSet { mode }].into_iter().chain(then).collect();
             let j = Journal::create(&dir, sid.as_str(), &key, ts, &first)?;
             let entries = first.into_iter().zip(1..).map(|(event, seq)| Entry { seq, ts_ms: ts, event }).collect();
             io::Result::Ok((j, entries))

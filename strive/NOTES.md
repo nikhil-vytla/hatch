@@ -2872,3 +2872,29 @@ whole-file `Change` through the proposal pipeline.
   its whole suite. The race is the one its comment describes: the
   follow-up prompt's git checkpoint can push it past the 6-second idle
   window. This change didn't cause it.
+
+## 2026-10-03: forks, and how other agents fork
+
+- I checked source or docs for 11 agents (2026-10-02): Claude Code, Codex,
+  pi and pi-durable, OpenCode, Gemini CLI, Cline, Aider, Cursor, Windsurf
+  and Zed.
+  - **Forking:** every one that forks copies only the conversation into a
+    new session and leaves the files alone. Claude Code's `/branch` and
+    `--fork-session`, Codex's `fork` (which removed its file snapshots),
+    pi's `/fork`, and OpenCode's `Session.fork` all do this. File isolation
+    exists only as a separate git worktree (Codex `--worktree`).
+  - **Going back in place** is where files get restored: always (OpenCode
+    `/undo`, Gemini `/restore`), or by choice (Claude Code and Gemini
+    `/rewind`, Cline).
+  - **How:** either an edit log, which misses shell changes, or
+    whole-worktree shadow-git snapshots, which strive already takes before
+    each prompt.
+- So strive forks the conversation only. The fork's first checkpoint is
+  the parent's last one, fetched into its own repository, so `/rewind 1`
+  is the explicit "files too".
+- Snapshot cost (measured on a copy of this repo): the first is about 2 s,
+  each unchanged one after about 200 to 270 ms, and the store grows only by
+  what changes (1.7 MB for 895 files).
+- `target/` reached 17 GB: on macOS each debug build's debug info stays in
+  object files cargo never removes. Debug builds now keep line tables
+  only, so it stays around 2 GB (PR #193).
