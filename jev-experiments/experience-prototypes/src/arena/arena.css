@@ -8,9 +8,6 @@
 .arena * {
   --c: var(--c-l, var(--ink));
 }
-:root[data-theme="dark"] .arena * {
-  --c: var(--c-d, var(--ink));
-}
 
 .arena {
   --radius: 12px;
@@ -23,10 +20,6 @@
   padding: 40px 24px 96px;
   color: var(--ink);
   font-size: 15px;
-}
-:root[data-theme="dark"] .arena {
-  --shadow-border: 0 0 0 1px oklch(1 0 0 / 0.09);
-  --shadow-raised: 0 0 0 1px oklch(1 0 0 / 0.13), 0 12px 28px -8px oklch(0 0 0 / 0.5);
 }
 .arena :focus-visible {
   outline: 2px solid var(--focus);
@@ -651,9 +644,6 @@
   mask-image: linear-gradient(90deg, #000 calc(100% - 24px), transparent);
 }
 /* On the dark surface the fade alone is hard to see; a hairline marks the cut edge. */
-:root[data-theme="dark"] .table-wrap[data-more="true"] {
-  border-inline-end: 1px solid var(--line);
-}
 .results {
   width: 100%;
   border-collapse: collapse;

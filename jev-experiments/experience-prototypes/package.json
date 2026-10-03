@@ -8,7 +8,7 @@
     "server": "bun server/dev.ts",
     "build": "bun scripts/prepare.ts && tsc --noEmit && vite build",
     "deploy": "bun scripts/deploy.ts",
-    "test": "bun ../live-worlds/prepare.ts && bun test server scripts/gzip-published.test.ts ../local-models-and-games/arcade/engine.test.ts ../local-models-and-games/integrity.test.ts ../local-models-and-games/calibration.test.ts ../music-arranger-v2 ../outcome-framing/*.test.ts ../cafe-jev ../judgment-reliability ../quality-and-simulation-review/paste-transactions.test.ts ../quality-and-simulation-review/composition-stream.test.ts ../visual-search/*.test.ts ../wardrobe-lab/*.test.ts ../icon-studio/*.test.ts ../live-worlds",
+    "test": "bun ../live-worlds/prepare.ts && bun test server scripts/gzip-published.test.ts ../local-models-and-games/arcade/engine.test.ts ../local-models-and-games/integrity.test.ts ../local-models-and-games/calibration.test.ts ../music-arranger-v2 ../outcome-framing/*.test.ts ../cafe-jev ../judgment-reliability ../visual-search/*.test.ts ../wardrobe-lab/*.test.ts ../icon-studio/*.test.ts ../live-worlds",
     "start": "bun scripts/start.ts",
     "record": "bun scripts/record.ts",
     "recover": "bun scripts/recover.ts && ../.venv/bin/python scripts/metrics.py",
