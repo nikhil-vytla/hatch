@@ -45,6 +45,15 @@ allow_attributes_without_reason = "deny"
 await_holding_lock = "deny"
 
 
+# Debug builds keep file:line in panics and backtraces, not full debug info:
+# on macOS each build leaves its debug info in object files cargo never
+# removes, which grew target/ by gigabytes a week.
+[profile.dev]
+debug = "line-tables-only"
+
+[profile.dev.package."*"]
+debug = false
+
 [profile.release]
 strip = true
 lto = "thin"
