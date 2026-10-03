@@ -43,6 +43,10 @@ The supplied release plan is the authority for this map. It explicitly includes 
 - [One text box that becomes what you mean](decisions/shapeshift-experiment.md) shipped as the arena's One box lane: Jev, Laya, a keyword classifier and a tiny in-browser model on every keystroke of 200 phrases ([results](../packages/arena/src/one-box/README.md)). Write a contestant is practice only, in the visitor's browser; sealed server scoring was removed so the site pays for nothing (#80).
 - [Decide](../packages/arena/src/decide/README.md) replaced Jev Daily: twenty everyday calls asked blind, then how visitors split, how Jev, Laya and MobileBERT chose, and how each moves across seven setups. Splitting a call into small questions fixed both of Jev's plain-question misses.
 
+## Next wave (2 Oct 2026)
+
+The first release is shipped. The next wave is planned in [FLAGSHIPS.md](FLAGSHIPS.md): a researcher-first flagship slate, multimodal Jev (perceive locally, decide with Jev; or open VLM decision models), installable tools (Chrome extension, Mac menu-bar app, CLI), and the quality backlog from the 2 Oct retrospective.
+
 ## Frontier and dependencies
 
 | Decision | Owner | Depends on | Status / evidence |
