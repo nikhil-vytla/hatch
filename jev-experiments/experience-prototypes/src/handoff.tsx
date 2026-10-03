@@ -120,14 +120,14 @@ export function Handoff({ result }: { result: any }) {
   if (source.id === "typed" && !typed)
     return (
       <div className="handoff">
-        <Pills values={SOURCES.map((x) => x.label)} value={source.label} onChange={(v) => setSource(SOURCES.find((x) => x.label === v) ?? SOURCES[0])} />
+        <Pills label="Dataset" values={SOURCES.map((x) => x.label)} value={source.label} onChange={(v) => setSource(SOURCES.find((x) => x.label === v) ?? SOURCES[0])} />
         <Notice>{failed ? "The Typed Decisions recording could not be loaded." : "Loading 2,000 recorded decisions…"}</Notice>
       </div>
     );
 
   return (
     <div className="handoff">
-      <Pills values={SOURCES.map((x) => x.label)} value={source.label} onChange={(v) => setSource(SOURCES.find((x) => x.label === v) ?? SOURCES[0])} />
+      <Pills label="Dataset" values={SOURCES.map((x) => x.label)} value={source.label} onChange={(v) => setSource(SOURCES.find((x) => x.label === v) ?? SOURCES[0])} />
       <p className="fine">{source.about}</p>
 
       <Pane title="Jev acts when it is at least this sure" sub={`${decisions.length.toLocaleString()} recorded ${source.unit}`}>

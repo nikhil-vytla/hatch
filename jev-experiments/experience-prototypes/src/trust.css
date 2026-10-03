@@ -48,6 +48,11 @@
 button > .mode-tag {
   opacity: 0.85;
 }
+/* On a selected button the tag takes the button's own text colour, so it stays readable. */
+button.active > .mode-tag,
+button[aria-pressed="true"] > .mode-tag {
+  color: inherit;
+}
 .mode-tag.mode-live,
 .mode-tag.mode-needs-key {
   color: var(--coral);

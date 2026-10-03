@@ -169,7 +169,7 @@ export function IntentRecognition({ result }: { result: any }) {
 
   return (
     <div className="intent-recognition">
-      <Pills values={[...TABS]} value={tab} onChange={(v) => setTab(v as Tab)} />
+      <Pills label="View" values={[...TABS]} value={tab} onChange={(v) => setTab(v as Tab)} />
       {tab === "Accuracy" && (
         <>
           <Baseline result={result} />

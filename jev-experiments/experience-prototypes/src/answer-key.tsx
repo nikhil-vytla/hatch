@@ -48,7 +48,7 @@ export function AnswerKey({ result }: { result: any }) {
         Five models answered the same {questions.length.toLocaleString()} workflow questions. Their answers are
         fixed. Only the answer key changes.
       </p>
-      <Pills values={KEYS.map((k) => k.label)} value={label} onChange={setLabel} />
+      <Pills label="Answer key" values={KEYS.map((k) => k.label)} value={label} onChange={setLabel} />
       <Pane title={`Graded against ${chosen.label.toLowerCase()}`} sub="Share of questions where the model's top answer matches the key's">
         <p className="fine">{chosen.about}</p>
         <p className="sr-only" aria-live="polite">

@@ -67,6 +67,7 @@ export function Benchmarks({ id, result, recordedAt }: { id: string; result: any
           <div className="case-toolbar">
             {id === "classify" && (
               <Pills
+                label="Dataset"
                 values={["banking77", "clinc150"]}
                 value={dataset}
                 onChange={(v) => {
@@ -77,6 +78,7 @@ export function Benchmarks({ id, result, recordedAt }: { id: string; result: any
             )}
             {id !== "language" && (
               <Pills
+                label="Show"
                 values={["All results", "Mistakes"]}
                 value={filter}
                 onChange={(v) => {

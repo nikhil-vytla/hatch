@@ -115,17 +115,22 @@ export function Pills({
   values,
   value,
   onChange,
+  label,
 }: {
   values: string[];
   value: string;
   onChange: (v: string) => void;
+  /** What the group chooses, for screen readers; each pill says whether it is the chosen one. */
+  label?: string;
 }) {
   return (
-    <div className="pills">
+    <div className="pills" role="group" aria-label={label}>
       {values.map((v) => (
         <button
           key={v}
+          type="button"
           className={value === v ? "active" : ""}
+          aria-pressed={value === v}
           onClick={() => onChange(v)}
         >
           {pretty(v)}
