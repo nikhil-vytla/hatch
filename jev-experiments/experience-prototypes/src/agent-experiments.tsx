@@ -445,19 +445,7 @@ export function AgentExperiment({ id, result }: { id: string; result: any }) {
       </div>
       <aside className="controls">
         <Pane title="Change the evidence">
-          <Field label={verify ? "Task and trace" : "Request"}>
-            <textarea
-              rows={verify ? 12 : 5}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-            />
-          </Field>
-          <RunButton
-            busy={busy}
-            label={verify ? "Check the claim" : "Evaluate with Jev"}
-            onClick={evaluate}
-          />
-          <Field label="Recorded example">
+          <Field label="Recorded example · free">
             <select
               value={index}
               onChange={(e) => {
@@ -483,6 +471,19 @@ export function AgentExperiment({ id, result }: { id: string; result: any }) {
               ))}
             </select>
           </Field>
+          <Field label={verify ? "Or edit the task and trace" : "Or write your own request"}>
+            <textarea
+              rows={verify ? 12 : 5}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+            />
+          </Field>
+          <RunButton
+            busy={busy}
+            secondary
+            label={verify ? "Check your own claim" : "Try your own"}
+            onClick={evaluate}
+          />
           <ErrorText error={error} />
           {modelProb && <Bars values={modelProb} selected={output} />}
           {/* A recorded example is one of the record's rows; anything else came from a live run here. */}

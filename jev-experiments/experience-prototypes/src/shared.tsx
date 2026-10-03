@@ -38,15 +38,18 @@ export function RunButton({
   busy,
   onClick,
   label = "Run with Jev",
+  secondary = false,
 }: {
   busy: boolean;
   onClick: () => void;
   label?: string;
+  /** Recorded runs come first on a page; a live run beside them is the quieter choice. */
+  secondary?: boolean;
 }) {
   // Every RunButton calls Jev on the visitor's key, so it says so.
   return (
     <span className="run-button">
-      <Button onClick={onClick} disabled={busy}>
+      <Button onClick={onClick} disabled={busy} secondary={secondary}>
         {busy ? <LoaderCircle size={15} className="spin" /> : <Play size={14} />}{" "}
         {busy ? "Working through it…" : label}
       </Button>
