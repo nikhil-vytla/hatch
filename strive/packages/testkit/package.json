@@ -8,7 +8,7 @@
   },
   "dependencies": {
     "@xterm/headless": "6.0.0",
-    "@earendil-works/pi-tui": "0.87.1",
+    "@earendil-works/pi-tui": "1.0.0",
     "@strive/protocol": "workspace:*"
   }
 }
