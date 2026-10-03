@@ -12,7 +12,7 @@ import type {
   TurnEnd,
 } from "@strive/protocol";
 import { describeError } from "@strive/protocol";
-import { MODE_NAMES, sessionAllowance } from "@strive/view";
+import { ancestry, MODE_NAMES, sessionAllowance } from "@strive/view";
 
 const MODES: ApprovalMode[] = ["ask", "autoEdit", "fullAuto"];
 
@@ -360,6 +360,17 @@ export function bridge(daemon: StriveClient, version: string): acp.AgentApp {
   // A new session's history has nothing an editor shows; a loaded one's is replayed.
   const open = async (id: string, editor: acp.AgentContext, mcpServers: acp.McpServer[]) => {
     const { session: info, entries } = await daemon.request("session/attach", { id });
+    // A fork's parents' conversation comes first (ADR-0030), each told by
+    // its own replay so their effect numbers don't mix with the fork's.
+    const read = async (sid: string) => (await daemon.request("session/read", { id: sid })).entries;
+
+    for (const part of await ancestry(entries, read)) {
+      const earlier = new Session(info.id, info.cwd, daemon, editor);
+
+      for (const e of part.entries) earlier.entry(e, true);
+      await earlier.flushed();
+    }
+
     const s = new Session(info.id, info.cwd, daemon, editor);
 
     for (const e of entries) s.entry(e, true);

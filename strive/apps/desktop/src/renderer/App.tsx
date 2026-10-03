@@ -36,7 +36,7 @@ import {
 import { type ReactNode, useCallback, useEffect, useLayoutEffect, useReducer, useRef, useState } from "react";
 import { useStickToBottom } from "use-stick-to-bottom";
 import type { Bridge, Opened } from "../shared/bridge";
-import { type Item, label, summarize, type Tool } from "./conversation";
+import { Conversation, type Item, label, summarize, type Tool } from "./conversation";
 import { ChangesPane } from "./ChangesPane";
 import { focusEntry, onFocus, takeFocus } from "./focus";
 import { LearnedPane } from "./LearnedPane";
@@ -1092,12 +1092,36 @@ function Transcript({ model, opened, session }: { model: SessionModel; opened: O
   const items = model.conversation.items;
   const lastTools = items.findLastIndex((i) => i.kind === "tools");
 
+  // A fork's parents' conversation, as it was (ADR-0030): shown, not acted on.
+  const [earlier] = useState(() =>
+    (opened.earlier ?? []).map((part) => {
+      const c = new Conversation(opened.home);
+
+      for (const e of part.entries) c.apply(e);
+
+      return { session: part.session, items: c.items };
+    }),
+  );
+
   return (
     <div className="transcript">
       <PromptRail prompts={items.flatMap((i) => (i.kind === "user" ? [{ seq: i.seq, text: i.text }] : []))} />
       <div className="scroller" ref={scrollRef}>
         <div className="thread" ref={contentRef}>
-          {!items.some((i) => i.kind === "user") && <Empty opened={opened} model={model} session={session} />}
+          {earlier.length === 0 && !items.some((i) => i.kind === "user") && (
+            <Empty opened={opened} model={model} session={session} />
+          )}
+          {earlier.map((part) =>
+            part.items.map((item) => (
+              <ItemView
+                key={`${part.session}-${item.kind}-${item.seq}`}
+                prefix={`${part.session}-`}
+                item={item}
+                session={session}
+                live={false}
+              />
+            )),
+          )}
           {items.map((item, i) => (
             <ItemView
               key={`${item.kind}-${item.seq}`}
@@ -1361,14 +1385,14 @@ function Empty({ opened, model, session }: EmptyProps) {
   );
 }
 
-type ItemProps = { item: Item; session: SessionActions; live: boolean; checkpoint?: number };
+type ItemProps = { item: Item; session: SessionActions; live: boolean; checkpoint?: number; prefix?: string };
 
-function ItemView({ item, session, live, checkpoint }: ItemProps) {
+function ItemView({ item, session, live, checkpoint, prefix = "" }: ItemProps) {
   switch (item.kind) {
     case "user":
       return (
         <UserMessage
-          id={`msg-${item.seq}`}
+          id={`msg-${prefix}${item.seq}`}
           seq={item.seq}
           text={item.text}
           checkpoint={checkpoint}

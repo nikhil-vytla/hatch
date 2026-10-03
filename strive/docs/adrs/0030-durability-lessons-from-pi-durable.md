@@ -206,9 +206,9 @@ Two things are missing:
    - `strive fork [ID] [--at SEQ]` is the CLI. In the TUI, `/fork` lists
      the conversation's prompts, and `/fork n` goes on in a new session
      from just before the nth, with it back in the editor.
-   - Not yet: the desktop app shows the fork's note but not its parents'
-     conversation, and an ACP `session/load` replays the fork's own
-     entries.
+   - Every client shows a fork's parents' conversation the same way
+     (`ancestry` in `@strive/view`). The TUI and the desktop app show it
+     above the fork's own, and an ACP `session/load` replays it first.
 3. Shared editing of documents, pi-durable's `Chord`, isn't needed.
    strive's shared state is the journal, which every client already
    follows from any seq.

@@ -239,3 +239,29 @@ test("`strive acp` speaks ACP on its stdio", async () => {
   // It is a strive session like any other.
   expect(daemon!.strive("sessions", "--all").stdout).toContain(sessionId.slice(-6));
 });
+
+test("a loaded fork is replayed from its parent's conversation, up to where it forked", async () => {
+  const cwd = await setup([{ text: "first answer" }, { text: "second answer" }]);
+  const first = await editor(allowOnce);
+  const { sessionId } = await first.agent.request("session/new", { cwd, mcpServers: [] });
+
+  await first.agent.request("session/prompt", { sessionId, prompt: [{ type: "text", text: "first question" }] });
+  await first.agent.request("session/prompt", { sessionId, prompt: [{ type: "text", text: "second question" }] });
+  const { client } = await StriveClient.connect(daemon!.socket, { name: "test", version: "0" });
+
+  closers.push(() => client.close());
+  const { entries } = await client.request("session/read", { id: sessionId });
+  const second = entries.find((e) => e.event.type === "userMessage" && e.event.text === "second question")!;
+  const fork = await client.request("session/fork", { id: sessionId, at: second.seq - 1 });
+  const viewer = await editor(allowOnce);
+
+  await viewer.agent.request("session/load", { sessionId: fork.id, cwd, mcpServers: [] });
+
+  const told = viewer.updates.flatMap((u) =>
+    (u.sessionUpdate === "user_message_chunk" || u.sessionUpdate === "agent_message_chunk") && u.content.type === "text"
+      ? [u.content.text]
+      : [],
+  );
+
+  expect(told).toEqual(["first question", "first answer"]);
+});

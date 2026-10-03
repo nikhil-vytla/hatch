@@ -16,6 +16,8 @@ export type Opened = {
   init: InitializeResult;
   session: SessionInfo;
   entries: Entry[];
+  /** A fork's parents' conversations (ADR-0030), oldest first, each up to where the next forked. */
+  earlier?: { session: string; entries: Entry[] }[];
   home: string;
   /** `darwin` draws the traffic lights over the window's own titlebar. */
   platform: string;
