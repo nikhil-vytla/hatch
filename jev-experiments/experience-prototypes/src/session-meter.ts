@@ -5,12 +5,13 @@
  */
 import { useSyncExternalStore } from "react";
 import { USD_PER_INPUT_TOKEN } from "./receipt";
+import { JEV_PRICE } from "../../packages/arena/src/jev-price";
 
 /** Where the price comes from, shown beside the meter. */
 export const LIST_PRICE = {
-  label: "$0.042 / 1M input tokens · output free",
+  label: `$${JEV_PRICE.usdPerMillionInputTokens} / 1M input tokens · output free`,
   source: "https://docs.typesafe.ai/models",
-  checked: "29 Sep 2026",
+  checked: JEV_PRICE.readOn,
 };
 
 export type SessionUsage = {

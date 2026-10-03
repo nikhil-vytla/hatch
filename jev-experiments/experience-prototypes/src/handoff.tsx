@@ -6,6 +6,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { cheapest, curve, split, top, type Decision } from "../../packages/arena/src/handoff/model";
 import { Notice, Pane, Pills, Stat } from "./shared";
+import { percent1 as pct } from "./api";
 
 /** How far each dataset's stated confidence can be trusted, from its recorded calibration. */
 type Source = { id: string; label: string; about: string; unit: string; calibration: string };
@@ -39,7 +40,6 @@ const SOURCES: Source[] = [
 
 const COSTS = [1, 2, 5, 10, 20, 50, 100];
 
-const pct = (n: number) => `${(n * 100).toFixed(1)}%`;
 
 function fromIntent(result: any, id: string): Decision[] {
   return (result?.experiments?.[id]?.rows ?? [])

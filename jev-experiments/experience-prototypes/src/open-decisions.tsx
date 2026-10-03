@@ -6,6 +6,7 @@
 import { useEffect, useState } from "react";
 import { Fold, Notice, Pane } from "./shared";
 import "./open-decisions.css";
+import { percent1 as pct } from "./api";
 
 type Model = { id: string; name: string; repo: string; quantisation: string; licence: string; runtime: "mlx" | "sglang"; color: string };
 type Typed = { id: string; name: string; agreement: number; ece: number; brier: number; decisions: number };
@@ -25,7 +26,6 @@ type Data = {
   meta: { machine: { chip: string; memoryGiB: number }; versions: { mlx: string; mlx_lm: string }; method: { commit: string } } | null;
 };
 
-const pct = (n: number) => `${(n * 100).toFixed(1)}%`;
 const ms = (n: number) => `${Math.round(n)} ms`;
 
 /** The prompt SGLang renders for one Fool Jev question (prompt format 1), before the chat template. */

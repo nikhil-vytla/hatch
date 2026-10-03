@@ -16,7 +16,7 @@ import {
 } from "../../../packages/arena/src/decide/data";
 import type { Dist, WireAnswer } from "../../../packages/arena/src/decide/combine";
 import { combine, wireAnswerSchema } from "../../../packages/arena/src/decide/combine";
-import { EvaluationError, getApiKey, NO_KEY_MESSAGE, run as runJev } from "../api";
+import { EvaluationError, getApiKey, NO_KEY_MESSAGE, run as runJev, percent as pct } from "../api";
 import { describeFailure, type Failure } from "../live-failure";
 import { fromLive, Receipt, type ReceiptData } from "../receipt";
 import { KeyTag, LiveFailure, ModeTag } from "../trust";
@@ -33,7 +33,6 @@ const GROUP_LABEL: Record<DecideSetup["group"], string> = {
   split: "Split up",
 };
 
-const pct = (p: number) => `${Math.round(p * 100)}%`;
 
 const WORDS = ["no", "one", "two", "three", "four", "five"];
 

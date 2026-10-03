@@ -37,6 +37,7 @@ import { getApiKey, NO_KEY_MESSAGE, run } from "./api";
 import { describeFailure, type Failure } from "./live-failure";
 import { KeyTag, LiveFailure, ModeTag } from "./trust";
 import "./rumour-mill.css";
+import { JEV_USD_PER_INPUT_TOKEN as USD_PER_TOKEN } from "../../packages/arena/src/jev-price";
 
 type ModelId = "free" | "jev" | "recorded";
 
@@ -46,8 +47,6 @@ const MODEL_NAMES: Record<ModelId, string> = {
   recorded: "Jev (recorded run)",
 };
 
-// TypeSafe's list price: $0.042 per million input tokens, output free.
-const USD_PER_TOKEN = 0.042 / 1e6;
 
 /** Measured on the recording: about 118 input tokens per profile question. */
 const TOKENS_PER_PROFILE = 118;

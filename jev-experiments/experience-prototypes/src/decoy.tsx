@@ -7,6 +7,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Receipt } from "./receipt";
 import { ModeTag } from "./trust";
 import { Fold, Notice, Pane, Pills } from "./shared";
+import { percent as pct } from "./api";
 
 type Scenario = { id: string; context: string; question: string; a: string; b: string; aDecoy: string; bDecoy: string };
 type SetId = "none" | "decoy-a" | "decoy-b";
@@ -48,7 +49,6 @@ const SETS: { id: SetId; label: string }[] = [
 
 const ORDERS = ["Both orders, averaged", "A listed first", "A listed last"];
 
-const pct = (n: number) => `${Math.round(n * 100)}%`;
 
 /** A's share of the pair A and B, leaving the decoy out, as the study measures it. */
 const pairShare = (p: Record<string, number>) => {

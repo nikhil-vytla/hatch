@@ -13,6 +13,7 @@ import { evaluate, type Payload } from "../../../experience-prototypes/server/ga
 import { answerLocally, lineRequest, merge, reactionRequest, split, toHearDecision, type Event } from "../../../live-worlds/win-over/decide";
 import { createWorld, goal } from "../../../live-worlds/win-over/engine";
 import { NLI_MODEL, type ZeroShot } from "../src/decide/nli";
+import { jevCostUsd } from "../src/jev-price";
 
 const key = process.env.AI_GATEWAY_API_KEY;
 
@@ -51,7 +52,7 @@ for (const e of LINES) {
   const tokens = reply.usage?.input_tokens ?? 0;
   const jev = listeners.map((r) => toHearDecision(split(reply.answers, "line"), split(reply.answers, r.id), e, "Jev", 0, 0));
 
-  cost += (tokens * 0.042) / 1e6;
+  cost += jevCostUsd(tokens);
   rows.push(
     JSON.stringify({
       at: new Date().toISOString(),

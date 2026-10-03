@@ -25,6 +25,7 @@ import {
   type Event,
 } from "./decide";
 import { applyGossip, applyHear, goal, markBusy, type Meeting, type Resident, type World } from "./engine";
+import { JEV_USD_PER_INPUT_TOKEN } from "../../packages/arena/src/jev-price";
 
 export type JevReply = { answers: Record<string, Answer>; latency_ms?: number; usage?: { input_tokens?: number } | null };
 
@@ -35,8 +36,8 @@ export type Backend =
 
 type Job = { kind: "hear"; event: Event; listeners: Resident[] } | { kind: "gossip"; meetings: Meeting[] };
 
-// TypeSafe's list price: $0.042 per million input tokens, output free.
-export const USD_PER_TOKEN = 0.042 / 1e6;
+// TypeSafe's list price, per input token.
+export const USD_PER_TOKEN = JEV_USD_PER_INPUT_TOKEN;
 
 const now = () => (typeof performance === "undefined" ? Date.now() : performance.now());
 

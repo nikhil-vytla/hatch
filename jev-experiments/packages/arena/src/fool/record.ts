@@ -13,6 +13,7 @@ import {
   type Payload,
 } from "../../../../experience-prototypes/server/gateway";
 import { answerRequest, cheatFor, PUZZLES, refereeRequest, sentencesFor } from "./model";
+import { jevCostUsd } from "../jev-price";
 
 const CAP = 200;
 
@@ -77,8 +78,7 @@ for (const job of jobs) {
   try {
     const r = await evaluate(job.request, { apiKey: key, maxAttempts: 3, deadlineMs: 20_000 });
     const tokens = r.usage?.input_tokens ?? null;
-    // TypeSafe's list price: $0.042 per million input tokens, output free.
-    const costUsd = tokens === null ? null : (tokens * 0.042) / 1e6;
+    const costUsd = tokens === null ? null : jevCostUsd(tokens);
 
     cost += costUsd ?? 0;
     appendFileSync(
