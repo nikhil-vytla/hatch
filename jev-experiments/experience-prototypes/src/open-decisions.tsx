@@ -50,42 +50,13 @@ export function OpenDecisions() {
   if (!data) return <Notice error={failed}>{failed ? "The recorded results could not be loaded." : "Loading the recorded results…"}</Notice>;
 
   const color = (id: string) => (id === "jev" ? data.jevColor : data.models.find((m) => m.id === id)?.color);
-  const jev = data.typed.find((t) => t.id === "jev");
-  const open = data.typed.filter((t) => data.models.some((m) => m.id === t.id));
-  const best = [...open].sort((a, b) => b.agreement - a.agreement)[0];
   const study4b = data.typed.find((t) => t.id.startsWith("study."));
   const sglang4b = data.typed.find((t) => t.id === "qwen3-4b");
   const realSglang4b = data.typed.find((t) => t.id === "sglang-l4.qwen3-4b");
-  const boxJev = data.oneBox.find((b) => b.id === "jev");
-  const boxOpen = data.oneBox
-    .filter((b) => data.models.some((m) => m.id === b.id))
-    .sort((a, b) => b.right - a.right)[0];
-  // The headline's speed claim is about the laptop, so only laptop runs compete.
-  const fastest = data.latency.open
-    .filter((l) => data.models.find((m) => m.id === l.id)?.runtime === "mlx")
-    .sort((a, b) => a.batch14Ms - b.batch14Ms)[0];
 
   return (
     <div className="od">
-      {jev && best && (
-        <p className="od-verdict">
-          A small open model can speak Jev&rsquo;s language, but not yet its judgement. The best one here, {best.name}, agrees
-          with the Typed decisions reference {pct(best.agreement)} of the time to Jev&rsquo;s {pct(jev.agreement)}
-          {boxOpen && boxJev && boxOpen.id === best.id && boxOpen.right >= boxJev.right - 0.05 && boxJev.wrong > 0 && (
-            <>
-              , and in One box it ends on the right card nearly as often as Jev but shows about{" "}
-              {Math.round(boxOpen.wrong / boxJev.wrong)} times as many wrong cards on the way
-            </>
-          )}
-          .
-        </p>
-      )}
-      {fastest && (
-        <p className="fine od-sub">
-          The fastest on the laptop, {fastest.name}, answers all 14 One box questions in {ms(fastest.batch14Ms)} on a laptop; Jev&rsquo;s
-          recorded median, over the network, is {ms(data.latency.jevBatch14Ms)}.
-        </p>
-      )}
+      {/* The verdict and its numbers are in the headline strip above, computed from the same file. */}
 
       <Pane title="How SGLang does it" sub="No text is generated">
         <ol className="od-steps">

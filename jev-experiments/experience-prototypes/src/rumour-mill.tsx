@@ -600,10 +600,7 @@ export function RumourMill() {
     <div className="toybox rm">
       <div className="rm-top">
         <div>
-          <p className="rm-sub">
-            Pin a rumour on a street in Bramble and watch it travel. Everyone who hears it decides once: ignore it, pass it
-            on, go, or argue it down.
-          </p>
+          <p className="rm-sub">Everyone who hears it decides once: ignore it, pass it on, go, or argue it down.</p>
         </div>
         <div className="rm-presets" role="group" aria-label="Rumours">
           {PRESETS.map((p) => (
