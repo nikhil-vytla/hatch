@@ -40,7 +40,11 @@ safe?: boolean, } | { "type": "userMessage", text: string,
  * The slash command this prompt expanded (ADR-0024): what the
  * person typed was `/name arguments`, and `text` is what it stands for.
  */
-command?: CommandUse, } | { "type": "recovered", discardedBytes: number, } | { "type": "budgetSet", usdMicros?: number, tokens?: number, } | { "type": "modelCallStarted", 
+command?: CommandUse, 
+/**
+ * The id the client sent the prompt with, if any.
+ */
+requestId?: string, } | { "type": "recovered", discardedBytes: number, } | { "type": "budgetSet", usdMicros?: number, tokens?: number, } | { "type": "modelCallStarted", 
 /**
  * Numbers this session's calls; pairs with `ModelCallFinished`.
  */

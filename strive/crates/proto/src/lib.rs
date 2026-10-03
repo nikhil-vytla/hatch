@@ -302,6 +302,12 @@ pub struct SessionAttachResult {
 pub struct SessionPromptParams {
     pub id: String,
     pub text: String,
+    /// Names this prompt (ADR-0030): one sent again with an id the session
+    /// already holds is answered with the first one's seq and journals
+    /// nothing, so a retried send counts once.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub request_id: Option<String>,
 }
 
 /// The seq of the entry a request appended.
@@ -1223,6 +1229,10 @@ pub enum Event {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         #[ts(optional)]
         command: Option<CommandUse>,
+        /// The id the client sent the prompt with, if any.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[ts(optional)]
+        request_id: Option<String>,
     },
     /// Opening the journal found a partial last line from a crash and
     /// discarded it.

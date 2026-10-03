@@ -455,5 +455,6 @@ test("a project's slash command is listed, sent as the prompt it stands for, and
     type: "userMessage",
     text: "Review PR 42 carefully.",
     command: { name: "review", arguments: "42" },
+    requestId: expect.any(String),
   });
 });

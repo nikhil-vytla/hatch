@@ -17,7 +17,7 @@ fn started() -> Event {
 }
 
 fn msg(text: &str) -> Event {
-    Event::UserMessage { text: text.into(), command: None }
+    Event::UserMessage { text: text.into(), command: None, request_id: None }
 }
 
 fn entry(seq: u64, ts_ms: u64, event: Event) -> Entry {

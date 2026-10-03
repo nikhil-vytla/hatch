@@ -95,6 +95,7 @@ test("the task can come on stdin", async () => {
   expect(r.entries.find((e) => e.event.type === "userMessage")?.event).toEqual({
     type: "userMessage",
     text: "say hello",
+    requestId: "strive-run",
   });
 });
 

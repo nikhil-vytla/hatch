@@ -170,6 +170,9 @@ export class App {
   private offered = false;
   /** While the offer waits for an answer: the seq of the last sign it named. */
   private offer?: { session: SessionInfo; through: number };
+
+  /** The last message whose saving the daemon didn't confirm, and the id it was sent with. */
+  private unconfirmed?: { text: string; requestId: string };
   /** Set once the TUI has let go of the daemon, so it exits once. */
   private closed = false;
 
@@ -456,9 +459,15 @@ export class App {
     this.editor.setText("");
 
     if (!text.startsWith("/")) {
+      // Sent again as it was, a message whose saving wasn't confirmed keeps
+      // its id, so the daemon counts it once if the first send did land.
+      const requestId = this.unconfirmed?.text === text ? this.unconfirmed.requestId : crypto.randomUUID();
+
       try {
-        await this.client.request("session/prompt", { id: this.session.id, text });
+        await this.client.request("session/prompt", { id: this.session.id, text, requestId });
+        this.unconfirmed = undefined;
       } catch (e) {
+        this.unconfirmed = { text, requestId };
         this.editor.setText(text);
         this.say(style.danger(`Couldn't confirm your message was saved: ${describeError(e)}`));
       }
@@ -576,7 +585,7 @@ export class App {
         return;
       default:
         if (this.projectCommands.some((c) => c.name === cmd)) {
-          await this.client.request("session/prompt", { id: this.session.id, text });
+          await this.client.request("session/prompt", { id: this.session.id, text, requestId: crypto.randomUUID() });
 
           return;
         }

@@ -349,7 +349,7 @@ export function App({ bridge, opened, onSwitch, offers }: Props) {
   );
 
   const session: SessionActions = {
-    prompt: (text) => act(bridge.request("session/prompt", { id, text })),
+    prompt: (text) => act(bridge.request("session/prompt", { id, text, requestId: crypto.randomUUID() })),
     interrupt: () => act(bridge.request("session/interrupt", { id })),
     decide: (effect, decision) => act(bridge.request("approval/respond", { id, effect, decision })),
     rewind: (checkpoint) => act(bridge.request("session/rewind", { id, checkpoint })),

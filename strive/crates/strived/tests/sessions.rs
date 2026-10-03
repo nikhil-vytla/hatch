@@ -445,3 +445,54 @@ fn a_host_cannot_choose_the_model() {
     let r = host.call("session/model", &json!({"id": id, "model": "claude-haiku-4-5"}));
     assert_eq!(r["error"]["message"], "only a person can do this, not the agent's host");
 }
+
+#[test]
+fn a_prompt_sent_again_under_its_request_id_counts_once() {
+    let env = Env::new();
+    let dir = tempfile::Builder::new().prefix("strv-req").tempdir_in("/tmp").unwrap();
+    let id = create(&env, dir.path().to_str().unwrap());
+    let mut c = env.rpc();
+    let first = c.ok("session/prompt", &json!({"id": id, "text": "fix it", "requestId": "r-1"}))["seq"].clone();
+    let again = c.ok("session/prompt", &json!({"id": id, "text": "fix it", "requestId": "r-1"}))["seq"].clone();
+    assert_eq!(again, first, "answered with the first one's seq");
+    let other = c.ok("session/prompt", &json!({"id": id, "text": "fix it", "requestId": "r-2"}))["seq"].clone();
+    assert_ne!(other, first, "another id is another prompt");
+
+    // Sent at once from two connections: the writer journals one.
+    let both: Vec<_> = (0..2)
+        .map(|_| {
+            let (mut c, id) = (env.rpc(), id.clone());
+            std::thread::spawn(move || {
+                c.ok("session/prompt", &json!({"id": id, "text": "go", "requestId": "r-3"}))["seq"].clone()
+            })
+        })
+        .collect();
+    let seqs: Vec<Value> = both.into_iter().map(|t| t.join().unwrap()).collect();
+    assert_eq!(seqs[0], seqs[1], "{seqs:?}");
+
+    // And after the daemon restarts, from the journal.
+    env.stop();
+    let after = env.rpc().ok("session/prompt", &json!({"id": id, "text": "fix it", "requestId": "r-1"}))["seq"].clone();
+    assert_eq!(after, first);
+
+    let all = events(&env.rpc().ok("session/read", &json!({"id": id}))["entries"]);
+    let prompts: Vec<&Value> = all.iter().filter(|e| e["type"] == "userMessage").collect();
+    let ids: Vec<&Value> = prompts.iter().map(|e| &e["requestId"]).collect();
+    assert_eq!(ids, vec![&json!("r-1"), &json!("r-2"), &json!("r-3")], "{prompts:?}");
+    // A prompt sent again journals no checkpoint of its own (where git takes them at all).
+    let checkpoints = all.iter().filter(|e| e["type"] == "checkpointed").count();
+    assert!(checkpoints == 3 || checkpoints == 0, "{checkpoints} checkpoints for 3 prompts");
+}
+
+#[test]
+fn a_request_id_is_one_to_128_bytes() {
+    let env = Env::new();
+    let dir = tempfile::Builder::new().prefix("strv-req").tempdir_in("/tmp").unwrap();
+    let id = create(&env, dir.path().to_str().unwrap());
+    for bad in [String::new(), "x".repeat(129)] {
+        let r = env.rpc().call("session/prompt", &json!({"id": id, "text": "hi", "requestId": bad}));
+        assert!(r["error"]["message"].as_str().unwrap().contains("1 to 128 bytes"), "{r}");
+    }
+    let r = env.rpc().call("session/prompt", &json!({"id": id, "text": "hi", "requestId": "x".repeat(128)}));
+    assert!(r.get("error").is_none(), "{r}");
+}
