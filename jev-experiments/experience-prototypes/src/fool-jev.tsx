@@ -12,7 +12,7 @@ import {
   verdict,
   type Puzzle,
 } from "../../packages/arena/src/fool/model";
-import { getApiKey, NO_KEY_MESSAGE, run, percent as pct } from "./api";
+import { getApiKey, NO_KEY_MESSAGE, run, percent as pct, fetchJson } from "./api";
 import { Receipt, USD_PER_INPUT_TOKEN } from "./receipt";
 import { describeFailure, type Failure } from "./live-failure";
 import { KeyTag, LiveFailure, ModeTag, openSettings } from "./trust";
@@ -98,8 +98,7 @@ export function FoolJev() {
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    fetch("/fool/fool.json")
-      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+    fetchJson("/fool/fool.json")
       .then(setData)
       .catch(() => setFailed(true));
   }, []);

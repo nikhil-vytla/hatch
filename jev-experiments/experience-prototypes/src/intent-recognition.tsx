@@ -5,7 +5,7 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import { Benchmarks, Learning } from "./benchmarks";
-import { percent } from "./api";
+import { percent, fetchJson } from "./api";
 import { Notice, Pane, Pills, Stat } from "./shared";
 
 const TABS = ["Accuracy", "Stability", "Prompt search"] as const;
@@ -24,9 +24,7 @@ function useRecord(name: string, enabled: boolean) {
     if (!cache.has(name))
       cache.set(
         name,
-        fetch(`/data/${name}.json`).then((r) =>
-          r.ok ? r.json() : Promise.reject(new Error(String(r.status))),
-        ),
+        fetchJson(`/data/${name}.json`),
       );
 
     let live = true;

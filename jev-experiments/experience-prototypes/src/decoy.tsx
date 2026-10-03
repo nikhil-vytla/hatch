@@ -7,7 +7,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Receipt } from "./receipt";
 import { ModeTag } from "./trust";
 import { Fold, Notice, Pane, Pills } from "./shared";
-import { percent as pct } from "./api";
+import { percent as pct, fetchJson } from "./api";
 
 type Scenario = { id: string; context: string; question: string; a: string; b: string; aDecoy: string; bDecoy: string };
 type SetId = "none" | "decoy-a" | "decoy-b";
@@ -66,8 +66,7 @@ export function Decoy() {
   const [order, setOrder] = useState(ORDERS[0]);
 
   useEffect(() => {
-    fetch("/decoy/decoy.json")
-      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+    fetchJson("/decoy/decoy.json")
       .then(setData)
       .catch(() => setFailed(true));
   }, []);

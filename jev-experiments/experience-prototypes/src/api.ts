@@ -118,6 +118,9 @@ export function download(
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
+/** Fetches a JSON file; a non-2xx response rejects with its status as the message. */
+export const fetchJson = <T = any>(url: string, init?: RequestInit): Promise<T> =>
+  fetch(url, init).then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))));
 export function pretty(s: unknown) {
   return String(s ?? "").replaceAll("_", " ");
 }
