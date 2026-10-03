@@ -86,14 +86,14 @@ for (const [name, source] of Object.entries(publication)) {
   for (const c of split.cases) writeFileSync(resolve(dir, "cases", c.name), c.body + "\n");
 }
 mkdirSync("public/research", { recursive: true });
-const qualityReview = resolve(lab, "quality-and-simulation-review");
+const qualityReview = resolve(lab, "archive/quality-and-simulation-review");
 if (existsSync(resolve(qualityReview, "review.html"))) {
   mkdirSync("public/research/quality-review", { recursive: true });
   for (const name of ["review.html", "README.md", "FUTURE-EXPERIMENTS.md"])
     if (existsSync(resolve(qualityReview, name))) copyFileSync(resolve(qualityReview, name), resolve("public/research/quality-review", name));
 }
-if (existsSync(resolve(lab, "real-time-playground/show-me-realtime.html")))
-  copyFileSync(resolve(lab, "real-time-playground/show-me-realtime.html"), resolve("public/research/show-me-realtime.html"));
+if (existsSync(resolve(lab, "archive/real-time-playground/show-me-realtime.html")))
+  copyFileSync(resolve(lab, "archive/real-time-playground/show-me-realtime.html"), resolve("public/research/show-me-realtime.html"));
 if (hasSources) {
   const iconBuild = spawnSync("bun", [resolve(lab, "icon-studio/collection.ts"), resolve("public/icon-studio")], { stdio: "inherit" });
   if (iconBuild.status !== 0) throw new Error("Icon collection preparation failed.");

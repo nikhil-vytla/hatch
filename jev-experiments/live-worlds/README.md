@@ -34,4 +34,4 @@ bun run build
 
 Canonical recordings are compact JSONL. Preparation reconstructs ignored JSON imports for the browser and never reads an owner credential. Local recording CLIs are separate and are never imported into deployed app or API modules. No fetched game or brush repository is vendored.
 
-See [Tetris](tetris/README.md), [crowd](crowd/README.md) and [Ghost Brush](ghost-brush/README.md) for exact protocols, controls, tests, and limitations. The earlier [timing sketch](../real-time-playground/README.md) remains a small tool for exploring useful-action duration and simulated latency. [Creative interaction research](../creative-interaction-research/README.md) records the primary references behind the visual direction.
+See [Tetris](tetris/README.md), [crowd](crowd/README.md) and [Ghost Brush](ghost-brush/README.md) for exact protocols, controls, tests, and limitations. The earlier [timing sketch](../archive/real-time-playground/README.md) remains a small tool for exploring useful-action duration and simulated latency. [Creative interaction research](../archive/creative-interaction-research/README.md) records the primary references behind the visual direction.
