@@ -41,4 +41,9 @@ elif command -v xvfb-run >/dev/null; then
 else
   echo "skipping the desktop tests: no display (install xvfb)" >&2
 fi
+# Cargo never removes what earlier builds left; say so before it's a surprise.
+target_gb=$(( $(du -sk target 2>/dev/null | cut -f1) / 1048576 ))
+if [ "$target_gb" -ge 10 ]; then
+  echo "note: target/ holds ${target_gb} GB of build output; \`cargo clean\` frees it (the next build takes about a minute)" >&2
+fi
 echo "all checks passed"

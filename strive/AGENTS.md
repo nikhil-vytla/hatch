@@ -41,6 +41,8 @@ strive is a Rust daemon (`crates/`) plus TypeScript clients (`packages/`). Read
 - Take std locks with `crate::sync::lock`, `read` or `write`. Never hold one across
   an `.await`; clippy denies it.
 - Use `anyhow` in the `strived` binary and concrete error types in library crates.
+- Debug builds keep only line tables (`Cargo.toml`), so `target/` stays a few GB.
+  `check.sh` notes when it passes 10 GB; `cargo clean` frees it.
 - The Rust types in `crates/proto` are the protocol. `cargo test -p strive-proto`
   regenerates `packages/protocol/src/generated`. Never edit generated files.
 
