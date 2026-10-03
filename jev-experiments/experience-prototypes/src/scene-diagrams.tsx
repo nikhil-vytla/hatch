@@ -5,6 +5,7 @@
 export type Diagram = { from: string[]; to: string };
 
 export const DIAGRAMS: Record<string, Diagram> = {
+  "who-said-that": { from: ["voice", "words"], to: "who said it" },
   paste: { from: ["copied page", "form"], to: "fact per field" },
   ui: { from: ["request"], to: "layout choices" },
   games: { from: ["what it sees"], to: "next move" },

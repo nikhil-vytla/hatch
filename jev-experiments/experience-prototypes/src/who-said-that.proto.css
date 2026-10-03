@@ -1,0 +1,87 @@
+/* PROTOTYPE — Who said that? (Toy Box tokens from style.css) */
+.wst { display: grid; gap: 18px; padding-bottom: 88px; }
+.wst-lede { font-size: 18px; max-width: 64ch; margin: 0; }
+.wst-controls { display: grid; gap: 12px; }
+.wst-controls [role="group"] { display: flex; flex-wrap: wrap; gap: 10px; }
+.wst button { font: inherit; cursor: pointer; }
+.wst-controls [role="group"] button,
+.wst-actions button,
+.wst-consent button,
+.wst-variants button,
+.wst-copy {
+  border: 2.5px solid var(--ink); border-radius: 14px; background: var(--surface); color: var(--ink);
+  padding: 8px 14px; font-weight: 800; display: inline-grid; gap: 2px; text-align: left; box-shadow: 3px 3px 0 var(--ink);
+}
+.wst button small { font-weight: 600; font-size: 12px; color: var(--muted); }
+.wst button[aria-pressed="true"] { background: var(--sun); }
+.wst button:disabled { opacity: 0.55; cursor: not-allowed; box-shadow: none; }
+.wst audio { width: 100%; max-width: 640px; }
+.wst-consent { border: 3px solid var(--ink); border-radius: 18px; background: var(--sky); padding: 16px; display: grid; gap: 10px; max-width: 640px; }
+.wst-consent p { margin: 0; }
+.wst-status { margin: 0; font-weight: 800; }
+.wst-error { color: #a62a0e; }
+.wst-receipt { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; font-size: 14px; color: var(--muted); }
+.wst-receipt b { color: var(--ink); }
+.wst-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-left: auto; }
+
+.wst-chip { display: inline-block; font-weight: 800; font-size: 13px; border: 2px solid var(--ink); border-radius: 999px; padding: 1px 10px; min-width: 64px; text-align: center; }
+.wst-me { background: var(--sky); }
+.wst-friend { background: var(--mint); }
+.wst-else { background: var(--bg); color: var(--muted); border-style: dashed; }
+
+.wst-transcript { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; max-width: 820px; }
+.wst-transcript li > button {
+  width: 100%; display: grid; grid-template-columns: 44px auto 1fr auto; gap: 10px; align-items: center; text-align: left;
+  background: var(--surface); border: 2px solid var(--ink); border-radius: 14px; padding: 8px 12px; color: var(--ink);
+}
+.wst-transcript li.wst-faded > button { background: var(--bg); color: var(--muted); border-style: dashed; }
+.wst-time { font-variant-numeric: tabular-nums; font-size: 13px; color: var(--muted); }
+.wst-text { font-size: 16px; }
+.wst-miss { color: #a62a0e; font-weight: 800; }
+.wst-why { margin: 6px 0 4px 54px; display: grid; gap: 6px; }
+.wst-why p { margin: 0; font-size: 13px; color: var(--muted); }
+.wst-odds { margin: 0; display: grid; gap: 4px; max-width: 520px; }
+.wst-odds div { display: grid; grid-template-columns: 180px 1fr; gap: 10px; align-items: center; }
+.wst-odds dt { font-size: 13px; }
+.wst-odds dd { margin: 0; display: flex; gap: 8px; align-items: center; }
+.wst-bar { display: inline-block; height: 10px; border-radius: 6px; background: var(--ink); min-width: 2px; }
+.wst-odds b { font-size: 13px; font-variant-numeric: tabular-nums; }
+
+.wst-timeline { display: grid; gap: 8px; border: 3px solid var(--ink); border-radius: 18px; background: var(--surface); padding: 16px; box-shadow: var(--sticker); }
+.wst-lane { display: grid; grid-template-columns: 100px 1fr; gap: 10px; align-items: center; }
+.wst-lane-label { font-weight: 800; }
+.wst-track { position: relative; height: 34px; border-radius: 10px; background: var(--bg); }
+.wst-block { position: absolute; top: 4px; bottom: 4px; border: 2px solid var(--ink); border-radius: 8px; padding: 0; }
+.wst-playhead { position: absolute; top: -4px; bottom: -4px; width: 2px; background: #c43a17; }
+.wst-axis { display: flex; justify-content: space-between; margin-left: 110px; font-size: 12px; color: var(--muted); }
+.wst-hover { border-top: 2px dashed var(--line); padding-top: 10px; display: grid; gap: 6px; }
+.wst-hover p { margin: 0; }
+
+.wst-fix { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+.wst-fix section { border: 3px solid var(--ink); border-radius: 18px; background: var(--surface); padding: 16px; display: grid; gap: 8px; align-content: start; }
+.wst-fix h3 { margin: 0; font-family: var(--display); font-size: 18px; }
+.wst-raw { margin: 0; color: var(--muted); line-height: 1.6; }
+.wst-turn { margin: 0; line-height: 1.5; }
+.wst-toggle { font-size: 14px; display: flex; gap: 6px; align-items: center; }
+.wst-copy { justify-self: start; margin-top: 6px; }
+
+.wst-how { max-width: 820px; }
+.wst-how summary { font-weight: 800; cursor: pointer; }
+.wst-how p { color: var(--muted); }
+
+.wst-variants {
+  position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 20; display: flex; gap: 8px; align-items: center;
+  background: var(--ink); color: var(--sun); padding: 8px 12px; border-radius: 999px; box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.25);
+}
+.wst-variants > span { font-weight: 800; font-size: 13px; padding: 0 6px; }
+.wst-variants button { box-shadow: none; padding: 4px 12px; font-size: 13px; border-width: 2px; }
+@media (max-width: 720px) {
+  .wst-fix { grid-template-columns: 1fr; }
+  .wst-transcript li > button { grid-template-columns: 40px auto 1fr; }
+  .wst-miss { display: none; }
+  .wst-odds div { grid-template-columns: 140px 1fr; }
+  .wst-lane { grid-template-columns: 70px 1fr; }
+  .wst-axis { margin-left: 80px; }
+  .wst-variants { left: 8px; right: 8px; transform: none; flex-wrap: wrap; justify-content: center; border-radius: 18px; }
+  .wst-actions { margin-left: 0; }
+}

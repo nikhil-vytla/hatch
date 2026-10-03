@@ -22,6 +22,7 @@ const Handoff = lazy(() => import("../handoff").then(m => ({ default: m.Handoff 
 const Decoy = lazy(() => import("../decoy").then(m => ({ default: m.Decoy })));
 const OpenDecisions = lazy(() => import("../open-decisions").then(m => ({ default: m.OpenDecisions })));
 const OceanReef = lazy(() => import("../ocean-reef").then(m => ({ default: m.OceanReef })));
+const WhoSaidThat = lazy(() => import("../who-said-that.proto").then(m => ({ default: m.WhoSaidThat })));
 const AnswerKey = lazy(() => import("../answer-key").then(m => ({ default: m.AnswerKey })));
 const RewardBench = lazy(() => import("../rewardbench").then(m => ({ default: m.RewardBench })));
 const LocalModels = lazy(() => import("../local-models").then(m => ({ default: m.LocalModels })));
@@ -111,6 +112,8 @@ function View({
       return <Handoff result={result} />;
     case "ocean":
       return <OceanReef />;
+    case "who-said-that":
+      return <WhoSaidThat />;
     case "decoy":
       return <Decoy />;
     case "open-decisions":
@@ -206,7 +209,7 @@ function LiveExperimentPage({ id }: { id: string }) {
     setRecord(null);
     setError("");
     setAboutOpen(false);
-    if (id === "routing" || id === "decoy" || id === "rumour-mill" || id === "win-over" || id === "ocean" || id === "open-decisions") {
+    if (id === "routing" || id === "decoy" || id === "rumour-mill" || id === "win-over" || id === "ocean" || id === "open-decisions" || id === "who-said-that") {
       setRecord({ result: {} });
       return () => {
         alive = false;

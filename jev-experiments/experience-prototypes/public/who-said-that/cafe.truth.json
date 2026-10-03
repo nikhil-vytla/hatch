@@ -1,0 +1,127 @@
+{
+ "rate": 16000,
+ "seconds": 58.45,
+ "voices": {
+  "me": "am_michael",
+  "priya": "af_bella",
+  "barista": "am_fenrir",
+  "table": "bm_george"
+ },
+ "tags": {
+  "me": [
+   0.4,
+   4.675000000000001
+  ],
+  "priya": [
+   5.175000000000001,
+   9.15
+  ]
+ },
+ "lines": [
+  {
+   "who": "me",
+   "text": "Hi, it's me. I'll be the one talking about the new flat.",
+   "start": 0.4,
+   "end": 4.675,
+   "gain": 0.9
+  },
+  {
+   "who": "priya",
+   "text": "And I'm Priya. I'm the one who keeps changing the plan.",
+   "start": 5.175,
+   "end": 9.15,
+   "gain": 0.9
+  },
+  {
+   "who": "me",
+   "text": "So the floor plan has the kitchen facing",
+   "start": 9.95,
+   "end": 13.075,
+   "gain": 0.9
+  },
+  {
+   "who": "priya",
+   "text": "facing the garden, right?",
+   "start": 13.225,
+   "end": 15.575,
+   "gain": 0.9
+  },
+  {
+   "who": "barista",
+   "text": "Large oat latte for Sam!",
+   "start": 15.875,
+   "end": 18.075,
+   "gain": 0.45
+  },
+  {
+   "who": "me",
+   "text": "Exactly, and the stairs go up behind the pantry.",
+   "start": 18.375,
+   "end": 22.325,
+   "gain": 0.9
+  },
+  {
+   "who": "table",
+   "text": "Did you see the match last night? Unbelievable ending.",
+   "start": 22.525,
+   "end": 26.525,
+   "gain": 0.35
+  },
+  {
+   "who": "priya",
+   "text": "Then the second bedroom loses its window, though.",
+   "start": 26.925,
+   "end": 30.7,
+   "gain": 0.9
+  },
+  {
+   "who": "me",
+   "text": "Not if we move the bathroom to the north wall and",
+   "start": 31.2,
+   "end": 34.8,
+   "gain": 0.9
+  },
+  {
+   "who": "priya",
+   "text": "and push the landing out by a metre. I like that.",
+   "start": 34.95,
+   "end": 38.65,
+   "gain": 0.9
+  },
+  {
+   "who": "barista",
+   "text": "Can I get a name for the flat white?",
+   "start": 39.05,
+   "end": 41.425,
+   "gain": 0.45
+  },
+  {
+   "who": "me",
+   "text": "How much would that cost us, do you think?",
+   "start": 41.825,
+   "end": 44.775,
+   "gain": 0.9
+  },
+  {
+   "who": "table",
+   "text": "I think they'll sell the striker in January.",
+   "start": 44.975,
+   "end": 48.625,
+   "gain": 0.35
+  },
+  {
+   "who": "priya",
+   "text": "Less than the extension. Maybe twelve thousand.",
+   "start": 49.025,
+   "end": 52.725,
+   "gain": 0.9
+  },
+  {
+   "who": "me",
+   "text": "Then let's ask the architect about the north wall on Monday.",
+   "start": 53.225,
+   "end": 57.65,
+   "gain": 0.9
+  }
+ ]
+}
