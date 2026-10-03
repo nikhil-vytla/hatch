@@ -26,15 +26,16 @@ import { bootstrapMany } from "./bootstrap";
 import { OPEN_MODELS } from "../../open-decisions/models";
 import { PALETTE } from "./palette";
 import type { Card, CardContestant, Estimate, MetricDef, RunSet } from "./schema";
+import { JEV_PRICE_TEXT, JEV_USD_PER_INPUT_TOKEN } from "../jev-price";
 
 /**
  * Jev's price and request size, for the cost measure. Price: TypeSafe's published rate,
- * docs.typesafe.ai/models (read 29 Sep 2026): $0.042 per million input tokens, output free.
+ * TypeSafe list price: see ../jev-price.ts (docs.typesafe.ai/models, read 29 Sep 2026).
  * Request size: measured through the gateway on 29 Sep 2026 with One box's 14 questions:
  * 1,732 input tokens for a 1-character prefix, 1,782 for the longest phrase (187 characters),
  * so about 1,732 plus 0.27 per character. The gateway billed exactly price times tokens.
  */
-const JEV_USD_PER_TOKEN = 0.042 / 1_000_000;
+const JEV_USD_PER_TOKEN = JEV_USD_PER_INPUT_TOKEN;
 
 const tokensFor = (chars: number) => 1732 + Math.max(0, chars - 1) * (50 / 186);
 
@@ -195,7 +196,7 @@ const METRICS: MetricDef[] = [
     unit: "usd",
     better: "lower",
     axis: "cost",
-    help: "What typing 1,000 of these phrases would cost at TypeSafe's list price ($0.042 per million input tokens, output free): one request per keystroke, at the request size measured on 29 Sep 2026. Local contestants have no per-call price; their hardware isn't counted.",
+    help: `What typing 1,000 of these phrases would cost at TypeSafe's list price (${JEV_PRICE_TEXT}): one request per keystroke, at the request size measured on 29 Sep 2026. Local contestants have no per-call price; their hardware isn't counted.`,
   },
   {
     id: "wrong",

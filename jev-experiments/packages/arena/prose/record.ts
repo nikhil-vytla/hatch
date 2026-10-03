@@ -16,6 +16,7 @@ import { appendFileSync, existsSync, readFileSync } from "node:fs";
 import { evaluate, GatewayError } from "../../../experience-prototypes/server/gateway";
 import { rng, shuffled } from "../src/checkable/items";
 import { allJobs } from "./variants";
+import { jevCostUsd } from "../src/jev-price";
 
 const key = process.env.AI_GATEWAY_API_KEY;
 
@@ -58,7 +59,7 @@ for (const job of todo) {
   if (asked >= limit) break;
 
   // Largest request is ~2.5 KB; assume at most 2,000 input tokens for the next one.
-  const worst = (2000 * 0.042) / 1e6;
+  const worst = jevCostUsd(2000);
 
   if (spent + worst > MAX_COST_USD || ok + 1 > MAX_OK) {
     console.log(`Budget reached: $${spent.toFixed(6)}, ${ok} ok. Stopping.`);
@@ -75,7 +76,7 @@ for (const job of todo) {
       const inputTokens = r.usage?.input_tokens ?? null;
 
       // Unknown cost is budgeted at the list price for the reported tokens (or 2,000 tokens).
-      spent += r.cost_usd ?? ((inputTokens ?? 2000) * 0.042) / 1e6;
+      spent += r.cost_usd ?? jevCostUsd(inputTokens ?? 2000);
       tokens += inputTokens ?? 0;
       ok++;
       appendFileSync(

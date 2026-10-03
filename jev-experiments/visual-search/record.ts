@@ -4,6 +4,7 @@ import { resolve } from "node:path";
 import { readRecord } from "../experience-prototypes/scripts/records";
 import { evaluate, GatewayError } from "../experience-prototypes/scripts/local-model";
 import { PRESETS, PROTOCOL, makeBatches, readScores, type SearchMode, type Artwork, type SearchScores } from "./protocol";
+import { JEV_USD_PER_INPUT_TOKEN } from "../packages/arena/src/jev-price";
 const here = import.meta.dir, file = resolve(here, "events.jsonl"), hash = (s: string) => createHash("sha256").update(s).digest("hex");
 const collectionText = readFileSync(resolve(here, "collection.jsonl"), "utf8"), collection = readRecord(resolve(here, "collection.jsonl")), works: Artwork[] = collection.result.works;
 const manifest = { ...PROTOCOL, collection_sha256: hash(collectionText), protocol_sha256: hash(JSON.stringify(PROTOCOL)), planned_scores: works.length * PRESETS.length * 2, frozen_at: "2026-10-01" };
@@ -16,7 +17,7 @@ const prior: any[] = existsSync(file) ? readFileSync(file, "utf8").trim().split(
 for (const row of prior) if (row.event === "completed") { if (completed.has(row.id)) throw new Error(`Duplicate completed score ${row.id}`); if (row.protocol_sha256 !== manifest.protocol_sha256 || row.collection_sha256 !== manifest.collection_sha256) throw new Error("Evidence protocol changed"); completed.set(row.id, row); }
 const write = (row: any) => appendFileSync(file, JSON.stringify(row) + "\n"); let batches = 0;
 // A hard spending cap at Jev's list price (input tokens only; output is free), counting earlier runs too.
-const USD_PER_TOKEN = 0.042 / 1e6, CAP_USD = Number(process.env.VISUAL_RECORD_CAP_USD ?? 0.25);
+const USD_PER_TOKEN = JEV_USD_PER_INPUT_TOKEN, CAP_USD = Number(process.env.VISUAL_RECORD_CAP_USD ?? 0.25);
 let spent = prior.filter(r => r.event === "batch_completed").reduce((n, r) => n + (r.response?.usage?.input_tokens ?? 0) * USD_PER_TOKEN, 0);
 const flag = process.argv.indexOf("--max-batches"), maxBatches = flag > 0 ? Number(process.argv[flag + 1]) : Infinity;
 // Stop instead of retrying forever when the gateway keeps failing.

@@ -10,6 +10,7 @@ import { appendFileSync } from "node:fs";
 import { evaluate } from "../../experience-prototypes/server/gateway";
 import { allProfiles, jevRequest, type MessageKind } from "./profiles";
 import { PRESETS } from "./presets";
+import { JEV_USD_PER_INPUT_TOKEN as USD_PER_TOKEN } from "../../packages/arena/src/jev-price";
 
 const key = process.env.AI_GATEWAY_API_KEY;
 
@@ -18,8 +19,6 @@ if (!key) throw Error("Set AI_GATEWAY_API_KEY to record.");
 const PRESET = "scam";
 const MAX_REQUESTS = 300;
 const MAX_USD = 0.1;
-// TypeSafe's list price: $0.042 per million input tokens, output free.
-const USD_PER_TOKEN = 0.042 / 1e6;
 
 const preset = PRESETS.find((p) => p.id === PRESET);
 

@@ -4,6 +4,7 @@ import { ArrowLeft, ArrowRight, Check, Eye, Search } from "lucide-react";
 import { Pane, Stat, Button, Fold, State, Notice } from "./shared";
 import { fromRecorded, Receipt } from "./receipt";
 import { ContentReview } from "./provenance";
+import { percent1 } from "./api";
 
 const subsets = ["Focus", "Factuality", "Math", "Safety", "Precise IF", "Ties"];
 const descriptions: Record<string, string> = {
@@ -18,8 +19,7 @@ const descriptions: Record<string, string> = {
     "Can Jev recognize explicit constraint satisfaction? These labels use executable verifiers upstream.",
   Ties: "Can Jev keep all valid answers above invalid ones, without inventing large differences between equally valid answers?",
 };
-const pct = (n: number | null | undefined) =>
-  n == null ? "Pending" : `${(100 * n).toFixed(1)}%`;
+const pct = (n: number | null | undefined) => (n == null ? "Pending" : percent1(n));
 const top = (r: any) => Math.max(...r.candidates.map((c: any) => c.score));
 const correct = (r: any) => {
   if (r.subset === "Ties")

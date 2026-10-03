@@ -5,6 +5,7 @@
  *   bun live-worlds/win-over/summarize.ts
  */
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { jevCostUsd } from "../../packages/arena/src/jev-price";
 
 type Decision = { intent?: string; intentP?: number; action?: string };
 type Row = {
@@ -53,7 +54,7 @@ writeFileSync(
       jev: {
         calls: rows.length,
         medianMs: ms[Math.floor(ms.length / 2)],
-        costUsd: rows.reduce((s, r) => s + (r.jev.inputTokens * 0.042) / 1e6, 0),
+        costUsd: rows.reduce((s, r) => s + jevCostUsd(r.jev.inputTokens), 0),
       },
       lines: rows.map((r) => ({
         text: r.line.text,

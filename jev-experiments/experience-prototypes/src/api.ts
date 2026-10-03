@@ -121,4 +121,7 @@ export function download(
 export function pretty(s: unknown) {
   return String(s ?? "").replaceAll("_", " ");
 }
+/** A share as a whole percent: 0.473 → "47%". */
 export const percent = (n: number) => `${Math.round(n * 100)}%`;
+/** A share as a percent to one decimal: 0.4734 → "47.3%". */
+export const percent1 = (n: number) => `${(n * 100).toFixed(1)}%`;

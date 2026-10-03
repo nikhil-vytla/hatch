@@ -31,7 +31,7 @@ import { decideAll, POLICY_NAME, WEIGHT_COUNT } from "../../live-worlds/ocean/po
 import evolved from "../../live-worlds/ocean/policy.json";
 import { parseRecording, RACE, replayer, type Recording } from "../../live-worlds/ocean/replay";
 import type { Decision } from "../../live-worlds/ocean/engine";
-import { getApiKey, NO_KEY_MESSAGE, run } from "./api";
+import { getApiKey, NO_KEY_MESSAGE, run, percent as pct } from "./api";
 import { describeFailure, type Failure } from "./live-failure";
 import { LiveFailure } from "./trust";
 import "./ocean-reef.css";
@@ -70,7 +70,6 @@ const ACTION_WORDS: Record<Action, string> = {
   rest: "Rest",
 };
 
-const pct = (n: number) => `${Math.round(n * 100)}%`;
 
 /** Jev's cost per minute, from the recorded run's measured batches. */
 const JEV_USD_PER_MINUTE = 0.04;

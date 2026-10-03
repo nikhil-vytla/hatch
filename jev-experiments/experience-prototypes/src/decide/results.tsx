@@ -18,8 +18,8 @@ import {
   steadiness,
 } from "../../../packages/arena/src/decide/results";
 import "./decide.css";
+import { percent as pct } from "../api";
 
-const pct = (p: number) => `${Math.round(p * 100)}%`;
 
 const WORDS = ["no", "one", "two", "three", "four", "five"];
 
