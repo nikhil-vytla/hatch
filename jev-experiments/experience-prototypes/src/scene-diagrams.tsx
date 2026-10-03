@@ -11,7 +11,6 @@ export const DIAGRAMS: Record<string, Diagram> = {
   music: { from: ["motif"], to: "arrangement" },
   "semantic-table": { from: ["each row"], to: "yes/no per column" },
   beverage: { from: ["craving"], to: "next question" },
-  routing: { from: ["task"], to: "which model" },
   verify: { from: ["claim", "trace"], to: "supported?" },
   search: { from: ["query", "sources"], to: "which answers" },
   classify: { from: ["request"], to: "1 of 77 intents" },

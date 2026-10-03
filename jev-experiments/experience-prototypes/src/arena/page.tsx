@@ -88,6 +88,39 @@ function NotFound({ name }: { name: string }) {
   );
 }
 
+/**
+ * Entries shown as tabs of one entry: the second Tetris card asks the same three designs with
+ * gravity running, so it is a tab of the paused one rather than its own entry. Both cards and
+ * their links keep working; only the index lists the first.
+ */
+const ENTRY_TABS: { id: string; label: string }[][] = [
+  [
+    { id: "tetris-turns", label: "Paused until everyone answers" },
+    { id: "tetris-realtime", label: "In real time" },
+  ],
+];
+
+const TAB_OF = new Set(ENTRY_TABS.flatMap((group) => group.slice(1).map((t) => t.id)));
+
+/** Arena entries that measure a catalog scene: link to the scene instead of repeating it. */
+const SCENE_FOR = new Map([["cafe", { id: "beverage", title: "Café Jev" }]]);
+
+function EntryTabs({ id }: { id: string }) {
+  const group = ENTRY_TABS.find((g) => g.some((t) => t.id === id));
+
+  if (!group) return null;
+
+  return (
+    <nav className="entry-tabs" aria-label="Versions of this entry">
+      {group.map((t) => (
+        <a key={t.id} href={viewHash({ card: t.id })} aria-current={t.id === id ? "page" : undefined}>
+          {t.label}
+        </a>
+      ))}
+    </nav>
+  );
+}
+
 function Overview({ index }: { index: ArenaIndex }) {
   const heading = useHeadingFocus();
 
@@ -111,7 +144,7 @@ function Overview({ index }: { index: ArenaIndex }) {
         </p>
       </header>
       <ol className="toc">
-        {index.cards.map((card) => (
+        {index.cards.filter((card) => !TAB_OF.has(card.id)).map((card) => (
           <li key={card.id}>
             <a href={viewHash({ card: card.id })}>
               <Sketch card={card} />
@@ -191,6 +224,7 @@ function LensBody({ model: m }: { model: CardModel }) {
 function CardArticle({ card, view }: { card: Card; view: View }) {
   const m = useCardModel(card, view, Boolean(getApiKey()));
   const heading = useRef<HTMLHeadingElement>(null);
+  const scene = SCENE_FOR.get(card.id);
   const measureApplies = m.lens === "bars" || m.lens === "per-item";
 
   const slices =
@@ -225,10 +259,17 @@ function CardArticle({ card, view }: { card: Card; view: View }) {
           <p className="kicker">
             {FAMILY[card.family]} · {REFERENCE[card.reference]}
           </p>
+          <EntryTabs id={card.id} />
           <h1 ref={heading} tabIndex={-1}>
             {card.title}
           </h1>
           <p className="lede">{card.question}</p>
+          {scene && (
+            <p className="entry-scene-link">
+              The playable version is the scene <a href={`#experiment/${scene.id}`}>{scene.title}</a>; this
+              entry is its measurement.
+            </p>
+          )}
           <p className="finding" aria-live="polite">
             {m.finding}
           </p>

@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { retiredScene } from "../catalog";
-import type { Note } from "./manifest";
+import { noteRetirement, type Note } from "./manifest";
 
 /** "2026-09-22" → "22 September 2026", read as a calendar date (no time zone shift). */
 const longDate = (iso: string) =>
@@ -13,6 +13,8 @@ export function Article({
   note: Note;
   children: ReactNode;
 }) {
+  const retired = noteRetirement(note);
+
   return (
     <article
       className="experiment-notes experiment-note"
@@ -21,6 +23,11 @@ export function Article({
       <a className="note-back" href="#/notes">
         ← All notes
       </a>
+      {retired && (
+        <p className="note-retired" role="note">
+          Retired {retired.on}. {retired.reason}
+        </p>
+      )}
       <header className="note-header">
         <p className="note-kicker">
           {note.number} / {note.category}

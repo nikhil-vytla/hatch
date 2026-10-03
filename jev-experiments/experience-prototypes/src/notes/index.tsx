@@ -1,4 +1,4 @@
-import { experimentNotes } from "./manifest";
+import { experimentNotes, listedNotes } from "./manifest";
 import { ScoreNote } from "./score-note";
 import { CrowdNote } from "./crowd-note";
 import { RoutingNote } from "./routing-note";
@@ -51,7 +51,7 @@ export function NotesIndex() {
         </p>
       </header>
       <ol className="notes-list">
-        {experimentNotes.map((note) => (
+        {listedNotes.map((note) => (
           <li key={note.slug}>
             <span className="note-number">{note.number}</span>
             <div>
