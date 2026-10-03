@@ -7,10 +7,12 @@ import type { ReactNode } from "react";
 import heldout from "../../../live-worlds/ocean/heldout.json";
 import { percent } from "../api";
 import { PROMPTS } from "../../../live-worlds/eyes/model";
+import { SENTRY_CAVEATS, SentryData, SentryMethod, SentryResults } from "../screen-sentry-evidence";
+import { WHO_CAVEATS, WhoData, WhoMethod, WhoResults } from "../who-said-that-evidence";
 import type { EvidenceTab } from "./evidence-drawer";
 
 /** Pages that use the game format: play first, evidence in a drawer. */
-export const GAME_PAGES = new Set(["ocean", "rumour-mill", "win-over", "snake", "games", "tetris", "eyes"]);
+export const GAME_PAGES = new Set(["ocean", "rumour-mill", "win-over", "snake", "games", "tetris", "eyes", "screen-sentry", "who-said-that"]);
 
 const REPO = "https://github.com/nikhil-vytla/hatch/tree/main/jev-experiments";
 
@@ -69,6 +71,18 @@ function ReefResults() {
 type Scene = { results?: ReactNode; method?: ReactNode; caveats: ReactNode[]; data: ReactNode };
 
 const SCENES: Record<string, Scene> = {
+  "screen-sentry": {
+    results: <SentryResults />,
+    method: <SentryMethod />,
+    caveats: SENTRY_CAVEATS,
+    data: <SentryData />,
+  },
+  "who-said-that": {
+    results: <WhoResults />,
+    method: <WhoMethod />,
+    caveats: WHO_CAVEATS,
+    data: <WhoData />,
+  },
   eyes: {
     method: (
       <>
@@ -167,11 +181,12 @@ const SCENES: Record<string, Scene> = {
   },
 };
 
-/** The drawer's tabs for a game page; `about` is the page's existing About material. */
-export function gameEvidence(id: string, about: ReactNode, download: ReactNode): EvidenceTab[] {
+/** The drawer's tabs for a game page; `about` is the page's existing About material, or null when it has none. */
+export function gameEvidence(id: string, about: ReactNode | null, download: ReactNode): EvidenceTab[] {
   const s = SCENES[id];
+  const aboutTab: EvidenceTab[] = about === null ? [] : [{ id: "about", label: "About", content: about }];
 
-  if (!s) return [{ id: "about", label: "About", content: about }];
+  if (!s) return aboutTab;
 
   return [
     ...(s.results ? [{ id: "results", label: "Results", content: s.results }] : []),
@@ -197,6 +212,6 @@ export function gameEvidence(id: string, about: ReactNode, download: ReactNode):
         </>
       ),
     },
-    { id: "about", label: "About", content: about },
+    ...aboutTab,
   ];
 }

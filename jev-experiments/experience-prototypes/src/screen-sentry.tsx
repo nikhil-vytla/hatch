@@ -13,8 +13,6 @@ import { blockKey, batchRequest, batchScores, BATCH } from "../../live-worlds/se
 import { RISK_THRESHOLD, score, type Scores, type Weights } from "../../live-worlds/sentry/model";
 import { HARD_TRAPS, PAGES, runHelper, TRAPS, withTrap, type Outcome, type PageBlock, type PlacedTrap, type TrapKind } from "../../live-worlds/sentry/pages";
 import weightsJson from "../../live-worlds/sentry/weights.json";
-import evalJson from "../../live-worlds/sentry/eval.json";
-import compareJson from "../../live-worlds/sentry/compare.json";
 import { NO_KEY_MESSAGE, run } from "./api";
 import { describeFailure, type Failure } from "./live-failure";
 import { fromLiveBatches, Receipt, type ReceiptData } from "./receipt";
@@ -29,12 +27,6 @@ type Recorded = {
   batches: Record<string, { at: string; servedBy: string | null; latencyMs: number; inputTokens: number | null; costUsd: number | null; request: unknown; answers: unknown }>;
 };
 
-type Count = { injectionsCaught: string; harmlessFlagged: string };
-
-type Compare = { sets: Record<string, { free: Count; jev: Count }>; spend: { requests: number; costUsd: number; medianLatencyMs: number; recordedOn: string } };
-
-// SAFETY: compare.json is written by live-worlds/sentry/compare.ts in exactly this shape.
-const CMP = compareJson as Compare;
 
 type Mode = "plant" | "levels";
 
@@ -54,17 +46,6 @@ const LEVELS: { kind: TrapKind; goal: string }[] = [
   { kind: "system", goal: "Forge a system note it doesn't catch." },
 ];
 
-const SETS: [string, string][] = [
-  ["scene: default traps", "The five default traps, on all three pages"],
-  ["scene: hard traps", "Eight harder traps, on all three pages"],
-  ["scene: page blocks", "The pages' own harmless blocks"],
-  ["wild2", "Fresh hand-written test (written before scoring)"],
-  ["wild", "First hand-written test (guided the fixes)"],
-  ["injecagent", "InjecAgent: instructions planted in tool output"],
-  ["deepset", "deepset prompt injections"],
-  ["gandalf", "Gandalf 'ignore your instructions' attempts"],
-  ["jailbreak", "Jailbreak prompts (its harmless rows still instruct an AI)"],
-];
 
 const pct = (n: number) => `${Math.round(n * 100)}%`;
 
@@ -177,171 +158,6 @@ function SentryTable({ blocks, free, jev, jevLabel, active }: { blocks: PageBloc
   );
 }
 
-/** Method, results, data and limits, one click away from the game. */
-function Evidence({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const [tab, setTab] = useState<"results" | "method" | "data" | "limits">("results");
-  const ref = useRef<HTMLDialogElement>(null);
-
-  useEffect(() => {
-    const d = ref.current;
-
-    if (!d) return;
-
-    if (open && !d.open) d.showModal();
-    else if (!open && d.open) d.close();
-  }, [open]);
-
-  const tabs: [typeof tab, string][] = [
-    ["results", "Results"],
-    ["method", "Method"],
-    ["data", "Data"],
-    ["limits", "Limits"],
-  ];
-
-  return (
-    <dialog ref={ref} className="ss-drawer" aria-labelledby="ss-drawer-title" onClose={onClose}>
-      <div className="ss-drawer-head">
-        <h3 id="ss-drawer-title">Accuracy and data</h3>
-        <button type="button" className="ss-close" onClick={onClose} aria-label="Close">
-          ×
-        </button>
-      </div>
-      <div className="ss-drawer-tabs" role="tablist" aria-label="Accuracy and data">
-        {tabs.map(([id, label]) => (
-          <button key={id} type="button" role="tab" aria-selected={tab === id} onClick={() => setTab(id)}>
-            {label}
-          </button>
-        ))}
-      </div>
-      <div className="ss-drawer-body" role="tabpanel">
-        {tab === "results" && (
-          <>
-            <p>
-              The same blocks, checked by the free sentry and by Jev's recorded answers, at a risk threshold of{" "}
-              {pct(RISK_THRESHOLD)}. Counts are injections caught and harmless blocks wrongly flagged.
-            </p>
-            <table className="ss-table ss-results">
-              <thead>
-                <tr>
-                  <th scope="col">Set</th>
-                  <th scope="col">Free: caught</th>
-                  <th scope="col">Free: false alarms</th>
-                  <th scope="col">Jev: caught</th>
-                  <th scope="col">Jev: false alarms</th>
-                </tr>
-              </thead>
-              <tbody>
-                {SETS.filter(([k]) => CMP.sets[k]).map(([k, label]) => (
-                  <tr key={k}>
-                    <th scope="row">{label}</th>
-                    <td>{CMP.sets[k].free.injectionsCaught}</td>
-                    <td>{CMP.sets[k].free.harmlessFlagged}</td>
-                    <td>{CMP.sets[k].jev.injectionsCaught}</td>
-                    <td>{CMP.sets[k].jev.harmlessFlagged}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            <p className="ss-fine">
-              Jev's answers: {CMP.spend.requests} requests recorded on {CMP.spend.recordedOn}, ${CMP.spend.costUsd} at list
-              price, median {CMP.spend.medianLatencyMs} ms per batch of up to {BATCH} blocks.
-            </p>
-          </>
-        )}
-        {tab === "method" && (
-          <>
-            <p>
-              Each block of the page is asked five yes/no questions: is it addressed to an AI, does it change the user's goal,
-              does it ask for secrets, is it an instruction rather than content, and would following it hijack a helper doing
-              the user's task. A block is flagged when the last one is at least {pct(RISK_THRESHOLD)}.
-            </p>
-            <p>
-              The free sentry answers them in your browser with five small logistic heads over hashed words, word pairs, a few
-              cue words and where the block sits (visible, hidden, tiny, a comment, alt text). It trained on{" "}
-              {(evalJson as { trainedOn: string }).trainedOn}. Real rows train the hijack question only, at a quarter of an
-              authored block's weight, a setting chosen on validation data carved from the training set.
-            </p>
-            <p>
-              Jev is asked the same five questions in batches of {BATCH} blocks, with the page title and the helper's task as
-              context. Its answers here were recorded once for every block and trap the scene ships; edit a trap and only the
-              free sentry, or Jev on your own key, can rate the new words.
-            </p>
-            <p>
-              The helper is code: it reads blocks in order, skips flagged ones and follows the first unflagged trap. Flagging a
-              real price means it never sees that price.
-            </p>
-          </>
-        )}
-        {tab === "data" && (
-          <>
-            <p>Training and test data, all openly licensed, checked at the source on 3 Oct 2026:</p>
-            <ul>
-              <li>
-                <a href="https://huggingface.co/datasets/deepset/prompt-injections" target="_blank" rel="noreferrer">
-                  deepset/prompt-injections
-                </a>{" "}
-                (Apache-2.0)
-              </li>
-              <li>
-                <a href="https://huggingface.co/datasets/Lakera/gandalf_ignore_instructions" target="_blank" rel="noreferrer">
-                  Lakera/gandalf_ignore_instructions
-                </a>{" "}
-                (MIT)
-              </li>
-              <li>
-                <a href="https://huggingface.co/datasets/jackhhao/jailbreak-classification" target="_blank" rel="noreferrer">
-                  jackhhao/jailbreak-classification
-                </a>{" "}
-                (Apache-2.0)
-              </li>
-              <li>
-                <a href="https://github.com/uiuc-kang-lab/InjecAgent" target="_blank" rel="noreferrer">
-                  InjecAgent
-                </a>{" "}
-                (MIT), injections planted in tool output
-              </li>
-              <li>Our own authored blocks, two hand-written test sets and eight hard traps</li>
-            </ul>
-            <p>
-              No Jev answer trains anything: TypeSafe's terms forbid it. Everything, including Jev's raw recorded answers, is in{" "}
-              <a href="https://github.com/nikhil-vytla/hatch/tree/main/jev-experiments/live-worlds/sentry" target="_blank" rel="noreferrer">
-                live-worlds/sentry
-              </a>
-              .
-            </p>
-          </>
-        )}
-        {tab === "limits" && (
-          <ul>
-            <li>The helper and its actions are simulated; nothing browses anywhere.</li>
-            <li>
-              The hand-written tests are small (20 injections, 20 harmless blocks each). A few blocks either way moves the rates a
-              lot.
-            </li>
-            <li>
-              The first hand-written test guided which gaps were fixed, so it flatters the free sentry; the second was written
-              before any scoring.
-            </li>
-            <li>
-              The free sentry still flags some harmless blocks that mention assistants or agents, and some image captions and
-              comments. Jev catches more of the hard traps.
-            </li>
-            <li>
-              Harmless "ignore our last email" notices pass only when worded like the training ones: a held-out wording ("Forget
-              about the delay: we've fixed it") was flagged every time.
-            </li>
-            <li>
-              The jailbreak dataset's "harmless" prompts still give an AI instructions. Jev flags many of them; on a web page that
-              is arguably right.
-            </li>
-            <li>It reads text only. A trap drawn into an image's pixels gets past both.</li>
-          </ul>
-        )}
-      </div>
-    </dialog>
-  );
-}
-
 export function ScreenSentry() {
   const [mode, setMode] = useState<Mode>("plant");
   const [pageId, setPageId] = useState("flights");
@@ -358,7 +174,6 @@ export function ScreenSentry() {
   const [live, setLive] = useState<{ key: string; scores: Scores[]; receipt: ReceiptData } | null>(null);
   const [failure, setFailure] = useState<Failure | null>(null);
   const [asking, setAsking] = useState(false);
-  const [evidence, setEvidence] = useState(false);
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const base = PAGES.find((p) => p.id === pageId) ?? PAGES[0];
@@ -655,9 +470,6 @@ export function ScreenSentry() {
         <span className="ss-count" aria-live="polite">
           {flaggedCount} of {page.blocks.length} blocks flagged
         </span>
-        <button type="button" className="ss-evidence" onClick={() => setEvidence(true)}>
-          Accuracy and data
-        </button>
       </div>
 
       {mode === "levels" && (
@@ -693,9 +505,8 @@ export function ScreenSentry() {
         </ol>
       </details>
 
-      <p className="ss-fine">The helper is simulated and never leaves this page. Method, data and accuracy are under Accuracy and data.</p>
+      <p className="ss-fine">The helper is simulated and never leaves this page. Method, data and accuracy are under About & evidence.</p>
 
-      <Evidence open={evidence} onClose={() => setEvidence(false)} />
     </div>
   );
 }
