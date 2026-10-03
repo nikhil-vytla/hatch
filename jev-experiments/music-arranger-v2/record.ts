@@ -1,10 +1,9 @@
-import { existsSync } from "node:fs";
 import { evaluate, GatewayError } from "../experience-prototypes/scripts/local-model";
-import { readRecord, writeRecord } from "../experience-prototypes/scripts/records";
+import { readRecord, recordExists, writeRecord } from "../experience-prototypes/scripts/records";
 import { cases } from "./cases";
 import { ENGINE_VERSION, CONTOURS, blankScore, settingsFromAnswers, globalRequest, phraseRequest, makeCandidates, applyCandidate, validateScore, type Score } from "./engine";
 const path = new URL("./music-v2.jsonl", import.meta.url).pathname;
-const document: any = existsSync(path) ? readRecord(path) : {
+const document: any = recordExists(path) ? readRecord(path) : {
   manifest: { experiment: "music-v2", engine: ENGINE_VERSION, created: new Date().toISOString(), status: "recording", model: "typesafe-ai/jev", source: "Live gateway requests using authorized local credentials", protocol: "14 authored briefs; 8 preserved original inputs and 6 additional contour-specific briefs, one seed each, one global call and four sequential contextual phrase calls. No audio input, no human listening evaluation.", candidate_policy: "Six procedural candidates per phrase. Jev chooses from full event descriptions. Every choice conditions on selected phrase history. Independent global choices share one request. No quality-based retries.", retry_policy: "Gateway retries only transient HTTP/network failures. A resumed run keeps completed decisions. Invalid answers and permanent errors remain errors.", planned_cases: cases, original_source: "../results/music.jsonl, original records retained unchanged" },
   result: { rows: [], provider_history: [], human_preference: null, note: "These are authored examples and mechanical checks. No listener preference, scene-fit quality or superiority claim is supported.", availability: { planned: cases.length, completed: 0, unavailable: 0 } },
 };

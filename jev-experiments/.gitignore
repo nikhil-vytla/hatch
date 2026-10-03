@@ -25,3 +25,15 @@ packages/arena/recordings/judgement.jsonl
 packages/arena/sealed/
 packages/node_modules
 live-worlds/node_modules
+
+# Large recordings are committed gzipped; these are their uncompressed working copies
+# (scripts/compress-records.ts refreshes the .gz after recording).
+rewardbench2/results.jsonl
+judgment-reliability/events.jsonl
+judgment-reliability/cases.jsonl
+visual-search/events.jsonl
+outcome-framing/events.jsonl
+music-arranger-v2/music-v2.jsonl
+local-models-and-games/apple/results.jsonl
+experience-prototypes/results/classify.jsonl
+cafe-jev/cafe.jsonl

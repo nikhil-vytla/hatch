@@ -65,7 +65,7 @@ const SCOPE: Record<string, { title: string; abstract: (result: any) => ReactNod
       </p>
     ),
     data: "/data/classify.json",
-    source: { path: "experience-prototypes/results/classify.jsonl", label: "The recorded run" },
+    source: { path: "experience-prototypes/results/classify.jsonl.gz", label: "The recorded run (gzipped)" },
   },
   "local-models": {
     title: "Decision models on a Mac",

@@ -10,7 +10,7 @@ import {
 } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { resolve } from "node:path";
-import { readRecord } from "./records";
+import { copyRecord, readRecord, recordExists } from "./records";
 import { projectRewardBenchDocument, splitRewardBench } from "./benchmark-publication";
 import { enrichProvenance } from "./provenance";
 import { prepareJudgmentReliability } from "../../judgment-reliability/prepare";
@@ -43,7 +43,7 @@ for (const name of readdirSync(dest)) {
 for (const [name, source] of Object.entries(publication)) {
   const target = resolve(dest, `${name}.json`);
   if (hasSources) {
-    if (!existsSync(source))
+    if (!recordExists(source))
       throw new Error(`Missing recorded evidence: ${source}`);
     const document = readRecord(source);
     if (document.result) enrichProvenance(name, document.result, lab);
@@ -103,12 +103,12 @@ if (hasSources) {
   const document = prepareJudgmentReliability(resolve("public/judgment-reliability"));
   writeFileSync(resolve(dest, "judgment-reliability.json"), JSON.stringify(document) + "\n");
   mkdirSync(resolve("public/outcome-framing"), { recursive: true });
-  if (existsSync(resolve(lab, "outcome-framing/events.jsonl")))
-    copyFileSync(resolve(lab, "outcome-framing/events.jsonl"), resolve("public/outcome-framing/events.jsonl"));
+  if (recordExists(resolve(lab, "outcome-framing/events.jsonl")))
+    copyRecord(resolve(lab, "outcome-framing/events.jsonl"), resolve("public/outcome-framing/events.jsonl"));
   mkdirSync(resolve("public/visual-search"), { recursive: true });
   copyFileSync(resolve(lab, "visual-search/collection.jsonl"), resolve("public/visual-search/collection.jsonl"));
-  if (existsSync(resolve(lab, "visual-search/events.jsonl")))
-    copyFileSync(resolve(lab, "visual-search/events.jsonl"), resolve("public/visual-search/evidence.jsonl"));
+  if (recordExists(resolve(lab, "visual-search/events.jsonl")))
+    copyRecord(resolve(lab, "visual-search/events.jsonl"), resolve("public/visual-search/evidence.jsonl"));
   mkdirSync(resolve("public/wardrobe"), { recursive: true });
   if (existsSync(resolve(lab, "wardrobe-lab/recording.json")))
     copyFileSync(resolve(lab, "wardrobe-lab/recording.json"), resolve("public/wardrobe/recording.json"));

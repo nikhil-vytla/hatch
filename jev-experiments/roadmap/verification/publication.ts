@@ -7,6 +7,8 @@ import { assertPublicationSource } from "../../rewardbench2/publication-source";
 import { projectRewardBenchDocument } from "../../experience-prototypes/scripts/benchmark-publication";
 import {
   readRecord,
+  readRecordBytes,
+  recordExists,
   encodeRecord,
   decodeRecord,
 } from "../../experience-prototypes/scripts/records";
@@ -20,7 +22,7 @@ const sha = (data: string | Buffer) =>
 const files = Object.entries(publication).map(([name, relative]) => {
   const source = resolve(app, relative),
     output = resolve(app, "public/data", `${name}.json`);
-  if (!existsSync(source) || !existsSync(output))
+  if (!recordExists(source) || !existsSync(output))
     throw Error(`Missing source or prepared output: ${name}`);
   const original = readRecord(source),
     prepared = JSON.parse(readFileSync(output, "utf8"));
@@ -40,7 +42,8 @@ const files = Object.entries(publication).map(([name, relative]) => {
   return {
     name,
     source: relative,
-    sourceSha256: sha(readFileSync(source)),
+    // Hash the decompressed record, so a recording stored as .gz keeps its published hash.
+    sourceSha256: sha(readRecordBytes(source)),
     publicSha256: sha(readFileSync(output)),
     publicBytes: readFileSync(output).length,
     comparison: projected ? "publication-source-derivative" : "original-record",

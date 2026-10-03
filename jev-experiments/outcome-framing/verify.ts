@@ -1,12 +1,12 @@
-import { readFileSync, writeFileSync } from "node:fs";
+import { writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { createHash } from "node:crypto";
-import { readRecord } from "../experience-prototypes/scripts/records";
+import { readRecord, readRecordText } from "../experience-prototypes/scripts/records";
 import { initial, act, chooseCode, modelPolicies, features, type Policy } from "./tetris";
 import { drawingCases, drawingMethods, drawingPayload, intensity, reference, drawingMetrics, SIZE } from "./drawing";
 const here = import.meta.dir, hash = (x: unknown) => createHash("sha256").update(JSON.stringify(x)).digest("hex");
 const assert = (ok: unknown, message: string) => { if (!ok) throw Error(message); };
-const events = readFileSync(resolve(here, "events.jsonl"), "utf8").trim().split("\n").map(s => JSON.parse(s));
+const events = readRecordText(resolve(here, "events.jsonl")).trim().split("\n").map(s => JSON.parse(s));
 const responses = new Map<string, any>();
 for (const e of events) {
   if (e.kind === "request") assert(e.requestHash === hash(e.body), `Changed request ${e.id}`);

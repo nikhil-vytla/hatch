@@ -71,6 +71,8 @@ Early classification and judge rows recorded only the successful final attempt's
 
 The 120-request latency sweep completed 118 requests. With 1,000 state words, median gateway elapsed time was 342 ms for one question and 368 ms for 128 questions, but p95 was about 10.5 seconds because of retries. This supports batching many questions in a call; it does not establish consistently low tail latency. The 40-case robustness sweep includes an identical-repeat control, whose answered count changed too. Availability noise must be separated from representation sensitivity before drawing a strong conclusion.
 
+The nine largest recordings are committed gzipped (`*.jsonl.gz`, about 61 MB down to 10 MB), listed in `experience-prototypes/scripts/compress-records.ts`. Every reader goes through `records.ts`, which reads the plain `.jsonl` working copy when one exists and otherwise the `.gz`, and hashes always use the decompressed bytes, so published hashes didn't change. Recorders that append unpack the `.gz` into a gitignored working copy first; after recording, run `bun experience-prototypes/scripts/compress-records.ts` to refresh the committed `.gz`. `writeRecord` rewrites a recording stored only as `.gz` in place.
+
 The recorded work ran on Apple Silicon with MPS. Local browser models are downloaded only when those demos are opened and run. The browser's quantized ONNX writer differs from the Python benchmark's FP16 model. The included [model card](artifacts/MODEL_CARD.md) explains the 914 KB trained SmolLM2 adapter/head and its limitations. No base-model weights or fetched source repositories are committed.
 
 ## Run it

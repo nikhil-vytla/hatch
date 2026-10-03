@@ -1,4 +1,4 @@
-import { writeRecord } from "../experience-prototypes/scripts/records";
+import { readRecordText, writeRecord } from "../experience-prototypes/scripts/records";
 import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -8,10 +8,10 @@ import { sourceClusterKey, analysisMetadata, BOOTSTRAP } from "./clustering";
 const here = dirname(fileURLToPath(import.meta.url));
 export function loadEvidence() {
   const manifest = JSON.parse(readFileSync(resolve(here, "manifest.json"), "utf8"));
-  const raw = readFileSync(resolve(here, "cases.jsonl"), "utf8");
+  const raw = readRecordText(resolve(here, "cases.jsonl"));
   if (hash(raw) !== manifest.cases_sha256) throw new Error("Case archive checksum mismatch");
   const pairs: Pair[] = raw.trim().split("\n").map(line => JSON.parse(line));
-  const events = readFileSync(resolve(here, "events.jsonl"), "utf8").trim().split("\n").filter(Boolean).map(line => JSON.parse(line));
+  const events = readRecordText(resolve(here, "events.jsonl")).trim().split("\n").filter(Boolean).map(line => JSON.parse(line));
   const records = new Map<string, any>();
   for (const event of events) if (event.status === "completed") { if (records.has(event.id)) throw new Error(`Duplicate success ${event.id}`); if (event.protocol_sha256 !== manifest.protocol_sha256) throw new Error("Protocol drift"); records.set(event.id, event); }
   return { manifest, pairs, events, records };

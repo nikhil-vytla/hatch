@@ -1,4 +1,4 @@
-import { writeRecord } from "../experience-prototypes/scripts/records";
+import { copyRecord, writeRecord } from "../experience-prototypes/scripts/records";
 import { mkdirSync, writeFileSync, copyFileSync, readdirSync, unlinkSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -12,8 +12,8 @@ export function prepareJudgmentReliability(target: string) {
   const prepared = new Set<string>();
   for (const c of cases) { const body = JSON.stringify(c) + "\n"; const name = `${c.pair_id}-${hash(body).slice(0, 12)}.json`; writeFileSync(resolve(target, "cases", name), body); prepared.add(name); const entry = result.case_index.find(i => i.pair_id === c.pair_id)!; Object.assign(entry, { chunk: name }); }
   for (const name of readdirSync(resolve(target, "cases"))) if (/^[0-9a-f-]+-[0-9a-f]{12}\.json$/.test(name) && !prepared.has(name)) unlinkSync(resolve(target, "cases", name));
-  copyFileSync(resolve(here, "events.jsonl"), resolve(target, "evidence.jsonl"));
-  copyFileSync(resolve(here, "cases.jsonl"), resolve(target, "cases.jsonl"));
+  copyRecord(resolve(here, "events.jsonl"), resolve(target, "evidence.jsonl"));
+  copyRecord(resolve(here, "cases.jsonl"), resolve(target, "cases.jsonl"));
   copyFileSync(resolve(here, "manifest.json"), resolve(target, "manifest.json"));
   return { name: "judgment-reliability", result };
 }
