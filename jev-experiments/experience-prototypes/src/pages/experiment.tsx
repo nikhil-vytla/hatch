@@ -12,7 +12,7 @@ import { REPORT_PAGES } from "../formats/report-pages";
 import "./experiment.css";
 
 /** Game pages: the headline result comes after the game, so play starts first. Benchmark pages lead with it. */
-const STRIP_AFTER = new Set(["ocean", "win-over", "rumour-mill", "screen-sentry"]);
+const STRIP_AFTER = new Set(["ocean", "win-over", "rumour-mill", "screen-sentry", "eyes"]);
 
 const Paste = lazy(() => import("../new-experiments").then(m => ({ default: m.Paste })));
 const LayoutStudy = lazy(() => import("../layout-study").then(m => ({ default: m.LayoutStudy })));
@@ -45,6 +45,7 @@ const WinOver = lazy(() => import("../win-over").then(m => ({ default: m.WinOver
 const DrawingFraming = lazy(() => import("../outcome-framing").then(m => ({ default: m.DrawingFraming })));
 const WhoSaidThat = lazy(() => import("../who-said-that").then(m => ({ default: m.WhoSaidThat })));
 const ArcadeScene = lazy(() => import("../arcade-scene").then(m => ({ default: m.ArcadeScene })));
+const EyesVsState = lazy(() => import("../eyes-vs-state").then(m => ({ default: m.EyesVsState })));
 
 const cache = new Map<string, any>();
 async function load(name: string) {
@@ -68,6 +69,8 @@ function View({
   composition: any;
 }) {
   switch (exp.id) {
+    case "eyes":
+      return <EyesVsState />;
     case "snake":
       return <ArcadeScene result={result} />;
     case "local-models":
@@ -237,7 +240,7 @@ function LiveExperimentPage({ id }: { id: string }) {
     setRecord(null);
     setError("");
     setAboutOpen(false);
-    if (id === "decoy" || id === "prose" || id === "rumour-mill" || id === "win-over" || id === "ocean" || id === "open-decisions" || id === "screen-sentry" || id === "who-said-that") {
+    if (id === "eyes" || id === "decoy" || id === "prose" || id === "rumour-mill" || id === "win-over" || id === "ocean" || id === "open-decisions" || id === "screen-sentry" || id === "who-said-that") {
       setRecord({ result: {} });
       return () => {
         alive = false;

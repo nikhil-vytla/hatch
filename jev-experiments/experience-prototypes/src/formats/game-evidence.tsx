@@ -6,10 +6,11 @@
 import type { ReactNode } from "react";
 import heldout from "../../../live-worlds/ocean/heldout.json";
 import { percent } from "../api";
+import { PROMPTS } from "../../../live-worlds/eyes/model";
 import type { EvidenceTab } from "./evidence-drawer";
 
 /** Pages that use the game format: play first, evidence in a drawer. */
-export const GAME_PAGES = new Set(["ocean", "rumour-mill", "win-over", "snake", "games", "tetris"]);
+export const GAME_PAGES = new Set(["ocean", "rumour-mill", "win-over", "snake", "games", "tetris", "eyes"]);
 
 const REPO = "https://github.com/nikhil-vytla/hatch/tree/main/jev-experiments";
 
@@ -68,6 +69,34 @@ function ReefResults() {
 type Scene = { results?: ReactNode; method?: ReactNode; caveats: ReactNode[]; data: ReactNode };
 
 const SCENES: Record<string, Scene> = {
+  eyes: {
+    method: (
+      <>
+        <p>
+          Each lane B move is one prefill of an open vision-language model (Qwen3-VL, Apache-2.0, 4-bit, MLX-VLM on an
+          Apple M4 Max) over a 320×320 screenshot and a fixed question, with thinking off. The logits of the four answer
+          letters (A up, B right, C down, D left) at the answer position are softmaxed, as SGLang's /v1/decisions does;
+          nothing is generated. The most probable direction becomes the move, turned into left, straight or right using
+          the snake's heading; going back the way it came drives the head into its own neck.
+        </p>
+        <p>
+          Lane A's greedy rule is code reading the true positions. Jev's games come from the arcade recording, text in,
+          one choice per move. Jev is text-only: TypeSafe's model page says "No image, audio, or video input".
+        </p>
+        {Object.entries(PROMPTS).map(([k, q]) => (
+          <pre key={k} className="fmt-prompt">
+            {k}: {q}
+          </pre>
+        ))}
+      </>
+    ),
+    caveats: [
+      "Zero-shot, small, quantised models on a 10×10 board; a fine-tuned or larger model, or one served on a GPU, may do far better.",
+      "One run per model and wording over 23 seeds; the clearer wording was tried once. Jev has 3 recorded games.",
+      "Times are per move on one M4 Max, warm.",
+    ],
+    data: <p>{source("live-worlds/eyes")} holds the scorer, the recorder, the perception check and every recorded frame.</p>,
+  },
   ocean: {
     results: <ReefResults />,
     method: (

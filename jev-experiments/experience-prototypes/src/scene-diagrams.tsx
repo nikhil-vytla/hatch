@@ -32,6 +32,7 @@ export const DIAGRAMS: Record<string, Diagram> = {
   "win-over": { from: ["your line", "listener"], to: "intent · mood · move" },
   ocean: { from: ["fish's view"], to: "next move" },
   "who-said-that": { from: ["a line", "lines before"], to: "continues · replies" },
+  eyes: { from: ["screenshot", "or facts"], to: "next move" },
   "ghost-brush": { from: ["gesture", "feeling"], to: "brush style" },
   "screen-sentry": { from: ["page block"], to: "hijack risk" },
 };
