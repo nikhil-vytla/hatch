@@ -43,6 +43,8 @@ jobs:
         run: bun test jev-experiments/packages/arena
       - name: Live worlds
         run: bun test jev-experiments/live-worlds
+      - name: jev-lab CLI
+        run: bun test jev-experiments/tools/decide-cli
       - name: Catalog links and app units
         run: bun test jev-experiments/experience-prototypes/src
 
