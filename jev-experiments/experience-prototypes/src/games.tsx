@@ -165,9 +165,9 @@ export function Games({ result }: { result: any }) {
     return (
       <Pane title="Navigation replays">No recorded episode is available.</Pane>
     );
+  // Watch an episode first; the results across all 30 seeds follow it.
   return (
     <>
-    <GameResults result={result} />
     <div className="workbench">
       <div className="artifact-column">
         <div className="game-stage">
@@ -318,6 +318,7 @@ export function Games({ result }: { result: any }) {
         </Pane>
       </aside>
     </div>
+    <GameResults result={result} />
     </>
   );
 }

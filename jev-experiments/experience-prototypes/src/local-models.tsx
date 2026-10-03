@@ -125,6 +125,170 @@ export function LocalModels({ result: r }: { result: any }) {
           />
         </div>
       </div>
+      {/* Inspect a decision first; the methods and measurements follow. */}
+      <Pane
+        title="Inspect every decision"
+        sub={`${rows.length} cases`}
+        className="model-explorer"
+      >
+        <div className="model-explorer-controls">
+          <label>
+            Model
+            <select
+              aria-label="Inspect model"
+              value={model}
+              onChange={(e) => {
+                setModel(e.target.value);
+                setCaseIndex(0);
+              }}
+            >
+              {r.models.map((m: any) => (
+                <option key={m.id} value={m.id}>
+                  {m.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Workflow
+            <select
+              aria-label="Decision workflow"
+              value={group}
+              onChange={(e) => {
+                setGroup(e.target.value);
+                setCaseIndex(0);
+              }}
+            >
+              <option value="all">All workflows</option>
+              {r.workflows.map((w: string) => (
+                <option key={w} value={w}>
+                  {workflow(w)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <input
+              type="checkbox"
+              checked={onlyDisagreement}
+              onChange={(e) => {
+                setOnlyDisagreement(e.target.checked);
+                setCaseIndex(0);
+              }}
+            />{" "}
+            Disagrees with teacher
+          </label>
+        </div>
+        {c ? (
+          <>
+            <div className="model-explorer-controls">
+              <Button
+                secondary
+                aria-label="Previous decision case"
+                disabled={actualIndex === 0}
+                onClick={() => {
+                  setCaseIndex(actualIndex - 1);
+                  setQuestionIndex(0);
+                }}
+              >
+                <ArrowLeft size={14} />
+              </Button>
+              <label>
+                Case
+                <select
+                  aria-label="Decision case"
+                  value={actualIndex}
+                  onChange={(e) => {
+                    setCaseIndex(Number(e.target.value));
+                    setQuestionIndex(0);
+                  }}
+                >
+                  {rows.map((x: any, i: number) => (
+                    <option key={x.id} value={i}>
+                      {i + 1} · {x.id}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <Button
+                secondary
+                aria-label="Next decision case"
+                disabled={actualIndex === rows.length - 1}
+                onClick={() => {
+                  setCaseIndex(actualIndex + 1);
+                  setQuestionIndex(0);
+                }}
+              >
+                <ArrowRight size={14} />
+              </Button>
+            </div>
+            <div className="model-evidence">
+              <Pane title="The complete state" sub={workflow(c.workflow)}>
+                <pre className="case-state">
+                  {typeof c.state === "string"
+                    ? c.state
+                    : JSON.stringify(c.state, null, 2)}
+                </pre>
+                <p className="source-line">
+                  <a href={r.dataset.url}>Typed Decisions</a> · original test ID{" "}
+                  <code>{c.id}</code>
+                  <br />
+                  Revision <code>{r.dataset.revision}</code> ·{" "}
+                  {r.dataset.license}
+                </p>
+              </Pane>
+              <Pane title="Question and probabilities">
+                <select
+                  aria-label="Decision question"
+                  value={questionIndex}
+                  onChange={(e) => setQuestionIndex(Number(e.target.value))}
+                >
+                  {c.questions.map((x: any, i: number) => (
+                    <option key={x.key} value={i}>
+                      {x.key} · {x.type}
+                    </option>
+                  ))}
+                </select>
+                <p style={{ fontSize: 13, lineHeight: 1.8 }}>
+                  {q.instructions}
+                </p>
+                <div className="option-comparison">
+                  {q.keys.map((key: string, i: number) => (
+                    <div key={key}>
+                      <h4>
+                        {key} · {q.options[i]}
+                      </h4>
+                      <div className="option-bars">
+                        <span>Model</span>
+                        <div>
+                          <motion.i
+                            animate={{ width: pct(q.predictions[model][i]) }}
+                          />
+                        </div>
+                        <span>{pct(q.predictions[model][i])}</span>
+                      </div>
+                      <div className="option-bars teacher">
+                        <span>Teacher</span>
+                        <div>
+                          <i style={{ width: pct(q.target[i]) }} />
+                        </div>
+                        <span>{pct(q.target[i])}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </Pane>
+            </div>
+          </>
+        ) : (
+          <Notice>No cases match this filter.</Notice>
+        )}
+        <p className="fine">
+          Selected model: {selected?.name}. No state, question, or criterion
+          text was truncated. Teacher labels average sampled model judgments;
+          their uncertainty is visible above.
+        </p>
+      </Pane>
       <div className="local-methods">
         <article>
           <span className="method-number">First token</span>
@@ -332,169 +496,6 @@ export function LocalModels({ result: r }: { result: any }) {
           </p>
         </Pane>
       </div>
-      <Pane
-        title="Inspect every decision"
-        sub={`${rows.length} cases`}
-        className="model-explorer"
-      >
-        <div className="model-explorer-controls">
-          <label>
-            Model
-            <select
-              aria-label="Inspect model"
-              value={model}
-              onChange={(e) => {
-                setModel(e.target.value);
-                setCaseIndex(0);
-              }}
-            >
-              {r.models.map((m: any) => (
-                <option key={m.id} value={m.id}>
-                  {m.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Workflow
-            <select
-              aria-label="Decision workflow"
-              value={group}
-              onChange={(e) => {
-                setGroup(e.target.value);
-                setCaseIndex(0);
-              }}
-            >
-              <option value="all">All workflows</option>
-              {r.workflows.map((w: string) => (
-                <option key={w} value={w}>
-                  {workflow(w)}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            <input
-              type="checkbox"
-              checked={onlyDisagreement}
-              onChange={(e) => {
-                setOnlyDisagreement(e.target.checked);
-                setCaseIndex(0);
-              }}
-            />{" "}
-            Disagrees with teacher
-          </label>
-        </div>
-        {c ? (
-          <>
-            <div className="model-explorer-controls">
-              <Button
-                secondary
-                aria-label="Previous decision case"
-                disabled={actualIndex === 0}
-                onClick={() => {
-                  setCaseIndex(actualIndex - 1);
-                  setQuestionIndex(0);
-                }}
-              >
-                <ArrowLeft size={14} />
-              </Button>
-              <label>
-                Case
-                <select
-                  aria-label="Decision case"
-                  value={actualIndex}
-                  onChange={(e) => {
-                    setCaseIndex(Number(e.target.value));
-                    setQuestionIndex(0);
-                  }}
-                >
-                  {rows.map((x: any, i: number) => (
-                    <option key={x.id} value={i}>
-                      {i + 1} · {x.id}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <Button
-                secondary
-                aria-label="Next decision case"
-                disabled={actualIndex === rows.length - 1}
-                onClick={() => {
-                  setCaseIndex(actualIndex + 1);
-                  setQuestionIndex(0);
-                }}
-              >
-                <ArrowRight size={14} />
-              </Button>
-            </div>
-            <div className="model-evidence">
-              <Pane title="The complete state" sub={workflow(c.workflow)}>
-                <pre className="case-state">
-                  {typeof c.state === "string"
-                    ? c.state
-                    : JSON.stringify(c.state, null, 2)}
-                </pre>
-                <p className="source-line">
-                  <a href={r.dataset.url}>Typed Decisions</a> · original test ID{" "}
-                  <code>{c.id}</code>
-                  <br />
-                  Revision <code>{r.dataset.revision}</code> ·{" "}
-                  {r.dataset.license}
-                </p>
-              </Pane>
-              <Pane title="Question and probabilities">
-                <select
-                  aria-label="Decision question"
-                  value={questionIndex}
-                  onChange={(e) => setQuestionIndex(Number(e.target.value))}
-                >
-                  {c.questions.map((x: any, i: number) => (
-                    <option key={x.key} value={i}>
-                      {x.key} · {x.type}
-                    </option>
-                  ))}
-                </select>
-                <p style={{ fontSize: 13, lineHeight: 1.8 }}>
-                  {q.instructions}
-                </p>
-                <div className="option-comparison">
-                  {q.keys.map((key: string, i: number) => (
-                    <div key={key}>
-                      <h4>
-                        {key} · {q.options[i]}
-                      </h4>
-                      <div className="option-bars">
-                        <span>Model</span>
-                        <div>
-                          <motion.i
-                            animate={{ width: pct(q.predictions[model][i]) }}
-                          />
-                        </div>
-                        <span>{pct(q.predictions[model][i])}</span>
-                      </div>
-                      <div className="option-bars teacher">
-                        <span>Teacher</span>
-                        <div>
-                          <i style={{ width: pct(q.target[i]) }} />
-                        </div>
-                        <span>{pct(q.target[i])}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </Pane>
-            </div>
-          </>
-        ) : (
-          <Notice>No cases match this filter.</Notice>
-        )}
-        <p className="fine">
-          Selected model: {selected?.name}. No state, question, or criterion
-          text was truncated. Teacher labels average sampled model judgments;
-          their uncertainty is visible above.
-        </p>
-      </Pane>
       <CalibrationPanel result={r} />
       <Fold title="Results by workflow">
         <p className="fine">
