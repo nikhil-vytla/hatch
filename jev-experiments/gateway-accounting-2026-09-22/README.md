@@ -2,7 +2,7 @@
 
 The application gateway now preserves native structured questions and records every outbound HTTP attempt. A rejected answer retains independently reported model identity, token usage and cost. Missing observations stay unknown, including a total whose earlier attempt has no reported charge.
 
-This slice follows the [four-language native adapters](../native-questions-2026-09-22/README.md). It delivers the shared gateway, Score agreement helper and request accounting. The typed decision envelope, CLI/MCP classifier integration and wider application redesign remain separate release work.
+This slice follows the [four-language native adapters](../archive/native-questions-2026-09-22/README.md). It delivers the shared gateway, Score agreement helper and request accounting. The typed decision envelope, CLI/MCP classifier integration and wider application redesign remain separate release work.
 
 ## Behavior
 

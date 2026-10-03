@@ -20,7 +20,7 @@ The outcome method selected the first placement, `p0`, in 49/57 decisions; two-p
 
 The engine uses a 10×20 board, five fixed seeds, a 12-button allowance per piece and a 32-piece horizon. It has no gravity, hold or tucks. A breadth-first search enumerates reachable top-of-board moves and a hard drop; each candidate retains its executable button path. Model observation exposes the current board and next two pieces, not the full future bag or the baseline utility value. Code computes exact resulting boards for the outcome condition and a heuristic-selected next placement for the two-piece condition. These information and computation differences are confounds if interpreted as a pure wording comparison.
 
-This protocol remains a bounded comparison. The user's separate request for full real-time games is explored in [Life keeps moving](../real-time-playground/README.md), where the world continues while decisions are pending. The comparison's manual controls are not a finished real-time Tetris implementation.
+This protocol remains a bounded comparison. The user's separate request for full real-time games is explored in [Life keeps moving](../archive/real-time-playground/README.md), where the world continues while decisions are pending. The comparison's manual controls are not a finished real-time Tetris implementation.
 
 ## Drawing results
 
