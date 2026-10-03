@@ -356,11 +356,6 @@ nav a {
   margin: auto;
   padding: 0 4.3%;
 }
-.motion-art {
-  width: 100%;
-  height: 100%;
-  display: block;
-}
 .transfer-dot {
   position: absolute;
   left: 30px;
@@ -2229,14 +2224,6 @@ nav a {
   font-weight: 500;
   color: var(--sage);
   margin-left: auto;
-}
-.vision-input {
-  width: 100%;
-  max-height: 450px;
-  object-fit: contain;
-  border: 1px solid var(--line);
-  border-radius: 9px;
-  background: #fafaf5;
 }
 .large-code {
   font-size: 13px;
