@@ -1,4 +1,4 @@
-import { decodePortableRecord } from "../roadmap/integration/portable-records";
+import { decodePortableRecord } from "./portable-records";
 import { createHash } from "node:crypto";
 import {
   existsSync,
@@ -563,4 +563,4 @@ export function preparePublicHarnessEvidence(lab: string, destination: string) {
   return { runs: index.runs.length, files: pending.size };
 }
 
-export { projectRewardBenchDocument, type WithheldCandidate } from "../experience-prototypes/scripts/benchmark-publication";
+export { projectRewardBenchDocument, type WithheldCandidate } from "../../experience-prototypes/scripts/benchmark-publication";
