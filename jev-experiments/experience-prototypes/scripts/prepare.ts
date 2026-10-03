@@ -121,11 +121,6 @@ if (hasSources) {
 for (const name of ["README.md", "SOURCES.md", "IDEA_GARDEN.md"])
   if (existsSync(resolve(lab, name)))
     copyFileSync(resolve(lab, name), resolve("public/research", name));
-if (existsSync(resolve(lab, "web/public/vision-input.png")))
-  copyFileSync(
-    resolve(lab, "web/public/vision-input.png"),
-    "public/vision-input.png",
-  );
 if (existsSync("README.md"))
   copyFileSync("README.md", "public/research/EXPERIENCE_PROTOTYPES.md");
 if (existsSync("extension/README.md"))
