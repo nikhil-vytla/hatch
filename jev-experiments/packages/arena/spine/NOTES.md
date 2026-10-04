@@ -22,7 +22,7 @@
 
 ## Recording
 
-- **Protocol commit:** `bdf2edb`, 7 s before the first request.
+- **Protocol commit:** `bdf2edb` before rebasing (the first commit in PR #204), authored 7 s before the first request.
 - **Pilot:** 10 requests, all answered. The full run then recorded 1,300 rows with 0 failures in
   about 2 minutes, at concurrency 3.
 - **Spend:** $0.01819 at list price, against a $0.25 cap.

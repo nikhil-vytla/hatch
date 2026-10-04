@@ -9,7 +9,7 @@ persuader toy, where every push plays back the recorded answer.
 
 ## Protocol
 
-[PROTOCOL.md](PROTOCOL.md) was committed (`bdf2edb`, 3 Oct 2026 17:11:52 PDT) 7 seconds before
+[PROTOCOL.md](PROTOCOL.md) was committed (author time 3 Oct 2026 17:11:52 PDT; `bdf2edb` before rebasing; the rebased commit is the first in PR #204) 7 seconds before
 the first request (4 Oct 2026 00:11:59 UTC), together with `model.ts` (items, pushes, requests)
 and `analyze.ts` (measures, bootstrap). Since then the only changes to `analyze.ts` are a
 descriptive `run` block (requests, cost, latency) and a type-only fix. Neither touches a
