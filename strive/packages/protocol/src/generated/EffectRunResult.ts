@@ -2,9 +2,6 @@
 import type { EffectOutcome } from "./EffectOutcome";
 import type { EffectRecord } from "./EffectRecord";
 
-/**
- * The effect's journal number and outcome, with the output text inline.
- */
 export type EffectRunResult = { effect: number, 
 /**
  * The effect as journaled: for a check, the command its file held.

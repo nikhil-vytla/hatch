@@ -103,11 +103,13 @@ fn request(state: &State, record: &EffectRecord) -> Option<EffectRequest> {
         EffectRecord::Edit { path, old_text, new_text } => {
             Some(EffectRequest::Edit { path: path.clone(), old_text: text(old_text)?, new_text: text(new_text)? })
         }
-        // A command, a tool or a check may have done its work, or half of it.
+        // A command, a tool or a check may have done its work, or half of it;
+        // an observed call strive never ran, so it never runs it again (ADR-0031).
         EffectRecord::Bash { .. }
         | EffectRecord::Mcp { .. }
         | EffectRecord::Extension { .. }
-        | EffectRecord::Check { .. } => None,
+        | EffectRecord::Check { .. }
+        | EffectRecord::Observed { .. } => None,
     }
 }
 

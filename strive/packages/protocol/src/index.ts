@@ -50,6 +50,14 @@ export type * from "./generated/EffectRunParams";
 
 export type * from "./generated/EffectRunResult";
 
+export type * from "./generated/EffectObserveParams";
+
+export type * from "./generated/EffectObserved";
+
+export type * from "./generated/EffectReportParams";
+
+export type * from "./generated/Engine";
+
 export type * from "./generated/Empty";
 
 export type * from "./generated/Entry";

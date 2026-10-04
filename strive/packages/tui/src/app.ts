@@ -322,7 +322,10 @@ export class App {
       if (sessions[0]) return sessions[0].id;
     }
 
-    return (await this.client.request("session/create", { cwd: this.cwd, safe: mode === "safe" })).id;
+    // What runs a new session's turns (ADR-0031), as `strive --engine` asked.
+    const engine = process.env.STRIVE_ENGINE === "claude-code" ? ("claude-code" as const) : undefined;
+
+    return (await this.client.request("session/create", { cwd: this.cwd, safe: mode === "safe", engine })).id;
   }
 
   private explainOpenError(cause: unknown, mode: SessionMode): string {

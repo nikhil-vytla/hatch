@@ -70,6 +70,8 @@ async function recordText(record: EffectRecord, blob: Blob): Promise<string> {
 
     case "mcp":
       return `called ${record.server}'s ${record.tool} ${cut(await blob(record.arguments), LIMITS.change)}`;
+    case "observed":
+      return `Claude Code ran its ${record.tool} (strive gated it, didn't run it) ${cut(await blob(record.input), LIMITS.change)}`;
     default:
       return record satisfies never;
   }
@@ -133,6 +135,8 @@ async function block(entry: Entry, effects: Map<number, Effect>, ran: Set<string
       return "";
     case "forkedFrom":
       return `${at} forked from session ${e.session} at its entry #${e.seq}; what came before is that session's`;
+    case "engineSet":
+      return `${at} ${e.engine === "claude-code" ? "Claude Code" : "strive's agent"} runs this session's turns`;
     case "approvalRequested":
       return `${at} asked for approval: ${e.description}`;
     case "approvalDecided":

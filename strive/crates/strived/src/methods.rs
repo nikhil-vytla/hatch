@@ -9,11 +9,11 @@ use strive_proto::rpc::{Message, RequestId, RpcError};
 use strive_proto::{
     Appended, AuthSet, AuthSetParams, AuthStatus, AuthStatusResult, BlobGet, BlobGetParams, BlobGetResult,
     DaemonShutdown, DaemonStatus, DaemonStatusResult, EffectOutcome, EffectRun, EffectRunParams, EffectRunResult,
-    Empty, Initialize, InitializeParams, InitializeResult, Method, Notification, PROTOCOL_VERSION, ProviderAuth,
-    SessionAttach, SessionAttachParams, SessionAttachResult, SessionBudget, SessionBudgetParams, SessionCreate,
-    SessionCreateParams, SessionEntry, SessionEntryNotification, SessionGateway, SessionKind, SessionList,
-    SessionListParams, SessionListResult, SessionPrompt, SessionPromptParams, SessionRead, SessionReadResult,
-    SessionRef,
+    Empty, Engine, Initialize, InitializeParams, InitializeResult, Method, Notification, PROTOCOL_VERSION,
+    ProviderAuth, SessionAttach, SessionAttachParams, SessionAttachResult, SessionBudget, SessionBudgetParams,
+    SessionCreate, SessionCreateParams, SessionEntry, SessionEntryNotification, SessionGateway, SessionKind,
+    SessionList, SessionListParams, SessionListResult, SessionPrompt, SessionPromptParams, SessionRead,
+    SessionReadResult, SessionRef,
 };
 use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
@@ -368,6 +368,7 @@ fn host_may_record(event: &Event, kind: SessionKind) -> bool {
         | Event::EffectCleared { .. }
         | Event::EffectRerun { .. }
         | Event::ForkedFrom { .. }
+        | Event::EngineSet { .. }
         | Event::ApprovalModeSet { .. }
         | Event::ApprovalRequested { .. }
         | Event::ApprovalDecided { .. }
@@ -433,7 +434,18 @@ async fn host_config(state: &Arc<State>, sid: &SessionId) -> Reply {
         mcp_tools: mcp.tools,
         kind: info.kind,
         learned_files: learned,
+        engine: engine_of(state, &sid)?,
+        engine_home: Some(state.sessions.session_dir(&sid).join("engine").display().to_string()),
     })
+}
+
+/// What runs the session's turns (ADR-0031): the engine its journal set, if any.
+fn engine_of(state: &State, sid: &SessionId) -> Result<Option<Engine>, RpcError> {
+    let (_, report) = state.sessions.read(sid).map_err(session_error)?;
+    Ok(report.entries.iter().find_map(|e| match e.event {
+        Event::EngineSet { engine } => Some(engine),
+        _ => None,
+    }))
 }
 
 /// A learning session's context as a run starts: the files as they are
@@ -926,6 +938,8 @@ async fn route_effect(state: &Arc<State>, method: &str, params: Value) -> Reply 
             state.sessions.forget_cancel(&sid, &call_id);
             result
         }
+        strive_proto::EffectObserve::NAME => crate::observe::observe(state, params).await,
+        strive_proto::EffectReport::NAME => crate::observe::report(state, params).await,
         EffectCancel::NAME => {
             let EffectCancelParams { id, call_id } = parse::<EffectCancel>(params)?;
             let flag = state.sessions.cancel_flag(&session_id(&id)?, &call_id);
@@ -1260,7 +1274,8 @@ async fn run_effect(
 async fn route_session(state: &Arc<State>, conn: &Arc<Conn>, method: &str, params: Value) -> Reply {
     match method {
         SessionCreate::NAME => {
-            let SessionCreateParams { cwd, safe } = parse::<SessionCreate>(params)?;
+            let SessionCreateParams { cwd, safe, engine } = parse::<SessionCreate>(params)?;
+            let then = engine.filter(|e| *e != Engine::Native).map(|engine| Event::EngineSet { engine });
             // Kept as its real path, so a later swap of any part shows (see `workspace_of`).
             let cwd = std::path::Path::new(&cwd).canonicalize().map_or(cwd, |p| p.display().to_string());
             reply::<SessionCreate>(
@@ -1272,7 +1287,7 @@ async fn route_session(state: &Arc<State>, conn: &Arc<Conn>, method: &str, param
                         state.settings.approvals,
                         None,
                         safe || !state.settings.extensions,
-                        Vec::new(),
+                        then.into_iter().collect(),
                     )
                     .await
                     .map_err(session_error)?,

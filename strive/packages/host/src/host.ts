@@ -40,7 +40,12 @@ export function applies(paths: string[], changed: string[]): boolean {
 }
 
 export function systemPrompt(config: AgentConfig): string {
-  const parts = [base(config.cwd)];
+  return [base(config.cwd), ...projectContext(config)].join("\n\n");
+}
+
+/** What the project tells any agent: its instruction files and skills, as sections. */
+export function projectContext(config: AgentConfig): string[] {
+  const parts: string[] = [];
 
   if (config.instructions.length > 0) {
     parts.push(
@@ -60,7 +65,7 @@ export function systemPrompt(config: AgentConfig): string {
     );
   }
 
-  return parts.join("\n\n");
+  return parts;
 }
 
 function base(cwd: string): string {

@@ -1,6 +1,6 @@
 # ADR-0031: Vendor engines: Claude Code and Codex run a session's turns, gated by the daemon
 
-Status: proposed (2026-10-03). Nothing here is built yet. Stage 3 ("Reach").
+Status: accepted (2026-10-03). The Claude Code engine is built (see "As built"); Codex, strict mode and isolation are not. Stage 3 ("Reach").
 
 ## Context
 
@@ -177,6 +177,44 @@ parts of this design gain value and others lose it.
 So the plan is ordered by how long each part lasts: the gateway and
 journal first, then gating, then isolation, with strict mode for
 high-assurance work.
+
+## As built: Claude Code (2026-10-03)
+
+Built as decided, with these differences:
+- **The engine is its own event,** `engineSet`, journaled by the daemon
+  after `sessionStarted`, not a field of it. A native session journals
+  nothing, so older journals read the same.
+- **The fail-closed backstop is in the host, not a hook.** Claude Code runs
+  `PreToolUse` hooks before its permission check, so a hook can't tell
+  whether the daemon cleared the call. Instead, a tool result for a call
+  the daemon never cleared fails the turn, unless it is the error result
+  Claude Code gives for a call the daemon refused. The daemon's journal shows the
+  gap either way: an observed effect is started before it can be cleared.
+- **The sandbox must still ask.** By default Claude Code runs a sandboxed
+  command without asking (`autoAllowBashIfSandboxed`), past `canUseTool`.
+  The host turns that off, and refuses unsandboxed retries.
+- **Outputs come from the SDK's tool-result messages,** reported with
+  `effect/report`, not from a `PostToolUse` hook. A second report of one
+  call is refused.
+- **None of the person's Claude settings apply** (`settingSources: []`),
+  and its transcripts live in the session's directory (`CLAUDE_CONFIG_DIR`),
+  so it resumes its own session. Web search is off: it runs at the
+  provider, and the gateway refuses it.
+- **How the daemon gates a call:**
+  - reads, writes and edits go through the same gate as strive's own;
+  - a command follows the approval mode alone, since it runs in Claude
+    Code's sandbox, not strive's;
+  - plans, to-dos and subagents are allowed, because a subagent's own
+    calls are gated one by one;
+  - any other tool, such as a web fetch, asks unless the mode is full-auto.
+- **Which Claude Code runs:**
+  - `STRIVE_CLAUDE_CODE`, if set;
+  - otherwise the one the SDK pins, when the host runs from source;
+  - otherwise the `claude` on the path. The installed `strive-tui` doesn't
+    bundle Claude Code's 229 MB native binary.
+- **Not built yet:** the desktop's and ACP's engine choice, the vendor's own
+  budget limit as a second line, forks of an engine session (its own
+  transcript isn't forked), Codex, strict mode and isolation.
 
 ## Consequences
 

@@ -79,6 +79,8 @@ methods! {
     AuthStatus = "auth/status" (Empty) -> AuthStatusResult;
         EffectRun = "effect/run" (EffectRunParams) -> EffectRunResult;
     EffectCancel = "effect/cancel" (EffectCancelParams) -> Empty;
+    EffectObserve = "effect/observe" (EffectObserveParams) -> EffectObserved;
+    EffectReport = "effect/report" (EffectReportParams) -> Empty;
     BlobGet = "blob/get" (BlobGetParams) -> BlobGetResult;
     SessionApprovals = "session/approvals" (SessionApprovalsParams) -> Appended;
             ApprovalRespond = "approval/respond" (ApprovalRespondParams) -> Empty;
@@ -237,6 +239,10 @@ pub struct SessionCreateParams {
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     #[ts(as = "Option<bool>", optional)]
     pub safe: bool,
+    /// What runs the session's turns (ADR-0031); strive's own loop when absent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub engine: Option<Engine>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
@@ -500,6 +506,59 @@ pub struct EffectCancelParams {
 }
 
 /// The effect's journal number and outcome, with the output text inline.
+/// What runs a session's turns (ADR-0031): strive's own loop, or a vendor
+/// agent whose tool calls the daemon gates and observes.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "kebab-case")]
+#[ts(export)]
+pub enum Engine {
+    #[default]
+    Native,
+    ClaudeCode,
+}
+
+/// A vendor engine's tool call, before it runs (ADR-0031): the daemon
+/// gates it as it does its own effects and journals it as `observed`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct EffectObserveParams {
+    pub id: String,
+    /// The model's tool-use id.
+    pub call_id: String,
+    pub tool: String,
+    #[ts(type = "unknown")]
+    pub input: serde_json::Value,
+}
+
+/// The daemon's decision on an observed call: allowed (it is then the
+/// vendor's to run, and to report), or refused, with why.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct EffectObserved {
+    pub effect: u64,
+    pub allowed: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub reason: Option<String>,
+}
+
+/// How an allowed observed call ended, as the vendor reports it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct EffectReportParams {
+    pub id: String,
+    pub effect: u64,
+    /// What the tool gave the model.
+    pub output: String,
+    /// The vendor said the tool failed.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    #[ts(as = "Option<bool>", optional)]
+    pub failed: bool,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
@@ -563,6 +622,15 @@ pub struct AgentConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub learned_files: Option<Vec<LearnedFile>>,
+    /// What runs the turns (ADR-0031); strive's own loop when absent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub engine: Option<Engine>,
+    /// A vendor engine's own state (its session transcripts), kept with
+    /// the session so it resumes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub engine_home: Option<String>,
 }
 
 /// The project's context as a learning run starts (`host/context`). The
@@ -1543,6 +1611,10 @@ pub enum Event {
         session: String,
         seq: u64,
     },
+    /// A vendor agent runs this session's turns (ADR-0031).
+    EngineSet {
+        engine: Engine,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
@@ -1875,6 +1947,13 @@ pub enum EffectRecord {
         timeout_ms: u64,
         #[serde(default)]
         note: String,
+    },
+    /// A vendor engine's tool call (ADR-0031): the daemon gated it, and the
+    /// vendor ran it. Its input, as JSON, by digest.
+    Observed {
+        engine: Engine,
+        tool: String,
+        input: Digest,
     },
 }
 
