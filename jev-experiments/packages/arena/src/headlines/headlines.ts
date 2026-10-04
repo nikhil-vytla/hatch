@@ -5,7 +5,11 @@
  */
 import { KEY_MODELS, rank, type Question } from "../answer-key/model";
 import { verdict as foolVerdict, type Puzzle } from "../fool/model";
-import { split, top, type Decision } from "../handoff/model";
+import { split } from "../handoff/model";
+import type { Card } from "../data/schema";
+import { HANDOFF_THRESHOLD, heldOutN, heldOutRows, intentDecisions, intentFacts, type IntentRow } from "../decisions-in-ui/facts";
+
+export { HANDOFF_THRESHOLD, intentDecisions, type IntentRow };
 
 export type Stat = { value: string; label: string };
 
@@ -147,14 +151,6 @@ export function answerKeyHeadline(questions: Question[]): Headline | null {
 
 // ---------- When to ask a person (BANKING77)
 
-export type IntentRow = { error?: unknown; probabilities?: Record<string, number> | null; prediction?: string; target?: string };
-
-export function intentDecisions(rows: IntentRow[]): Decision[] {
-  return rows.flatMap((r) => (!r.error && r.probabilities ? [{ confidence: top(r.probabilities).confidence, right: r.prediction === r.target }] : []));
-}
-
-export const HANDOFF_THRESHOLD = 0.9;
-
 export function handoffHeadline(rows: IntentRow[]): Headline | null {
   const s = split(intentDecisions(rows), HANDOFF_THRESHOLD);
 
@@ -174,6 +170,40 @@ export function handoffHeadline(rows: IntentRow[]): Headline | null {
     line: `${pct0(handled)} handled at ${pct0(HANDOFF_THRESHOLD)}, ${pct1(right)} right`,
     share: { big: pct0(handled), ring: handled, sentence: `Jev acts alone on ${pct0(handled)} of banking requests when it's at least ${pct0(HANDOFF_THRESHOLD)} sure.` },
     source: "classify (BANKING77, recorded Jev answers)",
+  };
+}
+
+// ---------- Decisions in an interface (One box held-out phrases + BANKING77 handoff)
+
+/** Wrong cards a phrase, to two decimals. */
+const perPhrase = (x: number) => x.toFixed(2);
+
+export function decisionsInUiHeadline(card: Card, banking: IntentRow[]): Headline | null {
+  const rows = heldOutRows(card);
+  const jev = rows.find((r) => r.id === "jev@cancel");
+  const rival = rows.filter((r) => r.id !== "jev@cancel").sort((a, b) => b.right.value - a.right.value)[0];
+  const h = intentFacts(banking);
+  const n = heldOutN(card);
+
+  if (!jev || !rival || !h || !n) return null;
+
+  const fewest = rows.every((r) => r.wrong.value >= jev.wrong.value);
+
+  return {
+    id: "decisions-in-ui",
+    verdict: `Typing into one box, Jev ends on the right card for ${pct0(jev.right.value)} of ${n} held-out phrases with ${perPhrase(jev.wrong.value)} wrong cards a phrase${fewest ? ", the fewest of any contestant" : ""}; at a ${pct0(HANDOFF_THRESHOLD)} threshold it acts alone on ${pct0(h.handled)} of banking requests and gets ${pct1(h.right)} of them right.`,
+    stats: [
+      { value: pct0(jev.right.value), label: `held-out phrases ending on the right card (${rival.short} ${pct0(rival.right.value)})` },
+      { value: `${perPhrase(jev.wrong.value)} vs ${perPhrase(rival.wrong.value)}`, label: `wrong cards a phrase, Jev vs ${rival.short}` },
+      { value: pct0(h.handled), label: `banking requests handled alone at ${pct0(HANDOFF_THRESHOLD)}, ${pct1(h.right)} right` },
+    ],
+    line: `${pct0(jev.right.value)} right card, ${perPhrase(jev.wrong.value)} wrong cards a phrase`,
+    share: {
+      big: pct0(jev.right.value),
+      ring: jev.right.value,
+      sentence: `Typing into one box, Jev ends on the right card for ${pct0(jev.right.value)} of held-out phrases and almost never shows a wrong one.`,
+    },
+    source: "arena one-box card (held-out phrases) and classify (BANKING77, recorded Jev answers)",
   };
 }
 
