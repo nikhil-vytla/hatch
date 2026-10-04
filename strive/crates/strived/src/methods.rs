@@ -61,6 +61,13 @@ async fn choose_model(state: &Arc<State>, SessionModelParams { id, model }: Sess
     reply::<SessionModel>(Appended { seq: entries[0].seq })
 }
 
+/// Journals how much the session's model thinks, from its next turn.
+async fn set_effort(state: &Arc<State>, SessionEffortParams { id, effort }: SessionEffortParams) -> Reply {
+    let entries =
+        state.sessions.append(&session_id(&id)?, vec![Event::EffortSet { effort }]).await.map_err(session_error)?;
+    reply::<SessionEffort>(Appended { seq: entries[0].seq })
+}
+
 /// Whose API a model is called through, and so whose key it needs.
 pub fn provider_of(model: &str) -> &'static str {
     if model.starts_with("claude") { "anthropic" } else { "openai" }
@@ -1288,6 +1295,38 @@ async fn run_effect(
     }
 }
 
+/// `session/attach`: the session's entries so far, then each new one as a
+/// notification. A person's attach counts them as someone who can approve.
+async fn attach(state: &Arc<State>, conn: &Arc<Conn>, params: Value) -> Reply {
+    let SessionAttachParams { id, after_seq, observer } = parse::<SessionAttach>(params)?;
+    let sid = session_id(&id)?;
+    let (person, _attaching) = {
+        let host = crate::sync::lock(&conn.host_of);
+        if host.is_host() || observer == Some(true) {
+            (false, None)
+        } else {
+            conn.attaching.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            (true, Some(Attaching(&conn.attaching)))
+        }
+    };
+    let (session, entries, mut stream) =
+        state.sessions.attach(&sid, after_seq.unwrap_or(0), person).await.map_err(session_error)?;
+    let weak = conn.out.clone();
+    let forward = tokio::spawn(async move {
+        while let Some(push) = stream.recv().await {
+            let Some(msg) = notification(&id, push) else {
+                crate::log!("a session {id} notification did not serialize; ending the subscription");
+                break;
+            };
+            if weak.upgrade().is_none_or(|out| out.send(msg).is_err()) {
+                break;
+            }
+        }
+    });
+    crate::sync::lock(&conn.subscriptions).push(forward);
+    reply::<SessionAttach>(SessionAttachResult { session, entries })
+}
+
 async fn route_session(state: &Arc<State>, conn: &Arc<Conn>, method: &str, params: Value) -> Reply {
     match method {
         SessionCreate::NAME => {
@@ -1318,35 +1357,7 @@ async fn route_session(state: &Arc<State>, conn: &Arc<Conn>, method: &str, param
                 state.sessions.list(cwd.as_deref(), kind.unwrap_or_default()).map_err(|e| internal(&e))?;
             reply::<SessionList>(SessionListResult { sessions, unreadable })
         }
-        SessionAttach::NAME => {
-            let SessionAttachParams { id, after_seq, observer } = parse::<SessionAttach>(params)?;
-            let sid = session_id(&id)?;
-            let (person, _attaching) = {
-                let host = crate::sync::lock(&conn.host_of);
-                if host.is_host() || observer == Some(true) {
-                    (false, None)
-                } else {
-                    conn.attaching.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-                    (true, Some(Attaching(&conn.attaching)))
-                }
-            };
-            let (session, entries, mut stream) =
-                state.sessions.attach(&sid, after_seq.unwrap_or(0), person).await.map_err(session_error)?;
-            let weak = conn.out.clone();
-            let forward = tokio::spawn(async move {
-                while let Some(push) = stream.recv().await {
-                    let Some(msg) = notification(&id, push) else {
-                        crate::log!("a session {id} notification did not serialize; ending the subscription");
-                        break;
-                    };
-                    if weak.upgrade().is_none_or(|out| out.send(msg).is_err()) {
-                        break;
-                    }
-                }
-            });
-            crate::sync::lock(&conn.subscriptions).push(forward);
-            reply::<SessionAttach>(SessionAttachResult { session, entries })
-        }
+        SessionAttach::NAME => attach(state, conn, params).await,
         SessionPrompt::NAME => prompt(state, params).await,
         SessionRewind::NAME => {
             require_person(conn)?;
@@ -1382,13 +1393,7 @@ async fn route_session(state: &Arc<State>, conn: &Arc<Conn>, method: &str, param
         }
         SessionEffort::NAME => {
             require_person(conn)?;
-            let SessionEffortParams { id, effort } = parse::<SessionEffort>(params)?;
-            let entries = state
-                .sessions
-                .append(&session_id(&id)?, vec![Event::EffortSet { effort }])
-                .await
-                .map_err(session_error)?;
-            reply::<SessionEffort>(Appended { seq: entries[0].seq })
+            set_effort(state, parse::<SessionEffort>(params)?).await
         }
         SessionBudget::NAME => {
             require_person(conn)?;
