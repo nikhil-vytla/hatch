@@ -29,6 +29,7 @@ import {
   useRun,
   ErrorText,
 } from "./shared";
+import { MoreControls } from "./more-controls";
 import { extractLineFacts, fillEmpty, undoFill, pasteBatches, type Patch } from "./paste-transactions";
 export const pasteSources = {
   Conference:
@@ -224,6 +225,7 @@ export function Paste({ record }: { record: any }) {
                           className="suggestion"
                         >
                           <button
+                            data-first-action={i === 0 || undefined}
                             onClick={() => {
                               setActive(fact.id);
                               accept(key);
@@ -300,29 +302,31 @@ export function Paste({ record }: { record: any }) {
               ))}
             </select>
           </Field>
-          <Field label="Edit the source">
-            <textarea
-              rows={10}
-              value={source}
-              onChange={(e) => {
-                invalidate(); setSource(e.target.value);
-              }}
+          <MoreControls id="paste" what="Edit the source and fields, and ask Jev again">
+            <Field label="Edit the source">
+              <textarea
+                rows={10}
+                value={source}
+                onChange={(e) => {
+                  invalidate(); setSource(e.target.value);
+                }}
+              />
+            </Field>
+            <Field label="Destination fields, one per line">
+              <textarea
+                rows={5}
+                value={fields.join("\n")}
+                onChange={(e) => {
+                  invalidate(); setFields(e.target.value.split("\n")); setValues({}); valuesRef.current={}; setHistory([]);
+                }}
+              />
+            </Field>
+            <RunButton
+              busy={busy}
+              label="Find what belongs"
+              onClick={() => void findSuggestions()}
             />
-          </Field>
-          <Field label="Destination fields, one per line">
-            <textarea
-              rows={5}
-              value={fields.join("\n")}
-              onChange={(e) => {
-                invalidate(); setFields(e.target.value.split("\n")); setValues({}); valuesRef.current={}; setHistory([]);
-              }}
-            />
-          </Field>
-          <RunButton
-            busy={busy}
-            label="Find what belongs"
-            onClick={() => void findSuggestions()}
-          />
+          </MoreControls>
           <ErrorText error={error} />
           {last && <Receipt data={pasteReceipt(last)} />}
           <State
