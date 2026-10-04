@@ -85,6 +85,7 @@ export type Methods = {
   "proposal/rollback": { params: ProposalRef; result: Appended };
   "host/register": { params: SessionRef; result: AgentConfig };
   "host/context": { params: SessionRef; result: LearnerContext };
+  "host/config": { params: SessionRef; result: AgentConfig };
   "host/record": { params: HostRecordParams; result: Appended };
   "host/stream": { params: HostStreamParams; result: Empty };
   "host/proposeExtension": { params: HostProposeExtensionParams; result: ExtensionProposed };

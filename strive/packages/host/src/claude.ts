@@ -69,13 +69,15 @@ export class ClaudeHost {
   /** Each tool call the daemon refused: Claude Code gives the model the refusal as its result. */
   private readonly refused = new Set<string>();
   private readonly prompts = new PromptReader();
+  /** A model was chosen for the session's next turns: the next one fetches its config first. */
+  private stale = false;
   private early: Entry[] | undefined = [];
   private lost = false;
 
   constructor(
     private readonly client: StriveClient,
     private readonly sessionId: string,
-    private readonly config: AgentConfig,
+    private config: AgentConfig,
   ) {
     client.onClose(() => {
       this.lost = true;
@@ -106,6 +108,7 @@ export class ClaudeHost {
     const since = lastStart?.event.type === "turnStarted" ? (lastStart.event.throughSeq ?? lastStart.seq) : 0;
 
     for (const e of entries) {
+      this.noteModel(e);
       const text = this.prompts.read(e);
 
       if (text !== undefined && e.seq > since && isPrompt(e)) this.queued.push({ text, seq: e.seq });
@@ -126,12 +129,26 @@ export class ClaudeHost {
       return;
     }
 
+    this.noteModel(entry);
     const text = this.prompts.read(entry);
 
     if (text !== undefined) {
       this.queued.push({ text, seq: entry.seq });
       void this.kick();
     }
+  }
+
+  /** A model chosen for the next turns, other than this host's: Claude Code is started on it from then on. */
+  private noteModel(entry: Entry) {
+    if (entry.event.type !== "modelSet" || entry.event.model === this.config.model) return;
+    this.stale = true;
+  }
+
+  /** The config for a newly chosen model, fetched until it is. */
+  private async reconfigure() {
+    if (!this.stale) return;
+    this.config = await this.client.request("host/config", { id: this.sessionId });
+    this.stale = false;
   }
 
   interrupt() {
@@ -193,6 +210,7 @@ export class ClaudeHost {
     let reason: TurnEnd = { kind: "done" };
 
     try {
+      await this.reconfigure();
       reason = await this.converse(prompts.map((p) => p.text).join("\n\n"), abort);
     } catch (e) {
       reason = abort.signal.aborted ? this.stopped() : { kind: "failed", error: describeError(e) };

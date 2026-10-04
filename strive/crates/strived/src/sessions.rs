@@ -857,10 +857,8 @@ struct Writer {
     allowed_files: std::collections::BTreeSet<String>,
     /// The rules the agent was given (ADR-0025), as `name:digest`.
     rules_loaded: std::collections::BTreeSet<String>,
-    /// The model chosen for the agent, and whether a prompt is journaled
-    /// (staged ones included), after which it can't change.
+    /// The model chosen for the agent: it changes only between turns.
     model: Option<String>,
-    prompted: bool,
     /// The last turn started, and the one still open (staged ones included).
     last_turn: u64,
     open_turn: Option<u64>,
@@ -942,7 +940,6 @@ fn spawn_writer(
             _ => None,
         }),
         rules_loaded: events.iter().filter_map(rule_key).collect(),
-        prompted: events.iter().any(|e| matches!(e, Event::UserMessage { .. })),
         subscribers: Vec::new(),
         verify,
     };
@@ -1093,10 +1090,10 @@ impl Writer {
                 return Staged::Handled;
             }
             Cmd::SetModel { model, reply } => {
-                if self.prompted {
-                    let why = "this session already has a prompt, so its agent may be running on its model; \
-                               start a new session to use another";
-                    let _ = reply.send(Err(why.into()));
+                // A turn keeps the model it started on; the next one takes the new one.
+                if let Some(turn) = self.open_turn() {
+                    let why = format!("turn {turn} is running on the current model; change it once the turn ends");
+                    let _ = reply.send(Err(why));
                     return Staged::Handled;
                 }
                 self.model = Some(model.clone());
@@ -1190,7 +1187,6 @@ impl Writer {
                     events.push(Event::Checkpointed { checkpoint: self.checkpoints.len() as u64, commit });
                 }
                 events.push(Event::UserMessage { text, command, request_id });
-                self.prompted = true;
                 (events, Box::new(move |r, _| drop(reply.send(r))))
             }
             Cmd::CheckpointCommit { checkpoint, reply } => {

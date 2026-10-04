@@ -98,6 +98,7 @@ methods! {
     ProposalRollback = "proposal/rollback" (ProposalRef) -> Appended;
     HostRegister = "host/register" (SessionRef) -> AgentConfig;
     HostContext = "host/context" (SessionRef) -> LearnerContext;
+    HostConfig = "host/config" (SessionRef) -> AgentConfig;
     HostRecord = "host/record" (HostRecordParams) -> Appended;
     HostStream = "host/stream" (HostStreamParams) -> Empty;
     HostProposeExtension = "host/proposeExtension" (HostProposeExtensionParams) -> ExtensionProposed;
@@ -401,8 +402,8 @@ pub struct ModelInfo {
     pub output_usd_micros: u64,
 }
 
-/// Chooses the model a session's agent starts with. Refused once the
-/// session has a prompt: its agent may already be running on another.
+/// Chooses the model for a session's next turns. Refused while a turn runs:
+/// a turn keeps the model it started on.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]

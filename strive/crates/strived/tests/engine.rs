@@ -47,6 +47,10 @@ fn a_session_says_which_engine_runs_it_and_its_host_is_told() {
     assert!(w.events().iter().any(|e| e == &json!({"type": "engineSet", "engine": "claude-code"})));
     let config = w.env.rpc().ok("host/register", &json!({"id": w.id}));
     assert_eq!(config["engine"], "claude-code");
+    // Claude Code runs Claude models only.
+    let r = w.env.rpc().call("session/model", &json!({"id": w.id, "model": "gpt-5"}));
+    assert!(r["error"]["message"].as_str().unwrap().contains("isn't a Claude model"), "{r}");
+    w.env.rpc().ok("session/model", &json!({"id": w.id, "model": "claude-haiku-4-5"}));
     assert!(config["engineHome"].as_str().unwrap().ends_with("/engine"), "{config}");
     // Without one, strive's own agent runs it, and the journal says nothing.
     let native = w.env.rpc().ok("session/create", &json!({"cwd": w.root}))["id"].as_str().unwrap().to_string();

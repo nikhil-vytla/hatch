@@ -22,8 +22,8 @@ use crate::server::State;
 use crate::sessions::Push;
 use crate::sessions::{Answer, SessionError, SessionId};
 use strive_proto::{
-    AgentConfig, Event, HostContext, HostRecord, HostRecordParams, HostRegister, HostStream, HostStreamParams,
-    LearnedFile, LearnerContext, SessionDelta, SessionDeltaNotification, SessionInterrupt,
+    AgentConfig, Event, HostConfig, HostContext, HostRecord, HostRecordParams, HostRegister, HostStream,
+    HostStreamParams, LearnedFile, LearnerContext, SessionDelta, SessionDeltaNotification, SessionInterrupt,
     SessionInterruptNotification, SessionInterruptRequested,
 };
 use strive_proto::{ApprovalRespond, ApprovalRespondParams, Decision, SessionApprovals, SessionApprovalsParams};
@@ -34,7 +34,8 @@ use strive_proto::{
 };
 use strive_proto::{SessionFork, SessionForkParams, SessionRewind, SessionRewindParams, SessionRewindResult};
 
-/// Journals a priced model for the session's agent, before its first prompt.
+/// Journals a priced model for the session's next turns. Its host takes
+/// it up when it sees the entry (`host/config`).
 async fn choose_model(state: &Arc<State>, SessionModelParams { id, model }: SessionModelParams) -> Reply {
     if state.models.get(&model).is_none() {
         return Err(RpcError::new(
@@ -42,9 +43,16 @@ async fn choose_model(state: &Arc<State>, SessionModelParams { id, model }: Sess
             format!("no price is known for {model}; add it under \"models\" in ~/.strive/settings.json"),
         ));
     }
+    let sid = session_id(&id)?;
+    if engine_of(state, &sid)? == Some(Engine::ClaudeCode) && provider_of(&model) != "anthropic" {
+        return Err(RpcError::new(
+            RpcError::INVALID_PARAMS,
+            format!("Claude Code runs this session, and {model} isn't a Claude model"),
+        ));
+    }
     let entries = state
         .sessions
-        .set_model(&session_id(&id)?, model)
+        .set_model(&sid, model)
         .await
         .map_err(session_error)?
         .map_err(|why| RpcError::new(RpcError::INVALID_REQUEST, why))?;
@@ -579,6 +587,12 @@ async fn route_host(state: &Arc<State>, conn: &Arc<Conn>, method: &str, params: 
             let sid = session_id(&id)?;
             require_host(conn, &sid)?;
             learner_context(state, &sid).await
+        }
+        HostConfig::NAME => {
+            let SessionRef { id } = parse::<HostConfig>(params)?;
+            let sid = session_id(&id)?;
+            require_host(conn, &sid)?;
+            host_config(state, &sid).await
         }
         HostRecord::NAME => {
             conn.records.fetch_add(1, std::sync::atomic::Ordering::SeqCst);

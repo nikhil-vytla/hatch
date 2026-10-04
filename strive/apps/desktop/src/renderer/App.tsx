@@ -1674,9 +1674,8 @@ function Composer({ model, opened, session }: { model: SessionModel; opened: Ope
             models={session.models?.models}
             current={currentModel(model, session.models)}
             keyed={session.keyed}
-            locked={model.prompted}
+            locked={model.working}
             onPick={session.setModel}
-            onNewSession={session.newSession}
           />
           <span className="spacer" />
           {model.working ? (

@@ -156,3 +156,20 @@ test("a sandboxed command still asks the daemon first, even in full-auto", async
   expect(cleared).toBeGreaterThan(-1);
   expect(finished).toBeGreaterThan(cleared);
 });
+
+test("a model chosen between turns is the one Claude Code runs the next turn on", async () => {
+  const s = await setup((r) => ({ text: r.messages.length > 1 ? "second answer" : "first answer" }), "fullAuto");
+
+  await s.client.request("session/model", { id: s.id, model: "claude-haiku-4-5" });
+  await s.client.request("session/prompt", { id: s.id, text: "first question" });
+  await untilTurnsEnded(s.client, s.id, 1);
+  const before = fake!.requests.length;
+
+  await s.client.request("session/model", { id: s.id, model: "claude-opus-4-5" });
+  await s.client.request("session/prompt", { id: s.id, text: "second question" });
+  await untilTurnsEnded(s.client, s.id, 2);
+  const models = (from: number, to?: number) => new Set(fake!.requests.slice(from, to).map((r) => r.model));
+
+  expect(models(0, before).has("claude-haiku-4-5")).toBe(true);
+  expect(models(before)).toEqual(new Set(["claude-opus-4-5"]));
+});

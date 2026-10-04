@@ -175,6 +175,21 @@ test("/session prints the full id and the resume command", async () => {
   await ui.term.waitFor(`session ${id} · resume with strive -r ${id}`);
 });
 
+test("/model lists the models, marks this session's, and chooses one for the next turns", async () => {
+  const ui = await openUi();
+  await enter(ui, "/model");
+  const screen = await ui.term.waitFor("Choose one with /model <name>");
+  // Settings' model, until one is chosen; the test daemon holds no keys.
+  expect(screen.find((l) => l.includes("●"))).toContain("claude-sonnet-4-5");
+  expect(screen.find((l) => l.includes(" gpt-5 "))).toContain("no key: strive auth openai");
+  await enter(ui, "/model claude-imaginary-9");
+  await ui.term.waitFor("no price is known for claude-imaginary-9");
+  await enter(ui, "/model gpt-5");
+  await ui.term.waitFor("Model: gpt-5");
+  await enter(ui, "/model");
+  await ui.term.waitFor("● gpt-5");
+});
+
 test("an unknown command is named in the error", async () => {
   const ui = await openUi();
   await enter(ui, "/nope");

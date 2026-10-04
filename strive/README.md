@@ -53,7 +53,8 @@ In the TUI, type what you want done. The agent reads and changes files in
 the directory and runs commands in a sandbox (no network, writes only in
 the workspace). By default, edits in the workspace just happen and commands
 ask first; `/approvals` changes that. Esc interrupts. `/rewind` puts the files
-back to how they were before any prompt.
+back to how they were before any prompt. `/model` lists the models, and
+`/model gpt-5` runs the next turns on another, with the conversation so far.
 
 No config file is needed. State lives in `~/.strive`, or in `STRIVE_HOME` if set.
 Every session starts with a $5 budget. Change it with `/budget` in the TUI,

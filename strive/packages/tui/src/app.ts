@@ -61,6 +61,11 @@ export const COMMANDS: SlashCommand[] = [
     description: "List checkpoints, or put the files back to one: /rewind 2",
     argumentHint: "[checkpoint]",
   },
+  {
+    name: "model",
+    description: "List the models, or choose one for the next turns: /model gpt-5",
+    argumentHint: "[model]",
+  },
   { name: "help", description: "List commands and keys" },
   { name: "quit", description: "Exit strive (the daemon keeps running)" },
 ];
@@ -160,6 +165,8 @@ export class App {
   private projectCommands: SlashCommand[] = [];
   /** Checkpoints and what each was taken before. */
   private readonly checkpoints = new Map<number, string>();
+  /** The model chosen for this session's next turns, if one was. */
+  private chosenModel?: string;
   private awaitingPrompt?: number;
   private spend = new Spend();
   /** Every prompt of the conversation shown, a fork's parents' included: where `/fork n` goes back to. */
@@ -391,6 +398,8 @@ export class App {
 
     if (e.type === "rewound") this.checkpoints.set(e.savedAs, `before rewinding to ${e.to}`);
 
+    if (e.type === "modelSet") this.chosenModel = e.model;
+
     if (e.type === "turnStarted") this.working = e.turn;
 
     if (e.type === "turnEnded") this.working = undefined;
@@ -412,6 +421,43 @@ export class App {
     if (text) this.say(text);
     // Entries that add no line (a finished turn) still change the footer.
     this.tui.requestRender();
+  }
+
+  /**
+   * `/model`: lists the models the daemon prices, marking this session's and
+   * those without a key. `/model name` chooses one for the next turns.
+   */
+  private async model(name: string | undefined) {
+    if (!this.session) return;
+
+    if (name) {
+      try {
+        await this.client.request("session/model", { id: this.session.id, model: name });
+      } catch (e) {
+        this.say(style.danger(describeError(e)));
+      }
+
+      return;
+    }
+
+    const [{ models, default: fallback }, { providers }] = await Promise.all([
+      this.client.request("model/list", {}),
+      this.client.request("auth/status", {}),
+    ]);
+
+    const current = this.chosenModel ?? fallback;
+    const unkeyed = new Set(providers.flatMap((p) => (p.source === "none" ? [p.provider] : [])));
+
+    this.say(
+      models
+        .map((m) => {
+          const line = `${m.id === current ? style.accent("●") : " "} ${m.id}  ${style.muted(m.provider)}`;
+
+          return unkeyed.has(m.provider) ? `${line}  ${style.muted(`no key: strive auth ${m.provider}`)}` : line;
+        })
+        .join("\n"),
+    );
+    this.say(style.muted("Choose one with /model <name>; the next turn runs on it."));
   }
 
   /**
@@ -642,6 +688,10 @@ export class App {
 
       case "fork":
         await this.fork(text.slice(1).split(/\s+/)[1]);
+
+        return;
+      case "model":
+        await this.model(text.slice(1).split(/\s+/)[1]);
 
         return;
       case "session":

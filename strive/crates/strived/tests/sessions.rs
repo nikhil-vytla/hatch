@@ -404,10 +404,11 @@ fn the_priced_models_are_listed() {
     assert_eq!(gpt["provider"], "openai");
 }
 
-/// A model chosen before the first prompt is the one the agent starts
-/// with, after a restart too. Once there's a prompt it can't change.
+/// A model chosen between turns is the one the next turn runs on, after a
+/// restart too, and the session's host is told it. A turn keeps the model
+/// it started on.
 #[test]
-fn a_model_chosen_before_the_first_prompt_is_the_agents() {
+fn a_model_chosen_between_turns_is_the_next_turns() {
     let env = Env::new();
     let id = create(&env, "/tmp/repo");
     let mut c = env.rpc();
@@ -415,15 +416,29 @@ fn a_model_chosen_before_the_first_prompt_is_the_agents() {
     assert_eq!(unpriced["error"]["code"], -32602, "{unpriced}");
     c.ok("session/model", &json!({"id": id, "model": "claude-haiku-4-5"}));
     c.ok("session/prompt", &json!({"id": id, "text": "go"}));
-    let late = c.call("session/model", &json!({"id": id, "model": "claude-opus-4-5"}));
-    assert_eq!(late["error"]["code"], -32600, "{late}");
-    assert!(late["error"]["message"].as_str().unwrap().contains("start a new session"), "{late}");
+    let mut host = env.rpc();
+    assert_eq!(host.ok("host/register", &json!({"id": id}))["model"], "claude-haiku-4-5");
+    host.ok("host/record", &json!({"id": id, "event": {"type": "turnStarted", "turn": 1}}));
+    let during = c.call("session/model", &json!({"id": id, "model": "claude-opus-4-5"}));
+    assert_eq!(during["error"]["code"], -32600, "{during}");
+    assert!(during["error"]["message"].as_str().unwrap().contains("once the turn ends"), "{during}");
+    host.ok("host/record", &json!({"id": id, "event": {"type": "turnEnded", "turn": 1, "reason": {"kind": "done"}}}));
+    // Between turns, another provider's model too.
+    c.ok("session/model", &json!({"id": id, "model": "gpt-5"}));
+    let config = host.ok("host/config", &json!({"id": id}));
+    assert_eq!((&config["model"], &config["provider"]), (&json!("gpt-5"), &json!("openai")));
+    assert!(config["baseUrl"].as_str().unwrap().contains("/openai"), "{config}");
+    // Only the session's host is told.
+    let other = env.rpc().call("host/config", &json!({"id": id}));
+    assert!(other["error"].is_object(), "{other}");
+    drop(host);
     env.stop();
     let config = env.rpc().ok("host/register", &json!({"id": id}));
-    assert_eq!(config["model"], "claude-haiku-4-5");
+    assert_eq!(config["model"], "gpt-5");
     let r = env.rpc().ok("session/read", &json!({"id": id}));
-    let chosen: Vec<Value> = events(&r["entries"]).into_iter().filter(|e| e["type"] == "modelSet").collect();
-    assert_eq!(chosen, vec![json!({"type": "modelSet", "model": "claude-haiku-4-5"})]);
+    let chosen: Vec<Value> =
+        events(&r["entries"]).into_iter().filter(|e| e["type"] == "modelSet").map(|e| e["model"].clone()).collect();
+    assert_eq!(chosen, vec![json!("claude-haiku-4-5"), json!("gpt-5")]);
 }
 
 /// Without a choice, the agent uses the model in settings.

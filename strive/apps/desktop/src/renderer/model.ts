@@ -13,10 +13,8 @@ export class SessionModel {
   readonly conversation: Conversation;
   /** The model the agent last called. */
   modelName?: string;
-  /** The model a person chose for the session, before its first prompt. */
+  /** The model a person chose for the session's next turns. */
   chosenModel?: string;
-  /** Whether the session has a prompt: from then on its model is fixed. */
-  prompted = false;
   /** The session's directory, which paths are shown from. */
   workspace?: string;
   /** Counts events after which the files may differ: a finished effect, a rewind, a turn's end. */
@@ -65,12 +63,12 @@ export class SessionModel {
         this.checkpoints.push({ n: e.checkpoint, label: "" });
         this.labelNext = e.checkpoint;
         break;
+      // The next turn runs on it, so it's the one to show, not the last one called.
       case "modelSet":
         this.chosenModel = e.model;
+        this.modelName = undefined;
         break;
       case "userMessage":
-        this.prompted = true;
-
         if (this.labelNext !== undefined) {
           this.label(this.labelNext, `before “${e.text}”`);
           this.before.set(entry.seq, this.labelNext);
