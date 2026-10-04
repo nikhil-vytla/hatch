@@ -20,6 +20,7 @@ export const GZIPPED_RECORDINGS = [
   "local-models-and-games/apple/results.jsonl",
   "experience-prototypes/results/classify.jsonl",
   "cafe-jev/cafe.jsonl",
+  "packages/arena/spine/recordings/spine.jsonl",
 ];
 
 if (import.meta.main) {
