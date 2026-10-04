@@ -62,6 +62,15 @@ DEV = {
         title='dev', blurb='', stereo=True,
         parts=[('IS1009a', 560, 650, 'Mix-Headset', 0, 'Table 1'), ('ES2008a', 600, 690, 'Mix-Headset', 0, 'Table 2')],
     ),
+    # Windows with topic changes in them, and a second pair of tables (same meetings as the scored
+    # one, other stretches), so changes are not tuned on one stereo window.
+    'dev-topics-a': dict(title='dev', blurb='', parts=[('ES2008a', 640, 730, 'Mix-Headset', 0, 'The meeting')]),
+    'dev-topics-b': dict(title='dev', blurb='', parts=[('ES2002a', 710, 800, 'Mix-Headset', 0, 'The meeting')]),
+    'dev-topics-c': dict(title='dev', blurb='', parts=[('IS1009a', 490, 580, 'Mix-Headset', 0, 'The meeting')]),
+    'dev-two-tables-b': dict(
+        title='dev', blurb='', stereo=True,
+        parts=[('ES2002a', 710, 800, 'Mix-Headset', 0, 'Table 1'), ('IS1009a', 100, 190, 'Mix-Headset', 0, 'Table 2')],
+    ),
 }
 
 

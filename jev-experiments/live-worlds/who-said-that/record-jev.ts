@@ -6,7 +6,8 @@
  *   bun live-worlds/who-said-that/record-jev.ts [--pilot]
  *
  * One request at a time, resuming from recordings/jev.jsonl. Stops at the spending cap (list
- * price) or after five failures in a row. `--pilot` sends the first 10 requests only. Writes
+ * price; `--cap <usd>` also caps this run) or after five failures in a row. A line is asked again
+ * when its request has changed (re-recorded signals). `--pilot` sends the first 10 requests only. Writes
  * experience-prototypes/public/who-said-that/<id>.jev.json for the page.
  *
  * Evaluation only: these answers are shown, never trained on (TypeSafe MCA §2.3(b)).
@@ -33,15 +34,21 @@ type Row = { id: string; at: string; status: "ok" | "error"; request?: Payload; 
 const rows: Row[] = existsSync(out) ? readFileSync(out, "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l)) : [];
 const done = new Map(rows.filter((r) => r.status === "ok").map((r) => [r.id, r]));
 let spent = rows.reduce((s, r) => s + (r.costUsd ?? 0), 0);
+const before = spent;
+const capAt = process.argv.indexOf("--cap");
+const RUN_CAP_USD = capAt >= 0 ? Number(process.argv[capAt + 1]) : Infinity;
 let sent = 0;
 let failures = 0;
 
 async function ask(id: string, request: Payload): Promise<Row | undefined> {
-  if (done.has(id)) return done.get(id);
+  // Reuse an answer only for the same request: re-recorded signals change the lines.
+  if (done.has(id) && JSON.stringify(done.get(id)!.request) === JSON.stringify(request)) return done.get(id);
 
   if (process.argv.includes("--pilot") && sent >= PILOT) return undefined;
 
   if (spent >= CAP_USD) throw new Error(`Stopped at the $${CAP_USD} cap ($${spent.toFixed(4)} spent).`);
+
+  if (spent - before >= RUN_CAP_USD) throw new Error(`Stopped at this run's $${RUN_CAP_USD} cap.`);
 
   sent++;
 
@@ -101,4 +108,4 @@ for (const sid of ids) {
   console.log(sid, `${answers.filter(Boolean).length}/${heard.length} lines`, count ? "counts ok" : "no counts");
 }
 
-console.log(`Sent ${sent} requests; $${spent.toFixed(5)} at list price so far (cap $${CAP_USD}).`);
+console.log(`Sent ${sent} requests; $${(spent - before).toFixed(5)} this run, $${spent.toFixed(5)} at list price so far (cap $${CAP_USD}).`);

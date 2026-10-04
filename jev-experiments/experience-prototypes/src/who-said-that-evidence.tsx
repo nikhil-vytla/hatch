@@ -57,7 +57,8 @@ export function WhoMethod() {
         <b>Step one, signals (code and small models).</b> Speech is found where the level rises 6 dB above the recording's quiet
         floor, cut into stretches of at most 5 s. Each stretch is transcribed by whisper-tiny.en, fingerprinted by Wespeaker's
         CAM++ voice model and embedded for meaning by all-MiniLM-L6-v2. With a phone on each table, a frame only counts for a
-        phone when that phone hears it louder than the other.
+        phone when it is more than 3 dB louder than the other table's leak and the room's noise would make it. The leak is measured
+        from the recording, so a table's own words still count under louder talk at the other table.
       </p>
       <p>
         <b>Step two, three text questions per line</b>, none of which depends on how anything has been grouped, so a recorded
@@ -70,11 +71,12 @@ export function WhoMethod() {
         far, or a new one), and a new topic or not. Each option's score is the sum of the signal pushes shown in the “why” panel,
         then a softmax. Code keeps the voice prints, levels, phones, topics and counts. A speaker counts once they have two
         lines, a conversation at three, a topic at two. Hindsight re-labels earlier lines against the final voice prints and
-        conversation topics.
+        conversation topics. With a phone on each table, the phone decides the conversation, and it can rule a speaker out (they
+        sit at the other table) but never in, since everyone at a table is on its phone.
       </p>
       <p>
-        The weights were set by hand on development windows (other stretches of the same meetings), then frozen before these three
-        scenarios were scored. Nothing was trained, and no Jev answer was used to set anything: Jev's answers are only shown and
+        The weights were set by hand on seven development windows (other stretches of the same meetings), then frozen before these
+        three scenarios were scored. The changes that were tried and rejected are listed in the folder README. Nothing was trained, and no Jev answer was used to set anything: Jev's answers are only shown and
         scored.
       </p>
     </>
@@ -125,7 +127,13 @@ export function WhoResults() {
       </div>
       <p className="fmt-fine">
         Share of the corpus's words whose label matches, after matching labels one to one; as decided / with hindsight. Words never
-        heard as speech count as wrong. Jev's recorded answers cost {formatCost(0.00288)} for 107 requests at list price.
+        heard as speech count as wrong. Jev's recorded answers cost {formatCost(0.00549)} for 200 requests at list price (93 of them
+        re-asked the same questions about re-recorded two-tables lines).
+      </p>
+      <p className="fmt-fine">
+        Before the accuracy work, two tables scored speaker 46% and conversation 83%, with 2 of 5 speakers found and 64 of 382
+        words never heard (now 10). The free rules in the design meeting scored conversation 88% and topic 58%. They invented a
+        second conversation, whose split happened to fall on a topic change, so topic is now 54%.
       </p>
     </>
   );
@@ -133,9 +141,11 @@ export function WhoResults() {
 
 export const WHO_CAVEATS: string[] = [
   "whisper-tiny mishears overlapping and far-off speech, and every text answer inherits that.",
-  "Topics are undercounted: a 90 s window rarely holds enough lines to separate two related topics.",
-  "With two tables, the phone a line was heard on is so strong a signal that each table's speakers merge into one (5 people come out as 2); switch “Loudness or microphone” off and it finds 5 speakers but mixes up the tables. When both tables talk at once the quieter table's words are often lost: 64 of 382 words were never heard.",
-  "On these scenarios Jev's text answers help most in the single meeting (it never invents a second conversation); on two tables, voice and phone level decide nearly everything, so it changes little.",
+  "Topics are undercounted, and the limit is the meaning signal: on the development windows, only about 70% of lines are closer to their own topic than to another, even when the true topics are given.",
+  "A stretch of up to 5 s often holds two or three speakers in fast talk, and all of it gets one label.",
+  "With two tables, the leak is measured as one level for the room. In this mix it is exactly one level (−12 dB); a real room's leak varies, so expect more lost or stray words. Stretches heard under louder talk at the other table have its words mixed into their text.",
+  "Overlapping speech within one table is not detected: the one suitable open model, pyannote's segmentation, is gated.",
+  "On these scenarios Jev's text answers help most in the single meeting, where it counts all four speakers; on two tables, voice and phone decide nearly everything, so it changes little.",
   "Asked once about a whole transcript, Jev's conversation and topic counts are poor; the counts here come from code.",
 ];
 

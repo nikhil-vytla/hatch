@@ -176,6 +176,38 @@ describe("signals", () => {
     expect(heard[1].start).toBeGreaterThan(3);
     expect(heard.every((h) => (h.balance ?? 0) > 6)).toBe(true);
   });
+
+  test("a table's quiet line under louder talk at the other table is kept", async () => {
+    const n = 16000 * 6;
+    const tone = (a: number, b: number, f: number, amp: number) => {
+      const x = new Float32Array(n);
+
+      for (let i = 0; i < n; i++) {
+        const t = i / 16000;
+
+        x[i] = 0.0005 * Math.sin(i * 12.9898) + (t >= a && t < b ? amp * Math.sin(2 * Math.PI * f * t) : 0);
+      }
+
+      return x;
+    };
+    // Table 2 talks for 5 s; table 1 says one quieter line (about 9.5 dB down) in the middle of it.
+    const near = [tone(2, 3, 220, 0.1), tone(0.5, 5.5, 330, 0.3)];
+    const bleed = 10 ** (-12 / 20);
+    const channels = near.map((x, c) => x.map((v, i) => v + bleed * near[1 - c][i]));
+    const models: Models = {
+      transcribe: async () => "hello there",
+      embed: async (texts) => texts.map(() => [1, 0]),
+      speaker: async () => new Float32Array([1, 0, 0]),
+    };
+    const heard = await listen(channels, models);
+    const own = heard.filter((h) => h.channel === 0);
+
+    expect(own.length).toBe(1);
+    expect(own[0].start).toBeGreaterThan(1.8);
+    expect(own[0].end).toBeLessThan(3.2);
+    expect(own[0].balance!).toBeLessThan(0);
+    expect(heard.filter((h) => h.channel === 1).length).toBeGreaterThan(0);
+  });
 });
 
 describe("transcript", () => {
