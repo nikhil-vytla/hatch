@@ -17,6 +17,7 @@ import {
 import { getApiKey, run } from "./api";
 import { fromLive, fromRecorded, Receipt } from "./receipt";
 import { KeyTag, ModeTag } from "./trust";
+import { MoreControls } from "./more-controls";
 import {
   CONTRACT_VERSION,
   MENU_REVISION,
@@ -1129,6 +1130,7 @@ export function Beverage({ result }: { result: any }) {
                 </div>
               </div>
               {!scene.confirmed && (
+                <MoreControls id="cafe-customize" what="Temperature, milk, sweetness, size, shots and flavor">
                 <div className="cafe-customize">
                   {(
                     [
@@ -1207,6 +1209,7 @@ export function Beverage({ result }: { result: any }) {
                     them.
                   </p>
                 </div>
+                </MoreControls>
               )}
               <div
                 className={`cafe-receipt ${scene.confirmed ? "confirmed" : ""}`}
@@ -1262,6 +1265,7 @@ export function Beverage({ result }: { result: any }) {
               </div>
               {!scene.confirmed ? (
                 <button
+                  data-first-action
                   className="cafe-primary cafe-confirm"
                   disabled={
                     blockers.length > 0 || !!draft.trim() || busy || preparing
