@@ -21,6 +21,7 @@ const config = (baseUrl: string): AgentConfig => ({
   maxOutput: 1000,
   turnSeconds: 30,
   compactAtTokens: 150_000,
+  reasoning: true,
   instructions: [],
   skills: [],
   checks: [],

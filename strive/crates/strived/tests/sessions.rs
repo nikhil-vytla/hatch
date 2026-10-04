@@ -398,10 +398,12 @@ fn the_priced_models_are_listed() {
     assert_eq!(
         haiku,
         &json!({"id": "claude-haiku-4-5", "provider": "anthropic", "contextWindow": 200_000,
-                "inputUsdMicros": 1_000_000, "outputUsdMicros": 5_000_000})
+                "inputUsdMicros": 1_000_000, "outputUsdMicros": 5_000_000, "reasoning": true})
     );
-    let gpt = r["models"].as_array().unwrap().iter().find(|m| m["id"] == "gpt-5").unwrap();
-    assert_eq!(gpt["provider"], "openai");
+    let find = |id: &str| r["models"].as_array().unwrap().iter().find(|m| m["id"] == id).unwrap().clone();
+    assert_eq!((&find("gpt-5")["provider"], &find("gpt-5")["reasoning"]), (&json!("openai"), &json!(true)));
+    // Effort isn't asked of a model that doesn't think.
+    assert_eq!(find("gpt-4.1")["reasoning"], false);
 }
 
 /// A model chosen between turns is the one the next turn runs on, after a

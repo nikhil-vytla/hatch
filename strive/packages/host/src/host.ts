@@ -764,8 +764,11 @@ export class Host {
 
     try {
       await this.reconfigure();
-      this.agent.state.model = model(this.config, this.effort !== "off");
-      this.agent.state.thinkingLevel = this.effort;
+      // Asked only of a model that thinks: another refuses the request.
+      const thinking = this.config.reasoning ? this.effort : "off";
+
+      this.agent.state.model = model(this.config, thinking !== "off");
+      this.agent.state.thinkingLevel = thinking;
     } catch (e) {
       const error = `the session's new model couldn't be taken up: ${describeError(e)}`;
       await this.record({ type: "turnEnded", turn: this.turn, reason: { kind: "failed", error } });

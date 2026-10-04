@@ -204,6 +204,37 @@ test("/effort sets how much the model thinks, Shift+Tab steps it, and Ctrl+P nee
   await ui.term.waitFor("No model has a key yet");
 });
 
+test("Ctrl+P in a Claude Code session steps only through Claude models", async () => {
+  const { client } = await StriveClient.connect(daemon.socket, { name: "test", version: "0" });
+
+  // Stand-ins: the test daemon's upstreams are a dead port.
+  for (const provider of ["anthropic", "openai"])
+    await client.request("auth/set", { provider, apiKey: "sk-test-not-a-key" });
+  client.close();
+  process.env.STRIVE_ENGINE = "claude-code";
+
+  try {
+    const ui = await openUi();
+    await ui.term.waitFor("Claude Code runs this session");
+    // After the last Claude model, back to the first, past every GPT one.
+    await enter(ui, "/model claude-sonnet-4-5");
+    await ui.term.waitFor("Model: claude-sonnet-4-5");
+    ui.term.type("\x10");
+    await ui.term.waitFor("Model: claude-haiku-4-5");
+    expect((await ui.term.screen()).some((l) => l.includes("isn't a Claude model"))).toBe(false);
+  } finally {
+    delete process.env.STRIVE_ENGINE;
+  }
+});
+
+test("/effort says when the model doesn't think", async () => {
+  const ui = await openUi();
+  await enter(ui, "/model gpt-4.1");
+  await ui.term.waitFor("Model: gpt-4.1");
+  await enter(ui, "/effort high");
+  await ui.term.waitFor("gpt-4.1 doesn't think, so effort applies once a model that does runs.");
+});
+
 test("an unknown command is named in the error", async () => {
   const ui = await openUi();
   await enter(ui, "/nope");

@@ -249,6 +249,7 @@ async fn route(state: &Arc<State>, conn: &Arc<Conn>, method: &str, params: Value
                     context_window: m.context_window,
                     input_usd_micros: m.price.input,
                     output_usd_micros: m.price.output,
+                    reasoning: m.reasoning,
                 })
                 .collect();
             reply::<ModelList>(ModelListResult { models, default: state.settings.model.clone() })
@@ -439,6 +440,7 @@ async fn host_config(state: &Arc<State>, sid: &SessionId) -> Reply {
             0 => model.context_window / 5 * 4,
             n => n,
         },
+        reasoning: model.reasoning,
         instructions: ctx.instructions,
         skills: ctx.skills,
         // The learner runs nothing, so it has no checks to run.

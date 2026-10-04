@@ -8,4 +8,8 @@ provider: string, contextWindow: number,
 /**
  * Micro-dollars per million tokens.
  */
-inputUsdMicros: number, outputUsdMicros: number, };
+inputUsdMicros: number, outputUsdMicros: number, 
+/**
+ * Whether it thinks before it answers, so a session's effort applies.
+ */
+reasoning: boolean, };

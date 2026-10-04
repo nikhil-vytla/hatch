@@ -69,7 +69,7 @@ or for new sessions in `~/.strive/settings.json`:
   "approvals": "autoEdit",
   "budget": { "usd": 10 },
   "models": {
-    "claude-opus-5-5": { "input": 5, "output": 25, "cacheWrite": 6.25, "cacheRead": 0.5, "contextWindow": 1000000 }
+    "claude-opus-5-5": { "input": 5, "output": 25, "cacheWrite": 6.25, "cacheRead": 0.5, "contextWindow": 1000000, "reasoning": true }
   },
   "mcpServers": {
     "github": { "command": "npx", "args": ["-y", "@modelcontextprotocol/server-github"], "env": { "GITHUB_TOKEN": "..." } }
@@ -78,7 +78,8 @@ or for new sessions in `~/.strive/settings.json`:
 ```
 
 Prices are dollars per million tokens. A model without a known price is
-refused rather than guessed. `mcpServers` takes the same shape as Claude
+refused rather than guessed. `reasoning` says the model can think, so
+`/effort` applies to it; it's off unless set. `mcpServers` takes the same shape as Claude
 Code's (stdio servers). Each tool call asks first unless approvals are
 full-auto. `"extensions": false` starts every new session in safe mode, as
 `strive --safe` does.

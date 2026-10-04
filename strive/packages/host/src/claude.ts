@@ -4,7 +4,13 @@
 // reported back (`effect/report`), so the journal holds each call as
 // observed. Model calls go through the session's gateway, so the budget is
 // reserved before each one and the exact bytes are kept.
-import { type CanUseTool, query, type SDKMessage } from "@anthropic-ai/claude-agent-sdk";
+import {
+  type CanUseTool,
+  type EffortLevel,
+  query,
+  type SDKMessage,
+  type ThinkingConfig,
+} from "@anthropic-ai/claude-agent-sdk";
 import {
   type AgentConfig,
   describeError,
@@ -249,6 +255,22 @@ export class ClaudeHost {
     return env;
   }
 
+  /**
+   * How much Claude Code's model thinks: off is off, and a level is Claude
+   * Code's to map onto the model. A model that doesn't think is asked
+   * nothing of it.
+   */
+  private thinking(): ClaudeThinking {
+    const options: ClaudeThinking = {};
+
+    if (!this.config.reasoning) return options;
+
+    if (this.effort === "off") options.thinking = { type: "disabled" };
+    else options.effort = this.effort;
+
+    return options;
+  }
+
   /** One turn of Claude Code, its messages journaled as they come. */
   private async converse(prompt: string, abort: AbortController): Promise<TurnEnd> {
     const executable = claudeExecutable();
@@ -267,8 +289,7 @@ export class ClaudeHost {
         cwd: this.config.cwd,
         pathToClaudeCodeExecutable: executable,
         model: this.config.model,
-        // Off is off; a level is Claude Code's to map onto the model's thinking.
-        ...(this.effort === "off" ? { thinking: { type: "disabled" } } : { effort: this.effort }),
+        ...this.thinking(),
         resume: this.claudeSession,
         abortController: abort,
         includePartialMessages: true,
@@ -363,6 +384,9 @@ export class ClaudeHost {
     return undefined;
   }
 }
+
+/** The thinking a turn asks of Claude Code's model. */
+type ClaudeThinking = { thinking?: ThinkingConfig; effort?: EffortLevel };
 
 /** What Claude Code's process is given. */
 type ClaudeEnv = {

@@ -140,3 +140,32 @@ test("effort set between turns makes the next turn's model think, and off stops 
 
   expect(thinking).toEqual([undefined, "enabled", undefined]);
 });
+
+test("effort is asked only of a model that thinks, after a switch too", async () => {
+  const openai = fakeOpenAI("answer");
+
+  const daemon = startDaemon({ STRIVE_UPSTREAM_OPENAI: openai.url, OPENAI_API_KEY: "sk-test-key", STRIVE_HOST: HOST });
+
+  const { client } = await StriveClient.connect(daemon.socket, { name: "test", version: "0" });
+
+  cleanup.push(
+    () => client.close(),
+    () => daemon.dispose(),
+    () => openai.stop(),
+  );
+  const { id } = await client.request("session/create", { cwd: realpathSync(mkdtempSync("/tmp/strv-effort-")) });
+
+  await client.request("session/effort", { id, effort: "high" });
+  // gpt-4.1 doesn't think: asked to, it would refuse the request.
+  await client.request("session/model", { id, model: "gpt-4.1" });
+  await client.request("session/prompt", { id, text: "one" });
+  await untilTurnsEnded(client, id, 1);
+  await client.request("session/model", { id, model: "gpt-5" });
+  await client.request("session/prompt", { id, text: "two" });
+  await untilTurnsEnded(client, id, 2);
+
+  expect(openai.requests.map((r) => [r.model, r.body.includes('"reasoning_effort"')])).toEqual([
+    ["gpt-4.1", false],
+    ["gpt-5", true],
+  ]);
+});

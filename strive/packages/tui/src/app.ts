@@ -16,6 +16,7 @@ import {
 import {
   type ApprovalMode,
   type Effort,
+  type Engine,
   type Decision,
   describeError,
   type Entry,
@@ -178,6 +179,8 @@ export class App {
   private chosenModel?: string;
   /** How much the model thinks, as last set. */
   private effort: Effort = "off";
+  /** What runs this session's turns, if not strive's own agent: it limits the models. */
+  private engine?: Engine;
   private awaitingPrompt?: number;
   private spend = new Spend();
   /** Every prompt of the conversation shown, a fork's parents' included: where `/fork n` goes back to. */
@@ -425,6 +428,8 @@ export class App {
 
     if (e.type === "effortSet") this.effort = e.effort;
 
+    if (e.type === "engineSet") this.engine = e.engine;
+
     if (e.type === "turnStarted") this.working = e.turn;
 
     if (e.type === "turnEnded") this.working = undefined;
@@ -455,7 +460,15 @@ export class App {
       await this.client.request("session/effort", { id: this.session.id, effort });
     } catch (e) {
       this.say(style.danger(describeError(e)));
+
+      return;
     }
+
+    const { models, default: fallback } = await this.client.request("model/list", {});
+    const current = models.find((m) => m.id === (this.chosenModel ?? fallback));
+
+    if (effort !== "off" && current && !current.reasoning)
+      this.say(style.muted(`${current.id} doesn't think, so effort applies once a model that does runs.`));
   }
 
   /** Ctrl+P: the next model whose provider has a key, for the next turns. */
@@ -465,7 +478,9 @@ export class App {
       this.client.request("auth/status", {}),
     ]);
 
-    const keyed = models.filter((m) => providers.some((p) => p.provider === m.provider && p.source !== "none"));
+    // Claude Code runs Claude models only.
+    const runnable = models.filter((m) => this.engine !== "claude-code" || m.provider === "anthropic");
+    const keyed = runnable.filter((m) => providers.some((p) => p.provider === m.provider && p.source !== "none"));
     const at = keyed.findIndex((m) => m.id === (this.chosenModel ?? fallback));
     const next = keyed[(at + 1) % keyed.length];
 

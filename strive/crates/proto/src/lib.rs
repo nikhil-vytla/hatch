@@ -401,6 +401,9 @@ pub struct ModelInfo {
     /// Micro-dollars per million tokens.
     pub input_usd_micros: u64,
     pub output_usd_micros: u64,
+    /// Whether it thinks before it answers, so a session's effort applies.
+    #[serde(default)]
+    pub reasoning: bool,
 }
 
 /// Chooses the model for a session's next turns. Refused while a turn runs:
@@ -620,6 +623,10 @@ pub struct AgentConfig {
     /// Summarize the conversation before a turn once it is estimated to be
     /// this many tokens.
     pub compact_at_tokens: u64,
+    /// Whether the model thinks before it answers: a session's effort is
+    /// asked of it only then.
+    #[serde(default)]
+    pub reasoning: bool,
     /// Instruction files (AGENTS.md, CLAUDE.md), outermost first.
     pub instructions: Vec<InstructionFile>,
     pub skills: Vec<SkillInfo>,

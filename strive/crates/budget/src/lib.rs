@@ -29,6 +29,8 @@ pub struct Model {
     /// The most output tokens one response can carry; bounds requests that
     /// set no cap of their own.
     pub max_output: u64,
+    /// Whether it can think before it answers, so a session's effort applies.
+    pub reasoning: bool,
 }
 
 /// The cost of `usage` at `price`, rounded up to a whole micro-dollar.
@@ -60,6 +62,7 @@ const BUILTIN: &[(&str, PriceSetting)] = &[
             cache_read: Some(0.1),
             context_window: 200_000,
             max_output: Some(64_000),
+            reasoning: true,
         },
     ),
     (
@@ -72,6 +75,7 @@ const BUILTIN: &[(&str, PriceSetting)] = &[
             cache_read: Some(0.3),
             context_window: 200_000,
             max_output: Some(64_000),
+            reasoning: true,
         },
     ),
     (
@@ -84,6 +88,7 @@ const BUILTIN: &[(&str, PriceSetting)] = &[
             cache_read: Some(0.5),
             context_window: 200_000,
             max_output: Some(64_000),
+            reasoning: true,
         },
     ),
     (
@@ -96,6 +101,7 @@ const BUILTIN: &[(&str, PriceSetting)] = &[
             cache_read: Some(1.5),
             context_window: 200_000,
             max_output: Some(32_000),
+            reasoning: true,
         },
     ),
     (
@@ -108,6 +114,7 @@ const BUILTIN: &[(&str, PriceSetting)] = &[
             cache_read: Some(0.1),
             context_window: 1_047_576,
             max_output: Some(32_768),
+            reasoning: false,
         },
     ),
     (
@@ -120,6 +127,7 @@ const BUILTIN: &[(&str, PriceSetting)] = &[
             cache_read: Some(0.5),
             context_window: 1_047_576,
             max_output: Some(32_768),
+            reasoning: false,
         },
     ),
     (
@@ -132,6 +140,7 @@ const BUILTIN: &[(&str, PriceSetting)] = &[
             cache_read: Some(0.025),
             context_window: 400_000,
             max_output: Some(128_000),
+            reasoning: true,
         },
     ),
     (
@@ -144,6 +153,7 @@ const BUILTIN: &[(&str, PriceSetting)] = &[
             cache_read: Some(0.125),
             context_window: 400_000,
             max_output: Some(128_000),
+            reasoning: true,
         },
     ),
 ];
@@ -174,6 +184,10 @@ pub struct PriceSetting {
     /// Defaults to the context window.
     #[serde(default)]
     pub max_output: Option<u64>,
+    /// Whether the model thinks before it answers. Off unless set, so effort
+    /// is never asked of a model that would refuse it.
+    #[serde(default)]
+    pub reasoning: bool,
 }
 
 impl PriceSetting {
@@ -188,6 +202,7 @@ impl PriceSetting {
             },
             context_window: self.context_window,
             max_output: self.max_output.unwrap_or(self.context_window),
+            reasoning: self.reasoning,
         }
     }
 }

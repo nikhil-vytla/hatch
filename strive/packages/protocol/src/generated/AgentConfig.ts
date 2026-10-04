@@ -26,6 +26,11 @@ baseUrl: string, contextWindow: number, maxOutput: number, turnSeconds: number,
  */
 compactAtTokens: number, 
 /**
+ * Whether the model thinks before it answers: a session's effort is
+ * asked of it only then.
+ */
+reasoning: boolean, 
+/**
  * Instruction files (AGENTS.md, CLAUDE.md), outermost first.
  */
 instructions: Array<InstructionFile>, skills: Array<SkillInfo>, 
