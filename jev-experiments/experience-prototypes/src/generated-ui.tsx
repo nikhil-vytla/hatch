@@ -452,6 +452,7 @@ export function GeneratedUI({ record }: { record: any }) {
               )
             }
             onClick={replay}
+            data-first-action
           >
             {replaying ? "Replaying the decisions…" : "Replay recorded build"}
           </Button>
