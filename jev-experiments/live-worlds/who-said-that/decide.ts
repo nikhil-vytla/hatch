@@ -63,15 +63,33 @@ type Conversation = { id: number; meaning: number[]; db: number; n: number; topi
  * The level push. With one microphone: how far this line's loudness is from the group's (3 dB
  * costs one point). With one microphone per table: whether the group is mostly heard on this
  * line's microphone, counted more when the line is clearly louder there.
+ *
+ * `ruleOutOnly` (used for speakers): the microphone can only count against a group mostly heard
+ * elsewhere. Being on the right table says nothing about which of its people is talking, so it
+ * must not add evidence for any one of them.
  */
-function levelPush(h: Heard, g: { db: number; n: number; channels: Map<number, number> }, w: number) {
+function levelPush(h: Heard, g: { db: number; n: number; channels: Map<number, number> }, w: number, ruleOutOnly = false) {
   if (h.channel === undefined) return (w * -Math.abs(h.db - g.db)) / 3;
 
-  const share = g.n ? (g.channels.get(h.channel) ?? 0) / g.n : 0.5;
+  const share = channelShare(g.channels, h.channel);
   const clear = Math.min(1, Math.max(0.3, (h.balance ?? 0) / 6));
+  const lean = (share - 0.5) * 8 * clear;
 
-  return w * (share - 0.5) * 8 * clear;
+  return w * (ruleOutOnly ? Math.min(0, lean) : lean);
 }
+
+/** Share of a group's microphone evidence on `channel` (0.5 with none yet). */
+function channelShare(channels: Map<number, number>, channel: number) {
+  const total = [...channels.values()].reduce((a, b) => a + b, 0);
+
+  return total ? (channels.get(channel) ?? 0) / total : 0.5;
+}
+
+/**
+ * How much a line says about where its group sits: by how clearly it is on its microphone. Early
+ * lines heard almost as loud on both microphones otherwise fixed a conversation to the wrong table.
+ */
+const channelWeight = (h: Heard) => Math.min(1, Math.max(0.05, (h.balance ?? 0) / 6));
 
 export type State = { speakers: Speaker[]; conversations: Conversation[]; topicIds: number; lines: Line[] };
 
@@ -109,7 +127,7 @@ function softmax(options: { id: number; label: string; push: Partial<Record<Sign
 function newLevelPush(h: Heard, conversations: Conversation[], w: number) {
   if (h.channel === undefined) return w * -1.2;
 
-  const lives = conversations.some((c) => c.n && (c.channels.get(h.channel!) ?? 0) / c.n > 0.5);
+  const lives = conversations.some((c) => c.n && channelShare(c.channels, h.channel!) > 0.5);
   const clear = Math.min(1, Math.max(0.3, (h.balance ?? 0) / 6));
 
   return w * (lives ? -2 : 4 * clear);
@@ -133,7 +151,9 @@ export function speakerOptions(s: State, heard: Heard[], text: TextAnswers[], i:
         // 0.3 sits between same-speaker (median about 0.45, profiles higher) and different-speaker
         // (about 0.05) similarity on the development windows.
         voice: w.voice * (cosine(h.voice, sp.voice) - 0.3) * 10,
-        level: levelPush(h, sp, w.level),
+        // The microphone can rule a speaker out (they sit at the other table) but not in: everyone
+        // at a table is on its microphone. Counting it for them merged a table's people into one.
+        level: levelPush(h, sp, w.level, true),
         continues: same ? w.continues * (cont - 0.4) * 4 : 0,
         timing: same && gap < 0.3 ? w.timing * 0.8 : 0,
       },
@@ -166,7 +186,9 @@ export function conversationOptions(s: State, heard: Heard[], text: TextAnswers[
       push: {
         topic: w.topic * (cosine(h.meaning, c.meaning) - 0.18) * 7,
         reply: w.reply * (replyMass - 0.3) * 3,
-        membership: speaker ? w.membership * (share - 0.5) * 3 : 0,
+        // Only once the speaker has spoken (a newcomer used to count against every conversation),
+        // and only with one microphone: with one per table, the microphone decides.
+        membership: total && h.channel === undefined ? w.membership * (share - 0.5) * 3 : 0,
         level: levelPush(h, c, w.level),
         continues: prev?.conv === c.id ? w.continues * (cont - 0.4) * 2 : 0,
       },
@@ -241,8 +263,8 @@ export function step(s: State, heard: Heard[], text: TextAnswers[], i: number, w
   sp.convs.set(conv, (sp.convs.get(conv) ?? 0) + 1);
 
   if (h.channel !== undefined) {
-    sp.channels.set(h.channel, (sp.channels.get(h.channel) ?? 0) + 1);
-    c.channels.set(h.channel, (c.channels.get(h.channel) ?? 0) + 1);
+    sp.channels.set(h.channel, (sp.channels.get(h.channel) ?? 0) + channelWeight(h));
+    c.channels.set(h.channel, (c.channels.get(h.channel) ?? 0) + channelWeight(h));
   }
   c.meaning = blend(c.meaning, h.meaning, c.n, 5);
   c.db = c.n ? c.db + (h.db - c.db) / Math.min(c.n + 1, 8) : h.db;
@@ -359,7 +381,7 @@ export function hindsight(s: State, heard: Heard[], w: Weights): { who: number; 
 
       return out;
     };
-    const who = best(real, (sp) => w.voice * cosine(h.voice, sp.voice) * 10 + levelPush(h, sp, w.level), l.who, (sp) => sp.id);
+    const who = best(real, (sp) => w.voice * cosine(h.voice, sp.voice) * 10 + levelPush(h, sp, w.level, true), l.who, (sp) => sp.id);
     const speaker = s.speakers[who];
     const total = speaker ? [...speaker.convs.values()].reduce((a, b) => a + b, 0) : 0;
     const conv = best(
@@ -367,7 +389,7 @@ export function hindsight(s: State, heard: Heard[], w: Weights): { who: number; 
       (c) =>
         w.topic * cosine(h.meaning, c.meaning) * 7 +
         levelPush(h, c, w.level) +
-        (speaker && total ? w.membership * ((speaker.convs.get(c.id) ?? 0) / total) * 3 : 0),
+        (speaker && total && h.channel === undefined ? w.membership * ((speaker.convs.get(c.id) ?? 0) / total) * 3 : 0),
       l.conv,
       (c) => c.id,
     );

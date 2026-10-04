@@ -32,13 +32,14 @@ export function frameDb(x: Float32Array): number[] {
 
 /**
  * Energy voice-activity detection. Speech is anything well above the room's noise floor (its
- * 20th-percentile frame); a pause of at least `minGap` seconds splits a segment.
+ * 20th-percentile frame, unless `floorDb` is given); a pause of at least `minGap` seconds splits a
+ * segment.
  */
-export function detectSpeech(x: Float32Array, opts: { aboveFloorDb?: number; minGap?: number; minLength?: number } = {}): Segment[] {
+export function detectSpeech(x: Float32Array, opts: { aboveFloorDb?: number; minGap?: number; minLength?: number; floorDb?: number } = {}): Segment[] {
   const { aboveFloorDb = 9, minGap = 0.12, minLength = 0.35 } = opts;
   const db = frameDb(x);
   const sorted = [...db].sort((a, b) => a - b);
-  const floor = sorted[Math.floor(sorted.length * 0.2)] ?? -100;
+  const floor = opts.floorDb ?? sorted[Math.floor(sorted.length * 0.2)] ?? -100;
   // Smooth over 50 ms so single quiet frames inside words don't split them.
   const on = db.map((_, i) => {
     let m = -Infinity;
