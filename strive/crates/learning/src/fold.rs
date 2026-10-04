@@ -129,6 +129,7 @@ pub fn fold(entries: &[Entry]) -> Vec<Folded> {
             | Event::EffectRerun { .. }
             | Event::ForkedFrom { .. }
             | Event::EngineSet { .. }
+            | Event::EffortSet { .. }
             | Event::ApprovalModeSet { .. }
             | Event::ApprovalRequested { .. }
             | Event::ApprovalDecided { .. }

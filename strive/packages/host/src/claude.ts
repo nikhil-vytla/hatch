@@ -8,6 +8,7 @@ import { type CanUseTool, query, type SDKMessage } from "@anthropic-ai/claude-ag
 import {
   type AgentConfig,
   describeError,
+  type Effort,
   type Entry,
   type Event,
   type StriveClient,
@@ -71,6 +72,8 @@ export class ClaudeHost {
   private readonly prompts = new PromptReader();
   /** A model was chosen for the session's next turns: the next one fetches its config first. */
   private stale = false;
+  /** How much the model thinks, as last set: each turn starts with it. */
+  private effort: Effort = "off";
   private early: Entry[] | undefined = [];
   private lost = false;
 
@@ -140,6 +143,8 @@ export class ClaudeHost {
 
   /** A model chosen for the next turns, other than this host's: Claude Code is started on it from then on. */
   private noteModel(entry: Entry) {
+    if (entry.event.type === "effortSet") this.effort = entry.event.effort;
+
     if (entry.event.type !== "modelSet" || entry.event.model === this.config.model) return;
     this.stale = true;
   }
@@ -262,6 +267,8 @@ export class ClaudeHost {
         cwd: this.config.cwd,
         pathToClaudeCodeExecutable: executable,
         model: this.config.model,
+        // Off is off; a level is Claude Code's to map onto the model's thinking.
+        ...(this.effort === "off" ? { thinking: { type: "disabled" } } : { effort: this.effort }),
         resume: this.claudeSession,
         abortController: abort,
         includePartialMessages: true,

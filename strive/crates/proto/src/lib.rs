@@ -105,6 +105,7 @@ methods! {
     SessionInterrupt = "session/interrupt" (SessionRef) -> Empty;
     ModelList = "model/list" (Empty) -> ModelListResult;
     SessionModel = "session/model" (SessionModelParams) -> Appended;
+    SessionEffort = "session/effort" (SessionEffortParams) -> Appended;
 }
 
 /// A server-to-client notification: its wire name plus payload type.
@@ -506,7 +507,6 @@ pub struct EffectCancelParams {
     pub call_id: String,
 }
 
-/// The effect's journal number and outcome, with the output text inline.
 /// What runs a session's turns (ADR-0031): strive's own loop, or a vendor
 /// agent whose tool calls the daemon gates and observes.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, TS)]
@@ -516,6 +516,28 @@ pub enum Engine {
     #[default]
     Native,
     ClaudeCode,
+}
+
+/// How much the model thinks before it answers: off, or a level the
+/// provider maps to its own (a thinking budget, or reasoning effort).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub enum Effort {
+    #[default]
+    Off,
+    Low,
+    Medium,
+    High,
+}
+
+/// Sets how much the session's model thinks, from its next turn.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct SessionEffortParams {
+    pub id: String,
+    pub effort: Effort,
 }
 
 /// A vendor engine's tool call, before it runs (ADR-0031): the daemon
@@ -560,6 +582,7 @@ pub struct EffectReportParams {
     pub failed: bool,
 }
 
+/// The effect's journal number and outcome, with the output text inline.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
@@ -1615,6 +1638,10 @@ pub enum Event {
     /// A vendor agent runs this session's turns (ADR-0031).
     EngineSet {
         engine: Engine,
+    },
+    /// How much the model thinks, from the session's next turn.
+    EffortSet {
+        effort: Effort,
     },
 }
 

@@ -232,6 +232,8 @@ export function describe(entry: Entry, options: DescribeOptions = {}): Line[] {
       ];
     case "modelSet":
       return note("faint", `Model: ${e.model}`);
+    case "effortSet":
+      return note("faint", `Effort: ${e.effort}`);
     case "compacted":
       return note("faint", "Summarized the conversation so far to keep it within the model's context.");
     case "ruleLoaded":

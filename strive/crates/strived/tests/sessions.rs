@@ -441,6 +441,26 @@ fn a_model_chosen_between_turns_is_the_next_turns() {
     assert_eq!(chosen, vec![json!("claude-haiku-4-5"), json!("gpt-5")]);
 }
 
+/// How much the model thinks is journaled for the host to read, and only a
+/// person sets it.
+#[test]
+fn effort_is_journaled_and_only_a_person_sets_it() {
+    let env = Env::new();
+    let id = create(&env, "/tmp/repo");
+    env.rpc().ok("session/effort", &json!({"id": id, "effort": "high"}));
+    let bad = env.rpc().call("session/effort", &json!({"id": id, "effort": "extreme"}));
+    assert_eq!(bad["error"]["code"], -32602, "{bad}");
+    let mut host = env.rpc();
+    host.ok("host/register", &json!({"id": id}));
+    let r = host.call("session/effort", &json!({"id": id, "effort": "off"}));
+    assert_eq!(r["error"]["message"], "only a person can do this, not the agent's host");
+    let r = host.call("host/record", &json!({"id": id, "event": {"type": "effortSet", "effort": "off"}}));
+    assert!(r["error"].is_object(), "{r}");
+    let r = env.rpc().ok("session/read", &json!({"id": id}));
+    let set: Vec<Value> = events(&r["entries"]).into_iter().filter(|e| e["type"] == "effortSet").collect();
+    assert_eq!(set, vec![json!({"type": "effortSet", "effort": "high"})]);
+}
+
 /// Without a choice, the agent uses the model in settings.
 #[test]
 fn a_session_without_a_chosen_model_uses_the_settings_one() {

@@ -1,6 +1,6 @@
-// A model chosen between turns, end to end: a real daemon and host, the
-// first turn on a scripted Anthropic model and the next on a scripted
-// OpenAI one, which is sent the whole conversation so far.
+// A model and effort chosen between turns, end to end: a real daemon and
+// host, a scripted Anthropic model, and a scripted OpenAI one that is sent
+// the whole conversation so far.
 import { afterEach, expect, setDefaultTimeout, test } from "bun:test";
 import { mkdtempSync, realpathSync } from "node:fs";
 import { resolve } from "node:path";
@@ -106,4 +106,37 @@ test("a model chosen between turns runs the next turn, on another provider too, 
   expect(
     e.filter((x) => x.type === "assistantMessage").map((x) => (x.type === "assistantMessage" ? x.text : "")),
   ).toEqual(["first answer", "second answer"]);
+});
+
+test("effort set between turns makes the next turn's model think, and off stops it", async () => {
+  const anthropic = new FakeAnthropic(() => ({ text: "answer" })).start();
+
+  const daemon = startDaemon({
+    STRIVE_UPSTREAM_ANTHROPIC: anthropic.url,
+    ANTHROPIC_API_KEY: "sk-test-key",
+    STRIVE_HOST: HOST,
+  });
+
+  const { client } = await StriveClient.connect(daemon.socket, { name: "test", version: "0" });
+
+  cleanup.push(
+    () => client.close(),
+    () => daemon.dispose(),
+    () => anthropic.stop(),
+  );
+  const { id } = await client.request("session/create", { cwd: realpathSync(mkdtempSync("/tmp/strv-effort-")) });
+
+  await client.request("session/model", { id, model: "claude-haiku-4-5" });
+  await client.request("session/prompt", { id, text: "plain" });
+  await untilTurnsEnded(client, id, 1);
+  await client.request("session/effort", { id, effort: "high" });
+  await client.request("session/prompt", { id, text: "think hard" });
+  await untilTurnsEnded(client, id, 2);
+  await client.request("session/effort", { id, effort: "off" });
+  await client.request("session/prompt", { id, text: "plain again" });
+  await untilTurnsEnded(client, id, 3);
+
+  const thinking = anthropic.requests.map((r) => r.thinking?.type);
+
+  expect(thinking).toEqual([undefined, "enabled", undefined]);
 });

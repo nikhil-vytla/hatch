@@ -79,6 +79,16 @@ pub fn engine_name(engine: strive_proto::Engine) -> &'static str {
     }
 }
 
+/// How an effort level reads: `off`, `low`, `medium`, `high`.
+pub fn effort_name(effort: strive_proto::Effort) -> &'static str {
+    match effort {
+        strive_proto::Effort::Off => "off",
+        strive_proto::Effort::Low => "low",
+        strive_proto::Effort::Medium => "medium",
+        strive_proto::Effort::High => "high",
+    }
+}
+
 fn outcome_text(record: Option<&EffectRecord>, outcome: &EffectOutcome, blob: Blob) -> String {
     match outcome {
         EffectOutcome::Refused { reason } => format!("refused: {reason}"),
@@ -152,6 +162,7 @@ fn block(entry: &Entry, starts: &HashMap<u64, (u64, &EffectRecord)>, blob: Blob)
         },
         Event::Rewound { to, .. } => format!("{at} rewound the files to checkpoint {to}"),
         Event::EngineSet { engine } => format!("{at} {} runs this session's turns", engine_name(*engine)),
+        Event::EffortSet { effort } => format!("{at} thinking effort set to {}", effort_name(*effort)),
         Event::ForkedFrom { session, seq } => {
             format!("{at} forked from session {session} at its entry #{seq}; what came before is that session's")
         }

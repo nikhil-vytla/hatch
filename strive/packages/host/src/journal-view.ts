@@ -208,6 +208,8 @@ async function block(entry: Entry, effects: Map<number, Effect>, ran: Set<string
       return `${at} proposal #${e.proposal} rolled back by ${e.by} (a client)`;
     case "modelSet":
       return `${at} the session's model set to ${e.model}`;
+    case "effortSet":
+      return `${at} the model's thinking effort set to ${e.effort}`;
     case "sessionStarted":
     case "budgetSet":
     case "modelCallStarted":

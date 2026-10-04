@@ -402,6 +402,7 @@ impl Ledger {
                 | Event::EffectRerun { .. }
                 | Event::ForkedFrom { .. }
                 | Event::EngineSet { .. }
+                | Event::EffortSet { .. }
                 | Event::ApprovalModeSet { .. }
                 | Event::ApprovalRequested { .. }
                 | Event::ApprovalDecided { .. }

@@ -28,7 +28,7 @@ use strive_proto::{
 };
 use strive_proto::{ApprovalRespond, ApprovalRespondParams, Decision, SessionApprovals, SessionApprovalsParams};
 use strive_proto::{EffectCancel, EffectCancelParams, EffectRequest};
-use strive_proto::{ModelInfo, ModelList, ModelListResult, SessionModel, SessionModelParams};
+use strive_proto::{ModelInfo, ModelList, ModelListResult, SessionEffort, SessionEffortParams, SessionModel, SessionModelParams};
 use strive_proto::{
     SessionChanges, SessionChangesParams, SessionChangesResult, SessionCommands, SessionCommandsResult,
 };
@@ -377,6 +377,7 @@ fn host_may_record(event: &Event, kind: SessionKind) -> bool {
         | Event::EffectRerun { .. }
         | Event::ForkedFrom { .. }
         | Event::EngineSet { .. }
+        | Event::EffortSet { .. }
         | Event::ApprovalModeSet { .. }
         | Event::ApprovalRequested { .. }
         | Event::ApprovalDecided { .. }
@@ -1376,6 +1377,13 @@ async fn route_session(state: &Arc<State>, conn: &Arc<Conn>, method: &str, param
         SessionModel::NAME => {
             require_person(conn)?;
             choose_model(state, parse::<SessionModel>(params)?).await
+        }
+        SessionEffort::NAME => {
+            require_person(conn)?;
+            let SessionEffortParams { id, effort } = parse::<SessionEffort>(params)?;
+            let entries =
+                state.sessions.append(&session_id(&id)?, vec![Event::EffortSet { effort }]).await.map_err(session_error)?;
+            reply::<SessionEffort>(Appended { seq: entries[0].seq })
         }
         SessionBudget::NAME => {
             require_person(conn)?;

@@ -40,6 +40,7 @@ import type { SessionChangesParams } from "./SessionChangesParams";
 import type { SessionChangesResult } from "./SessionChangesResult";
 import type { SessionCommandsResult } from "./SessionCommandsResult";
 import type { SessionCreateParams } from "./SessionCreateParams";
+import type { SessionEffortParams } from "./SessionEffortParams";
 import type { SessionForkParams } from "./SessionForkParams";
 import type { SessionInfo } from "./SessionInfo";
 import type { SessionListParams } from "./SessionListParams";
@@ -92,6 +93,7 @@ export type Methods = {
   "session/interrupt": { params: SessionRef; result: Empty };
   "model/list": { params: Empty; result: ModelListResult };
   "session/model": { params: SessionModelParams; result: Appended };
+  "session/effort": { params: SessionEffortParams; result: Appended };
 };
 
 export type MethodName = keyof Methods;

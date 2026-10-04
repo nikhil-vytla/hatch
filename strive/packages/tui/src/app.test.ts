@@ -190,6 +190,20 @@ test("/model lists the models, marks this session's, and chooses one for the nex
   await ui.term.waitFor("● gpt-5");
 });
 
+test("/effort sets how much the model thinks, Shift+Tab steps it, and Ctrl+P needs a keyed model", async () => {
+  const ui = await openUi();
+  await enter(ui, "/effort extreme");
+  await ui.term.waitFor("Effort is off. Use /effort off, low, medium or high.");
+  await enter(ui, "/effort high");
+  await ui.term.waitFor("Effort: high");
+  // From high, round to off.
+  ui.term.type("\x1b[Z");
+  await ui.term.waitFor("Effort: off");
+  // The test daemon holds no keys.
+  ui.term.type("\x10");
+  await ui.term.waitFor("No model has a key yet");
+});
+
 test("an unknown command is named in the error", async () => {
   const ui = await openUi();
   await enter(ui, "/nope");

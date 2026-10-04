@@ -8,6 +8,7 @@ import {
   type AgentConfig,
   describeError,
   type EffectRequest,
+  type Effort,
   type Entry,
   type ExtensionInfo,
   type Event,
@@ -477,6 +478,8 @@ export class Host {
   private models: ReturnType<typeof createStriveModels>;
   /** A model was chosen for the session's next turns: the next one fetches its config first. */
   private stale = false;
+  /** How much the model thinks, as last set: each turn starts with it. */
+  private effort: Effort = "off";
   private readonly mode: AgentMode;
   private readonly prompts = new PromptReader();
   /** The daemon's connection closed: nothing more can be recorded. */
@@ -732,6 +735,8 @@ export class Host {
 
   /** A model chosen for the next turns, other than this host's: its limits are fetched before the next turn. */
   private noteModel(entry: Entry) {
+    if (entry.event.type === "effortSet") this.effort = entry.event.effort;
+
     if (entry.event.type !== "modelSet" || entry.event.model === this.config.model) return;
     this.stale = true;
   }
@@ -759,6 +764,8 @@ export class Host {
 
     try {
       await this.reconfigure();
+      this.agent.state.model = model(this.config, this.effort !== "off");
+      this.agent.state.thinkingLevel = this.effort;
     } catch (e) {
       const error = `the session's new model couldn't be taken up: ${describeError(e)}`;
       await this.record({ type: "turnEnded", turn: this.turn, reason: { kind: "failed", error } });
