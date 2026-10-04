@@ -88,6 +88,23 @@ describe.skipIf(!ready)("headline strips match their data", () => {
     expect(h.stats[2].value).toBe(String(wrong));
   });
 
+  test("decisions in an interface: Jev's held-out right and wrong cards, read from the arena card", () => {
+    const card = json(join(app, "public/arena/index.json")).cards.find((c: { id: string }) => c.id === "one-box");
+    const held = card.slices.workflow["held-out"];
+    const jev = held["jev@cancel"];
+    const h = scene("decisions-in-ui");
+
+    expect(h.stats[0].value).toBe(pct0(jev.right.value));
+    expect(h.stats[1].value.startsWith(jev.wrong.value.toFixed(2))).toBe(true);
+
+    // "Fewest wrong cards" is only claimed when no contestant shows fewer.
+    const wrongs: number[] = Object.values<{ wrong: { value: number } }>(held).map((r) => r.wrong.value);
+    const fewest = wrongs.every((w) => w >= jev.wrong.value);
+
+    expect(h.verdict.includes("the fewest of any contestant")).toBe(fewest);
+    expect(h.stats[2].value).toBe(scene("handoff").stats[0].value);
+  });
+
   test("open decisions: the best open model and Jev, read from the published file", () => {
     const d = json(join(app, "public/open-decisions/open-decisions.json"));
     const open = d.typed.filter((t: { id: string }) => d.models.some((m: { id: string }) => m.id === t.id));

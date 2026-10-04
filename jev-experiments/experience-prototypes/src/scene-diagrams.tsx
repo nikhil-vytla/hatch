@@ -15,6 +15,7 @@ export const DIAGRAMS: Record<string, Diagram> = {
   search: { from: ["query", "sources"], to: "which answers" },
   classify: { from: ["request"], to: "1 of 77 intents" },
   handoff: { from: ["answer", "confidence"], to: "act or ask" },
+  "decisions-in-ui": { from: ["keystrokes", "confidence"], to: "card or ask" },
   "open-decisions": { from: ["prompt"], to: "label odds" },
   decoy: { from: ["A", "B", "A′"], to: "choice" },
   prose: { from: ["question", "78 rewordings"], to: "yes/no shift" },
