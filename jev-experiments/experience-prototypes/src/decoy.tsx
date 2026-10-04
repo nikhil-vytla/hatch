@@ -152,6 +152,7 @@ export function Decoy({ figure = false }: { figure?: boolean } = {}) {
                       costUsd: r.costUsd,
                       at: r.at,
                       servedBy: r.servedBy,
+                      study: "decoy",
                       raw: { request: r.request, response: r.answers ? { answers: r.answers } : undefined },
                     }}
                   />,

@@ -263,6 +263,7 @@ export function FoolJev() {
             costUsd: shown.costUsd,
             at: shown.at,
             servedBy: shown.servedBy,
+            study: "fool",
             raw: {
               request: shown.sentence
                 ? { answer: answerRequest(puzzle, shown.sentence), referee: refereeRequest(puzzle, shown.sentence) }

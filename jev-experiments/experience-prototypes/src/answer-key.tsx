@@ -31,6 +31,22 @@ const KEYS: { label: string; key: Key; about: string }[] = [
 ];
 
 
+/**
+ * Jev's request for one Typed Decisions case, rebuilt from the published case (/data/local-models.json):
+ * its state, and its questions with each option under its key.
+ */
+export function typedCaseRequest(c: any) {
+  return {
+    state: c.state,
+    questions: Object.fromEntries(
+      c.questions.map((q: any) => [
+        q.key,
+        { type: q.type, instructions: q.instructions, criteria: Object.fromEntries(q.keys.map((k: string, i: number) => [k, q.options[i]])) },
+      ]),
+    ),
+  };
+}
+
 export function AnswerKey({ result }: { result: any }) {
   const [label, setLabel] = useState(KEYS[1].label);
   const questions: Question[] = useMemo(() => (result?.cases ?? []).flatMap((c: any) => c.questions), [result]);
@@ -90,8 +106,9 @@ export function AnswerKey({ result }: { result: any }) {
             data={{
               mode: "recorded",
               questions: questions.length,
+              rebuilt: true,
               raw: {
-                request: { state: result.cases[0].state, question: result.cases[0].questions[0].instructions },
+                request: typedCaseRequest(result.cases[0]),
                 response: { target: questions[0].target, predictions: questions[0].predictions },
                 note: `The first of ${questions.length.toLocaleString()} recorded questions, as published in /data/local-models.json. This record kept each model's probabilities, not per-request time or cost.`,
               },

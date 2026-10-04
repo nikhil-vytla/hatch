@@ -1,0 +1,88 @@
+/* "Build this": runnable code under a receipt, Stripe Docs style, in the Toy Box look. */
+.build-this {
+  flex-basis: 100%;
+  margin-top: 6px;
+  color: var(--ink);
+}
+.build-this > summary {
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+  color: var(--ink);
+  list-style: none;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.build-this > summary::-webkit-details-marker {
+  display: none;
+}
+.build-this > summary::before {
+  content: "</>";
+  font: 700 11px var(--code, ui-monospace, monospace);
+  padding: 1px 6px;
+  border: 1.5px solid var(--ink);
+  border-radius: 999px;
+  background: var(--sun, #ffd23f);
+  text-decoration: none;
+}
+.build-this-intro,
+.build-this-docs {
+  margin: 8px 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+.build-this-intro code {
+  font: 12px var(--code, ui-monospace, monospace);
+  color: var(--ink);
+}
+.build-this-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+.build-this-tabs button {
+  min-height: 32px;
+  padding: 4px 12px;
+  border: 1.5px solid var(--ink);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink);
+  font: 600 13px var(--sans, inherit);
+  cursor: pointer;
+}
+.build-this-tabs button.active {
+  background: var(--ink);
+  color: var(--bg);
+}
+.build-this-tabs .build-this-copy {
+  margin-left: auto;
+  background: var(--sun, #ffd23f);
+}
+.build-this-code {
+  margin: 8px 0 0;
+  max-height: 360px;
+  overflow: auto;
+  padding: 12px 14px;
+  border: 2px solid var(--ink);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--ink);
+  font: 12px/1.5 var(--code, ui-monospace, monospace);
+  white-space: pre;
+  tab-size: 2;
+}
+.build-this-answers {
+  margin-top: 8px;
+}
+.build-this-answers > summary {
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+}
+.build-this-docs a {
+  color: var(--ink);
+}

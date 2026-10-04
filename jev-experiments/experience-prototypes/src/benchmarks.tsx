@@ -14,6 +14,7 @@ import {
   Fold,
 } from "./shared";
 import { pretty, percent } from "./api";
+import { intentRequest, robustnessRequest, type IntentDataset } from "./intent-requests";
 import { fromRecorded, Receipt } from "./receipt";
 import { ContentReview } from "./provenance";
 /** `recordedAt` dates the receipts when this record isn't the page's own (the Stability tab). */
@@ -246,7 +247,20 @@ export function Benchmarks({ id, result, recordedAt }: { id: string; result: any
                   </div>
                 </div>
               )}
-              {row.latency_ms ? <Receipt label="This case" data={fromRecorded(row, recordedAt ? { at: recordedAt } : {})} /> : null}
+              {row.latency_ms ? (
+                <Receipt
+                  label="This case"
+                  data={{
+                    ...fromRecorded(row, recordedAt ? { at: recordedAt } : {}),
+                    raw: {
+                      request: id === "classify" ? intentRequest(dataset as IntentDataset, row.text) : id === "robustness" ? robustnessRequest(row) : undefined,
+                      response: row,
+                    },
+                    rebuilt: id !== "classify",
+                    requestNote: id === "classify" ? "Rebuilt with the recorder's code; it matches this request's recorded hash." : undefined,
+                  }}
+                />
+              ) : null}
               <Fold title="Source and case details">
                 <p>
                   Case: {row.id ?? row.pair_id}.{" "}

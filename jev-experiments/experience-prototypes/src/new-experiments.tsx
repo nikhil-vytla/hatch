@@ -83,7 +83,9 @@ export function pasteQuestions(
 }
 /** A recorded preset is one saved response; a live paste may be several batched requests. */
 const pasteReceipt = (last: any) =>
-  last.source === "live" ? fromLiveBatches(last.responses ?? [], last.request) : fromRecorded(last);
+  last.source === "live"
+    ? fromLiveBatches(last.responses ?? [], last.request)
+    : { ...fromRecorded(last), raw: { request: last.preset in pasteSources ? recordedRequests.paste(last.preset, last.source_text) : undefined, response: last } };
 
 export function Paste({ record }: { record: any }) {
   const [preset, setPreset] = useState<keyof typeof pasteSources>("Conference"),
@@ -570,7 +572,7 @@ export function SemanticTable({ record }: { record: any }) {
             }
           />
           <ErrorText error={error} />
-          {last && <Receipt data={last === record ? fromRecorded(last) : fromLive(last)} />}
+          {last && <Receipt data={last === record ? { ...fromRecorded(last), raw: { request: recordedRequests.semanticTable(), response: last } } : fromLive(last)} />}
           <Button
             secondary
             onClick={() =>
@@ -768,7 +770,7 @@ export function UndoExperiment({ record }: { record: any }) {
               : `Undo ${chosen.length} selected changes`}
           </Button>
           <ErrorText error={error} />
-          {last && <Receipt data={last === record ? fromRecorded(last) : fromLive(last)} />}
+          {last && <Receipt data={last === record ? { ...fromRecorded(last), raw: { request: recordedRequests.undo(), response: last } } : fromLive(last)} />}
           <State
             value={{
               request: query,
@@ -938,7 +940,7 @@ export function Changes({ record }: { record: any }) {
             }
           />
           <ErrorText error={error} />
-          {last && <Receipt data={last === record ? fromRecorded(last) : fromLive(last)} />}
+          {last && <Receipt data={last === record ? { ...fromRecorded(last), raw: { request: recordedRequests.changes(), response: last } } : fromLive(last)} />}
           <State
             value={{
               before: impactFacts,
@@ -952,3 +954,33 @@ export function Changes({ record }: { record: any }) {
     </div>
   );
 }
+
+/**
+ * The requests scripts/record.ts sends for these scenes' recorded examples. record.ts builds them
+ * from here, so a recorded receipt's "Build this" shows the request that was recorded.
+ */
+export const recordedRequests = {
+  paste: (preset: keyof typeof pasteSources, source: string = pasteSources[preset]) => ({
+    state: { source, destination: preset },
+    questions: pasteQuestions(pasteFields[preset], extractFacts(source), preset),
+  }),
+  semanticTable: () => ({
+    state: { conversations: Object.fromEntries(supportRows.map((r) => [r.id, r.text])) },
+    questions: Object.fromEntries(
+      supportRows.map((r) => [r.id, judge(`For conversation ${r.id}: Was a refund promised but no successful refund is evidenced?`)]),
+    ),
+  }),
+  undo: () => ({
+    state: { request: "Undo the color changes, but keep the new layout and title.", edits },
+    questions: Object.fromEntries(edits.map((e) => [e.id, judge(`Should edit ${e.id} be undone to satisfy the request? Preserve unrelated edits.`)])),
+  }),
+  changes: () => ({
+    state: {
+      before: impactFacts,
+      after: { ...impactFacts, venue: "Waterfront Pavilion, Portland" },
+      // Text only: the dependency lists are the answer key, so they stay out of the request.
+      conclusions: conclusionsForJev,
+    },
+    questions: Object.fromEntries(conclusionsForJev.map((c) => [c.id, judge(`Does conclusion ${c.id} need review because the facts changed?`)])),
+  }),
+};

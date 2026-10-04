@@ -5,6 +5,8 @@
  */
 import { useState } from "react";
 import prose from "../../../packages/arena/prose/results.json";
+import { allJobs } from "../../../packages/arena/prose/variants";
+import { BuildThis } from "../build-this";
 import { FoolJev } from "../fool-jev";
 import { homeHeadline } from "../headline-strip";
 import { Article } from "./article";
@@ -39,6 +41,15 @@ const WORDING: Record<string, string> = {
 };
 
 const STUDY = "https://github.com/nikhil-vytla/hatch/tree/main/jev-experiments/packages/arena/prose";
+/** The suggestion finding's first claim, asked plainly and with "Most people say no.", as the study sent it. */
+const SUGGESTION_PAIR = (() => {
+  const jobs = allJobs().filter((j) => j.study === "claim-truth");
+  const item = jobs[0]?.item;
+  const pick = (family: string, variant: string) => jobs.find((j) => j.item === item && j.family === family && j.variant === variant)?.request;
+
+  return { canonical: pick("baseline", "canonical"), "most-say-no": pick("suggestion", "most-say-no") };
+})();
+
 const signed = (x: number) => `${x >= 0 ? "+" : "−"}${Math.abs(x).toFixed(2)}`;
 const label = (v: Variant) => v.variant.replaceAll("-", " ");
 
@@ -217,6 +228,7 @@ export function ProseArticle() {
           has every variant's counts and intervals. The run used {run.inputTokens.toLocaleString()} input tokens, with a
           median latency of {run.latencyMs.p50} ms. The decoy result has <a href="#experiment/decoy">its own article</a>.
         </p>
+        <BuildThis request={SUGGESTION_PAIR} study="suggestion" label="Build this: one claim, with and without the suggestion" />
       </section>
     </Article>
   );

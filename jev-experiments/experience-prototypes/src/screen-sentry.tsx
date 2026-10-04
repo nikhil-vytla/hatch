@@ -309,7 +309,7 @@ export function ScreenSentry() {
         out.push(...batchScores(body.answers, chunk.length));
       }
 
-      setLive({ key: pageKey, scores: out, receipt: fromLiveBatches(bodies, { task: page.task }) });
+      setLive({ key: pageKey, scores: out, receipt: fromLiveBatches(bodies) });
       setDecider("live");
       reset();
     } catch (e) {

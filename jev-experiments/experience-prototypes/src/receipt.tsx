@@ -7,6 +7,9 @@
 import { createContext, useContext } from "react";
 import "./receipt.css";
 import { JEV_USD_PER_INPUT_TOKEN } from "../../packages/arena/src/jev-price";
+import { requestFor } from "./api";
+import { BuildThis } from "./build-this";
+import { asJevRequest, type CliStudy } from "./build-this-snippets";
 
 /** TypeSafe's list price for Jev, per input token (see packages/arena/src/jev-price.ts). */
 export const USD_PER_INPUT_TOKEN = JEV_USD_PER_INPUT_TOKEN;
@@ -27,6 +30,17 @@ export type ReceiptData = {
   /** For browser runs: which model, since nothing was served. */
   model?: string | null;
   raw?: { request?: unknown; response?: unknown; note?: string };
+  /** The CLI study that reproduces this scene end to end, when there is one (see BuildThis). */
+  study?: CliStudy;
+  /**
+   * The record didn't keep its request, so raw.request is rebuilt with code for the same input
+   * (the recorder's builder, or what "Try your own" would send), not a copy of the recorded one.
+   */
+  rebuilt?: boolean;
+  /** Where the request lives when the record keeps it only in a published log (see request-log.ts). */
+  loadRequest?: () => Promise<unknown>;
+  /** One sentence on where "Build this" got the request, when that needs saying. */
+  requestNote?: string;
 };
 
 /** Two significant figures, no false precision: $0.000013, $0.0011, $0.04; "$0" for free. */
@@ -98,7 +112,7 @@ export function fromLive(body: unknown, request?: unknown): ReceiptData {
     inputTokens: b.usage?.input_tokens ?? null,
     at: new Date().toISOString(),
     servedBy: b.served_by ?? null,
-    raw: { request, response: body },
+    raw: { request: request ?? requestFor(body), response: body },
   };
 }
 
@@ -107,6 +121,8 @@ export function fromLive(body: unknown, request?: unknown): ReceiptData {
  * questions and tokens summed, host from the first response. Missing fields stay missing.
  */
 export function fromLiveBatches(bodies: unknown[], request?: unknown): ReceiptData {
+  const sent = bodies.map(requestFor);
+
   const one = bodies.map((b) => fromLive(b));
   const sum = (pick: (r: ReceiptData) => number | null | undefined) => {
     const xs = one.map(pick).filter((x): x is number => typeof x === "number" && Number.isFinite(x));
@@ -121,7 +137,10 @@ export function fromLiveBatches(bodies: unknown[], request?: unknown): ReceiptDa
     inputTokens: sum((r) => r.inputTokens),
     at: new Date().toISOString(),
     servedBy: one.find((r) => r.servedBy)?.servedBy ?? null,
-    raw: { request, response: bodies.length === 1 ? bodies[0] : bodies },
+    raw: {
+      request: request ?? (sent.some(Boolean) ? (sent.length === 1 ? sent[0] : sent) : undefined),
+      response: bodies.length === 1 ? bodies[0] : bodies,
+    },
   };
 }
 
@@ -151,7 +170,8 @@ export function fromRecorded(obj: unknown, extra: Partial<ReceiptData> = {}): Re
     costUsd: num(o.cost_usd) || num(o.costUsd) || null,
     at: str(o.at) ?? str(o.recorded_at),
     servedBy: str(o.served_by) ?? str(o.servedBy),
-    raw: { response: obj },
+    // A record that kept its typed request shows it (and "Build this") without the scene asking.
+    raw: { ...(asJevRequest(o.request) ? { request: o.request } : {}), response: obj },
     ...extra,
   };
 }
@@ -181,6 +201,9 @@ export function Receipt({ data, label, className = "" }: { data: ReceiptData; la
           {data.raw.note && <p className="receipt-note">{data.raw.note}</p>}
           <pre>{JSON.stringify({ request: data.raw.request, response: data.raw.response }, null, 2)}</pre>
         </details>
+      )}
+      {(data.raw?.request !== undefined || data.loadRequest) && data.mode !== "browser" && (
+        <BuildThis request={data.raw?.request} load={data.loadRequest} response={data.raw?.response} study={data.study} rebuilt={data.rebuilt} note={data.requestNote} />
       )}
     </div>
   );
