@@ -3,6 +3,10 @@
   flex-basis: 100%;
   margin-top: 6px;
   color: var(--ink);
+  /* Long code lines scroll inside the block instead of widening the page. */
+  contain: inline-size;
+  min-width: 0;
+  max-width: 100%;
 }
 .build-this > summary {
   cursor: pointer;
