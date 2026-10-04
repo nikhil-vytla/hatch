@@ -20,6 +20,7 @@ import { buildArena } from "../../packages/arena/src/data/build";
 import { buildDecide } from "../../packages/arena/src/decide/build";
 import { buildDecoy } from "../../packages/arena/prose/decoy-build";
 import { buildFool } from "../../packages/arena/src/fool/build";
+import { buildSpine } from "../../packages/arena/spine/build";
 import { buildEyes } from "../../live-worlds/eyes/build";
 import { buildOpenDecisions } from "../../packages/arena/open-decisions/build";
 import { buildHeadlines } from "../../packages/arena/src/headlines/build";
@@ -135,6 +136,7 @@ await buildArena(resolve("public/arena"));
 buildDecide(resolve("../packages/arena"), resolve("public/decide"));
 buildDecoy(resolve("../packages/arena/prose"), resolve("public/decoy"));
 buildFool(resolve("../packages/arena"), resolve("public/fool"));
+buildSpine(resolve("../packages/arena/spine"), resolve("public/spine"));
 buildOpenDecisions(resolve("../packages/arena"), resolve("."), resolve("public/open-decisions"));
 // The reef's recorded Jev run, still gzipped: the page decompresses it in the browser.
 mkdirSync(resolve("public/ocean"), { recursive: true });

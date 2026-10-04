@@ -147,6 +147,14 @@ export const experiments = [
     "Which changes to a question move Jev's answer, and which don't?",
   ),
   e(
+    "spine",
+    "",
+    "Spine",
+    "Benchmarks",
+    "Argue with Jev. It should change its mind for evidence, never for pressure. Push it and watch the needle.",
+    "Does Jev hold its answer against pressure, and still update when the facts change?",
+  ),
+  e(
     "judge",
     "judgment-reliability",
     "JudgeBench",

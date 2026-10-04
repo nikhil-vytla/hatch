@@ -8,11 +8,12 @@ import heldout from "../../../live-worlds/ocean/heldout.json";
 import { percent } from "../api";
 import { PROMPTS } from "../../../live-worlds/eyes/model";
 import { SENTRY_CAVEATS, SentryData, SentryMethod, SentryResults } from "../screen-sentry-evidence";
+import { SPINE_CAVEATS, SpineData, SpineMethod, SpineResults } from "../spine-evidence";
 import { WHO_CAVEATS, WhoData, WhoMethod, WhoResults } from "../who-said-that-evidence";
 import type { EvidenceTab } from "./evidence-drawer";
 
 /** Pages that use the game format: play first, evidence in a drawer. */
-export const GAME_PAGES = new Set(["ocean", "rumour-mill", "win-over", "snake", "games", "tetris", "eyes", "screen-sentry", "who-said-that"]);
+export const GAME_PAGES = new Set(["ocean", "rumour-mill", "win-over", "snake", "games", "tetris", "eyes", "screen-sentry", "who-said-that", "spine"]);
 
 const REPO = "https://github.com/nikhil-vytla/hatch/tree/main/jev-experiments";
 
@@ -82,6 +83,12 @@ const SCENES: Record<string, Scene> = {
     method: <WhoMethod />,
     caveats: WHO_CAVEATS,
     data: <WhoData />,
+  },
+  spine: {
+    results: <SpineResults />,
+    method: <SpineMethod />,
+    caveats: SPINE_CAVEATS,
+    data: <SpineData />,
   },
   eyes: {
     method: (

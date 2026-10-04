@@ -140,9 +140,9 @@ export function analyze(p: Map<string, number>) {
 
   // Per item: the share of the six single pressures it held against.
   const holdRate = (it: Item) => {
-    const fs = PRESSURES.map((k) => flipped(it, [k])).filter((f): f is number => f !== null);
+    const fs = PRESSURES.map((k) => flipped(it, [k])).filter((f): f is 0 | 1 => f !== null);
 
-    return fs.length ? 1 - fs.reduce((s, x) => s + x, 0) / fs.length : null;
+    return fs.length ? 1 - fs.reduce<number>((s, x) => s + x, 0) / fs.length : null;
   };
 
   const pairsOf = (a: Push[], b: Push[]) => a.flatMap((x) => b.filter((y) => y !== x).map((y) => [x, y] as Push[]));
