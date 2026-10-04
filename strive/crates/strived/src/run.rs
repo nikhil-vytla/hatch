@@ -24,6 +24,8 @@ pub struct Options {
     pub budget_usd: Option<f64>,
     /// Safe mode: no extension's tools or hooks run.
     pub safe: bool,
+    /// What runs the session's turns (ADR-0031).
+    pub engine: Option<strive_proto::Engine>,
 }
 
 /// How long the agent's host has to start the turn.
@@ -42,7 +44,7 @@ fn exit_code(reason: &TurnEnd) -> ExitCode {
 
 pub async fn run(c: &mut Client, opts: Options) -> Result<ExitCode> {
     let cwd = std::env::current_dir()?.canonicalize()?.display().to_string();
-    let session = c.request::<SessionCreate>(SessionCreateParams { cwd, safe: opts.safe }).await?;
+    let session = c.request::<SessionCreate>(SessionCreateParams { cwd, safe: opts.safe, engine: opts.engine }).await?;
     let id = session.id.clone();
     if let Some(mode) = opts.approvals {
         c.request::<SessionApprovals>(SessionApprovalsParams { id: id.clone(), mode }).await?;

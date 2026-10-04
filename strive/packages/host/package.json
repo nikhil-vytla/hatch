@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "0.3.288",
     "@strive/protocol": "workspace:*",
     "@strive/view": "workspace:*",
     "@earendil-works/pi-ai": "1.0.0",

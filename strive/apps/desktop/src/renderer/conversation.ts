@@ -229,6 +229,9 @@ export function label(record: EffectRecord, workspace?: string): string {
       return `${record.server} · ${record.tool}`;
     case "extension":
       return `${record.name} · ${record.tool}`;
+    // strive gated it; Claude Code ran it.
+    case "observed":
+      return `Claude Code · ${record.tool}`;
     default:
       return record satisfies never;
   }

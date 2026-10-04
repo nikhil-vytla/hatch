@@ -30,6 +30,7 @@ strive -c             # continue the latest session in this directory
 strive -r ID          # resume a session by id
 strive fork [ID]      # a new session that goes on from a session's conversation (--at SEQ; /fork n in the TUI)
 strive --safe         # a new session in safe mode: no extension's tools or hooks run (also for app and run)
+strive --engine claude-code  # a new session Claude Code runs, every tool call gated and journaled by strive (also for run)
 strive sessions       # sessions started here, newest first (--all for every directory)
 strive log [ID]       # a session's journal (default: the latest here)
 strive verify [ID]    # check a journal is intact; --all checks every session

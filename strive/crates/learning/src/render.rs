@@ -63,6 +63,19 @@ fn record_text(record: &EffectRecord, blob: Blob) -> String {
         EffectRecord::Mcp { server, tool, arguments } => {
             format!("called {server}'s {tool} {}", cut(&blob_text(blob, arguments), CHANGE))
         }
+        EffectRecord::Observed { engine, tool, input } => format!(
+            "{} ran its {tool} (strive gated it, didn't run it) {}",
+            engine_name(*engine),
+            cut(&blob_text(blob, input), CHANGE)
+        ),
+    }
+}
+
+/// An engine as a reader names it.
+pub fn engine_name(engine: strive_proto::Engine) -> &'static str {
+    match engine {
+        strive_proto::Engine::Native => "strive's agent",
+        strive_proto::Engine::ClaudeCode => "Claude Code",
     }
 }
 
@@ -138,6 +151,7 @@ fn block(entry: &Entry, starts: &HashMap<u64, (u64, &EffectRecord)>, blob: Blob)
             TurnEnd::Failed { error } => format!("{at} turn {turn} failed: {error}"),
         },
         Event::Rewound { to, .. } => format!("{at} rewound the files to checkpoint {to}"),
+        Event::EngineSet { engine } => format!("{at} {} runs this session's turns", engine_name(*engine)),
         Event::ForkedFrom { session, seq } => {
             format!("{at} forked from session {session} at its entry #{seq}; what came before is that session's")
         }

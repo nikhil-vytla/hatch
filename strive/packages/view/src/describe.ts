@@ -164,6 +164,8 @@ export function describe(entry: Entry, options: DescribeOptions = {}): Line[] {
           return note("muted", `${r.kind} ${r.path}`);
         case "mcp":
           return note("muted", `${r.server}: ${r.tool}`);
+        case "observed":
+          return note("muted", `Claude Code: ${r.tool}`);
         default:
           return r satisfies never;
       }
@@ -195,6 +197,13 @@ export function describe(entry: Entry, options: DescribeOptions = {}): Line[] {
           return e.outcome satisfies never;
       }
 
+    case "engineSet":
+      return note(
+        "faint",
+        e.engine === "claude-code"
+          ? "Claude Code runs this session; strive gates its tools."
+          : "strive's agent runs this session.",
+      );
     case "forkedFrom":
       return note(
         "accent",

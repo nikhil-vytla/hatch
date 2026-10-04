@@ -112,6 +112,9 @@ pub fn describe(e: &Entry) -> String {
         }
         Event::EffectCleared { effect } => format!("effect {effect} allowed; running"),
         Event::ForkedFrom { session, seq } => format!("forked from session {session} at its entry {seq}"),
+        Event::EngineSet { engine } => {
+            format!("{} runs this session's turns", strive_learning::render::engine_name(*engine))
+        }
         Event::EffectRerun { effect, outcome, .. } => match outcome {
             EffectOutcome::Done { .. } => format!("effect {effect} run again after a crash: done"),
             EffectOutcome::Refused { reason } => format!("effect {effect} run again after a crash: refused: {reason}"),
@@ -357,6 +360,9 @@ fn describe_effect(r: &EffectRecord) -> String {
         EffectRecord::Check { name, command, .. } => format!("check {name}: {command}"),
         EffectRecord::Extension { name, tool, .. } => format!("extension {name}: {tool}"),
         EffectRecord::Mcp { server, tool, .. } => format!("mcp: {server}'s {tool}"),
+        EffectRecord::Observed { engine, tool, .. } => {
+            format!("{}'s {tool} (observed)", strive_learning::render::engine_name(*engine))
+        }
     }
 }
 

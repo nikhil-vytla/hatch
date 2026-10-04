@@ -1,16 +1,24 @@
 #!/usr/bin/env bun
 // `strive-tui host --session ID`: the daemon starts this for a session.
 import { StriveClient } from "@strive/protocol";
+import { ClaudeHost } from "./claude";
 import { Host } from "./host";
 
-export async function runHost(socket: string, sessionId: string): Promise<{ host: Host; client: StriveClient }> {
+export async function runHost(
+  socket: string,
+  sessionId: string,
+): Promise<{ host: Host | ClaudeHost; client: StriveClient }> {
   const { client } = await StriveClient.connect(socket, {
     name: "strive-host",
     version: process.env.STRIVE_VERSION ?? "dev",
   });
 
   const config = await client.request("host/register", { id: sessionId });
-  const host = new Host(client, sessionId, config);
+
+  // What runs the turns (ADR-0031): strive's own loop, or Claude Code.
+  const host =
+    config.engine === "claude-code" ? new ClaudeHost(client, sessionId, config) : new Host(client, sessionId, config);
+
   client.on("session/entry", ({ sessionId: sid, entry }) => sid === sessionId && host.onEntry(entry));
   client.on("session/interrupt", ({ sessionId: sid }) => sid === sessionId && host.interrupt());
   const { entries } = await client.request("session/attach", { id: sessionId });

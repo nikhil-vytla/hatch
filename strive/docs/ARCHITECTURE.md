@@ -170,6 +170,23 @@ attaches to the session. Hosts don't count as clients for idle exit.
 - A host can't answer approvals, change approval modes or budgets, rewind,
   ask the learner to run, or decide on or roll back a proposal.
 
+**Engines** ([ADR-0031](adrs/0031-vendor-engines.md)). `session/create`
+may name an `engine`. The daemon journals it as `engineSet`, and the host
+config carries it with the engine's home (`session_dir/engine`).
+- For `claude-code`, the host runs Claude Code through its Agent SDK
+  (`claude.ts`) instead of pi-agent-core:
+  - Claude Code uses its own tools;
+  - its model calls go to the session's gateway with a placeholder key;
+  - every tool call waits on `canUseTool`, which asks the daemon with
+    `effect/observe`.
+- The daemon:
+  - journals the call as an `observed` effect;
+  - gates it (the mode, guarded files, hooks, a person);
+  - journals `effectCleared`, or finishes the effect as refused.
+- The host reports each result with `effect/report`. A result for a call
+  the daemon never cleared fails the turn.
+- Observed effects never run again after a crash: strive didn't run them.
+
 **Trust.** The daemon enforces what the agent may *ask* for: every file
 change, command and model call goes through it. The host itself still
 runs as the user, unsandboxed. The host-only restrictions above guard

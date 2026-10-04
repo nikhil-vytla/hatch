@@ -26,6 +26,7 @@ const DID: Record<Extract<Entry["event"], { type: "effectStarted" }>["record"]["
   edit: "Edited",
   write: "Wrote",
   mcp: "Called",
+  observed: "Claude Code ran",
 };
 
 export type Shown = {

@@ -65,6 +65,8 @@ export function toolCall(record: EffectRecord, cwd: string): Pick<acp.ToolCall, 
       return { title: `${record.server}'s ${record.tool}`, kind: "other", locations: [] };
     case "extension":
       return { title: `${record.name}'s ${record.tool}`, kind: "other", locations: [] };
+    case "observed":
+      return { title: `Claude Code's ${record.tool}`, kind: "other", locations: [] };
   }
 }
 

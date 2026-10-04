@@ -48,14 +48,19 @@ pub fn exec_acp(home: &Home) -> Result<()> {
 }
 
 /// Replaces this process with the TUI. Only returns on failure.
-pub fn exec(home: &Home, session: &Session) -> Result<()> {
+pub fn exec(home: &Home, session: &Session, engine: Option<&str>) -> Result<()> {
     if !std::io::stdin().is_terminal() || !std::io::stdout().is_terminal() {
         bail!(
             "strive needs a terminal; for scripts use `strive status --json` (headless runs arrive with `strive run`)"
         );
     }
     let cmd = locate()?;
-    let err = Command::new(&cmd[0])
+    let mut c = Command::new(&cmd[0]);
+    // What runs a new session's turns (ADR-0031), for the TUI to ask for.
+    if let Some(engine) = engine {
+        c.env("STRIVE_ENGINE", engine);
+    }
+    let err = c
         .args(&cmd[1..])
         .env("STRIVE_SOCKET", home.socket())
         .env("STRIVE_VERSION", env!("CARGO_PKG_VERSION"))

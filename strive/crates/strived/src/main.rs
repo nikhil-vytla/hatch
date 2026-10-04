@@ -23,6 +23,7 @@ mod learning;
 mod log;
 mod mcp;
 mod methods;
+mod observe;
 mod paths;
 mod pinned;
 mod rerun;
@@ -61,6 +62,10 @@ struct Cli {
     /// Start a new session in safe mode: no extension's tools or hooks run in it.
     #[arg(long, conflicts_with_all = ["continue_latest", "resume"])]
     safe: bool,
+    /// What runs a new session's turns: strive's own agent (native), or
+    /// Claude Code, gated and journaled by strive (ADR-0031).
+    #[arg(long, value_parser = ["native", "claude-code"], conflicts_with_all = ["continue_latest", "resume"])]
+    engine: Option<String>,
     #[command(subcommand)]
     command: Option<Cmd>,
 }
@@ -85,6 +90,9 @@ enum Cmd {
         /// Safe mode: no extension's tools or hooks run in the session.
         #[arg(long)]
         safe: bool,
+        /// What runs the session's turns: native, or claude-code (ADR-0031).
+        #[arg(long, value_parser = ["native", "claude-code"])]
+        engine: Option<String>,
     },
     /// Open the desktop app on a new session in this directory.
     App {
@@ -258,10 +266,10 @@ async fn run(cli: Cli) -> Result<ExitCode> {
                 (true, None) => tui::Session::Continue,
                 (false, None) => tui::Session::New { safe: cli.safe },
             };
-            tui::exec(&home, &session)?;
+            tui::exec(&home, &session, cli.engine.as_deref())?;
             unreachable!("exec returns only on error")
         }
-        Some(Cmd::Run { task, json, approvals, budget, safe }) => {
+        Some(Cmd::Run { task, json, approvals, budget, safe, engine }) => {
             let task = match task.as_deref() {
                 None | Some("-") => std::io::read_to_string(std::io::stdin())?,
                 Some(t) => t.to_string(),
@@ -282,6 +290,7 @@ async fn run(cli: Cli) -> Result<ExitCode> {
                 approvals,
                 budget_usd: budget,
                 safe,
+                engine: engine.as_deref().map(engine_named),
             };
             run::run(&mut c, opts).await
         }
@@ -367,6 +376,14 @@ async fn run(cli: Cli) -> Result<ExitCode> {
                 server::Started::Served | server::Started::AlreadyRunning => Ok(ExitCode::SUCCESS),
             }
         }
+    }
+}
+
+/// The engine a command-line name means; clap allows only these names.
+fn engine_named(name: &str) -> strive_proto::Engine {
+    match name {
+        "claude-code" => strive_proto::Engine::ClaudeCode,
+        _ => strive_proto::Engine::Native,
     }
 }
 

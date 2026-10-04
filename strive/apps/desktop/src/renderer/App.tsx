@@ -1476,6 +1476,7 @@ const KIND_ICON: Record<Tool["record"]["kind"], IconName> = {
   edit: "pencil",
   write: "pencil",
   mcp: "plug",
+  observed: "shield",
 };
 
 const DECIDED: Record<Decision, string> = {
