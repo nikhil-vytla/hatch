@@ -359,6 +359,51 @@ export function eyesHeadline(e: EyesSummary): Headline | null {
   };
 }
 
+// ---------- Count with me (counting objects in COCO photos against the exact annotations)
+
+type CountGroup = { id: string; label: string; n: number; exactBin: { mean: number }; signed: { mean: number } };
+
+/** The parts of public/count/count.json the headline reads (built by live-worlds/count/build.ts). */
+export type CountSummary = {
+  items: object[];
+  lanes: { id: string; label: string; exactBin: { mean: number }; even: { mean: number; n: number }; groups: CountGroup[] }[];
+};
+
+export function countHeadline(c: CountSummary): Headline | null {
+  const lane = (id: string) => c.lanes.find((l) => l.id === id);
+  const vlm = lane("vlm");
+  const jev = lane("jev");
+
+  if (!vlm || !jev) return null;
+
+  const group = (l: typeof vlm, id: string) => l.groups.find((g) => g.id === id);
+  const few = group(vlm, "few");
+  const crowd = group(vlm, "crowd");
+  const jevCrowd = group(jev, "crowd");
+
+  if (!few || !crowd || !jevCrowd) return null;
+
+  const under = Math.round(-crowd.signed.mean);
+
+  return {
+    id: "count",
+    verdict: `${vlm.label} named the right count for ${pct0(few.exactBin.mean)} of photos with ${few.label} objects and ${pct0(crowd.exactBin.mean)} with ${crowd.label}${under > 0 ? `, undercounting those by about ${under} on average` : ""}. Jev, which can't see, got ${pct0(jevCrowd.exactBin.mean)} of the crowds from a detector's boxes written as text.`,
+    stats: [
+      { value: pct0(few.exactBin.mean), label: `right count, ${few.label} objects (${vlm.label})` },
+      { value: pct0(crowd.exactBin.mean), label: `right count, ${crowd.label} (${vlm.label})` },
+      { value: pct0(jevCrowd.exactBin.mean), label: `right count, ${crowd.label} (Jev on the boxes)` },
+      { value: pct0(vlm.even.mean), label: `"is the count even?" right (${vlm.label})` },
+    ],
+    line: `${pct0(few.exactBin.mean)} right with ${few.label} objects, ${pct0(crowd.exactBin.mean)} with ${crowd.label}`,
+    share: {
+      big: pct0(crowd.exactBin.mean),
+      ring: crowd.exactBin.mean,
+      sentence: `An open vision model counted ${few.label} objects right ${pct0(few.exactBin.mean)} of the time, and crowds of ${crowd.label} ${pct0(crowd.exactBin.mean)}.`,
+    },
+    source: `live-worlds/count/recordings: Qwen3-VL-4B on an M4 Max, DETR, Jev; ${c.items.length} COCO val2017 images`,
+  };
+}
+
 // ---------- The rumour mill (the £500 scam, Jev's recorded answers vs the free model)
 
 export type SpreadCounts = { heard: number; believe: number };

@@ -22,6 +22,7 @@ import { buildDecoy } from "../../packages/arena/prose/decoy-build";
 import { buildFool } from "../../packages/arena/src/fool/build";
 import { buildSpine } from "../../packages/arena/spine/build";
 import { buildEyes } from "../../live-worlds/eyes/build";
+import { buildCount } from "../../live-worlds/count/build";
 import { buildOpenDecisions } from "../../packages/arena/open-decisions/build";
 import { buildHeadlines } from "../../packages/arena/src/headlines/build";
 const lab = resolve(".."),
@@ -143,5 +144,7 @@ mkdirSync(resolve("public/ocean"), { recursive: true });
 copyFileSync(resolve("../live-worlds/ocean/recordings/jev-heatwave.jsonl.gz"), resolve("public/ocean/jev-heatwave.jsonl.gz"));
 // Eyes against state: recorded vision-model Snake runs and the facts lane, after arcade.json.
 buildEyes(lab, resolve("."), resolve("public/eyes"));
+// Count with me: COCO images, their truths and the three deciders' recorded answers.
+buildCount(lab, resolve("public/count"));
 // Headline numbers, computed from the files above; last, so every input exists.
 buildHeadlines(lab, resolve("."), resolve("../packages/arena/src/headlines"));
