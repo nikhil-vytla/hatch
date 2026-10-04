@@ -282,6 +282,15 @@ fn within_its_budget_a_session_keeps_cited_entries_then_prompts_and_marks_gaps()
     assert_eq!(render(&big, &[], 500, &blob), "[#1 left out]");
 }
 
+/// The learner reads which engine ran a session, by name.
+#[test]
+fn a_session_says_which_engine_ran_it() {
+    let e = entries(vec![Event::EngineSet { engine: strive_proto::Engine::ClaudeCode }, prompt("go")]);
+    assert_eq!(render(&e, &[], 1000, &blob), "#1 Claude Code runs this session's turns\n#2 user: go");
+    let e = entries(vec![Event::EngineSet { engine: strive_proto::Engine::Native }]);
+    assert_eq!(render(&e, &[], 1000, &blob), "#1 strive's agent runs this session's turns");
+}
+
 /// Blocks are joined by line breaks, and those count against the budget.
 #[test]
 fn the_blocks_a_budget_keeps_fit_in_it() {
