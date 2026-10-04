@@ -19,6 +19,7 @@ import {
   observe,
   options,
   question,
+  recordedRequest,
   type State,
   type Game,
 } from "../../local-models-and-games/arcade/engine";
@@ -464,7 +465,17 @@ export function Arcade({ game, result }: { game: Game; result: any }) {
             {mode !== "manual" && action?.latency_ms ? (
               <Receipt
                 label="This move"
-                data={action.response ? fromLive(action.response) : fromRecorded(action)}
+                data={
+                  action.response
+                    ? fromLive(action.response)
+                    : fromRecorded(action, {
+                        raw: {
+                          request: recordedRequest(action.state),
+                          response: action,
+                          note: action.batch_size > 1 ? `This move was one of ${action.batch_size} games asked in one request; the code asks for this game alone.` : undefined,
+                        },
+                      })
+                }
               />
             ) : null}
             <StateView

@@ -245,6 +245,14 @@ export function greedy(s: State): string {
     return cost(previews[a]) - cost(previews[b]);
   })[0];
 }
+/** The shared state of a recorded batch: every pending game's move asked at once, one question each. */
+export const BATCH_POLICY = "Each question is a separate game. Choose its action independently.";
+
+/** One game's move as the recorded batches asked it (record.ts), with this game as the only question. */
+export function recordedRequest(s: State, id = "action") {
+  return { state: { policy: BATCH_POLICY }, questions: { [id]: question(s) } };
+}
+
 export function question(s: State) {
   return {
     type: "choice" as const,

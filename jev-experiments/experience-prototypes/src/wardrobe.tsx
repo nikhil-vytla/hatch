@@ -802,7 +802,7 @@ export function Wardrobe({ result }: { result: any }) {
           {lastJevTurn && (
             <Receipt
               label="Last change"
-              data={lastJevTurn.provenance === "live-jev" ? fromLive(lastJevTurn.raw) : fromRecorded(lastJevTurn.raw)}
+              data={lastJevTurn.provenance === "live-jev" ? fromLive(lastJevTurn.raw) : { ...fromRecorded(lastJevTurn.raw), rebuilt: true, raw: { request: { state: editState(lastJevTurn.before, lastJevTurn.text), questions: editQuestions(lastJevTurn.before) }, response: lastJevTurn.raw } }}
             />
           )}
           <div className="wardrobe-history-actions">

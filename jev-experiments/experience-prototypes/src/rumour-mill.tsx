@@ -21,6 +21,7 @@ import {
   type World,
 } from "../../live-worlds/rumour/engine";
 import { PRESETS } from "../../live-worlds/rumour/presets";
+import { BuildThis } from "./build-this";
 import { allProfiles, jevRequest, toDist, type Dist, type MessageKind, type Profile } from "../../live-worlds/rumour/profiles";
 import type { Vectors } from "../../live-worlds/rumour/similarity";
 import {
@@ -215,6 +216,8 @@ export function RumourMill() {
   const [done, setDone] = useState(false);
   const [copied, setCopied] = useState(false);
   const [fps, setFps] = useState(0);
+  // The latest batch sent to Jev live, for "Build this".
+  const [sentReq, setSentReq] = useState<unknown>(null);
   const runId = useRef(0);
   const requested = useRef<Record<MessageKind, Set<string>>>({ rumour: new Set(), counter: new Set() });
   const inFlight = useRef(0);
@@ -253,6 +256,8 @@ export function RumourMill() {
     inFlight.current++;
 
     const req = jevRequest(batch, kind, t.message.text, kind === "counter" ? (w.rumour?.message.text ?? null) : null, t.message.place);
+
+    setSentReq(req);
 
     run(req.state, req.questions)
       .then((r) => {
@@ -324,6 +329,7 @@ export function RumourMill() {
     setCopied(false);
     setSelected(null);
     setStats({ model: m, calls: 0, ms: [], tokens: 0, scoredIn: null });
+    setSentReq(null);
     setNote("");
 
     if (m === "jev" && !getApiKey()) {
@@ -653,6 +659,24 @@ export function RumourMill() {
                 : `${stats.calls} call${stats.calls === 1 ? "" : "s"}${avgMs === null ? "" : ` · ${avgMs} ms each`}${stats.model === "jev" ? ` · $${cost.toFixed(5)}` : " · $0.00111 when recorded"}`}
               {fps ? ` · ${fps} fps` : ""}
             </p>
+            {w.rumour && (
+              <BuildThis
+                request={
+                  stats.model === "jev" && sentReq
+                    ? sentReq
+                    : jevRequest(allProfiles("rumour").slice(0, 100), "rumour", w.rumour.message.text, null, w.rumour.message.place)
+                }
+                rebuilt={stats.model === "free" || (stats.model === "jev" && !sentReq)}
+                note={
+                  stats.model === "recorded"
+                    ? "The first of the recording's batches of 100 resident profiles (live-worlds/rumour/record.ts)."
+                    : stats.model === "free"
+                      ? "The free model decided in your browser; this is the first batch of 100 profiles Jev gets for the same rumour."
+                      : undefined
+                }
+                label="Build this: one batch of residents"
+              />
+            )}
             {model === "jev" && (
               <p className="rm-fine">
                 About ${(profileCount * TOKENS_PER_PROFILE * USD_PER_TOKEN).toFixed(4)} per rumour and $

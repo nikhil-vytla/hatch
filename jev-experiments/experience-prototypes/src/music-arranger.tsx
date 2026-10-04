@@ -93,7 +93,7 @@ export function Music({ result }: { result: any }) {
   const playing = status === "playing", locked = score.phrases[phrase].locked, candidates = useMemo(() => makeCandidates(score, phrase), [score, phrase]);
   // The selected phrase's Jev decision: {request, result} when asked live here, the recorded decision otherwise.
   const decision: any = score.phrases[phrase].source === "jev" ? score.phrases[phrase].decision : null;
-  const phraseDecision = decision ? (decision.result ? fromLive(decision.result, decision.request) : fromRecorded(decision)) : null;
+  const phraseDecision = decision ? (decision.result ? fromLive(decision.result, decision.request) : fromRecorded(decision, { raw: { request: (rows[rowIndex]?.calls ?? []).filter((c: any) => c.stage === decision.stage).pop()?.request, response: decision } })) : null;
   const note = score.events.find(e => e.id === selected), displayedScore = playing && heard ? heard : score, displayedPhrase = playing && beat >= 0 ? Math.floor(beat / 8) : phrase;
   function stop() { startGeneration.current.next(); engine.current?.dispose(); engine.current = null; setStatus("idle"); setBeat(-1); setPending(false); setHeard(null); setAudition(""); }
   function cancelRequest() { modelGeneration.current.next(); abort.current?.abort(); abort.current = null; setBusy(false); }

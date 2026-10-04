@@ -8,6 +8,7 @@ import {
   step,
   question,
   greedy,
+  BATCH_POLICY,
   type State,
   type Game,
 } from "./engine";
@@ -51,10 +52,7 @@ while (
   try {
     const response = await evaluate(
       {
-        state: {
-          policy:
-            "Each question is a separate game. Choose its action independently.",
-        },
+        state: { policy: BATCH_POLICY },
         questions: qs,
       },
       { apiKey: process.env.AI_GATEWAY_API_KEY!, deadlineMs: 240000 },

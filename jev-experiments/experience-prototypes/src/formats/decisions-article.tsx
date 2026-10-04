@@ -8,10 +8,12 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ArenaIndex, Card } from "../../../packages/arena/src/data/schema";
 import { allN, HANDOFF_THRESHOLD, heldOutN, heldOutRows, intentFacts, jevPolicies } from "../../../packages/arena/src/decisions-in-ui/facts";
+import { QUESTIONS } from "../../../packages/arena/src/one-box/questions";
 import { TYPING } from "../../../packages/arena/src/one-box/replay";
 import { loadIndex, type View } from "../arena/data";
 import { useCardModel } from "../arena/model";
 import { TryBox } from "../arena/try-box";
+import { BuildThis } from "../build-this";
 import { TypingWatch } from "../arena/typing";
 import "../arena/arena.css";
 import { Handoff } from "../handoff";
@@ -115,7 +117,12 @@ export function DecisionsArticle({ result }: { result: any }) {
         <>Guo, C. et al. (2017). On calibration of modern neural networks. ICML.</>,
       ]}
     >
-      {/* BuildThis hook: once the shared snippet component lands, show the One box request here. */}
+      <BuildThis
+        request={{ state: { text: "lunch with priya thursday at noon on zoom" }, questions: QUESTIONS }}
+        rebuilt
+        note="Every keystroke's request has this shape: what's typed so far, and the same One box questions."
+        label="Build this: One box's request"
+      />
       <section>
         <h2>The question</h2>
         <p>
