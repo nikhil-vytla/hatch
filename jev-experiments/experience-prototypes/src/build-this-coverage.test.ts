@@ -12,7 +12,7 @@ const SRC = new URL(".", import.meta.url).pathname;
 /** Receipts that don't carry a request themselves, by file and label or data, with why. */
 const EXEMPT: { file: string; match: string; why: string }[] = [
   { file: "eyes-vs-state.tsx", match: "MLX-VLM", why: "the vision model's receipt, not a Jev request" },
-  { file: "generated-ui.tsx", match: "composed", why: "a composition is a loop of requests json-render builds step by step, not one request" },
+  { file: "generated-ui.tsx", match: "composed", why: "a composition is a loop of requests json-render builds step by step; the BuildThis beside it shows the first" },
   { file: "win-over.tsx", match: 'label="Decided by"', why: "the BuildThis beside it shows the line's batched Jev call" },
 ];
 
@@ -85,7 +85,7 @@ describe("Build this coverage", () => {
   });
 
   test("the scenes without receipts that call Jev show Build this", () => {
-    for (const f of ["handoff.tsx", "ocean-reef.tsx", "rumour-mill.tsx", "live-tetris.tsx", "win-over.tsx", "formats/prose-article.tsx", "arena/try-box.tsx"])
+    for (const f of ["handoff.tsx", "ocean-reef.tsx", "rumour-mill.tsx", "live-tetris.tsx", "win-over.tsx", "formats/prose-article.tsx", "arena/try-box.tsx", "arena/watch.tsx", "generated-ui.tsx"])
       expect(readFileSync(join(SRC, f), "utf8")).toContain("<BuildThis");
   });
 });

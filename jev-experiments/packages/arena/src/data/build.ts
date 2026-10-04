@@ -7,6 +7,7 @@
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
+import { gunzipSync } from "node:zlib";
 import { z } from "zod";
 import { score } from "../score";
 import { PALETTE } from "./palette";
@@ -957,6 +958,51 @@ async function turnsCard(out: string): Promise<Card> {
 }
 
 // ---------------------------------------------------------------- Tetris, real time
+/** Designs that remember judgements ask only about some spots, so the board alone can't rebuild their requests. */
+const REMEMBERS = new Set<RealtimeDesign>(["spot-clean-cached", "spot-clean-confident"]);
+
+const requestRowSchema = z.object({
+  seed: z.number(),
+  framing: z.string(),
+  pieceId: z.number(),
+  board: z.array(z.string()),
+  body: timedReplaySchema.shape.events.element.shape.body,
+});
+
+/**
+ * The recorded events with the request each one sent, from the run's full request log
+ * (`<run>.jsonl.gz`, one row per event in the same order). Events answered from memory have none.
+ */
+function withBodies(
+  events: z.infer<typeof timedReplaySchema>["events"],
+  replayFile: string,
+  seed: number,
+  design: RealtimeDesign,
+) {
+  const log = replayFile.replace(/\.replay\.json$/, ".jsonl.gz");
+
+  const rows = gunzipSync(readFileSync(join(recordings, log)))
+    .toString("utf8")
+    .trim()
+    .split("\n")
+    .map((line) => requestRowSchema.parse(JSON.parse(line)))
+    .filter((x) => x.seed === seed && x.framing === design);
+
+  if (rows.length !== events.length)
+    throw new Error(
+      `${log}: ${rows.length} requests for ${events.length} ${design} events on seed ${seed}`,
+    );
+
+  return events.map((e, i) => {
+    const row = rows[i];
+
+    if (row.pieceId !== e.pieceId || JSON.stringify(row.board) !== JSON.stringify(e.board))
+      throw new Error(`${log}: request ${i} for ${design} on seed ${seed} is for another board`);
+
+    return row.body ? { ...e, body: row.body } : e;
+  });
+}
+
 async function realtimeCard(out: string): Promise<Card> {
   const load = (f: string) => realtimeRunSchema.parse(readJson(join(recordings, f)));
 
@@ -993,7 +1039,10 @@ async function realtimeCard(out: string): Promise<Card> {
         : "Real time · backs off 0.4–4 s",
       r.date,
       { ...base, retry: r.retry },
-      [`packages/arena/recordings/${r.file}`],
+      [
+        `packages/arena/recordings/${r.file}`,
+        `packages/arena/recordings/${r.file.replace(/\.replay\.json$/, ".jsonl.gz")}`,
+      ],
     ),
   );
 
@@ -1064,8 +1113,9 @@ async function realtimeCard(out: string): Promise<Card> {
           JSON.stringify({
             schema: "arena.replay.timed/1",
             retryPolicy: suffix,
+            framing: d,
             seed: g.seed,
-            events: g.events,
+            events: REMEMBERS.has(d) ? withBodies(g.events, r.file, g.seed, d) : g.events,
           }),
         );
       }

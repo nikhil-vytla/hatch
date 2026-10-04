@@ -15,6 +15,8 @@ import { Sparkles, Check, GitBranch, RotateCcw } from "lucide-react";
 import { uiCatalog, uiInitial, exampleSpec } from "./ui-catalog";
 import { getApiKey, download, readResponse, requireKey } from "./api";
 import { fromRecorded, Receipt, type ReceiptData } from "./receipt";
+import { BuildThis } from "./build-this";
+import { firstCompositionRequest, type ComposeBody } from "./composition-request";
 import {
   Pane,
   Field,
@@ -164,6 +166,38 @@ const compositionReceipt = (event: any, mode: "recorded" | "live"): ReceiptData 
 
   return { ...r, at: mode === "live" ? new Date().toISOString() : null, raw: { response: { ...event, spec: undefined }, note: "The interface spec itself is in the state panel." } };
 };
+
+/**
+ * "Build this" for the first decision "Compose a new interface" sends for the prompt in the box,
+ * built by the server's own composer call and stopped before anything is sent.
+ */
+function FirstRequest({ prompt, domain }: { prompt: string; domain: string }) {
+  const [request, setRequest] = useState<unknown>(null);
+
+  useEffect(() => {
+    let alive = true;
+    // Typing changes the prompt on every key; build once it settles.
+    const timer = setTimeout(() => {
+      if (!prompt.trim() || prompt.length > 4000) return setRequest(null);
+      void firstCompositionRequest({ prompt, domain: domain as ComposeBody["domain"] }).then((r) => {
+        if (alive) setRequest(r);
+      });
+    }, 250);
+    return () => {
+      alive = false;
+      clearTimeout(timer);
+    };
+  }, [prompt, domain]);
+
+  return (
+    <BuildThis
+      request={request ?? undefined}
+      rebuilt
+      note="Nothing is sent until you compose. This is the first request Compose sends for the prompt in the box; json-render then asks once per element, with what's already built in the state, until Jev picks finish."
+      label="Build this: the first decision"
+    />
+  );
+}
 
 export function GeneratedUI({ record }: { record: any }) {
   const [domain, setDomain] = useState("settings"),
@@ -373,6 +407,7 @@ export function GeneratedUI({ record }: { record: any }) {
           </div>
         </div>
         {composed && <Receipt data={composed} />}
+        <FirstRequest prompt={prompt} domain={domain} />
         {notice && <Notice>{notice}</Notice>}
         {shortlist.length>0&&<Pane title="Your shortlist">{shortlist.map(name=><Button key={name} secondary onClick={()=>setShortlist(items=>items.filter(item=>item!==name))}>{name} · Remove</Button>)}</Pane>}
         <div className="version-strip">

@@ -46,6 +46,20 @@ export function BuildThis({
   const requests = useMemo(() => collectRequests(loaded ? loaded.request : request), [loaded, request]);
   const [tab, setTab] = useState<Tab>("python");
   const [copied, setCopied] = useState<Tab | null>(null);
+  // Scenes that animate re-render every frame; the code changes only with the request or tab.
+  const code = useMemo(
+    () =>
+      !requests.length
+        ? ""
+        : tab === "python"
+          ? pythonSnippet(requests)
+          : tab === "typescript"
+            ? typescriptSnippet(requests)
+            : tab === "curl"
+              ? curlSnippet(requests)
+              : cliSnippet(study ?? "fool"),
+    [requests, tab, study],
+  );
 
   if (!requests.length && !load) return null;
 
@@ -60,15 +74,6 @@ export function BuildThis({
   };
 
   const tabs: Tab[] = study ? ["python", "typescript", "curl", "cli"] : ["python", "typescript", "curl"];
-  const code = !requests.length
-    ? ""
-    : tab === "python"
-      ? pythonSnippet(requests)
-      : tab === "typescript"
-        ? typescriptSnippet(requests)
-        : tab === "curl"
-          ? curlSnippet(requests)
-          : cliSnippet(study ?? "fool");
   const answers = response === undefined ? null : expectedAnswers(response);
   const questions = requests.reduce((n, r) => n + Object.keys(r.request.questions).length, 0);
 

@@ -16,9 +16,11 @@ import {
   recordedFraming,
 } from "../../../packages/arena/src/tetris-framings";
 import { run } from "../api";
+import { BuildThis } from "../build-this";
 import { formatNumber, loadChunk } from "./data";
 import { Face, type Mood } from "./face";
 import { colorVars, LIVE_ID, type CardModel } from "./model";
+import { notingSend, notingTimed, notingTurns, type RequestNote } from "./tetris-requests";
 
 /** Milliseconds per piece at 1× in turn mode: slow enough to follow each landing. */
 const TURN_MS = 700;
@@ -97,8 +99,17 @@ function Board({ game, target }: { game: Game; target?: string }) {
   );
 }
 
-/** Builds a playable contestant from its replay chunk, code, or the visitor's key. */
-async function playerFor(card: Card, id: string, seed: string, name: string): Promise<Contestant> {
+/**
+ * Builds a playable contestant from its replay chunk, code, or the visitor's key. Jev lanes keep
+ * the request behind their latest decision in `note`, for "Build this".
+ */
+async function playerFor(
+  card: Card,
+  id: string,
+  seed: string,
+  name: string,
+  note: RequestNote,
+): Promise<Contestant> {
   if (id === "code.planner") return { ...heuristic(0), name };
 
   if (id === "code.random") return { ...randomPlayer(1), name };
@@ -109,8 +120,9 @@ async function playerFor(card: Card, id: string, seed: string, name: string): Pr
     const budget = card.id === "tetris-realtime" ? { deadlineMs: 4000, maxAttempts: 2 } : undefined;
 
     return {
-      ...framedJev("spot-clean-confident", (body, signal) =>
-        run(body.state, body.questions, signal, budget),
+      ...framedJev(
+        "spot-clean-confident",
+        notingSend((body, signal) => run(body.state, body.questions, signal, budget), note),
       ),
       name,
     };
@@ -123,9 +135,40 @@ async function playerFor(card: Card, id: string, seed: string, name: string): Pr
   const chunk = await loadChunk(path, replaySchema);
 
   if (chunk.schema === "arena.replay.timed/1")
-    return timedReplay(chunk.events, name, id, chunk.retryPolicy);
+    return notingTimed(
+      timedReplay(chunk.events, name, id, chunk.retryPolicy),
+      chunk.events,
+      chunk.framing,
+      note,
+    );
 
-  return { ...recordedFraming(chunk.exchanges, chunk.framing), name };
+  return notingTurns(
+    { ...recordedFraming(chunk.exchanges, chunk.framing), name },
+    chunk.exchanges,
+    chunk.framing,
+    note,
+  );
+}
+
+/** "Build this" for a Jev lane's latest decision: the request sent, recorded, or rebuilt from the board. */
+function LatestRequest({ note, lane }: { note: RequestNote; lane: string }) {
+  const last = note.latest;
+
+  if (!last) return null;
+
+  return (
+    <BuildThis
+      request={last.request}
+      response={last.response}
+      rebuilt={last.rebuilt}
+      note={
+        last.rebuilt
+          ? "The replay keeps answers, not requests, so this one is rebuilt from this board with the code the recording ran."
+          : undefined
+      }
+      label={`Build this: ${lane}, latest decision`}
+    />
+  );
 }
 
 /** Mood from how the lane is doing: happy when it leads on lines, puzzled when it topped out. */
@@ -138,11 +181,14 @@ function moodOf(arena: TetrisArena, i: number): Mood {
   return best > 0 && lane.game.lines === best ? "happy" : "calm";
 }
 
+/** The arena being played, its lineup, and where each lane keeps its latest Jev request. */
+type Playing = { arena: TetrisArena; ids: string[]; notes: RequestNote[] };
+
 export function Watch({ model: m }: { model: CardModel }) {
   const card = m.card;
   const mode = card.id === "tetris-realtime" ? "realtime" : "turns";
   const seed = m.view.seed ?? card.items?.[0]?.id ?? "7";
-  const [game, setGame] = useState<{ arena: TetrisArena; ids: string[] } | null>(null);
+  const [game, setGame] = useState<Playing | null>(null);
   const [running, setRunning] = useState(false);
   const [speed, setSpeed] = useState(1);
   const [announcement, setAnnouncement] = useState("");
@@ -154,11 +200,16 @@ export function Watch({ model: m }: { model: CardModel }) {
   /** Builds the players for the current lineup; an effect event so it always sees the latest model. */
   const build = useEffectEvent(async () => {
     const ids = [...m.ids];
-    const players = await Promise.all(ids.map((id) => playerFor(card, id, seed, m.nameOf(id))));
+    const notes = ids.map((): RequestNote => ({ latest: null }));
+
+    const players = await Promise.all(
+      ids.map((id, i) => playerFor(card, id, seed, m.nameOf(id), notes[i])),
+    );
 
     return {
       arena: new TetrisArena(Number(seed), players, mode, { pieceLimit: PIECE_LIMIT }),
       ids,
+      notes,
     };
   });
 
@@ -366,6 +417,11 @@ export function Watch({ model: m }: { model: CardModel }) {
             </article>
           );
         })}
+      </div>
+      <div className="watch-requests">
+        {game.ids.map((id, i) => (
+          <LatestRequest key={id} note={game.notes[i]} lane={m.label(id)} />
+        ))}
       </div>
       <p className="sr-only" role="status">
         {announcement}

@@ -72,25 +72,34 @@ const wireAnswer = z.object({
   confidence: z.number().nullish(),
 });
 
+const framing = z.enum([
+  "landing-choice",
+  "spot-clean",
+  "spot-score",
+  "spot-clean-cached",
+  "spot-clean-confident",
+]);
+
+/** A Jev request as the gateway got it, for "Build this". */
+const wireRequest = z.object({
+  state: z.record(z.string(), z.unknown()),
+  questions: z.record(
+    z.string(),
+    z.object({
+      type: z.enum(["choice", "noul", "score"]),
+      instructions: z.string(),
+      criteria: z.union([z.record(z.string(), z.string()), z.array(z.string())]).optional(),
+    }),
+  ),
+});
+
 export const turnsReplaySchema = z.object({
   schema: z.literal("arena.replay.turns/1"),
-  framing: z.enum([
-    "landing-choice",
-    "spot-clean",
-    "spot-score",
-    "spot-clean-cached",
-    "spot-clean-confident",
-  ]),
+  framing,
   seed: z.number(),
   exchanges: z.array(
     z.object({
-      framing: z.enum([
-        "landing-choice",
-        "spot-clean",
-        "spot-score",
-        "spot-clean-cached",
-        "spot-clean-confident",
-      ]),
+      framing,
       pieceId: z.number(),
       board: z.array(z.string()),
       ms: z.number(),
@@ -103,6 +112,8 @@ export const turnsReplaySchema = z.object({
 export const timedReplaySchema = z.object({
   schema: z.literal("arena.replay.timed/1"),
   retryPolicy: z.enum(["fixed", "backoff"]),
+  /** How the recorded lane asked; the site rebuilds its requests from the board with this. */
+  framing: framing.optional(),
   seed: z.number(),
   events: z.array(
     z.object({
@@ -115,6 +126,11 @@ export const timedReplaySchema = z.object({
       probabilities: probabilities.optional(),
       error: z.string().optional(),
       latencyMs: z.number().optional(),
+      /**
+       * The request sent, kept only where the board can't rebuild it: designs that remember
+       * past judgements ask only about some spots. Absent there, the answer came from memory.
+       */
+      body: wireRequest.optional(),
     }),
   ),
 });

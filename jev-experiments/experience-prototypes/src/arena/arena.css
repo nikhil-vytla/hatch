@@ -953,6 +953,10 @@ th[aria-sort="descending"] .sort {
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 16px;
 }
+/* One "Build this" per Jev lane, under the boards. */
+.watch-requests {
+  margin-top: 8px;
+}
 .lane {
   min-width: 0;
   padding: 12px;

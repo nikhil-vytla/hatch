@@ -31,6 +31,22 @@ import {
 } from "./build-this-snippets";
 import { intentRequest, robustnessRequest } from "./intent-requests";
 import { recordedRequests } from "./new-experiments";
+import { TetrisArena } from "../../packages/arena/src/tetris";
+import { framedJev, type FramingId, type Wire } from "../../packages/arena/src/tetris-framings";
+import { firstCompositionRequest } from "./composition-request";
+
+/** The first request an arena Tetris lane sends with a framing, captured from the arena itself. */
+async function tetrisRequest(framing: FramingId) {
+  let body: Wire | undefined;
+  const lane = framedJev(framing, async (b) => {
+    body ??= b;
+    throw new Error("captured");
+  });
+
+  await new TetrisArena(7, [lane], "turns", { pieceLimit: 40 }).turn();
+
+  return body;
+}
 
 const reef = createReef(7);
 const pair: Pair = {
@@ -55,6 +71,9 @@ const CASES: Record<string, unknown> = {
   "arcade move": arcadeRequest(initial("snake", 7)),
   wardrobe: { state: editState(INITIAL_OUTFIT, "make the jacket navy"), questions: editQuestions(INITIAL_OUTFIT) },
   "change impact": recordedRequests.changes(),
+  "arena Tetris, judge each spot": await tetrisRequest("spot-clean-confident"),
+  "arena Tetris, pick one landing": await tetrisRequest("landing-choice"),
+  "Generated UI, first decision": await firstCompositionRequest({ domain: "apartments", prompt: "Compare all three apartments. Show rent, commute, budget, and a shortlist button for each." }),
   "judgment reliability": { state: POLICY_STATE, questions: encodedQuestions(pair, { id: "p1/r0/shared/AB", pair_id: "p1", repeat: 0, condition: "shared", swap: false }) },
   rewardbench: rewardPayload({ id: "1", subset: "Ties", prompt: "Say hi", candidates: [{ label: "A", text: "hi", model: "m", chosen: true }], num_correct: 1, num_incorrect: 0, input_hash: "" }),
   escapes: {
