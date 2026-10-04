@@ -1,4 +1,4 @@
-import type { Entry } from "@strive/protocol";
+import type { Engine, Entry } from "@strive/protocol";
 import { useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import type { Bridge, Opened, StriveEvent } from "../shared/bridge";
@@ -57,13 +57,13 @@ function Shell({ first }: { first: Opened }) {
     });
   }, [offers]);
 
-  const switchTo = async (id?: string) => {
+  const switchTo = async (id?: string, engine?: Engine) => {
     const before = listener;
     const left = opened.session.id;
     listener = undefined;
 
     try {
-      setOpened(await window.strive.switchTo(id));
+      setOpened(await window.strive.switchTo(id, engine));
     } catch (e) {
       // Still on the same session: its app goes on getting events, those held meanwhile first.
       if (before) events.onEvent(before);

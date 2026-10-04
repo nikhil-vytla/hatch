@@ -30,7 +30,7 @@ strive -c             # continue the latest session in this directory
 strive -r ID          # resume a session by id
 strive fork [ID]      # a new session that goes on from a session's conversation (--at SEQ; /fork n in the TUI)
 strive --safe         # a new session in safe mode: no extension's tools or hooks run (also for app and run)
-strive --engine claude-code  # a new session Claude Code runs, every tool call gated and journaled by strive (also for run)
+strive --engine claude-code  # a new session Claude Code runs, every tool call gated and journaled by strive (also for app, acp and run)
 strive sessions       # sessions started here, newest first (--all for every directory)
 strive log [ID]       # a session's journal (default: the latest here)
 strive verify [ID]    # check a journal is intact; --all checks every session
@@ -92,7 +92,8 @@ others) run strive as an agent with `strive acp`. In Zed's settings:
 
 A session started in an editor is an ordinary strive session: the editor
 shows its replies and tool calls and asks you about approvals, and
-`strive -r ID` continues it in the terminal.
+`strive -r ID` continues it in the terminal. With `"args": ["acp", "--engine",
+"claude-code"]`, Claude Code runs the editor's sessions instead.
 
 The agent follows the project's `AGENTS.md` (or `CLAUDE.md`) files and
 knows its skills (`SKILL.md` under `.strive/skills`, `.claude/skills` or

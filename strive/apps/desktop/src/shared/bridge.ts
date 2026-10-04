@@ -1,6 +1,7 @@
 // What the preload script exposes to the renderer as `window.strive`.
 import type {
   Digest,
+  Engine,
   Entry,
   InitializeResult,
   MethodName,
@@ -38,8 +39,8 @@ export type Bridge = {
   request<M extends MethodName>(method: M, params: Methods[M]["params"]): Promise<Methods[M]["result"]>;
   /** This project's sessions, newest first. */
   sessions(): Promise<SessionInfo[]>;
-  /** Shows another of this project's sessions, or a new one; what it shows. */
-  switchTo(id?: string): Promise<Opened>;
+  /** Shows another of this project's sessions, or a new one (run by `engine`); what it shows. */
+  switchTo(id?: string, engine?: Engine): Promise<Opened>;
   /** A tool's input or output from the content store, as text: only ones this session's journal names. */
   blob(digest: Digest): Promise<string>;
   /**

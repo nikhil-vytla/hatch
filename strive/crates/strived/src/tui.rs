@@ -36,14 +36,15 @@ pub enum Session {
 
 /// Replaces this process with the ACP bridge (ADR-0029), which speaks the
 /// Agent Client Protocol on this process's stdio. Only returns on failure.
-pub fn exec_acp(home: &Home) -> Result<()> {
+pub fn exec_acp(home: &Home, engine: Option<&str>) -> Result<()> {
     let cmd = locate()?;
-    let err = Command::new(&cmd[0])
-        .args(&cmd[1..])
-        .arg("acp")
-        .env("STRIVE_SOCKET", home.socket())
-        .env("STRIVE_VERSION", env!("CARGO_PKG_VERSION"))
-        .exec();
+    let mut c = Command::new(&cmd[0]);
+    c.args(&cmd[1..]).arg("acp").env("STRIVE_SOCKET", home.socket()).env("STRIVE_VERSION", env!("CARGO_PKG_VERSION"));
+    // What runs the sessions the editor starts (ADR-0031), for the bridge to ask for.
+    if let Some(engine) = engine {
+        c.env("STRIVE_ENGINE", engine);
+    }
+    let err = c.exec();
     bail!("starting the ACP bridge ({}): {err}", cmd.join(" "))
 }
 

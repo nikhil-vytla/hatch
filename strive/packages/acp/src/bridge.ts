@@ -400,7 +400,9 @@ export function bridge(daemon: StriveClient, version: string): acp.AgentApp {
     }))
     .onRequest("authenticate", () => ({}))
     .onRequest("session/new", async (ctx) => {
-      const { id } = await daemon.request("session/create", { cwd: ctx.params.cwd });
+      // What runs the editor's sessions (ADR-0031), as `strive acp --engine` asked.
+      const engine = process.env.STRIVE_ENGINE === "claude-code" ? ("claude-code" as const) : undefined;
+      const { id } = await daemon.request("session/create", { cwd: ctx.params.cwd, engine });
       const s = await open(id, ctx.client, ctx.params.mcpServers);
 
       return { sessionId: s.id, modes: s.modes() };
