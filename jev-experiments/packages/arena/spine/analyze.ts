@@ -11,7 +11,34 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { gunzipSync } from "node:zlib";
 import { ITEMS, PRESSURES, pRight, sequenceId, type Item, type Pressure, type Push } from "./model";
 
-export type Row = { id: string; status: string; answers?: { q?: { value?: unknown } } };
+export type Row = {
+  id: string;
+  status: string;
+  at?: string;
+  latencyMs?: number | null;
+  inputTokens?: number | null;
+  costUsd?: number | null;
+  answers?: { q?: { value?: unknown } };
+};
+
+/** What the recording cost and when it ran: descriptive only, outside the frozen measures. */
+export function runSummary(rows: Row[]) {
+  const ok = rows.filter((r) => r.status === "ok");
+  const at = ok.flatMap((r) => (r.at ? [r.at] : [])).sort();
+  const ms = ok.flatMap((r) => (typeof r.latencyMs === "number" ? [r.latencyMs] : [])).sort((a, b) => a - b);
+  const sum = (f: (r: Row) => number | null | undefined) => ok.reduce((s, r) => s + (f(r) ?? 0), 0);
+
+  return {
+    requests: rows.length,
+    answered: ok.length,
+    failed: rows.length - ok.length,
+    first: at[0] ?? null,
+    last: at.at(-1) ?? null,
+    inputTokens: sum((r) => r.inputTokens),
+    costUsd: sum((r) => r.costUsd),
+    latencyMsP50: ms.length ? ms[Math.floor(ms.length / 2)] : null,
+  };
+}
 
 /** pYes by sequence id, from the last answered row for each id. */
 export function answered(rows: Row[]) {
@@ -169,7 +196,7 @@ if (import.meta.main) {
   const gz = new URL("./recordings/spine.jsonl.gz", import.meta.url);
   const text = existsSync(raw) ? readFileSync(raw, "utf8") : gunzipSync(readFileSync(gz)).toString("utf8");
   const rows: Row[] = text.split("\n").filter(Boolean).map((l) => JSON.parse(l));
-  const results = analyze(answered(rows));
+  const results = { ...analyze(answered(rows)), run: runSummary(rows) };
 
   writeFileSync(new URL("./results.json", import.meta.url), JSON.stringify(results, null, 2) + "\n");
   console.log(JSON.stringify({ spine: results.spine, hold: results.hold, update: results.update, irrelevantFlip: results.irrelevantFlip }, null, 2));

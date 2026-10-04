@@ -8,6 +8,7 @@
  */
 import "../../../experience-prototypes/scripts/credentials";
 import { appendFileSync, existsSync, readFileSync } from "node:fs";
+import { unpackForAppend } from "../../../experience-prototypes/scripts/records";
 import { evaluate, GatewayError, type Payload } from "../../../experience-prototypes/server/gateway";
 import { jevCostUsd } from "../src/jev-price";
 import { allSequences, ITEMS, requestFor, sequenceId } from "./model";
@@ -20,7 +21,8 @@ const key = process.env.AI_GATEWAY_API_KEY;
 
 if (!key) throw Error("Set AI_GATEWAY_API_KEY to record.");
 
-const out = new URL("./recordings/spine.jsonl", import.meta.url);
+// Committed gzipped; unpack the working copy (gitignored) so new rows land after the old ones.
+const out = unpackForAppend(new URL("./recordings/spine.jsonl", import.meta.url));
 
 const prior = existsSync(out)
   ? readFileSync(out, "utf8")
