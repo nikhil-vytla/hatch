@@ -30,7 +30,7 @@ strive -c             # continue the latest session in this directory
 strive -r ID          # resume a session by id
 strive fork [ID]      # a new session that goes on from a session's conversation (--at SEQ; /fork n in the TUI)
 strive --safe         # a new session in safe mode: no extension's tools or hooks run (also for app and run)
-strive --engine claude-code  # a new session Claude Code runs, every tool call gated and journaled by strive (also for run)
+strive --engine claude-code  # a new session Claude Code runs, every tool call gated and journaled by strive (also for app, acp and run)
 strive sessions       # sessions started here, newest first (--all for every directory)
 strive log [ID]       # a session's journal (default: the latest here)
 strive verify [ID]    # check a journal is intact; --all checks every session
@@ -53,7 +53,11 @@ In the TUI, type what you want done. The agent reads and changes files in
 the directory and runs commands in a sandbox (no network, writes only in
 the workspace). By default, edits in the workspace just happen and commands
 ask first; `/approvals` changes that. Esc interrupts. `/rewind` puts the files
-back to how they were before any prompt.
+back to how they were before any prompt. `/model` lists the models, and
+`/model gpt-5` runs the next turns on another, with the conversation so far
+(Ctrl+P steps through the models with a key). `/effort high` makes the model
+think before it answers, from the next turn (Shift+Tab steps through off,
+low, medium and high).
 
 No config file is needed. State lives in `~/.strive`, or in `STRIVE_HOME` if set.
 Every session starts with a $5 budget. Change it with `/budget` in the TUI,
@@ -65,7 +69,7 @@ or for new sessions in `~/.strive/settings.json`:
   "approvals": "autoEdit",
   "budget": { "usd": 10 },
   "models": {
-    "claude-opus-5-5": { "input": 5, "output": 25, "cacheWrite": 6.25, "cacheRead": 0.5, "contextWindow": 1000000 }
+    "claude-opus-5-5": { "input": 5, "output": 25, "cacheWrite": 6.25, "cacheRead": 0.5, "contextWindow": 1000000, "reasoning": true }
   },
   "mcpServers": {
     "github": { "command": "npx", "args": ["-y", "@modelcontextprotocol/server-github"], "env": { "GITHUB_TOKEN": "..." } }
@@ -74,7 +78,8 @@ or for new sessions in `~/.strive/settings.json`:
 ```
 
 Prices are dollars per million tokens. A model without a known price is
-refused rather than guessed. `mcpServers` takes the same shape as Claude
+refused rather than guessed. `reasoning` says the model can think, so
+`/effort` applies to it; it's off unless set. `mcpServers` takes the same shape as Claude
 Code's (stdio servers). Each tool call asks first unless approvals are
 full-auto. `"extensions": false` starts every new session in safe mode, as
 `strive --safe` does.
@@ -88,7 +93,8 @@ others) run strive as an agent with `strive acp`. In Zed's settings:
 
 A session started in an editor is an ordinary strive session: the editor
 shows its replies and tool calls and asks you about approvals, and
-`strive -r ID` continues it in the terminal.
+`strive -r ID` continues it in the terminal. With `"args": ["acp", "--engine",
+"claude-code"]`, Claude Code runs the editor's sessions instead.
 
 The agent follows the project's `AGENTS.md` (or `CLAUDE.md`) files and
 knows its skills (`SKILL.md` under `.strive/skills`, `.claude/skills` or

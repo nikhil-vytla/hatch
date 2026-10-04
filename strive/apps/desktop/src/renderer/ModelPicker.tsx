@@ -1,6 +1,6 @@
 // The composer's model chip, which opens the models the daemon can price.
-// A session's agent starts on its model and keeps it, so the choice is open
-// only until the first prompt; after that the picker says so.
+// A turn keeps the model it started on, so the choice is open between
+// turns; while one runs the picker says so.
 import type { ModelInfo } from "@strive/protocol";
 import { type KeyboardEvent as ReactKeyboardEvent, useEffect, useRef, useState } from "react";
 import { Icon } from "./icons";
@@ -12,10 +12,9 @@ type Props = {
   current?: string;
   /** Providers with a key: a model of any other can't be called. */
   keyed?: ReadonlySet<string>;
-  /** The session has a prompt, so its model is fixed. */
+  /** A turn is running, on the model it started with. */
   locked: boolean;
   onPick: (model: string) => void;
-  onNewSession: () => void;
 };
 
 /** Dollars per million tokens, as short as they go: $1, $0.25, $1.25. */
@@ -27,7 +26,7 @@ function contextSize(tokens: number): string {
   return tokens >= 1_000_000 ? `${Math.round(tokens / 100_000) / 10}M` : `${Math.round(tokens / 1000)}k`;
 }
 
-export function ModelPicker({ models, current, keyed, locked, onPick, onNewSession }: Props) {
+export function ModelPicker({ models, current, keyed, locked, onPick }: Props) {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
   const list = useRef<HTMLDivElement>(null);
@@ -84,21 +83,7 @@ export function ModelPicker({ models, current, keyed, locked, onPick, onNewSessi
       </button>
       {open && (
         <div className="popover model-menu" role="dialog" aria-label="models">
-          {locked && (
-            <p className="menu-note">
-              This session's agent keeps the model it started with; switching mid-session isn't supported.
-              <button
-                type="button"
-                className="quiet"
-                onClick={() => {
-                  setOpen(false);
-                  onNewSession();
-                }}
-              >
-                New session <kbd>⌘N</kbd>
-              </button>
-            </p>
-          )}
+          {locked && <p className="menu-note">The agent is working on this model. Choose another once it's done.</p>}
           <div role="listbox" aria-label="model" tabIndex={-1} ref={list} onKeyDown={step}>
             {models === undefined && <p className="menu-note">Loading…</p>}
             {models?.map((m) => {

@@ -291,6 +291,20 @@ fn a_session_says_which_engine_ran_it() {
     assert_eq!(render(&e, &[], 1000, &blob), "#1 strive's agent runs this session's turns");
 }
 
+/// And how much its model was set to think.
+#[test]
+fn a_session_says_how_much_its_model_thinks() {
+    use strive_proto::Effort;
+    let e = entries(
+        [Effort::Off, Effort::Low, Effort::Medium, Effort::High].map(|effort| Event::EffortSet { effort }).to_vec(),
+    );
+    assert_eq!(
+        render(&e, &[], 1000, &blob),
+        "#1 thinking effort set to off\n#2 thinking effort set to low\n#3 thinking effort set to medium\n\
+         #4 thinking effort set to high"
+    );
+}
+
 /// Blocks are joined by line breaks, and those count against the budget.
 #[test]
 fn the_blocks_a_budget_keeps_fit_in_it() {

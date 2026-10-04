@@ -40,6 +40,7 @@ import type { SessionChangesParams } from "./SessionChangesParams";
 import type { SessionChangesResult } from "./SessionChangesResult";
 import type { SessionCommandsResult } from "./SessionCommandsResult";
 import type { SessionCreateParams } from "./SessionCreateParams";
+import type { SessionEffortParams } from "./SessionEffortParams";
 import type { SessionForkParams } from "./SessionForkParams";
 import type { SessionInfo } from "./SessionInfo";
 import type { SessionListParams } from "./SessionListParams";
@@ -85,12 +86,14 @@ export type Methods = {
   "proposal/rollback": { params: ProposalRef; result: Appended };
   "host/register": { params: SessionRef; result: AgentConfig };
   "host/context": { params: SessionRef; result: LearnerContext };
+  "host/config": { params: SessionRef; result: AgentConfig };
   "host/record": { params: HostRecordParams; result: Appended };
   "host/stream": { params: HostStreamParams; result: Empty };
   "host/proposeExtension": { params: HostProposeExtensionParams; result: ExtensionProposed };
   "session/interrupt": { params: SessionRef; result: Empty };
   "model/list": { params: Empty; result: ModelListResult };
   "session/model": { params: SessionModelParams; result: Appended };
+  "session/effort": { params: SessionEffortParams; result: Appended };
 };
 
 export type MethodName = keyof Methods;

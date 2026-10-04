@@ -105,10 +105,17 @@ enum Cmd {
         /// Start a new session in safe mode: no extension's tools or hooks run in it.
         #[arg(long, conflicts_with_all = ["continue_latest", "resume"])]
         safe: bool,
+        /// What runs the new session's turns: native, or claude-code (ADR-0031).
+        #[arg(long, value_parser = ["native", "claude-code"], conflicts_with_all = ["continue_latest", "resume"])]
+        engine: Option<String>,
     },
     /// Speak the Agent Client Protocol on stdio, so an editor that speaks it
     /// runs strive sessions: give the editor `strive acp` as its agent command.
-    Acp,
+    Acp {
+        /// What runs the sessions the editor starts: native, or claude-code (ADR-0031).
+        #[arg(long, value_parser = ["native", "claude-code"])]
+        engine: Option<String>,
+    },
     /// Show the daemon's status.
     Status {
         #[arg(long)]
@@ -294,20 +301,20 @@ async fn run(cli: Cli) -> Result<ExitCode> {
             };
             run::run(&mut c, opts).await
         }
-        Some(Cmd::App { continue_latest, resume, safe }) => {
+        Some(Cmd::App { continue_latest, resume, safe, engine }) => {
             launch::ensure(&home, "strive-app").await?;
             let session = match (continue_latest, resume) {
                 (_, Some(id)) => tui::Session::Resume(id),
                 (true, None) => tui::Session::Continue,
                 (false, None) => tui::Session::New { safe },
             };
-            desktop::open(&home, &session)?;
+            desktop::open(&home, &session, engine.as_deref())?;
             println!("opened the desktop app");
             Ok(ExitCode::SUCCESS)
         }
-        Some(Cmd::Acp) => {
+        Some(Cmd::Acp { engine }) => {
             launch::ensure(&home, "strive-acp").await?;
-            tui::exec_acp(&home)?;
+            tui::exec_acp(&home, engine.as_deref())?;
             unreachable!("exec returns only on error")
         }
         Some(Cmd::Fork { id, at }) => commands::fork(&mut launch::ensure(&home, "strive-fork").await?.0, id, at).await,

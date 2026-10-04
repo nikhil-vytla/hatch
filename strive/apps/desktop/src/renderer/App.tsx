@@ -7,6 +7,7 @@ import {
   type ApprovalMode,
   type Decision,
   type Digest,
+  type Engine,
   type ModelListResult,
   type ProposalDecision,
   type ProposalState,
@@ -49,7 +50,12 @@ import { SessionModel } from "./model";
 import type { Offers } from "./offers";
 import { ModelPicker } from "./ModelPicker";
 
-type Props = { bridge: Bridge; opened: Opened; onSwitch: (id?: string) => Promise<void>; offers: Offers };
+type Props = {
+  bridge: Bridge;
+  opened: Opened;
+  onSwitch: (id?: string, engine?: Engine) => Promise<void>;
+  offers: Offers;
+};
 
 /** Whether the sessions sidebar shows, kept across launches. */
 const SIDEBAR_KEY = "strive.sidebar";
@@ -177,9 +183,9 @@ export function App({ bridge, opened, onSwitch, offers }: Props) {
     if (!narrow) setDrawer(false);
   }, [narrow]);
 
-  const switchTo = (to?: string) => {
+  const switchTo = (to?: string, engine?: Engine) => {
     setDrawer(false);
-    act(onSwitch(to));
+    act(onSwitch(to, engine));
   };
 
   const [pane, setPane] = useState<Pane | undefined>(savedPane);
@@ -427,6 +433,7 @@ export function App({ bridge, opened, onSwitch, offers }: Props) {
           onOpenChange={setPalette}
           actions={[
             { id: "new", label: "New session", keys: "⌘N", run: () => switchTo() },
+            { id: "new-claude-code", label: "New Claude Code session", run: () => switchTo(undefined, "claude-code") },
             { id: "sidebar", label: sidebar ? "Hide sessions" : "Show sessions", keys: "⌘B", run: toggleSidebar },
             { id: "changes", label: changes ? "Hide changes" : "Show changes", keys: "⌘D", run: toggleChanges },
             { id: "learned", label: learned ? "Hide learned" : "Show learned", keys: "⌘L", run: toggleLearned },
@@ -1674,9 +1681,8 @@ function Composer({ model, opened, session }: { model: SessionModel; opened: Ope
             models={session.models?.models}
             current={currentModel(model, session.models)}
             keyed={session.keyed}
-            locked={model.prompted}
+            locked={model.working}
             onPick={session.setModel}
-            onNewSession={session.newSession}
           />
           <span className="spacer" />
           {model.working ? (

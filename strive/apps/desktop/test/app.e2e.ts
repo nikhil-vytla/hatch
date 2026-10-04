@@ -355,7 +355,7 @@ test("the changes pane shows what changed since the last prompt, file by file", 
   assert.equal(await notes.locator(".row.add").textContent(), "1+const a = 2;");
 });
 
-test("the model chip picks the agent's model before the first prompt, and says why it can't after", async () => {
+test("the model chip picks the model for the next turns, and waits while a turn runs", async () => {
   const { page, cwd } = await openApp();
   const chip = page.getByRole("button", { name: "model: claude-sonnet-4-5" });
   await chip.click();
@@ -364,24 +364,53 @@ test("the model chip picks the agent's model before the first prompt, and says w
   await menu.getByRole("option", { name: /claude-haiku-4-5/ }).click();
   await page.getByRole("button", { name: "model: claude-haiku-4-5" }).waitFor();
   const id = sessionId(cwd);
-  const log = () => JSON.parse(strive("log", id, "--json"));
-  const chosen = log().entries.filter((e: { event: { type: string } }) => e.event.type === "modelSet");
-  assert.deepEqual(
-    chosen.map((e: { event: { model: string } }) => e.event.model),
-    ["claude-haiku-4-5"],
-  );
+
+  const chosen = () =>
+    JSON.parse(strive("log", id, "--json"))
+      .entries.filter((e: { event: { type: string } }) => e.event.type === "modelSet")
+      .map((e: { event: { model: string } }) => e.event.model);
+
+  assert.deepEqual(chosen(), ["claude-haiku-4-5"]);
   await page.getByPlaceholder("Ask strive to do anything…").fill("go");
   await page.keyboard.press("Enter");
   await page.locator(".msg.user", { hasText: "go" }).waitFor();
+  // A turn runs (the tests' hosts are off; this stands in for one): the choice waits.
+  const host = await Rpc.open();
+  await host.call("host/register", { id });
+  await host.call("host/record", { id, event: { type: "turnStarted", turn: 1 } });
   await page.getByRole("button", { name: "model: claude-haiku-4-5" }).click();
-  await menu.getByText("switching mid-session isn't supported").waitFor();
-  const other = menu.getByRole("option", { name: /claude-opus-4-5/ });
-  assert.equal(await other.getAttribute("aria-disabled"), "true");
-  await other.click({ force: true });
-  await menu.getByRole("button", { name: /New session/ }).click();
-  await page.getByText("What should we work on?").waitFor();
-  const unchanged = log().entries.filter((e: { event: { type: string } }) => e.event.type === "modelSet");
-  assert.equal(unchanged.length, 1, "the disabled pick changed nothing");
+  await menu.getByText("The agent is working on this model.", { exact: false }).waitFor();
+  const opus = menu.getByRole("option", { name: /claude-opus-4-5/ });
+  assert.equal(await opus.getAttribute("aria-disabled"), "true");
+  await opus.click({ force: true });
+  assert.deepEqual(chosen(), ["claude-haiku-4-5"], "the disabled pick changed nothing");
+  // Once it ends, the next turns can run on another.
+  await host.call("host/record", { id, event: { type: "turnEnded", turn: 1, reason: { kind: "done" } } });
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "model: claude-haiku-4-5" }).click();
+  await menu.getByRole("option", { name: /claude-opus-4-5/ }).click();
+  await page.getByRole("button", { name: "model: claude-opus-4-5" }).waitFor();
+  assert.deepEqual(chosen(), ["claude-haiku-4-5", "claude-opus-4-5"]);
+  host.close();
+});
+
+test("the palette starts a new session that Claude Code runs", async () => {
+  const { page, cwd } = await openApp();
+  const first = sessionId(cwd);
+  await command(page, "New Claude Code session");
+  await page.getByText("Claude Code runs this session; strive gates its tools.").waitFor();
+  const sessions: { id: string; cwd: string }[] = JSON.parse(strive("sessions", "--all", "--json"));
+  const made = sessions.find((s) => s.cwd === cwd && s.id !== first);
+  assert.ok(made, JSON.stringify(sessions));
+
+  const events: { type: string }[] = JSON.parse(strive("log", made.id, "--json")).entries.map(
+    (e: { event: { type: string } }) => e.event,
+  );
+
+  assert.deepEqual(
+    events.filter((e) => e.type === "engineSet"),
+    [{ type: "engineSet", engine: "claude-code" }],
+  );
 });
 
 test("a new session with no key for its model says how to add one, and sees one once it's added", async () => {

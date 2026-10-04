@@ -4,10 +4,17 @@
 // reported back (`effect/report`), so the journal holds each call as
 // observed. Model calls go through the session's gateway, so the budget is
 // reserved before each one and the exact bytes are kept.
-import { type CanUseTool, query, type SDKMessage } from "@anthropic-ai/claude-agent-sdk";
+import {
+  type CanUseTool,
+  type EffortLevel,
+  query,
+  type SDKMessage,
+  type ThinkingConfig,
+} from "@anthropic-ai/claude-agent-sdk";
 import {
   type AgentConfig,
   describeError,
+  type Effort,
   type Entry,
   type Event,
   type StriveClient,
@@ -69,13 +76,17 @@ export class ClaudeHost {
   /** Each tool call the daemon refused: Claude Code gives the model the refusal as its result. */
   private readonly refused = new Set<string>();
   private readonly prompts = new PromptReader();
+  /** A model was chosen for the session's next turns: the next one fetches its config first. */
+  private stale = false;
+  /** How much the model thinks, as last set: each turn starts with it. */
+  private effort: Effort = "off";
   private early: Entry[] | undefined = [];
   private lost = false;
 
   constructor(
     private readonly client: StriveClient,
     private readonly sessionId: string,
-    private readonly config: AgentConfig,
+    private config: AgentConfig,
   ) {
     client.onClose(() => {
       this.lost = true;
@@ -106,6 +117,7 @@ export class ClaudeHost {
     const since = lastStart?.event.type === "turnStarted" ? (lastStart.event.throughSeq ?? lastStart.seq) : 0;
 
     for (const e of entries) {
+      this.noteModel(e);
       const text = this.prompts.read(e);
 
       if (text !== undefined && e.seq > since && isPrompt(e)) this.queued.push({ text, seq: e.seq });
@@ -126,12 +138,28 @@ export class ClaudeHost {
       return;
     }
 
+    this.noteModel(entry);
     const text = this.prompts.read(entry);
 
     if (text !== undefined) {
       this.queued.push({ text, seq: entry.seq });
       void this.kick();
     }
+  }
+
+  /** A model chosen for the next turns, other than this host's: Claude Code is started on it from then on. */
+  private noteModel(entry: Entry) {
+    if (entry.event.type === "effortSet") this.effort = entry.event.effort;
+
+    if (entry.event.type !== "modelSet" || entry.event.model === this.config.model) return;
+    this.stale = true;
+  }
+
+  /** The config for a newly chosen model, fetched until it is. */
+  private async reconfigure() {
+    if (!this.stale) return;
+    this.config = await this.client.request("host/config", { id: this.sessionId });
+    this.stale = false;
   }
 
   interrupt() {
@@ -193,6 +221,7 @@ export class ClaudeHost {
     let reason: TurnEnd = { kind: "done" };
 
     try {
+      await this.reconfigure();
       reason = await this.converse(prompts.map((p) => p.text).join("\n\n"), abort);
     } catch (e) {
       reason = abort.signal.aborted ? this.stopped() : { kind: "failed", error: describeError(e) };
@@ -226,6 +255,21 @@ export class ClaudeHost {
     return env;
   }
 
+  /**
+   * How much Claude Code's model thinks. Not thinking is always said, since
+   * Claude Code thinks by default: with effort off, or a model strive's
+   * table doesn't list as thinking (as the native agent does). A level is
+   * Claude Code's to map onto the model.
+   */
+  private thinking(): ClaudeThinking {
+    const options: ClaudeThinking = {};
+
+    if (this.effort === "off" || !this.config.reasoning) options.thinking = { type: "disabled" };
+    else options.effort = this.effort;
+
+    return options;
+  }
+
   /** One turn of Claude Code, its messages journaled as they come. */
   private async converse(prompt: string, abort: AbortController): Promise<TurnEnd> {
     const executable = claudeExecutable();
@@ -244,6 +288,7 @@ export class ClaudeHost {
         cwd: this.config.cwd,
         pathToClaudeCodeExecutable: executable,
         model: this.config.model,
+        ...this.thinking(),
         resume: this.claudeSession,
         abortController: abort,
         includePartialMessages: true,
@@ -338,6 +383,9 @@ export class ClaudeHost {
     return undefined;
   }
 }
+
+/** The thinking a turn asks of Claude Code's model. */
+type ClaudeThinking = { thinking?: ThinkingConfig; effort?: EffortLevel };
 
 /** What Claude Code's process is given. */
 type ClaudeEnv = {

@@ -58,6 +58,10 @@ export type * from "./generated/EffectReportParams";
 
 export type * from "./generated/Engine";
 
+export type * from "./generated/Effort";
+
+export type * from "./generated/SessionEffortParams";
+
 export type * from "./generated/Empty";
 
 export type * from "./generated/Entry";

@@ -7,6 +7,7 @@ import { pathToFileURL } from "node:url";
 import {
   type Digest,
   describeError,
+  type Engine,
   type MethodName,
   type Methods,
   type SessionInfo,
@@ -66,8 +67,11 @@ const PROJECT: ReadonlySet<MethodName> = new Set<MethodName>([
   "learning/dismiss",
 ]);
 
-/** `safe`: a new session runs no extensions. */
-type Mode = { kind: "new"; safe: boolean } | { kind: "continue" } | { kind: "resume"; id: string };
+/** `safe`: a new session runs no extensions; `engine`, what runs its turns (ADR-0031). */
+type Mode = { kind: "new"; safe: boolean; engine?: Engine } | { kind: "continue" } | { kind: "resume"; id: string };
+
+/** The engine a name asks for, from the command line or the page: only one it names. */
+const engineNamed = (name: string | undefined): Engine | undefined => (name === "claude-code" ? name : undefined);
 
 type Args = { socket: string; cwd: string; mode: Mode };
 
@@ -90,7 +94,7 @@ function parseArgs(argv: string[]): Parsed {
     ? { kind: "resume", id: resume }
     : argv.includes("--continue")
       ? { kind: "continue" }
-      : { kind: "new", safe: argv.includes("--safe") };
+      : { kind: "new", safe: argv.includes("--safe"), engine: engineNamed(flag("--engine")) };
 
   return { ok: true, args: { socket, cwd: flag("--cwd") ?? process.cwd(), mode } };
 }
@@ -104,9 +108,9 @@ async function openSession(client: StriveClient, args: Args): Promise<SessionInf
     if (sessions[0]) return sessions[0].id;
   }
 
-  const safe = args.mode.kind === "new" && args.mode.safe;
+  const { safe, engine } = args.mode.kind === "new" ? args.mode : { safe: false, engine: undefined };
 
-  return (await client.request("session/create", { cwd: args.cwd, safe })).id;
+  return (await client.request("session/create", { cwd: args.cwd, safe, engine })).id;
 }
 
 /** Where the build put the preload script and renderer (bundling fixes `__dirname` at the source). */
@@ -245,7 +249,7 @@ async function main() {
   });
 
   // To another session of this project, or a new one (no id).
-  ipcMain.handle("strive:switch", async (e, target: string | undefined) => {
+  ipcMain.handle("strive:switch", async (e, target: string | undefined, asked: string | undefined) => {
     if (!fromOurPage(e)) throw new Error("not available to this frame");
 
     // Anything but one of this project's session ids (whatever the page sent) is refused here.
@@ -255,7 +259,8 @@ async function main() {
       if (!sessions.some((s) => s.id === target)) throw new Error("that session isn't one of this project's");
     }
 
-    const next = await open(async (c) => target ?? (await c.request("session/create", { cwd })).id);
+    const engine = engineNamed(asked);
+    const next = await open(async (c) => target ?? (await c.request("session/create", { cwd, engine })).id);
     const left = current;
     current = next;
     watch(next);

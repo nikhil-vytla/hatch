@@ -161,9 +161,14 @@ with one runtime. A host registers with `host/register`, which returns the
 agent config (model, gateway URL, limits, project context, MCP tools), then
 attaches to the session. Hosts don't count as clients for idle exit.
 - **The model** is the session's own if a person chose one with
-  `session/model` (journaled as `modelSet`), else settings'. It can be
-  chosen only before the first prompt, since a host may start on it then;
-  `model/list` lists the priced models to choose from.
+  `session/model` (journaled as `modelSet`), else settings'. `model/list`
+  lists the priced models to choose from.
+  - It can change between turns, to another provider's too, but not while
+    a turn runs: a turn keeps the model it started on.
+  - A host that sees `modelSet` fetches its new config (`host/config`)
+    before its next turn. pi-ai carries the conversation across providers:
+    another model's thinking becomes text, and tool-call ids are rewritten.
+  - A Claude Code session takes Claude models only.
 - One host per session: registration is exclusive.
 - A host must register before it attaches.
 - Only the session's host may record turns or stream text for it.

@@ -15,6 +15,8 @@ import {
 } from "@earendil-works/pi-tui";
 import {
   type ApprovalMode,
+  type Effort,
+  type Engine,
   type Decision,
   describeError,
   type Entry,
@@ -61,9 +63,22 @@ export const COMMANDS: SlashCommand[] = [
     description: "List checkpoints, or put the files back to one: /rewind 2",
     argumentHint: "[checkpoint]",
   },
+  {
+    name: "model",
+    description: "List the models, or choose one for the next turns: /model gpt-5",
+    argumentHint: "[model]",
+  },
+  {
+    name: "effort",
+    description: "How much the model thinks from the next turn: off, low, medium or high (Shift+Tab steps)",
+    argumentHint: "<level>",
+  },
   { name: "help", description: "List commands and keys" },
   { name: "quit", description: "Exit strive (the daemon keeps running)" },
 ];
+
+/** The effort levels, in the order Shift+Tab steps through them. */
+const EFFORTS: Effort[] = ["off", "low", "medium", "high"];
 
 const MODES_BY_NAME = new Map<string, ApprovalMode>([
   ["ask", "ask"],
@@ -160,6 +175,12 @@ export class App {
   private projectCommands: SlashCommand[] = [];
   /** Checkpoints and what each was taken before. */
   private readonly checkpoints = new Map<number, string>();
+  /** The model chosen for this session's next turns, if one was. */
+  private chosenModel?: string;
+  /** How much the model thinks, as last set. */
+  private effort: Effort = "off";
+  /** What runs this session's turns, if not strive's own agent: it limits the models. */
+  private engine?: Engine;
   private awaitingPrompt?: number;
   private spend = new Spend();
   /** Every prompt of the conversation shown, a fork's parents' included: where `/fork n` goes back to. */
@@ -223,6 +244,18 @@ export class App {
 
       if (matchesKey(data, "ctrl+c") || matchesKey(data, "ctrl+d")) {
         this.quit(0);
+
+        return { consume: true };
+      }
+
+      if (matchesKey(data, "shift+tab")) {
+        void this.setEffort(EFFORTS[(EFFORTS.indexOf(this.effort) + 1) % EFFORTS.length]);
+
+        return { consume: true };
+      }
+
+      if (matchesKey(data, "ctrl+p")) {
+        void this.nextModel();
 
         return { consume: true };
       }
@@ -391,6 +424,12 @@ export class App {
 
     if (e.type === "rewound") this.checkpoints.set(e.savedAs, `before rewinding to ${e.to}`);
 
+    if (e.type === "modelSet") this.chosenModel = e.model;
+
+    if (e.type === "effortSet") this.effort = e.effort;
+
+    if (e.type === "engineSet") this.engine = e.engine;
+
     if (e.type === "turnStarted") this.working = e.turn;
 
     if (e.type === "turnEnded") this.working = undefined;
@@ -412,6 +451,78 @@ export class App {
     if (text) this.say(text);
     // Entries that add no line (a finished turn) still change the footer.
     this.tui.requestRender();
+  }
+
+  private async setEffort(effort: Effort | undefined) {
+    if (!this.session || effort === undefined) return;
+
+    try {
+      await this.client.request("session/effort", { id: this.session.id, effort });
+    } catch (e) {
+      this.say(style.danger(describeError(e)));
+
+      return;
+    }
+
+    const { models, default: fallback } = await this.client.request("model/list", {});
+    const current = models.find((m) => m.id === (this.chosenModel ?? fallback));
+
+    if (effort !== "off" && current && !current.reasoning)
+      this.say(style.muted(`${current.id} doesn't think, so effort applies once a model that does runs.`));
+  }
+
+  /** Ctrl+P: the next model whose provider has a key, for the next turns. */
+  private async nextModel() {
+    const [{ models, default: fallback }, { providers }] = await Promise.all([
+      this.client.request("model/list", {}),
+      this.client.request("auth/status", {}),
+    ]);
+
+    // Claude Code runs Claude models only.
+    const runnable = models.filter((m) => this.engine !== "claude-code" || m.provider === "anthropic");
+    const keyed = runnable.filter((m) => providers.some((p) => p.provider === m.provider && p.source !== "none"));
+    const at = keyed.findIndex((m) => m.id === (this.chosenModel ?? fallback));
+    const next = keyed[(at + 1) % keyed.length];
+
+    if (next) await this.model(next.id);
+    else this.say(style.danger("No model has a key yet: add one with strive auth anthropic."));
+  }
+
+  /**
+   * `/model`: lists the models the daemon prices, marking this session's and
+   * those without a key. `/model name` chooses one for the next turns.
+   */
+  private async model(name: string | undefined) {
+    if (!this.session) return;
+
+    if (name) {
+      try {
+        await this.client.request("session/model", { id: this.session.id, model: name });
+      } catch (e) {
+        this.say(style.danger(describeError(e)));
+      }
+
+      return;
+    }
+
+    const [{ models, default: fallback }, { providers }] = await Promise.all([
+      this.client.request("model/list", {}),
+      this.client.request("auth/status", {}),
+    ]);
+
+    const current = this.chosenModel ?? fallback;
+    const unkeyed = new Set(providers.flatMap((p) => (p.source === "none" ? [p.provider] : [])));
+
+    this.say(
+      models
+        .map((m) => {
+          const line = `${m.id === current ? style.accent("●") : " "} ${m.id}  ${style.muted(m.provider)}`;
+
+          return unkeyed.has(m.provider) ? `${line}  ${style.muted(`no key: strive auth ${m.provider}`)}` : line;
+        })
+        .join("\n"),
+    );
+    this.say(style.muted("Choose one with /model <name>; the next turn runs on it."));
   }
 
   /**
@@ -462,6 +573,10 @@ export class App {
     this.early = [];
     this.working = undefined;
     this.unconfirmed = undefined;
+    // Each session's own, as its journal sets them.
+    this.chosenModel = undefined;
+    this.effort = "off";
+    this.engine = undefined;
     this.live.setText("");
     this.prompt.setText("");
     this.editor.disableSubmit = true;
@@ -644,6 +759,25 @@ export class App {
         await this.fork(text.slice(1).split(/\s+/)[1]);
 
         return;
+      case "model":
+        await this.model(text.slice(1).split(/\s+/)[1]);
+
+        return;
+      case "effort": {
+        const arg = text.slice(1).split(/\s+/)[1] ?? "";
+        const effort = EFFORTS.find((e) => e === arg);
+
+        if (!effort) {
+          this.say(style.danger(`Effort is ${this.effort}. Use /effort off, low, medium or high.`));
+
+          return;
+        }
+
+        await this.setEffort(effort);
+
+        return;
+      }
+
       case "session":
         this.say(
           `${style.muted("session")} ${this.session.id} · resume with ${style.accent(`strive -r ${this.session.id}`)}`,
@@ -662,7 +796,11 @@ export class App {
           );
         }
 
-        this.say(style.muted("Enter sends · Alt+Enter new line · Tab completes · Ctrl+C exits"));
+        this.say(
+          style.muted(
+            "Enter sends · Alt+Enter new line · Tab completes · Ctrl+P next model · Shift+Tab effort · Ctrl+C exits",
+          ),
+        );
 
         return;
       case "quit":

@@ -5,14 +5,15 @@ import { anthropicMessagesApi } from "@earendil-works/pi-ai/api/anthropic-messag
 import { openAICompletionsApi } from "@earendil-works/pi-ai/api/openai-completions.lazy";
 import type { AgentConfig } from "@strive/protocol";
 
-export function model(config: AgentConfig): Model<any> {
+/** The session's model; `thinks` while its effort is set, so with effort off its requests ask nothing of thinking. */
+export function model(config: AgentConfig, thinks = false): Model<any> {
   return {
     id: config.model,
     name: config.model,
     api: config.provider === "anthropic" ? "anthropic-messages" : "openai-completions",
     provider: "strive",
     baseUrl: config.baseUrl,
-    reasoning: false,
+    reasoning: thinks,
     input: ["text"],
     // strive prices calls in the gateway; the agent loop doesn't.
     cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },

@@ -212,9 +212,12 @@ Built as decided, with these differences:
   - otherwise the one the SDK pins, when the host runs from source;
   - otherwise the `claude` on the path. The installed `strive-tui` doesn't
     bundle Claude Code's 229 MB native binary.
-- **Not built yet:** the desktop's and ACP's engine choice, the vendor's own
-  budget limit as a second line, forks of an engine session (its own
-  transcript isn't forked), Codex, strict mode and isolation.
+- **Choosing it:** `strive --engine`, `strive app --engine` and the
+  desktop palette's "New Claude Code session", `strive acp --engine` (an
+  editor's agent command), and `strive run --engine`.
+- **Not built yet:** the vendor's own budget limit as a second line, forks
+  of an engine session (its own transcript isn't forked), Codex, strict
+  mode and isolation.
 
 ## Consequences
 

@@ -8,6 +8,7 @@ import type { Decision } from "./Decision";
 import type { Digest } from "./Digest";
 import type { EffectOutcome } from "./EffectOutcome";
 import type { EffectRecord } from "./EffectRecord";
+import type { Effort } from "./Effort";
 import type { Engine } from "./Engine";
 import type { Gate } from "./Gate";
 import type { HookAnswer } from "./HookAnswer";
@@ -175,4 +176,4 @@ callId?: string, label: string,
 /**
  * The workspace ops, as the agent gave them; the app parses them.
  */
-ops: unknown, } | { "type": "compacted", uptoSeq: number, summary: string, } | { "type": "modelSet", model: string, } | { "type": "forkedFrom", session: string, seq: number, } | { "type": "engineSet", engine: Engine, };
+ops: unknown, } | { "type": "compacted", uptoSeq: number, summary: string, } | { "type": "modelSet", model: string, } | { "type": "forkedFrom", session: string, seq: number, } | { "type": "engineSet", engine: Engine, } | { "type": "effortSet", effort: Effort, };

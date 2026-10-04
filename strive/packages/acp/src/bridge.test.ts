@@ -265,3 +265,30 @@ test("a loaded fork is replayed from its parent's conversation, up to where it f
 
   expect(told).toEqual(["first question", "first answer"]);
 });
+
+test("`strive acp --engine claude-code` starts the editor's sessions on Claude Code", async () => {
+  const cwd = await setup([]);
+  const tui = `bun ${resolve(import.meta.dir, "../../tui/src/main.ts")}`;
+
+  const proc = spawn(STRIVE_EXE, ["acp", "--engine", "claude-code"], {
+    env: { ...daemon!.env, STRIVE_TUI: tui },
+    stdio: ["pipe", "pipe", "inherit"],
+  });
+
+  const connection = acp
+    .client({ name: "test-editor" })
+    .connect(acp.ndJsonStream(Writable.toWeb(proc.stdin), Readable.toWeb(proc.stdout)));
+
+  closers.push(() => {
+    connection.close();
+    proc.kill();
+  });
+  await connection.agent.request("initialize", { protocolVersion: acp.PROTOCOL_VERSION });
+  const { sessionId } = await connection.agent.request("session/new", { cwd, mcpServers: [] });
+  const { client } = await StriveClient.connect(daemon!.socket, { name: "test", version: "0" });
+
+  closers.push(() => client.close());
+  const { entries } = await client.request("session/read", { id: sessionId });
+
+  expect(entries.map((e) => e.event)).toContainEqual({ type: "engineSet", engine: "claude-code" });
+});

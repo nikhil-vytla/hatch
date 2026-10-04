@@ -22,19 +22,22 @@ use crate::server::State;
 use crate::sessions::Push;
 use crate::sessions::{Answer, SessionError, SessionId};
 use strive_proto::{
-    AgentConfig, Event, HostContext, HostRecord, HostRecordParams, HostRegister, HostStream, HostStreamParams,
-    LearnedFile, LearnerContext, SessionDelta, SessionDeltaNotification, SessionInterrupt,
+    AgentConfig, Event, HostConfig, HostContext, HostRecord, HostRecordParams, HostRegister, HostStream,
+    HostStreamParams, LearnedFile, LearnerContext, SessionDelta, SessionDeltaNotification, SessionInterrupt,
     SessionInterruptNotification, SessionInterruptRequested,
 };
 use strive_proto::{ApprovalRespond, ApprovalRespondParams, Decision, SessionApprovals, SessionApprovalsParams};
 use strive_proto::{EffectCancel, EffectCancelParams, EffectRequest};
-use strive_proto::{ModelInfo, ModelList, ModelListResult, SessionModel, SessionModelParams};
+use strive_proto::{
+    ModelInfo, ModelList, ModelListResult, SessionEffort, SessionEffortParams, SessionModel, SessionModelParams,
+};
 use strive_proto::{
     SessionChanges, SessionChangesParams, SessionChangesResult, SessionCommands, SessionCommandsResult,
 };
 use strive_proto::{SessionFork, SessionForkParams, SessionRewind, SessionRewindParams, SessionRewindResult};
 
-/// Journals a priced model for the session's agent, before its first prompt.
+/// Journals a priced model for the session's next turns. Its host takes
+/// it up when it sees the entry (`host/config`).
 async fn choose_model(state: &Arc<State>, SessionModelParams { id, model }: SessionModelParams) -> Reply {
     if state.models.get(&model).is_none() {
         return Err(RpcError::new(
@@ -42,13 +45,27 @@ async fn choose_model(state: &Arc<State>, SessionModelParams { id, model }: Sess
             format!("no price is known for {model}; add it under \"models\" in ~/.strive/settings.json"),
         ));
     }
+    let sid = session_id(&id)?;
+    if engine_of(state, &sid)? == Some(Engine::ClaudeCode) && provider_of(&model) != "anthropic" {
+        return Err(RpcError::new(
+            RpcError::INVALID_PARAMS,
+            format!("Claude Code runs this session, and {model} isn't a Claude model"),
+        ));
+    }
     let entries = state
         .sessions
-        .set_model(&session_id(&id)?, model)
+        .set_model(&sid, model)
         .await
         .map_err(session_error)?
         .map_err(|why| RpcError::new(RpcError::INVALID_REQUEST, why))?;
     reply::<SessionModel>(Appended { seq: entries[0].seq })
+}
+
+/// Journals how much the session's model thinks, from its next turn.
+async fn set_effort(state: &Arc<State>, SessionEffortParams { id, effort }: SessionEffortParams) -> Reply {
+    let entries =
+        state.sessions.append(&session_id(&id)?, vec![Event::EffortSet { effort }]).await.map_err(session_error)?;
+    reply::<SessionEffort>(Appended { seq: entries[0].seq })
 }
 
 /// Whose API a model is called through, and so whose key it needs.
@@ -232,6 +249,7 @@ async fn route(state: &Arc<State>, conn: &Arc<Conn>, method: &str, params: Value
                     context_window: m.context_window,
                     input_usd_micros: m.price.input,
                     output_usd_micros: m.price.output,
+                    reasoning: m.reasoning,
                 })
                 .collect();
             reply::<ModelList>(ModelListResult { models, default: state.settings.model.clone() })
@@ -369,6 +387,7 @@ fn host_may_record(event: &Event, kind: SessionKind) -> bool {
         | Event::EffectRerun { .. }
         | Event::ForkedFrom { .. }
         | Event::EngineSet { .. }
+        | Event::EffortSet { .. }
         | Event::ApprovalModeSet { .. }
         | Event::ApprovalRequested { .. }
         | Event::ApprovalDecided { .. }
@@ -421,6 +440,7 @@ async fn host_config(state: &Arc<State>, sid: &SessionId) -> Reply {
             0 => model.context_window / 5 * 4,
             n => n,
         },
+        reasoning: model.reasoning,
         instructions: ctx.instructions,
         skills: ctx.skills,
         // The learner runs nothing, so it has no checks to run.
@@ -579,6 +599,12 @@ async fn route_host(state: &Arc<State>, conn: &Arc<Conn>, method: &str, params: 
             let sid = session_id(&id)?;
             require_host(conn, &sid)?;
             learner_context(state, &sid).await
+        }
+        HostConfig::NAME => {
+            let SessionRef { id } = parse::<HostConfig>(params)?;
+            let sid = session_id(&id)?;
+            require_host(conn, &sid)?;
+            host_config(state, &sid).await
         }
         HostRecord::NAME => {
             conn.records.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
@@ -1271,6 +1297,38 @@ async fn run_effect(
     }
 }
 
+/// `session/attach`: the session's entries so far, then each new one as a
+/// notification. A person's attach counts them as someone who can approve.
+async fn attach(state: &Arc<State>, conn: &Arc<Conn>, params: Value) -> Reply {
+    let SessionAttachParams { id, after_seq, observer } = parse::<SessionAttach>(params)?;
+    let sid = session_id(&id)?;
+    let (person, _attaching) = {
+        let host = crate::sync::lock(&conn.host_of);
+        if host.is_host() || observer == Some(true) {
+            (false, None)
+        } else {
+            conn.attaching.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            (true, Some(Attaching(&conn.attaching)))
+        }
+    };
+    let (session, entries, mut stream) =
+        state.sessions.attach(&sid, after_seq.unwrap_or(0), person).await.map_err(session_error)?;
+    let weak = conn.out.clone();
+    let forward = tokio::spawn(async move {
+        while let Some(push) = stream.recv().await {
+            let Some(msg) = notification(&id, push) else {
+                crate::log!("a session {id} notification did not serialize; ending the subscription");
+                break;
+            };
+            if weak.upgrade().is_none_or(|out| out.send(msg).is_err()) {
+                break;
+            }
+        }
+    });
+    crate::sync::lock(&conn.subscriptions).push(forward);
+    reply::<SessionAttach>(SessionAttachResult { session, entries })
+}
+
 async fn route_session(state: &Arc<State>, conn: &Arc<Conn>, method: &str, params: Value) -> Reply {
     match method {
         SessionCreate::NAME => {
@@ -1301,35 +1359,7 @@ async fn route_session(state: &Arc<State>, conn: &Arc<Conn>, method: &str, param
                 state.sessions.list(cwd.as_deref(), kind.unwrap_or_default()).map_err(|e| internal(&e))?;
             reply::<SessionList>(SessionListResult { sessions, unreadable })
         }
-        SessionAttach::NAME => {
-            let SessionAttachParams { id, after_seq, observer } = parse::<SessionAttach>(params)?;
-            let sid = session_id(&id)?;
-            let (person, _attaching) = {
-                let host = crate::sync::lock(&conn.host_of);
-                if host.is_host() || observer == Some(true) {
-                    (false, None)
-                } else {
-                    conn.attaching.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-                    (true, Some(Attaching(&conn.attaching)))
-                }
-            };
-            let (session, entries, mut stream) =
-                state.sessions.attach(&sid, after_seq.unwrap_or(0), person).await.map_err(session_error)?;
-            let weak = conn.out.clone();
-            let forward = tokio::spawn(async move {
-                while let Some(push) = stream.recv().await {
-                    let Some(msg) = notification(&id, push) else {
-                        crate::log!("a session {id} notification did not serialize; ending the subscription");
-                        break;
-                    };
-                    if weak.upgrade().is_none_or(|out| out.send(msg).is_err()) {
-                        break;
-                    }
-                }
-            });
-            crate::sync::lock(&conn.subscriptions).push(forward);
-            reply::<SessionAttach>(SessionAttachResult { session, entries })
-        }
+        SessionAttach::NAME => attach(state, conn, params).await,
         SessionPrompt::NAME => prompt(state, params).await,
         SessionRewind::NAME => {
             require_person(conn)?;
@@ -1362,6 +1392,10 @@ async fn route_session(state: &Arc<State>, conn: &Arc<Conn>, method: &str, param
         SessionModel::NAME => {
             require_person(conn)?;
             choose_model(state, parse::<SessionModel>(params)?).await
+        }
+        SessionEffort::NAME => {
+            require_person(conn)?;
+            set_effort(state, parse::<SessionEffort>(params)?).await
         }
         SessionBudget::NAME => {
             require_person(conn)?;

@@ -115,6 +115,7 @@ pub fn describe(e: &Entry) -> String {
         Event::EngineSet { engine } => {
             format!("{} runs this session's turns", strive_learning::render::engine_name(*engine))
         }
+        Event::EffortSet { effort } => format!("effort: {}", strive_learning::render::effort_name(*effort)),
         Event::EffectRerun { effect, outcome, .. } => match outcome {
             EffectOutcome::Done { .. } => format!("effect {effect} run again after a crash: done"),
             EffectOutcome::Refused { reason } => format!("effect {effect} run again after a crash: refused: {reason}"),

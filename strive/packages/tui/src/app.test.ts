@@ -175,6 +175,89 @@ test("/session prints the full id and the resume command", async () => {
   await ui.term.waitFor(`session ${id} · resume with strive -r ${id}`);
 });
 
+test("/model lists the models, marks this session's, and chooses one for the next turns", async () => {
+  const ui = await openUi();
+  await enter(ui, "/model");
+  const screen = await ui.term.waitFor("Choose one with /model <name>");
+  // Settings' model, until one is chosen; the test daemon holds no keys.
+  expect(screen.find((l) => l.includes("●"))).toContain("claude-sonnet-4-5");
+  expect(screen.find((l) => l.includes(" gpt-5 "))).toContain("no key: strive auth openai");
+  await enter(ui, "/model claude-imaginary-9");
+  await ui.term.waitFor("no price is known for claude-imaginary-9");
+  await enter(ui, "/model gpt-5");
+  await ui.term.waitFor("Model: gpt-5");
+  await enter(ui, "/model");
+  await ui.term.waitFor("● gpt-5");
+});
+
+test("/effort sets how much the model thinks, Shift+Tab steps it, and Ctrl+P needs a keyed model", async () => {
+  const ui = await openUi();
+  await enter(ui, "/effort extreme");
+  await ui.term.waitFor("Effort is off. Use /effort off, low, medium or high.");
+  await enter(ui, "/effort high");
+  await ui.term.waitFor("Effort: high");
+  // From high, round to off.
+  ui.term.type("\x1b[Z");
+  await ui.term.waitFor("Effort: off");
+  // The test daemon holds no keys.
+  ui.term.type("\x10");
+  await ui.term.waitFor("No model has a key yet");
+});
+
+test("Ctrl+P in a Claude Code session steps only through Claude models", async () => {
+  const { client } = await StriveClient.connect(daemon.socket, { name: "test", version: "0" });
+
+  // Stand-ins: the test daemon's upstreams are a dead port.
+  for (const provider of ["anthropic", "openai"])
+    await client.request("auth/set", { provider, apiKey: "sk-test-not-a-key" });
+  client.close();
+  process.env.STRIVE_ENGINE = "claude-code";
+
+  try {
+    const ui = await openUi();
+    await ui.term.waitFor("Claude Code runs this session");
+    // After the last Claude model, back to the first, past every GPT one.
+    await enter(ui, "/model claude-sonnet-4-5");
+    await ui.term.waitFor("Model: claude-sonnet-4-5");
+    ui.term.type("\x10");
+    await ui.term.waitFor("Model: claude-haiku-4-5");
+    expect((await ui.term.screen()).some((l) => l.includes("isn't a Claude model"))).toBe(false);
+  } finally {
+    delete process.env.STRIVE_ENGINE;
+  }
+});
+
+test("a session forked from a Claude Code one is strive's again: Ctrl+P reaches every keyed model", async () => {
+  const { client } = await StriveClient.connect(daemon.socket, { name: "test", version: "0" });
+
+  for (const provider of ["anthropic", "openai"])
+    await client.request("auth/set", { provider, apiKey: "sk-test-not-a-key" });
+  client.close();
+  process.env.STRIVE_ENGINE = "claude-code";
+
+  try {
+    const ui = await openUi();
+    await ui.term.waitFor("Claude Code runs this session");
+    await enter(ui, "hello");
+    await ui.term.waitFor("› hello", GIT_MS);
+    await enter(ui, "/fork 1");
+    await ui.term.waitFor("Forked from session", GIT_MS);
+    // Settings' model, then the next with a key: past the Claude models.
+    ui.term.type("\x10");
+    await ui.term.waitFor("Model: gpt-4.1");
+  } finally {
+    delete process.env.STRIVE_ENGINE;
+  }
+});
+
+test("/effort says when the model doesn't think", async () => {
+  const ui = await openUi();
+  await enter(ui, "/model gpt-4.1");
+  await ui.term.waitFor("Model: gpt-4.1");
+  await enter(ui, "/effort high");
+  await ui.term.waitFor("gpt-4.1 doesn't think, so effort applies once a model that does runs.");
+});
+
 test("an unknown command is named in the error", async () => {
   const ui = await openUi();
   await enter(ui, "/nope");

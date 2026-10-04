@@ -8,6 +8,7 @@ import {
   type AgentConfig,
   describeError,
   type EffectRequest,
+  type Effort,
   type Entry,
   type ExtensionInfo,
   type Event,
@@ -474,7 +475,11 @@ export class Host {
   private conversationSeq = 0;
   /** Entries that arrive while `start` is still loading, replayed after it. */
   private early: Entry[] | undefined = [];
-  private readonly models: ReturnType<typeof createStriveModels>;
+  private models: ReturnType<typeof createStriveModels>;
+  /** A model was chosen for the session's next turns: the next one fetches its config first. */
+  private stale = false;
+  /** How much the model thinks, as last set: each turn starts with it. */
+  private effort: Effort = "off";
   private readonly mode: AgentMode;
   private readonly prompts = new PromptReader();
   /** The daemon's connection closed: nothing more can be recorded. */
@@ -485,7 +490,7 @@ export class Host {
   constructor(
     private readonly client: StriveClient,
     private readonly sessionId: string,
-    private readonly config: AgentConfig,
+    private config: AgentConfig,
   ) {
     this.models = createStriveModels(model(config));
     this.mode = modeFor(client, sessionId, config);
@@ -537,7 +542,8 @@ export class Host {
         tools: this.mode.tools,
         messages: await this.conversation(history, blob),
       },
-      streamFn: this.models.streamSimple.bind(this.models),
+      // Through whichever model is current: a person may choose another between turns.
+      streamFn: (m, context, options) => this.models.streamSimple(m, context, options),
       toolExecution: "parallel",
     });
     let lastDelta = 0;
@@ -568,6 +574,7 @@ export class Host {
 
     for (const e of entries) {
       this.mode.onEntry?.(e);
+      this.noteModel(e);
       this.noteCheckpoint(e);
       const text = this.prompts.read(e);
 
@@ -591,6 +598,7 @@ export class Host {
     if (entry.seq <= this.lastSeq) return;
     this.lastSeq = entry.seq;
     this.mode.onEntry?.(entry);
+    this.noteModel(entry);
     this.noteCheckpoint(entry);
     const text = this.prompts.read(entry);
 
@@ -725,6 +733,23 @@ export class Host {
     this.agent.state.messages = [{ ...first, content: prompt }, ...rest];
   }
 
+  /** A model chosen for the next turns, other than this host's: its limits are fetched before the next turn. */
+  private noteModel(entry: Entry) {
+    if (entry.event.type === "effortSet") this.effort = entry.event.effort;
+
+    if (entry.event.type !== "modelSet" || entry.event.model === this.config.model) return;
+    this.stale = true;
+  }
+
+  /** The config for a newly chosen model, fetched until it is. */
+  private async reconfigure() {
+    if (!this.stale) return;
+    this.config = await this.client.request("host/config", { id: this.sessionId });
+    this.models = createStriveModels(model(this.config));
+    this.agent.state.model = model(this.config);
+    this.stale = false;
+  }
+
   private async runTurn(prompts: { text: string; seq: number }[]) {
     // The summary covers the conversation before this turn; the prompts this
     // turn takes are kept past it on resume.
@@ -736,6 +761,20 @@ export class Host {
     this.mode.turnStarted?.(prompts.map((p) => p.seq));
     await this.record({ type: "turnStarted", turn: this.turn, throughSeq: taken });
     this.conversationSeq = Math.max(this.conversationSeq, taken ?? 0);
+
+    try {
+      await this.reconfigure();
+      // Asked only of a model that thinks: another refuses the request.
+      const thinking = this.config.reasoning ? this.effort : "off";
+
+      this.agent.state.model = model(this.config, thinking !== "off");
+      this.agent.state.thinkingLevel = thinking;
+    } catch (e) {
+      const error = `the session's new model couldn't be taken up: ${describeError(e)}`;
+      await this.record({ type: "turnEnded", turn: this.turn, reason: { kind: "failed", error } });
+
+      return;
+    }
 
     if (this.mode.turnContext) {
       try {

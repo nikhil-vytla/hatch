@@ -98,12 +98,14 @@ methods! {
     ProposalRollback = "proposal/rollback" (ProposalRef) -> Appended;
     HostRegister = "host/register" (SessionRef) -> AgentConfig;
     HostContext = "host/context" (SessionRef) -> LearnerContext;
+    HostConfig = "host/config" (SessionRef) -> AgentConfig;
     HostRecord = "host/record" (HostRecordParams) -> Appended;
     HostStream = "host/stream" (HostStreamParams) -> Empty;
     HostProposeExtension = "host/proposeExtension" (HostProposeExtensionParams) -> ExtensionProposed;
     SessionInterrupt = "session/interrupt" (SessionRef) -> Empty;
     ModelList = "model/list" (Empty) -> ModelListResult;
     SessionModel = "session/model" (SessionModelParams) -> Appended;
+    SessionEffort = "session/effort" (SessionEffortParams) -> Appended;
 }
 
 /// A server-to-client notification: its wire name plus payload type.
@@ -399,10 +401,13 @@ pub struct ModelInfo {
     /// Micro-dollars per million tokens.
     pub input_usd_micros: u64,
     pub output_usd_micros: u64,
+    /// Whether it thinks before it answers, so a session's effort applies.
+    #[serde(default)]
+    pub reasoning: bool,
 }
 
-/// Chooses the model a session's agent starts with. Refused once the
-/// session has a prompt: its agent may already be running on another.
+/// Chooses the model for a session's next turns. Refused while a turn runs:
+/// a turn keeps the model it started on.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
@@ -505,7 +510,6 @@ pub struct EffectCancelParams {
     pub call_id: String,
 }
 
-/// The effect's journal number and outcome, with the output text inline.
 /// What runs a session's turns (ADR-0031): strive's own loop, or a vendor
 /// agent whose tool calls the daemon gates and observes.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, TS)]
@@ -515,6 +519,28 @@ pub enum Engine {
     #[default]
     Native,
     ClaudeCode,
+}
+
+/// How much the model thinks before it answers: off, or a level the
+/// provider maps to its own (a thinking budget, or reasoning effort).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub enum Effort {
+    #[default]
+    Off,
+    Low,
+    Medium,
+    High,
+}
+
+/// Sets how much the session's model thinks, from its next turn.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct SessionEffortParams {
+    pub id: String,
+    pub effort: Effort,
 }
 
 /// A vendor engine's tool call, before it runs (ADR-0031): the daemon
@@ -559,6 +585,7 @@ pub struct EffectReportParams {
     pub failed: bool,
 }
 
+/// The effect's journal number and outcome, with the output text inline.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
@@ -596,6 +623,10 @@ pub struct AgentConfig {
     /// Summarize the conversation before a turn once it is estimated to be
     /// this many tokens.
     pub compact_at_tokens: u64,
+    /// Whether the model thinks before it answers: a session's effort is
+    /// asked of it only then.
+    #[serde(default)]
+    pub reasoning: bool,
     /// Instruction files (AGENTS.md, CLAUDE.md), outermost first.
     pub instructions: Vec<InstructionFile>,
     pub skills: Vec<SkillInfo>,
@@ -1614,6 +1645,10 @@ pub enum Event {
     /// A vendor agent runs this session's turns (ADR-0031).
     EngineSet {
         engine: Engine,
+    },
+    /// How much the model thinks, from the session's next turn.
+    EffortSet {
+        effort: Effort,
     },
 }
 

@@ -30,11 +30,15 @@ fn locate() -> Result<Vec<String>> {
     )
 }
 
-/// Starts the desktop app on the session, detached from this terminal.
-pub fn open(home: &Home, session: &Session) -> Result<()> {
+/// Starts the desktop app on the session, detached from this terminal;
+/// `engine` runs a new session's turns (ADR-0031).
+pub fn open(home: &Home, session: &Session, engine: Option<&str>) -> Result<()> {
     let cmd = locate()?;
     let mut c = Command::new(&cmd[0]);
     c.args(&cmd[1..]).arg("--cwd").arg(std::env::current_dir()?);
+    if let Some(engine) = engine {
+        c.args(["--engine", engine]);
+    }
     match session {
         Session::New { safe: false } => {}
         Session::New { safe: true } => {
