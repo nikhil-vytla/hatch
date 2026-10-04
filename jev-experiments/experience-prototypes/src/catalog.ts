@@ -179,6 +179,14 @@ export const experiments = [
     "What does it cost a decision model to look at the screen instead of reading the state?",
   ),
   e(
+    "count",
+    "",
+    "Count with me",
+    "Games & simulations",
+    "Guess how many are in the photo, then see a vision model, a detector and Jev try. The crowds get bigger.",
+    "How well do models count, and where does it break as the crowd grows?",
+  ),
+  e(
     "snake",
     "arcade",
     "Arcade: Snake and Orbital rescue",

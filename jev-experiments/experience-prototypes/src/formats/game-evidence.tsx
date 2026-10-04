@@ -9,11 +9,12 @@ import { percent } from "../api";
 import { PROMPTS } from "../../../live-worlds/eyes/model";
 import { SENTRY_CAVEATS, SentryData, SentryMethod, SentryResults } from "../screen-sentry-evidence";
 import { SPINE_CAVEATS, SpineData, SpineMethod, SpineResults } from "../spine-evidence";
+import { COUNT_CAVEATS, CountDataNote, CountMethod, CountResults } from "../count-with-me-evidence";
 import { WHO_CAVEATS, WhoData, WhoMethod, WhoResults } from "../who-said-that-evidence";
 import type { EvidenceTab } from "./evidence-drawer";
 
 /** Pages that use the game format: play first, evidence in a drawer. */
-export const GAME_PAGES = new Set(["ocean", "rumour-mill", "win-over", "snake", "games", "tetris", "eyes", "screen-sentry", "who-said-that", "spine"]);
+export const GAME_PAGES = new Set(["ocean", "rumour-mill", "win-over", "snake", "games", "tetris", "eyes", "screen-sentry", "who-said-that", "spine", "count"]);
 
 const REPO = "https://github.com/nikhil-vytla/hatch/tree/main/jev-experiments";
 
@@ -117,6 +118,12 @@ const SCENES: Record<string, Scene> = {
       "Times are per move on one M4 Max, warm.",
     ],
     data: <p>{source("live-worlds/eyes")} holds the scorer, the recorder, the perception check and every recorded frame.</p>,
+  },
+  count: {
+    results: <CountResults />,
+    method: <CountMethod />,
+    caveats: COUNT_CAVEATS,
+    data: <CountDataNote />,
   },
   ocean: {
     results: <ReefResults />,

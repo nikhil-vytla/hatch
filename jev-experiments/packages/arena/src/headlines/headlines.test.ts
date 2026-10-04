@@ -239,6 +239,44 @@ describe.skipIf(!ready)("headline strips match their data", () => {
     expect(h.stats[2].value).toBe(pct0(right / perception.length));
   });
 
+  test("count: right count bins from the raw recordings and items.json", () => {
+    const dir = join(lab, "live-worlds/count");
+
+    const raw = (f: string) =>
+      readFileSync(join(dir, f), "utf8")
+        .trim()
+        .split("\n")
+        .map((l) => JSON.parse(l));
+
+    const items: { id: string; bin: number; count: number }[] = json(join(dir, "items.json")).items;
+    const truth = new Map(items.map((it) => [it.id, it]));
+    const top = (p: Record<string, number>) => Object.entries(p).sort((a, b) => b[1] - a[1])[0][0];
+    // The letter each recording picked for an image's count, keyed by image id.
+    const vlm = raw("recordings/qwen3-vl-4b.jsonl");
+    const vlmPicks = new Map<string, string>(vlm.filter((r) => r.question === "count").map((r) => [r.id, top(r.probabilities)]));
+
+    const jevPicks = new Map<string, string>(
+      raw("recordings/jev.jsonl")
+        .filter((r) => r.status === "ok")
+        .map((r) => [r.id, top(r.answers.count.probabilities)]),
+    );
+
+    const share = (picks: Map<string, string>, bins: number[]) => {
+      const inside = items.filter((it) => bins.includes(it.bin));
+
+      return inside.filter((it) => picks.get(it.id) === "ABCDEFGHI"[it.bin]).length / inside.length;
+    };
+
+    const even = vlm.filter((r) => r.question === "even");
+    const evenRight = even.filter((r) => (r.probabilities.Yes >= 0.5) === ((truth.get(r.id)?.count ?? NaN) % 2 === 0)).length;
+    const h = scene("count");
+
+    expect(h.stats[0].value).toBe(pct0(share(vlmPicks, [0, 1, 2])));
+    expect(h.stats[1].value).toBe(pct0(share(vlmPicks, [6, 7, 8])));
+    expect(h.stats[2].value).toBe(pct0(share(jevPicks, [6, 7, 8])));
+    expect(h.stats[3].value).toBe(pct0(evenRight / even.length));
+  });
+
   test("collection cards: headline lines where there's a strip, record counts elsewhere", () => {
     const card = (id: string) => computed?.cards.find((c) => c.id === id);
     const record = (name: string) => json(join(app, `public/data/${name}.json`)).result;
