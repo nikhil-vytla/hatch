@@ -66,6 +66,8 @@ export class ClaudeHost {
   private claudeSession?: string;
   /** Each tool call the daemon allowed, by its tool-use id: what its result is reported against. */
   private readonly calls = new Map<string, number>();
+  /** Each tool call the daemon refused: Claude Code gives the model the refusal as its result. */
+  private readonly refused = new Set<string>();
   private readonly prompts = new PromptReader();
   private early: Entry[] | undefined = [];
   private lost = false;
@@ -165,8 +167,12 @@ export class ClaudeHost {
         return { behavior: "allow", updatedInput: input };
       }
 
+      this.refused.add(toolUseID);
+
       return { behavior: "deny", message: r.reason ?? "strive refused this" };
     } catch (e) {
+      this.refused.add(toolUseID);
+
       return { behavior: "deny", message: `strive couldn't decide this, so it's refused: ${describeError(e)}` };
     }
   };
@@ -309,7 +315,10 @@ export class ClaudeHost {
         if (block.type !== "tool_result") continue;
         const effect = this.calls.get(block.tool_use_id);
 
-        // A result for a call the daemon never cleared ran past strive's gate.
+        // The refusal, as the model was told it; the daemon journaled it already.
+        if (effect === undefined && block.is_error === true && this.refused.delete(block.tool_use_id)) continue;
+
+        // Any other result for a call the daemon never cleared ran past strive's gate.
         if (effect === undefined)
           return { kind: "failed", error: `Claude Code ran a tool strive didn't allow (${block.tool_use_id})` };
         this.calls.delete(block.tool_use_id);

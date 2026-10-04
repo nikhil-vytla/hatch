@@ -187,7 +187,8 @@ Built as decided, with these differences:
 - **The fail-closed backstop is in the host, not a hook.** Claude Code runs
   `PreToolUse` hooks before its permission check, so a hook can't tell
   whether the daemon cleared the call. Instead, a tool result for a call
-  the daemon never cleared fails the turn. The daemon's journal shows the
+  the daemon never cleared fails the turn, unless it is the error result
+  Claude Code gives for a call the daemon refused. The daemon's journal shows the
   gap either way: an observed effect is started before it can be cleared.
 - **The sandbox must still ask.** By default Claude Code runs a sandboxed
   command without asking (`autoAllowBashIfSandboxed`), past `canUseTool`.

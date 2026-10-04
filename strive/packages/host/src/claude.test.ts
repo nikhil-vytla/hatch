@@ -43,13 +43,19 @@ async function events(client: StriveClient, id: string): Promise<Event[]> {
   return (await client.request("session/read", { id })).entries.map((e: Entry) => e.event);
 }
 
+/** The session's events once `n` turns have ended, each of them done (else how one ended). */
 async function untilTurnsEnded(client: StriveClient, id: string, n: number): Promise<Event[]> {
   const deadline = Date.now() + 50_000;
 
   for (;;) {
     const e = await events(client, id);
+    const ended = e.filter((x) => x.type === "turnEnded");
 
-    if (e.filter((x) => x.type === "turnEnded").length >= n) return e;
+    if (ended.length >= n) {
+      for (const t of ended) expect(t).toMatchObject({ reason: { kind: "done" } });
+
+      return e;
+    }
 
     if (Date.now() > deadline) throw new Error(`timed out: ${JSON.stringify(e.map((x) => x.type))}`);
     await Bun.sleep(100);
@@ -93,7 +99,6 @@ test("Claude Code runs a turn: its read is gated and journaled as observed, and 
   ).toContain("The file says hello.");
   // Its model calls went through the gateway: each one journaled, with its cost.
   expect(e.filter((x) => x.type === "modelCallFinished").length).toBeGreaterThanOrEqual(2);
-  expect(e.findLast((x) => x.type === "turnEnded")).toMatchObject({ reason: { kind: "done" } });
 });
 
 test("a call the daemon refuses doesn't run, and Claude Code is told why", async () => {
@@ -150,5 +155,4 @@ test("a sandboxed command still asks the daemon first, even in full-auto", async
 
   expect(cleared).toBeGreaterThan(-1);
   expect(finished).toBeGreaterThan(cleared);
-  expect(e.findLast((x) => x.type === "turnEnded")).toMatchObject({ reason: { kind: "done" } });
 });
