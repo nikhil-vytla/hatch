@@ -742,6 +742,7 @@ export function Wardrobe({ result }: { result: any }) {
               <p>“{demo.text}”</p>
               <button
                 className="wardrobe-primary"
+                data-first-action
                 onClick={replay}
                 disabled={!demoRows[demoStep % 4]?.response}
               >
