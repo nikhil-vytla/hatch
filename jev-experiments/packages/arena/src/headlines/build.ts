@@ -16,6 +16,7 @@ import {
   cardLine,
   decoyHeadline,
   eyesHeadline,
+  countHeadline,
   handoffHeadline,
   homeHeadline,
   openDecisionsHeadline,
@@ -26,6 +27,7 @@ import {
   winOverHeadline,
   type DecoyResults,
   type EyesSummary,
+  type CountSummary,
   type FoolData,
   type FreeModelResults,
   type Headlines,
@@ -66,6 +68,7 @@ export type HeadlineInputs = {
   /** The One box arena card, from public/arena/index.json. */
   oneBox: Card | null;
   spine: SpineResults | null;
+  count: CountSummary | null;
   /** Every catalog scene and its published record's result, for the collection cards. */
   records: { id: string; result: RecordResult | null }[];
 };
@@ -86,6 +89,7 @@ export function loadHeadlineInputs(lab: string, app: string): HeadlineInputs {
   const eyes = read<EyesSummary>(join(app, "public/eyes/eyes.json"));
   const arena = read<{ cards: Card[] }>(join(app, "public/arena/index.json"));
   const spine = read<SpineResults>(join(lab, "packages/arena/spine/results.json"));
+  const count = read<CountSummary>(join(app, "public/count/count.json"));
 
   const rows: RecordedRow[] = existsSync(scam)
     ? readFileSync(scam, "utf8")
@@ -108,6 +112,7 @@ export function loadHeadlineInputs(lab: string, app: string): HeadlineInputs {
     eyes,
     oneBox: arena?.cards.find((c) => c.id === "one-box") ?? null,
     spine,
+    count,
     records: experiments.map((e) => ({ id: e.id, result: e.data ? (read<{ result?: RecordResult }>(join(app, `public/data/${e.data}.json`))?.result ?? null) : null })),
   };
 }
@@ -133,6 +138,7 @@ export function headlinesFrom(i: HeadlineInputs): Headlines {
     i.eyes ? eyesHeadline(i.eyes) : null,
     i.oneBox && i.banking ? decisionsInUiHeadline(i.oneBox, i.banking) : null,
     i.spine ? spineHeadline(i.spine) : null,
+    i.count ? countHeadline(i.count) : null,
   ].filter((h) => h !== null);
 
   return {
