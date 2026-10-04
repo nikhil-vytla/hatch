@@ -24,6 +24,7 @@ const IntentRecognition = lazy(() => import("../intent-recognition").then(m => (
 const Handoff = lazy(() => import("../handoff").then(m => ({ default: m.Handoff })));
 const DecisionsArticle = lazy(() => import("../formats/decisions-article").then(m => ({ default: m.DecisionsArticle })));
 const DecoyArticle = lazy(() => import("../formats/decoy-article").then(m => ({ default: m.DecoyArticle })));
+const SpineArticle = lazy(() => import("../formats/spine-article").then(m => ({ default: m.SpineArticle })));
 const ProseArticle = lazy(() => import("../formats/prose-article").then(m => ({ default: m.ProseArticle })));
 const ScreenSentry = lazy(() => import("../screen-sentry").then(m => ({ default: m.ScreenSentry })));
 const OpenDecisions = lazy(() => import("../open-decisions").then(m => ({ default: m.OpenDecisions })));
@@ -147,6 +148,8 @@ function View({
       return <DecoyArticle />;
     case "prose":
       return <ProseArticle />;
+    case "spine":
+      return <SpineArticle />;
     case "screen-sentry":
       return <ScreenSentry />;
     case "open-decisions":
@@ -251,7 +254,7 @@ function LiveExperimentPage({ id }: { id: string }) {
     setRecord(null);
     setError("");
     setAboutOpen(false);
-    if (id === "eyes" || id === "decoy" || id === "prose" || id === "rumour-mill" || id === "win-over" || id === "ocean" || id === "open-decisions" || id === "screen-sentry" || id === "who-said-that") {
+    if (id === "eyes" || id === "decoy" || id === "prose" || id === "spine" || id === "rumour-mill" || id === "win-over" || id === "ocean" || id === "open-decisions" || id === "screen-sentry" || id === "who-said-that") {
       setRecord({ result: {} });
       return () => {
         alive = false;

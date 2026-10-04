@@ -405,6 +405,58 @@ export function winOverHeadline(r: FreeModelResults): Headline | null {
   };
 }
 
+// ---------- Spine (holding against pressure, updating on evidence)
+
+type SpineStat = { mean: number; ci: number[]; n: number } | null;
+
+/** The parts of packages/arena/spine/results.json the headline reads (written by spine/analyze.ts). */
+export type SpineResults = {
+  spine: SpineStat;
+  hold: SpineStat;
+  update: SpineStat;
+  perPressure: Record<string, { flip: SpineStat }>;
+  run: { answered: number };
+};
+
+/** The pressure kind that flipped Jev most often. */
+export function strongestPressure(r: SpineResults) {
+  const ranked = Object.entries(r.perPressure).flatMap(([k, v]) => (v.flip ? [{ k, flip: v.flip.mean }] : []));
+
+  return ranked.sort((a, b) => b.flip - a.flip)[0] ?? null;
+}
+
+const SPINE_PRESSURE_WORDS = {
+  crowd: "“most people say”",
+  expert: "“I'm an expert”",
+  contradict: "“you're wrong”",
+  repeat: "saying it three times",
+  emotion: "“please, I'm in trouble”",
+  authority: "“my manager has already confirmed”",
+} satisfies Record<string, string>;
+
+const pressureWords = (k: string) => Object.entries(SPINE_PRESSURE_WORDS).find(([key]) => key === k)?.[1] ?? k;
+
+export function spineHeadline(r: SpineResults): Headline | null {
+  const top = strongestPressure(r);
+
+  if (!r.spine || !r.hold || !r.update || !top) return null;
+
+  const score = r.spine.mean.toFixed(2);
+
+  return {
+    id: "spine",
+    verdict: `Jev took a real correction on ${pct0(r.update.mean)} of claims but held against only ${pct0(r.hold.mean)} of pushes with no evidence at all; ${pressureWords(top.k)} flipped ${pct0(top.flip)}.`,
+    stats: [
+      { value: score, label: "spine score (1 is perfect, 0 a coin's worth)" },
+      { value: pct0(r.hold.mean), label: "of pressure pushes held against" },
+      { value: pct0(r.update.mean), label: "of real corrections taken" },
+    ],
+    line: `Spine ${score}: takes ${pct0(r.update.mean)} of corrections, holds ${pct0(r.hold.mean)} against pressure`,
+    share: { big: score, ring: Math.max(0, r.spine.mean), sentence: `I argued with Jev. It takes ${pct0(r.update.mean)} of real corrections but holds against only ${pct0(r.hold.mean)} of pressure.` },
+    source: `packages/arena/spine/results.json (${count(r.run.answered)} recorded requests; 95% intervals in the article)`,
+  };
+}
+
 // ---------- Home: what the prose studies and Fool Jev found
 
 export type FoolData = { puzzles: Puzzle[]; recorded: Record<string, Record<string, { pYes: number; pChanges: number | null }>> };
