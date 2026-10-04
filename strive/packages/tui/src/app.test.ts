@@ -227,6 +227,29 @@ test("Ctrl+P in a Claude Code session steps only through Claude models", async (
   }
 });
 
+test("a session forked from a Claude Code one is strive's again: Ctrl+P reaches every keyed model", async () => {
+  const { client } = await StriveClient.connect(daemon.socket, { name: "test", version: "0" });
+
+  for (const provider of ["anthropic", "openai"])
+    await client.request("auth/set", { provider, apiKey: "sk-test-not-a-key" });
+  client.close();
+  process.env.STRIVE_ENGINE = "claude-code";
+
+  try {
+    const ui = await openUi();
+    await ui.term.waitFor("Claude Code runs this session");
+    await enter(ui, "hello");
+    await ui.term.waitFor("› hello", GIT_MS);
+    await enter(ui, "/fork 1");
+    await ui.term.waitFor("Forked from session", GIT_MS);
+    // Settings' model, then the next with a key: past the Claude models.
+    ui.term.type("\x10");
+    await ui.term.waitFor("Model: gpt-4.1");
+  } finally {
+    delete process.env.STRIVE_ENGINE;
+  }
+});
+
 test("/effort says when the model doesn't think", async () => {
   const ui = await openUi();
   await enter(ui, "/model gpt-4.1");

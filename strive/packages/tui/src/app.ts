@@ -573,6 +573,10 @@ export class App {
     this.early = [];
     this.working = undefined;
     this.unconfirmed = undefined;
+    // Each session's own, as its journal sets them.
+    this.chosenModel = undefined;
+    this.effort = "off";
+    this.engine = undefined;
     this.live.setText("");
     this.prompt.setText("");
     this.editor.disableSubmit = true;

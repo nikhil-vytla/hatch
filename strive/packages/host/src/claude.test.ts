@@ -173,3 +173,45 @@ test("a model chosen between turns is the one Claude Code runs the next turn on"
   expect(models(0, before).has("claude-haiku-4-5")).toBe(true);
   expect(models(before)).toEqual(new Set(["claude-opus-4-5"]));
 });
+
+test("Claude Code thinks only when effort is on and the model is one that thinks", async () => {
+  fake = new FakeAnthropic(() => ({ text: "answer" })).start();
+  // A model priced in settings, not said to think.
+  const settings = { models: { "claude-custom-1": { input: 1, output: 5, contextWindow: 200_000, maxOutput: 8_000 } } };
+
+  daemon = startDaemon(
+    { STRIVE_UPSTREAM_ANTHROPIC: fake.url, ANTHROPIC_API_KEY: "sk-test-key", STRIVE_HOST: HOST },
+    settings,
+  );
+
+  const { client } = await StriveClient.connect(daemon.socket, { name: "test", version: "0" });
+
+  clients.push(client);
+
+  const { id } = await client.request("session/create", {
+    cwd: realpathSync(mkdtempSync("/tmp/strv-claude-")),
+    engine: "claude-code",
+  });
+
+  const turn = async (n: number, text: string) => {
+    await client.request("session/prompt", { id, text });
+    await untilTurnsEnded(client, id, n);
+  };
+
+  const thinks = (from: number) =>
+    fake!.requests.slice(from).some((r) => r.thinking !== undefined && r.thinking.type !== "disabled");
+
+  await client.request("session/model", { id, model: "claude-haiku-4-5" });
+  await turn(1, "effort off");
+  let seen = fake.requests.length;
+
+  expect(thinks(0)).toBe(false);
+  await client.request("session/effort", { id, effort: "high" });
+  await client.request("session/model", { id, model: "claude-custom-1" });
+  await turn(2, "a model that doesn't think");
+  expect(thinks(seen)).toBe(false);
+  seen = fake.requests.length;
+  await client.request("session/model", { id, model: "claude-haiku-4-5" });
+  await turn(3, "a model that thinks");
+  expect(thinks(seen)).toBe(true);
+});

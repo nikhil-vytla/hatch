@@ -256,16 +256,15 @@ export class ClaudeHost {
   }
 
   /**
-   * How much Claude Code's model thinks: off is off, and a level is Claude
-   * Code's to map onto the model. A model that doesn't think is asked
-   * nothing of it.
+   * How much Claude Code's model thinks. Not thinking is always said, since
+   * Claude Code thinks by default: with effort off, or a model strive's
+   * table doesn't list as thinking (as the native agent does). A level is
+   * Claude Code's to map onto the model.
    */
   private thinking(): ClaudeThinking {
     const options: ClaudeThinking = {};
 
-    if (!this.config.reasoning) return options;
-
-    if (this.effort === "off") options.thinking = { type: "disabled" };
+    if (this.effort === "off" || !this.config.reasoning) options.thinking = { type: "disabled" };
     else options.effort = this.effort;
 
     return options;
