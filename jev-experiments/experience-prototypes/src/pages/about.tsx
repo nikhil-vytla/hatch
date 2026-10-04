@@ -1,5 +1,6 @@
 import { ArrowUpRight } from "lucide-react";
 import { BuilderCredits } from "../../../roadmap/credits";
+import { StartHereList } from "../start-here";
 import "./play.css";
 
 export function AboutPage() {
@@ -14,6 +15,8 @@ export function AboutPage() {
         <p>Jev Experiments is an independent collection of tools, playable scenes and research notes. It explores <a href="https://docs.typesafe.ai/introduction">TypeSafe AI's Jev</a>, which returns typed choices, probabilities and scores. The code around those decisions makes them useful, and is part of the experiment.</p>
         <p>A model call does not paint each grain or play each note. Local code handles the simulation, direct input and valid actions. The experiment notes show where a model's answer takes effect, alongside the source and evidence.</p>
         <p>The local models are separate experimental adaptations. Their results include weak transfer and sensitivity to option order. Read the <a href="#experiment/local-models">local decision study</a> for the methods, model identities and limitations.</p>
+        <h2>Three ways in</h2>
+        <StartHereList />
         <h2>How to read an experiment</h2>
         <dl className="about-modes">
           <div><dt>Local</dt><dd>Code or an explicitly identified local model runs the action.</dd></div>

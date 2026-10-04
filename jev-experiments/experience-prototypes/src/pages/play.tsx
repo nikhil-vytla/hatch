@@ -1,12 +1,11 @@
 import { useState } from "react";
-import { ArrowDown, ArrowUpRight, Search } from "lucide-react";
-import { experiments, categories, lookup } from "../catalog";
+import { ArrowUpRight, Search } from "lucide-react";
+import { experiments, categories } from "../catalog";
 import { listedNotes } from "../notes/manifest";
-import { MiniExperimentPreview } from "../live-world-preview";
-import { starterScore } from "../../../music-arranger-v2/engine";
 import { FoolJev } from "../fool-jev";
 import { cardLineFor, homeHeadline, ShareCardButton } from "../headline-strip";
 import { DIAGRAMS, diagramText, SceneDiagram } from "../scene-diagrams";
+import { StartHere } from "../start-here";
 import "./play.css";
 
 
@@ -34,34 +33,8 @@ function CardResult({ id }: { id: string }) {
   return c ? <p className={c.fromHeadline ? "card-result" : "card-result card-result-count"}>{c.line}</p> : null;
 }
 
-const scenes = [
-  { id: "music", action: "Play a phrase. Keep the part you like.", label: "Sound & composition" },
-  { id: "tetris", action: "Take over. Rewind. Try another landing.", label: "Play & compare" },
-  { id: "win-over", action: "Say anything. Win the town over by 5 pm.", label: "A town that judges you" },
-  { id: "visual-search", action: "Find an artwork. Make a collection.", label: "Search & collect" },
-] as const;
-
 // A plan for future work is available from About, not advertised as a playground.
 const catalog = experiments;
-const openingMelody = starterScore().events.filter(
-  (event) => event.phrase === 0 && event.track === "melody" && event.midi !== null,
-);
-
-function MusicFigure() {
-  return (
-    <svg className="play-music-figure" viewBox="0 0 380 208" aria-hidden="true">
-      {[0, 1, 2, 3, 4].map((line) => (
-        <path key={line} d={`M42 ${50 + line * 23}H338`} />
-      ))}
-      {openingMelody.map((note) => (
-        <rect key={note.id} x={44 + note.beat * 36} y={145 - (note.midi! - 60) * 5}
-          width={Math.max(4, note.duration * 36 - 4)} height={9} rx={2} />
-      ))}
-      <text x="44" y="183">Starter melody, first phrase</text>
-    </svg>
-  );
-}
-
 export function PlayPage() {
   const [category, setCategory] = useState("All");
   const [query, setQuery] = useState("");
@@ -112,31 +85,7 @@ export function PlayPage() {
         </section>}
       </div>
 
-      <section className="play-selected" aria-labelledby="selected-heading">
-        <div className="play-section-heading">
-          <h2 id="selected-heading">A few other ways in</h2>
-          <a href="#collection">Browse the collection <ArrowDown size={15} /></a>
-        </div>
-        <div className="play-scenes">
-          {scenes.map((scene) => (
-            <a className={`play-scene play-scene-${scene.id}`} href={`#experiment/${scene.id}`} key={scene.id}>
-              <div className="play-scene-image">
-                {scene.id === "music" ? (
-                  <MusicFigure />
-                ) : (
-                  // The town keeps the square's courtyard thumbnail.
-                  <MiniExperimentPreview kind={scene.id === "win-over" ? "crowd" : scene.id} />
-                )}
-              </div>
-              <CardDiagram id={scene.id} />
-              <p className="play-kicker">{scene.label}</p>
-              <h3>{lookup(scene.id).title}<ArrowUpRight size={18} /></h3>
-              <p className="play-scene-action">{scene.action}</p>
-              <CardResult id={scene.id} />
-            </a>
-          ))}
-        </div>
-      </section>
+      <StartHere />
 
       <section className="play-notes" aria-labelledby="recent-notes-heading">
         <div className="play-section-heading">
