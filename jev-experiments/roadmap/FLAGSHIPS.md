@@ -1,13 +1,22 @@
 # Next wave: flagships, multimodal Jev, installable tools
 
-Written 2 Oct 2026 after a three-part retrospective (audience value, engineering mess, roadmap research). The working notes, about 190 screenshots and the per-page scores are in the session's job folder. This file holds the decisions and the plan.
+Written 2 Oct 2026 after a three-part retrospective (audience value, engineering mess, roadmap research), and updated 3 Oct 2026. The working notes, about 190 screenshots and the per-page scores are in the session's job folder. This file holds the decisions and the plan.
+
+## What's live (3 Oct 2026)
+
+- **Seven of eight flagships are live.** The three new ones shipped: Eyes against state (#187), Screen sentry (#186) and Who said that? (#188). Decisions in an interface is the one still being combined.
+- **Page formats are rolled out:** articles for the decoy and the prose studies (#191), reports for six benchmark pages (#192), and one shared evidence drawer on every game page (#185, #198).
+- **Home and About** start with three paths: "Check our work" for researchers, "Just play", and "Build with it" for engineers.
+- **Tools:** the Screen sentry Chrome extension (`extensions/screen-sentry/`, not published to the store), the jev-lab CLI (`tools/decide-cli/`, #182) and the Who said that? Mac app (`apps/who-said-that-mac/`, microphone path untested).
+- **The retrospective's quality backlog is done**, apart from "Build this" snippets and the creative-tool controls, both now in progress.
+- **In progress (lanes B–G):** B "Build this" snippets per scene, C Decisions in an interface, D Spine (sycophancy), E Count with me, F creative-tool controls, G Who said that? accuracy.
 
 ## Decisions (2 Oct 2026)
 
 - **Researchers come first.** The front door is credible research: a clear question, method, sample, uncertainty and data. Laypeople still get a toy on every flagship, and engineers get the exact request.
 - **Recorded is the default everywhere.** Every main button replays a recording. Live Jev on the visitor's own key is a quiet secondary ("try your own"). There is no shared server key.
 - **Flagships are chosen for diversity:** different questions, modalities, audiences and page formats. Some existing scenes step back into the collection, and new ones join.
-- **Each page gets the format that suits it.** The three formats are a Distill-style article, a report with a companion toy, and a game with an evidence drawer. All three are being prototyped (`proto/page-formats`).
+- **Each page gets the format that suits it.** The three formats are a Distill-style article, a report with a companion toy, and a game with an evidence drawer. All three are rolled out (#185, #191, #192).
 - **Camera and microphone are in scope,** processed locally in the browser by default, with recorded demos first.
 - **Installable tools are in scope:** a Chrome extension, a Mac menu-bar app and a CLI.
 - **Jev's outputs are never training data.** TypeSafe's Master Customer Agreement §2.3(b) forbids distillation and imitation. Free models learn from simulation (the reef's evolved policy), open teachers (Bramble mini, labelled by Qwen3.8) or our own authored labels.
@@ -16,16 +25,16 @@ Written 2 Oct 2026 after a three-part retrospective (audience value, engineering
 
 | Flagship | Question it answers | Kind | Format | Status |
 |---|---|---|---|---|
-| Robustness: Fool Jev, prose studies, decoy | What moves a decision model that rewording doesn't? | research, text | Distill-style article | live; format prototype |
-| Evaluation: answer key, open decisions | Who's right depends on who wrote the key; how close do open models get? | research | report + companion toy | live; format prototype |
-| The reef | Does how fast a model decides change who survives? | simulation | game + evidence drawer | live; format prototype |
-| Decisions in an interface: One box + When to ask a person | What do fast, calibrated decisions do inside a real UI? | product UX | article | live, to be combined |
+| Robustness: Fool Jev, prose studies, decoy | What moves a decision model that rewording doesn't? | research, text | Distill-style article | live; article (#191) |
+| Evaluation: answer key, open decisions | Who's right depends on who wrote the key; how close do open models get? | research | report + companion toy | live; report (#192) |
+| The reef | Does how fast a model decides change who survives? | simulation | game + evidence drawer | live; drawer (#185), evolved policy (#133) |
+| Decisions in an interface: One box + When to ask a person | What do fast, calibrated decisions do inside a real UI? | product UX | article | both live; combining in progress (lane C) |
 | Decide | Where do models disagree with people on judgement calls? | crowd game | game | live |
-| Eyes against state | What does it cost to let a model look at the screen instead of reading state? | vision | game + evidence drawer | prototype `proto/eyes-vs-state` |
-| Screen sentry | Can a fast checker stop prompt injections as an AI helper browses? | agent safety | game + Chrome extension | prototype `proto/screen-sentry` |
-| Who said that? | In a noisy room, who said each line, and is it part of our conversation? | audio | tool + report, Mac app | prototype `proto/who-said-that` |
+| Eyes against state | What does it cost to let a model look at the screen instead of reading state? | vision | game + evidence drawer | live (#187); real Qwen3-VL runs on the M4 Max |
+| Screen sentry | Can a fast checker stop prompt injections as an AI helper browses? | agent safety | game + Chrome extension | live (#186), drawer (#198); extension in repo |
+| Who said that? | In a noisy room, who said each line, and is it part of our conversation? | audio | tool + report, Mac app | live (#188) on AMI audio, drawer (#198); accuracy work in progress (lane G) |
 
-These move to the collection rather than being flagships: Who can you win over?, the rumour mill. To be merged or retired: Model Routing Lab, the arena Café duplicate, Tetris realtime (into Tetris turns), and the "What one resident saw" note.
+Who can you win over? and the rumour mill moved to the collection. Model Routing Lab and the "What one resident saw" note are retired, Tetris realtime is a tab of Tetris turns, and the arena Café card links to the Café Jev scene (#176). The capability atlas is retired too (#189).
 
 ## Multimodal Jev
 
@@ -53,22 +62,22 @@ The idea we'd most like to borrow is floorplan's: show the count and cost at eve
 
 ## Installable tools
 
-- **Chrome extension:** Screen sentry marks instruction-like text on any page, using a bundled free classifier. Your own Jev key is optional. Prototype in `proto/screen-sentry` (`extensions/screen-sentry/`).
-- **Mac menu-bar app:** Who said that? writes speaker-labelled transcripts on-device. Prototype in `proto/who-said-that` (`apps/who-said-that-mac/`).
-- **CLI:** `eval` runs our published studies (Fool Jev, prose, decoy) against Jev, SGLang `/v1/systemone` or a local server, with a hard spend cap. `compare` diffs two recordings, and `bouncer` checks agent tool calls. Prototype in `proto/decide-cli` (`tools/decide-cli/`).
+- **Chrome extension:** Screen sentry marks instruction-like text on any page, using a bundled free classifier. Your own Jev key is optional. In the repo at `extensions/screen-sentry/` (#186); not published to the Chrome Web Store.
+- **Mac menu-bar app:** Who said that? writes speaker-labelled transcripts on-device. In the repo at `apps/who-said-that-mac/` (#188), still a prototype; recording from the microphone is untested.
+- **CLI:** `eval` runs our published studies (Fool Jev, prose, decoy) against Jev, SGLang `/v1/systemone` or a local server, with a hard spend cap. `compare` diffs two recordings, and `bouncer` checks agent tool calls. In the repo at `tools/decide-cli/` (#182), tests in CI; not published to npm.
 
 ## Quality backlog from the retrospective
 
 | Gap | Fix | Status |
 |---|---|---|
-| About 350 px of header before every scene | One compact header; "Jev's role" moves into the evidence section | in progress |
-| Headline strips duplicate verdicts and push play below the fold | Strips go after the first interaction on games, and replace old verdicts on benchmarks | in progress |
-| The main button needs a key on 4 scenes | The recorded replay is primary; "try your own" is secondary | in progress |
-| Results before play on game pages | Play first (Red Blob Games) | in progress |
-| Walls of text (JudgeBench 4,815 words, Decision models on a Mac 2,416) | Split each into a scene plus a linked note | in progress |
-| No "start here" per audience, no "build this" code | Entry rows on home and About; a generated SDK snippet per scene (Stripe Docs) | planned |
-| Stale READMEs, duplicate results folders, dead code, duplicated helpers, three copies of transformers.js, four builds per PR | Engineering cleanup PRs | in progress |
-| Creative tools with 60–90 controls | One obvious first action; the rest behind "More controls" | planned |
+| About 350 px of header before every scene | One compact header; "Jev's role" moves into the evidence section | done (#167) |
+| Headline strips duplicate verdicts and push play below the fold | Strips go after the first interaction on games, and replace old verdicts on benchmarks | done (#169) |
+| The main button needs a key on 4 scenes | The recorded replay is primary; "try your own" is secondary | done (#173) |
+| Results before play on game pages | Play first (Red Blob Games) | done (#174) |
+| Walls of text (JudgeBench 4,815 words, Decision models on a Mac 2,416) | Split each into a scene plus a linked note | done (#179) |
+| No "start here" per audience, no "build this" code | Entry rows on home and About; a generated SDK snippet per scene (Stripe Docs) | start-here rows done; "Build this" in progress (lane B) |
+| Stale READMEs, duplicate results folders, dead code, duplicated helpers, three copies of transformers.js, four builds per PR | Engineering cleanup PRs | done (#165, #166, #168, #170, #172, #175, #177, #178, #184, #189, #190); recordings gzipped (#199) |
+| Creative tools with 60–90 controls | One obvious first action; the rest behind "More controls" | in progress (lane F) |
 
 ## References
 
