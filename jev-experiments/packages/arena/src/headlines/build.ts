@@ -12,6 +12,7 @@ import { createTown } from "../../../../live-worlds/rumour/town";
 import { experiments } from "../../../../experience-prototypes/src/catalog";
 import {
   answerKeyHeadline,
+  decisionsInUiHeadline,
   cardLine,
   decoyHeadline,
   eyesHeadline,
@@ -35,6 +36,7 @@ import {
   type SentryCompare,
 } from "./headlines";
 import type { Question } from "../answer-key/model";
+import type { Card } from "../data/schema";
 
 /** The rumour mill's town, as the page builds it. */
 export const RUMOUR_TOWN = { seed: 7, residents: 4000 };
@@ -59,6 +61,8 @@ export type HeadlineInputs = {
   sentry: SentryCompare | null;
   rumour: { vectors: Vectors; messages: Record<string, number[]>; rows: RecordedRow[] } | null;
   eyes: EyesSummary | null;
+  /** The One box arena card, from public/arena/index.json. */
+  oneBox: Card | null;
   /** Every catalog scene and its published record's result, for the collection cards. */
   records: { id: string; result: RecordResult | null }[];
 };
@@ -77,6 +81,7 @@ export function loadHeadlineInputs(lab: string, app: string): HeadlineInputs {
   const vectors = read<Vectors & { messages: Record<string, number[]> }>(join(lab, "live-worlds/rumour/vectors.json"));
   const scam = join(lab, "live-worlds/rumour/jev-scam.jsonl");
   const eyes = read<EyesSummary>(join(app, "public/eyes/eyes.json"));
+  const arena = read<{ cards: Card[] }>(join(app, "public/arena/index.json"));
 
   const rows: RecordedRow[] = existsSync(scam)
     ? readFileSync(scam, "utf8")
@@ -97,6 +102,7 @@ export function loadHeadlineInputs(lab: string, app: string): HeadlineInputs {
     sentry,
     rumour: vectors && rows.length ? { vectors: { anchors: vectors.anchors, archetypes: vectors.archetypes, places: vectors.places }, messages: vectors.messages, rows } : null,
     eyes,
+    oneBox: arena?.cards.find((c) => c.id === "one-box") ?? null,
     records: experiments.map((e) => ({ id: e.id, result: e.data ? (read<{ result?: RecordResult }>(join(app, `public/data/${e.data}.json`))?.result ?? null) : null })),
   };
 }
@@ -120,6 +126,7 @@ export function headlinesFrom(i: HeadlineInputs): Headlines {
     i.sentry ? sentryHeadline(i.sentry) : null,
     i.rumour ? rumour(i.rumour) : null,
     i.eyes ? eyesHeadline(i.eyes) : null,
+    i.oneBox && i.banking ? decisionsInUiHeadline(i.oneBox, i.banking) : null,
   ].filter((h) => h !== null);
 
   return {

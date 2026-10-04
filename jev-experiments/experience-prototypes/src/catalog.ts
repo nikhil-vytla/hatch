@@ -115,6 +115,14 @@ export const experiments = [
     "When should software act on Jev's answer, and when should it ask a person?",
   ),
   e(
+    "decisions-in-ui",
+    "classify",
+    "Decisions in an interface",
+    "Benchmarks",
+    "Watch one box turn typing into a card, then set how sure Jev must be before it acts. An article.",
+    "What do fast, calibrated decisions do inside a real UI?",
+  ),
+  e(
     "open-decisions",
     "",
     "Open decisions",

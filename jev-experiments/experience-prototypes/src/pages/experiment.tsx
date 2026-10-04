@@ -22,6 +22,7 @@ const Games = lazy(() => import("../games").then(m => ({ default: m.Games })));
 const Learning = lazy(() => import("../benchmarks").then(m => ({ default: m.Learning })));
 const IntentRecognition = lazy(() => import("../intent-recognition").then(m => ({ default: m.IntentRecognition })));
 const Handoff = lazy(() => import("../handoff").then(m => ({ default: m.Handoff })));
+const DecisionsArticle = lazy(() => import("../formats/decisions-article").then(m => ({ default: m.DecisionsArticle })));
 const DecoyArticle = lazy(() => import("../formats/decoy-article").then(m => ({ default: m.DecoyArticle })));
 const ProseArticle = lazy(() => import("../formats/prose-article").then(m => ({ default: m.ProseArticle })));
 const ScreenSentry = lazy(() => import("../screen-sentry").then(m => ({ default: m.ScreenSentry })));
@@ -129,7 +130,17 @@ function View({
         </BenchmarkReport>
       );
     case "handoff":
-      return <Handoff result={result} />;
+      return (
+        <>
+          <Handoff result={result} />
+          <p className="fine">
+            <a href="#experiment/decisions-in-ui">Decisions in an interface</a> reads this beside One box: what the same
+            confidence does while someone types.
+          </p>
+        </>
+      );
+    case "decisions-in-ui":
+      return <DecisionsArticle result={result} />;
     case "ocean":
       return <OceanReef />;
     case "decoy":
