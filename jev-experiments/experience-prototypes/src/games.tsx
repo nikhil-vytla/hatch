@@ -11,7 +11,39 @@ import {
   ArrowUp,
 } from "lucide-react";
 import { Pane, Field, Button, Pills, Stat, State } from "./shared";
+import { choice } from "./api";
 import { fromRecorded, Receipt } from "./receipt";
+
+/**
+ * The request jev_lab's games recorder sent at a step (src/jev_lab/games.py), rebuilt from the
+ * published trace: the observation, the last eight moves for the memory policy, and one Choice
+ * over the legal actions. The record keeps the answers, not the requests.
+ */
+function recordedRequest(policy: string, trace: any[], step: number, observations: any[]) {
+  const seen = (e: any) => e.observation ?? observations?.[e.state_id];
+  const state = seen(trace[step]);
+  const recent =
+    policy === "jev_memory"
+      ? trace
+          .slice(0, step)
+          .slice(-8)
+          .map((e) => {
+            const s = seen(e);
+
+            return { action: e.action, front_before: s.visible_grid.at(-2)[Math.floor(s.visible_grid[0].length / 2)], carrying_before: s.carrying };
+          })
+      : [];
+
+  return {
+    state: { ...state, recent_actions: recent },
+    questions: {
+      action: choice(
+        "Choose the next legal action to accomplish the mission. Turn before moving toward a visible target. Pick up a key before opening a locked door. Avoid repeating unproductive action cycles.",
+        state.legal_actions,
+      ),
+    },
+  };
+}
 export function GameGrid({
   state,
   small = false,
@@ -297,7 +329,10 @@ export function Games({ result }: { result: any }) {
               ))}
           </div>
           {/* Only steps where Jev was asked: cached steps and code baselines made no request. */}
-          {entry && !entry.cache_hit && entry.latency_ms ? <Receipt label="This step" data={fromRecorded(entry)} /> : null}
+          {entry && !entry.cache_hit && entry.latency_ms ? <Receipt
+              label="This step"
+              data={{ ...fromRecorded(entry), rebuilt: true, raw: { request: recordedRequest(episode.policy, trace, step, result.observations), response: entry } }}
+            /> : null}
           <p className="fine">
             {episodes.length} completed episodes, including unsuccessful
             attempts. {interrupted.length} interrupted episode is excluded from

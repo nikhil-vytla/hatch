@@ -7,6 +7,9 @@ import { useEffect, useMemo, useState } from "react";
 import { cheapest, curve, split, top, type Decision } from "../../packages/arena/src/handoff/model";
 import { Notice, Pane, Pills, Stat } from "./shared";
 import { percent1 as pct, fetchJson } from "./api";
+import { typedCaseRequest } from "./answer-key";
+import { BuildThis } from "./build-this";
+import { intentRequest } from "./intent-requests";
 
 /** How far each dataset's stated confidence can be trusted, from its recorded calibration. */
 type Source = { id: string; label: string; about: string; unit: string; calibration: string };
@@ -113,6 +116,14 @@ export function Handoff({ result }: { result: any }) {
     [source, typed, result],
   );
 
+  // One recorded case's request, for "Build this": the first BANKING77 or CLINC150 utterance, or the first typed case.
+  const example = useMemo(() => {
+    if (source.id === "typed") return typed?.cases?.[0] ? typedCaseRequest(typed.cases[0]) : null;
+
+    const row = (result?.experiments?.[source.id]?.rows ?? []).find((r: any) => !r.error && r.text);
+
+    return row ? intentRequest(source.id as "banking77" | "clinc150", row.text) : null;
+  }, [source, typed, result]);
   const s = split(decisions, threshold);
   const best = useMemo(() => cheapest(decisions, cost), [decisions, cost]);
   const sure = split(decisions, 0.995);
@@ -161,6 +172,19 @@ export function Handoff({ result }: { result: any }) {
           </p>
         )}
       </Pane>
+      {example && (
+        <BuildThis
+          key={source.id}
+          request={example}
+          rebuilt={source.id === "typed"}
+          note={
+            source.id === "typed"
+              ? "Rebuilt from the first published case; the recording kept each model's probabilities, not the requests."
+              : "The first recorded case, rebuilt with the recorder's code; it matches the request's recorded hash."
+          }
+          label="Build this: one decision from this dataset"
+        />
+      )}
 
       <Pane title="What threshold is cheapest?" sub="Counting a review as one unit of cost">
         <label className="handoff-slider">

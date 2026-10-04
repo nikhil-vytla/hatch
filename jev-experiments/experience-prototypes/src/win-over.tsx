@@ -27,6 +27,7 @@ import { STUDENT_NAME } from "../../live-worlds/free-model/runtime";
 import studentLines from "../../live-worlds/free-model/recorded-lines.json";
 import { getApiKey, NO_KEY_MESSAGE, run, percent } from "./api";
 import { describeFailure } from "./live-failure";
+import { BuildThis } from "./build-this";
 import { Receipt } from "./receipt";
 import { KeyTag, LiveFailure, ModeTag, openSettings } from "./trust";
 import "./fool-jev.css";
@@ -503,6 +504,14 @@ export function WinOver() {
                     />
                   ) : (
                     <p className="wo-fine">Hasn't heard from you yet.</p>
+                  )}
+                  {b?.lastRequest && (
+                    <BuildThis
+                      request={b.lastRequest.request}
+                      rebuilt={!b.lastRequest.sent}
+                      note={b.lastRequest.sent ? undefined : "The residents decided in your browser; this is the one batched call Jev gets for the same line."}
+                      label="Build this: your last line as one Jev call"
+                    />
                   )}
                 </>
               ) : (

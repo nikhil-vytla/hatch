@@ -3,17 +3,7 @@ import "./credentials";
 import { existsSync } from "node:fs";
 import { evaluate } from "./local-model";
 import { compose } from "./local-model";
-import {
-  pasteSources,
-  pasteFields,
-  extractFacts,
-  pasteQuestions,
-  supportRows,
-  edits,
-  impactFacts,
-  conclusionsForJev,
-} from "../src/new-experiments";
-import { judge } from "../src/api";
+import { pasteSources, recordedRequests } from "../src/new-experiments";
 const dir = "results";
 const save = (name: string, result: unknown) =>
   writeRecord(`${dir}/${name}.jsonl`, {
@@ -39,75 +29,14 @@ const job = async (name: string, fn: () => Promise<void>) => {
 await job("paste", async () => {
   const rows = [];
   for (const [preset, source] of Object.entries(pasteSources)) {
-    const fields = pasteFields[preset as keyof typeof pasteFields];
-    const r = await evaluate({
-      state: { source, destination: preset },
-      questions: pasteQuestions(fields, extractFacts(source), preset),
-    });
+    const r = await evaluate(recordedRequests.paste(preset as keyof typeof pasteSources, source));
     rows.push({ preset, source_text: source, ...r });
   }
   save("paste", { rows });
 });
-await job("semantic-table", async () =>
-  save(
-    "semantic-table",
-    await evaluate({
-      state: {
-        conversations: Object.fromEntries(
-          supportRows.map((r) => [r.id, r.text]),
-        ),
-      },
-      questions: Object.fromEntries(
-        supportRows.map((r) => [
-          r.id,
-          judge(
-            `For conversation ${r.id}: Was a refund promised but no successful refund is evidenced?`,
-          ),
-        ]),
-      ),
-    }),
-  ),
-);
-await job("undo", async () =>
-  save(
-    "undo",
-    await evaluate({
-      state: {
-        request: "Undo the color changes, but keep the new layout and title.",
-        edits,
-      },
-      questions: Object.fromEntries(
-        edits.map((e) => [
-          e.id,
-          judge(
-            `Should edit ${e.id} be undone to satisfy the request? Preserve unrelated edits.`,
-          ),
-        ]),
-      ),
-    }),
-  ),
-);
-await job("changes", async () =>
-  save(
-    "changes",
-    await evaluate({
-      state: {
-        before: impactFacts,
-        after: { ...impactFacts, venue: "Waterfront Pavilion, Portland" },
-        // Text only: the dependency lists are the answer key, so they stay out of the request.
-        conclusions: conclusionsForJev,
-      },
-      questions: Object.fromEntries(
-        conclusionsForJev.map((c) => [
-          c.id,
-          judge(
-            `Does conclusion ${c.id} need review because the facts changed?`,
-          ),
-        ]),
-      ),
-    }),
-  ),
-);
+await job("semantic-table", async () => save("semantic-table", await evaluate(recordedRequests.semanticTable())));
+await job("undo", async () => save("undo", await evaluate(recordedRequests.undo())));
+await job("changes", async () => save("changes", await evaluate(recordedRequests.changes())));
 {
   const path = "results/composed-ui.jsonl";
   const previous = existsSync(path) ? readRecord(path).result : { rows: [] };

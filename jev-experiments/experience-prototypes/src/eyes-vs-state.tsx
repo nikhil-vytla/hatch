@@ -10,7 +10,7 @@
  * small in-browser model check at the bottom.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
-import { greedy, initial, step, type State } from "../../local-models-and-games/arcade/engine";
+import { greedy, initial, recordedRequest, step, type State } from "../../local-models-and-games/arcade/engine";
 import type { EyesData } from "../../live-worlds/eyes/build";
 import { apply, DIRECTIONS, PALETTE, type Direction, type Relative } from "../../live-worlds/eyes/model";
 import { fetchJson, percent as pct } from "./api";
@@ -289,7 +289,16 @@ export function EyesVsState() {
             {a.action ? ` · next: ${a.action}` : ""}
             {aOver ? ` · ${a.state.status === "lost" ? a.state.reason : "survived all 90 moves"}` : ""}
           </p>
-          {jevTrace && a.ms ? <Receipt data={{ mode: "recorded", ms: a.ms, questions: 1, servedBy: "typesafe-ai" }} label="Jev" /> : null}
+          {jevTrace && a.ms ? <Receipt
+              data={{
+                mode: "recorded",
+                ms: a.ms,
+                questions: 1,
+                servedBy: "typesafe-ai",
+                raw: { request: recordedRequest(a.state), response: { answers: { action: { value: a.action } } }, note: "Recorded in the arcade's Snake runs, batched with the other games; the code asks for this move alone." },
+              }}
+              label="Jev"
+            /> : null}
         </section>
 
         <section className={`ev-lane${bOver ? " is-over" : ""}`} aria-label="Lane B, looks at the screen">

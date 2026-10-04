@@ -32,6 +32,7 @@ import evolved from "../../live-worlds/ocean/policy.json";
 import { parseRecording, RACE, replayer, type Recording } from "../../live-worlds/ocean/replay";
 import type { Decision } from "../../live-worlds/ocean/engine";
 import { getApiKey, NO_KEY_MESSAGE, run, percent as pct } from "./api";
+import { BuildThis } from "./build-this";
 import { describeFailure, type Failure } from "./live-failure";
 import { LiveFailure } from "./trust";
 import "./ocean-reef.css";
@@ -219,6 +220,8 @@ export function OceanReef() {
   const counts = useRef<[number, number][]>([]);
   const policyMicros = useRef<number[]>([]);
   const spent = useRef(0);
+  // The latest batch sent to Jev, for "Build this".
+  const lastJev = useRef<unknown>(null);
   const fps = useRef(0);
   const [, setVersion] = useState(0);
   const [model, setModel] = useState<Model>("evolved");
@@ -396,6 +399,8 @@ export function OceanReef() {
 
           try {
             const req = jevRequest(views);
+
+            lastJev.current = req;
             const res = await run(req.state, req.questions);
 
             if (!live()) return;
@@ -643,6 +648,20 @@ export function OceanReef() {
             {model === "jev" ? ` · $${spent.current.toFixed(4)} so far` : " · $0"}
           </p>
           <Bar label="Stale" value={staleShare(w)} tone="stale" />
+          <BuildThis
+            key={model}
+            load={async () => {
+              const now = target();
+              const fish = due(now, JEV_BATCH);
+
+              return model === "jev" && lastJev.current
+                ? lastJev.current
+                : jevRequest((fish.length ? fish : now.fish.filter((f) => f.alive).slice(0, JEV_BATCH)).map((f) => view(now, f)));
+            }}
+            rebuilt={model !== "jev"}
+            note={model === "jev" ? undefined : "These fish aren't deciding with Jev; this is the batch Jev gets for up to 40 of them as the reef is now."}
+            label="Build this: one batch of fish"
+          />
           <label className="reef-lens">
             <input type="checkbox" checked={lens} onChange={(e) => setLens(e.target.checked)} /> Latency lens: grey out fish acting
             on a decision more than {STALE_AFTER} s old

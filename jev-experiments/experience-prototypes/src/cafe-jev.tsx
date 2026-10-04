@@ -412,6 +412,12 @@ export function Beverage({ result }: { result: any }) {
         (r: any) => r.response && r.contractVersion === CONTRACT_VERSION,
       )
     : [];
+  // The batch request a recorded response answered (three customers asked together).
+  const recordedPayload = (response: unknown) => {
+    const batchId = rows.find((r) => r.response === response)?.batchId;
+
+    return (result?.requestBatches ?? []).find((b: any) => b.id === batchId)?.payload;
+  };
   function invalidate() {
     current.current = {
       ...current.current,
@@ -1058,7 +1064,7 @@ export function Beverage({ result }: { result: any }) {
             )}
             {/* After a manual edit the drink on screen is the visitor's, not Jev's, so no receipt. */}
             {scene.response && (scene.source === "live" || scene.source === "recorded") && (
-              <Receipt data={scene.source === "live" ? fromLive(scene.response) : fromRecorded(scene.response)} />
+              <Receipt data={scene.source === "live" ? fromLive(scene.response) : fromRecorded(scene.response, { raw: { request: recordedPayload(scene.response), response: scene.response } })} />
             )}
             <button
               className="cafe-preference-toggle"

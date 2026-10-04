@@ -490,7 +490,7 @@ export function WhoSaidThat() {
 
       const answers = bodies.map((b, i) => fromJev((b as { answers: Record<string, Count & { value?: unknown }> }).answers, Math.min(LOOKBACK, i)));
 
-      setLive({ answers, receipt: fromLiveBatches(bodies, { note: "one request per line", first: requests[0] }), for: target });
+      setLive({ answers, receipt: fromLiveBatches(bodies, requests), for: target });
       setLane("live");
       setLiveNote("");
     } catch (e) {

@@ -50,6 +50,11 @@ export class Brain {
   lastError = "";
   /** The last failed request's error, so the page can say what went wrong and offer a way out. */
   lastFailure: unknown = null;
+  /**
+   * The latest line as one batched Jev call: sent when the backend is Jev, and what Jev would
+   * have been sent otherwise. The page's "Build this" shows it.
+   */
+  lastRequest: { request: { state: unknown; questions: Record<string, unknown> }; sent: boolean } | null = null;
 
   constructor(
     private world: () => World,
@@ -117,6 +122,9 @@ export class Brain {
     const w = this.world();
     const g = goal(w.goal ?? "gig");
     const b = this.backend;
+    const req = merge([{ key: "line", req: lineRequest(event) }, ...listeners.map((r) => ({ key: r.id, req: reactionRequest(r, event, g) }))]);
+
+    this.lastRequest = { request: req, sent: b.kind === "jev" };
 
     if (b.kind === "student") {
       const started = now();
@@ -155,7 +163,6 @@ export class Brain {
     }
 
     const started = now();
-    const req = merge([{ key: "line", req: lineRequest(event) }, ...listeners.map((r) => ({ key: r.id, req: reactionRequest(r, event, g) }))]);
     const reply = await b.ask(req.state, req.questions);
     const ms = Math.round(reply.latency_ms ?? now() - started);
     const line = split(reply.answers, "line");

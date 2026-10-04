@@ -14,6 +14,7 @@ import { QUESTIONS, type Reading } from "../../../packages/arena/src/one-box/que
 import { normalizeKey, TYPING } from "../../../packages/arena/src/one-box/replay";
 import { NO_KEY_MESSAGE, run, useHasKey } from "../api";
 import { describeFailure, type Failure } from "../live-failure";
+import { BuildThis } from "../build-this";
 import { fromLive, Receipt, type ReceiptData } from "../receipt";
 import { LiveFailure, ModeTag } from "../trust";
 import { colorVars, type CardModel } from "./model";
@@ -260,8 +261,17 @@ export function TryBox({ model: m }: { model: CardModel }) {
                   onRetry={() => askJev(text, performance.now())}
                   fallback={lane.requests ? "The last answer stays on screen." : "The keyword lane still answers without a key."}
                 />
+              ) : id === "jev" && lane.receipt ? (
+                <Receipt data={lane.receipt} />
               ) : (
-                id === "jev" && lane.receipt && <Receipt data={lane.receipt} />
+                // Before a live answer: the request Jev would get for what's typed (or an example).
+                id === "jev" && (
+                  <BuildThis
+                    request={{ state: { text: text.trim() || EXAMPLES[0] }, questions: QUESTIONS }}
+                    rebuilt
+                    note="Nothing has been sent yet; this is the request Jev gets for the text in the box, with the same questions as every answer here."
+                  />
+                )
               )}
             </article>
           );

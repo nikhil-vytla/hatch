@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { motion } from "motion/react";
 import { ArrowLeft, ArrowRight, Check, Eye, Search } from "lucide-react";
 import { Pane, Stat, Button, Fold, State, Notice } from "./shared";
+import { payload } from "../../rewardbench2/wire";
 import { fromRecorded, Receipt } from "./receipt";
 import { ContentReview } from "./provenance";
 import { percent1, fetchJson } from "./api";
@@ -361,7 +362,17 @@ export function RewardBench({ result }: { result: any }) {
                     .map((id: string) => requests.get(id))
                     .filter(Boolean)
                     .map((q: any, i: number, all: any[]) => (
-                      <Receipt key={q.id} label={all.length > 1 ? `Request ${i + 1}` : undefined} data={fromRecorded(q)} />
+                      <Receipt
+                        key={q.id}
+                        label={all.length > 1 ? `Request ${i + 1}` : undefined}
+                        data={
+                          // "Build this" once per case: its own Score questions, as run.ts encodes
+                          // them, without the other cases they were batched with.
+                          i === 0
+                            ? { ...fromRecorded(q), rebuilt: true, raw: { request: payload(row), response: q, note: "This case's answers were scored in batches with other cases; the request below asks this case's answers alone." } }
+                            : fromRecorded(q)
+                        }
+                      />
                     ))}
                   <Fold title="Full case record">
                     <State value={row} />
