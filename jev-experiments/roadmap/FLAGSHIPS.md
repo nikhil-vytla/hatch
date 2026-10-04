@@ -4,12 +4,13 @@ Written 2 Oct 2026 after a three-part retrospective (audience value, engineering
 
 ## What's live (3 Oct 2026)
 
-- **Seven of eight flagships are live.** The three new ones shipped: Eyes against state (#187), Screen sentry (#186) and Who said that? (#188). Decisions in an interface is the one still being combined.
+- **All eight flagships are live.** The three new ones shipped: Eyes against state (#187), Screen sentry (#186) and Who said that? (#188). Decisions in an interface is now one article (#203).
 - **Page formats are rolled out:** articles for the decoy and the prose studies (#191), reports for six benchmark pages (#192), and one shared evidence drawer on every game page (#185, #198).
 - **Home and About** start with three paths: "Check our work" for researchers, "Just play", and "Build with it" for engineers.
 - **Tools:** the Screen sentry Chrome extension (`extensions/screen-sentry/`, not published to the store), the jev-lab CLI (`tools/decide-cli/`, #182) and the Who said that? Mac app (`apps/who-said-that-mac/`, microphone path untested).
-- **The retrospective's quality backlog is done**, apart from "Build this" snippets and the creative-tool controls, both now in progress.
-- **In progress (lanes B–G):** B "Build this" snippets per scene, C Decisions in an interface, D Spine (sycophancy), E Count with me, F creative-tool controls, G Who said that? accuracy.
+- **The retrospective's quality backlog is done.** "Build this" snippets cover every scene except the arena Tetris board and Generated UI (#209). The creative tools put their extra controls behind "More controls" (#202, #205, #206).
+- **Two concepts became scenes:** Spine, on sycophancy (#204), and Count with me, on counting crowds (#207).
+- **Who said that? got more accurate (#208).** With two tables talking, speaker accuracy rose from 46% to 77% and conversation accuracy from 83% to 97%.
 
 ## Decisions (2 Oct 2026)
 
@@ -28,11 +29,11 @@ Written 2 Oct 2026 after a three-part retrospective (audience value, engineering
 | Robustness: Fool Jev, prose studies, decoy | What moves a decision model that rewording doesn't? | research, text | Distill-style article | live; article (#191) |
 | Evaluation: answer key, open decisions | Who's right depends on who wrote the key; how close do open models get? | research | report + companion toy | live; report (#192) |
 | The reef | Does how fast a model decides change who survives? | simulation | game + evidence drawer | live; drawer (#185), evolved policy (#133) |
-| Decisions in an interface: One box + When to ask a person | What do fast, calibrated decisions do inside a real UI? | product UX | article | both live; combining in progress (lane C) |
+| Decisions in an interface: One box + When to ask a person | What do fast, calibrated decisions do inside a real UI? | product UX | article | live as one article (#203) |
 | Decide | Where do models disagree with people on judgement calls? | crowd game | game | live |
 | Eyes against state | What does it cost to let a model look at the screen instead of reading state? | vision | game + evidence drawer | live (#187); real Qwen3-VL runs on the M4 Max |
 | Screen sentry | Can a fast checker stop prompt injections as an AI helper browses? | agent safety | game + Chrome extension | live (#186), drawer (#198); extension in repo |
-| Who said that? | In a noisy room, who said each line, and is it part of our conversation? | audio | tool + report, Mac app | live (#188) on AMI audio, drawer (#198); accuracy work in progress (lane G) |
+| Who said that? | In a noisy room, who said each line, and is it part of our conversation? | audio | tool + report, Mac app | live (#188) on AMI audio, drawer (#198); two tables keep speakers apart (#208): speaker accuracy 46% to 77% |
 
 Who can you win over? and the rumour mill moved to the collection. Model Routing Lab and the "What one resident saw" note are retired, Tetris realtime is a tab of Tetris turns, and the arena Café card links to the Café Jev scene (#176). The capability atlas is retired too (#189).
 
@@ -48,8 +49,8 @@ Jev is text-only. Its model page says "Text only. String, JSON object, or array 
 
 | Concept | Hook | Frontier problem or gain |
 |---|---|---|
-| Count with me | Frontier models miscount crowds. Count ducks, cars and chairs against ground truth. | counting and spatial grounding |
-| Spine | Argue with an assistant that may change its mind for evidence, never for pressure. | sycophancy (Fool Jev showed doubt flips Jev) |
+| Count with me: live (#207); Jev gets 27% of crowds of 13 or more right | Frontier models miscount crowds. Count ducks, cars and chairs against ground truth. | counting and spatial grounding |
+| Spine: live (#204); pressure from authority flips Jev 56–61% of the time | Argue with an assistant that may change its mind for evidence, never for pressure. | sycophancy (Fool Jev showed doubt flips Jev) |
 | Tool-call bouncer | Check each tool argument an agent proposes against the conversation. | hallucinated tool use |
 | Ask or act: the agent desk | A 30-step errand; at each step, go ahead, ask you, or stop. | knowing when to ask; long-horizon drift |
 | Napkin, live | Sketch a UI and it becomes a working form while you draw. | slow sketch-to-UI loops (tldraw make real) |
@@ -75,9 +76,9 @@ The idea we'd most like to borrow is floorplan's: show the count and cost at eve
 | The main button needs a key on 4 scenes | The recorded replay is primary; "try your own" is secondary | done (#173) |
 | Results before play on game pages | Play first (Red Blob Games) | done (#174) |
 | Walls of text (JudgeBench 4,815 words, Decision models on a Mac 2,416) | Split each into a scene plus a linked note | done (#179) |
-| No "start here" per audience, no "build this" code | Entry rows on home and About; a generated SDK snippet per scene (Stripe Docs) | start-here rows done; "Build this" in progress (lane B) |
+| No "start here" per audience, no "build this" code | Entry rows on home and About; a generated SDK snippet per scene (Stripe Docs) | done: start-here rows (#201), "Build this" on every scene except the arena Tetris board and Generated UI (#209) |
 | Stale READMEs, duplicate results folders, dead code, duplicated helpers, three copies of transformers.js, four builds per PR | Engineering cleanup PRs | done (#165, #166, #168, #170, #172, #175, #177, #178, #184, #189, #190); recordings gzipped (#199) |
-| Creative tools with 60–90 controls | One obvious first action; the rest behind "More controls" | in progress (lane F) |
+| Creative tools with 60–90 controls | One obvious first action; the rest behind "More controls" | done (#202, #205, #206) |
 
 ## References
 
