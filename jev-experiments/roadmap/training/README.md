@@ -41,7 +41,7 @@ The selector uses the predefined seed17 export's validation metrics, never the b
 
 The Core ML bridge contains the full frozen backbone, typed readout and calibration. Its inputs are token IDs and masks, and its output is the final probability vector. It records parameter counts, input/output shapes, artifact hashes and complete decision comparisons for CPU_ONLY and ALL. `--limit N` is an explicit pilot that cannot satisfy the export gate. A failed bridge or export records failure evidence instead of claiming success. Device placement is not inferred from ALL.
 
-Each compute condition compared all 2,960 supported validation, held-out and transfer decisions. Six public JSONL files retain all 17,760 pairs of MLX/Core ML probabilities and semantic option IDs without source passages, prompts or gold distributions. Hashes and links are recorded in the export reports.
+Each compute condition compared all 2,960 supported validation, held-out and transfer decisions. Six public JSONL files retain all 17,760 pairs of MLX/Core ML probabilities and semantic option IDs without source passages, prompts or gold distributions. Hashes and links are recorded in the export reports. The six files (`export-decisions-*.jsonl`, 7 MB) moved to [`archive/release-lab-2026-09/training/`](../../archive/release-lab-2026-09/training/) on 4 Oct 2026; the export reports' hashes still match them, and `export_decision_rows.py` writes new ones here.
 
 | Complete seed17 graph | CPU argmax agreement | ALL argmax agreement | Maximum probability delta, CPU / ALL |
 | --- | --- | --- | --- |

@@ -1,6 +1,6 @@
 # Routing review disposition
 
-The original Fable 5.1 Global [protocol feedback](../reviews/protocol-feedback.md) is preserved. The code and evidence changed after that snapshot.
+The original Fable 5.1 Global [protocol feedback](../../archive/release-lab-2026-09/reviews/protocol-feedback.md) is preserved. The code and evidence changed after that snapshot.
 
 | Finding | Disposition | Evidence |
 |---|---|---|
@@ -14,13 +14,13 @@ The original Fable 5.1 Global [protocol feedback](../reviews/protocol-feedback.m
 |18 Success with failure field|Skipped verification uses outcome.note and an explicit unverified record. The final boundary review below changes failed verification to an error with retained evidence.|router.ts; hooks.test.ts|
 |19 Accounting otherwise sound|Preserved full reservations and null totals; also made cached-input upper bounds conservative when configured cache rates exceed uncached prices.|policy.ts|
 
-Independent playable-agent review additionally reproduced redirect leakage, late verification cancellation, pre-cap classifier execution and malformed MCP null input. These were fixed and verified in [provider-free probes](../playable/review/routing-review.ts). Redirects now fail closed, already-cancelled tasks never call classifiers, and active stdio cancellation has its own regression.
+Independent playable-agent review additionally reproduced redirect leakage, late verification cancellation, pre-cap classifier execution and malformed MCP null input. These were fixed and verified in [provider-free probes](../../archive/release-lab-2026-09/playable/review/routing-review.ts). Redirects now fail closed, already-cancelled tasks never call classifiers, and active stdio cancellation has its own regression.
 
 Actual BYOK testing found a second class of failure not covered by the initial review: valid JSON could contain a malformed unified diff. The parser now checks hunk counts and preserves the raw rejected output. Applying a patch and testing the resulting repository remains the host's responsibility. The retained original sample and host recount repair are evidence of this limitation, not an unmodified success.
 
 ## Integrated prototype review
 
-The [Fable prototype review](../reviews/prototype-feedback.md) inspected a snapshot. Findings2,4,5 included omissions in that exported review bundle; the actual retained files were present. The root owns correcting that export and the current live-route evidence.
+The [Fable prototype review](../../archive/release-lab-2026-09/reviews/prototype-feedback.md) inspected a snapshot. Findings2,4,5 included omissions in that exported review bundle; the actual retained files were present. The root owns correcting that export and the current live-route evidence.
 
 | Finding | Disposition | Evidence |
 |---|---|---|

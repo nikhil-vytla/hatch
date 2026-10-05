@@ -24,7 +24,8 @@ Some scenes also run a free model in the browser: MobileBERT, MiniLM, Bramble mi
 | `results/`, `*/results.jsonl` | Recorded evidence as `jev-records-v1` JSONL; `experience-prototypes/scripts/publication-manifest.ts` lists what is public (see [`results/README.md`](results/README.md)) |
 | `src/jev_lab/`, `tests/` | The original Python research runner |
 | `adapters/` | Typed schema adapters for Python, TypeScript, Rust and Go |
-| `roadmap/` | Plans, routing and verification, including the publication-index check CI runs |
+| `roadmap/` | The typed-decision runtime, routing toolkit, Mac runtime, portable evidence, the publication-index check CI runs, and the [work map](roadmap/MAP.md) |
+| `archive/` | Finished audits and reports, including the September release lab's plans and evidence; nothing there is built or run |
 
 ## Early lab findings (Sept 2026)
 

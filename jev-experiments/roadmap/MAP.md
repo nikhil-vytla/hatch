@@ -6,7 +6,7 @@ Ship useful playable scenes, a materials sandbox, a completed local typed-decisi
 
 ## Notes and standing requirements
 
-The supplied release plan is the authority for this map. It explicitly includes implementation, overriding wayfinder's usual planning-only scope. Decision tickets below record questions and resolutions; [implementation checklist](IMPLEMENTATION.md) tracks delivery. Owners are workstream names, with the root integrator responsible for merging and verification. Read the evidence before changing a resolved decision.
+The supplied release plan is the authority for this map. It explicitly includes implementation, overriding wayfinder's usual planning-only scope. Decision tickets below record questions and resolutions; [implementation checklist](../archive/release-lab-2026-09/IMPLEMENTATION.md) tracks delivery. Owners are workstream names, with the root integrator responsible for merging and verification. Read the evidence before changing a resolved decision.
 
 - Publish the exact footnote "Not affiliated with or endorsed by TypeSafe AI". Credit original builders next to adaptations, distinguish model authors from playground authors, and retain design research with visual and styling artifacts.
 - Backward compatibility is not a release goal. Refactor structure and replace weak interactions when that produces a more coherent, useful, well-crafted result.
@@ -29,38 +29,38 @@ The supplied release plan is the authority for this map. It explicitly includes 
 | --- | --- | --- | --- |
 | Foundations | Contracts, CI, publication metadata, common runtime | Clean build and provider-free checks | Verified locally, including canonical-root build before sibling installs |
 | Internal previews | Play-first home, Tetris/crowd/music, routing integration | Visual review and actual client calls | Implemented, visually checked and exercised through real clients |
-| First public release | Playable core/materials, trained models/export, routing/CLI/MCP, Mac runtime | Research, usability, integrations and installation verified | Released 29 Sep 2026 from main `269a923`; the Sep 21 patch was superseded ([release gate](decisions/release-gate.md)) |
+| First public release | Playable core/materials, trained models/export, routing/CLI/MCP, Mac runtime | Research, usability, integrations and installation verified | Released 29 Sep 2026 from main `269a923`; the Sep 21 patch was superseded ([release gate](../archive/release-lab-2026-09/decisions/release-gate.md)) |
 | Arena and games | Multi-model arena, One box, Decide | Recorded contestants, public replays, no site-paid calls | Shipped (PRs #76, #80, #83) |
 | Next wave | Perception, private extension, source-linked annotations, icons/brushes | Named dependent decisions | Deferred |
 | Further products | Creative apps, richer mail, games/GPU worlds | Investigate before implementation commitment | Deferred |
 
 ## Decisions so far
 
-- [Build an instrument notebook](design-research/README.md) records the design-engineering research and separates visual inspiration from copied implementation.
+- [Build an instrument notebook](../archive/release-lab-2026-09/design-research/README.md) records the design-engineering research and separates visual inspiration from copied implementation.
 
-- [Preserve the deployment and research boundaries](decisions/deployment-boundary.md) records the canonical source root and patch-only research delivery rule.
-- [One typed-decision wire contract](decisions/decision-contract.md) fixes runtime identity, distribution and unsupported-result semantics.
-- [One text box that becomes what you mean](decisions/shapeshift-experiment.md) shipped as the arena's One box lane: Jev, Laya, a keyword classifier and a tiny in-browser model on every keystroke of 200 phrases ([results](../packages/arena/src/one-box/README.md)). Write a contestant is practice only, in the visitor's browser; sealed server scoring was removed so the site pays for nothing (#80).
+- [Preserve the deployment and research boundaries](../archive/release-lab-2026-09/decisions/deployment-boundary.md) records the canonical source root and patch-only research delivery rule.
+- [One typed-decision wire contract](../archive/release-lab-2026-09/decisions/decision-contract.md) fixes runtime identity, distribution and unsupported-result semantics.
+- [One text box that becomes what you mean](../archive/release-lab-2026-09/decisions/shapeshift-experiment.md) shipped as the arena's One box lane: Jev, Laya, a keyword classifier and a tiny in-browser model on every keystroke of 200 phrases ([results](../packages/arena/src/one-box/README.md)). Write a contestant is practice only, in the visitor's browser; sealed server scoring was removed so the site pays for nothing (#80).
 - [Decide](../packages/arena/src/decide/README.md) replaced Jev Daily: twenty everyday calls asked blind, then how visitors split, how Jev, Laya and MobileBERT chose, and how each moves across seven setups. Splitting a call into small questions fixed both of Jev's plain-question misses.
 
 ## Next wave (2 Oct 2026)
 
-The first release is shipped. The next wave is planned in [FLAGSHIPS.md](FLAGSHIPS.md): a researcher-first flagship slate, multimodal Jev (perceive locally, decide with Jev; or open VLM decision models), installable tools (Chrome extension, Mac menu-bar app, CLI), and the quality backlog from the 2 Oct retrospective.
+The first release is shipped. The next wave is planned in [FLAGSHIPS.md](../archive/release-lab-2026-09/FLAGSHIPS.md): a researcher-first flagship slate, multimodal Jev (perceive locally, decide with Jev; or open VLM decision models), installable tools (Chrome extension, Mac menu-bar app, CLI), and the quality backlog from the 2 Oct retrospective.
 
 ## Frontier and dependencies
 
 | Decision | Owner | Depends on | Status / evidence |
 | --- | --- | --- | --- |
-| [Freeze training and export criteria](decisions/training-protocol.md) | training/runtime | Typed contract | Resolved; execution tracked separately |
-| [Keep routing restrictions hard](decisions/routing-policy.md) | routing/integration | Typed contract | Resolved; negative comparison retained |
-| [Prove client delegation with real tasks](decisions/harness-evidence.md) | routing/integration | Routing policy | Real calls and independent tasks passed; see evidence index |
-| [Make scene changes observable](decisions/playable-defaults.md) | playable/root | Deployment boundary | Resolved; local production-build captures, functional checks and active frame samples retained |
-| [Select an installed local default](decisions/local-default.md) | training/runtime | Training criteria, export and mail evaluation | Resolved; validation-selected experimental Laya readout, fresh offline install passed |
-| [Release only supported claims](decisions/release-gate.md) | root | All first-release decisions | Resolved: main is the release; patch superseded ([record](verification/public-release.json)) |
+| [Freeze training and export criteria](../archive/release-lab-2026-09/decisions/training-protocol.md) | training/runtime | Typed contract | Resolved; execution tracked separately |
+| [Keep routing restrictions hard](../archive/release-lab-2026-09/decisions/routing-policy.md) | routing/integration | Typed contract | Resolved; negative comparison retained |
+| [Prove client delegation with real tasks](../archive/release-lab-2026-09/decisions/harness-evidence.md) | routing/integration | Routing policy | Real calls and independent tasks passed; see evidence index |
+| [Make scene changes observable](../archive/release-lab-2026-09/decisions/playable-defaults.md) | playable/root | Deployment boundary | Resolved; local production-build captures, functional checks and active frame samples retained |
+| [Select an installed local default](../archive/release-lab-2026-09/decisions/local-default.md) | training/runtime | Training criteria, export and mail evaluation | Resolved; validation-selected experimental Laya readout, fresh offline install passed |
+| [Release only supported claims](../archive/release-lab-2026-09/decisions/release-gate.md) | root | All first-release decisions | Resolved: main is the release; patch superseded ([record](../archive/release-lab-2026-09/verification/public-release.json)) |
 
 ## Port candidates from the superseded patch
 
-Each is a small pull request against current main, taken only if still wanted. File counts are from [application.patch](application.patch).
+Each is a small pull request against current main, taken only if still wanted. File counts are from [application.patch](../archive/release-lab-2026-09/application.patch).
 
 | Piece | Patch files | What it adds |
 | --- | --- | --- |
@@ -76,15 +76,15 @@ The home, navigation, style and catalog changes in the patch (`main.tsx`, `style
 
 | Decision | Dependency | Scope |
 | --- | --- | --- |
-| [Selective observation resolution](decisions/selective-perception.md) | Render profiling and frozen visual labels | Next wave |
-| [Private extension inference runtime](decisions/private-extension.md) | Local runtime and ONNX/browser measurements | Next wave |
-| [Correct source-linked interpretations](decisions/source-annotations.md) | Café, wardrobe and paste artifact contracts | Next wave |
-| [Icon and brush interaction improvements](decisions/brush-and-icons.md) | Scene history review | Next wave |
-| [Standalone creative products](decisions/creative-products.md) | First release usability evidence | Further products |
-| [Richer email workflows](decisions/email-workflows.md) | Read-only .eml evaluation and installation | Further products |
-| [Additional games and GPU worlds](decisions/games-and-gpu.md) | Frame-time profiles before infrastructure | Further products |
+| [Selective observation resolution](../archive/release-lab-2026-09/decisions/selective-perception.md) | Render profiling and frozen visual labels | Next wave |
+| [Private extension inference runtime](../archive/release-lab-2026-09/decisions/private-extension.md) | Local runtime and ONNX/browser measurements | Next wave |
+| [Correct source-linked interpretations](../archive/release-lab-2026-09/decisions/source-annotations.md) | Café, wardrobe and paste artifact contracts | Next wave |
+| [Icon and brush interaction improvements](../archive/release-lab-2026-09/decisions/brush-and-icons.md) | Scene history review | Next wave |
+| [Standalone creative products](../archive/release-lab-2026-09/decisions/creative-products.md) | First release usability evidence | Further products |
+| [Richer email workflows](../archive/release-lab-2026-09/decisions/email-workflows.md) | Read-only .eml evaluation and installation | Further products |
+| [Additional games and GPU worlds](../archive/release-lab-2026-09/decisions/games-and-gpu.md) | Frame-time profiles before infrastructure | Further products |
 
-The design research also opens bounded questions for [local rule interpretation](decisions/local-rules.md), [semantic observation](decisions/local-observation.md), [creative choice](decisions/local-creative-choice.md), and [useful uncertainty](decisions/useful-uncertainty.md). They depend on completed runtime evidence and do not enlarge this release.
+The design research also opens bounded questions for [local rule interpretation](../archive/release-lab-2026-09/decisions/local-rules.md), [semantic observation](../archive/release-lab-2026-09/decisions/local-observation.md), [creative choice](../archive/release-lab-2026-09/decisions/local-creative-choice.md), and [useful uncertainty](../archive/release-lab-2026-09/decisions/useful-uncertainty.md). They depend on completed runtime evidence and do not enlarge this release.
 
 ## Not yet specified
 
