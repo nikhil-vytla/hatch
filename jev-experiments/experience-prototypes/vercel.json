@@ -35,7 +35,7 @@
       ]
     },
     {
-      "source": "/(data|judgment-reliability|rewardbench2|outcome-framing|visual-search|icon-studio|arena|decide)/(.*)\\.(json|jsonl)",
+      "source": "/(data|rewardbench2|judgment-reliability|outcome-framing|visual-search|icon-studio|arena|decide)/(.*)\\.(json|jsonl)",
       "headers": [
         {
           "key": "Content-Encoding",

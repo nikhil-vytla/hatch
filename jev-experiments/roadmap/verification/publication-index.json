@@ -1,6 +1,7 @@
 {
-  "schemaVersion": 3,
+  "schemaVersion": 4,
   "publicationCount": 43,
+  "publicFileCount": 2834,
   "roundTripPassed": true,
   "expectedFieldsPreserved": true,
   "projectedPublications": [
@@ -15,7 +16,7 @@
       "publicSha256": "15ec160d6500807d2805ea4f36a3835cf578d666a53bdfca4fd6377832f55ac9",
       "publicBytes": 3820,
       "comparison": "original-record",
-      "recipe": "readRecord + enrichProvenance + availability"
+      "recipe": "readRecord"
     },
     {
       "name": "beverage",
@@ -24,7 +25,7 @@
       "publicSha256": "e4e53f4957f5015d3c5096a3b370889bf6fc5b5f01c3aa0238c6f35be15b2cbf",
       "publicBytes": 28410,
       "comparison": "original-record",
-      "recipe": "readRecord + enrichProvenance + availability"
+      "recipe": "readRecord"
     },
     {
       "name": "changes",
@@ -33,7 +34,7 @@
       "publicSha256": "2892c12829c3ac1a506d977466432e1c03f69511d557c7aa0d2f9d8de7249ebe",
       "publicBytes": 1861,
       "comparison": "original-record",
-      "recipe": "readRecord + enrichProvenance + availability"
+      "recipe": "readRecord"
     },
     {
       "name": "classify",
@@ -42,7 +43,7 @@
       "publicSha256": "ea0af5de6ed4119eb2218936346634404e7bcf4858d4f02adeaaa08a758d6308",
       "publicBytes": 2340858,
       "comparison": "original-record",
-      "recipe": "readRecord + enrichProvenance + availability"
+      "recipe": "readRecord + banking77 + clinc150 + priorContentAudit"
     },
     {
       "name": "cloudcheck",
@@ -51,7 +52,7 @@
       "publicSha256": "db169b6a79299460acb512bd084a3da8413ff94cd051e95567b612f24626e92b",
       "publicBytes": 3462,
       "comparison": "original-record",
-      "recipe": "readRecord + enrichProvenance + availability"
+      "recipe": "readRecord"
     },
     {
       "name": "composed-ui",
@@ -60,7 +61,7 @@
       "publicSha256": "09a97cc991b22cb08ed3ef2fc4d25e29ec3397a3b087e1ec8e9658f59b611ab1",
       "publicBytes": 20970,
       "comparison": "original-record",
-      "recipe": "readRecord + enrichProvenance + availability"
+      "recipe": "readRecord"
     },
     {
       "name": "decisions",
@@ -69,7 +70,7 @@
       "publicSha256": "7b9619bea3b0f4cc217df26d6d18967df8f2b97a5d562149e988ddbeddd9739a",
       "publicBytes": 181519,
       "comparison": "original-record",
-      "recipe": "readRecord + enrichProvenance + availability"
+      "recipe": "readRecord"
     },
     {
       "name": "deployment-check",
@@ -78,7 +79,7 @@
       "publicSha256": "80cbb1d97ef11649ef0a666d6e1a39987d92b01e9bfb714a90b0525b1c69889e",
       "publicBytes": 210,
       "comparison": "original-record",
-      "recipe": "readRecord + enrichProvenance + availability"
+      "recipe": "readRecord"
     },
     {
       "name": "evidence-audit",
@@ -87,7 +88,7 @@
       "publicSha256": "9e4d1c99b16af3314bc33f137e76aaf269d06c692ed12d9e5d0342a1b4e4b293",
       "publicBytes": 724,
       "comparison": "original-record",
-      "recipe": "readRecord + enrichProvenance + availability"
+      "recipe": "readRecord"
     },
     {
       "name": "games",
@@ -96,7 +97,7 @@
       "publicSha256": "6f6475c9a3d9c642ce737281a8dd3a34817c7cc4bcaf349057197a53a9d8e23a",
       "publicBytes": 1006240,
       "comparison": "original-record",
-      "recipe": "readRecord + enrichProvenance + availability"
+      "recipe": "readRecord"
     },
     {
       "name": "history",
@@ -105,7 +106,7 @@
       "publicSha256": "50121a6350e8753fce2690d388b7a496b1009fe7f41cb77720c1363aeca95433",
       "publicBytes": 29497,
       "comparison": "original-record",
-      "recipe": "readRecord + enrichProvenance + availability"
+      "recipe": "readRecord"
     },
     {
       "name": "index",
@@ -114,7 +115,7 @@
       "publicSha256": "e423a3a6e1911b2dda6cdc41690bedd5e9606fe9ee72d7267ef30aaff4772b69",
       "publicBytes": 3578,
       "comparison": "original-record",
-      "recipe": "readRecord + enrichProvenance + availability"
+      "recipe": "readRecord"
     },
     {
       "name": "journeys",
@@ -123,7 +124,7 @@
       "publicSha256": "5e40cae94a634f5deb0778ff885e6c403f0cfddc3fe04af1f47a89ab12ea9ce2",
       "publicBytes": 20977,
       "comparison": "original-record",
-      "recipe": "readRecord + enrichProvenance + availability"
+      "recipe": "readRecord"
     },
     {
       "name": "judge",
@@ -132,7 +133,7 @@
       "publicSha256": "bae13358777d1400fd8b78f63595bf182236ee595ce4b68d56318d7e19f10ce6",
       "publicBytes": 1006989,
       "comparison": "original-record",
-      "recipe": "readRecord + enrichProvenance + availability"
+      "recipe": "readRecord + judgeBench + priorContentAudit"
     },
     {
       "name": "rewardbench2",
@@ -151,7 +152,7 @@
         "withheld_candidate_texts": 4,
         "note": "Display-only derivative of the identified pre-derivation Jev result record, which already includes separate content-review omissions. These bytes are not the original evaluation record or upstream dataset. Recorded labels, scores, requests and metrics are retained."
       },
-      "recipe": "readRecord + enrichProvenance + projectRewardBenchDocument"
+      "recipe": "readRecord + rewardBench + projectRewardBenchDocument"
     },
     {
       "name": "latency",
@@ -160,16 +161,16 @@
       "publicSha256": "400ebfc821b7651e18f67a0dbc2b05138260041425e0d428a3be6c3018436253",
       "publicBytes": 24209,
       "comparison": "original-record",
-      "recipe": "readRecord + enrichProvenance + availability"
+      "recipe": "readRecord"
     },
     {
       "name": "logos",
       "source": "../results/logos.jsonl",
       "sourceSha256": "0cd41d223a11aa9156c7d02ea3ba32ad5db68f58754e6912fe31e8d07c95a693",
-      "publicSha256": "c1d76de17dc5ee6c7dbe19d5cd2065f06096086f030cdd97e3a9e69b4c67a455",
-      "publicBytes": 4995,
+      "publicSha256": "93de9d41c37f0afbce632c956d07d050da042684462774be188c01f5d819ad99",
+      "publicBytes": 4936,
       "comparison": "original-record",
-      "recipe": "readRecord + enrichProvenance + availability"
+      "recipe": "readRecord"
     },
     {
       "name": "micro",
@@ -178,7 +179,7 @@
       "publicSha256": "2593b12979279fab2473c7304bdc36a3c7aeac4b79b7489ad5b6d0d658f7ab74",
       "publicBytes": 3193,
       "comparison": "original-record",
-      "recipe": "readRecord + enrichProvenance + availability"
+      "recipe": "readRecord"
     },
     {
       "name": "music",
@@ -187,7 +188,7 @@
       "publicSha256": "1bbc35506020b20c05f7a971690a9d1f517964a967a33e8499624b743885d5f0",
       "publicBytes": 18367,
       "comparison": "original-record",
-      "recipe": "readRecord + enrichProvenance + availability"
+      "recipe": "readRecord + availability"
     },
     {
       "name": "optimize",
@@ -196,7 +197,7 @@
       "publicSha256": "187627b814ea2dde7e4bec2c63a0392eb153b5b43d3e862930865e4b1d474084",
       "publicBytes": 137551,
       "comparison": "original-record",
-      "recipe": "readRecord + enrichProvenance + availability"
+      "recipe": "readRecord + banking77"
     },
     {
       "name": "paste",
@@ -205,7 +206,7 @@
       "publicSha256": "87395fe0b77e7a581992e71b05c5c79bca979d84de38e8ba3d9c49e85b4258c8",
       "publicBytes": 4097,
       "comparison": "original-record",
-      "recipe": "readRecord + enrichProvenance + availability"
+      "recipe": "readRecord"
     },
     {
       "name": "replica",
@@ -214,7 +215,7 @@
       "publicSha256": "f96996302c8bf1425db488221f166c6f978d471dc55cc8a5b3258cf612a76fd0",
       "publicBytes": 78514,
       "comparison": "original-record",
-      "recipe": "readRecord + enrichProvenance + availability"
+      "recipe": "readRecord + banking77"
     },
     {
       "name": "robustness",
@@ -223,7 +224,7 @@
       "publicSha256": "f97d770ad4460deaa8d166a3c13d29a68de1379bc15fd2a07b63436d431b7784",
       "publicBytes": 618490,
       "comparison": "original-record",
-      "recipe": "readRecord + enrichProvenance + availability"
+      "recipe": "readRecord + banking77"
     },
     {
       "name": "routing",
@@ -232,7 +233,7 @@
       "publicSha256": "9a167d715ac8d57c440fa7983db992abfbd99ca8e2ced1d244108ee99fa4e295",
       "publicBytes": 10530,
       "comparison": "original-record",
-      "recipe": "readRecord + enrichProvenance + availability"
+      "recipe": "readRecord"
     },
     {
       "name": "search",
@@ -241,7 +242,7 @@
       "publicSha256": "a15fb35cfd0fcb8f7ae660c8d78323f633a0421b0146de1a6d9075e0814389b1",
       "publicBytes": 9533,
       "comparison": "original-record",
-      "recipe": "readRecord + enrichProvenance + availability"
+      "recipe": "readRecord + availability"
     },
     {
       "name": "semantic-table",
@@ -250,7 +251,7 @@
       "publicSha256": "43f48172e715bdeea41fb3800b26209b3724849e94098b400e77c8fec802fb54",
       "publicBytes": 875,
       "comparison": "original-record",
-      "recipe": "readRecord + enrichProvenance + availability"
+      "recipe": "readRecord"
     },
     {
       "name": "ui",
@@ -259,7 +260,7 @@
       "publicSha256": "e22e0600389cf937b2e9ea2a5f6dd6f28c5f975dfcb46a0c7ca86eb8e8eabd84",
       "publicBytes": 34654,
       "comparison": "original-record",
-      "recipe": "readRecord + enrichProvenance + availability"
+      "recipe": "readRecord + availability"
     },
     {
       "name": "undo",
@@ -268,7 +269,7 @@
       "publicSha256": "ec202be593663551aa42e4f9b578756898e113477deed61327679b7dbd4e7555",
       "publicBytes": 648,
       "comparison": "original-record",
-      "recipe": "readRecord + enrichProvenance + availability"
+      "recipe": "readRecord"
     },
     {
       "name": "verify",
@@ -277,7 +278,7 @@
       "publicSha256": "e40a48e97cfb7416dc599550e0f1d31688a0e7a53fce04c0284715431385bf58",
       "publicBytes": 9911,
       "comparison": "original-record",
-      "recipe": "readRecord + enrichProvenance + availability"
+      "recipe": "readRecord + availability"
     },
     {
       "name": "vision",
@@ -286,7 +287,7 @@
       "publicSha256": "874ba8f02f2169bf44716ce75a9b7d416ebf81a743f4f4cb3b1075af8dc5ca82",
       "publicBytes": 1350,
       "comparison": "original-record",
-      "recipe": "readRecord + enrichProvenance + availability"
+      "recipe": "readRecord"
     },
     {
       "name": "visuals",
@@ -295,7 +296,7 @@
       "publicSha256": "9e6efacbd6fc7b6bd84e9fb9c8149a058875e5f6b8f4892a9431c5986e3ea4a7",
       "publicBytes": 80796,
       "comparison": "original-record",
-      "recipe": "readRecord + enrichProvenance + availability"
+      "recipe": "readRecord"
     },
     {
       "name": "arcade",
@@ -304,7 +305,7 @@
       "publicSha256": "b79f41ae952ffd1df1e16f434fd38a60599c8bed04c964a14e518d2ff1fe556a",
       "publicBytes": 278812,
       "comparison": "original-record",
-      "recipe": "readRecord + enrichProvenance + availability"
+      "recipe": "readRecord"
     },
     {
       "name": "research-map",
@@ -313,7 +314,7 @@
       "publicSha256": "a7e9aa27e37d01672552389a96a176123745bd7d9ec42e1848a7f95e372af6d1",
       "publicBytes": 13639,
       "comparison": "original-record",
-      "recipe": "readRecord + enrichProvenance + availability"
+      "recipe": "readRecord"
     },
     {
       "name": "local-models",
@@ -322,7 +323,7 @@
       "publicSha256": "b4c27b914d678575dbb8fe574a58e77af74edc84a2eddc48360418799198d330",
       "publicBytes": 2766762,
       "comparison": "original-record",
-      "recipe": "readRecord + enrichProvenance + availability"
+      "recipe": "readRecord"
     },
     {
       "name": "music-v2",
@@ -331,7 +332,7 @@
       "publicSha256": "42574478b0b836c2a91606056d5b95866d63c372e1bc30b4394ec4e82f80890c",
       "publicBytes": 3724660,
       "comparison": "original-record",
-      "recipe": "readRecord + enrichProvenance + availability"
+      "recipe": "readRecord"
     },
     {
       "name": "cafe",
@@ -340,7 +341,7 @@
       "publicSha256": "9ad218efef019387adf2d536938bfe117f75e06cf711b3aff5629ea5a0b0d63f",
       "publicBytes": 2257632,
       "comparison": "original-record",
-      "recipe": "readRecord + enrichProvenance + availability"
+      "recipe": "readRecord"
     },
     {
       "name": "judgment-reliability",
@@ -358,7 +359,7 @@
       "publicSha256": "fe3391ab82cb2ecc9e64dcd90a2e37518404ff845c78b9abe36249111616db75",
       "publicBytes": 1238476,
       "comparison": "original-record",
-      "recipe": "readRecord + enrichProvenance + availability"
+      "recipe": "readRecord"
     },
     {
       "name": "drawing-framing",
@@ -367,7 +368,7 @@
       "publicSha256": "1f9314f1623768ffcd3cadefcd3d17ef7493a88f1dd4d31f8a2ee75d9d4b0707",
       "publicBytes": 95588,
       "comparison": "original-record",
-      "recipe": "readRecord + enrichProvenance + availability"
+      "recipe": "readRecord"
     },
     {
       "name": "visual-search",
@@ -376,7 +377,7 @@
       "publicSha256": "bd83e203180aa710ee990d554968ccc075136eeb0b302e629a3ad09c1fe4706a",
       "publicBytes": 312000,
       "comparison": "original-record",
-      "recipe": "readRecord + enrichProvenance + availability"
+      "recipe": "readRecord"
     },
     {
       "name": "wardrobe",
@@ -385,7 +386,7 @@
       "publicSha256": "d2dbe011b7e5fe0731e0ac45029903c5aa0a65713fbdabd66249bafde93af15e",
       "publicBytes": 33010,
       "comparison": "original-record",
-      "recipe": "readRecord + enrichProvenance + availability"
+      "recipe": "readRecord"
     },
     {
       "name": "icon-studio",
@@ -394,7 +395,7 @@
       "publicSha256": "c9be5a9dc2ddaeb0a93885440bd8188319f4d7653fbae5eed3b095a9d55fd3c7",
       "publicBytes": 191189,
       "comparison": "original-record",
-      "recipe": "readRecord + enrichProvenance + availability"
+      "recipe": "readRecord"
     },
     {
       "name": "live-worlds",
@@ -403,7 +404,231 @@
       "publicSha256": "c7406eeb857b739d5592dcdb42add398ba035ef148af0c84602e254e4a2fdc91",
       "publicBytes": 467,
       "comparison": "original-record",
-      "recipe": "readRecord + enrichProvenance + availability"
+      "recipe": "readRecord"
+    }
+  ],
+  "paths": [
+    {
+      "name": "routing-evidence",
+      "path": "routing-evidence",
+      "how": "write",
+      "gzip": false,
+      "files": 75,
+      "bytes": 629285,
+      "sha256": "a387a5cceb0690284dcf02cf1c8d18a082062714b7c1b53409f8799fe2436c81"
+    },
+    {
+      "name": "rewardbench2",
+      "path": "rewardbench2",
+      "how": "write",
+      "gzip": true,
+      "files": 1866,
+      "bytes": 15881187,
+      "sha256": "ea950560a80fca8dc9d632e38059c7c7c0ab93c50a10a67389cab1d5b011e1cd"
+    },
+    {
+      "name": "judgment-reliability",
+      "path": "judgment-reliability",
+      "how": "record build",
+      "gzip": true,
+      "files": 624,
+      "bytes": 30300128,
+      "sha256": "cab8c26f211bb4282e69a49be2d40ab45f91e9bd6050467573ff1e52725345c3"
+    },
+    {
+      "name": "outcome-framing",
+      "path": "outcome-framing",
+      "how": "copy",
+      "gzip": true,
+      "files": 1,
+      "bytes": 4980657,
+      "sha256": "527b98b941b9bbab88c43018039aa4a0743462debbcc0c1444248c523be41a1c"
+    },
+    {
+      "name": "visual-search",
+      "path": "visual-search",
+      "how": "copy",
+      "gzip": true,
+      "files": 2,
+      "bytes": 11089034,
+      "sha256": "00b8fb63e820ee2a64c6b584bf44bcbcb7147173a6cb0c66260587ee4e7bf785"
+    },
+    {
+      "name": "wardrobe",
+      "path": "wardrobe",
+      "how": "copy",
+      "gzip": false,
+      "files": 9,
+      "bytes": 2170837,
+      "sha256": "0f6e30ffa775db5a2708fe11abce6a027c27a1a785f47638f711458af529b844"
+    },
+    {
+      "name": "icon-studio",
+      "path": "icon-studio",
+      "how": "write + copy",
+      "gzip": true,
+      "files": 3,
+      "bytes": 1099052,
+      "sha256": "8e5c7db8679f1774159de81b21425526ac2271adfda5512858c69dfc2f0e45d1"
+    },
+    {
+      "name": "research",
+      "path": "research",
+      "how": "copy",
+      "gzip": false,
+      "files": 5,
+      "bytes": 42941,
+      "sha256": "8371c172a0130e63b574a938d7d3f3da4dba638e34ccaa802828b90fc09c6416"
+    },
+    {
+      "name": "quality-review",
+      "path": "research/quality-review",
+      "how": "committed",
+      "gzip": false,
+      "files": 3,
+      "bytes": 355646,
+      "sha256": "3ae50a8ef071260674fae622652d4fd2b23649737be7bec50471cb57cc88a8b8"
+    },
+    {
+      "name": "show-me-realtime",
+      "path": "research/show-me-realtime.html",
+      "how": "committed",
+      "gzip": false,
+      "files": 1,
+      "bytes": 29983,
+      "sha256": "5b523d5f4872b49b22fc8298a9a488a08405a6267eb339c71d5321606759e4b5"
+    },
+    {
+      "name": "companion",
+      "path": "companion.zip",
+      "how": "write",
+      "gzip": false,
+      "files": 1,
+      "bytes": 0,
+      "sha256": "efe50ea76a53b96988d802e58d5f37bad77e5099721721e24213190af3e22f06",
+      "unhashed": [
+        "companion.zip"
+      ]
+    },
+    {
+      "name": "companion-demo",
+      "path": "companion-demo",
+      "how": "committed",
+      "gzip": false,
+      "files": 2,
+      "bytes": 3226,
+      "sha256": "cc732b3a1ee8e1280ee126c6cb61f1678fca48099b36c2a0950f6dc6b18d824b"
+    },
+    {
+      "name": "who-said-that",
+      "path": "who-said-that",
+      "how": "committed",
+      "gzip": false,
+      "files": 13,
+      "bytes": 2919674,
+      "sha256": "7280e4d0ff05f80f445ea14c3eb7861efdbb1f55d2526671ba3aeee0ef9a1007"
+    },
+    {
+      "name": "capabilities",
+      "path": "capabilities.html",
+      "how": "committed",
+      "gzip": false,
+      "files": 1,
+      "bytes": 1178,
+      "sha256": "5df2c137b0409b782decc712fc8683989220a3fecf6ee1799aae8d2922ad8f1c"
+    },
+    {
+      "name": "favicon",
+      "path": "favicon.svg",
+      "how": "committed",
+      "gzip": false,
+      "files": 1,
+      "bytes": 360,
+      "sha256": "daddc97343f2f653f9b48d1264433342057e6aac0d2023d17b5d0c1cb02a4cd7"
+    },
+    {
+      "name": "arena",
+      "path": "arena",
+      "how": "write",
+      "gzip": true,
+      "files": 78,
+      "bytes": 5378937,
+      "sha256": "a86b83ad2013ab6bfdab73704fc3148c44567bcd50885f7a5b1f966770a7dabb",
+      "unhashed": [
+        "arena/index.json"
+      ]
+    },
+    {
+      "name": "decide",
+      "path": "decide",
+      "how": "write",
+      "gzip": true,
+      "files": 1,
+      "bytes": 177275,
+      "sha256": "bf031f2fe35437bab3d1279f812bc33c4d998bdd068935a26d8c370c409bb4ab"
+    },
+    {
+      "name": "decoy",
+      "path": "decoy",
+      "how": "write",
+      "gzip": false,
+      "files": 1,
+      "bytes": 34741,
+      "sha256": "ba497628ad1162e6bc4134928845677b8dc4863aa51c6e38967696484100f861"
+    },
+    {
+      "name": "fool",
+      "path": "fool",
+      "how": "write",
+      "gzip": false,
+      "files": 1,
+      "bytes": 31996,
+      "sha256": "ae71bc123d542d1512b243ded24abdc1e7e166d1ee49463980f60d6b3b0e9258"
+    },
+    {
+      "name": "spine",
+      "path": "spine",
+      "how": "write",
+      "gzip": false,
+      "files": 1,
+      "bytes": 188487,
+      "sha256": "ee183f2ae55b44ab74f589b1c62a04f67cf1063cb09700f129b5732c38f2225c"
+    },
+    {
+      "name": "open-decisions",
+      "path": "open-decisions",
+      "how": "write",
+      "gzip": false,
+      "files": 1,
+      "bytes": 10681,
+      "sha256": "175f1d2ac041b2a69ff75122eb74911ab81d84a2249e91ed710c0431cc01b002"
+    },
+    {
+      "name": "ocean",
+      "path": "ocean",
+      "how": "copy",
+      "gzip": false,
+      "files": 1,
+      "bytes": 58978,
+      "sha256": "48e35f2ab1a4f79f900e550a18dba8aea727695e3bd9da76a93ba58ff807c17f"
+    },
+    {
+      "name": "eyes",
+      "path": "eyes",
+      "how": "write",
+      "gzip": false,
+      "files": 1,
+      "bytes": 150310,
+      "sha256": "a67ad19362a32be1a2f64008ac878537406d6b73f550e7ae8844e9f0c8fecb12"
+    },
+    {
+      "name": "count",
+      "path": "count",
+      "how": "write",
+      "gzip": false,
+      "files": 99,
+      "bytes": 3375213,
+      "sha256": "4f25727319207cb7f7c148f7de388296acc5fc898f9fc45f97d123422d61e27b"
     }
   ]
 }

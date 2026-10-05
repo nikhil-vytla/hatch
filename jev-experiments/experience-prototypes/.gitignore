@@ -3,7 +3,8 @@ dist/
 .vercel/
 .env*
 public/data/
-public/research/
+# Copies prepare writes; research/quality-review/ and research/show-me-realtime.html are committed.
+public/research/*.md
 public/companion.zip
 .cache/
 .vercel

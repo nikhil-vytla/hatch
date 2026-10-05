@@ -8,20 +8,13 @@
 import { existsSync, statSync } from "node:fs";
 import { resolve } from "node:path";
 import { compressRecord } from "./records";
+import { gzippedRecordings } from "./publication";
 
-/** Paths relative to jev-experiments/. Keep in sync with the .gitignore entries for their plain copies. */
-export const GZIPPED_RECORDINGS = [
-  "rewardbench2/results.jsonl",
-  "judgment-reliability/events.jsonl",
-  "judgment-reliability/cases.jsonl",
-  "visual-search/events.jsonl",
-  "outcome-framing/events.jsonl",
-  "music-arranger-v2/music-v2.jsonl",
-  "local-models-and-games/apple/results.jsonl",
-  "experience-prototypes/results/classify.jsonl",
-  "cafe-jev/cafe.jsonl",
-  "packages/arena/spine/recordings/spine.jsonl",
-];
+/**
+ * Paths relative to jev-experiments/: every recording the publication manifest reads that is
+ * committed as `.gz`, and the builders' own. Keep their plain copies in .gitignore.
+ */
+export const GZIPPED_RECORDINGS = gzippedRecordings();
 
 if (import.meta.main) {
   const lab = resolve(import.meta.dir, "../..");

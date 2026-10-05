@@ -65,7 +65,7 @@ bun start
 
 The app runs on port 5191 and its API binds to `127.0.0.1:8793`. Recorded examples are public. Live calls accept the visitor's own [Vercel AI Gateway API key](https://vercel.com/docs/ai-gateway/authentication-and-byok/api-keys), kept only in browser memory until reload or disconnect. The app forwards that key per request to the fixed Jev endpoint without saving it. Deployed handlers never load environment credentials. Recording CLIs alone read `AI_GATEWAY_API_KEY` or the authorized literal assignment in zshrc. The companion explicitly saves the visitor's key in trusted extension storage and provides Disconnect.
 
-Evidence is committed as `jev-records-v1` JSONL. The first line holds document metadata with empty arrays; subsequent lines contain `{path, index, value}` entries, one array item per line. `scripts/records.ts` and `../src/jev_lab/records.py` reconstruct the original document. `publication.json` explicitly lists the public results. `bun run build` emits ordinary `/data/*.json` files; UI rendering and JSON downloads retain complete evidence. Unlisted public data files fail the build.
+Evidence is committed as `jev-records-v1` JSONL. The first line holds document metadata with empty arrays; subsequent lines contain `{path, index, value}` entries, one array item per line. `scripts/records.ts` and `../src/jev_lab/records.py` reconstruct the original document. `scripts/publication-manifest.ts` lists everything under `public/`: each record, and each study's own files, copies and builders. `bun run build` emits ordinary `/data/*.json` files; UI rendering and JSON downloads retain complete evidence. A file in `public/` that no entry owns fails the build.
 
 ```sh
 bun run build
@@ -77,7 +77,7 @@ bun run deploy
 
 `bun run deploy` pins the existing Vercel project, builds the prepared evidence locally, and deploys production. Visitors supply their own gateway keys; deployment needs no model credentials.
 
-Preparation reconstructs the files listed in `publication.json`, including full benchmark inputs already embedded in the evidence. Local recovery/metric recomputation needs the parent lab's request logs, dataset cache, and Python environment. A fresh checkout can build and browse all evidence without that cache. Rerunning recovery still requires its original local request logs. Vercel uploads prepared `public/data`; it does not fetch repositories or run training during the build. `public/data`, dependencies, provider credentials, caches, and upstream checkouts are excluded from the commit.
+Preparation reconstructs the records listed in the publication manifest, including full benchmark inputs already embedded in the evidence. Local recovery/metric recomputation needs the parent lab's request logs, dataset cache, and Python environment. A fresh checkout can build and browse all evidence without that cache. Rerunning recovery still requires its original local request logs. Vercel uploads prepared `public/data`; it does not fetch repositories or run training during the build. `public/data`, dependencies, provider credentials, caches, and upstream checkouts are excluded from the commit.
 
 ## Validation
 

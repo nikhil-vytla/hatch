@@ -1,6 +1,6 @@
 # results/
 
-The Python lab writes its records here (`uv run jev-lab run <name>`, `src/jev_lab/cli.py`). The site publishes only the records listed in `experience-prototypes/publication.json`, so that file decides which copy is public.
+The Python lab writes its records here (`uv run jev-lab run <name>`, `src/jev_lab/cli.py`). The site publishes only the records listed in `experience-prototypes/scripts/publication-manifest.ts`, so that file decides which copy is public.
 
 Some experiments were later re-recorded or enriched in `experience-prototypes/results/`, and the site publishes that copy:
 
