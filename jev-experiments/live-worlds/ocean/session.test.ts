@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, setDefaultTimeout, test } from "bun:test";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { gunzipSync } from "node:zlib";
@@ -8,6 +8,9 @@ import { fingerprint, type World } from "./engine";
 import { JEV_BATCH, JEV_EVERY, LIVE_CAP, type jevRequest } from "./models";
 import { parseRecording, type Recording } from "./replay";
 import { createSession, RACE_SCENARIO, replaySession, type Asked, type Scenario, type Session, type Timing } from "./session";
+
+// Whole runs of the reef: several take 3–5 s on a CI runner, past bun's 5 s default.
+setDefaultTimeout(30_000);
 
 /** Every tick's world, folded into one hash: positions, deaths, births, the RNG state and the decision count. */
 const tickHash = (w: World) => `${fingerprint(w)}|${w.rng}|${w.decisions}`;
