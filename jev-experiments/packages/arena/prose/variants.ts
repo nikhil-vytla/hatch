@@ -3,7 +3,7 @@
  * turns the answer into the study's quantity. One question per request, so no variant sees
  * another's wording. Content is fixed by `items.ts`; only form changes here.
  */
-import type { Payload } from "../../../experience-prototypes/server/gateway";
+import type { Payload } from "../../jev-client/src/index";
 import { rng, type WireQuestion } from "../src/checkable/items";
 import {
   ANCHOR_ITEMS,

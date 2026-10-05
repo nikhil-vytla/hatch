@@ -6,7 +6,7 @@
 import { createHash } from "node:crypto";
 import { existsSync, writeFileSync } from "node:fs";
 import { evaluate } from "../../experience-prototypes/scripts/local-model";
-import type { Payload } from "../../experience-prototypes/server/gateway";
+import type { Payload } from "../../packages/jev-client/src/index";
 import {
   applyReply,
   copy,

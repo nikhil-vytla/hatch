@@ -37,7 +37,7 @@ import recordedRaw from "../../live-worlds/rumour/jev-scam.jsonl?raw";
 import { useLiveAsk } from "./live-ask";
 import { KeyTag, LiveFailure, ModeTag } from "./trust";
 import "./rumour-mill.css";
-import { JEV_USD_PER_INPUT_TOKEN as USD_PER_TOKEN } from "../../packages/arena/src/jev-price";
+import { JEV_USD_PER_INPUT_TOKEN as USD_PER_TOKEN } from "../../packages/jev-client/src/price";
 
 type ModelId = "free" | "jev" | "recorded";
 

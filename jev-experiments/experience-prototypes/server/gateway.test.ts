@@ -5,7 +5,7 @@ import {
   retryDelay,
   GatewayError,
   type Payload,
-} from "./gateway";
+} from "../../packages/jev-client/src/index";
 const prior = process.env.AI_GATEWAY_API_KEY;
 beforeAll(() => {
   process.env.AI_GATEWAY_API_KEY = "unit-test-key";

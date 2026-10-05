@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { readRecord } from "../experience-prototypes/scripts/records";
-import { validate } from "../experience-prototypes/server/gateway";
+import { validate } from "../packages/jev-client/src/index";
 import { cases } from "./cases";
 import { validateScore, makeCandidates, starterScore, stepPitch, inKey, TONICS, MODES } from "./engine";
 const record = readRecord(new URL("./music-v2.jsonl", import.meta.url));

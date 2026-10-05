@@ -12,7 +12,9 @@
 import { answerRequest, PUZZLES, refereeRequest, sentencesFor } from "../../../packages/arena/src/fool/model";
 import { allJobs, type Job as ProseJob } from "../../../packages/arena/prose/variants";
 
-export type Payload = { state: unknown; questions: Record<string, { type: string; [k: string]: unknown }> };
+import type { Payload } from "../../../packages/jev-client/src/wire";
+
+export type { Payload };
 
 export type Job = { id: string; study: StudyId; request: Payload };
 

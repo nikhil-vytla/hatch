@@ -1,5 +1,5 @@
 import '../../experience-prototypes/scripts/credentials';
-import {evaluate} from '../../experience-prototypes/server/gateway';
+import {evaluate} from '../../packages/jev-client/src/index';
 import {TetrisSession,type Ticket} from '../../live-worlds/tetris/session';
 import {appendFileSync,writeFileSync,existsSync,readFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';

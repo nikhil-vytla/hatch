@@ -7,10 +7,10 @@
  */
 import "../../experience-prototypes/scripts/credentials";
 import { appendFileSync } from "node:fs";
-import { evaluate } from "../../experience-prototypes/server/gateway";
+import { evaluate } from "../../packages/jev-client/src/index";
 import { allProfiles, jevRequest, type MessageKind } from "./profiles";
 import { PRESETS } from "./presets";
-import { JEV_USD_PER_INPUT_TOKEN as USD_PER_TOKEN } from "../../packages/arena/src/jev-price";
+import { JEV_USD_PER_INPUT_TOKEN as USD_PER_TOKEN } from "../../packages/jev-client/src/price";
 
 const key = process.env.AI_GATEWAY_API_KEY;
 

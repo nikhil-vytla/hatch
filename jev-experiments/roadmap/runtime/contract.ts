@@ -1,8 +1,8 @@
 import { entryShape, jsonIssue, jsonEqual, type Entry, type EntryShape } from "../../packages/decision-runtime/src/native.js";
 import { scoreAgreement } from "../../packages/decision-runtime/src/score.js";
-import { accountingIssue, usageIssue, type RequestAccounting, type TokenUsage } from "./accounting.js";
+import { accountingIssue, usageIssue, type RequestAccounting, type TokenUsage } from "../../packages/jev-client/src/accounting.js";
 export type { Entry, EntryShape };
-export type { RequestAccounting, RequestAttempt, TokenUsage } from "./accounting";
+export type { RequestAccounting, RequestAttempt, TokenUsage } from "../../packages/jev-client/src/accounting";
 /** Version 2 preserves native structure and names distribution summaries explicitly. */
 export type Question =
   | {

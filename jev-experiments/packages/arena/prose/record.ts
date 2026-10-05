@@ -13,10 +13,10 @@
 import "../../../experience-prototypes/scripts/credentials";
 import { createHash } from "node:crypto";
 import { appendFileSync, existsSync, readFileSync } from "node:fs";
-import { evaluate, GatewayError } from "../../../experience-prototypes/server/gateway";
+import { evaluate, GatewayError } from "../../jev-client/src/index";
 import { rng, shuffled } from "../src/checkable/items";
 import { allJobs } from "./variants";
-import { jevCostUsd } from "../src/jev-price";
+import { jevCostUsd } from "../../jev-client/src/price";
 
 const key = process.env.AI_GATEWAY_API_KEY;
 

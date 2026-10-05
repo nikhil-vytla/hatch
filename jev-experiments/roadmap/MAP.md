@@ -64,7 +64,7 @@ Each is a small pull request against current main, taken only if still wanted. F
 
 | Piece | Patch files | What it adds |
 | --- | --- | --- |
-| Web routing lab with the caller's key | `api/route.ts`, `server/gateway.ts`, `vercel.json` | Runs a routed task live from the Model Routing Lab, paid by the visitor's key |
+| Web routing lab with the caller's key | `api/route.ts`, `packages/jev-client`, `vercel.json` | Runs a routed task live from the Model Routing Lab, paid by the visitor's key |
 | Crowd notices | `live-crowd.tsx` | Editable notices, per-person observations, matched notice comparisons |
 | Music continuity | `music-arranger.tsx` | Continuity filters, saved scores, source-hidden auditions |
 | Typed-decision study | `local-models.tsx` | Embeds the completed study (three recipes, three seeds) in the "Decision models on a Mac" scene |

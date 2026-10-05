@@ -3,7 +3,7 @@ import {
   evaluate,
   GatewayError,
   type Question,
-} from "../../experience-prototypes/server/gateway";
+} from "../../packages/jev-client/src/index";
 import { mkdirSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 const root = resolve(import.meta.dir, "../../.cache/apple-decisions"),

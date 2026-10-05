@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { validate } from "../../../experience-prototypes/server/gateway";
+import { validate } from "../../jev-client/src/index";
 import { analyse, type Recorded } from "./analyze";
 import { CHOICE_ITEMS, TRUTH_ITEMS } from "./items";
 import { bootstrap, calibration, dist, pClaim, tv, type Answers } from "./metrics";

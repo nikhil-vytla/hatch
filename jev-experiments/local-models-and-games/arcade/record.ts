@@ -2,7 +2,7 @@ import "../../experience-prototypes/scripts/credentials";
 import {
   evaluate,
   GatewayError,
-} from "../../experience-prototypes/server/gateway";
+} from "../../packages/jev-client/src/index";
 import {
   initial,
   step,

@@ -13,7 +13,7 @@ import {
 } from "./engine";
 import { createHash } from "node:crypto";
 import { existsSync, writeFileSync } from "node:fs";
-import type { Payload } from "../../experience-prototypes/server/gateway";
+import type { Payload } from "../../packages/jev-client/src/index";
 const target = new URL("./demo.jsonl", import.meta.url);
 if (existsSync(target))
   throw Error("A saved demo exists. Do not overwrite evidence.");

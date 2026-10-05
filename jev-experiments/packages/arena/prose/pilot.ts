@@ -6,7 +6,7 @@
  */
 import "../../../experience-prototypes/scripts/credentials";
 import { appendFileSync } from "node:fs";
-import { evaluate, GatewayError, type Payload } from "../../../experience-prototypes/server/gateway";
+import { evaluate, GatewayError, type Payload } from "../../jev-client/src/index";
 
 const key = process.env.AI_GATEWAY_API_KEY;
 

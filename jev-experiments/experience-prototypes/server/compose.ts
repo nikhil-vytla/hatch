@@ -1,6 +1,6 @@
 import { experimental_composeSpec } from "@json-render/core";
 import { composeOptions } from "../src/composition-request.js";
-import { evaluate, GatewayError } from "./gateway.js";
+import { evaluate, GatewayError } from "../../packages/jev-client/src/index.js";
 export async function* compose(body: any, signal: AbortSignal, apiKey: string) {
   if (
     !body ||

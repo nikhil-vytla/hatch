@@ -1,4 +1,4 @@
-import { apiKeyFromHeader, GatewayError } from "../server/gateway.js";
+import { apiKeyFromHeader, GatewayError } from "../../packages/jev-client/src/index.js";
 import { compose } from "../server/compose.js";
 export default async function handler(req: any, res: any) {
   res.setHeader("Cache-Control", "no-store");

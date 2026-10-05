@@ -8,15 +8,13 @@
  * - The TypeSafe JavaScript SDK (`@typesafe-ai/sdk`): `new TypeSafeClient({ apiKey, baseURL,
  *   defaultModel })` and `client.systemOne({ state, questions })`, which posts to
  *   `${baseURL}/v1/systemone`. https://docs.typesafe.ai/sdk/javascript
- * - The HTTP call this site's server makes (server/gateway.ts): POST to the Vercel AI Gateway's
+ * - The HTTP call this site's server makes (packages/jev-client): POST to the Vercel AI Gateway's
  *   TypeSafe route with model "typesafe-ai/jev". https://docs.typesafe.ai/api
  *
  * The key always comes from AI_GATEWAY_API_KEY in the environment; no snippet contains a key.
  */
+import { JEV_GATEWAY_BASE_URL, JEV_GATEWAY_URL, JEV_MODEL } from "../../packages/jev-client/src/wire";
 
-export const GATEWAY_BASE_URL = "https://ai-gateway.vercel.sh/typesafe";
-export const GATEWAY_URL = `${GATEWAY_BASE_URL}/v1/systemone`;
-export const GATEWAY_MODEL = "typesafe-ai/jev";
 
 export const DOCS = {
   python: "https://docs.typesafe.ai/sdk/python",
@@ -130,8 +128,8 @@ export function pythonSnippet(requests: NamedRequest[]): string {
     "# TYPESAFE_API_KEY and drop api_key, base_url and model.",
     "with TypeSafeClient(",
     '    api_key=os.environ["AI_GATEWAY_API_KEY"],',
-    `    base_url=${JSON.stringify(GATEWAY_BASE_URL)},`,
-    `    model=${JSON.stringify(GATEWAY_MODEL)},`,
+    `    base_url=${JSON.stringify(JEV_GATEWAY_BASE_URL)},`,
+    `    model=${JSON.stringify(JEV_MODEL)},`,
     ") as client:",
   ];
 
@@ -169,8 +167,8 @@ export function typescriptSnippet(requests: NamedRequest[]): string {
     "// TYPESAFE_API_KEY and drop apiKey, baseURL and defaultModel.",
     "const client = new TypeSafeClient({",
     "  apiKey: process.env.AI_GATEWAY_API_KEY,",
-    `  baseURL: ${JSON.stringify(GATEWAY_BASE_URL)},`,
-    `  defaultModel: ${JSON.stringify(GATEWAY_MODEL)},`,
+    `  baseURL: ${JSON.stringify(JEV_GATEWAY_BASE_URL)},`,
+    `  defaultModel: ${JSON.stringify(JEV_MODEL)},`,
     "});",
   ];
 
@@ -198,13 +196,13 @@ export function typescriptSnippet(requests: NamedRequest[]): string {
 }
 
 /** The body this site's server sends to the gateway for one request. */
-export const gatewayBody = (r: JevRequest) => ({ model: GATEWAY_MODEL, state: r.state, questions: r.questions });
+export const gatewayBody = (r: JevRequest) => ({ model: JEV_MODEL, state: r.state, questions: r.questions });
 
 export function curlSnippet(requests: NamedRequest[]): string {
   const shown = requests.slice(0, MAX_SHOWN);
   const blocks = shown.map(({ request }) =>
     [
-      `curl ${GATEWAY_URL} \\`,
+      `curl ${JEV_GATEWAY_URL} \\`,
       '  -H "Authorization: Bearer $AI_GATEWAY_API_KEY" \\',
       '  -H "Content-Type: application/json" \\',
       "  --data @- <<'JSON'",

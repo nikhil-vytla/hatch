@@ -1,4 +1,4 @@
-import { apiKeyFromHeader, evaluate, GatewayError } from "../server/gateway.js";
+import { apiKeyFromHeader, evaluate, GatewayError } from "../../packages/jev-client/src/index.js";
 export default async function handler(req: any, res: any) {
   res.setHeader("Cache-Control", "no-store");
   if (req.method !== "POST")

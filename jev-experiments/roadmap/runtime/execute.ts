@@ -11,7 +11,7 @@ import {
   accountingIssue,
   requestAccounting,
   type RequestAccounting,
-} from "./accounting.js";
+} from "../../packages/jev-client/src/accounting.js";
 /** A late provider result cannot turn cancellation into success. */
 export async function decide(
   adapter: Adapter,

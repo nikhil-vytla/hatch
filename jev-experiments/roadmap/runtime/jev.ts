@@ -2,7 +2,7 @@ import {
   evaluate,
   GatewayError,
   type Payload,
-} from "../../experience-prototypes/server/gateway";
+} from "../../packages/jev-client/src/index";
 import {
   DEFAULT_LIMITS,
   decisionSummary,

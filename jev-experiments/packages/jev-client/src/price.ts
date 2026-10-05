@@ -1,6 +1,7 @@
 /**
  * TypeSafe's list price for Jev, in one place. Input tokens are billed, output is free.
- * Source: https://docs.typesafe.ai/models, read 29 Sep 2026. Change it here when it changes.
+ * Source: https://docs.typesafe.ai/models, read 29 Sep 2026. Change it here when it changes
+ * (and in src/jev_lab/core.py, the Python ledger's own copy).
  */
 export const JEV_PRICE = {
   usdPerMillionInputTokens: 0.042,

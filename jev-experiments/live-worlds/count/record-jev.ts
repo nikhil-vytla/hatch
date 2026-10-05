@@ -8,8 +8,8 @@
  */
 import "../../experience-prototypes/scripts/credentials";
 import { appendFileSync, existsSync, readFileSync } from "node:fs";
-import { evaluate, GatewayError } from "../../experience-prototypes/server/gateway";
-import { jevCostUsd } from "../../packages/arena/src/jev-price";
+import { evaluate, GatewayError } from "../../packages/jev-client/src/index";
+import { jevCostUsd } from "../../packages/jev-client/src/price";
 import { jevRequest, type Detection, type Item } from "./model";
 
 const CAP_USD = 0.1;

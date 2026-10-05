@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { JEV_PRICE, JEV_PRICE_TEXT, JEV_USD_PER_INPUT_TOKEN, jevCostUsd } from "./jev-price";
+import { JEV_PRICE, JEV_PRICE_TEXT, JEV_USD_PER_INPUT_TOKEN, jevCostUsd } from "../../jev-client/src/price";
 
 describe("Jev's list price", () => {
   test("is TypeSafe's published rate", () => {

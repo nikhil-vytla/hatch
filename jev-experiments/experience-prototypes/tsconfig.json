@@ -17,6 +17,6 @@
       "react-dom/*": ["./node_modules/@types/react-dom/*"]
     }
   },
-  "include": ["src", "api", "server/gateway.ts", "server/compose.ts"],
+  "include": ["src", "api", "server/compose.ts", "../packages/jev-client/src"],
   "exclude": ["src/**/*.test.ts"]
 }

@@ -5,7 +5,7 @@
  *   bun live-worlds/win-over/summarize.ts
  */
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { jevCostUsd } from "../../packages/arena/src/jev-price";
+import { jevCostUsd } from "../../packages/jev-client/src/price";
 
 type Decision = { intent?: string; intentP?: number; action?: string };
 type Row = {

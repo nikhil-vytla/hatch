@@ -16,14 +16,13 @@ import { encodedQuestions, POLICY_STATE, type Pair, type Task } from "../../judg
 import { payload as rewardPayload } from "../../rewardbench2/wire";
 import { STUDIES } from "../../tools/decide-cli/src/studies";
 import { readRecord } from "../scripts/records";
+import { JEV_GATEWAY_BASE_URL, JEV_MODEL } from "../../packages/jev-client/src/wire";
 import {
   cliSnippet,
   collectRequests,
   curlBodies,
   curlSnippet,
   gatewayBody,
-  GATEWAY_BASE_URL,
-  GATEWAY_MODEL,
   MAX_SHOWN,
   pythonSnippet,
   typescriptSnippet,
@@ -118,7 +117,7 @@ describe("Build this snippets", () => {
       const run = new Function("TypeSafeClient", "process", "console", `return (async () => {\n${body}\n})();`);
 
       await run(TypeSafeClient, { env: { AI_GATEWAY_API_KEY: "from-env" } }, { log() {} });
-      expect(clients).toEqual([{ apiKey: "from-env", baseURL: GATEWAY_BASE_URL, defaultModel: GATEWAY_MODEL }]);
+      expect(clients).toEqual([{ apiKey: "from-env", baseURL: JEV_GATEWAY_BASE_URL, defaultModel: JEV_MODEL }]);
       expect(roundTrip(calls)).toEqual(shown(requests));
     });
 
@@ -150,7 +149,7 @@ describe("Build this snippets", () => {
       const lines = out.stdout.toString().trim().split("\n");
       const captured = JSON.parse(lines[lines.length - 1]);
 
-      expect(captured.clients).toEqual([{ api_key: "from-env", base_url: GATEWAY_BASE_URL, model: GATEWAY_MODEL }]);
+      expect(captured.clients).toEqual([{ api_key: "from-env", base_url: JEV_GATEWAY_BASE_URL, model: JEV_MODEL }]);
       expect(captured.calls).toEqual(shown(requests));
     });
 
@@ -188,7 +187,7 @@ describe("rebuilt requests match what was recorded", () => {
       for (const row of result.experiments[dataset].rows) {
         if (!row.request_hash) continue;
 
-        expect(sha256(pyDumps({ model: GATEWAY_MODEL, ...intentRequest(dataset, row.text) }))).toBe(row.request_hash);
+        expect(sha256(pyDumps({ model: JEV_MODEL, ...intentRequest(dataset, row.text) }))).toBe(row.request_hash);
         checked++;
       }
 

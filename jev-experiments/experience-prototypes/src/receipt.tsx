@@ -6,13 +6,13 @@
  */
 import { createContext, useContext } from "react";
 import "./receipt.css";
-import { JEV_USD_PER_INPUT_TOKEN } from "../../packages/arena/src/jev-price";
+import { JEV_USD_PER_INPUT_TOKEN } from "../../packages/jev-client/src/price";
 import { requestFor } from "./api";
 import { MODE_WORDS, type Mode } from "./mode";
 import { BuildThis } from "./build-this";
 import { asJevRequest, type CliStudy } from "./build-this-snippets";
 
-/** TypeSafe's list price for Jev, per input token (see packages/arena/src/jev-price.ts). */
+/** TypeSafe's list price for Jev, per input token (see packages/jev-client/src/price.ts). */
 export const USD_PER_INPUT_TOKEN = JEV_USD_PER_INPUT_TOKEN;
 
 

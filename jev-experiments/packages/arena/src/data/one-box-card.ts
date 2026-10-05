@@ -26,24 +26,22 @@ import { bootstrapMany } from "./bootstrap";
 import { OPEN_MODELS } from "../../open-decisions/models";
 import { PALETTE } from "./palette";
 import type { Card, CardContestant, Estimate, MetricDef, RunSet } from "./schema";
-import { JEV_PRICE_TEXT, JEV_USD_PER_INPUT_TOKEN } from "../jev-price";
+import { JEV_PRICE_TEXT, JEV_USD_PER_INPUT_TOKEN } from "../../../jev-client/src/price";
 
 /**
  * Jev's price and request size, for the cost measure. Price: TypeSafe's published rate,
- * TypeSafe list price: see ../jev-price.ts (docs.typesafe.ai/models, read 29 Sep 2026).
+ * TypeSafe list price: see packages/jev-client/src/price.ts (docs.typesafe.ai/models, read 29 Sep 2026).
  * Request size: measured through the gateway on 29 Sep 2026 with One box's 14 questions:
  * 1,732 input tokens for a 1-character prefix, 1,782 for the longest phrase (187 characters),
  * so about 1,732 plus 0.27 per character. The gateway billed exactly price times tokens.
  */
-const JEV_USD_PER_TOKEN = JEV_USD_PER_INPUT_TOKEN;
-
 const tokensFor = (chars: number) => 1732 + Math.max(0, chars - 1) * (50 / 186);
 
 /** One request per keystroke: the prefixes of a phrase, 1 to its full length. */
 const jevCostPerPhrase = (text: string) => {
   let usd = 0;
 
-  for (let n = 1; n <= text.length; n++) usd += tokensFor(n) * JEV_USD_PER_TOKEN;
+  for (let n = 1; n <= text.length; n++) usd += tokensFor(n) * JEV_USD_PER_INPUT_TOKEN;
 
   return usd;
 };

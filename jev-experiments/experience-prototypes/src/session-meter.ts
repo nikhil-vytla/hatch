@@ -5,7 +5,7 @@
  */
 import { useSyncExternalStore } from "react";
 import { USD_PER_INPUT_TOKEN } from "./receipt";
-import { JEV_PRICE } from "../../packages/arena/src/jev-price";
+import { JEV_PRICE } from "../../packages/jev-client/src/price";
 
 /** Where the price comes from, shown beside the meter. */
 export const LIST_PRICE = {

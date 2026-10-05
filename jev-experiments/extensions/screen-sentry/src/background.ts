@@ -6,8 +6,7 @@
  */
 import { BATCH, batchRequest, batchScores } from "../../../live-worlds/sentry/jev";
 import type { Block } from "../../../live-worlds/sentry/model";
-
-const GATEWAY = "https://ai-gateway.vercel.sh/typesafe/v1/systemone";
+import { JEV_GATEWAY_URL, JEV_MODEL, providerValues } from "../../../packages/jev-client/src/wire";
 
 /** At most this many flagged blocks per check: two requests. */
 const MAX_BLOCKS = 2 * BATCH;
@@ -27,10 +26,10 @@ chrome.runtime.onMessage.addListener((msg, _sender, reply) => {
       for (let start = 0; start < blocks.length; start += BATCH) {
         const chunk = blocks.slice(start, start + BATCH);
         const req = batchRequest({ task: "Read this web page for the user.", page: String(msg.url) }, chunk);
-        const res = await fetch(GATEWAY, {
+        const res = await fetch(JEV_GATEWAY_URL, {
           method: "POST",
           headers: { Authorization: `Bearer ${jevKey}`, "Content-Type": "application/json" },
-          body: JSON.stringify({ model: "typesafe-ai/jev", ...req }),
+          body: JSON.stringify({ model: JEV_MODEL, ...req }),
           signal: AbortSignal.timeout(15000),
         });
 
@@ -38,7 +37,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, reply) => {
 
         const body = await res.json();
         // The gateway puts each score under its question type; batchScores reads `value`.
-        const answers = Object.fromEntries(Object.entries(body.answers ?? {}).map(([k, a]) => [k, { value: (a as { noul?: number })?.noul }]));
+        const answers = providerValues(body.answers ?? {}, "noul");
 
         risks.push(...batchScores(answers, chunk.length).map((s) => s.risk));
       }

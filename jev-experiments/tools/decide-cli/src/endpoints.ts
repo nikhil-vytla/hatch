@@ -7,11 +7,10 @@
  *   systemone:http://host:port  SGLang's /v1/systemone, or packages/arena/open-decisions/server.py on MLX
  *   decisions:http://host:port  SGLang's /v1/decisions (noul and choice; score is best effort)
  */
-import { evaluate } from "../../../experience-prototypes/server/gateway";
+import { evaluate, JEV_PRICE, type Answers, type Payload } from "../../../packages/jev-client/src/index";
 import { toWire, type Raw } from "../../../packages/arena/open-decisions/wire";
-import type { Payload } from "./studies";
 
-export type Answers = Record<string, { type: string; value: unknown; probabilities: Record<string, number> | null }>;
+export type { Answers };
 
 export type Reply = {
   answers: Answers;
@@ -29,9 +28,6 @@ export type Endpoint = {
   usdPerMTok: number;
   ask(request: Payload, signal?: AbortSignal): Promise<Reply>;
 };
-
-/** TypeSafe's list price for Jev: $0.042 per million input tokens, output free (docs.typesafe.ai/models). */
-export const JEV_USD_PER_MTOK = 0.042;
 
 export class EndpointError extends Error {
   constructor(
@@ -100,12 +96,11 @@ export function endpoint(spec: string, opts: { model?: string; usdPerMTok?: numb
 
     return {
       label: "Jev via the Vercel AI Gateway",
-      usdPerMTok: opts.usdPerMTok ?? JEV_USD_PER_MTOK,
+      usdPerMTok: opts.usdPerMTok ?? JEV_PRICE.usdPerMillionInputTokens,
       async ask(request, signal) {
         if (!key) throw new EndpointError("Set AI_GATEWAY_API_KEY to ask Jev (it is billed to your key).", 401);
 
-        // SAFETY: Payload is the same { state, questions } shape the gateway validates on entry.
-        const r = await evaluate(request as never, { apiKey: key, maxAttempts: 3, deadlineMs: 20_000, signal });
+        const r = await evaluate(request, { apiKey: key, maxAttempts: 3, deadlineMs: 20_000, signal });
 
         return {
           answers: r.answers as Answers,

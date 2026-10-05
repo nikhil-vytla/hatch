@@ -14,9 +14,9 @@
  */
 import "../../experience-prototypes/scripts/credentials";
 import { mkdirSync, writeFileSync } from "node:fs";
-import { evaluate, GatewayError } from "../../experience-prototypes/server/gateway";
+import { evaluate, GatewayError, JEV_USD_PER_INPUT_TOKEN } from "../../packages/jev-client/src/index";
 import { advance, applyDecisions, createReef, due, STEP, trigger, view } from "./engine";
-import { fromJev, JEV_BATCH, JEV_MODEL, jevRequest, USD_PER_TOKEN } from "./models";
+import { fromJev, JEV_BATCH, JEV_MODEL, jevRequest } from "./models";
 import { RACE, type Entry } from "./replay";
 
 const MAX_REQUESTS = 240;
@@ -34,7 +34,7 @@ if (process.argv.includes("--probe")) {
   const r = await evaluate(req, { apiKey: key, maxAttempts: 2, deadlineMs: 20_000 });
   const tokens = r.usage?.input_tokens ?? null;
 
-  console.log({ bytes: JSON.stringify(req).length, questions: views.length, latencyMs: r.latency_ms, tokens, usd: tokens === null ? null : tokens * USD_PER_TOKEN, decisions: fromJev(views, r.answers, r.latency_ms).length, sample: fromJev(views, r.answers, r.latency_ms).slice(0, 3) });
+  console.log({ bytes: JSON.stringify(req).length, questions: views.length, latencyMs: r.latency_ms, tokens, usd: tokens === null ? null : tokens * JEV_USD_PER_INPUT_TOKEN, decisions: fromJev(views, r.answers, r.latency_ms).length, sample: fromJev(views, r.answers, r.latency_ms).slice(0, 3) });
   process.exit(0);
 }
 
@@ -73,7 +73,7 @@ while (w.time < RACE.seconds && requests < MAX_REQUESTS && usd < MAX_USD) {
   try {
     const r = await evaluate(jevRequest(views), { apiKey: key, maxAttempts: 1, deadlineMs: 10_000 });
     const tokens = r.usage?.input_tokens ?? null;
-    const cost = tokens === null ? null : tokens * USD_PER_TOKEN;
+    const cost = tokens === null ? null : tokens * JEV_USD_PER_INPUT_TOKEN;
 
     usd += cost ?? 0;
 

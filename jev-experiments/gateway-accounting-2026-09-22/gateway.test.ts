@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
-import { evaluate, GatewayError, type Payload } from "../experience-prototypes/server/gateway";
-import { accountingIssue } from "../roadmap/runtime/accounting";
+import { evaluate, GatewayError, type Payload } from "../packages/jev-client/src/index";
+import { accountingIssue } from "../packages/jev-client/src/accounting";
 
 const payload: Payload = {
   state: { document: "Authored public fixture" },

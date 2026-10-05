@@ -115,7 +115,7 @@ On our recordings, `report` reproduces the published numbers. A test (`test/pari
 ## What's real and what isn't
 
 - **Real:** the request builders, which are shared with the site; recording, resume, the cost cap and fail-fast; the analysis, which matches the published results; the SGLang `/v1/systemone` adapter, which is the same wire conversion the open-decisions recordings used; and the bouncer's heuristics.
-- **Not exercised here:** live `jev` and live SGLang, because building it spent nothing. The `jev` path is the site's own gateway client (`experience-prototypes/server/gateway.ts`), and the `systemone` path is the open-decisions adapter. `/v1/decisions` choice and score shapes follow the SGLang docs and are untested against a server.
+- **Not exercised here:** live `jev` and live SGLang, because building it spent nothing. The `jev` path is the shared Jev client (`packages/jev-client`), the same one the site's API uses, and the `systemone` path is the open-decisions adapter. `/v1/decisions` choice and score shapes follow the SGLang docs and are untested against a server.
 - **Not done:** concurrency, a published npm package, more studies (the full prose set or One box), and the bouncer's judge prompt has never been evaluated.
 
 No model here is trained on Jev's outputs. TypeSafe's Master Customer Agreement §2.3(b) forbids it. `jev-lab` only asks and measures.

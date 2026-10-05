@@ -8,7 +8,7 @@
  */
 import "../../../experience-prototypes/scripts/credentials";
 import { appendFileSync, existsSync, readFileSync } from "node:fs";
-import { evaluate, GatewayError } from "../../../experience-prototypes/server/gateway";
+import { evaluate, GatewayError } from "../../jev-client/src/index";
 import { rng, shuffled } from "../src/checkable/items";
 import { DECK, requestFor } from "../src/decide/deck";
 

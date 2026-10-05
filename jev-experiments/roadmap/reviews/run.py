@@ -7,7 +7,7 @@ ROOT=ROADMAP.parents[1]
 MODEL='amazon-bedrock/global.anthropic.claude-fable-5-1'
 p=argparse.ArgumentParser();p.add_argument('gate',choices=['protocol','prototype','release']);a=p.parse_args()
 snapshot=Path(tempfile.mkdtemp(prefix='jev-release-review-'))
-paths=['jev-experiments/roadmap','jev-experiments/experience-prototypes/src','jev-experiments/experience-prototypes/server/gateway.ts','jev-experiments/adapters/typescript/index.ts']
+paths=['jev-experiments/roadmap','jev-experiments/experience-prototypes/src','jev-experiments/packages/jev-client/src','jev-experiments/adapters/typescript/index.ts']
 inventory=[]
 for relative in paths:
  source=ROOT/relative

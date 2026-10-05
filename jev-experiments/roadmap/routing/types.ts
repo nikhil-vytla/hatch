@@ -1,4 +1,4 @@
-import type { RequestAccounting } from "../runtime/accounting";
+import type { RequestAccounting } from "../../packages/jev-client/src/accounting";
 import type { DecisionResponse, Issue } from "../runtime/contract";
 export type TaskCategory =
   "bug-fix" | "test-writing" | "repository-analysis" | "writing" | "other";

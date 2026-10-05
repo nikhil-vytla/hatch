@@ -1,5 +1,5 @@
 import { test, expect } from "bun:test";
-import { evaluate } from "../../experience-prototypes/server/gateway";
+import { evaluate } from "../../packages/jev-client/src/index";
 import { decode } from "../../adapters/typescript/index";
 const request = {
   state: "fixture",

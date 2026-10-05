@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { accountingIssue, parseCost, requestAccounting, usageIssue, type RequestAttempt } from "../roadmap/runtime/accounting";
+import { accountingIssue, parseCost, requestAccounting, usageIssue, type RequestAttempt } from "../packages/jev-client/src/accounting";
 
 const attempt = (n = 1): RequestAttempt => ({
   attempt: n, status: 200, requestMs: 2, requestedModel: "typesafe-ai/jev",

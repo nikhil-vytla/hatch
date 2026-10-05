@@ -23,7 +23,7 @@
  */
 import "../../../experience-prototypes/scripts/credentials";
 import { appendFileSync, existsSync, readFileSync } from "node:fs";
-import { evaluate, GatewayError } from "../../../experience-prototypes/server/gateway";
+import { evaluate, GatewayError } from "../../jev-client/src/index";
 import { phrasesSchema } from "../src/one-box/phrases";
 import { normalizeKey } from "../src/one-box/replay";
 import { QUESTIONS } from "../src/one-box/questions";

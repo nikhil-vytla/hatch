@@ -1,4 +1,4 @@
-import type { Payload } from '../experience-prototypes/server/gateway';
+import type { Payload } from '../packages/jev-client/src/index';
 
 export const WIDTH = 10, HEIGHT = 20, PIECE_LIMIT = 32, BUTTON_BUDGET = 12;
 export type Piece = 'I'|'J'|'L'|'O'|'S'|'T'|'Z';

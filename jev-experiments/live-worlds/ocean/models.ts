@@ -7,14 +7,11 @@
  */
 import type { ZeroShot } from "../../packages/arena/src/decide/nli";
 import type { Action, Decision, View } from "./engine";
-import { JEV_USD_PER_INPUT_TOKEN } from "../../packages/arena/src/jev-price";
 
 export const BROWSER_MODEL = "MobileBERT";
 export const JEV_MODEL = "Jev";
 /** Fish per Jev request. */
 export const JEV_BATCH = 40;
-// TypeSafe's list price, per input token.
-export const USD_PER_TOKEN = JEV_USD_PER_INPUT_TOKEN;
 
 export const OPTION_TEXT: Record<Action, string> = {
   school: "Swim with the other fish in the school.",

@@ -1,5 +1,5 @@
 import { test, expect } from "bun:test";
-import { apiKeyFromHeader, evaluate } from "./gateway";
+import { apiKeyFromHeader, evaluate } from "../../packages/jev-client/src/index";
 import evaluateHandler from "../api/evaluate";
 import composeHandler from "../api/compose";
 const payload = {

@@ -1,4 +1,4 @@
-import type { Payload, Question } from '../experience-prototypes/server/gateway';
+import type { Payload, Question } from '../packages/jev-client/src/index';
 export const SIZE=16;
 export type DrawingMethod='intensity'|'membership'|'formula'|'scanline';
 export const drawingMethods:Record<DrawingMethod,{title:string;description:string}>={

@@ -9,11 +9,11 @@
 import "../../../experience-prototypes/scripts/credentials";
 import { pipeline } from "@huggingface/transformers";
 import { writeFileSync } from "node:fs";
-import { evaluate, type Payload } from "../../../experience-prototypes/server/gateway";
+import { evaluate, type Payload } from "../../jev-client/src/index";
 import { answerLocally, lineRequest, merge, reactionRequest, split, toHearDecision, type Event } from "../../../live-worlds/win-over/decide";
 import { createWorld, goal } from "../../../live-worlds/win-over/engine";
 import { NLI_MODEL, type ZeroShot } from "../src/decide/nli";
-import { jevCostUsd } from "../src/jev-price";
+import { jevCostUsd } from "../../jev-client/src/price";
 
 const key = process.env.AI_GATEWAY_API_KEY;
 

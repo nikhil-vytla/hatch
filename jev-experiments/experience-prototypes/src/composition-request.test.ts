@@ -5,7 +5,8 @@
  */
 import { afterEach, describe, expect, test } from "bun:test";
 import { compose } from "../server/compose";
-import { gatewayBody, GATEWAY_URL } from "./build-this-snippets";
+import { JEV_GATEWAY_URL } from "../../packages/jev-client/src/wire";
+import { gatewayBody } from "./build-this-snippets";
 import { firstCompositionRequest, type ComposeBody } from "./composition-request";
 
 const PROMPTS: ComposeBody[] = [
@@ -57,7 +58,7 @@ describe("Generated UI: Build this", () => {
 
       expect(shown).not.toBeNull();
       expect(sent).toHaveLength(1);
-      expect(sent[0].url).toBe(GATEWAY_URL);
+      expect(sent[0].url).toBe(JEV_GATEWAY_URL);
       expect(sent[0].body).toEqual(JSON.parse(JSON.stringify(gatewayBody(shown as never))));
       expect(last).toMatchObject({ type: "complete", stopReason: "unavailable" });
     });

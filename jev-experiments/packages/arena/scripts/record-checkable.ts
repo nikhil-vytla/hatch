@@ -14,7 +14,7 @@
  */
 import "../../../experience-prototypes/scripts/credentials";
 import { appendFileSync, existsSync, readFileSync } from "node:fs";
-import { evaluate, GatewayError } from "../../../experience-prototypes/server/gateway";
+import { evaluate, GatewayError } from "../../jev-client/src/index";
 import { bankSchema, rng, shuffled } from "../src/checkable/items";
 
 /** Optional: another bank in src/checkable/ and its log name, e.g. judgement-bank.json judgement. */

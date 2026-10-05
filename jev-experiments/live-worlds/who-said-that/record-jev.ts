@@ -14,8 +14,8 @@
  */
 import "../../experience-prototypes/scripts/credentials";
 import { appendFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";
-import { evaluate, GatewayError, type Payload } from "../../experience-prototypes/server/gateway";
-import { jevCostUsd } from "../../packages/arena/src/jev-price";
+import { evaluate, GatewayError, type Payload } from "../../packages/jev-client/src/index";
+import { jevCostUsd } from "../../packages/jev-client/src/price";
 import { fromJev, jevCountRequest, jevRequest, LOOKBACK, type TextAnswers } from "./questions";
 import type { Heard } from "./signals";
 

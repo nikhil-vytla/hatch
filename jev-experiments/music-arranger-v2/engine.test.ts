@@ -1,7 +1,7 @@
 import { describe, test, expect } from "bun:test";
 import { createRequire } from "node:module";
 import { CONTOURS, MODES, TONICS, INSTRUMENTS, starterScore, blankScore, makeCandidates, applyCandidate, validateScore, playbackEvents, populateMidi, editNote, setTrack, Generation, BarScore, phraseRequest, globalRequest, voiceChord, type Settings } from "./engine";
-import { validate } from "../experience-prototypes/server/gateway";
+import { validate } from "../packages/jev-client/src/index";
 const appRequire = createRequire(new URL("../experience-prototypes/package.json", import.meta.url));
 const { Midi } = appRequire("@tonejs/midi");
 describe("canonical score", () => {

@@ -25,7 +25,7 @@ import {
   type Event,
 } from "./decide";
 import { applyGossip, applyHear, goal, markBusy, type Meeting, type Resident, type World } from "./engine";
-import { JEV_USD_PER_INPUT_TOKEN } from "../../packages/arena/src/jev-price";
+import { JEV_USD_PER_INPUT_TOKEN } from "../../packages/jev-client/src/price";
 
 export type JevReply = { answers: Record<string, Answer>; latency_ms?: number; usage?: { input_tokens?: number } | null };
 
@@ -35,9 +35,6 @@ export type Backend =
   | { kind: "jev"; name: string; ask: (state: unknown, questions: Record<string, unknown>) => Promise<JevReply> };
 
 type Job = { kind: "hear"; event: Event; listeners: Resident[] } | { kind: "gossip"; meetings: Meeting[] };
-
-// TypeSafe's list price, per input token.
-export const USD_PER_TOKEN = JEV_USD_PER_INPUT_TOKEN;
 
 const now = () => (typeof performance === "undefined" ? Date.now() : performance.now());
 
@@ -211,6 +208,6 @@ export class Brain {
 
   private account(reply: JevReply) {
     this.calls++;
-    this.costUsd += (reply.usage?.input_tokens ?? 0) * USD_PER_TOKEN;
+    this.costUsd += (reply.usage?.input_tokens ?? 0) * JEV_USD_PER_INPUT_TOKEN;
   }
 }

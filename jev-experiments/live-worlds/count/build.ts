@@ -6,7 +6,7 @@
  */
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { jevCostUsd, JEV_PRICE_TEXT } from "../../packages/arena/src/jev-price";
+import { jevCostUsd, JEV_PRICE_TEXT } from "../../packages/jev-client/src/price";
 import {
   BIN_LABELS,
   DETECTOR_THRESHOLD,

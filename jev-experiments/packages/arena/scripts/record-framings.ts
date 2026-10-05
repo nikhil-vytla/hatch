@@ -19,7 +19,7 @@
  * exactly from the game state).
  */
 import "../../../experience-prototypes/scripts/credentials";
-import { evaluate } from "../../../experience-prototypes/server/gateway";
+import { evaluate } from "../../jev-client/src/index";
 import { TetrisArena } from "../src/tetris";
 import { framedJev, type Exchange, type FramingId } from "../src/tetris-framings";
 import { existsSync, appendFileSync, writeFileSync } from "node:fs";

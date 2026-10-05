@@ -16,7 +16,7 @@
  * resetting after a success) and adds "remember only confident judgements".
  */
 import "../../../experience-prototypes/scripts/credentials";
-import { evaluate } from "../../../experience-prototypes/server/gateway";
+import { evaluate } from "../../jev-client/src/index";
 import { TetrisArena, type Contestant, type TimedEvent } from "../src/tetris";
 import { framedJev, type Exchange, type FramingId } from "../src/tetris-framings";
 import { existsSync, writeFileSync } from "node:fs";

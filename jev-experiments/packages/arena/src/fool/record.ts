@@ -11,9 +11,9 @@ import {
   evaluate,
   GatewayError,
   type Payload,
-} from "../../../../experience-prototypes/server/gateway";
+} from "../../../jev-client/src/index";
 import { answerRequest, cheatFor, PUZZLES, refereeRequest, sentencesFor } from "./model";
-import { jevCostUsd } from "../jev-price";
+import { jevCostUsd } from "../../../jev-client/src/price";
 
 const CAP = 200;
 

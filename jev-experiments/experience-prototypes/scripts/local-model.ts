@@ -1,8 +1,8 @@
 // Recording tools opt into local credentials. Deployed handlers never import this module.
 import "./credentials";
-import { evaluate as request, type Payload } from "../server/gateway";
+import { evaluate as request, type Payload } from "../../packages/jev-client/src/index";
 import { compose as generate } from "../server/compose";
-export { GatewayError } from "../server/gateway";
+export { GatewayError } from "../../packages/jev-client/src/index";
 const key = () => {
   const value = process.env.AI_GATEWAY_API_KEY;
   if (!value)

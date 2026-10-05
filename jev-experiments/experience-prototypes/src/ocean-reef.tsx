@@ -25,7 +25,8 @@ import {
   type Fish,
   type World,
 } from "../../live-worlds/ocean/engine";
-import { BROWSER_MODEL, fromJev, JEV_BATCH, JEV_MODEL, jevRequest, USD_PER_TOKEN } from "../../live-worlds/ocean/models";
+import { BROWSER_MODEL, fromJev, JEV_BATCH, JEV_MODEL, jevRequest } from "../../live-worlds/ocean/models";
+import { JEV_USD_PER_INPUT_TOKEN as USD_PER_TOKEN } from "../../packages/jev-client/src/price";
 import { paint, hitFish, VIEW } from "../../live-worlds/ocean/render";
 import { decideAll, POLICY_NAME, WEIGHT_COUNT } from "../../live-worlds/ocean/policy";
 import evolved from "../../live-worlds/ocean/policy.json";

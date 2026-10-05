@@ -2,6 +2,8 @@
  * SGLang's System One answers (noul / choice / score with x_label_mass) in the wire shape our
  * recordings already use for Jev and Laya: { type, value, probabilities, confidence }.
  */
+import type { Answer } from "../../jev-client/src/wire";
+
 export type Raw = {
   type: string;
   noul?: number;
@@ -12,11 +14,7 @@ export type Raw = {
   x_label_mass?: number;
 };
 
-export type WireAnswer = {
-  type: string;
-  value: unknown;
-  probabilities: Record<string, number> | null;
-  confidence?: number;
+export type WireAnswer = Answer & {
   /** Full-vocabulary probability of the answer labels (SGLang's label_mass). */
   labelMass?: number;
 };

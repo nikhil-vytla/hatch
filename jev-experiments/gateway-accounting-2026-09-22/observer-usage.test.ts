@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
-import { evaluate, GatewayError } from "../experience-prototypes/server/gateway";
-import { usageIssue, accountingIssue } from "../roadmap/runtime/accounting";
+import { evaluate, GatewayError } from "../packages/jev-client/src/index";
+import { usageIssue, accountingIssue } from "../packages/jev-client/src/accounting";
 const payload = { state: "authored fixture", questions: { q: { type: "noul", instructions: { check: "ready" } } } };
 const response = (usage: unknown = { input_tokens: 10, output_tokens: 4, total_tokens: 14 }) => Response.json({
   model: "authored-model", answers: { q: { type: "noul", noul: 0.75 } }, usage,

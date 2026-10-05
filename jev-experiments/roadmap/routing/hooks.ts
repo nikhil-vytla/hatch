@@ -1,4 +1,4 @@
-import { accountingIssue, type RequestAccounting } from "../runtime/accounting.js";
+import { accountingIssue, type RequestAccounting } from "../../packages/jev-client/src/accounting.js";
 import type { Identity, Issue } from "../runtime/contract";
 import type {
   ExecutionResult,

@@ -16,7 +16,7 @@
  *   bun jev-experiments/packages/arena/scripts/record-robustness.ts
  */
 import "../../../experience-prototypes/scripts/credentials";
-import { evaluate } from "../../../experience-prototypes/server/gateway";
+import { evaluate } from "../../jev-client/src/index";
 import { TetrisArena, heuristic, type Contestant, type Question } from "../src/tetris";
 import {
   framedJev,

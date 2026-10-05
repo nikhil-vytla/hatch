@@ -2,7 +2,7 @@
 import { decide } from '../../../runtime/execute';
 import { questionValues, validateRequest, DEFAULT_LIMITS, type Adapter, type DecisionRequest, type DecisionResponse } from '../../../runtime/contract';
 import { createJevAdapter } from '../../../runtime/jev';
-import { evaluate } from '../../../../experience-prototypes/server/gateway';
+import { evaluate } from '../../../../packages/jev-client/src/index';
 
 const request: DecisionRequest = {schemaVersion:'1',requestId:'fixture',state:'fixture',questions:[{id:'q',kind:'boolean',prompt:'Is this a fixture?'}]};
 const identity={adapter:'fixture',model:'fixture',revision:'pinned-one',local:true};

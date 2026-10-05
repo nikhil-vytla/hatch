@@ -486,7 +486,7 @@ export function preparePublicHarnessEvidence(lab: string, destination: string) {
           .split(/\r?\n/)
           .filter((line) => line.trim())
           .map((line) => JSON.parse(line));
-        const projected = events.map((event) =>
+        const projected = events.map((event: any) =>
           field === "transcript"
             ? projectTranscriptEvent(harness, event, retained ? { ...options, portableRecord: true } : options)
             : projectAudit(event, options),

@@ -2,7 +2,7 @@ import evaluateHandler from "../api/evaluate";
 import { tallyHandler } from "../api/tally";
 import { memoryStore } from "../../packages/arena/src/decide/tally";
 import wardrobeTokenHandler from "../api/wardrobe-token";
-import { apiKeyFromHeader, GatewayError } from "./gateway";
+import { apiKeyFromHeader, GatewayError } from "../../packages/jev-client/src/index";
 import { compose } from "./compose";
 // Decide's visitor votes, kept in memory while the dev server runs.
 const tallies = memoryStore();

@@ -9,8 +9,8 @@
 import "../../../experience-prototypes/scripts/credentials";
 import { appendFileSync, existsSync, readFileSync } from "node:fs";
 import { unpackForAppend } from "../../../experience-prototypes/scripts/records";
-import { evaluate, GatewayError, type Payload } from "../../../experience-prototypes/server/gateway";
-import { jevCostUsd } from "../src/jev-price";
+import { evaluate, GatewayError, type Payload } from "../../jev-client/src/index";
+import { jevCostUsd } from "../../jev-client/src/price";
 import { allSequences, ITEMS, requestFor, sequenceId } from "./model";
 
 const CAP_USD = 0.25;

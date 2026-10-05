@@ -1,11 +1,15 @@
+/**
+ * The Jev client: one call to Jev through the Vercel AI Gateway, with retries, cancellation,
+ * provider-answer validation and per-attempt accounting. Node only (it measures bodies with
+ * Buffer); browser code imports ./wire.js and ./price.js instead.
+ */
 import {
   entryShape,
   jsonEqual,
   jsonIssue,
   nativeQuestionIssue,
-  type NativeQuestion,
-} from "../../packages/decision-runtime/src/native.js";
-import { probabilityMassAccepted, scoreAgreement } from "../../packages/decision-runtime/src/score.js";
+} from "../../decision-runtime/src/native.js";
+import { probabilityMassAccepted, scoreAgreement } from "../../decision-runtime/src/score.js";
 import {
   parseCost,
   requestAccounting,
@@ -13,9 +17,9 @@ import {
   type RequestAttempt,
   type RequestAccounting,
   type TokenUsage,
-} from "../../roadmap/runtime/accounting.js";
-export type Question = NativeQuestion;
-export type Payload = { state: unknown; questions: Record<string, Question> };
+} from "./accounting.js";
+import { JEV_GATEWAY_URL, JEV_MODEL, type Payload } from "./wire.js";
+export type { Payload, Question } from "./wire.js";
 export class GatewayError extends Error {
   constructor(
     message: string,
@@ -342,8 +346,8 @@ export async function evaluate(
       attempt: i + 1,
       status: "pending",
       requestMs: 0,
-      requestedModel: "typesafe-ai/jev",
-      model: "typesafe-ai/jev",
+      requestedModel: JEV_MODEL,
+      model: JEV_MODEL,
       modelSource: "configured-unverified",
       usage: null,
       costUsd: null,
@@ -389,7 +393,7 @@ export async function evaluate(
         ? AbortSignal.any([options.signal, timeout])
         : timeout;
       const response = await fetcher(
-        "https://ai-gateway.vercel.sh/typesafe/v1/systemone",
+        JEV_GATEWAY_URL,
         {
           method: "POST",
           redirect: "error",
@@ -398,7 +402,7 @@ export async function evaluate(
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            model: "typesafe-ai/jev",
+            model: JEV_MODEL,
             state: body.state,
             questions: body.questions,
           }),

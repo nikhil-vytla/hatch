@@ -1,4 +1,4 @@
-import { apiKeyFromHeader } from "../../experience-prototypes/server/gateway.js";
+import { apiKeyFromHeader } from "../../packages/jev-client/src/index.js";
 import { routeTask } from "./router.js";
 import { defaultPolicy, validatePolicy, validateTask } from "./policy.js";
 import { executeHttp } from "./http-executor.js";
