@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import {
   ArrowUpRight,
   Play,
@@ -220,28 +220,6 @@ export function Stat({
 }
 export function Empty({ children }: { children: ReactNode }) {
   return <div className="empty">{children}</div>;
-}
-export function ErrorText({ error }: { error: string }) {
-  return error ? <Notice error>{error}</Notice> : null;
-}
-export function useRun() {
-  const [busy, setBusy] = useState(false),
-    [error, setError] = useState("");
-  return {
-    busy,
-    error,
-    execute: async (fn: () => Promise<void>) => {
-      setBusy(true);
-      setError("");
-      try {
-        await fn();
-      } catch (e) {
-        setError(e instanceof Error ? e.message : String(e));
-      } finally {
-        setBusy(false);
-      }
-    },
-  };
 }
 export function Availability({ rows, result }: { rows: any[]; result: any }) {
   const unavailable = rows.filter((r) => r.error).length;

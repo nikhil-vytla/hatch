@@ -1,4 +1,3 @@
-import { compositionEvents } from "./composition-stream";
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
@@ -13,7 +12,9 @@ import {
 } from "@json-render/react";
 import { Sparkles, Check, GitBranch, RotateCcw } from "lucide-react";
 import { uiCatalog, uiInitial, exampleSpec } from "./ui-catalog";
-import { getApiKey, download, readResponse, requireKey } from "./api";
+import { download } from "./api";
+import { useLiveAsk } from "./live-ask";
+import { LiveFailure } from "./trust";
 import { fromRecorded, Receipt, type ReceiptData } from "./receipt";
 import { BuildThis } from "./build-this";
 import { firstCompositionRequest, type ComposeBody } from "./composition-request";
@@ -25,8 +26,6 @@ import {
   Pills,
   Notice,
   State,
-  useRun,
-  ErrorText,
 } from "./shared";
 function Input({ props, bindings }: any) {
   const [value, set] = useBoundProp<string>(props.value, bindings?.value);
@@ -219,15 +218,14 @@ export function GeneratedUI({ record }: { record: any }) {
     [composed, setComposed] = useState<ReceiptData | null>(null),
     [epoch, setEpoch] = useState(0),
     [replaying, setReplaying] = useState(false);
-  const requestVersion = useRef(0);
   const [shortlist, setShortlist] = useState<string[]>([]);
   const replayTimer = useRef<ReturnType<typeof setInterval> | null>(null);
-  const { busy, error, execute } = useRun();
-  const state = useRef<any>(uiInitial),
-    controller = useRef<AbortController | null>(null);
+  // The composition in flight: Stop, a new domain, a new compose, or leaving aborts it.
+  const jev = useLiveAsk(),
+    busy = jev.busy;
+  const state = useRef<any>(uiInitial);
   useEffect(
     () => () => {
-      requestVersion.current++; controller.current?.abort();
       if (replayTimer.current) clearInterval(replayTimer.current);
     },
     [],
@@ -285,41 +283,16 @@ export function GeneratedUI({ record }: { record: any }) {
     replayTimer.current = setInterval(tick, 550);
   }
   async function generate(edit: boolean) {
-    await execute(async () => {
-      const version=++requestVersion.current;
-      const requestController = new AbortController(); controller.current = requestController;
-      setVersions(v=>v.map((item,i)=>i===active?{...item,spec:{...item.spec,state:structuredClone(state.current)}}:item));
-      setSteps([]);
-      setNotice("");
-      try {
-      requireKey();
-      const response = await fetch("/api/compose", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${getApiKey()}`,
-        },
-        body: JSON.stringify({
-          prompt,
-          domain,
-          state: edit ? state.current : uiInitial,
-          ...(edit ? { spec } : {}),
-        }),
-        signal: requestController.signal,
-      });
-      if (!response.ok) {
-        const b = await readResponse(response);
-        throw new Error(b.error);
-      }
-      if(version!==requestVersion.current)return;
+    setVersions(v=>v.map((item,i)=>i===active?{...item,spec:{...item.spec,state:structuredClone(state.current)}}:item));
+    setSteps([]);
+    setNotice("");
+    const body = { prompt, domain, state: edit ? state.current : uiInitial, ...(edit ? { spec } : {}) };
+    // Every Jev call the server makes for this composition is metered as the stream reports it.
+    const outcome = await jev.ask(async (j) => {
       let final:any=null, complete=false;
-      for await(const event of compositionEvents(response.body!,requestController.signal)) {
-          if(version!==requestVersion.current)return;
+      try {
+        for await(const event of j.compose(body)) {
           if(event.type === "complete")complete=true;
-          if (event.type === "error") {
-            setSource("Interrupted composition");
-            throw new Error(event.error);
-          }
           if (event.spec) {
             setSpec(event.spec);
             final = event;
@@ -338,24 +311,29 @@ export function GeneratedUI({ record }: { record: any }) {
                 event.stopReason +
                 ". The last valid version is preserved.",
             );
+        }
+      } catch (error) {
+        if (!j.signal.aborted) setSource("Interrupted composition");
+        throw error;
       }
-      if(version!==requestVersion.current)return;
-      if (!complete) { setSource("Partial composition"); setNotice("The stream ended before completion. The visible partial interface is preserved; it is not a completed run."); }
-      if (final?.spec) {
-        setComposed(compositionReceipt(final, "live"));
-        setVersions((v) => [
-          ...v,
-          {
-            spec: final.spec,
-            label: prompt,
-            kind: final.stopReason === "finish" ? "live" : "partial",
-          },
-        ]);
-        setActive(versions.length);
-        setEpoch((e) => e + 1);
-      }
-      } catch(error) { if(requestController.signal.aborted || version!==requestVersion.current)return; setSource("Interrupted composition"); throw error; }
+      return { final, complete };
     });
+    if (!outcome) return;
+    const { final, complete } = outcome;
+    if (!complete) { setSource("Partial composition"); setNotice("The stream ended before completion. The visible partial interface is preserved; it is not a completed run."); }
+    if (final?.spec) {
+      setComposed(compositionReceipt(final, "live"));
+      setVersions((v) => [
+        ...v,
+        {
+          spec: final.spec,
+          label: prompt,
+          kind: final.stopReason === "finish" ? "live" : "partial",
+        },
+      ]);
+      setActive(versions.length);
+      setEpoch((e) => e + 1);
+    }
   }
   return (
     <div className="workbench">
@@ -446,7 +424,7 @@ export function GeneratedUI({ record }: { record: any }) {
             values={["settings", "apartments", "event"]}
             value={domain}
             onChange={(d) => {
-              requestVersion.current++; controller.current?.abort(); setShortlist([]); setNotice("");
+              jev.reset(); setShortlist([]); setNotice("");
               if (replayTimer.current) clearInterval(replayTimer.current);
               setReplaying(false);
               setDomain(d);
@@ -504,7 +482,7 @@ export function GeneratedUI({ record }: { record: any }) {
             Revise this version
           </Button>
           {busy && (
-            <Button secondary onClick={() => {requestVersion.current++;controller.current?.abort();setSource("Interrupted composition");setNotice("Stopped. The partial preview is preserved.");}}>
+            <Button secondary onClick={() => {jev.cancel();setSource("Interrupted composition");setNotice("Stopped. The partial preview is preserved.");}}>
               Stop, keep the preview
             </Button>
           )}
@@ -519,7 +497,12 @@ export function GeneratedUI({ record }: { record: any }) {
               </button>
             ))}
           </div>
-          <ErrorText error={error} />
+          {jev.failure && (
+            <LiveFailure
+              failure={jev.failure}
+              fallback="The partial preview is preserved. Recorded compositions work without a key."
+            />
+          )}
           <State
             title="Inspect components and Jev decisions"
             value={{ spec, steps }}

@@ -41,11 +41,6 @@ export class EvaluationError extends Error {
 export const NO_KEY_MESSAGE =
   "Connect your AI Gateway key in Settings to run Jev live. Recorded examples work without one, and live runs are billed to your key.";
 
-/** Throws the shared no-key error; call before any request that needs the visitor's key. */
-export function requireKey() {
-  if (!getApiKey()) throw new EvaluationError(NO_KEY_MESSAGE, 401, { error: NO_KEY_MESSAGE });
-}
-
 /**
  * The request each live response answered, keyed by the response body, so a receipt (and its
  * "Build this" code) can show exactly what was sent without every scene threading it through.

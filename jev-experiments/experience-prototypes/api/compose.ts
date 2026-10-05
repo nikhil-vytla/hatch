@@ -1,5 +1,5 @@
-import { apiKeyFromHeader, GatewayError } from "../../packages/jev-client/src/index.js";
-import { compose } from "../server/compose.js";
+import { apiKeyFromHeader } from "../../packages/jev-client/src/index.js";
+import { composeLines } from "../server/compose.js";
 export default async function handler(req: any, res: any) {
   res.setHeader("Cache-Control", "no-store");
   if (req.method !== "POST")
@@ -10,23 +10,12 @@ export default async function handler(req: any, res: any) {
       .status(401)
       .json({ error: "Enter your Vercel AI Gateway API key to run live." });
   res.setHeader("Content-Type", "application/x-ndjson");
-  res.setHeader("Cache-Control", "no-store");
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 52000);
   res.on?.("close", () => controller.abort());
   try {
-    for await (const event of compose(req.body, controller.signal, apiKey))
-      res.write(JSON.stringify(event) + "\n");
-  } catch (e) {
-    res.write(
-      JSON.stringify({
-        type: "error",
-        error:
-          e instanceof GatewayError
-            ? e.message
-            : "Composition interrupted. Check your input and try again.",
-      }) + "\n",
-    );
+    // The framing (events, a line per Jev call, the closing error line) is shared with server/dev.ts.
+    for await (const line of composeLines(req.body, controller.signal, apiKey)) res.write(line);
   } finally {
     clearTimeout(timer);
     res.end();
