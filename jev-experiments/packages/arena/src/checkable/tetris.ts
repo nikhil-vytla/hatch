@@ -13,7 +13,7 @@ import {
   ROWS,
   type Game,
   type Landing,
-} from "../../../../live-worlds/tetris/engine";
+} from "../tetris-engine";
 import { rng, shuffled, type Item, type WireQuestion } from "./items";
 
 const LABELS = ["A", "B", "C"] as const;

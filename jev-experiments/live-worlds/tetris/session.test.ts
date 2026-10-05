@@ -1,6 +1,45 @@
 import { describe, expect, test } from "bun:test";
-import { command } from "./engine";
-import { DECISION_INSTRUCTIONS, snapshot, TetrisSession } from "./session";
+import { command } from "../../packages/arena/src/tetris-engine";
+import { readFileSync } from "node:fs";
+import { DECISION_INSTRUCTIONS, snapshot, TetrisSession, type Ticket } from "./session";
+
+type RecordedEvent = { lane: number; sentAt: number; receivedAt?: number; status: string; answer?: string; reason?: string; latencyMs: number; response?: unknown; httpStatus?: number };
+type RecordedLane = { status: string; lines: number; pieces: number; score: number; stats: unknown };
+const recordedGames = readFileSync(new URL("../../roadmap/tetris/games.jsonl", import.meta.url), "utf8").trim().split("\n").map(line => JSON.parse(line));
+
+/**
+ * Replays a recorded live session through the page's own ticket loop. The recorder collected
+ * requests once per frame, so requests are collected at the recorded send times only; each
+ * reply arrives at its recorded world time.
+ */
+function replay(game: { summary: { seed: number; worldMs: number }; events: RecordedEvent[] }) {
+  const s = new TetrisSession(game.summary.seed), unsent = [...game.events], inFlight: { t: Ticket; e: RecordedEvent }[] = [];
+  const frames = new Set(game.events.map(e => e.sentAt));
+  s.configure(0, { source: "jev", framing: "button", assisted: false }); s.configure(1, { source: "jev", framing: "landing", assisted: false }); s.play();
+  const exchange = () => {
+    if (frames.has(s.pair.clockMs)) for (const t of s.requests(true)) {
+      const i = unsent.findIndex(e => e.lane === t.lane && e.sentAt === t.sentAt);
+      expect(i).toBeGreaterThanOrEqual(0); inFlight.push({ t, e: unsent.splice(i, 1)[0] });
+    }
+    for (const x of inFlight.filter(x => x.e.receivedAt === s.pair.clockMs)) {
+      inFlight.splice(inFlight.indexOf(x), 1);
+      const failed = x.e.status === "failed";
+      s.receive(x.t, failed ? undefined : x.e.answer, x.e.latencyMs, failed ? x.e.reason : undefined, x.e.response, x.e.httpStatus);
+    }
+  };
+  exchange();
+  while (s.pair.clockMs < game.summary.worldMs) { s.advance(20); exchange(); }
+  s.pause();
+  return s;
+}
+describe("recorded live sessions", () => {
+  for (const game of recordedGames) test(`seed ${game.summary.seed} replays exactly on both lanes, short buttons and landings`, () => {
+    const s = replay(game), lane = (l: RecordedLane) => ({ status: l.status, lines: l.lines, pieces: l.pieces, score: l.score, stats: l.stats });
+    expect(s.pair.lanes.map(l => lane({ ...l.game, stats: l.stats }))).toEqual(game.summary.lanes.map(lane));
+    const decision = (e: RecordedEvent) => [e.lane, e.sentAt, e.receivedAt, e.status, e.answer, e.reason];
+    expect(s.events.map(decision)).toEqual(game.events.map(decision));
+  });
+});
 
 function unassisted() { const s = new TetrisSession(); s.configure(0, { assisted: false }); s.configure(1, { assisted: false }); s.play(); return s; }
 describe("paired live lifecycle", () => {
@@ -148,11 +187,12 @@ describe("paired live lifecycle", () => {
     const s = new TetrisSession(); s.play(); const first = s.requests(false)[0]; s.advance(400);
     // The first advertised landing is the current pose's direct hard drop.
     s.receive(first, Object.keys(first.options)[0], 400); s.advance(20);
-    const lane = s.pair.lanes[0]; expect(lane.game.pieceId).toBe(2); expect(lane.pieceStartedAt).toBe(420);
-    expect(lane.pending).toBeNull(); expect(lane.nextRequestAt).toBe(900);
-    s.advance(300); expect(s.pair.clockMs).toBe(720); expect(lane.plan).toBeNull(); expect(lane.stats.fallbackMs).toBe(0);
+    // The pair is a view of the lanes; read it again after each advance.
+    const lane = () => s.pair.lanes[0]; expect(lane().game.pieceId).toBe(2); expect(lane().pieceStartedAt).toBe(420);
+    expect(lane().pending).toBeNull(); expect(lane().nextRequestAt).toBe(900);
+    s.advance(300); expect(s.pair.clockMs).toBe(720); expect(lane().plan).toBeNull(); expect(lane().stats.fallbackMs).toBe(0);
     expect(s.requests(false).some(t => t.lane === 0)).toBe(false);
-    s.advance(380); expect(lane.plan).toBeNull(); s.advance(20); expect(lane.plan?.origin).toBe("fallback");
+    s.advance(380); expect(lane().plan).toBeNull(); s.advance(20); expect(lane().plan?.origin).toBe("fallback");
   });
   test("changing wait keeps valid decisions and snapshots retain piece-grace timing", () => {
     const s = new TetrisSession(); s.play(); const ticket = s.requests(false)[0]; s.advance(100);

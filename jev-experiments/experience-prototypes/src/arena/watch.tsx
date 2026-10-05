@@ -1,5 +1,5 @@
 import { useEffect, useEffectEvent, useRef, useState } from "react";
-import { cells, COLS, ghost, ROWS, type Game } from "../../../live-worlds/tetris/engine";
+import { cells, COLS, ghost, ROWS, type Game } from "../../../packages/arena/src/tetris-engine";
 import { replaySchema } from "../../../packages/arena/src/data/chunks";
 import type { Card } from "../../../packages/arena/src/data/schema";
 import {

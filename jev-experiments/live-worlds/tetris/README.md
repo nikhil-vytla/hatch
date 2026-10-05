@@ -37,7 +37,7 @@ Checkpoints occur every 200ms and at request, resolution, cancellation and contr
 Run from the repository root:
 
 ```sh
-bun test jev-experiments/live-worlds/tetris
+bun test jev-experiments/live-worlds/tetris jev-experiments/packages/arena/src/tetris-engine.test.ts
 bun jev-experiments/live-worlds/tetris/local-smoke.ts
 ```
 
@@ -52,7 +52,7 @@ A final [browser receipt fixture](browser-receipts.json) passed on the rebuilt p
 ## Integration
 
 - Import `LiveTetris` from `experience-prototypes/src/live-tetris.tsx`. Its props are optional `result` and `active`; `result` is accepted for compatibility but unused. Keep it mounted and pass `active={tab === 'play'}`.
-- The component imports its own CSS. `engine.ts` and `session.ts` contain no DOM or network dependency. Browser requests exclusively use the existing `run/getApiKey` functions and their memory-held BYOK key.
+- The component imports its own CSS. `session.ts`, the Tetris lane it runs on ([packages/arena/src/tetris.ts](../../packages/arena/src/tetris.ts), shared with the arena boards) and the rules ([tetris-engine.ts](../../packages/arena/src/tetris-engine.ts)) contain no DOM or network dependency. Browser requests exclusively use the existing `run/getApiKey` functions and their memory-held BYOK key.
 - Root owns the wrapper, catalog, package test command, preparation and deployment. No package, main, catalog, recorder or publication edits were made by this worker.
 - New paid model runs, production deployment and touch-device hardware testing were not performed. The landing search is synchronous; very slow devices may accumulate simulation backlog, which is retained rather than silently discarded. In-memory history grows with session length.
 

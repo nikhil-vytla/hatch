@@ -634,10 +634,9 @@ function studyCard(out: string): Card {
 /** Code players are deterministic: cache their games under a hash of the engine and player source. */
 const sourceHash = sha(
   [
-    "../../../../live-worlds/tetris/engine.ts",
+    "../tetris-engine.ts",
     "../tetris.ts",
     "../tetris-framings.ts",
-    "../../../../live-worlds/tetris/session.ts",
   ]
     .map((f) => readFileSync(resolve(import.meta.dir, f), "utf8"))
     .join("\n"),

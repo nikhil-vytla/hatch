@@ -8,9 +8,14 @@
  * own. Code then picks the best-judged landing.
  */
 import { z } from "zod";
-import { boardFeatures, type Landing } from "../../../live-worlds/tetris/engine";
-import { optionCriteria, type Answer, type Contestant, type Question } from "./tetris";
-import { DECISION_INSTRUCTIONS } from "../../../live-worlds/tetris/session";
+import { boardFeatures, type Landing } from "./tetris-engine";
+import {
+  DECISION_INSTRUCTIONS,
+  optionCriteria,
+  type Answer,
+  type Contestant,
+  type Question,
+} from "./tetris";
 
 export type FramingId =
   | "landing-choice"

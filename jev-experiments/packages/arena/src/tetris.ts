@@ -1,11 +1,12 @@
 /**
- * N copies of the same Tetris world, one decision-maker per copy.
+ * The Tetris lane: one world clock, N copies of the same game, one decision-maker per copy.
+ * Both the arena boards and the live Tetris page (live-worlds/tetris/session.ts) run on this
+ * module, so a recorded run replays exactly wherever it was recorded.
  *
- * Real time: every lane shares one world clock (20 ms steps). A lane asks
- * "which reachable landing?" when its previous question resolves; the answer
- * lands when the lane's contestant delivers it, and gravity keeps going while
- * it waits. Lane mechanics mirror live-worlds/tetris/session.ts so recorded
- * live runs replay exactly.
+ * Real time: every lane shares one world clock (20 ms steps). A lane asks its contestant about
+ * the falling piece when its previous question resolves and its request interval has passed;
+ * the answer lands when the contestant delivers it, and gravity keeps going while it waits. A
+ * lane may also be played by hand, or fall back to the code planner after a wait.
  *
  * Turns: the world waits. Every lane places piece N before any lane sees
  * piece N+1, so only choice quality differs.
@@ -16,16 +17,47 @@ import {
   command,
   createGame,
   landings,
+  lcg,
   STEP_MS,
+  type Command,
   type Game,
+  type Intent,
   type Landing,
   type Pose,
-} from "../../../live-worlds/tetris/engine";
-import { DECISION_INSTRUCTIONS } from "../../../live-worlds/tetris/session";
+} from "./tetris-engine";
 
 export type TimingMode = "realtime" | "turns";
 
 export type Source = "recorded" | "live" | "code";
+
+/** What a lane asks for: a reachable landing, one short control, or the code planner's objective. */
+export type Framing = "landing" | "button" | "intent";
+
+export const DECISION_INSTRUCTIONS: Record<Framing, string> = {
+  button:
+    "Choose one short control for the falling piece. Rotations and hard drop happen once; left/right/soft drop repeat for 240ms. Gravity continues. Prefer moves that avoid holes and complete rows. The answer expires after 300ms of world time.",
+  landing:
+    "Choose a reachable landing for this piece. Candidate features are computed by code after line clearing. Avoid top-out and buried empty cells, keep the stack low, and clear lines. Code will execute the route to your chosen landing if it remains reachable.",
+  intent:
+    "Choose the code planner's objective for this piece. You choose a policy, not a landing or direct control. Code searches reachable landings and follows the selected objective.",
+};
+
+/** How a lane asks and what code does between answers. */
+export type LaneSettings = {
+  framing: Framing;
+  /** World time between request starts. */
+  intervalMs: number;
+  /** Without a usable plan, the code planner takes over once a piece is this old. */
+  assisted: boolean;
+  fallbackWaitMs: number;
+};
+
+const ARENA_SETTINGS: LaneSettings = {
+  framing: "landing",
+  intervalMs: 900,
+  assisted: false,
+  fallbackWaitMs: 700,
+};
 
 export type Probabilities = Record<string, number>;
 
@@ -43,6 +75,7 @@ export type Question = {
   lane: number;
   pieceId: number;
   sentAt: number;
+  framing: Framing;
   state: {
     rules: string;
     board: string[];
@@ -63,8 +96,15 @@ export type Question = {
   };
 };
 
-/** A scheduled answer lands at a world time. A promise lands when it resolves. */
-export type Reply = { receiveAt: number; answer: Answer } | { missing: string } | Promise<Answer>;
+/**
+ * A scheduled answer lands at a world time. A promise lands when it resolves. In real time,
+ * `later` means the caller hands the answer over with `deliver()` (the live page's own request loop).
+ */
+export type Reply =
+  | { receiveAt: number; answer: Answer }
+  | { missing: string }
+  | { later: true }
+  | Promise<Answer>;
 
 export type Contestant = {
   id: string;
@@ -100,7 +140,20 @@ export type LogEntry = {
   optionCount: number;
 };
 
-type Plan = { pieceId: number; target: string; expires: number; nextAt: number };
+/** Who moves the piece: a hand, gravity alone, the code fallback, or a contestant's plan. */
+export type Control = "human" | "gravity" | "fallback" | "over" | Source;
+
+/** Code follows a chosen landing's route, or repeats one short control. */
+export type Plan = {
+  pieceId: number;
+  origin: Source | "fallback";
+  target?: string;
+  action?: Command;
+  expires: number;
+  nextAt: number;
+  intent?: Intent;
+  used?: boolean;
+};
 
 type Pending = {
   question: Question;
@@ -110,16 +163,31 @@ type Pending = {
   abort?: AbortController;
 };
 
+export type LaneStats = {
+  applied: number;
+  stale: number;
+  failed: number;
+  missing: number;
+  cancelled: number;
+  latencyMs: number[];
+  /** World time under each kind of control. */
+  controlMs: Record<Exclude<Control, "over">, number>;
+};
+
 export type Lane = {
   contestant: Contestant;
   game: Game;
+  settings: LaneSettings;
+  /** Played by hand: no questions, no plans; `input()` moves the piece. */
+  human: boolean;
+  control: Control;
   plan: Plan | null;
   pending: Pending | null;
   nextRequestAt: number;
   trackedPieceId: number;
   pieceStartedAt: number;
   revision: number;
-  stats: { applied: number; stale: number; failed: number; missing: number; latencyMs: number[] };
+  stats: LaneStats;
   recordingEnded: number | null;
   missingPiece: number | null;
   answeredPiece: number | null;
@@ -127,15 +195,46 @@ export type Lane = {
   failures: number;
 };
 
+export const laneStats = (): LaneStats => ({
+  applied: 0,
+  stale: 0,
+  failed: 0,
+  missing: 0,
+  cancelled: 0,
+  latencyMs: [],
+  controlMs: { human: 0, gravity: 0, fallback: 0, recorded: 0, live: 0, code: 0 },
+});
+
 const RULES =
   "10 columns, 20 rows; gravity continues while you decide; choose one option. Every candidate landing is reachable in the observed state. Code executes a chosen landing route. Intent delegates landing search to a code planner.";
 
-const INTERVAL_MS = 900,
-  DEADLINE_MS = 5000,
+const DEADLINE_MS = 5000,
   PLAN_MS = 5000,
+  BUTTON_DEADLINE_MS = 300,
+  BUTTON_MS = 240,
+  FALLBACK_START_MS = 160,
+  FALLBACK_PLAN_MS = 10000,
   MOVE_MS = 80,
   RETRY_MS = 400,
   RETRY_CAP_MS = 4000;
+
+const BUTTONS = {
+  left: "Hold left briefly",
+  right: "Hold right briefly",
+  cw: "Rotate clockwise once",
+  ccw: "Rotate counterclockwise once",
+  soft: "Hold soft drop briefly",
+  drop: "Hard drop and lock now",
+  wait: "Let gravity act",
+} satisfies Partial<Record<Command, string>>;
+
+const INTENTS = {
+  clear_lines: "Code planner favors immediate cleared lines",
+  keep_low: "Code planner favors lower total column height",
+  avoid_holes: "Code planner strongly penalizes buried empty cells",
+} satisfies Record<Intent, string>;
+
+const REPEATING: Command[] = ["left", "right", "soft"];
 
 export function optionCriteria(options: Landing[]) {
   return Object.fromEntries(
@@ -153,6 +252,16 @@ export function optionCriteria(options: Landing[]) {
       }),
     ]),
   );
+}
+
+const criteriaFor = (framing: Framing, options: Landing[]) =>
+  framing === "button" ? BUTTONS : framing === "intent" ? INTENTS : optionCriteria(options);
+
+/** The answer code would give: the planner's landing, its first input, or its default objective. */
+export function suggestion(framing: Framing, options: Landing[]) {
+  const best = chooseLanding(options);
+
+  return framing === "button" ? best.path[0] : framing === "intent" ? "avoid_holes" : best.id;
 }
 
 export function observe(game: Game, clockMs: number): Question["state"] {
@@ -182,22 +291,25 @@ export class TetrisArena {
     public seed: number,
     contestants: Contestant[],
     public mode: TimingMode = "realtime",
-    options: { pieceLimit?: number } = {},
+    options: { pieceLimit?: number; settings?: (lane: number) => LaneSettings } = {},
   ) {
     if (options.pieceLimit) this.pieceLimit = options.pieceLimit;
-    this.lanes = contestants.map((contestant) => {
+    this.lanes = contestants.map((contestant, i) => {
       const game = createGame(seed);
 
       return {
         contestant,
         game,
+        settings: options.settings?.(i) ?? { ...ARENA_SETTINGS },
+        human: false,
+        control: "gravity",
         plan: null,
         pending: null,
         nextRequestAt: 0,
         trackedPieceId: game.pieceId,
         pieceStartedAt: 0,
         revision: 0,
-        stats: { applied: 0, stale: 0, failed: 0, missing: 0, latencyMs: [] },
+        stats: laneStats(),
         recordingEnded: null,
         missingPiece: null,
         answeredPiece: null,
@@ -220,23 +332,25 @@ export class TetrisArena {
   private question(index: number): Question | null {
     const lane = this.lanes[index],
       g = lane.game,
+      framing = lane.settings.framing,
       options = landings(g);
 
     if (!options.length) return null;
     const state = observe(g, this.clockMs);
-    const criteria = optionCriteria(options);
+    const criteria = criteriaFor(framing, options);
 
     return {
       id: `${index}:${++this.serial}`,
       lane: index,
       pieceId: g.pieceId,
       sentAt: this.clockMs,
+      framing,
       state,
       options,
       request: structuredClone({
         state,
         questions: {
-          decision: { type: "choice", instructions: DECISION_INSTRUCTIONS.landing, criteria },
+          decision: { type: "choice", instructions: DECISION_INSTRUCTIONS[framing], criteria },
         },
       }),
     };
@@ -265,17 +379,20 @@ export class TetrisArena {
     entry: LogEntry,
     status: DecisionStatus,
     extra: Partial<LogEntry> = {},
-  ) {
+  ): DecisionStatus {
     Object.assign(entry, { status, resolvedAt: this.clockMs, ...extra });
 
     if (status === "applied") lane.stats.applied++;
     else if (status === "stale") lane.stats.stale++;
     else if (status === "failed") lane.stats.failed++;
     else if (status === "missing") lane.stats.missing++;
+    else if (status === "cancelled") lane.stats.cancelled++;
 
     // Median answer time counts answers that were used, not failed attempts.
     if (extra.latencyMs !== undefined && status === "applied")
       lane.stats.latencyMs.push(extra.latencyMs);
+
+    return status;
   }
 
   // ---------- real time ----------
@@ -291,16 +408,16 @@ export class TetrisArena {
       steps++;
     }
   }
+  /** One world step: lanes move, due lanes ask, and scheduled answers land. */
   step() {
     // The first question goes out at world time 0, before gravity moves anything.
     if (!this.started) {
       this.started = true;
-      this.lanes.forEach((_, i) => this.maybeAsk(i));
+      this.askDue();
     }
 
-    this.clockMs += STEP_MS;
-    this.lanes.forEach((_, i) => this.stepLane(i));
-    this.lanes.forEach((_, i) => this.maybeAsk(i));
+    this.tick();
+    this.askDue();
     this.lanes.forEach((lane) => {
       const p = lane.pending;
 
@@ -308,13 +425,25 @@ export class TetrisArena {
         this.receive(lane, p, p.answer);
     });
   }
+  /** Moves every lane one step of world time, without asking anything. */
+  tick() {
+    this.clockMs += STEP_MS;
+    this.lanes.forEach((_, i) => this.stepLane(i));
+  }
+  /** Asks every lane's contestant that is due a question now. */
+  askDue() {
+    this.lanes.forEach((_, i) => this.maybeAsk(i));
+  }
   private track(lane: Lane) {
     if (lane.trackedPieceId !== lane.game.pieceId) {
       lane.trackedPieceId = lane.game.pieceId;
       lane.pieceStartedAt = this.clockMs;
 
       if (lane.plan?.pieceId !== lane.game.pieceId) lane.plan = null;
+      lane.control = lane.human ? "human" : "gravity";
     }
+
+    if (lane.game.status === "over") lane.control = "over";
   }
   private stepLane(i: number) {
     const lane = this.lanes[i],
@@ -326,20 +455,54 @@ export class TetrisArena {
     if (this.finished(lane)) return;
 
     if (lane.plan && (lane.plan.pieceId !== g.pieceId || lane.plan.expires < now)) lane.plan = null;
-    const p = lane.plan;
+
+    if (
+      !lane.human &&
+      !lane.plan &&
+      lane.settings.assisted &&
+      now - lane.pieceStartedAt >= lane.settings.fallbackWaitMs
+    ) {
+      const pick = chooseLanding(landings(g));
+
+      if (pick)
+        lane.plan = {
+          pieceId: g.pieceId,
+          origin: "fallback",
+          target: pick.id,
+          expires: now + FALLBACK_PLAN_MS,
+          nextAt: now + FALLBACK_START_MS,
+        };
+    }
+
+    const p = lane.human ? null : lane.plan;
+    lane.control = lane.human ? "human" : p ? p.origin : "gravity";
+    lane.stats.controlMs[lane.control] += STEP_MS;
 
     if (p && now >= p.nextAt) {
       p.nextAt = now + MOVE_MS;
-      // Regenerate the route from the moving piece, not from the old observation.
-      const target = landings(g).find((o) => o.id === p.target);
 
-      if (target) command(g, target.path[0]);
-      else lane.plan = null;
+      if (p.target) {
+        // Regenerate the route from the moving piece, not from the old observation.
+        const target = landings(g).find((o) => o.id === p.target);
+
+        if (target) command(g, target.path[0]);
+        else lane.plan = null;
+      } else if (p.action) {
+        if (REPEATING.includes(p.action) || !p.used) command(g, p.action);
+        p.used = true;
+      }
     }
 
     advanceGame(g, STEP_MS);
     this.track(lane);
     this.supersede(lane);
+  }
+  /** A hand on the controls: one input on a lane played by hand. */
+  input(index: number, input: Command) {
+    const lane = this.lanes[index];
+
+    command(lane.game, input);
+    this.track(lane);
   }
   /**
    * An answer for a piece that has already locked can never be used. Drop it
@@ -360,7 +523,8 @@ export class TetrisArena {
   private maybeAsk(i: number) {
     const lane = this.lanes[i];
 
-    if (lane.pending || this.finished(lane) || this.clockMs < lane.nextRequestAt) return;
+    if (lane.human || lane.pending || this.finished(lane) || this.clockMs < lane.nextRequestAt)
+      return;
 
     if (!lane.contestant.reask && lane.answeredPiece === lane.game.pieceId) return;
 
@@ -372,7 +536,7 @@ export class TetrisArena {
 
     if (!q) return;
     const entry = this.record(i, q);
-    lane.nextRequestAt = this.clockMs + INTERVAL_MS;
+    lane.nextRequestAt = this.clockMs + lane.settings.intervalMs;
     const abort = new AbortController();
     const pending: Pending = { question: q, entry, abort };
     lane.pending = pending;
@@ -397,6 +561,8 @@ export class TetrisArena {
           }
         },
       );
+    } else if ("later" in reply) {
+      // The caller delivers the answer.
     } else if ("missing" in reply) {
       lane.pending = null;
       lane.missingPiece = q.pieceId;
@@ -410,7 +576,18 @@ export class TetrisArena {
       if (reply.receiveAt <= this.clockMs) this.receive(lane, pending, reply.answer);
     }
   }
-  private receive(lane: Lane, p: Pending, a: Answer) {
+  /** Hands over the answer to a question asked with a `later` reply. A question no longer in flight is "cancelled". */
+  deliver(index: number, questionId: string, answer: Answer): DecisionStatus {
+    const lane = this.lanes[index],
+      p = lane.pending;
+
+    if (!p || p.question.id !== questionId) return "cancelled";
+    p.answer = answer;
+    p.receiveAt = this.clockMs;
+
+    return this.receive(lane, p, answer);
+  }
+  private receive(lane: Lane, p: Pending, a: Answer): DecisionStatus {
     lane.pending = null;
 
     const q = p.question,
@@ -448,7 +625,7 @@ export class TetrisArena {
       latencyMs,
     };
 
-    if (!q.options.some((o) => o.id === a.choice))
+    if (!Object.hasOwn(q.request.questions.decision.criteria, a.choice))
       return this.resolve(lane, p.entry, "failed", {
         ...common,
         reason: "Answer is not one of the offered landings",
@@ -460,36 +637,69 @@ export class TetrisArena {
         reason: "The piece locked before the answer arrived",
       });
 
-    if (this.clockMs - q.sentAt > DEADLINE_MS)
+    const button = q.framing === "button";
+
+    if (this.clockMs - q.sentAt > (button ? BUTTON_DEADLINE_MS : DEADLINE_MS))
       return this.resolve(lane, p.entry, "stale", {
         ...common,
         reason: "Answer arrived after its useful window",
       });
-    const target = landings(lane.game).find((o) => o.id === a.choice);
+    const origin = lane.contestant.source;
 
-    if (!target)
-      return this.resolve(lane, p.entry, "stale", {
-        ...common,
-        reason: "The chosen landing is no longer reachable",
-      });
-    lane.plan = {
-      pieceId: q.pieceId,
-      target: target.id,
-      expires: this.clockMs + PLAN_MS,
-      nextAt: this.clockMs,
-    };
+    if (button)
+      lane.plan = {
+        pieceId: q.pieceId,
+        origin,
+        // SAFETY: the choice is one of a button question's criteria keys (checked above), which are controls.
+        action: a.choice as Command,
+        expires: this.clockMs + BUTTON_MS,
+        nextAt: this.clockMs,
+      };
+    else {
+      const options = landings(lane.game),
+        // SAFETY: an intent question's criteria keys are exactly the planner's objectives.
+        intent = q.framing === "intent" ? (a.choice as Intent) : undefined;
+
+      const target = intent
+        ? chooseLanding(options, intent)
+        : options.find((o) => o.id === a.choice);
+
+      if (!target)
+        return this.resolve(lane, p.entry, "stale", {
+          ...common,
+          reason: "The chosen landing is no longer reachable",
+        });
+      lane.plan = {
+        pieceId: q.pieceId,
+        origin,
+        target: target.id,
+        expires: this.clockMs + PLAN_MS,
+        nextAt: this.clockMs,
+        ...(intent && { intent }),
+      };
+    }
+
     lane.answeredPiece = q.pieceId;
-    this.resolve(lane, p.entry, "applied", common);
+
+    return this.resolve(lane, p.entry, "applied", common);
+  }
+  /** Drops a lane's question in flight; its answer can no longer land. */
+  cancel(index: number, reason: string) {
+    const lane = this.lanes[index];
+
+    if (!lane.pending) return;
+    lane.pending.abort?.abort();
+    this.resolve(lane, lane.pending.entry, "cancelled", { reason });
+    lane.pending = null;
   }
   /** Ends a run the way the recorder did: in-flight questions become cancelled. */
   stop() {
-    for (const lane of this.lanes)
+    this.lanes.forEach((lane, i) => {
       if (lane.pending) {
-        lane.pending.abort?.abort();
-        this.resolve(lane, lane.pending.entry, "cancelled", { reason: "Run stopped" });
-        lane.pending = null;
+        this.cancel(i, "Run stopped");
         lane.revision++;
       }
+    });
   }
 
   // ---------- turns ----------
@@ -511,7 +721,7 @@ export class TetrisArena {
       if (reply instanceof Promise)
         answer = await reply.catch((e) => ({ error: String(e?.message ?? e) }));
       else if ("missing" in reply) missing = reply.missing;
-      else answer = reply.answer;
+      else if ("answer" in reply) answer = reply.answer;
 
       return { lane, q, entry, answer, missing };
     });
@@ -559,12 +769,6 @@ export class TetrisArena {
 }
 
 // ---------- contestants ----------
-const rng = (seed: number) => () => {
-  seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
-
-  return seed / 4294967296;
-};
-
 /** A code planner answering after a fixed world-time delay. */
 export function heuristic(
   delayMs = 0,
@@ -594,7 +798,7 @@ export function randomPlayer(seed = 1, delayMs = 0): Contestant {
     name: "Random landing",
     source: "code",
     ask(q) {
-      const r = rng(seed * 7919 + q.pieceId * 104729)();
+      const r = lcg(seed * 7919 + q.pieceId * 104729) / 4294967296;
       const pick = q.options[Math.floor(r * q.options.length)];
 
       return {

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { ArrowDown, ArrowLeft, ArrowRight, Pause, Play, RotateCcw, RotateCw } from "lucide-react";
 import { download, EvaluationError, getApiKey, run } from "./api";
 import { BuildThis } from "./build-this";
-import { boardFeatures, cells, ghost, PIECES, type Command, type Game, type Piece } from "../../live-worlds/tetris/engine";
+import { boardFeatures, cells, ghost, PIECES, type Command, type Game, type Piece } from "../../packages/arena/src/tetris-engine";
 import { DECISION_INSTRUCTIONS as instructions, TetrisSession, type DecisionEvent, type Lane, type Settings, type Ticket } from "../../live-worlds/tetris/session";
 import "./live-tetris.css";
 

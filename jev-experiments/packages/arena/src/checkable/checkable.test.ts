@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { cells, createGame, landings } from "../../../../live-worlds/tetris/engine";
+import { cells, createGame, landings } from "../tetris-engine";
 import bankJson from "./bank.json";
 import { distanceLevel, gridItem, gridTruth, solve } from "./grid";
 import { bankSchema, dailySet } from "./items";
