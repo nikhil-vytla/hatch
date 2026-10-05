@@ -3,23 +3,17 @@
  * key and no GPU. Answers are a hash of the question, not a model: use it to exercise the plumbing,
  * never as a result.
  */
-const hash = (s: string) => {
-  let h = 2166136261;
-
-  for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619) >>> 0;
-
-  return h / 4294967296;
-};
+import { fnv1aUnit } from "../../seeded/src/index.js";
 
 type Question = { type: string; instructions?: string; criteria?: Record<string, string> | string[] };
 
 export function mockAnswer(q: Question) {
-  const h = hash(JSON.stringify(q));
+  const h = fnv1aUnit(JSON.stringify(q));
 
   if (q.type === "noul") return { type: "noul", noul: 0.05 + 0.9 * h };
 
   const keys = q.type === "choice" ? Object.keys((q.criteria ?? {}) as Record<string, string>) : ((q.criteria ?? []) as string[]).map((_, i) => String(i));
-  const raw = keys.map((k) => 0.1 + hash(k + h));
+  const raw = keys.map((k) => 0.1 + fnv1aUnit(k + h));
   const z = raw.reduce((a, b) => a + b, 0);
   const probabilities = Object.fromEntries(keys.map((k, i) => [k, raw[i]! / z]));
   const top = keys.reduce((a, b) => (probabilities[b]! > probabilities[a]! ? b : a), keys[0]!);

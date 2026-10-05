@@ -8,7 +8,7 @@
  * The questions: which count bin (a choice), "more than N?" for a ladder of N (yes/no), and "is
  * the count even?" (yes/no). Bins and their letters are shared with choose.py.
  */
-import { bootstrap } from "../../packages/arena/prose/metrics";
+import { bootstrapMean } from "../../packages/seeded/src/index";
 
 /** Inclusive count bins; must match BINS in choose.py (a test checks). */
 export const BINS: [number, number][] = [
@@ -185,7 +185,7 @@ export function summarize(items: Item[], answers: Map<string, Answer>) {
   const stat = (key: "exactBin" | "withinOne" | "binError" | "absError" | "signed" | "ladder" | "even") => {
     const xs = rows.map((r) => r[key]).filter((x) => !Number.isNaN(x));
 
-    return { mean: mean(xs), ci: bootstrap(xs), n: xs.length };
+    return { mean: mean(xs), ci: bootstrapMean(xs), n: xs.length };
   };
 
   const byBin = BINS.map((_, b) => {
@@ -197,9 +197,9 @@ export function summarize(items: Item[], answers: Map<string, Answer>) {
       bin: b,
       n: rs.length,
       exactBin: mean(exact),
-      exactBinCi: bootstrap(exact),
+      exactBinCi: bootstrapMean(exact),
       absError: mean(abs),
-      absErrorCi: bootstrap(abs),
+      absErrorCi: bootstrapMean(abs),
       signed: mean(rs.map((r) => r.signed)),
     };
   });

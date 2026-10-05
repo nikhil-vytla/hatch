@@ -2,6 +2,9 @@
  * Tetris rules: a 10×20 board, a seeded seven-bag, moves, kicks, lock delay, scoring and the
  * reachable-landing search. No clock or controller lives here; lanes (./tetris.ts) drive it.
  */
+// The piece bag draws from the seeded LCG (the arena's random player uses it too).
+import { lcgNext as random } from "../../seeded/src/index";
+
 export const COLS = 10;
 
 export const ROWS = 20;
@@ -71,15 +74,6 @@ export function fits(board: number[][], pose: Pose) {
   return cells(pose).every(
     ([x, y]) => x >= 0 && x < COLS && y >= -4 && y < ROWS && (y < 0 || board[y][x] === 0),
   );
-}
-
-/** The seeded LCG behind the piece bag; the arena's random player draws from it too. */
-export const lcg = (state: number) => (Math.imul(state, 1664525) + 1013904223) >>> 0;
-
-function random(g: Game) {
-  g.rng = lcg(g.rng);
-
-  return g.rng / 4294967296;
 }
 
 function fillQueue(g: Game) {

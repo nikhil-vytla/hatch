@@ -17,7 +17,6 @@ import {
   command,
   createGame,
   landings,
-  lcg,
   STEP_MS,
   type Command,
   type Game,
@@ -25,6 +24,7 @@ import {
   type Landing,
   type Pose,
 } from "./tetris-engine";
+import { lcg } from "../../seeded/src/index";
 
 export type TimingMode = "realtime" | "turns";
 

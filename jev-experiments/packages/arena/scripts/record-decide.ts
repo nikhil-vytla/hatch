@@ -9,7 +9,7 @@
 import { jevEndpoint } from "../../jev-client/src/endpoints";
 import { attemptErrorRow, attemptRow, record, recorderKey, waitOutBusy, type Job } from "../../jev-client/src/recorder";
 import type { Payload } from "../../jev-client/src/wire";
-import { rng, shuffled } from "../src/checkable/items";
+import { mulberry32, shuffled } from "../../seeded/src/index";
 import { DECK, requestFor } from "../src/decide/deck";
 
 export const out = new URL("../recordings/decide.jsonl", import.meta.url);
@@ -18,7 +18,7 @@ export const out = new URL("../recordings/decide.jsonl", import.meta.url);
 export const jobs = (): Job[] =>
   shuffled(
     DECK.flatMap((d) => d.setups.map((s) => ({ id: `${d.id}:${s.id}`, request: requestFor(d, s) as Payload }))),
-    rng(20260928),
+    mulberry32(20260928),
   );
 
 if (import.meta.main) {

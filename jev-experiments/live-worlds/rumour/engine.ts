@@ -5,7 +5,8 @@
  * whose answer hasn't arrived stay "thinking" while the rest of the town carries on.
  */
 import { profileKey, type Action, type Dist, type MessageKind, type Source } from "./profiles";
-import { PLACES, rng, type PlaceId, type Town } from "./town";
+import { mulberry32 } from "../../packages/seeded/src/index";
+import { PLACES, type PlaceId, type Town } from "./town";
 
 export const TICK = 0.35;
 
@@ -43,7 +44,7 @@ export type World = {
 };
 
 export function createWorld(town: Town, seed = 1): World {
-  return { town, time: 0, carry: 0, next: rng(seed), rumour: null, counter: null, curve: [] };
+  return { town, time: 0, carry: 0, next: mulberry32(seed), rumour: null, counter: null, curve: [] };
 }
 
 function track(town: Town, message: Message): Track {

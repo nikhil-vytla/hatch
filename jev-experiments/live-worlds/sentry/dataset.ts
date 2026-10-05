@@ -7,6 +7,7 @@
  * numbers say something about new wording, not just new slot values.
  */
 import type { Block, Head, Where } from "./model";
+import { mulberry32 } from "../../packages/seeded/src/index";
 
 export type Labels = Record<Head, 0 | 1>;
 
@@ -218,27 +219,11 @@ const families: Family[] = [
   },
 ];
 
-/** mulberry32, so the dataset is the same on every machine. */
-function rng(seed: number) {
-  let a = seed >>> 0;
-
-  return () => {
-    a = (a + 0x6d2b79f5) >>> 0;
-
-    let t = a;
-
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
 const fill = (s: string, r: () => number) => s.replace(/\{(\w+)\}/g, (_, k) => SLOTS[k][Math.floor(r() * SLOTS[k].length)]);
 
 /** `perTemplate` examples of every template of every family, with random slots and placement. */
 export function generate(perTemplate = 24, seed = 7): Example[] {
-  const r = rng(seed);
+  const r = mulberry32(seed);
   const out: Example[] = [];
 
   for (const f of families)

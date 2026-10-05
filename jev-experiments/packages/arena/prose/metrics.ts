@@ -1,5 +1,4 @@
-/** Pure measurement code for the prose studies: readers, distances, bootstrap, calibration. */
-import { rng } from "../src/checkable/items";
+/** Pure measurement code for the prose studies: readers, distances, calibration. */
 import type { Reader } from "./variants";
 
 export type Answer = { type: string; value: number | string; probabilities: Record<string, number> | null };
@@ -76,31 +75,6 @@ export const binaryCredit = (pCorrect: number) => (Math.abs(pCorrect - 0.5) < 1e
 export const side = (p: number) => (Math.abs(p - 0.5) < 1e-9 ? 0 : p > 0.5 ? 1 : -1);
 
 export const mean = (xs: number[]) => (xs.length ? xs.reduce((s, x) => s + x, 0) / xs.length : NaN);
-
-/**
- * Percentile bootstrap interval for the mean, resampling units (items) with replacement.
- * Seeded, so the same data always gives the same interval.
- */
-export function bootstrap(xs: number[], seed = 1, draws = 10_000, level = 0.95): [number, number] {
-  if (!xs.length) return [NaN, NaN];
-
-  const random = rng(seed);
-  const means: number[] = [];
-
-  for (let b = 0; b < draws; b++) {
-    let s = 0;
-
-    for (let i = 0; i < xs.length; i++) s += xs[Math.floor(random() * xs.length)]!;
-    means.push(s / xs.length);
-  }
-
-  means.sort((a, b) => a - b);
-
-  const lo = means[Math.floor(((1 - level) / 2) * draws)]!;
-  const hi = means[Math.min(draws - 1, Math.floor((1 - (1 - level) / 2) * draws))]!;
-
-  return [lo, hi];
-}
 
 /** Expected calibration error with equal-width confidence bins, plus the bins. */
 export function calibration(points: { confidence: number; correct: number }[], bins = 10) {

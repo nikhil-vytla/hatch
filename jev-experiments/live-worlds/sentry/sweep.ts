@@ -9,17 +9,9 @@
 import { trainingSet, train } from "./train";
 import { RISK_THRESHOLD, score } from "./model";
 import type { Example } from "./dataset";
+import { fnv1aUnit } from "../../packages/seeded/src/index";
 
-function hashed(s: string) {
-  let h = 0x2545f491;
-
-  for (let i = 0; i < s.length; i++) {
-    h ^= s.charCodeAt(i);
-    h = Math.imul(h, 0x01000193);
-  }
-
-  return (h >>> 0) / 4294967296;
-}
+const hashed = (s: string) => fnv1aUnit(s, 0x2545f491);
 
 const isValidation = (e: Example) => (e.source ? hashed(e.text) < 0.2 : e.template === 2);
 

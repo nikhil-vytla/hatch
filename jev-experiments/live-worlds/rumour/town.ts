@@ -4,6 +4,7 @@
  * people on the next street, and the town's hubs (the baker, the barber, the postie…).
  * Everything is deterministic from the seed.
  */
+import { mulberry32 } from "../../packages/seeded/src/index";
 
 export const VIEW = { width: 1000, height: 640 };
 
@@ -84,22 +85,6 @@ export type Block = { id: number; x: number; y: number; w: number; h: number; st
 
 export type Town = { seed: number; residents: Resident[]; blocks: Block[]; links: number[][] };
 
-/** Mulberry32: small, fast and deterministic. */
-export function rng(seed: number) {
-  let a = seed >>> 0;
-
-  return () => {
-    a = (a + 0x6d2b79f5) >>> 0;
-
-    let t = a;
-
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
 const STREETS = ["Mill Lane", "Cherry Row", "Station Road", "Kiln Street", "Orchard Way", "Hope Street", "Ferry Lane", "Quarry Road", "Bell Street", "Wharf Row"];
 
 /** The river runs down x ≈ 600–640; blocks sit either side. */
@@ -116,7 +101,7 @@ function layoutBlocks(): Block[] {
 }
 
 export function createTown(seed = 7, count = 4000): Town {
-  const rand = rng(seed);
+  const rand = mulberry32(seed);
   const blocks = layoutBlocks();
   const cumulative = ARCHETYPES.reduce<number[]>((acc, a) => [...acc, (acc.at(-1) ?? 0) + a.share], []);
   const pickArchetype = () => {

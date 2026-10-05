@@ -97,7 +97,7 @@ The committed thumbnails (`images/`, 480 px JPEG) total 3.2 MB. Full-size origin
 ## Files
 
 - `choose.py` picks the images and writes `items.json` and `images/`. It needs Pillow and COCO's annotations zip (241 MB, not committed).
-- `model.ts` holds the bins, prompts, Jev's request, the answer readers and the metrics. It uses the seeded bootstrap from `packages/arena/prose/metrics.ts`.
+- `model.ts` holds the bins, prompts, Jev's request, the answer readers and the metrics. It uses the seeded bootstrap from `packages/seeded`.
 - `record-vlm.ts` records the vision model against `eyes/vlm_server.py` to `recordings/qwen3-vl-4b.jsonl` (588 rows: 98 images × 6 questions).
 - `../../experience-prototypes/scripts/count-detect.ts` records DETR's boxes to `recordings/detr.jsonl`.
 - `record-jev.ts` records Jev to `recordings/jev.jsonl`, with a hard cap of $0.10 at list price.

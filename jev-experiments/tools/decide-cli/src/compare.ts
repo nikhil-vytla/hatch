@@ -3,7 +3,8 @@
  * questions, each one's flip rate, and the decoy effect with bootstrap intervals (plus a paired
  * interval on the difference, over scenarios).
  */
-import { bootstrap, mean } from "../../../packages/arena/prose/metrics";
+import { mean } from "../../../packages/arena/prose/metrics";
+import { bootstrapMean } from "../../../packages/seeded/src/index";
 import { decoy, flipRate, tops } from "./analysis";
 import { receipt, type Row } from "./record";
 import { studyOf, type StudyId } from "./studies";
@@ -23,7 +24,7 @@ export function compare(a: Row[], b: Row[]) {
       const both = da.scenarios.filter((s) => db.scenarios.some((t) => t.item === s.item));
       const diffs = both.map((s) => s.effect - db.scenarios.find((t) => t.item === s.item)!.effect);
 
-      return { study, a: da.effect, b: db.effect, difference: { mean: mean(diffs), ci: bootstrap(diffs, 51), scenarios: diffs.length } };
+      return { study, a: da.effect, b: db.effect, difference: { mean: mean(diffs), ci: bootstrapMean(diffs, 51), scenarios: diffs.length } };
     }
 
     return { study, a: flipRate(study, a), b: flipRate(study, b) };

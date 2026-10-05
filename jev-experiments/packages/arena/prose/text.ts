@@ -1,20 +1,8 @@
 /** Text helpers for the prose studies: noise, numbers as words, and state layouts. */
-import { rng, shuffled } from "../src/checkable/items";
+import { mulberry32, shuffled } from "../../seeded/src/index";
 import type { Fact } from "./items";
 
 export const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
-
-/** A stable 32-bit seed from a string (FNV-1a). */
-export function seedOf(s: string) {
-  let h = 0x811c9dc5;
-
-  for (const ch of s) {
-    h ^= ch.codePointAt(0)!;
-    h = Math.imul(h, 0x01000193) >>> 0;
-  }
-
-  return h;
-}
 
 const NEIGHBOURS: Record<string, string> = {
   a: "qsz", b: "vgn", c: "xdv", d: "sfe", e: "wrd", f: "dgr", g: "fht", h: "gjy", i: "uok",
@@ -27,7 +15,7 @@ const NEIGHBOURS: Record<string, string> = {
  * character, dropped, doubled, or replaced by a neighbouring key. Deterministic per seed.
  */
 export function typos(text: string, rate: number, seed: number) {
-  const random = rng(seed);
+  const random = mulberry32(seed);
   const chars = [...text];
   const out: string[] = [];
 
@@ -170,7 +158,7 @@ export const layouts = {
 
 /** Facts in a seeded order that differs from the authored one. */
 export function shuffleFacts(facts: Fact[], seed: number) {
-  const order = shuffled(facts, rng(seed));
+  const order = shuffled(facts, mulberry32(seed));
 
   return order.every((f, i) => f === facts[i]) ? [...facts].reverse() : order;
 }

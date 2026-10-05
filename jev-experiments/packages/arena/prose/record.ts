@@ -15,7 +15,7 @@ import { GatewayError, jevCostUsd } from "../../jev-client/src/index";
 import { jevEndpoint, type JevResult, type Reply } from "../../jev-client/src/endpoints";
 import { readRows } from "../../jev-client/src/recordings";
 import { record, recorderKey, statusOf, waitOutBusy, type Attempt, type Job } from "../../jev-client/src/recorder";
-import { rng, shuffled } from "../src/checkable/items";
+import { mulberry32, shuffled } from "../../seeded/src/index";
 import { allJobs } from "./variants";
 
 const MAX_COST_USD = 1.0;
@@ -26,7 +26,7 @@ const pilot = new URL("./recordings/pilot.jsonl", import.meta.url);
 const hash = (x: unknown) => createHash("sha256").update(JSON.stringify(x)).digest("hex").slice(0, 16);
 
 /** Every prose request, in the recording's seeded order. */
-export const jobs = (): Job[] => shuffled(allJobs(), rng(20260929)).map((j) => ({ id: j.id, request: j.request }));
+export const jobs = (): Job[] => shuffled(allJobs(), mulberry32(20260929)).map((j) => ({ id: j.id, request: j.request }));
 
 /** A Score the gateway rejects (a 502 with this code) is an answer, never re-asked. */
 const rejectedScore = (e: unknown) => e instanceof GatewayError && e.code === "native_score_mismatch";

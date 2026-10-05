@@ -16,7 +16,8 @@ import { readFileSync } from "node:fs";
 import { jevEndpoint } from "../../jev-client/src/endpoints";
 import { attemptErrorRow, attemptRow, record, recorderKey, waitOutBusy, type Job } from "../../jev-client/src/recorder";
 import type { Payload } from "../../jev-client/src/wire";
-import { bankSchema, rng, shuffled } from "../src/checkable/items";
+import { bankSchema } from "../src/checkable/items";
+import { mulberry32, shuffled } from "../../seeded/src/index";
 
 export const outFor = (log: string) => new URL(`../recordings/${log}.jsonl`, import.meta.url);
 
@@ -24,7 +25,7 @@ export const outFor = (log: string) => new URL(`../recordings/${log}.jsonl`, imp
 export function jobs(bank = "bank.json"): Job[] {
   const doc = bankSchema.parse(JSON.parse(readFileSync(new URL(`../src/checkable/${bank}`, import.meta.url), "utf8")));
 
-  return shuffled(doc.items, rng(20260926)).map((i) => ({ id: i.id, request: { state: i.state, questions: i.questions } as Payload }));
+  return shuffled(doc.items, mulberry32(20260926)).map((i) => ({ id: i.id, request: { state: i.state, questions: i.questions } as Payload }));
 }
 
 if (import.meta.main) {

@@ -7,6 +7,7 @@
  * whether they believe and pass on gossip. Model answers arrive whenever they arrive; the world
  * never waits for them.
  */
+import { lcgNext as random } from "../../packages/seeded/src/index";
 
 export const VIEW = { width: 900, height: 590 };
 
@@ -139,11 +140,6 @@ export const DOUBT = 0.15;
 const SPEED = 44;
 const PLAYER_SPEED = 120;
 
-export function random(w: { rng: number }) {
-  w.rng = (w.rng * 1664525 + 1013904223) >>> 0;
-
-  return w.rng / 2 ** 32;
-}
 
 const pick = <T>(w: { rng: number }, xs: T[]) => xs[Math.floor(random(w) * xs.length)];
 

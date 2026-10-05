@@ -14,6 +14,7 @@
  * injection datasets (data/SOURCES.md), which train the risk head only. It never saw a Jev answer:
  * TypeSafe's Master Customer Agreement §2.3(b) forbids training a model to imitate Jev.
  */
+import { fnv1a } from "../../packages/seeded/src/index";
 
 export type Where = "visible" | "hidden" | "tiny" | "offscreen" | "comment" | "alt" | "aria-hidden";
 
@@ -48,16 +49,7 @@ const CUES: [string, RegExp][] = [
 const tokens = (s: string) => s.toLowerCase().match(/[a-z0-9$£€@.]+/g) ?? [];
 
 /** FNV-1a, so the browser and the trainer hash identically. */
-function hash(s: string) {
-  let h = 0x811c9dc5;
-
-  for (let i = 0; i < s.length; i++) {
-    h ^= s.charCodeAt(i);
-    h = Math.imul(h, 0x01000193);
-  }
-
-  return (h >>> 0) % DIM;
-}
+const hash = (s: string) => fnv1a(s) % DIM;
 
 /** Sparse features: [index, value] pairs, L2-normalised text part plus fixed cue and layout slots. */
 export function features(b: Block): [number, number][] {

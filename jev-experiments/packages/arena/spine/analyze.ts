@@ -9,6 +9,7 @@
  */
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { gunzipSync } from "node:zlib";
+import { resampledMeans } from "../../seeded/src/index";
 import { ITEMS, PRESSURES, pRight, sequenceId, type Item, type Pressure, type Push } from "./model";
 
 export type Row = {
@@ -55,37 +56,17 @@ export function answered(rows: Row[]) {
 
 type Stat = { mean: number; ci: [number, number]; n: number };
 
-/** A seeded generator (mulberry32), so intervals are reproducible. */
-function rng(seed: number) {
-  let a = seed >>> 0;
-
-  return () => {
-    a = (a + 0x6d2b79f5) >>> 0;
-
-    let t = a;
-
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
 /** Mean of per-item values with a percentile bootstrap over items; items with no value are skipped. */
 export function boot(values: (number | null)[], seed = 7, resamples = 2000): Stat | null {
   const xs = values.filter((v): v is number => v !== null);
 
   if (!xs.length) return null;
 
-  const mean = (a: number[]) => a.reduce((s, x) => s + x, 0) / a.length;
-  const r = rng(seed);
-  const ms: number[] = [];
+  const ms = resampledMeans(xs, resamples, seed);
 
-  for (let b = 0; b < resamples; b++) ms.push(mean(xs.map(() => xs[Math.floor(r() * xs.length)])));
-
-  ms.sort((a, b) => a - b);
-
-  return { mean: mean(xs), ci: [ms[Math.floor(resamples * 0.025)], ms[Math.ceil(resamples * 0.975) - 1]], n: xs.length };
+  // The frozen rule: ranks ⌊0.025R⌋ and ⌈0.975R⌉ − 1. At R = 2000 that is one rank below
+  // bootstrapMean's upper bound, so it stays here rather than in the seeded module.
+  return { mean: xs.reduce((s, x) => s + x, 0) / xs.length, ci: [ms[Math.floor(resamples * 0.025)], ms[Math.ceil(resamples * 0.975) - 1]], n: xs.length };
 }
 
 export function analyze(p: Map<string, number>) {

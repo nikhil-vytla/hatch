@@ -1,4 +1,6 @@
 /** Original deterministic courtyard. No network, UI, wall-clock or hidden model state. */
+import { lcgNext as random } from "../../packages/seeded/src/index";
+
 export const STEP = 1 / 30;
 export type PlaceId =
   "cafe" | "bakery" | "library" | "garden" | "stage" | "fountain";
@@ -279,10 +281,6 @@ export type Ticket = {
 };
 export const copy = <T>(value: T): T => structuredClone(value);
 const clamp = (x: number) => Math.max(0, Math.min(1, x));
-export function random(state: { rng: number }) {
-  state.rng = (Math.imul(state.rng, 1664525) + 1013904223) >>> 0;
-  return state.rng / 4294967296;
-}
 export function place(id: PlaceId) {
   return PLACES.find((p) => p.id === id)!;
 }

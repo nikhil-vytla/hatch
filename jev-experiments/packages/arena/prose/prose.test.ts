@@ -2,10 +2,11 @@ import { describe, expect, test } from "bun:test";
 import { validate } from "../../jev-client/src/index";
 import { analyse, type Recorded } from "./analyze";
 import { CHOICE_ITEMS, TRUTH_ITEMS } from "./items";
-import { bootstrap, calibration, dist, pClaim, tv, type Answers } from "./metrics";
+import { calibration, dist, pClaim, tv, type Answers } from "./metrics";
 import { intWords, numbersAsWords, ordinalWords, typos } from "./text";
 import { LANGUAGES, TRANSLATIONS } from "./translations";
 import { allJobs, placeCorrect, type Job } from "./variants";
+import { bootstrapMean } from "../../seeded/src/index";
 
 const jobs = allJobs();
 
@@ -118,9 +119,9 @@ describe("metrics", () => {
 
   test("bootstrap is seeded and brackets the mean", () => {
     const xs = [0, 0.1, 0.2, 0.3, 0.4];
-    const [lo, hi] = bootstrap(xs, 5);
+    const [lo, hi] = bootstrapMean(xs, 5);
 
-    expect(bootstrap(xs, 5)).toEqual([lo, hi]);
+    expect(bootstrapMean(xs, 5)).toEqual([lo, hi]);
     expect(lo).toBeLessThan(0.2);
     expect(hi).toBeGreaterThan(0.2);
   });

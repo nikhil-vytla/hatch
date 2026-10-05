@@ -4,7 +4,8 @@
  * another's wording. Content is fixed by `items.ts`; only form changes here.
  */
 import type { Payload } from "../../jev-client/src/index";
-import { rng, type WireQuestion } from "../src/checkable/items";
+import type { WireQuestion } from "../src/checkable/items";
+import { fnv1aCodePoints, mulberry32 } from "../../seeded/src/index";
 import {
   ANCHOR_ITEMS,
   AMBIGUOUS_ITEMS,
@@ -24,7 +25,6 @@ import {
   layouts,
   LONG_BACKGROUND,
   numbersAsWords,
-  seedOf,
   shuffleFacts,
   typos,
 } from "./text";
@@ -85,7 +85,7 @@ function wording(it: ClaimItem): ClaimVariant[] {
   const q = it.question;
   const c = it.claim;
   const n = it.claimNeg;
-  const seed = seedOf(it.id);
+  const seed = fnv1aCodePoints(it.id);
 
   return [
     { family: "baseline", variant: "canonical", instructions: q },
@@ -269,7 +269,7 @@ function shapes(it: ClaimItem): ClaimVariant[] {
 function representation(it: ClaimItem): ClaimVariant[] {
   const q = it.question;
   const f = it.facts;
-  const seed = seedOf(it.id);
+  const seed = fnv1aCodePoints(it.id);
   const json = layouts.json(f);
 
   return [
@@ -368,8 +368,8 @@ function choiceJobs(it: ChoiceItem): Job[] {
     },
     keyMap: Object.fromEntries(it.options.map(([k], i) => [keys[i]!, k])),
   });
-  const random = seedOf(it.id);
-  const draw = rng(random);
+  const random = fnv1aCodePoints(it.id);
+  const draw = mulberry32(random);
   const opaque = it.options.map(() => `k${Math.floor(draw() * 36 ** 3).toString(36).padStart(3, "0")}`);
   const vs: { family: string; variant: string; question: WireQuestion; keyMap: Record<string, string>; each?: boolean }[] = [
     { family: "baseline", variant: "canonical", ...base(it.options) },

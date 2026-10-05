@@ -9,7 +9,6 @@ import { gunzipSync } from "node:zlib";
 import {
   argmax,
   binaryCredit,
-  bootstrap,
   calibration,
   credit,
   dist,
@@ -21,6 +20,7 @@ import {
   type Answers,
 } from "./metrics";
 import { allJobs, type Job } from "./variants";
+import { bootstrapMean } from "../../seeded/src/index";
 
 export type Recorded = {
   id: string;
@@ -159,7 +159,7 @@ export function analyse(rows: Recorded[]) {
         n: pairs.length,
         flips,
         shift: mean(shifts),
-        shiftCI: bootstrap(shifts, seed),
+        shiftCI: bootstrapMean(shifts, seed),
       };
 
       if (truthful) {
@@ -170,7 +170,7 @@ export function analyse(rows: Recorded[]) {
           accuracy: mean(right.map(binaryCredit)),
           pRight: mean(right),
           delta: mean(deltas),
-          deltaCI: bootstrap(deltas, seed),
+          deltaCI: bootstrapMean(deltas, seed),
         });
         md.push(
           `| ${v.family} | ${v.variant} | ${pairs.length} | ${pct(row.accuracy as number)} | ${f2(row.pRight as number)} | ${signed(row.delta as number)} ${ci(row.deltaCI as [number, number])} | ${flips} | ${f3(row.shift as number)} ${ci(row.shiftCI as [number, number])} |`,
@@ -178,7 +178,7 @@ export function analyse(rows: Recorded[]) {
       } else {
         const deltas = pairs.map((x) => x.p - x.c);
 
-        Object.assign(row, { pClaim: mean(pairs.map((x) => x.p)), delta: mean(deltas), deltaCI: bootstrap(deltas, seed) });
+        Object.assign(row, { pClaim: mean(pairs.map((x) => x.p)), delta: mean(deltas), deltaCI: bootstrapMean(deltas, seed) });
         md.push(
           `| ${v.family} | ${v.variant} | ${pairs.length} | ${f2(row.pClaim as number)} | ${signed(row.delta as number)} ${ci(row.deltaCI as [number, number])} | ${flips} | ${f3(row.shift as number)} ${ci(row.shiftCI as [number, number])} |`,
         );
@@ -256,7 +256,7 @@ export function analyse(rows: Recorded[]) {
         pair: label,
         n: xs.length,
         bias: mean(bias),
-        biasCI: bootstrap(bias, 11),
+        biasCI: bootstrapMean(bias, 11),
         absDev: mean(bias.map(Math.abs)),
         over02: bias.filter((b) => Math.abs(b) > 0.2).length,
         sameSide: xs.filter((x) => side(x.a) === side(x.b) && side(x.a) !== 0).length,
@@ -286,7 +286,7 @@ export function analyse(rows: Recorded[]) {
       const d = items
         .map((it) => raw(it, fa, va) - raw(it, fb, vb))
         .filter(Number.isFinite);
-      const r = { contrast: label, n: d.length, mean: mean(d), ci: bootstrap(d, 13), moved: d.filter((x) => x > 0.1).length };
+      const r = { contrast: label, n: d.length, mean: mean(d), ci: bootstrapMean(d, 13), moved: d.filter((x) => x > 0.1).length };
 
       con.push(r);
       md.push(`| ${label} | ${r.n} | ${signed(r.mean)} ${ci(r.ci)} | ${r.moved} |`);
@@ -310,7 +310,7 @@ export function analyse(rows: Recorded[]) {
         const accQ = mean(items.map((it) => binaryCredit(pCorrect(it, pc(it, "language-question", lang)))).filter(Number.isFinite));
         const accF = mean(items.map((it) => binaryCredit(pCorrect(it, pc(it, "language-full", lang)))).filter(Number.isFinite));
 
-        return { lang, accQuestion: accQ, deltaQuestion: mean(q), ciQuestion: bootstrap(q, 67), accFull: accF, deltaFull: mean(full), ciFull: bootstrap(full, 71) };
+        return { lang, accQuestion: accQ, deltaQuestion: mean(q), ciQuestion: bootstrapMean(q, 67), accFull: accF, deltaFull: mean(full), ciFull: bootstrapMean(full, 71) };
       });
       md.push(
         "Languages: question translated (JSON facts in English) vs the English canonical; question and facts translated vs English prose facts.",
@@ -398,7 +398,7 @@ export function analyse(rows: Recorded[]) {
         accuracy: mean(xs.map((x) => credit(x.p, truth(x.it)))),
         pRight: mean(right),
         delta: mean(deltas),
-        deltaCI: bootstrap(deltas, 17),
+        deltaCI: bootstrapMean(deltas, 17),
         changed: xs.filter((x) => argmax(x.p) !== argmax(x.c)).length,
         tv: tvs.length ? mean(tvs) : NaN,
       };
@@ -426,10 +426,10 @@ export function analyse(rows: Recorded[]) {
       "| --- | --- | --- | --- |",
       ...byPos.map((r) => `| ${r.position} | ${r.n} | ${pct(r.accuracy)} | ${f2(r.pRight)} |`),
       "",
-      `P(right) listed first − listed last: ${signed(mean(firstLast))} ${ci(bootstrap(firstLast, 19))} over ${firstLast.length} items.`,
+      `P(right) listed first − listed last: ${signed(mean(firstLast))} ${ci(bootstrapMean(firstLast, 19))} over ${firstLast.length} items.`,
       "",
     );
-    json.choice = { variants: table, position: byPos, firstMinusLast: { mean: mean(firstLast), ci: bootstrap(firstLast, 19) } };
+    json.choice = { variants: table, position: byPos, firstMinusLast: { mean: mean(firstLast), ci: bootstrapMean(firstLast, 19) } };
   }
 
   // ---------- framing ----------
@@ -462,10 +462,10 @@ export function analyse(rows: Recorded[]) {
       "| --- | --- | --- | --- | --- |",
       ...rows2.map((r) => `| ${r.item} | ${f2(r.gain)} | ${f2(r.loss)} | ${signed(r.effect, 2)} | ${signed(r.orderEffect, 2)} |`),
       "",
-      `Framing effect (gain − loss): ${signed(mean(effect))} ${ci(bootstrap(effect, 23))}, ${effect.filter((x) => x > 0).length} of ${effect.length} scenarios in the human direction. Order effect (sure option listed first − second): ${signed(mean(order))} ${ci(bootstrap(order, 29))}.`,
+      `Framing effect (gain − loss): ${signed(mean(effect))} ${ci(bootstrapMean(effect, 23))}, ${effect.filter((x) => x > 0).length} of ${effect.length} scenarios in the human direction. Order effect (sure option listed first − second): ${signed(mean(order))} ${ci(bootstrapMean(order, 29))}.`,
       "",
     );
-    json.framing = { scenarios: rows2, effect: { mean: mean(effect), ci: bootstrap(effect, 23) }, order: { mean: mean(order), ci: bootstrap(order, 29) } };
+    json.framing = { scenarios: rows2, effect: { mean: mean(effect), ci: bootstrapMean(effect, 23) }, order: { mean: mean(order), ci: bootstrapMean(order, 29) } };
   }
 
   // ---------- attribute framing ----------
@@ -488,10 +488,10 @@ export function analyse(rows: Recorded[]) {
       "| --- | --- | --- | --- |",
       ...rows2.map((r) => `| ${r.item} | ${f2(r.positive)} | ${f2(r.negative)} | ${signed(r.positive - r.negative, 2)} |`),
       "",
-      `Mean difference ${signed(mean(d))} ${ci(bootstrap(d, 31))}; ${d.filter((x) => x > 0).length} of ${d.length} rated higher when framed positively.`,
+      `Mean difference ${signed(mean(d))} ${ci(bootstrapMean(d, 31))}; ${d.filter((x) => x > 0).length} of ${d.length} rated higher when framed positively.`,
       "",
     );
-    json.attribute = { items: rows2, effect: { mean: mean(d), ci: bootstrap(d, 31) } };
+    json.attribute = { items: rows2, effect: { mean: mean(d), ci: bootstrapMean(d, 31) } };
   }
 
   // ---------- anchoring ----------
@@ -533,10 +533,10 @@ export function analyse(rows: Recorded[]) {
       "| --- | --- | --- | --- | --- |",
       ...summary.map((r) => `| ${r.variant} | ${r.n} | ${pct(r.accuracy)} | ${f2(r.pRight)} | ${signed(r.bias, 2)} |`),
       "",
-      `High − low anchor, in levels: irrelevant number in the state ${signed(mean(irr))} ${ci(bootstrap(irr, 37))} (${irr.filter((x) => x > 0).length} of ${irr.length} towards the anchor); comparative question ${signed(mean(cmp))} ${ci(bootstrap(cmp, 41))} (${cmp.filter((x) => x > 0).length} of ${cmp.length}).`,
+      `High − low anchor, in levels: irrelevant number in the state ${signed(mean(irr))} ${ci(bootstrapMean(irr, 37))} (${irr.filter((x) => x > 0).length} of ${irr.length} towards the anchor); comparative question ${signed(mean(cmp))} ${ci(bootstrapMean(cmp, 41))} (${cmp.filter((x) => x > 0).length} of ${cmp.length}).`,
       "",
     );
-    json.anchor = { summary, irrelevant: { mean: mean(irr), ci: bootstrap(irr, 37), values: irr }, comparative: { mean: mean(cmp), ci: bootstrap(cmp, 41), values: cmp } };
+    json.anchor = { summary, irrelevant: { mean: mean(irr), ci: bootstrapMean(irr, 37), values: irr }, comparative: { mean: mean(cmp), ci: bootstrapMean(cmp, 41), values: cmp } };
   }
 
   // ---------- decoy ----------
@@ -576,10 +576,10 @@ export function analyse(rows: Recorded[]) {
       "| --- | --- | --- | --- | --- | --- | --- |",
       ...rows2.map((r) => `| ${r.item} | ${f2(r.none)} | ${f2(r.decoyA)} | ${f2(r.decoyB)} | ${signed(r.effect, 2)} | ${f3(r.pDecoy)} | ${signed(r.order, 2)} |`),
       "",
-      `Attraction effect (A-decoy − B-decoy): ${signed(mean(e))} ${ci(bootstrap(e, 43))}, ${e.filter((x) => x > 0).length} of ${e.length} in the human direction. Order (A's share when listed first − last): ${signed(mean(o))} ${ci(bootstrap(o, 47))}.`,
+      `Attraction effect (A-decoy − B-decoy): ${signed(mean(e))} ${ci(bootstrapMean(e, 43))}, ${e.filter((x) => x > 0).length} of ${e.length} in the human direction. Order (A's share when listed first − last): ${signed(mean(o))} ${ci(bootstrapMean(o, 47))}.`,
       "",
     );
-    json.decoy = { scenarios: rows2, effect: { mean: mean(e), ci: bootstrap(e, 43) }, order: { mean: mean(o), ci: bootstrap(o, 47) } };
+    json.decoy = { scenarios: rows2, effect: { mean: mean(e), ci: bootstrapMean(e, 43) }, order: { mean: mean(o), ci: bootstrapMean(o, 47) } };
   }
 
   // ---------- likert ----------
@@ -596,7 +596,7 @@ export function analyse(rows: Recorded[]) {
     const rowsV = vs.map((v) => {
       const d = items.map((it) => a(it, v) - a(it, "agree-5")).filter(Number.isFinite);
 
-      return { variant: v, n: d.length, agreement: mean(items.map((it) => a(it, v)).filter(Number.isFinite)), delta: mean(d), ci: bootstrap(d, 53), absDelta: mean(d.map(Math.abs)) };
+      return { variant: v, n: d.length, agreement: mean(items.map((it) => a(it, v)).filter(Number.isFinite)), delta: mean(d), ci: bootstrapMean(d, 53), absDelta: mean(d.map(Math.abs)) };
     });
     const acqScore = items.map((it) => a(it, "agree-5") + a(it, "agree-5-reversed-statement") - 1).filter(Number.isFinite);
     const acqYes = items.map((it) => a(it, "yes-no-agree") + a(it, "yes-no-agree-reversed") - 1).filter(Number.isFinite);
@@ -610,14 +610,14 @@ export function analyse(rows: Recorded[]) {
       "| --- | --- | --- | --- | --- |",
       ...rowsV.map((r) => `| ${r.variant} | ${r.n} | ${f2(r.agreement)} | ${signed(r.delta)} ${ci(r.ci)} | ${f3(r.absDelta)} |`),
       "",
-      `Acquiescence (agreement with a statement + with its reversal − 1; 0 means consistent): 5-point ${signed(mean(acqScore))} ${ci(bootstrap(acqScore, 59))}; yes/no ${signed(mean(acqYes))} ${ci(bootstrap(acqYes, 61))}.`,
+      `Acquiescence (agreement with a statement + with its reversal − 1; 0 means consistent): 5-point ${signed(mean(acqScore))} ${ci(bootstrapMean(acqScore, 59))}; yes/no ${signed(mean(acqYes))} ${ci(bootstrapMean(acqYes, 61))}.`,
       "",
       "| Statement | agree-5 | reversed | sum − 1 | yes/no | yes/no reversed | sum − 1 |",
       "| --- | --- | --- | --- | --- | --- | --- |",
       ...items.map((it) => `| ${it} | ${f2(a(it, "agree-5"))} | ${f2(a(it, "agree-5-reversed-statement"))} | ${signed(a(it, "agree-5") + a(it, "agree-5-reversed-statement") - 1, 2)} | ${f2(a(it, "yes-no-agree"))} | ${f2(a(it, "yes-no-agree-reversed"))} | ${signed(a(it, "yes-no-agree") + a(it, "yes-no-agree-reversed") - 1, 2)} |`),
       "",
     );
-    json.likert = { variants: rowsV, acquiescence: { score: { mean: mean(acqScore), ci: bootstrap(acqScore, 59) }, yesNo: { mean: mean(acqYes), ci: bootstrap(acqYes, 61) } } };
+    json.likert = { variants: rowsV, acquiescence: { score: { mean: mean(acqScore), ci: bootstrapMean(acqScore, 59) }, yesNo: { mean: mean(acqYes), ci: bootstrapMean(acqYes, 61) } } };
   }
 
   return { md: md.join("\n"), json };

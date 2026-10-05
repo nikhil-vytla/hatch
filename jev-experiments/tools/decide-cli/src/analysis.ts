@@ -1,10 +1,11 @@
 /**
  * Per-study analysis of a recording, using the prose studies' own metric code
- * (packages/arena/prose/metrics.ts) with the same bootstrap seeds, so `jev-decide` reproduces the
- * published numbers on our recordings (see test/parity.test.ts).
+ * (packages/arena/prose/metrics.ts) and bootstrap (packages/seeded) with the same seeds, so
+ * `jev-decide` reproduces the published numbers on our recordings (see test/parity.test.ts).
  */
 import { MENU, PUZZLES, sentencesFor, verdict } from "../../../packages/arena/src/fool/model";
-import { bootstrap, dist, mean, pClaim, side, type Answers } from "../../../packages/arena/prose/metrics";
+import { dist, mean, pClaim, side, type Answers } from "../../../packages/arena/prose/metrics";
+import { bootstrapMean } from "../../../packages/seeded/src/index";
 import type { Row } from "./record";
 import { proseJobs, type StudyId } from "./studies";
 
@@ -49,9 +50,9 @@ export function suggestion(rows: Row[]): SuggestionRow[] {
       flips: pairs.filter((x) => side(x.p) !== side(x.c)).length,
       pRight: mean(pairs.map((x) => right(x.it, x.p))),
       delta: mean(deltas),
-      deltaCI: bootstrap(deltas, 7),
+      deltaCI: bootstrapMean(deltas, 7),
       shift: mean(shifts),
-      shiftCI: bootstrap(shifts, 7),
+      shiftCI: bootstrapMean(shifts, 7),
     };
   });
 }
@@ -81,7 +82,7 @@ export function decoy(rows: Row[]) {
     .filter((r) => Number.isFinite(r.effect));
   const e = scenarios.map((r) => r.effect);
 
-  return { scenarios, effect: { mean: mean(e), ci: bootstrap(e, 43) }, humanDirection: e.filter((x) => x > 0).length };
+  return { scenarios, effect: { mean: mean(e), ci: bootstrapMean(e, 43) }, humanDirection: e.filter((x) => x > 0).length };
 }
 
 export type FoolRow = { sentence: string; flipped: number; ruledOut: number; puzzles: number; meanRight: number };

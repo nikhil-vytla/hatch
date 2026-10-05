@@ -25,7 +25,7 @@ import { readFileSync } from "node:fs";
 import { jevEndpoint } from "../../jev-client/src/endpoints";
 import { attemptErrorRow, attemptRow, record, recorderKey, waitOutBusy, type Job } from "../../jev-client/src/recorder";
 import type { Payload } from "../../jev-client/src/wire";
-import { rng, shuffled } from "../src/checkable/items";
+import { mulberry32, shuffled } from "../../seeded/src/index";
 import { phrasesSchema } from "../src/one-box/phrases";
 import { normalizeKey } from "../src/one-box/replay";
 import { QUESTIONS } from "../src/one-box/questions";
@@ -67,7 +67,7 @@ export function jobs(scope: "words" | "all" = "all", phrasesPath = defaultPhrase
     }
   }
 
-  const order = shuffled([...prefixes.keys()], rng(20260924));
+  const order = shuffled([...prefixes.keys()], mulberry32(20260924));
 
   return [...order.filter((k) => wordEnds.has(k)), ...order.filter((k) => !wordEnds.has(k))].map((k) => ({
     id: k,

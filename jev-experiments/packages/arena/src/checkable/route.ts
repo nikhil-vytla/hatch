@@ -5,7 +5,8 @@
  * rules to the facts; answering means reading the message and the policy, including which
  * rule takes precedence.
  */
-import { rng, type Item } from "./items";
+import { type Item } from "./items";
+import { mulberry32 } from "../../../seeded/src/index";
 
 type Topic = "refund" | "security" | "outage" | "shipping" | "access" | "feature" | "billing";
 
@@ -176,7 +177,7 @@ const TOPICS: Topic[] = [
 ];
 
 export function routeItem(seed: number): Item {
-  const random = rng(seed * 53 + 11);
+  const random = mulberry32(seed * 53 + 11);
   const threshold = pick([50, 100, 150, 200], random);
   const topic = pick(TOPICS, random);
 

@@ -15,25 +15,11 @@ import { gossipRequest, reactionRequest } from "../win-over/decide";
 import { createWorld, GOALS, LIKES, TEMPERS, type Rumour } from "../win-over/engine";
 import { fill, fillRumour, lineTemplates, rumourTemplates } from "./banks";
 import { teacherLineRequest } from "./teacher-requests";
+import { mulberry32 } from "../../packages/seeded/src/index";
 
 const out = process.argv[2] ?? "free-model-jobs";
 
 mkdirSync(out, { recursive: true });
-
-/** A small seeded generator, so the jobs are reproducible. */
-function rng(seed: number) {
-  let s = seed >>> 0;
-
-  return () => {
-    s = (s + 0x6d2b79f5) >>> 0;
-    let t = s;
-
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
 
 const hash = (s: string) => [...s].reduce((h, c) => (Math.imul(h, 31) + c.charCodeAt(0)) >>> 0, 7);
 
@@ -47,7 +33,7 @@ const write = (name: string, rows: unknown[]) => {
 
 // ---------- Who can you win over? ----------
 
-const rand = rng(20260930);
+const rand = mulberry32(20260930);
 const templates = lineTemplates();
 const lines = new Map<string, { template: string; intent: string; event: Event }>();
 
@@ -138,7 +124,7 @@ write("wo-gossip.jsonl", gossipRows);
 
 // ---------- The rumour mill ----------
 
-const rrand = rng(42);
+const rrand = mulberry32(42);
 const rumourRows = [];
 const counterRows = [];
 const seen = new Set<string>();

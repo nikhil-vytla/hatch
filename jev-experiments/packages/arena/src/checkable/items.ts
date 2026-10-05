@@ -4,6 +4,7 @@
  * means right or wrong.
  */
 import { z } from "zod";
+import { mulberry32, shuffled } from "../../../seeded/src/index";
 
 export const wireQuestionSchema = z.union([
   z.object({
@@ -43,32 +44,6 @@ export const bankSchema = z.object({
 
 export type Bank = z.infer<typeof bankSchema>;
 
-/** mulberry32: small, seeded, the same on every machine. */
-export function rng(seed: number) {
-  let s = seed >>> 0;
-
-  return () => {
-    s = (s + 0x6d2b79f5) | 0;
-    let t = Math.imul(s ^ (s >>> 15), 1 | s);
-
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
-export function shuffled<T>(xs: T[], random: () => number) {
-  const a = [...xs];
-
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(random() * (i + 1));
-
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-
-  return a;
-}
-
 const DAY_MS = 86_400_000;
 
 /** Day 0 of Jev Daily. */
@@ -86,7 +61,7 @@ export function dailySet(bank: Bank, date: string) {
   const pick = (kind: Item["kind"], per: number, salt: number) => {
     const order = shuffled(
       bank.items.filter((i) => i.kind === kind).map((i) => i.id),
-      rng(salt),
+      mulberry32(salt),
     );
 
     if (!order.length) return [];

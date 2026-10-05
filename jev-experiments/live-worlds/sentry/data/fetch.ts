@@ -9,25 +9,15 @@
  * test. Nothing here comes from Jev: TypeSafe's MCA §2.3(b) forbids training on its outputs.
  */
 import { writeFileSync } from "node:fs";
+import { fnv1aUnit } from "../../../packages/seeded/src/index";
 
 export type Row = { text: string; injection: boolean; source: string; split: "train" | "test" };
 
 const HF = "https://datasets-server.huggingface.co/rows";
 const RAW = "https://raw." + "githubusercontent.com";
 
-/** FNV-1a of the text, so a row's split never changes between runs. */
-function hashed(s: string) {
-  let h = 0x811c9dc5;
-
-  for (let i = 0; i < s.length; i++) {
-    h ^= s.charCodeAt(i);
-    h = Math.imul(h, 0x01000193);
-  }
-
-  return (h >>> 0) / 4294967296;
-}
-
-const testBy = (key: string): "train" | "test" => (hashed(key) < 0.3 ? "test" : "train");
+/** FNV-1a of the key, so a row's split never changes between runs. */
+const testBy = (key: string): "train" | "test" => (fnv1aUnit(key) < 0.3 ? "test" : "train");
 
 async function hfRows(dataset: string, split: string) {
   const out: Record<string, unknown>[] = [];

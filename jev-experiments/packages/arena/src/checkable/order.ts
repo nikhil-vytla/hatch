@@ -5,7 +5,8 @@
  * arithmetic. Code checks the drink against the requirements. At most one requirement is
  * broken, so "which one" always has a single answer.
  */
-import { rng, type Item } from "./items";
+import { type Item } from "./items";
+import { mulberry32 } from "../../../seeded/src/index";
 
 type Drink = {
   name: string;
@@ -287,7 +288,7 @@ const card = (d: Drink) => ({
 });
 
 export function orderItem(seed: number): Item | null {
-  const random = rng(seed * 31 + 7);
+  const random = mulberry32(seed * 31 + 7);
   const count = 1 + Math.floor(random() * 3);
   const kinds = [...KINDS].sort(() => random() - 0.5).slice(0, count);
   const reqs = kinds.map((k) => requirement(k, random));

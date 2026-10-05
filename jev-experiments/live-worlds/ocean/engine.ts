@@ -7,6 +7,8 @@
  * Everything random comes from the world's own generator, so the same seed, events and
  * decisions applied at the same ticks give the same reef (that is how a recorded run replays).
  */
+import { mulberry32Next as random } from "../../packages/seeded/src/index";
+
 export const STEP = 1 / 30;
 export const WIDTH = 960;
 export const HEIGHT = 560;
@@ -76,16 +78,6 @@ export type World = {
   /** Results of finished events: share of the cohort alive when it was reported. */
   outcomes: { kind: EventKind; at: number; cohort: number; survived: number }[];
 };
-
-export function random(w: { rng: number }) {
-  w.rng = (w.rng + 0x6d2b79f5) | 0;
-
-  let t = Math.imul(w.rng ^ (w.rng >>> 15), 1 | w.rng);
-
-  t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-
-  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-}
 
 const clamp = (v: number, lo = 0, hi = 1) => Math.max(lo, Math.min(hi, v));
 

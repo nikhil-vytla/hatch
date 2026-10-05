@@ -15,6 +15,7 @@ import {
 } from "../../../packages/arena/src/data/chunks";
 import { loadChunk } from "./data";
 import { colorVars, type CardModel } from "./model";
+import { mulberry32Next, shuffled } from "../../../packages/seeded/src/index";
 
 /** One recorded decision: the contestant's top answer, how sure it was, and the reference's. */
 type Decision = { row: number; top: number; conf: number; ref: number; agree: boolean };
@@ -75,26 +76,9 @@ function useDecisions(m: CardModel) {
 
 /** A seeded shuffle (mulberry32), so a room is the same until you reroll it. */
 function sample<T>(xs: T[], n: number, seed: number) {
-  let s = seed;
+  const state = { rng: seed };
 
-  const rand = () => {
-    s = (s + 0x6d2b79f5) | 0;
-    let t = Math.imul(s ^ (s >>> 15), 1 | s);
-
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-
-  const a = [...xs];
-
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(rand() * (i + 1));
-
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-
-  return a.slice(0, n);
+  return shuffled(xs, () => mulberry32Next(state)).slice(0, n);
 }
 
 const BINS = [0.5, 0.6, 0.7, 0.8, 0.9];

@@ -2,7 +2,8 @@
  * Grid items: a small maze with an agent A, a key K, a locked door D and an exit E. The state
  * is the picture only; breadth-first search over (square, has key) works out the answers.
  */
-import { rng, type Item } from "./items";
+import { type Item } from "./items";
+import { mulberry32 } from "../../../seeded/src/index";
 
 const LEGEND =
   "Rows run top to bottom. '#' is a wall, '.' is open floor, A is the agent, K is the key, D is a locked door and E is the exit. The agent moves one square up, down, left or right per step. Stepping onto K picks up the key. The agent can only step onto D while carrying the key.";
@@ -127,7 +128,7 @@ export const distanceLevel = (steps: number | null) =>
   steps === null || steps >= 15 ? 2 : steps >= 8 ? 1 : 0;
 
 function layout(seed: number) {
-  const random = rng(seed);
+  const random = mulberry32(seed);
   const n = 7 + Math.floor(random() * 3);
 
   const g: string[][] = Array.from({ length: n }, (_, y) =>

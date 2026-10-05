@@ -14,7 +14,8 @@ import {
   type Game,
   type Landing,
 } from "../tetris-engine";
-import { rng, shuffled, type Item, type WireQuestion } from "./items";
+import { type Item, type WireQuestion } from "./items";
+import { mulberry32, shuffled } from "../../../seeded/src/index";
 
 const LABELS = ["A", "B", "C"] as const;
 
@@ -54,7 +55,7 @@ function uniqueMax<T>(entries: [Label, T][], measure: (t: T) => number) {
 
 /** Plays a seeded game to a mid-game position: mostly sensible placements, some careless ones. */
 function position(seed: number): Game | null {
-  const random = rng(seed);
+  const random = mulberry32(seed);
   const g = createGame(seed);
   const pieces = 10 + Math.floor(random() * 30);
 
@@ -93,7 +94,7 @@ export function tetrisItem(seed: number): Item | null {
   const options = landings(g).filter((l) => !l.features.topOut);
 
   if (options.length < 5) return null;
-  const random = rng(seed ^ 0x9e3779b9);
+  const random = mulberry32(seed ^ 0x9e3779b9);
 
   // Plausible candidates: the better half by holes then height, plus a few others.
   const ranked = [...options].sort(

@@ -9,19 +9,11 @@
  */
 import { readFileSync } from "node:fs";
 import type { Example } from "./dataset";
+import { fnv1aUnit } from "../../packages/seeded/src/index";
 
 export type RealRow = { text: string; injection: boolean; source: string; split: "train" | "test" };
 
-function hashed(s: string) {
-  let h = 0x9e3779b9;
-
-  for (let i = 0; i < s.length; i++) {
-    h ^= s.charCodeAt(i);
-    h = Math.imul(h, 0x01000193);
-  }
-
-  return (h >>> 0) / 4294967296;
-}
+const hashed = (s: string) => fnv1aUnit(s, 0x9e3779b9);
 
 /** Share of each source's training rows kept; test splits are always kept whole. */
 const KEEP: Record<string, number> = { gandalf: 0.2 };

@@ -11,7 +11,7 @@ import { gunzipSync } from "node:zlib";
 import { z } from "zod";
 import { score } from "../score";
 import { PALETTE } from "./palette";
-import { bootstrap, bootstrapMany } from "./bootstrap";
+import { bootstrapGroups, bootstrapGroupsMany } from "../../../seeded/src/index";
 import { heuristic, randomPlayer, TetrisArena, type Contestant as Player } from "../tetris";
 import { perfectReader } from "../tetris-framings";
 import { timedReplaySchema } from "./chunks";
@@ -489,7 +489,7 @@ function studyCard(out: string): Card {
     const point = stats(id, idx.flat()),
       n = idx.length;
 
-    const intervals = bootstrapMany(idx, (s) => stats(id, s), 1000);
+    const intervals = bootstrapGroupsMany(idx, (s) => stats(id, s), 1000);
     const ci = (k: keyof typeof point) => intervals.get(k);
     const m = models.find((x) => x.id === id);
 
@@ -1393,7 +1393,7 @@ export function cafeCard(out: string): Card {
     const idx = CASES.map((c, i) => (filter(c) ? i : -1)).filter((i) => i >= 0);
 
     const point = stats(id, idx),
-      ci = bootstrapMany(
+      ci = bootstrapGroupsMany(
         idx.map((i) => [i]),
         (s) => stats(id, s),
         1000,
@@ -1553,13 +1553,13 @@ function robustnessCard(out: string): Card {
       meanChange: {
         value: mean(all),
         n: usable.length,
-        ...bootstrap(perBoard, (s) => mean(s), 1000),
+        ...bootstrapGroups(perBoard, (s) => mean(s), 1000),
         method: "bootstrap-case",
       },
       moved: {
         value: all.filter((d) => d > 0.2).length / (all.length || 1),
         n: usable.length,
-        ...bootstrap(perBoard, (s) => s.filter((d) => d > 0.2).length / (s.length || 1), 1000),
+        ...bootstrapGroups(perBoard, (s) => s.filter((d) => d > 0.2).length / (s.length || 1), 1000),
         method: "bootstrap-case",
       },
       sameChoice: {

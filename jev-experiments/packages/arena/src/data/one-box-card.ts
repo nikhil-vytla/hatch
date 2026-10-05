@@ -21,7 +21,7 @@ import {
   type Answered,
   type Policy,
 } from "../one-box/replay";
-import { bootstrapMany } from "./bootstrap";
+import { bootstrapGroupsMany } from "../../../seeded/src/index";
 import { OPEN_MODELS } from "../../open-decisions/models";
 import { PALETTE } from "./palette";
 import type { Card, CardContestant, Estimate, MetricDef, RunSet } from "./schema";
@@ -372,7 +372,7 @@ export function oneBoxCard(
     const estimates = (idx: number[]): Card["results"][string] => {
       const point = stats(idx);
 
-      const ci = bootstrapMany(
+      const ci = bootstrapGroupsMany(
         idx.map((i) => [i]),
         (s) => stats(s),
         1000,
