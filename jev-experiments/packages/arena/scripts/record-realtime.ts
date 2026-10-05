@@ -21,9 +21,9 @@ import { TetrisArena, type Contestant, type TimedEvent } from "../src/tetris";
 import { framedJev, type Exchange, type FramingId } from "../src/tetris-framings";
 import { existsSync, writeFileSync } from "node:fs";
 import { gzipSync } from "node:zlib";
+import { requireKey } from "../../jev-client/src/recorder";
 
-const key = process.env.AI_GATEWAY_API_KEY;
-if (!key) throw Error("Set AI_GATEWAY_API_KEY to record.");
+const key = requireKey();
 const dir = new URL("../recordings/", import.meta.url);
 const run = process.argv[2] === "2" ? 2 : 1;
 const stem = run === 2 ? "realtime-2" : "realtime";

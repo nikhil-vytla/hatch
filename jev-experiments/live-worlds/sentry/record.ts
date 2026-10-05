@@ -8,14 +8,15 @@
  *          for an accuracy comparison with the free sentry. Evaluation only.
  *
  * Jev's answers are never trained on (TypeSafe MCA §2.3(b)). Hard cap of $0.25 at list price; stops
- * after 5 failures in a row; resumes from rows already recorded. `--pilot` sends 10 requests.
+ * after 5 failures in a row; resumes from rows already recorded. `--pilot` sends 10 requests;
+ * `--dry-run` lists them and sends nothing.
  *
- *   bun live-worlds/sentry/record.ts [--pilot]
+ *   bun live-worlds/sentry/record.ts [--pilot] [--dry-run]
  */
-import "../../experience-prototypes/scripts/credentials";
-import { appendFileSync, existsSync, readFileSync } from "node:fs";
-import { evaluate, GatewayError, type Payload } from "../../packages/jev-client/src/index";
-import { jevCostUsd } from "../../packages/jev-client/src/price";
+import { jevEndpoint, type JevResult, type Reply } from "../../packages/jev-client/src/endpoints";
+import { readRows } from "../../packages/jev-client/src/recordings";
+import { jevErrorRow, jevRow, listPrice, noRetry, record, recorderKey, type Attempt } from "../../packages/jev-client/src/recorder";
+import type { Payload } from "../../packages/jev-client/src/wire";
 import { batchRequest, BATCH, blockKey } from "./jev";
 import type { Block } from "./model";
 import { HARD_TRAPS, PAGES, TRAPS } from "./pages";
@@ -25,18 +26,14 @@ import { WILD2 } from "./wild2";
 
 const CAP_USD = 0.25;
 
-const key = process.env.AI_GATEWAY_API_KEY;
+export const out = new URL("./recordings/jev.jsonl", import.meta.url);
 
-if (!key) throw Error("Set AI_GATEWAY_API_KEY to record.");
-
-const out = new URL("./recordings/jev.jsonl", import.meta.url);
-
-type Job = { id: string; set: "scene" | "eval"; keys: string[]; request: Payload };
+export type SentryJob = { id: string; set: "scene" | "eval"; keys: string[]; request: Payload };
 
 const chunks = <T>(xs: T[], n: number) => Array.from({ length: Math.ceil(xs.length / n) }, (_, i) => xs.slice(i * n, i * n + n));
 
 /** Unique blocks per page: the page itself plus every trap it can carry. */
-function sceneJobs(): Job[] {
+function sceneJobs(): SentryJob[] {
   return PAGES.flatMap((p) => {
     const blocks: Block[] = [
       ...p.blocks.map(({ text, where }) => ({ text, where })),
@@ -55,7 +52,7 @@ function sceneJobs(): Job[] {
 }
 
 /** The risk question only, 40 blocks per request, with a neutral reading task. */
-function evalJobs(): Job[] {
+function evalJobs(): SentryJob[] {
   const rows: (Block & { id: string })[] = [
     ...realRows()
       .filter((r) => r.split === "test")
@@ -78,56 +75,40 @@ function evalJobs(): Job[] {
   });
 }
 
-const recorded = existsSync(out)
-  ? readFileSync(out, "utf8")
-      .split("\n")
-      .filter(Boolean)
-      .map((l) => JSON.parse(l) as { id: string; status: string; costUsd?: number | null })
-  : [];
 
-const done = new Set(recorded.filter((r) => r.status === "ok").map((r) => r.id));
+/** Both sets, scene first, in the recording's order. */
+export const jobs = (): SentryJob[] => [...sceneJobs(), ...evalJobs()];
 
-let spent = recorded.reduce((a, r) => a + (r.costUsd ?? 0), 0);
+/** The answered row: the set, its block keys and the exact request, then the answers. */
+export function okRow(job: SentryJob, reply: Reply<JevResult>, at: Attempt) {
+  const { answers, ...row } = jevRow(job, reply, at, { set: job.set, keys: job.keys });
 
-const all = [...sceneJobs(), ...evalJobs()];
-const jobs = process.argv.includes("--pilot") ? all.slice(0, 10) : all;
-
-let sent = 0;
-
-let failures = 0;
-
-for (const job of jobs) {
-  if (done.has(job.id)) continue;
-
-  if (spent >= CAP_USD) {
-    console.log(`Stopped at the $${CAP_USD} cap.`);
-    break;
-  }
-
-  if (failures >= 5) {
-    console.log("Stopped after 5 failures in a row.");
-    break;
-  }
-
-  sent++;
-
-  const at = new Date().toISOString();
-
-  try {
-    const r = await evaluate(job.request, { apiKey: key, maxAttempts: 3, deadlineMs: 30_000 });
-    const tokens = r.usage?.input_tokens ?? null;
-    const costUsd = tokens === null ? null : jevCostUsd(tokens);
-
-    spent += costUsd ?? 0;
-    failures = 0;
-    appendFileSync(
-      out,
-      JSON.stringify({ id: job.id, set: job.set, keys: job.keys, at, status: "ok", model: r.model, servedBy: r.served_by, generationId: r.generation_id, latencyMs: r.latency_ms, inputTokens: tokens, costUsd, request: job.request, answers: r.answers }) + "\n",
-    );
-  } catch (e) {
-    failures++;
-    appendFileSync(out, JSON.stringify({ id: job.id, set: job.set, at, status: "error", error: e instanceof GatewayError ? e.message : String(e) }) + "\n");
-  }
+  return { ...row, request: job.request, answers };
 }
 
-console.log(`Sent ${sent} of ${jobs.length} requests (${all.length} in all); list-price spend so far $${spent.toFixed(5)}.`);
+export const errorRow = (job: SentryJob, e: unknown, at: Attempt) => jevErrorRow(job, e, at, { set: job.set });
+
+if (import.meta.main) {
+  await import("../../experience-prototypes/scripts/credentials");
+
+  const { dryRun, apiKey } = recorderKey();
+  const spentBefore = readRows(out).reduce((a, r) => a + (r.costUsd ?? 0), 0);
+  const all = jobs();
+  const chosen = process.argv.includes("--pilot") ? all.slice(0, 10) : all;
+  const result = await record(chosen, jevEndpoint({ apiKey, maxAttempts: 3, deadlineMs: 30_000 }), {
+    out,
+    dryRun,
+    maxUsd: CAP_USD,
+    spentUsd: spentBefore,
+    spend: (reply) => listPrice(reply.raw!) ?? 0,
+    failFast: 5,
+    retry: noRetry,
+    okRow,
+    errorRow,
+  });
+
+  if (!dryRun) {
+    if (result.stopped) console.log(`Stopped: ${result.stopped}.`);
+    console.log(`Sent ${result.sent} of ${chosen.length} requests (${all.length} in all); list-price spend so far $${(spentBefore + result.spentUsd).toFixed(5)}.`);
+  }
+}

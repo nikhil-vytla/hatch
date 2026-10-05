@@ -25,6 +25,7 @@ import {
   type RunSet,
 } from "./schema";
 import { readRecord } from "../../../../experience-prototypes/scripts/records";
+import { latestById, readRows } from "../../../jev-client/src/recordings";
 import { CASES, comparePreferences } from "../../../../cafe-jev/cases";
 import {
   FIELDS,
@@ -289,15 +290,7 @@ function withOpenModels(doc: z.infer<typeof studySchema>) {
 
     if (!existsSync(path)) continue;
 
-    const rows = new Map<string, z.infer<typeof openRowSchema>>();
-
-    for (const line of readFileSync(path, "utf8").split("\n")) {
-      if (!line.trim()) continue;
-
-      const row = openRowSchema.parse(JSON.parse(line));
-
-      if (row.status === "ok") rows.set(row.id, row);
-    }
+    const rows = latestById(readRows<unknown>(path).map((r) => openRowSchema.parse(r)));
 
     if (doc.cases.some((c) => !rows.has(c.id))) continue;
 

@@ -18,10 +18,9 @@ import { appendFileSync, existsSync, readFileSync } from "node:fs";
 import { gunzipSync } from "node:zlib";
 import { evaluate, GatewayError } from "../../jev-client/src/index";
 import { bankSchema, type Item } from "../src/checkable/items";
+import { requireKey } from "../../jev-client/src/recorder";
 
-const key = process.env.AI_GATEWAY_API_KEY;
-
-if (!key) throw Error("Set AI_GATEWAY_API_KEY to record.");
+const key = requireKey();
 
 const out = new URL("../recordings/decompose.jsonl", import.meta.url);
 

@@ -6,7 +6,6 @@
  */
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { gunzipSync } from "node:zlib";
 import { z } from "zod";
 import { answersSchema, toReading } from "../one-box/adapter";
 import { cardOf, type Shown } from "../one-box/calm";
@@ -27,6 +26,7 @@ import { OPEN_MODELS } from "../../open-decisions/models";
 import { PALETTE } from "./palette";
 import type { Card, CardContestant, Estimate, MetricDef, RunSet } from "./schema";
 import { JEV_PRICE_TEXT, JEV_USD_PER_INPUT_TOKEN } from "../../../jev-client/src/price";
+import { readRows } from "../../../jev-client/src/recordings";
 
 /**
  * Jev's price and request size, for the cost measure. Price: TypeSafe's published rate,
@@ -122,14 +122,11 @@ function recordings(dir: string): Recording[] {
   for (const { f, id, gz } of files) if (!gz || !chosen.has(id)) chosen.set(id, f);
 
   return [...chosen].map(([id, f]) => {
-    const buf = readFileSync(join(dir, f));
-    const text = f.endsWith(".gz") ? gunzipSync(buf).toString("utf8") : buf.toString("utf8");
     const answers = new Map<string, Answered>();
     let last = "";
 
-    for (const line of text.split("\n")) {
-      if (!line.trim()) continue;
-      const row = rowSchema.parse(JSON.parse(line));
+    for (const raw of readRows<unknown>(join(dir, f))) {
+      const row = rowSchema.parse(raw);
       const at = row.at ?? "";
 
       if (row.status !== "ok" || row.latencyMs === undefined) continue;

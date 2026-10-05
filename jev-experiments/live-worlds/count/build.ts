@@ -6,6 +6,7 @@
  */
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { readRows } from "../../packages/jev-client/src/recordings";
 import { jevCostUsd, JEV_PRICE_TEXT } from "../../packages/jev-client/src/price";
 import {
   BIN_LABELS,
@@ -24,14 +25,6 @@ import {
   type Item,
 } from "./model";
 
-function lines<T>(path: string): T[] {
-  if (!existsSync(path)) return [];
-
-  return readFileSync(path, "utf8")
-    .split("\n")
-    .filter(Boolean)
-    .map((l) => JSON.parse(l));
-}
 
 type VlmRow = { id: string; question: string; model: string; probabilities: Record<string, number>; ms: number };
 type DetRow = { id: string; model: string; ms: number; detections: Detection[] };
@@ -55,9 +48,9 @@ export function countData(lab: string) {
   const dir = join(lab, "live-worlds/count");
   const doc = JSON.parse(readFileSync(join(dir, "items.json"), "utf8")) as { source: string; minArea: number; items: Item[] };
   const items = doc.items;
-  const vlmRows = lines<VlmRow>(join(dir, "recordings/qwen3-vl-4b.jsonl"));
-  const detRows = lines<DetRow>(join(dir, "recordings/detr.jsonl"));
-  const jevRows = lines<JevRow>(join(dir, "recordings/jev.jsonl")).filter((r) => r.status === "ok");
+  const vlmRows = readRows<VlmRow>(join(dir, "recordings/qwen3-vl-4b.jsonl"));
+  const detRows = readRows<DetRow>(join(dir, "recordings/detr.jsonl"));
+  const jevRows = readRows<JevRow>(join(dir, "recordings/jev.jsonl")).filter((r) => r.status === "ok");
 
   const lanes: { id: string; label: string; sees: string; model: string; answers: Map<string, Answer> }[] = [];
 

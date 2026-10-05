@@ -6,7 +6,8 @@
  *
  *   bun live-worlds/eyes/record.ts [--url http://127.0.0.1:30100] [--seeds 101-120,7,19,42] [--prompt v1|v2] [--name qwen3-vl-4b]
  */
-import { appendFileSync, existsSync, readFileSync } from "node:fs";
+import { appendFileSync } from "node:fs";
+import { readRows } from "../../packages/jev-client/src/recordings";
 import { greedy, initial, type State } from "../../local-models-and-games/arcade/engine";
 import { png } from "./frame";
 import { apply, DIRECTIONS, LABELS, pick, PROMPTS, relative, type Direction, type FrameRecord } from "./model";
@@ -34,15 +35,10 @@ if (!health.ok) throw Error(`Scorer not healthy at ${url}`);
 
 const model: string = health.model;
 const server = `mlx-vlm on Apple M4 Max (local); one prefill per move, softmax over A-D logits`;
-const done = new Set(
-  existsSync(out)
-    ? readFileSync(out, "utf8")
-        .split("\n")
-        .filter(Boolean)
-        .map((l) => JSON.parse(l))
-        .map((r: FrameRecord) => `${r.seed}:${r.tick}`)
-    : [],
-);
+// The first recorded move per frame, so a resumed game replays to the next unrecorded frame.
+const recorded = new Map<string, FrameRecord>();
+
+for (const r of readRows<FrameRecord>(out)) if (!recorded.has(`${r.seed}:${r.tick}`)) recorded.set(`${r.seed}:${r.tick}`, r);
 
 let failures = 0;
 
@@ -53,14 +49,10 @@ for (const seed of seeds) {
     const key = `${seed}:${s.tick}`;
     const frame = png(s);
 
-    if (done.has(key)) {
-      // Replay the recorded choice so the game reaches the next unrecorded frame.
-      const r: FrameRecord = readFileSync(out, "utf8")
-        .split("\n")
-        .filter(Boolean)
-        .map((l) => JSON.parse(l))
-        .find((x: FrameRecord) => x.seed === seed && x.tick === s.tick);
+    const r = recorded.get(key);
 
+    if (r) {
+      // Replay the recorded choice so the game reaches the next unrecorded frame.
       s = apply(s, r.move);
       continue;
     }

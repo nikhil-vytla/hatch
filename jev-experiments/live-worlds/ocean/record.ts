@@ -18,13 +18,12 @@ import { evaluate, GatewayError, JEV_USD_PER_INPUT_TOKEN } from "../../packages/
 import { advance, applyDecisions, createReef, due, STEP, trigger, view } from "./engine";
 import { fromJev, JEV_BATCH, JEV_MODEL, jevRequest } from "./models";
 import { RACE, type Entry } from "./replay";
+import { requireKey } from "../../packages/jev-client/src/recorder";
 
 const MAX_REQUESTS = 240;
 const MAX_USD = 0.058;
 
-const key = process.env.AI_GATEWAY_API_KEY;
-
-if (!key) throw Error("Set AI_GATEWAY_API_KEY to record.");
+const key = requireKey();
 
 const w = createReef(RACE.seed);
 

@@ -15,7 +15,7 @@ import { decoy, fool, suggestion } from "./src/analysis";
 import { check, judge, parseLog } from "./src/bouncer";
 import { compare } from "./src/compare";
 import { endpoint } from "./src/endpoints";
-import { serveMock } from "./src/mock";
+import { serveMock } from "../../packages/jev-client/src/mock";
 import { readRows, receiptLine, run, type Row } from "./src/record";
 import { isStudy, jobsFor, STUDIES, studyOf, type StudyId } from "./src/studies";
 import { f2, f3, interval, signed, table } from "./src/table";

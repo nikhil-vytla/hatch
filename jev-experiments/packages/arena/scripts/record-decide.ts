@@ -4,67 +4,38 @@
  * one request at a time with a 700 ms gap, busy replies waited out and every attempt logged,
  * weak answers never re-asked. Truths are never sent. Append-only and resumable.
  *
- *   bun jev-experiments/packages/arena/scripts/record-decide.ts
+ *   bun jev-experiments/packages/arena/scripts/record-decide.ts [--dry-run]
  */
-import "../../../experience-prototypes/scripts/credentials";
-import { appendFileSync, existsSync, readFileSync } from "node:fs";
-import { evaluate, GatewayError } from "../../jev-client/src/index";
+import { jevEndpoint } from "../../jev-client/src/endpoints";
+import { attemptErrorRow, attemptRow, record, recorderKey, waitOutBusy, type Job } from "../../jev-client/src/recorder";
+import type { Payload } from "../../jev-client/src/wire";
 import { rng, shuffled } from "../src/checkable/items";
 import { DECK, requestFor } from "../src/decide/deck";
 
-const key = process.env.AI_GATEWAY_API_KEY;
+export const out = new URL("../recordings/decide.jsonl", import.meta.url);
 
-if (!key) throw Error("Set AI_GATEWAY_API_KEY to record.");
+/** One request per decision and setup, in the recording's seeded order. */
+export const jobs = (): Job[] =>
+  shuffled(
+    DECK.flatMap((d) => d.setups.map((s) => ({ id: `${d.id}:${s.id}`, request: requestFor(d, s) as Payload }))),
+    rng(20260928),
+  );
 
-const out = new URL("../recordings/decide.jsonl", import.meta.url);
-const done = new Set<string>();
+if (import.meta.main) {
+  await import("../../../experience-prototypes/scripts/credentials");
 
-if (existsSync(out))
-  for (const line of readFileSync(out, "utf8").split("\n"))
-    if (line.trim()) {
-      const row: { id?: unknown; status?: unknown } = JSON.parse(line);
+  const { dryRun, apiKey } = recorderKey();
+  const all = jobs();
+  const result = await record(all, jevEndpoint({ apiKey, maxAttempts: 1, deadlineMs: 20_000 }), {
+    out,
+    dryRun,
+    failFast: Infinity,
+    retry: waitOutBusy,
+    gapMs: 700,
+    okRow: attemptRow,
+    errorRow: attemptErrorRow,
+    onStart: (todo, skipped) => console.log(`${all.length} requests, ${skipped} recorded, ${todo} to ask.`),
+  });
 
-      if (typeof row.id === "string" && row.status === "ok") done.add(row.id);
-    }
-
-const jobs = DECK.flatMap((d) =>
-  d.setups.map((s) => ({ id: `${d.id}:${s.id}`, request: requestFor(d, s) })),
-);
-const todo = shuffled(jobs, rng(20260928)).filter((j) => !done.has(j.id));
-const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
-
-console.log(`${jobs.length} requests, ${done.size} recorded, ${todo.length} to ask.`);
-
-for (const job of todo) {
-  let backoff = 2000;
-
-  for (let attempt = 1; ; attempt++) {
-    const at = new Date().toISOString();
-
-    try {
-      const r = await evaluate(job.request, { apiKey: key, maxAttempts: 1, deadlineMs: 20_000 });
-
-      appendFileSync(
-        out,
-        `${JSON.stringify({ id: job.id, at, attempt, status: "ok", latencyMs: r.service_latency_ms, model: r.model, servedBy: r.served_by, generationId: r.generation_id, answers: r.answers, rejected: r.rejected, costUsd: r.cost_usd })}\n`,
-      );
-      break;
-    } catch (error) {
-      const status = error instanceof GatewayError ? error.status : 0;
-      const message = error instanceof Error ? error.message : String(error);
-
-      appendFileSync(
-        out,
-        `${JSON.stringify({ id: job.id, at, attempt, status: "error", code: status, message })}\n`,
-      );
-
-      if (status !== 429 && status !== 503 && status !== 0) throw error;
-      await wait(backoff);
-      backoff = Math.min(30_000, backoff * 2);
-    }
-  }
-
-  await wait(700);
+  if (!dryRun) console.log(result.stopped ? `Stopped: ${result.stopped}` : "Done.");
 }
-
-console.log("Done.");

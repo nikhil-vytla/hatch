@@ -27,9 +27,12 @@ export function mockAnswer(q: Question) {
   return q.type === "choice" ? { type: "choice", choice: top, probabilities } : { type: "score", score: Number(top), probabilities };
 }
 
-export type MockOptions = { port?: number; failWith?: number; latencyMs?: number };
+/** `failWith` fails every request with that status, or only the first `failTimes` requests. */
+export type MockOptions = { port?: number; failWith?: number; failTimes?: number; latencyMs?: number };
 
 export function serveMock(opts: MockOptions = {}) {
+  let requests = 0;
+
   return Bun.serve({
     port: opts.port ?? 0,
     async fetch(req) {
@@ -39,7 +42,7 @@ export function serveMock(opts: MockOptions = {}) {
 
       if (url.pathname !== "/v1/systemone" || req.method !== "POST") return new Response("not found", { status: 404 });
 
-      if (opts.failWith) return new Response(JSON.stringify({ error: "mock failure" }), { status: opts.failWith });
+      if (opts.failWith && ++requests <= (opts.failTimes ?? Infinity)) return new Response(JSON.stringify({ error: "mock failure" }), { status: opts.failWith });
 
       const body = (await req.json()) as { questions: Record<string, Question> };
 

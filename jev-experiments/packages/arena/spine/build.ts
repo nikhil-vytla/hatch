@@ -5,7 +5,7 @@
  */
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { readRecordText, recordExists } from "../../../experience-prototypes/scripts/records";
+import { latestById, readRows } from "../../jev-client/src/recordings";
 import { answered, type Row } from "./analyze";
 import { ITEMS, PUSH_LABELS, PUSHES } from "./model";
 
@@ -21,14 +21,9 @@ type Recorded = Row & { servedBy?: string | null };
 
 export function buildSpine(root: string, outDir: string) {
   const path = join(root, "recordings/spine.jsonl");
-  const rows: Recorded[] = recordExists(path)
-    ? readRecordText(path)
-        .split("\n")
-        .filter(Boolean)
-        .map((l) => JSON.parse(l))
-    : [];
+  const rows = readRows<Recorded>(path);
   const p = answered(rows);
-  const last = new Map(rows.filter((r) => r.status === "ok").map((r) => [r.id, r]));
+  const last = latestById(rows);
 
   const recorded = Object.fromEntries(
     [...p].map(([id, pYes]): [string, SpineRecorded] => {

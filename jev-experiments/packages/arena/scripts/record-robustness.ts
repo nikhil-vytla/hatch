@@ -27,9 +27,9 @@ import {
 } from "../src/tetris-framings";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { gzipSync } from "node:zlib";
+import { requireKey } from "../../jev-client/src/recorder";
 
-const key = process.env.AI_GATEWAY_API_KEY;
-if (!key) throw Error("Set AI_GATEWAY_API_KEY to record.");
+const key = requireKey();
 const dir = new URL("../recordings/", import.meta.url);
 const out = {
   position: new URL("robustness-position.jsonl.gz", dir),

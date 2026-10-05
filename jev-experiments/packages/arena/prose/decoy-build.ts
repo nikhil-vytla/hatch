@@ -3,9 +3,9 @@
  * per set and order, and Jev's recorded answer to it. Read from the frozen prose recording; a set
  * with no answered row is left out, never invented.
  */
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { gunzipSync } from "node:zlib";
+import { latestById, readRows } from "../../jev-client/src/recordings";
 import { DECOY_ITEMS } from "./items";
 import { allJobs } from "./variants";
 
@@ -20,31 +20,14 @@ type Row = {
   answers?: { q?: { probabilities?: Record<string, number> } };
 };
 
-function readRows(dir: string) {
-  const raw = join(dir, "recordings/prose.jsonl");
-  const gz = join(dir, "recordings/prose.jsonl.gz");
-  const text = existsSync(raw)
-    ? readFileSync(raw, "utf8")
-    : existsSync(gz)
-      ? gunzipSync(readFileSync(gz)).toString("utf8")
-      : "";
-
+/** The decoy rows of the prose recording (the working copy, else the committed .gz). */
+function decoyRows(dir: string) {
   // A retried request is logged once per attempt; the last answered attempt stands.
-  const rows = new Map<string, Row>();
-
-  for (const line of text.split("\n")) {
-    if (!line.startsWith('{"id":"decoy:')) continue;
-
-    const row: Row = JSON.parse(line);
-
-    if (row.status === "ok" && row.answers?.q?.probabilities) rows.set(row.id, row);
-  }
-
-  return rows;
+  return latestById(readRows<Row>(join(dir, "recordings/prose.jsonl")), (row) => row.id.startsWith("decoy:") && row.status === "ok" && !!row.answers?.q?.probabilities);
 }
 
 export function buildDecoy(dir: string, outDir: string) {
-  const rows = readRows(dir);
+  const rows = decoyRows(dir);
   const jobs = allJobs().filter((j) => j.study === "decoy");
 
   const recorded = jobs.flatMap((job) => {

@@ -23,9 +23,9 @@ import { evaluate } from "../../jev-client/src/index";
 import { TetrisArena } from "../src/tetris";
 import { framedJev, type Exchange, type FramingId } from "../src/tetris-framings";
 import { existsSync, appendFileSync, writeFileSync } from "node:fs";
+import { requireKey } from "../../jev-client/src/recorder";
 
-const key = process.env.AI_GATEWAY_API_KEY;
-if (!key) throw Error("Set AI_GATEWAY_API_KEY to record.");
+const key = requireKey();
 const out = new URL("../recordings/tetris-framings.jsonl", import.meta.url);
 if (existsSync(new URL("../recordings/tetris-framings.jsonl.gz", import.meta.url)))
   throw Error("A recording already exists. Preserve it; do not overwrite recorded outcomes.");

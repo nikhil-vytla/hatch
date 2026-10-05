@@ -3,8 +3,9 @@
  * contestant's raw answers and combined distribution per setup. A contestant with no recording
  * yet is left out, never invented.
  */
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { latestById, readRows as readRecording } from "../../../jev-client/src/recordings";
 import { z } from "zod";
 import { combine, wireAnswerSchema, type Dist, type WireAnswer } from "./combine";
 import { describe } from "./combine";
@@ -52,15 +53,10 @@ export type Result = {
 };
 
 function readRows(path: string) {
-  if (!existsSync(path)) return new Map<string, z.infer<typeof rowSchema>>();
-
-  const rows = readFileSync(path, "utf8")
-    .split("\n")
-    .filter((l) => l.trim())
-    .map((l) => rowSchema.parse(JSON.parse(l)))
-    .filter((r) => r.status === "ok" && r.answers);
-
-  return new Map(rows.map((r) => [r.id, r]));
+  return latestById(
+    readRecording<unknown>(path).map((r) => rowSchema.parse(r)),
+    (r) => r.status === "ok" && !!r.answers,
+  );
 }
 
 export function buildDecide(root: string, outDir: string) {

@@ -5,6 +5,7 @@
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { readRows } from "../../packages/jev-client/src/recordings";
 import { PROMPTS, type FrameRecord } from "./model";
 import { greedyLane, jevLane, perceptionSummary, SEEDS, vlmLane, type JevEpisode, type PerceptionRow } from "./summary";
 
@@ -15,14 +16,6 @@ export const RUNS = [
   { id: "qwen3-vl-8b.v1", label: "Qwen3-VL-8B", prompt: "v1" },
 ] as const;
 
-function lines<T>(path: string): T[] {
-  if (!existsSync(path)) return [];
-
-  return readFileSync(path, "utf8")
-    .split("\n")
-    .filter(Boolean)
-    .map((l) => JSON.parse(l));
-}
 
 export function eyesData(lab: string, app: string) {
   const dir = join(lab, "live-worlds/eyes/recordings");
@@ -31,7 +24,7 @@ export function eyesData(lab: string, app: string) {
   const jev: JevEpisode[] = (arcade?.result?.episodes ?? []).filter((e: { game: string; policy: string }) => e.game === "snake" && e.policy === "jev");
 
   const runs = RUNS.flatMap((r) => {
-    const rows = lines<FrameRecord>(join(dir, `${r.id}.jsonl`));
+    const rows = readRows<FrameRecord>(join(dir, `${r.id}.jsonl`));
 
     if (!rows.length) return [];
 
@@ -48,7 +41,7 @@ export function eyesData(lab: string, app: string) {
     ];
   });
 
-  const perception = lines<PerceptionRow & { model: string }>(join(dir, "qwen3-vl-8b.perception.jsonl"));
+  const perception = readRows<PerceptionRow & { model: string }>(join(dir, "qwen3-vl-8b.perception.jsonl"));
 
   return {
     seeds: SEEDS,

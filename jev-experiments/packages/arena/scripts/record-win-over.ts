@@ -14,10 +14,9 @@ import { answerLocally, lineRequest, merge, reactionRequest, split, toHearDecisi
 import { createWorld, goal } from "../../../live-worlds/win-over/engine";
 import { NLI_MODEL, type ZeroShot } from "../src/decide/nli";
 import { jevCostUsd } from "../../jev-client/src/price";
+import { requireKey } from "../../jev-client/src/recorder";
 
-const key = process.env.AI_GATEWAY_API_KEY;
-
-if (!key) throw Error("Set AI_GATEWAY_API_KEY to record.");
+const key = requireKey();
 
 const LINES: Event[] = [
   { kind: "say", text: "Hi! I just moved in next to the bakery." },

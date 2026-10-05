@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { decoy } from "../src/analysis";
 import { compare } from "../src/compare";
 import { endpoint } from "../src/endpoints";
-import { serveMock } from "../src/mock";
+import { serveMock } from "../../../packages/jev-client/src/mock";
 import { readRows, receipt, run } from "../src/record";
 import { jobsFor } from "../src/studies";
 

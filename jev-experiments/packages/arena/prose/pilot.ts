@@ -7,10 +7,9 @@
 import "../../../experience-prototypes/scripts/credentials";
 import { appendFileSync } from "node:fs";
 import { evaluate, GatewayError, type Payload } from "../../jev-client/src/index";
+import { requireKey } from "../../jev-client/src/recorder";
 
-const key = process.env.AI_GATEWAY_API_KEY;
-
-if (!key) throw Error("Set AI_GATEWAY_API_KEY to record.");
+const key = requireKey();
 
 const out = new URL("./recordings/pilot.jsonl", import.meta.url);
 const jobs: { id: string; request: Payload }[] = [

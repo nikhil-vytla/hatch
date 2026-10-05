@@ -15,174 +15,93 @@
  * The log is append-only. Rerunning resumes: prefixes already recorded are skipped, never
  * re-asked or overwritten.
  *
- *   bun jev-experiments/packages/arena/scripts/record-one-box.ts [words|all] [phrases.json] [log.jsonl]
+ *   bun jev-experiments/packages/arena/scripts/record-one-box.ts [words|all] [phrases.json] [log.jsonl] [--dry-run]
  *
  * `words` asks only prefixes that end a word (about 1,300 requests); `all` asks every prefix
  * (about 5,500). Upstream's cancel-on-keystroke policy only ever lands word-end prefixes and
  * the full phrase at this typing speed; `all` also supports the keep-the-latest policy.
  */
-import "../../../experience-prototypes/scripts/credentials";
-import { appendFileSync, existsSync, readFileSync } from "node:fs";
-import { evaluate, GatewayError } from "../../jev-client/src/index";
+import { readFileSync } from "node:fs";
+import { jevEndpoint } from "../../jev-client/src/endpoints";
+import { attemptErrorRow, attemptRow, record, recorderKey, waitOutBusy, type Job } from "../../jev-client/src/recorder";
+import type { Payload } from "../../jev-client/src/wire";
+import { rng, shuffled } from "../src/checkable/items";
 import { phrasesSchema } from "../src/one-box/phrases";
 import { normalizeKey } from "../src/one-box/replay";
 import { QUESTIONS } from "../src/one-box/questions";
 
-const key = process.env.AI_GATEWAY_API_KEY;
+export type OneBoxJob = Job & { phrases: string[] };
 
-if (!key) throw Error("Set AI_GATEWAY_API_KEY to record.");
-
-const scope = process.argv[2] ?? "all";
-
-if (scope !== "words" && scope !== "all") throw Error("Scope is words or all.");
+const defaultPhrases = new URL("../src/one-box/phrases.json", import.meta.url).pathname;
+export const defaultOut = new URL("../recordings/one-box.jsonl", import.meta.url).pathname;
 
 /**
- * Optional third and fourth arguments point at another phrase file and log.
- */
-const phrasesPath =
-  process.argv[3] ?? new URL("../src/one-box/phrases.json", import.meta.url).pathname;
-const out = process.argv[4] ?? new URL("../recordings/one-box.jsonl", import.meta.url).pathname;
-
-const doc = phrasesSchema.parse(JSON.parse(readFileSync(phrasesPath, "utf8")));
-
-/** Every prefix key and the phrases that produce it. */
-const prefixes = new Map<string, string[]>();
-
-for (const p of doc.phrases) {
-  // Whole characters, as a typist produces them: an emoji is one keystroke, never half of one.
-  const chars = Array.from(p.text);
-
-  for (let i = 1; i <= chars.length; i++) {
-    const endsWord = i === chars.length || chars[i] === " ";
-
-    if (scope === "words" && !endsWord) continue;
-    const k = normalizeKey(chars.slice(0, i).join(""));
-
-    if (k.length < 2) continue;
-    const ids = prefixes.get(k) ?? [];
-
-    if (!ids.includes(p.id)) ids.push(p.id);
-    prefixes.set(k, ids);
-  }
-}
-
-const done = new Set<string>();
-
-if (existsSync(out))
-  for (const line of readFileSync(out, "utf8").split("\n"))
-    if (line.trim()) {
-      const row: { key?: unknown; status?: unknown } = JSON.parse(line);
-
-      if (typeof row.key === "string" && row.status === "ok") done.add(row.key);
-    }
-
-/** A seeded shuffle (mulberry32), so the order is the same on every run and resume. */
-function shuffled<T>(xs: T[], seed = 20260924) {
-  let s = seed;
-  const rand = () => {
-    s = (s + 0x6d2b79f5) | 0;
-    let t = Math.imul(s ^ (s >>> 15), 1 | s);
-
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-
-  const a = [...xs];
-
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(rand() * (i + 1));
-
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-
-  return a;
-}
-
-/**
- * Word-end prefixes first (all upstream's cancel-on-keystroke policy ever lands), then the rest,
- * each group in seeded shuffled order. Added after the first ~250 prefixes, when busy replies
+ * Every prefix key, asked as `{ text }` with upstream's questions. Word-end prefixes first (all
+ * upstream's cancel-on-keystroke policy ever lands), then the rest, each group in seeded
+ * shuffled order. The grouping was added after the first ~250 prefixes, when busy replies
  * capped the run at about 22 answers a minute; asked keys are never re-asked.
  */
-const wordEnds = new Set<string>();
+export function jobs(scope: "words" | "all" = "all", phrasesPath = defaultPhrases): OneBoxJob[] {
+  const doc = phrasesSchema.parse(JSON.parse(readFileSync(phrasesPath, "utf8")));
+  /** Every prefix key and the phrases that produce it. */
+  const prefixes = new Map<string, string[]>();
+  const wordEnds = new Set<string>();
 
-for (const p of doc.phrases) {
-  const chars = Array.from(p.text);
+  for (const p of doc.phrases) {
+    // Whole characters, as a typist produces them: an emoji is one keystroke, never half of one.
+    const chars = Array.from(p.text);
 
-  chars.forEach((c, i) => {
-    if (i === chars.length - 1 || chars[i + 1] === " ")
-      wordEnds.add(normalizeKey(chars.slice(0, i + 1).join("")));
-  });
-}
+    for (let i = 1; i <= chars.length; i++) {
+      const endsWord = i === chars.length || chars[i] === " ";
 
-const order = shuffled([...prefixes.keys()]);
+      if (endsWord) wordEnds.add(normalizeKey(chars.slice(0, i).join("")));
 
-const todo = [
-  ...order.filter((k) => wordEnds.has(k)),
-  ...order.filter((k) => !wordEnds.has(k)),
-].filter((k) => !done.has(k));
-const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+      if (scope === "words" && !endsWord) continue;
+      const k = normalizeKey(chars.slice(0, i).join(""));
 
-/**
- * Pause between requests. The first 150 prefixes ran at 150 ms and about half the attempts
- * came back busy; a longer gap asks the provider less often.
- */
-const GAP_MS = 700;
+      if (k.length < 2) continue;
+      const ids = prefixes.get(k) ?? [];
 
-console.log(
-  `${prefixes.size} prefixes in scope "${scope}", ${done.size} recorded, ${todo.length} to ask.`,
-);
-
-let n = 0;
-
-for (const k of todo) {
-  let backoff = 2000;
-
-  for (let attempt = 1; ; attempt++) {
-    const at = new Date().toISOString();
-
-    try {
-      const r = await evaluate(
-        { state: { text: k }, questions: QUESTIONS },
-        { apiKey: key, maxAttempts: 1, deadlineMs: 20_000 },
-      );
-
-      appendFileSync(
-        out,
-        `${JSON.stringify({
-          key: k,
-          phrases: prefixes.get(k),
-          at,
-          attempt,
-          status: "ok",
-          latencyMs: r.service_latency_ms,
-          model: r.model,
-          servedBy: r.served_by,
-          generationId: r.generation_id,
-          answers: r.answers,
-          rejected: r.rejected,
-          costUsd: r.cost_usd,
-        })}\n`,
-      );
-      break;
-    } catch (error) {
-      const status = error instanceof GatewayError ? error.status : 0;
-      const message = error instanceof Error ? error.message : String(error);
-
-      appendFileSync(
-        out,
-        `${JSON.stringify({ key: k, at, attempt, status: "error", code: status, message })}\n`,
-      );
-
-      // Busy or unreachable: wait and ask again. Anything else is a real failure; stop.
-      if (status !== 429 && status !== 503 && status !== 0) throw error;
-      await wait(backoff);
-      backoff = Math.min(30_000, backoff * 2);
+      if (!ids.includes(p.id)) ids.push(p.id);
+      prefixes.set(k, ids);
     }
   }
 
-  if (++n % 50 === 0) console.log(`${n} / ${todo.length}`);
-  await wait(GAP_MS);
+  const order = shuffled([...prefixes.keys()], rng(20260924));
+
+  return [...order.filter((k) => wordEnds.has(k)), ...order.filter((k) => !wordEnds.has(k))].map((k) => ({
+    id: k,
+    request: { state: { text: k }, questions: QUESTIONS } as Payload,
+    phrases: prefixes.get(k)!,
+  }));
 }
 
-console.log("Done.");
+if (import.meta.main) {
+  await import("../../../experience-prototypes/scripts/credentials");
+
+  const { dryRun, apiKey } = recorderKey();
+  const [scope = "all", phrasesPath = defaultPhrases, out = defaultOut] = process.argv.slice(2).filter((a) => !a.startsWith("--"));
+
+  if (scope !== "words" && scope !== "all") throw Error("Scope is words or all.");
+
+  const all = jobs(scope, phrasesPath);
+  const result = await record(all, jevEndpoint({ apiKey, maxAttempts: 1, deadlineMs: 20_000 }), {
+    out,
+    dryRun,
+    // One box keys its rows by prefix.
+    idOf: (row) => row.key as string,
+    failFast: Infinity,
+    retry: waitOutBusy,
+    // The first 150 prefixes ran at 150 ms and about half the attempts came back busy; a longer
+    // gap asks the provider less often.
+    gapMs: 700,
+    okRow: (job, reply, at) => attemptRow(job, reply, at, { key: job.id, phrases: job.phrases }),
+    errorRow: (job, e, at) => attemptErrorRow(job, e, at, { key: job.id }),
+    onStart: (todo, skipped) => console.log(`${all.length} prefixes in scope "${scope}", ${skipped} recorded, ${todo} to ask.`),
+    onJob: (s) => {
+      if (s.jobs % 50 === 0) console.log(`${s.jobs} / ${s.todo}`);
+    },
+  });
+
+  if (!dryRun) console.log(result.stopped ? `Stopped: ${result.stopped}` : "Done.");
+}

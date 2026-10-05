@@ -18,5 +18,5 @@
     }
   },
   "include": ["src", "api", "server/compose.ts", "../packages/jev-client/src"],
-  "exclude": ["src/**/*.test.ts"]
+  "exclude": ["src/**/*.test.ts", "../packages/jev-client/src/mock.ts"]
 }

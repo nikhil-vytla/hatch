@@ -10,91 +10,43 @@
  *
  * The log is append-only; rerunning resumes and never re-asks a recorded item.
  *
- *   bun jev-experiments/packages/arena/scripts/record-checkable.ts
+ *   bun jev-experiments/packages/arena/scripts/record-checkable.ts [bank.json log] [--dry-run]
  */
-import "../../../experience-prototypes/scripts/credentials";
-import { appendFileSync, existsSync, readFileSync } from "node:fs";
-import { evaluate, GatewayError } from "../../jev-client/src/index";
+import { readFileSync } from "node:fs";
+import { jevEndpoint } from "../../jev-client/src/endpoints";
+import { attemptErrorRow, attemptRow, record, recorderKey, waitOutBusy, type Job } from "../../jev-client/src/recorder";
+import type { Payload } from "../../jev-client/src/wire";
 import { bankSchema, rng, shuffled } from "../src/checkable/items";
 
-/** Optional: another bank in src/checkable/ and its log name, e.g. judgement-bank.json judgement. */
-const BANK = process.argv[2] ?? "bank.json";
-const LOG = process.argv[3] ?? "checkable";
+export const outFor = (log: string) => new URL(`../recordings/${log}.jsonl`, import.meta.url);
 
-const key = process.env.AI_GATEWAY_API_KEY;
+/** The bank's items as requests, in the recording's seeded order. `bank` names a file in src/checkable/. */
+export function jobs(bank = "bank.json"): Job[] {
+  const doc = bankSchema.parse(JSON.parse(readFileSync(new URL(`../src/checkable/${bank}`, import.meta.url), "utf8")));
 
-if (!key) throw Error("Set AI_GATEWAY_API_KEY to record.");
-
-const out = new URL(`../recordings/${LOG}.jsonl`, import.meta.url);
-
-const bank = bankSchema.parse(
-  JSON.parse(readFileSync(new URL(`../src/checkable/${BANK}`, import.meta.url), "utf8")),
-);
-
-const done = new Set<string>();
-
-if (existsSync(out))
-  for (const line of readFileSync(out, "utf8").split("\n"))
-    if (line.trim()) {
-      const row: { id?: unknown; status?: unknown } = JSON.parse(line);
-
-      if (typeof row.id === "string" && row.status === "ok") done.add(row.id);
-    }
-
-const todo = shuffled(bank.items, rng(20260926)).filter((i) => !done.has(i.id));
-const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
-
-console.log(`${bank.items.length} items, ${done.size} recorded, ${todo.length} to ask.`);
-
-let n = 0;
-
-for (const item of todo) {
-  let backoff = 2000;
-
-  for (let attempt = 1; ; attempt++) {
-    const at = new Date().toISOString();
-
-    try {
-      const r = await evaluate(
-        { state: item.state, questions: item.questions },
-        { apiKey: key, maxAttempts: 1, deadlineMs: 20_000 },
-      );
-
-      appendFileSync(
-        out,
-        `${JSON.stringify({
-          id: item.id,
-          at,
-          attempt,
-          status: "ok",
-          latencyMs: r.service_latency_ms,
-          model: r.model,
-          servedBy: r.served_by,
-          generationId: r.generation_id,
-          answers: r.answers,
-          rejected: r.rejected,
-          costUsd: r.cost_usd,
-        })}\n`,
-      );
-      break;
-    } catch (error) {
-      const status = error instanceof GatewayError ? error.status : 0;
-      const message = error instanceof Error ? error.message : String(error);
-
-      appendFileSync(
-        out,
-        `${JSON.stringify({ id: item.id, at, attempt, status: "error", code: status, message })}\n`,
-      );
-
-      // Busy or unreachable: wait and ask again. Anything else is a real failure; stop.
-      if (status !== 429 && status !== 503 && status !== 0) throw error;
-      await wait(backoff);
-      backoff = Math.min(30_000, backoff * 2);
-    }
-  }
-
-  if (++n % 25 === 0) console.log(`${n} / ${todo.length}`);
-  await wait(700);
+  return shuffled(doc.items, rng(20260926)).map((i) => ({ id: i.id, request: { state: i.state, questions: i.questions } as Payload }));
 }
 
-console.log("Done.");
+if (import.meta.main) {
+  await import("../../../experience-prototypes/scripts/credentials");
+
+  const { dryRun, apiKey } = recorderKey();
+  // Optional: another bank in src/checkable/ and its log name, e.g. judgement-bank.json judgement.
+  const [bank = "bank.json", log = "checkable"] = process.argv.slice(2).filter((a) => !a.startsWith("--"));
+  const all = jobs(bank);
+  const result = await record(all, jevEndpoint({ apiKey, maxAttempts: 1, deadlineMs: 20_000 }), {
+    out: outFor(log),
+    dryRun,
+    failFast: Infinity,
+    retry: waitOutBusy,
+    gapMs: 700,
+    okRow: attemptRow,
+    errorRow: attemptErrorRow,
+    onStart: (todo, skipped) => console.log(`${all.length} items, ${skipped} recorded, ${todo} to ask.`),
+    onJob: (s) => {
+      if (s.jobs % 25 === 0) console.log(`${s.jobs} / ${s.todo}`);
+    },
+  });
+
+  if (!dryRun) console.log(result.stopped ? `Stopped: ${result.stopped}` : "Done.");
+}

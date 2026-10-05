@@ -1,112 +1,58 @@
 /**
  * Records Jev's answers for every puzzle × sentence (and the referee's for every sentence), so
  * Fool Jev works without a key. One request at a time; resumes from what is already recorded;
- * stops at the request cap. `--pilot` records four requests to check the referee first.
+ * stops at the request cap. `--pilot` records four requests to check the referee first;
+ * `--dry-run` lists the requests and sends nothing.
  *
- *   bun packages/arena/src/fool/record.ts [--pilot]
+ *   bun packages/arena/src/fool/record.ts [--pilot] [--dry-run]
  */
-import "../../../../experience-prototypes/scripts/credentials";
-import { appendFileSync, existsSync, readFileSync } from "node:fs";
-import {
-  evaluate,
-  GatewayError,
-  type Payload,
-} from "../../../jev-client/src/index";
+import type { Payload } from "../../../jev-client/src/index";
+import { jevEndpoint } from "../../../jev-client/src/endpoints";
+import { jevErrorRow, jevRow, listPrice, noRetry, record, recorderKey, type Job } from "../../../jev-client/src/recorder";
 import { answerRequest, cheatFor, PUZZLES, refereeRequest, sentencesFor } from "./model";
-import { jevCostUsd } from "../../../jev-client/src/price";
 
 const CAP = 200;
 
-const key = process.env.AI_GATEWAY_API_KEY;
+export const out = new URL("../../recordings/fool.jsonl", import.meta.url);
 
-if (!key) throw Error("Set AI_GATEWAY_API_KEY to record.");
+export const jobs = (): Job[] =>
+  PUZZLES.flatMap((p) =>
+    sentencesFor(p.id).flatMap((s): Job[] => [
+      { id: `answer:${p.id}:${s}`, request: answerRequest(p, s) as Payload },
+      ...(s ? [{ id: `referee:${p.id}:${s}`, request: refereeRequest(p, s) as Payload }] : []),
+    ]),
+  );
 
-const out = new URL("../../recordings/fool.jsonl", import.meta.url);
+export function pilot(all: Job[]) {
+  const madrid = PUZZLES[0];
+  const ids = [
+    `referee:${madrid.id}:Most people say no.`,
+    `referee:${madrid.id}:${cheatFor(madrid.id)}`,
+    `referee:${madrid.id}:It's raining in London.`,
+    `referee:${madrid.id}:I'm pretty sure the answer is no.`,
+    `referee:capital:${cheatFor("capital")}`,
+    `referee:capital:I'm pretty sure the answer is no.`,
+    `answer:${madrid.id}:Most people say no.`,
+  ];
 
-const done = new Set(
-  existsSync(out)
-    ? readFileSync(out, "utf8")
-        .split("\n")
-        .filter(Boolean)
-        .map((l) => JSON.parse(l))
-        .filter((r) => r.status === "ok")
-        .map((r) => r.id)
-    : [],
-);
-
-type Job = { id: string; request: Payload };
-
-const all: Job[] = PUZZLES.flatMap((p) =>
-  sentencesFor(p.id).flatMap((s) => [
-    { id: `answer:${p.id}:${s}`, request: answerRequest(p, s) },
-    ...(s ? [{ id: `referee:${p.id}:${s}`, request: refereeRequest(p, s) }] : []),
-  ]),
-);
-
-const madrid = PUZZLES[0];
-
-const jobs = process.argv.includes("--pilot")
-  ? all.filter((j) =>
-      [
-        `referee:${madrid.id}:Most people say no.`,
-        `referee:${madrid.id}:${cheatFor(madrid.id)}`,
-        `referee:${madrid.id}:It's raining in London.`,
-        `referee:${madrid.id}:I'm pretty sure the answer is no.`,
-        `referee:capital:${cheatFor("capital")}`,
-        `referee:capital:I'm pretty sure the answer is no.`,
-        `answer:${madrid.id}:Most people say no.`,
-      ].includes(j.id),
-    )
-  : all;
-
-let sent = 0;
-
-let cost = 0;
-
-for (const job of jobs) {
-  if (done.has(job.id)) continue;
-
-  if (sent >= CAP) {
-    console.log(`Stopped at the cap of ${CAP} requests.`);
-    break;
-  }
-
-  sent++;
-
-  const at = new Date().toISOString();
-
-  try {
-    const r = await evaluate(job.request, { apiKey: key, maxAttempts: 3, deadlineMs: 20_000 });
-    const tokens = r.usage?.input_tokens ?? null;
-    const costUsd = tokens === null ? null : jevCostUsd(tokens);
-
-    cost += costUsd ?? 0;
-    appendFileSync(
-      out,
-      JSON.stringify({
-        id: job.id,
-        at,
-        status: "ok",
-        model: r.model,
-        servedBy: r.served_by,
-        generationId: r.generation_id,
-        latencyMs: r.latency_ms,
-        inputTokens: tokens,
-        costUsd,
-        answers: r.answers,
-      }) + "\n",
-    );
-  } catch (e) {
-    appendFileSync(
-      out,
-      JSON.stringify({
-        id: job.id,
-        at,
-        status: "error",
-        error: e instanceof GatewayError ? e.message : String(e),
-      }) + "\n",
-    );
-  }
+  return all.filter((j) => ids.includes(j.id));
 }
 
-console.log(`Sent ${sent} requests, list-price cost $${cost.toFixed(5)}.`);
+if (import.meta.main) {
+  await import("../../../../experience-prototypes/scripts/credentials");
+
+  const { dryRun, apiKey } = recorderKey();
+  const all = jobs();
+  const result = await record(process.argv.includes("--pilot") ? pilot(all) : all, jevEndpoint({ apiKey, maxAttempts: 3, deadlineMs: 20_000 }), {
+    out,
+    dryRun,
+    limit: CAP,
+    failFast: Infinity,
+    spend: (reply) => listPrice(reply.raw!) ?? 0,
+    retry: noRetry,
+    okRow: jevRow,
+    errorRow: jevErrorRow,
+  });
+
+  if (!dryRun) console.log(`Sent ${result.sent} requests, list-price cost $${result.spentUsd.toFixed(5)}.`);
+}

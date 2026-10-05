@@ -367,6 +367,7 @@ class Client:
         if len(wire) > 110000:
             raise ValueError("Request exceeds the lab's conservative 110 KB packing limit")
         model = body["model"]
+        # 0.042: Jev's list price per million input tokens, a copy of packages/jev-client/src/price.ts.
         estimate = (
             (len(wire) + 2000) * 0.042 / 1e6
             if model == JEV

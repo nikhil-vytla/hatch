@@ -3,8 +3,9 @@
  * every recorded sentence, so the toy works without a key. A sentence with no answered row is
  * left out, never invented.
  */
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { latestById, readRows } from "../../../jev-client/src/recordings";
 import { CHEATS, cleanSentence, MENU, PUZZLES, sentencesFor } from "./model";
 
 type Row = {
@@ -29,22 +30,8 @@ export type Recorded = {
   refereeAnswers: Row["answers"] | null;
 };
 
-function readRows(path: string) {
-  const rows = new Map<string, Row>();
-
-  if (!existsSync(path)) return rows;
-
-  // A request is logged once per run; the last answered row stands.
-  for (const line of readFileSync(path, "utf8").split("\n")) {
-    if (!line.trim()) continue;
-
-    const row: Row = JSON.parse(line);
-
-    if (row.status === "ok") rows.set(row.id, row);
-  }
-
-  return rows;
-}
+// A request is logged once per run; the last answered row stands.
+const answered = (path: string) => latestById(readRows<Row>(path));
 
 const value = (row: Row | undefined, key: string) => {
   const v = row?.answers?.[key]?.value;
@@ -53,7 +40,7 @@ const value = (row: Row | undefined, key: string) => {
 };
 
 export function buildFool(root: string, outDir: string) {
-  const rows = readRows(join(root, "recordings/fool.jsonl"));
+  const rows = answered(join(root, "recordings/fool.jsonl"));
 
   const recorded = Object.fromEntries(
     PUZZLES.map((p) => {
