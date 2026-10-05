@@ -5,32 +5,14 @@
  * puts the chosen decider against a recorded Jev run on the same reef and the same heatwave.
  */
 import { useEffect, useRef, useState } from "react";
-import {
-  ACTIONS,
-  advance,
-  applyDecisions,
-  cohortAlive,
-  createReef,
-  dropFood,
-  due,
-  DURATION,
-  STALE_AFTER,
-  STEP,
-  staleShare,
-  traitMeans,
-  trigger,
-  view,
-  type Action,
-  type EventKind,
-  type Fish,
-  type World,
-} from "../../live-worlds/ocean/engine";
-import { BROWSER_MODEL, fromJev, JEV_BATCH, JEV_MODEL, jevRequest } from "../../live-worlds/ocean/models";
-import { JEV_USD_PER_INPUT_TOKEN as USD_PER_TOKEN } from "../../packages/jev-client/src/price";
+import { evolved as evolvedDecider, jev as jevDecider, nli } from "../../live-worlds/ocean/deciders";
+import { ACTIONS, cohortAlive, dropFood, due, STALE_AFTER, staleShare, traitMeans, view, type Action, type EventKind, type Fish, type World } from "../../live-worlds/ocean/engine";
+import { BROWSER_MODEL, JEV_BATCH, JEV_EVERY, JEV_MODEL, jevRequest, LIVE_CAP } from "../../live-worlds/ocean/models";
 import { paint, hitFish, VIEW } from "../../live-worlds/ocean/render";
-import { decideAll, POLICY_NAME, WEIGHT_COUNT } from "../../live-worlds/ocean/policy";
+import { POLICY_NAME, WEIGHT_COUNT } from "../../live-worlds/ocean/policy";
 import evolved from "../../live-worlds/ocean/policy.json";
-import { parseRecording, RACE, replayer, type Recording } from "../../live-worlds/ocean/replay";
+import { parseRecording, RACE, type Recording } from "../../live-worlds/ocean/replay";
+import { createSession, RACE_SCENARIO, replaySession, wallClock, type Asked, type Scenario, type Session, type Timing } from "../../live-worlds/ocean/session";
 import type { Decision } from "../../live-worlds/ocean/engine";
 import { percent as pct } from "./api";
 import { useLiveAsk } from "./live-ask";
@@ -40,12 +22,19 @@ import "./ocean-reef.css";
 
 type Model = "evolved" | "browser" | "jev";
 
-/** The evolved policy decides every live fish every this many ticks: ten times a second. */
-const POLICY_EVERY = 3;
+/** The free reef: the race's seed, no scripted event, no end. */
+const FREE: Scenario = { seed: RACE.seed, event: null, eventAt: Infinity, seconds: Infinity };
+
+/** How the session asks each decider. The evolved policy decides every live fish every 3 ticks (ten times a second); the others never make the world wait. */
+const TIMING: Record<Model, Timing> = {
+  evolved: { kind: "every", ticks: 3 },
+  browser: { kind: "live", batch: 1, everyTicks: 1 },
+  jev: { kind: "live", batch: JEV_BATCH, everyTicks: JEV_EVERY, cap: LIVE_CAP },
+};
+
 type Race = {
-  live: World;
-  rep: ReturnType<typeof replayer>;
-  heated: boolean;
+  live: Session;
+  rep: Session;
   liveStale: number[];
   repStale: number[];
   startedAt: number;
@@ -95,7 +84,9 @@ let worker: Worker | null = null;
 const pending = new Map<number, (d: Decision | null) => void>();
 let onDownload: (percent: number) => void = () => {};
 
-function askBrowser(id: number, f: ReturnType<typeof view>) {
+function askBrowser(f: ReturnType<typeof view>) {
+  const id = f.id;
+
   if (!worker) {
     worker = new Worker(new URL("./ocean-model.worker.ts", import.meta.url), { type: "module" });
     worker.onmessage = (e: MessageEvent) => {
@@ -203,15 +194,12 @@ export function OceanReef() {
   const canvas = useRef<HTMLCanvasElement | null>(null);
   const raceLeft = useRef<HTMLCanvasElement | null>(null);
   const raceRight = useRef<HTMLCanvasElement | null>(null);
-  const world = useRef<World>(createReef(RACE.seed));
+  const free = useRef<Session>(createSession(FREE));
   const race = useRef<Race | null>(null);
   const recording = useRef<Recording | null>(null);
-  const generation = useRef(0);
-  const latencies = useRef<number[]>([]);
   /** [ms, decisions] samples of the decided world, for decisions a second. */
   const counts = useRef<[number, number][]>([]);
   const policyMicros = useRef<number[]>([]);
-  const spent = useRef(0);
   // The latest batch sent to Jev, for "Build this".
   const lastJev = useRef<unknown>(null);
   const fps = useRef(0);
@@ -222,45 +210,31 @@ export function OceanReef() {
   const [selected, setSelected] = useState<number | null>(null);
   const [download, setDownload] = useState<number | null>(null);
   const [error, setError] = useState("");
-  /** Live Jev (its status says why it stopped), and a counter that restarts its loop on "Try again". */
+  /** Live Jev (its status says why it stopped), and a counter that starts a new run on "Try again". */
   const jev = useLiveAsk();
   const [attempt, setAttempt] = useState(0);
   const [copied, setCopied] = useState(false);
   const [raceState, setRaceState] = useState<"idle" | "loading" | "running" | "done">("idle");
   const [baseline, setBaseline] = useState<{ alive: number; survived: number; cohort: number } | null>(null);
   const runningRef = useRef(running);
-  const modelRef = useRef(model);
 
   runningRef.current = running;
-  modelRef.current = model;
   onDownload = (p) => setDownload(p);
 
-  const target = () => race.current?.live ?? world.current;
-
-  /** Every live fish, decided now by the evolved policy; times it per fish. */
-  const decideEvolved = (w: World) => {
-    const t = performance.now();
-    const ds = decideAll(w, evolved);
-
-    applyDecisions(w, ds);
-
-    if (ds.length) policyMicros.current = [...policyMicros.current.slice(-59), ((performance.now() - t) * 1000) / ds.length];
-  };
+  /** The session the chosen decider works on: the race's live lane while a race is on screen, otherwise the free reef. */
+  const target = () => race.current?.live ?? free.current;
+  const world = free.current.world;
 
   // The world clock and painting.
   useEffect(() => {
     let raf = 0;
-    let last = performance.now();
-    let acc = 0;
     let frames = 0;
-    let since = last;
+    let since = performance.now();
     let lastUi = 0;
+    const clock = wallClock();
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
     const loop = (now: number) => {
-      const dt = Math.min(0.25, (now - last) / 1000);
-
-      last = now;
       frames++;
 
       if (now - since > 1000) {
@@ -269,42 +243,25 @@ export function OceanReef() {
         since = now;
       }
 
-      if (runningRef.current) {
-        acc += dt;
+      for (let n = clock(now, runningRef.current); n > 0; n--) {
+        const r = race.current;
 
-        for (let n = 0; acc >= STEP && n < 6; n++) {
-          acc -= STEP;
+        if (!r) free.current.step();
+        // Both lanes start together, once the live lane has its decider.
+        else if (!r.done && r.live.ready) {
+          r.live.step();
+          r.rep.step();
 
-          const r = race.current;
+          if (r.live.world.tick % 30 === 0) {
+            r.liveStale.push(staleShare(r.live.world));
+            r.repStale.push(staleShare(r.rep.world));
+          }
 
-          if (r && !r.done) {
-            if (!r.heated && r.live.time >= RACE.heatwaveAt) {
-              r.heated = true;
-              trigger(r.live, "heatwave");
-            }
-
-            if (modelRef.current === "evolved" && r.live.tick % POLICY_EVERY === 0) decideEvolved(r.live);
-
-            advance(r.live);
-            r.rep.step();
-
-            if (r.live.tick % 30 === 0) {
-              r.liveStale.push(staleShare(r.live));
-              r.repStale.push(staleShare(r.rep.world));
-            }
-
-            if (r.live.time >= RACE.seconds) {
-              r.done = true;
-              setRaceState("done");
-            }
-          } else {
-            if (modelRef.current === "evolved" && world.current.tick % POLICY_EVERY === 0) decideEvolved(world.current);
-
-            advance(world.current);
+          if (r.live.done()) {
+            r.done = true;
+            setRaceState("done");
           }
         }
-
-        if (acc > STEP * 6) acc = 0;
       }
 
       const r = race.current;
@@ -314,18 +271,18 @@ export function OceanReef() {
         const a = raceLeft.current?.getContext("2d");
         const b = raceRight.current?.getContext("2d");
 
-        if (a) paint(a, r.live, { ...opts, selected: null });
+        if (a) paint(a, r.live.world, { ...opts, selected: null });
 
         if (b) paint(b, r.rep.world, { ...opts, selected: null });
       } else {
         const ctx = canvas.current?.getContext("2d");
 
-        if (ctx) paint(ctx, world.current, opts);
+        if (ctx) paint(ctx, free.current.world, opts);
       }
 
       if (now - lastUi > 250) {
         lastUi = now;
-        counts.current = [...counts.current.filter(([t]) => t > now - 5000), [now, (race.current?.live ?? world.current).decisions]];
+        counts.current = [...counts.current.filter(([t]) => t > now - 5000), [now, target().world.decisions]];
         setVersion((v) => v + 1);
       }
 
@@ -337,103 +294,86 @@ export function OceanReef() {
     return () => cancelAnimationFrame(raf);
   }, [lens, selected]);
 
-  // The decision loop: asks the chosen model about the most urgent fish, forever, without
-  // ever making the world wait. Restarts when the model or the target world changes.
+  // Who decides: the chosen model's adapter on the target session. The session asks it about
+  // the most urgent fish, paced by the world, and never makes the world wait for a live one.
+  // A new model, a race starting or ending, or "Try again" starts a new run.
   useEffect(() => {
-    const gen = ++generation.current;
-    const live = () => gen === generation.current;
+    const s = target();
 
-    latencies.current = [];
     counts.current = [];
-
-    // The evolved policy runs inside the clock loop; nothing to wait for here.
-    if (model === "evolved") return;
-
-    const loop = async () => {
-      while (live()) {
-        if (!runningRef.current || (race.current && race.current.done)) {
-          await new Promise((r) => setTimeout(r, 100));
-          continue;
-        }
-
-        const w = target();
-
-        if (model === "browser") {
-          const f = due(w, 1)[0];
-
-          if (!f) {
-            await new Promise((r) => setTimeout(r, 50));
-            continue;
-          }
-
-          const d = await askBrowser(f.id, view(w, f));
-
-          if (!live()) return;
-
-          setDownload(null);
-
-          if (d && target() === w) {
-            applyDecisions(w, [d]);
-            latencies.current.push(d.latencyMs ?? 0);
-          }
-        } else {
-          if (!jev.hasKey()) return;
-
-          const views = due(w, JEV_BATCH).map((f) => view(w, f));
-
-          if (!views.length) {
-            await new Promise((r) => setTimeout(r, 50));
-            continue;
-          }
-
-          const req = jevRequest(views);
-
-          lastJev.current = req;
-          const res = await jev.ask(req);
-
-          if (!live()) return;
-
-          if (res) {
-            const ds = fromJev(views, res.answers ?? {}, res.latency_ms ?? null);
-
-            if (target() === w) applyDecisions(w, ds);
-
-            spent.current += (res.usage?.input_tokens ?? 0) * USD_PER_TOKEN;
-            latencies.current.push(res.latency_ms ?? 0);
-          } else {
-            const s = jev.live.status;
-
-            // Fish keep their last action meanwhile. A rejected key or a spent budget won't fix
-            // itself, so stop asking until the visitor acts; otherwise wait as long as asked.
-            if (s.kind !== "failed" || !s.failure.retryable) return;
-
-            await new Promise((r) => setTimeout(r, s.failure.retryAfterMs ?? 2000));
-          }
-        }
-
-        latencies.current = latencies.current.slice(-60);
-      }
-    };
-
-    void loop();
+    s.use(adapter(model), TIMING[model]);
 
     return () => {
-      generation.current++;
+      s.use(null);
       jev.cancel();
     };
-  }, [model, raceState === "running", attempt]);
+  }, [model, raceState === "running" || raceState === "done", attempt]);
 
-  const w = race.current?.live ?? world.current;
+  /** The adapter for a model. Jev goes through the live-ask module; MobileBERT through its worker. */
+  function adapter(m: Model): Asked | null {
+    if (m === "evolved") {
+      const policy = evolvedDecider(evolved);
+
+      // Times the policy per fish, for "µs per fish".
+      return {
+        name: policy.name,
+        decide(w, fish) {
+          const t = performance.now();
+          const ds = policy.decide(w, fish) as Decision[];
+
+          if (ds.length) policyMicros.current = [...policyMicros.current.slice(-59), ((performance.now() - t) * 1000) / ds.length];
+
+          return ds;
+        },
+      };
+    }
+
+    if (m === "browser")
+      return nli(async (v) => {
+        const d = await askBrowser(v);
+
+        setDownload(null);
+
+        return d;
+      });
+
+    if (!jev.hasKey()) return null;
+
+    return jevDecider(async (request) => {
+      if (!jev.live.hasKey()) throw new Error("No key");
+
+      lastJev.current = request;
+
+      const res = await jev.live.ask(request);
+
+      if (res) return res;
+
+      const s = jev.live.status;
+
+      // Fish keep their last action meanwhile. A rejected key or a spent budget won't fix
+      // itself, so the run stops asking until the visitor acts; otherwise wait as long as asked.
+      if (s.kind !== "failed" || !s.failure.retryable) throw new Error("Stopped");
+
+      await new Promise((r) => setTimeout(r, s.failure.retryAfterMs ?? 2000));
+
+      return null;
+    });
+  }
+
+  const t = target();
+  const w = t.world;
   const alive = w.fish.filter((f) => f.alive);
   const c = counts.current;
   const rate = c.length > 1 ? ((c[c.length - 1][1] - c[0][1]) * 1000) / Math.max(1, c[c.length - 1][0] - c[0][0]) : 0;
   const micros = policyMicros.current.length ? [...policyMicros.current].sort((a, b) => a - b)[Math.floor(policyMicros.current.length / 2)] : null;
-  const median = latencies.current.length ? [...latencies.current].sort((a, b) => a - b)[Math.floor(latencies.current.length / 2)] : null;
+  const lat = t.stats.latencies;
+  const median = lat.length ? [...lat].sort((a, b) => a - b)[Math.floor(lat.length / 2)] : null;
   const means = traitMeans(w);
-  const active = world.current.events.find((e) => world.current.time < e.end + 10 && !e.reported);
-  const outcome = world.current.outcomes.at(-1);
-  const sel = selected === null ? null : world.current.fish.find((f) => f.id === selected) ?? null;
+  const active = world.events.find((e) => world.time < e.end + 10 && !e.reported);
+  const outcome = world.outcomes.at(-1);
+  const sel = selected === null ? null : world.fish.find((f) => f.id === selected) ?? null;
   const decider = model === "evolved" ? POLICY_NAME : model === "browser" ? BROWSER_MODEL : JEV_MODEL;
+  const capped = model === "jev" && t.stopped?.reason === "cap";
 
   const startRace = async () => {
     setRaceState("loading");
@@ -448,23 +388,21 @@ export function OceanReef() {
       return;
     }
 
-    race.current = { live: createReef(RACE.seed), rep: replayer(recording.current), heated: false, liveStale: [], repStale: [], startedAt: performance.now(), done: false };
+    race.current = { live: createSession(RACE_SCENARIO), rep: replaySession(recording.current), liveStale: [], repStale: [], startedAt: performance.now(), done: false };
     setSelected(null);
     setRaceState("running");
 
     // The no-decision baseline: the same reef where every fish keeps schooling.
     setTimeout(() => {
-      const b = createReef(RACE.seed);
+      const b = createSession(RACE_SCENARIO);
 
-      while (b.time < RACE.seconds) {
-        if (Math.abs(b.time - RACE.heatwaveAt) < STEP / 2) trigger(b, "heatwave");
+      b.use(null);
 
-        advance(b);
-      }
+      while (!b.done()) b.step();
 
-      const o = b.outcomes[0];
+      const o = b.world.outcomes[0];
 
-      setBaseline({ alive: b.fish.filter((f) => f.alive).length, survived: o?.survived ?? 0, cohort: o?.cohort ?? 0 });
+      setBaseline({ alive: b.world.fish.filter((f) => f.alive).length, survived: o?.survived ?? 0, cohort: o?.cohort ?? 0 });
     }, 50);
   };
 
@@ -547,7 +485,7 @@ export function OceanReef() {
         <>
           <div className="reef-events" role="group" aria-label="Events">
             {EVENTS.map((e) => (
-              <button key={e.kind} type="button" title={e.about} disabled={!!world.current.events.find((x) => x.kind === e.kind && world.current.time < x.end)} onClick={() => trigger(world.current, e.kind)}>
+              <button key={e.kind} type="button" title={e.about} disabled={!!world.events.find((x) => x.kind === e.kind && world.time < x.end)} onClick={() => free.current.trigger(e.kind)}>
                 {e.label}
               </button>
             ))}
@@ -566,16 +504,16 @@ export function OceanReef() {
                 const rect = e.currentTarget.getBoundingClientRect();
                 const x = ((e.clientX - rect.left) / rect.width) * VIEW.width;
                 const y = ((e.clientY - rect.top) / rect.height) * VIEW.height;
-                const f = hitFish(world.current, x, y);
+                const f = hitFish(world, x, y);
 
                 if (f) setSelected(f.id);
-                else dropFood(world.current, x, y);
+                else dropFood(world, x, y);
               }}
             />
             {active && (
               <p className="reef-banner" aria-live="polite">
-                {world.current.time < active.end ? `${EVENTS.find((e) => e.kind === active.kind)?.label} · ${Math.ceil(active.end - world.current.time)} s left` : "Counting survivors…"}{" "}
-                · {cohortAlive(world.current, active)} of {active.cohort.length} still alive
+                {world.time < active.end ? `${EVENTS.find((e) => e.kind === active.kind)?.label} · ${Math.ceil(active.end - world.time)} s left` : "Counting survivors…"}{" "}
+                · {cohortAlive(world, active)} of {active.cohort.length} still alive
               </p>
             )}
             <p className="reef-hint">Tap a fish to follow it. Tap the water to drop food.</p>
@@ -609,7 +547,7 @@ export function OceanReef() {
             <canvas ref={raceRight} width={VIEW.width} height={VIEW.height} className="reef-canvas" aria-label="The same reef, replayed from Jev's recorded run" />
           </div>
           <p className="reef-banner reef-race-clock" aria-live="polite">
-            {r.done ? "Done." : r.live.time < RACE.heatwaveAt ? `Heatwave in ${Math.ceil(RACE.heatwaveAt - r.live.time)} s` : `${Math.ceil(RACE.seconds - r.live.time)} s left`}
+            {r.done ? "Done." : r.live.world.time < RACE.heatwaveAt ? `Heatwave in ${Math.ceil(RACE.heatwaveAt - r.live.world.time)} s` : `${Math.ceil(RACE.seconds - r.live.world.time)} s left`}
           </p>
         </div>
       )}
@@ -625,13 +563,21 @@ export function OceanReef() {
             {model === "evolved" && micros !== null ? ` · ${micros < 10 ? micros.toFixed(1) : micros.toFixed(0)} µs per fish, every fish ten times a second` : ""}
             {model !== "evolved" && median !== null ? ` · median ${median} ms ${model === "jev" ? "per batch of up to 40 fish" : "per fish"}` : ""}
             {download !== null ? ` · downloading the model (27 MB, once) ${download}%` : ""}
-            {model === "jev" ? ` · $${spent.current.toFixed(4)} so far` : " · $0"}
+            {model === "jev" ? ` · $${t.stats.usd.toFixed(4)} of this run's $${LIVE_CAP.usd.toFixed(2)} cap, ${t.stats.requests} of ${LIVE_CAP.requests} requests` : " · $0"}
           </p>
+          {capped && (
+            <div role="status">
+              <p className="reef-fine">This run stopped at its cap. Fish keep their last action.</p>
+              <button type="button" className="reef-go" onClick={() => setAttempt((n) => n + 1)}>
+                Start a new run
+              </button>
+            </div>
+          )}
           <Bar label="Stale" value={staleShare(w)} tone="stale" />
           <BuildThis
             key={model}
             load={async () => {
-              const now = target();
+              const now = target().world;
               const fish = due(now, JEV_BATCH);
 
               return model === "jev" && lastJev.current
@@ -667,7 +613,7 @@ export function OceanReef() {
         </section>
 
         {sel && !r ? (
-          <Inspector f={sel} w={world.current} onClose={() => setSelected(null)} />
+          <Inspector f={sel} w={world} onClose={() => setSelected(null)} />
         ) : (
           <section className="reef-card">
             <h3>Race the models</h3>
@@ -695,7 +641,7 @@ export function OceanReef() {
                       </tr>
                     </thead>
                     <tbody>
-                      {raceRow(`${decider} (live)`, r.live, r.liveStale, (r.live.decisions / Math.max(1, r.live.time)).toFixed(0))}
+                      {raceRow(`${decider} (live)`, r.live.world, r.liveStale, (r.live.world.decisions / Math.max(1, r.live.world.time)).toFixed(0))}
                       {raceRow("Jev (recorded)", r.rep.world, r.repStale, (r.rep.world.decisions / Math.max(1, r.rep.world.time)).toFixed(0))}
                       {baseline && r.done && (
                         <tr>

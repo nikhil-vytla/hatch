@@ -1,7 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { gunzipSync } from "node:zlib";
-import { parseRecording, RACE, replayer } from "./replay";
+import { parseRecording, RACE } from "./replay";
+import { replaySession } from "./session";
 
 const text = gunzipSync(readFileSync(new URL("./recordings/jev-heatwave.jsonl.gz", import.meta.url))).toString("utf8");
 const summary = JSON.parse(text.trim().split("\n").at(-1) ?? "{}");
@@ -9,7 +10,7 @@ const summary = JSON.parse(text.trim().split("\n").at(-1) ?? "{}");
 describe("recorded Jev reef", () => {
   test("replays to exactly the recorded outcome, without calling Jev", () => {
     const rec = parseRecording(text);
-    const r = replayer(rec);
+    const r = replaySession(rec);
 
     while (!r.done()) r.step();
 

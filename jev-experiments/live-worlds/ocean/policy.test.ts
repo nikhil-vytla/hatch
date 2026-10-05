@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { ACTIONS, createReef, view, type View } from "./engine";
+import { evolved } from "./deciders";
 import { fitness, runEpisode } from "./evaluate";
 import { choose, decideAll, features, INPUTS, WEIGHT_COUNT } from "./policy";
 import { ruleAction } from "./rule";
@@ -62,7 +63,7 @@ describe("evolved reef policy", () => {
 
   test("a held-out episode is reproducible from its seed", async () => {
     const ep = { seed: 5003, event: "heatwave" as const, eventAt: 15, seconds: 30, budget: Infinity, every: 3 };
-    const go = () => runEpisode(ep, (w, f) => decideAll(w, shipped, f));
+    const go = () => runEpisode(ep, evolved(shipped));
 
     expect(await go()).toEqual(await go());
     expect(fitness(await go())).toBeGreaterThan(0);

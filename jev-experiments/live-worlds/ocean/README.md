@@ -41,12 +41,16 @@ The held-out run happened on a Linux L4 workspace (Bun 1.4.2). One episode was f
 ## Files
 
 - `engine.ts`: the world
+- `session.ts`: one run: the scenario's event, the clock, who gets asked and when, the live request and spend cap, applying answers at the tick they arrive, and the log. The page, `record.ts` and the held-out table all run on it.
+- `deciders.ts`: the adapters at the session's seam: the rule, the evolved policy, MobileBERT, Jev (over any transport) and a recorded run
 - `render.ts`: canvas drawing
-- `models.ts`: Jev and MobileBERT requests
-- `replay.ts`: the recorded race
+- `models.ts`: Jev and MobileBERT requests, and what each decider sees
+- `replay.ts`: the recording format and the race scenario
 - `policy.ts`, `policy.json`, `train.ts`, `train-worker.ts`: the evolved policy
 - `rule.ts`: the hand-written baseline
 - `evaluate.ts`, `heldout.ts`, `heldout-worker.ts`: episode runs and the held-out table
 - `record.ts`: the one Jev recording
 
-Tests are `engine.test.ts`, `replay.test.ts` and `policy.test.ts`.
+A live Jev run on the page sends one batch at a time, no more than one every 9 ticks (0.3 s) however fast answers come, and stops at 200 requests or $0.06 a run; the cap is shown with the spend.
+
+Tests are `engine.test.ts`, `session.test.ts`, `replay.test.ts` and `policy.test.ts`. `session.test.ts` pins per-tick trace hashes of the recorded replay and of held-out runs, taken from the code before the session existed.

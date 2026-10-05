@@ -16,9 +16,9 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { availableParallelism } from "node:os";
 import type { ZeroShot } from "../../packages/arena/src/decide/nli";
-import { view, type EventKind } from "./engine";
+import { nliInProcess } from "./deciders";
+import type { EventKind } from "./engine";
 import { runEpisode, type Episode, type Result } from "./evaluate";
-import { decideWithNli } from "./models";
 
 export const TEST_SEED_FROM = 5000;
 export const EVENTS: EventKind[] = ["heatwave", "net", "storm", "bloom", "oil"];
@@ -109,9 +109,10 @@ if (import.meta.main) {
     const { NLI_MODEL } = await import("../../packages/arena/src/decide/nli");
     // SAFETY: transformers.js's zero-shot pipeline is called with (premise, labels, options), the ZeroShot shape.
     const clf = (await pipeline("zero-shot-classification", NLI_MODEL, { dtype: "q8" })) as unknown as ZeroShot;
+    const mobilebert = nliInProcess(clf);
 
     for (const i of bert) {
-      results[i] = await runEpisode(jobs[i].episode, async (w, fish) => Promise.all(fish.map((f) => decideWithNli(clf, view(w, f)))));
+      results[i] = await runEpisode(jobs[i].episode, mobilebert);
       done++;
 
       if (done % 10 === 0) console.log(`${done} of ${jobs.length}`);

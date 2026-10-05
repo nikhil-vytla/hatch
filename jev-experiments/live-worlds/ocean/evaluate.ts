@@ -1,11 +1,12 @@
 /**
- * Runs one reef episode with a decider under a decisions-per-second budget, the way the page does:
- * each tick the most urgent fish (engine `due`) get decisions while the budget allows; everyone
- * else keeps their last action. An unlimited budget decides every live fish every `every` ticks.
+ * One reef episode for training and the held-out table: a session (session.ts) with a decider
+ * under a decisions-per-second budget. The world waits for each answer, so a slow decider is
+ * judged on what it decides, not on how long it takes. An unlimited budget decides every live
+ * fish every `every` ticks; a finite one gives the most urgent fish (engine `due`) that many
+ * decisions a world second, and everyone else keeps their last action.
  */
-import { advance, applyDecisions, createReef, due, trigger, type Decision, type EventKind, type Fish, type World } from "./engine";
-
-export type Decider = (w: World, fish: Fish[]) => Decision[] | Promise<Decision[]>;
+import type { EventKind } from "./engine";
+import { createSession, type Asked } from "./session";
 
 export type Episode = {
   seed: number;
@@ -19,34 +20,17 @@ export type Episode = {
 
 export type Result = { seed: number; event: EventKind | null; start: number; alive: number; survived: number; cohort: number; births: number };
 
-export async function runEpisode(e: Episode, decide: Decider | null): Promise<Result> {
-  const w = createReef(e.seed);
+export async function runEpisode(e: Episode, decider: Asked | null): Promise<Result> {
+  const s = createSession({ seed: e.seed, event: e.event, eventAt: e.eventAt, seconds: e.seconds });
+  const w = s.world;
   const start = w.fish.filter((f) => f.alive).length;
-  const every = e.every ?? 1;
-  let credit = 0;
 
-  while (w.time < e.seconds) {
-    if (e.event && !w.events.length && w.time >= e.eventAt) trigger(w, e.event);
+  s.use(decider, e.budget === Infinity ? { kind: "every", ticks: e.every ?? 1 } : { kind: "rate", perSecond: e.budget });
 
-    if (decide) {
-      if (e.budget === Infinity) {
-        if (w.tick % every === 0) applyDecisions(w, await decide(w, w.fish.filter((f) => f.alive)));
-      } else {
-        credit += e.budget / 30;
+  while (!s.done()) {
+    const wait = s.step();
 
-        const n = Math.floor(credit);
-
-        if (n > 0) {
-          credit -= n;
-
-          const fish = due(w, n);
-
-          if (fish.length) applyDecisions(w, await decide(w, fish));
-        }
-      }
-    }
-
-    advance(w);
+    if (wait) await wait;
   }
 
   const o = w.outcomes[0];
