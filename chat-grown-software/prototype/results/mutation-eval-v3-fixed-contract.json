@@ -1,0 +1,4167 @@
+[
+ {
+  "turn": 1,
+  "cls": "logical",
+  "where": "addExpense: || -> && @73",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 1,
+  "cls": "line-delete",
+  "where": "addExpense: drop \"state.expenses = state.expenses || [];\"",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 1,
+  "cls": "line-delete",
+  "where": "addExpense: drop \"state.expenses.push({ amount, category }\"",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 1,
+  "cls": "line-delete",
+  "where": "addExpense: drop \"return state.expenses.length;\"",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 1,
+  "cls": "stray-write",
+  "where": "addExpense: state.cache = {}",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": true,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 1,
+  "cls": "hang",
+  "where": "addExpense: while (true) {}",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": true,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": true,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 2,
+  "cls": "arith",
+  "where": "total: + -> - @73",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 2,
+  "cls": "logical",
+  "where": "total: || -> && @43",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 2,
+  "cls": "constant",
+  "where": "total: 0 -> 1 @86",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 2,
+  "cls": "line-delete",
+  "where": "total: drop \"return (state.expenses || []).reduce((su\"",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 2,
+  "cls": "stray-write",
+  "where": "total: state.cache = {}",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": true,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 1
+ },
+ {
+  "turn": 2,
+  "cls": "hang",
+  "where": "total: while (true) {}",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": true,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": true,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 2,
+  "cls": "drive-by",
+  "where": "addExpense: logical || -> && @73",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": false,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 2,
+  "cls": "drive-by",
+  "where": "addExpense: line-delete drop \"state.expenses = state.expenses || [];\"",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": false,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 2,
+  "cls": "drive-by",
+  "where": "addExpense: line-delete drop \"state.expenses.push({ amount, category }\"",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": false,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 2,
+  "cls": "drive-by",
+  "where": "addExpense: line-delete drop \"return state.expenses.length;\"",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": false,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 2,
+  "cls": "drive-by",
+  "where": "addExpense: stray-write state.cache = {}",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": true,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 3,
+  "cls": "arith",
+  "where": "byCategory: + -> - @122",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": true,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 3,
+  "cls": "logical",
+  "where": "byCategory: || -> && @74",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": true,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 3,
+  "cls": "logical",
+  "where": "byCategory: || -> && @116",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": true,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 3,
+  "cls": "constant",
+  "where": "byCategory: 0 -> 1 @120",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": true,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 3,
+  "cls": "line-delete",
+  "where": "byCategory: drop \"const out = {};\"",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": true,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 3,
+  "cls": "line-delete",
+  "where": "byCategory: drop \"for (const e of state.expenses || []) ou\"",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": true,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 3,
+  "cls": "line-delete",
+  "where": "byCategory: drop \"return out;\"",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": true,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 3,
+  "cls": "stray-write",
+  "where": "byCategory: state.cache = {}",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": true,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 1
+ },
+ {
+  "turn": 3,
+  "cls": "hang",
+  "where": "byCategory: while (true) {}",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": true,
+   "ratchet": false,
+   "properties": true,
+   "fuzz": true,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 3,
+  "cls": "drive-by",
+  "where": "addExpense: logical || -> && @73",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": false,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 3,
+  "cls": "drive-by",
+  "where": "addExpense: line-delete drop \"state.expenses = state.expenses || [];\"",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": false,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 3,
+  "cls": "drive-by",
+  "where": "addExpense: line-delete drop \"state.expenses.push({ amount, category }\"",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": false,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 3,
+  "cls": "drive-by",
+  "where": "addExpense: line-delete drop \"return state.expenses.length;\"",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": false,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 3,
+  "cls": "drive-by",
+  "where": "addExpense: stray-write state.cache = {}",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": true,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 3,
+  "cls": "drive-by",
+  "where": "total: arith + -> - @73",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": true,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 3,
+  "cls": "drive-by",
+  "where": "total: logical || -> && @43",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": true,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 3,
+  "cls": "drive-by",
+  "where": "total: constant 0 -> 1 @86",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": true,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 3,
+  "cls": "drive-by",
+  "where": "total: line-delete drop \"return (state.expenses || []).reduce((su\"",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": true,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 3,
+  "cls": "drive-by",
+  "where": "total: stray-write state.cache = {}",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": true,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 4,
+  "cls": "arith",
+  "where": "cents: * -> / @41",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": true,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 3,
+  "advisories": 0
+ },
+ {
+  "turn": 4,
+  "cls": "arith",
+  "where": "cents: / -> * @48",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": true,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 3,
+  "advisories": 0
+ },
+ {
+  "turn": 4,
+  "cls": "constant",
+  "where": "cents: 100 -> 101 @44",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": true,
+   "fuzz": false,
+   "traces": false,
+   "goals": false
+  },
+  "surfaced": 3,
+  "advisories": 0
+ },
+ {
+  "turn": 4,
+  "cls": "constant",
+  "where": "cents: 100 -> 101 @51",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": true,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 3,
+  "advisories": 0
+ },
+ {
+  "turn": 4,
+  "cls": "line-delete",
+  "where": "cents: drop \"return Math.round(x * 100) / 100;\"",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": true,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 3,
+  "advisories": 0
+ },
+ {
+  "turn": 4,
+  "cls": "stray-write",
+  "where": "cents: state.cache = {}",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": true,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": true,
+   "traces": false,
+   "goals": false
+  },
+  "surfaced": 3,
+  "advisories": 0
+ },
+ {
+  "turn": 4,
+  "cls": "hang",
+  "where": "cents: while (true) {}",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": true,
+   "ratchet": true,
+   "properties": true,
+   "fuzz": true,
+   "traces": true,
+   "goals": true
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 4,
+  "cls": "arith",
+  "where": "total: + -> - @79",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": true,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 1,
+  "advisories": 0
+ },
+ {
+  "turn": 4,
+  "cls": "logical",
+  "where": "total: || -> && @49",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": true,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 1,
+  "advisories": 0
+ },
+ {
+  "turn": 4,
+  "cls": "constant",
+  "where": "total: 0 -> 1 @92",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": true,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 1,
+  "advisories": 0
+ },
+ {
+  "turn": 4,
+  "cls": "line-delete",
+  "where": "total: drop \"return cents((state.expenses || []).redu\"",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": true,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 1,
+  "advisories": 0
+ },
+ {
+  "turn": 4,
+  "cls": "stray-write",
+  "where": "total: state.cache = {}",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": true,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": true,
+   "traces": false,
+   "goals": false
+  },
+  "surfaced": 1,
+  "advisories": 0
+ },
+ {
+  "turn": 4,
+  "cls": "hang",
+  "where": "total: while (true) {}",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": true,
+   "ratchet": true,
+   "properties": true,
+   "fuzz": true,
+   "traces": true,
+   "goals": true
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 4,
+  "cls": "callee-rename",
+  "where": "total: cents() -> cents2()",
+  "equivalent": false,
+  "killed": {
+   "static": true,
+   "invariants": false,
+   "ratchet": true,
+   "properties": true,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 1,
+  "advisories": 0
+ },
+ {
+  "turn": 4,
+  "cls": "arith",
+  "where": "byCategory: + -> - @128",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": true,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 2,
+  "advisories": 0
+ },
+ {
+  "turn": 4,
+  "cls": "logical",
+  "where": "byCategory: || -> && @74",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": true,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 2,
+  "advisories": 0
+ },
+ {
+  "turn": 4,
+  "cls": "logical",
+  "where": "byCategory: || -> && @122",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": true,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 2,
+  "advisories": 0
+ },
+ {
+  "turn": 4,
+  "cls": "constant",
+  "where": "byCategory: 0 -> 1 @126",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": true,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 2,
+  "advisories": 0
+ },
+ {
+  "turn": 4,
+  "cls": "line-delete",
+  "where": "byCategory: drop \"const out = {};\"",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": true,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 2,
+  "advisories": 0
+ },
+ {
+  "turn": 4,
+  "cls": "line-delete",
+  "where": "byCategory: drop \"for (const e of state.expenses || []) ou\"",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": true,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 2,
+  "advisories": 0
+ },
+ {
+  "turn": 4,
+  "cls": "line-delete",
+  "where": "byCategory: drop \"return out;\"",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": true,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 2,
+  "advisories": 0
+ },
+ {
+  "turn": 4,
+  "cls": "stray-write",
+  "where": "byCategory: state.cache = {}",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": true,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": true,
+   "traces": false,
+   "goals": false
+  },
+  "surfaced": 2,
+  "advisories": 0
+ },
+ {
+  "turn": 4,
+  "cls": "hang",
+  "where": "byCategory: while (true) {}",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": true,
+   "ratchet": true,
+   "properties": true,
+   "fuzz": true,
+   "traces": true,
+   "goals": true
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 4,
+  "cls": "callee-rename",
+  "where": "byCategory: cents() -> cents2()",
+  "equivalent": false,
+  "killed": {
+   "static": true,
+   "invariants": false,
+   "ratchet": true,
+   "properties": true,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 2,
+  "advisories": 0
+ },
+ {
+  "turn": 4,
+  "cls": "drive-by",
+  "where": "addExpense: logical || -> && @73",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": false,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 4,
+  "cls": "drive-by",
+  "where": "addExpense: line-delete drop \"state.expenses = state.expenses || [];\"",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": false,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 4,
+  "cls": "drive-by",
+  "where": "addExpense: line-delete drop \"state.expenses.push({ amount, category }\"",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": false,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 4,
+  "cls": "drive-by",
+  "where": "addExpense: line-delete drop \"return state.expenses.length;\"",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": false,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 4,
+  "cls": "drive-by",
+  "where": "addExpense: stray-write state.cache = {}",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": true,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 5,
+  "cls": "relational",
+  "where": "addExpense: > -> >= @84",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": true,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 5,
+  "cls": "relational",
+  "where": "addExpense: === -> !== @61",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 4,
+  "advisories": 1
+ },
+ {
+  "turn": 5,
+  "cls": "logical",
+  "where": "addExpense: && -> || @74",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": true,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 0,
+  "advisories": 1
+ },
+ {
+  "turn": 5,
+  "cls": "logical",
+  "where": "addExpense: || -> && @223",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 4,
+  "advisories": 0
+ },
+ {
+  "turn": 5,
+  "cls": "constant",
+  "where": "addExpense: 0 -> 1 @87",
+  "equivalent": true,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 5,
+  "cls": "line-delete",
+  "where": "addExpense: drop \"if (!(typeof amount === \"number\" && amou\"",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": true,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 0,
+  "advisories": 7
+ },
+ {
+  "turn": 5,
+  "cls": "line-delete",
+  "where": "addExpense: drop \"if (!category) throw new Error(\"category\"",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": true,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 0,
+  "advisories": 3
+ },
+ {
+  "turn": 5,
+  "cls": "line-delete",
+  "where": "addExpense: drop \"state.expenses = state.expenses || [];\"",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 1,
+  "advisories": 0
+ },
+ {
+  "turn": 5,
+  "cls": "line-delete",
+  "where": "addExpense: drop \"state.expenses.push({ amount, category }\"",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": false
+  },
+  "surfaced": 4,
+  "advisories": 0
+ },
+ {
+  "turn": 5,
+  "cls": "line-delete",
+  "where": "addExpense: drop \"return state.expenses.length;\"",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": false
+  },
+  "surfaced": 4,
+  "advisories": 0
+ },
+ {
+  "turn": 5,
+  "cls": "stray-write",
+  "where": "addExpense: state.cache = {}",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": true,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": false
+  },
+  "surfaced": 4,
+  "advisories": 0
+ },
+ {
+  "turn": 5,
+  "cls": "hang",
+  "where": "addExpense: while (true) {}",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": true,
+   "ratchet": true,
+   "properties": false,
+   "fuzz": true,
+   "traces": true,
+   "goals": true
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 5,
+  "cls": "drive-by",
+  "where": "total: arith + -> - @79",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": true,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 5,
+  "cls": "drive-by",
+  "where": "total: logical || -> && @49",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": true,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 5,
+  "cls": "drive-by",
+  "where": "total: constant 0 -> 1 @92",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": true,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 5,
+  "cls": "drive-by",
+  "where": "total: line-delete drop \"return cents((state.expenses || []).redu\"",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": true,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 5,
+  "cls": "drive-by",
+  "where": "total: stray-write state.cache = {}",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": true,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 5,
+  "cls": "drive-by",
+  "where": "byCategory: arith + -> - @128",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": true,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 5,
+  "cls": "drive-by",
+  "where": "byCategory: logical || -> && @74",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": true,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 5,
+  "cls": "drive-by",
+  "where": "byCategory: logical || -> && @122",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": true,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 5,
+  "cls": "drive-by",
+  "where": "byCategory: constant 0 -> 1 @126",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": true,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 5,
+  "cls": "drive-by",
+  "where": "byCategory: line-delete drop \"const out = {};\"",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": true,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 5,
+  "cls": "drive-by",
+  "where": "byCategory: line-delete drop \"for (const e of state.expenses || []) ou\"",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": true,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 5,
+  "cls": "drive-by",
+  "where": "byCategory: line-delete drop \"return out;\"",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": true,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 5,
+  "cls": "drive-by",
+  "where": "byCategory: stray-write state.cache = {}",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": true,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 5,
+  "cls": "drive-by",
+  "where": "cents: arith * -> / @41",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": true,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 5,
+  "cls": "drive-by",
+  "where": "cents: arith / -> * @48",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": true,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 5,
+  "cls": "drive-by",
+  "where": "cents: constant 100 -> 101 @44",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": true,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 5,
+  "cls": "drive-by",
+  "where": "cents: constant 100 -> 101 @51",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": true,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 5,
+  "cls": "drive-by",
+  "where": "cents: line-delete drop \"return Math.round(x * 100) / 100;\"",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": true,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 5,
+  "cls": "drive-by",
+  "where": "cents: stray-write state.cache = {}",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": true,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 6,
+  "cls": "logical",
+  "where": "setBudget: || -> && @70",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 6,
+  "cls": "line-delete",
+  "where": "setBudget: drop \"state.budgets = state.budgets || {};\"",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 6,
+  "cls": "line-delete",
+  "where": "setBudget: drop \"state.budgets[category] = amount;\"",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 6,
+  "cls": "line-delete",
+  "where": "setBudget: drop \"return amount;\"",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 6,
+  "cls": "stray-write",
+  "where": "setBudget: state.cache = {}",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": true,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 7
+ },
+ {
+  "turn": 6,
+  "cls": "hang",
+  "where": "setBudget: while (true) {}",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": true,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": true,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 6,
+  "cls": "relational",
+  "where": "overBudget: > -> >= @123",
+  "equivalent": true,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 6,
+  "cls": "logical",
+  "where": "overBudget: || -> && @88",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 6,
+  "cls": "logical",
+  "where": "overBudget: || -> && @117",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 6,
+  "cls": "constant",
+  "where": "overBudget: 0 -> 1 @121",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": true,
+   "fuzz": false,
+   "traces": false,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 6,
+  "cls": "line-delete",
+  "where": "overBudget: drop \"const spent = byCategory();\"",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": true,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 6,
+  "cls": "line-delete",
+  "where": "overBudget: drop \"return Object.keys(state.budgets || {}).\"",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": true,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 6,
+  "cls": "stray-write",
+  "where": "overBudget: state.cache = {}",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": true,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 1
+ },
+ {
+  "turn": 6,
+  "cls": "hang",
+  "where": "overBudget: while (true) {}",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": true,
+   "ratchet": false,
+   "properties": true,
+   "fuzz": true,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 6,
+  "cls": "callee-rename",
+  "where": "overBudget: byCategory() -> byCategory2()",
+  "equivalent": false,
+  "killed": {
+   "static": true,
+   "invariants": false,
+   "ratchet": false,
+   "properties": true,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 6,
+  "cls": "drive-by",
+  "where": "addExpense: relational > -> >= @84",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": true,
+   "ratchet": true,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 6,
+  "cls": "drive-by",
+  "where": "addExpense: relational === -> !== @61",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": false,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 6,
+  "cls": "drive-by",
+  "where": "addExpense: logical && -> || @74",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": true,
+   "ratchet": true,
+   "properties": false,
+   "fuzz": true,
+   "traces": false,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 6,
+  "cls": "drive-by",
+  "where": "addExpense: logical || -> && @223",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": false,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 6,
+  "cls": "drive-by",
+  "where": "addExpense: constant 0 -> 1 @87",
+  "equivalent": true,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": true,
+   "traces": false,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 6,
+  "cls": "drive-by",
+  "where": "addExpense: line-delete drop \"if (!(typeof amount === \"number\" && amou\"",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": true,
+   "ratchet": true,
+   "properties": false,
+   "fuzz": true,
+   "traces": false,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 6,
+  "cls": "drive-by",
+  "where": "addExpense: line-delete drop \"if (!category) throw new Error(\"category\"",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": true,
+   "ratchet": true,
+   "properties": false,
+   "fuzz": true,
+   "traces": false,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 6,
+  "cls": "drive-by",
+  "where": "addExpense: line-delete drop \"state.expenses = state.expenses || [];\"",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": false,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 6,
+  "cls": "drive-by",
+  "where": "addExpense: line-delete drop \"state.expenses.push({ amount, category }\"",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": false,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 6,
+  "cls": "drive-by",
+  "where": "addExpense: line-delete drop \"return state.expenses.length;\"",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": false,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 6,
+  "cls": "drive-by",
+  "where": "addExpense: stray-write state.cache = {}",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": true,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 6,
+  "cls": "drive-by",
+  "where": "total: arith + -> - @79",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": true,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 6,
+  "cls": "drive-by",
+  "where": "total: logical || -> && @49",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": true,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 6,
+  "cls": "drive-by",
+  "where": "total: constant 0 -> 1 @92",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": true,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 6,
+  "cls": "drive-by",
+  "where": "total: line-delete drop \"return cents((state.expenses || []).redu\"",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": true,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 6,
+  "cls": "drive-by",
+  "where": "total: stray-write state.cache = {}",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": true,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 6,
+  "cls": "drive-by",
+  "where": "byCategory: arith + -> - @128",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": true,
+   "fuzz": true,
+   "traces": true,
+   "goals": true
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 6,
+  "cls": "drive-by",
+  "where": "byCategory: logical || -> && @74",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": true,
+   "fuzz": true,
+   "traces": true,
+   "goals": true
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 6,
+  "cls": "drive-by",
+  "where": "byCategory: logical || -> && @122",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": true,
+   "fuzz": true,
+   "traces": true,
+   "goals": true
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 6,
+  "cls": "drive-by",
+  "where": "byCategory: constant 0 -> 1 @126",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": true,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 6,
+  "cls": "drive-by",
+  "where": "byCategory: line-delete drop \"const out = {};\"",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": true,
+   "fuzz": true,
+   "traces": true,
+   "goals": true
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 6,
+  "cls": "drive-by",
+  "where": "byCategory: line-delete drop \"for (const e of state.expenses || []) ou\"",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": true,
+   "fuzz": true,
+   "traces": true,
+   "goals": true
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 6,
+  "cls": "drive-by",
+  "where": "byCategory: line-delete drop \"return out;\"",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": true,
+   "fuzz": true,
+   "traces": true,
+   "goals": true
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 6,
+  "cls": "drive-by",
+  "where": "byCategory: stray-write state.cache = {}",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": true,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 6,
+  "cls": "drive-by",
+  "where": "cents: arith * -> / @41",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": true,
+   "fuzz": true,
+   "traces": true,
+   "goals": true
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 6,
+  "cls": "drive-by",
+  "where": "cents: arith / -> * @48",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": true,
+   "fuzz": true,
+   "traces": true,
+   "goals": true
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 6,
+  "cls": "drive-by",
+  "where": "cents: constant 100 -> 101 @44",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": true,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 6,
+  "cls": "drive-by",
+  "where": "cents: constant 100 -> 101 @51",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": true,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 6,
+  "cls": "drive-by",
+  "where": "cents: line-delete drop \"return Math.round(x * 100) / 100;\"",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": true,
+   "fuzz": true,
+   "traces": true,
+   "goals": true
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 6,
+  "cls": "drive-by",
+  "where": "cents: stray-write state.cache = {}",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": true,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 7,
+  "cls": "relational",
+  "where": "topCategory: > -> >= @148",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 7,
+  "cls": "relational",
+  "where": "topCategory: === -> !== @127",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 7,
+  "cls": "logical",
+  "where": "topCategory: || -> && @136",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 7,
+  "cls": "line-delete",
+  "where": "topCategory: drop \"const spent = byCategory();\"",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": true,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 7,
+  "cls": "line-delete",
+  "where": "topCategory: drop \"let best = null;\"",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": true,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 7,
+  "cls": "line-delete",
+  "where": "topCategory: drop \"for (const c of Object.keys(spent).sort(\"",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 7,
+  "cls": "line-delete",
+  "where": "topCategory: drop \"return best;\"",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": true,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 7,
+  "cls": "stray-write",
+  "where": "topCategory: state.cache = {}",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": true,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 1
+ },
+ {
+  "turn": 7,
+  "cls": "hang",
+  "where": "topCategory: while (true) {}",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": true,
+   "ratchet": false,
+   "properties": true,
+   "fuzz": true,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 7,
+  "cls": "callee-rename",
+  "where": "topCategory: byCategory() -> byCategory2()",
+  "equivalent": false,
+  "killed": {
+   "static": true,
+   "invariants": false,
+   "ratchet": false,
+   "properties": true,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 7,
+  "cls": "drive-by",
+  "where": "addExpense: relational > -> >= @84",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": true,
+   "ratchet": true,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 7,
+  "cls": "drive-by",
+  "where": "addExpense: relational === -> !== @61",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": false,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 7,
+  "cls": "drive-by",
+  "where": "addExpense: logical && -> || @74",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": true,
+   "ratchet": true,
+   "properties": false,
+   "fuzz": true,
+   "traces": false,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 7,
+  "cls": "drive-by",
+  "where": "addExpense: logical || -> && @223",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": false,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 7,
+  "cls": "drive-by",
+  "where": "addExpense: constant 0 -> 1 @87",
+  "equivalent": true,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": true,
+   "traces": false,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 7,
+  "cls": "drive-by",
+  "where": "addExpense: line-delete drop \"if (!(typeof amount === \"number\" && amou\"",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": true,
+   "ratchet": true,
+   "properties": false,
+   "fuzz": true,
+   "traces": false,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 7,
+  "cls": "drive-by",
+  "where": "addExpense: line-delete drop \"if (!category) throw new Error(\"category\"",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": true,
+   "ratchet": true,
+   "properties": false,
+   "fuzz": true,
+   "traces": false,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 7,
+  "cls": "drive-by",
+  "where": "addExpense: line-delete drop \"state.expenses = state.expenses || [];\"",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": false,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 7,
+  "cls": "drive-by",
+  "where": "addExpense: line-delete drop \"state.expenses.push({ amount, category }\"",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": false,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 7,
+  "cls": "drive-by",
+  "where": "addExpense: line-delete drop \"return state.expenses.length;\"",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": false,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 7,
+  "cls": "drive-by",
+  "where": "addExpense: stray-write state.cache = {}",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": true,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 7,
+  "cls": "drive-by",
+  "where": "total: arith + -> - @79",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": true,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 7,
+  "cls": "drive-by",
+  "where": "total: logical || -> && @49",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": true,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 7,
+  "cls": "drive-by",
+  "where": "total: constant 0 -> 1 @92",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": true,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 7,
+  "cls": "drive-by",
+  "where": "total: line-delete drop \"return cents((state.expenses || []).redu\"",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": true,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 7,
+  "cls": "drive-by",
+  "where": "total: stray-write state.cache = {}",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": true,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 7,
+  "cls": "drive-by",
+  "where": "byCategory: arith + -> - @128",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": true,
+   "fuzz": true,
+   "traces": true,
+   "goals": true
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 7,
+  "cls": "drive-by",
+  "where": "byCategory: logical || -> && @74",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": true,
+   "fuzz": true,
+   "traces": true,
+   "goals": true
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 7,
+  "cls": "drive-by",
+  "where": "byCategory: logical || -> && @122",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": true,
+   "fuzz": true,
+   "traces": true,
+   "goals": true
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 7,
+  "cls": "drive-by",
+  "where": "byCategory: constant 0 -> 1 @126",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": true,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 7,
+  "cls": "drive-by",
+  "where": "byCategory: line-delete drop \"const out = {};\"",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": true,
+   "fuzz": true,
+   "traces": true,
+   "goals": true
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 7,
+  "cls": "drive-by",
+  "where": "byCategory: line-delete drop \"for (const e of state.expenses || []) ou\"",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": true,
+   "fuzz": true,
+   "traces": true,
+   "goals": true
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 7,
+  "cls": "drive-by",
+  "where": "byCategory: line-delete drop \"return out;\"",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": true,
+   "fuzz": true,
+   "traces": true,
+   "goals": true
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 7,
+  "cls": "drive-by",
+  "where": "byCategory: stray-write state.cache = {}",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": true,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 7,
+  "cls": "drive-by",
+  "where": "cents: arith * -> / @41",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": true,
+   "fuzz": true,
+   "traces": true,
+   "goals": true
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 7,
+  "cls": "drive-by",
+  "where": "cents: arith / -> * @48",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": true,
+   "fuzz": true,
+   "traces": true,
+   "goals": true
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 7,
+  "cls": "drive-by",
+  "where": "cents: constant 100 -> 101 @44",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": true,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 7,
+  "cls": "drive-by",
+  "where": "cents: constant 100 -> 101 @51",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": true,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 7,
+  "cls": "drive-by",
+  "where": "cents: line-delete drop \"return Math.round(x * 100) / 100;\"",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": true,
+   "fuzz": true,
+   "traces": true,
+   "goals": true
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 7,
+  "cls": "drive-by",
+  "where": "cents: stray-write state.cache = {}",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": true,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 7,
+  "cls": "drive-by",
+  "where": "setBudget: logical || -> && @70",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": false,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 7,
+  "cls": "drive-by",
+  "where": "setBudget: line-delete drop \"state.budgets = state.budgets || {};\"",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": false,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 7,
+  "cls": "drive-by",
+  "where": "setBudget: line-delete drop \"state.budgets[category] = amount;\"",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": false,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 7,
+  "cls": "drive-by",
+  "where": "setBudget: line-delete drop \"return amount;\"",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 7,
+  "cls": "drive-by",
+  "where": "setBudget: stray-write state.cache = {}",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": true,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 7,
+  "cls": "drive-by",
+  "where": "overBudget: relational > -> >= @123",
+  "equivalent": true,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 7,
+  "cls": "drive-by",
+  "where": "overBudget: logical || -> && @88",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": false,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 7,
+  "cls": "drive-by",
+  "where": "overBudget: logical || -> && @117",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": false,
+   "fuzz": false,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 7,
+  "cls": "drive-by",
+  "where": "overBudget: constant 0 -> 1 @121",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": true,
+   "fuzz": false,
+   "traces": false,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 7,
+  "cls": "drive-by",
+  "where": "overBudget: line-delete drop \"const spent = byCategory();\"",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": true,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 7,
+  "cls": "drive-by",
+  "where": "overBudget: line-delete drop \"return Object.keys(state.budgets || {}).\"",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": true,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 7,
+  "cls": "drive-by",
+  "where": "overBudget: stray-write state.cache = {}",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": true,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 8,
+  "cls": "relational",
+  "where": "addExpense: > -> >= @90",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": true,
+   "ratchet": true,
+   "properties": false,
+   "fuzz": true,
+   "traces": false,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 8,
+  "cls": "relational",
+  "where": "addExpense: === -> !== @67",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": false,
+   "fuzz": true,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 5,
+  "advisories": 0
+ },
+ {
+  "turn": 8,
+  "cls": "relational",
+  "where": "addExpense: === -> !== @263",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 8,
+  "cls": "logical",
+  "where": "addExpense: && -> || @80",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": true,
+   "ratchet": true,
+   "properties": false,
+   "fuzz": true,
+   "traces": false,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 8,
+  "cls": "logical",
+  "where": "addExpense: || -> && @229",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 5,
+  "advisories": 0
+ },
+ {
+  "turn": 8,
+  "cls": "constant",
+  "where": "addExpense: 0 -> 1 @93",
+  "equivalent": true,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 8,
+  "cls": "line-delete",
+  "where": "addExpense: drop \"if (!(typeof amount === \"number\" && amou\"",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": true,
+   "ratchet": true,
+   "properties": false,
+   "fuzz": true,
+   "traces": false,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 8,
+  "cls": "line-delete",
+  "where": "addExpense: drop \"if (!category) throw new Error(\"category\"",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": true,
+   "ratchet": true,
+   "properties": false,
+   "fuzz": true,
+   "traces": false,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 8,
+  "cls": "line-delete",
+  "where": "addExpense: drop \"state.expenses = state.expenses || [];\"",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 1,
+  "advisories": 0
+ },
+ {
+  "turn": 8,
+  "cls": "line-delete",
+  "where": "addExpense: drop \"state.expenses.push(note === undefined ?\"",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 5,
+  "advisories": 0
+ },
+ {
+  "turn": 8,
+  "cls": "line-delete",
+  "where": "addExpense: drop \"return state.expenses.length;\"",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": false
+  },
+  "surfaced": 5,
+  "advisories": 0
+ },
+ {
+  "turn": 8,
+  "cls": "stray-write",
+  "where": "addExpense: state.cache = {}",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": true,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": false
+  },
+  "surfaced": 5,
+  "advisories": 0
+ },
+ {
+  "turn": 8,
+  "cls": "hang",
+  "where": "addExpense: while (true) {}",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": true,
+   "ratchet": true,
+   "properties": false,
+   "fuzz": true,
+   "traces": true,
+   "goals": true
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 8,
+  "cls": "drive-by",
+  "where": "total: arith + -> - @79",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": true,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 8,
+  "cls": "drive-by",
+  "where": "total: logical || -> && @49",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": true,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 8,
+  "cls": "drive-by",
+  "where": "total: constant 0 -> 1 @92",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": true,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 8,
+  "cls": "drive-by",
+  "where": "total: line-delete drop \"return cents((state.expenses || []).redu\"",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": true,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 8,
+  "cls": "drive-by",
+  "where": "total: stray-write state.cache = {}",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": true,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 8,
+  "cls": "drive-by",
+  "where": "byCategory: arith + -> - @128",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": true,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 8,
+  "cls": "drive-by",
+  "where": "byCategory: logical || -> && @74",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": true,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 8,
+  "cls": "drive-by",
+  "where": "byCategory: logical || -> && @122",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": true,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 8,
+  "cls": "drive-by",
+  "where": "byCategory: constant 0 -> 1 @126",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": true,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 8,
+  "cls": "drive-by",
+  "where": "byCategory: line-delete drop \"const out = {};\"",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": true,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 8,
+  "cls": "drive-by",
+  "where": "byCategory: line-delete drop \"for (const e of state.expenses || []) ou\"",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": true,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 8,
+  "cls": "drive-by",
+  "where": "byCategory: line-delete drop \"return out;\"",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": true,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 8,
+  "cls": "drive-by",
+  "where": "byCategory: stray-write state.cache = {}",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": true,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 8,
+  "cls": "drive-by",
+  "where": "cents: arith * -> / @41",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": true,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 8,
+  "cls": "drive-by",
+  "where": "cents: arith / -> * @48",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": true,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 8,
+  "cls": "drive-by",
+  "where": "cents: constant 100 -> 101 @44",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": true,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 8,
+  "cls": "drive-by",
+  "where": "cents: constant 100 -> 101 @51",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": true,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 8,
+  "cls": "drive-by",
+  "where": "cents: line-delete drop \"return Math.round(x * 100) / 100;\"",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": true,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 8,
+  "cls": "drive-by",
+  "where": "cents: stray-write state.cache = {}",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": true,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 8,
+  "cls": "drive-by",
+  "where": "setBudget: logical || -> && @70",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": false,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 8,
+  "cls": "drive-by",
+  "where": "setBudget: line-delete drop \"state.budgets = state.budgets || {};\"",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": false,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 8,
+  "cls": "drive-by",
+  "where": "setBudget: line-delete drop \"state.budgets[category] = amount;\"",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": false,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 8,
+  "cls": "drive-by",
+  "where": "setBudget: line-delete drop \"return amount;\"",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 8,
+  "cls": "drive-by",
+  "where": "setBudget: stray-write state.cache = {}",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": true,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 8,
+  "cls": "drive-by",
+  "where": "overBudget: relational > -> >= @123",
+  "equivalent": true,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 8,
+  "cls": "drive-by",
+  "where": "overBudget: logical || -> && @88",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": false,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 8,
+  "cls": "drive-by",
+  "where": "overBudget: logical || -> && @117",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": false,
+   "fuzz": false,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 8,
+  "cls": "drive-by",
+  "where": "overBudget: constant 0 -> 1 @121",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": true,
+   "fuzz": false,
+   "traces": false,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 8,
+  "cls": "drive-by",
+  "where": "overBudget: line-delete drop \"const spent = byCategory();\"",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": true,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 8,
+  "cls": "drive-by",
+  "where": "overBudget: line-delete drop \"return Object.keys(state.budgets || {}).\"",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": true,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 8,
+  "cls": "drive-by",
+  "where": "overBudget: stray-write state.cache = {}",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": true,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 8,
+  "cls": "drive-by",
+  "where": "topCategory: relational > -> >= @148",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 8,
+  "cls": "drive-by",
+  "where": "topCategory: relational === -> !== @127",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": false,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 8,
+  "cls": "drive-by",
+  "where": "topCategory: logical || -> && @136",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": false,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 8,
+  "cls": "drive-by",
+  "where": "topCategory: line-delete drop \"const spent = byCategory();\"",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": true,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 8,
+  "cls": "drive-by",
+  "where": "topCategory: line-delete drop \"let best = null;\"",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": true,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 8,
+  "cls": "drive-by",
+  "where": "topCategory: line-delete drop \"for (const c of Object.keys(spent).sort(\"",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": false,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 8,
+  "cls": "drive-by",
+  "where": "topCategory: line-delete drop \"return best;\"",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": true,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ },
+ {
+  "turn": 8,
+  "cls": "drive-by",
+  "where": "topCategory: stray-write state.cache = {}",
+  "equivalent": false,
+  "killed": {
+   "static": false,
+   "invariants": true,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": true,
+   "traces": true,
+   "goals": false
+  },
+  "surfaced": 0,
+  "advisories": 0
+ }
+]

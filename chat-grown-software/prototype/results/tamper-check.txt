@@ -1,0 +1,3 @@
+tampering at top level -> rejected (failed: static, invariants, ratchet, properties, fuzz, traces, goals)
+tampering inside a function body -> accepted; Array.prototype.every still native: true
+then writing a negative expense -> {"ok":false,"error":"undone: expenses-shape is false"}
