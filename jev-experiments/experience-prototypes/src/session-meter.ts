@@ -1,6 +1,6 @@
 /**
- * What this tab has spent on the visitor's key: every request that reached /api/evaluate, the
- * input tokens the gateway reported, and their cost at TypeSafe's list price. It lives in memory
+ * What this tab has spent on the visitor's key: every request that reached /api/evaluate and
+ * every Jev call a streamed composition made on the server, the input tokens the gateway reported, and their cost at TypeSafe's list price. It lives in memory
  * and resets on reload, like the key. Recorded answers and in-browser models never count.
  */
 import { useSyncExternalStore } from "react";
@@ -41,11 +41,14 @@ export function addCall(u: SessionUsage, ok: boolean, body?: unknown): SessionUs
 let usage: SessionUsage = EMPTY_USAGE;
 const listeners = new Set<() => void>();
 
-/** Called by api.ts for every /api/evaluate response. */
+/** Called by live-ask.ts for every /api/evaluate response and every Jev call a composition reports. */
 export function recordCall(ok: boolean, body?: unknown) {
   usage = addCall(usage, ok, body);
   for (const l of listeners) l();
 }
+
+/** This tab's usage so far, outside React. */
+export const sessionUsage = () => usage;
 
 export function resetSession() {
   usage = EMPTY_USAGE;

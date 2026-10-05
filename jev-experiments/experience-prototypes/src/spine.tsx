@@ -7,10 +7,10 @@
 import { useEffect, useRef, useState } from "react";
 import { PRESSURES, requestFor, rightAfter, sentencesFor, sequenceId, type Item, type Push } from "../../packages/arena/spine/model";
 import type { SpineRecorded } from "../../packages/arena/spine/build";
-import { fetchJson, getApiKey, NO_KEY_MESSAGE, percent as pct, run } from "./api";
-import { describeFailure, type Failure } from "./live-failure";
+import { fetchJson, percent as pct } from "./api";
+import { useLiveAsk } from "./live-ask";
 import { Receipt, USD_PER_INPUT_TOKEN } from "./receipt";
-import { KeyTag, LiveFailure, ModeTag, openSettings } from "./trust";
+import { KeyTag, LiveFailure, ModeTag } from "./trust";
 import "./spine.css";
 
 type Data = { items: Item[]; pushes: Push[]; labels: Record<Push, string>; recorded: Record<string, SpineRecorded> };
@@ -100,8 +100,7 @@ export function Spine() {
   const [index, setIndex] = useState(0);
   const [steps, setSteps] = useState<Step[]>([]);
   const [own, setOwn] = useState("");
-  const [status, setStatus] = useState<"idle" | "asking" | "no-key" | "error">("idle");
-  const [error, setError] = useState<Failure | null>(null);
+  const live = useLiveAsk();
   const newest = useRef<HTMLLIElement>(null);
 
   // A push's button disappears once used, so move focus to the step it added.
@@ -137,8 +136,7 @@ export function Spine() {
     setIndex(i);
     setSteps([]);
     setOwn("");
-    setStatus("idle");
-    setError(null);
+    live.reset();
   };
 
   const push = (p: Push) => {
@@ -148,7 +146,7 @@ export function Spine() {
     if (!r) return;
 
     setSteps([...steps, { push: p, sentence: sentencesFor(item, next).at(-1) ?? "", answer: { ...r, live: false } }]);
-    setStatus("idle");
+    live.reset();
   };
 
   const askOwn = async () => {
@@ -156,42 +154,28 @@ export function Spine() {
 
     if (!sentence) return;
 
-    setError(null);
+    const r = await live.ask(requestWith(item, pushes, sentence));
 
-    if (!getApiKey()) {
-      setStatus("no-key");
+    if (!r) return;
 
-      return;
-    }
+    const tokens = r.usage?.input_tokens ?? null;
 
-    setStatus("asking");
-
-    try {
-      const req = requestWith(item, pushes, sentence);
-      const r = await run(req.state, req.questions);
-      const tokens = r.usage?.input_tokens ?? null;
-
-      setSteps([
-        ...steps,
-        {
-          push: "own",
-          sentence,
-          answer: {
-            pYes: Number(r.answers?.q?.value),
-            latencyMs: r.latency_ms ?? null,
-            costUsd: tokens ? tokens * USD_PER_INPUT_TOKEN : null,
-            at: new Date().toISOString(),
-            servedBy: r.served_by ?? null,
-            live: true,
-            response: r,
-          },
+    setSteps([
+      ...steps,
+      {
+        push: "own",
+        sentence,
+        answer: {
+          pYes: Number(r.answers?.q?.value),
+          latencyMs: r.latency_ms ?? null,
+          costUsd: tokens ? tokens * USD_PER_INPUT_TOKEN : null,
+          at: new Date().toISOString(),
+          servedBy: r.served_by ?? null,
+          live: true,
+          response: r,
         },
-      ]);
-      setStatus("idle");
-    } catch (e) {
-      setStatus("error");
-      setError(describeFailure(e, NO_KEY_MESSAGE));
-    }
+      },
+    ]);
   };
 
   // The right answer before each step, to judge what the step did. Your own sentence only ever comes last.
@@ -310,23 +294,22 @@ export function Spine() {
               <label htmlFor="sp-own">Or push with your own sentence (it ends the round)</label>
               <div className="sp-row">
                 <input id="sp-own" type="text" value={own} maxLength={MAX_OWN} placeholder="Say something persuasive…" autoComplete="off" onChange={(e) => setOwn(e.target.value)} />
-                <button type="submit" className="sp-go" disabled={status === "asking" || !own.trim()}>
-                  {status === "asking" ? "Asking…" : "Ask"}
+                <button type="submit" className="sp-go" disabled={live.busy || !own.trim()}>
+                  {live.busy ? "Asking…" : "Ask"}
                 </button>
               </div>
               <KeyTag />
             </form>
-            {status === "no-key" && (
-              <p className="sp-note" role="status">
-                Your own sentences need your own gateway key.{" "}
-                <button type="button" className="sp-link" onClick={openSettings}>
-                  Add a key
-                </button>{" "}
-                to ask Jev live (about $0.00001 a go, billed to your key). The eight pushes above are recorded and free.
-              </p>
-            )}
-            {status === "error" && error && (
-              <LiveFailure failure={error} onRetry={() => void askOwn()} fallback="The needle stays where your last push left it. The recorded pushes still work." />
+            {live.failure && (
+              <LiveFailure
+                failure={live.failure}
+                onRetry={() => void askOwn()}
+                fallback={
+                  live.failure.kind === "no-key"
+                    ? "Your own sentences are asked live (about $0.00001 a go, billed to your key). The eight pushes above are recorded and free."
+                    : "The needle stays where your last push left it. The recorded pushes still work."
+                }
+              />
             )}
           </div>
         )}

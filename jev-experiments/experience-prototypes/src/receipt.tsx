@@ -8,17 +8,17 @@ import { createContext, useContext } from "react";
 import "./receipt.css";
 import { JEV_USD_PER_INPUT_TOKEN } from "../../packages/arena/src/jev-price";
 import { requestFor } from "./api";
+import { MODE_WORDS, type Mode } from "./mode";
 import { BuildThis } from "./build-this";
 import { asJevRequest, type CliStudy } from "./build-this-snippets";
 
 /** TypeSafe's list price for Jev, per input token (see packages/arena/src/jev-price.ts). */
 export const USD_PER_INPUT_TOKEN = JEV_USD_PER_INPUT_TOKEN;
 
-/** "recorded" replays a saved answer, "live" was just asked with the visitor's key, "browser" ran on this device. */
-export type ReceiptMode = "recorded" | "live" | "browser";
 
 export type ReceiptData = {
-  mode: ReceiptMode;
+  /** recorded replays a saved answer, live was just asked with the visitor's key, browser ran on this device. */
+  mode: Mode;
   ms?: number | null;
   questions?: number | null;
   inputTokens?: number | null;
@@ -63,8 +63,6 @@ export function formatDate(at: string) {
   return `${Number(m[3])} ${MONTHS[Number(m[2]) - 1]} ${m[1]}`;
 }
 
-const MODE_LABEL: Record<ReceiptMode, string> = { recorded: "recorded", live: "live", browser: "in your browser" };
-
 /** The receipt's parts, in reading order. */
 export function receiptParts(d: ReceiptData): string[] {
   const parts: string[] = [];
@@ -84,7 +82,7 @@ export function receiptParts(d: ReceiptData): string[] {
 
   if (cost !== null && Number.isFinite(cost)) parts.push(formatCost(cost));
 
-  parts.push(MODE_LABEL[d.mode]);
+  parts.push(MODE_WORDS[d.mode].receipt);
 
   const date = d.at ? formatDate(d.at) : null;
 

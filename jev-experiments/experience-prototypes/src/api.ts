@@ -54,6 +54,10 @@ export function requireKey() {
  */
 const sentRequests = new WeakMap<object, { state: unknown; questions: Record<string, unknown> }>();
 export const requestFor = (body: unknown) => (body && typeof body === "object" ? sentRequests.get(body) : undefined);
+/** Called by live-ask.ts for every answered request. */
+export const rememberRequest = (body: unknown, request: { state: unknown; questions: Record<string, unknown> }) => {
+  if (body && typeof body === "object") sentRequests.set(body, request);
+};
 
 export async function run(
   state: unknown,

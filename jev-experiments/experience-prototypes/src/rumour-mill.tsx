@@ -34,8 +34,7 @@ import { placeIn } from "../../live-worlds/rumour/places";
 import { ARCHETYPES, createTown, PLACES, VIEW, type PlaceId, type Town } from "../../live-worlds/rumour/town";
 import vectorsDoc from "../../live-worlds/rumour/vectors.json";
 import recordedRaw from "../../live-worlds/rumour/jev-scam.jsonl?raw";
-import { getApiKey, NO_KEY_MESSAGE, run } from "./api";
-import { describeFailure, type Failure } from "./live-failure";
+import { useLiveAsk } from "./live-ask";
 import { KeyTag, LiveFailure, ModeTag } from "./trust";
 import "./rumour-mill.css";
 import { JEV_USD_PER_INPUT_TOKEN as USD_PER_TOKEN } from "../../packages/arena/src/jev-price";
@@ -223,7 +222,8 @@ export function RumourMill() {
   const inFlight = useRef(0);
   /** No Jev requests before this time (performance.now()); Infinity after a failure retrying can't fix. */
   const pausedUntil = useRef(0);
-  const [failure, setFailure] = useState<Failure | null>(null);
+  // Up to three batches in flight at once; a new run aborts the last run's.
+  const jev = useLiveAsk();
 
   const preset = PRESETS.find((p) => p.id === presetId);
   const isPreset = !!preset && text === preset.text;
@@ -259,11 +259,19 @@ export function RumourMill() {
 
     setSentReq(req);
 
-    run(req.state, req.questions)
-      .then((r) => {
-        if (runId.current !== id) return;
+    void jev
+      .ask(req, {
+        whenBusy: "parallel",
+        onFailure: (f) => {
+          for (const p of batch) requested.current[kind].delete(p.key);
 
-        setFailure(null);
+          // Hold every request until it could work: the server's delay if retrying helps, else until
+          // the visitor acts. Without this, each frame re-asked and a bad key became a request storm.
+          pausedUntil.current = f.retryable ? performance.now() + (f.retryAfterMs ?? 5000) : Infinity;
+        },
+      })
+      .then((r) => {
+        if (!r || runId.current !== id) return;
 
         for (const [i, p] of batch.entries()) {
           const d = toDist(r.answers?.[`p${i}`]?.probabilities);
@@ -273,18 +281,6 @@ export function RumourMill() {
         }
 
         setStats((s) => ({ ...s, calls: s.calls + 1, ms: [...s.ms, r.latency_ms ?? 0], tokens: s.tokens + (r.usage?.input_tokens ?? 0) }));
-      })
-      .catch((e: unknown) => {
-        if (runId.current !== id) return;
-
-        for (const p of batch) requested.current[kind].delete(p.key);
-
-        // Hold every request until it could work: the server's delay if retrying helps, else until
-        // the visitor acts. Without this, each frame re-asked and a bad key became a request storm.
-        const f = describeFailure(e, NO_KEY_MESSAGE);
-
-        pausedUntil.current = f.retryable ? performance.now() + (f.retryAfterMs ?? 5000) : Infinity;
-        setFailure(f);
       })
       .finally(() => {
         inFlight.current--;
@@ -323,6 +319,9 @@ export function RumourMill() {
     const id = ++runId.current;
     const w = createWorld(town, 1);
 
+    // The last run's batches are no use to this one.
+    jev.cancel();
+
     worldRef.current = w;
     requested.current = { rumour: new Set(), counter: new Set() };
     setDone(false);
@@ -332,11 +331,7 @@ export function RumourMill() {
     setSentReq(null);
     setNote("");
 
-    if (m === "jev" && !getApiKey()) {
-      setNote("Add your gateway key in Settings to run Jev live. The free model needs no key.");
-
-      return;
-    }
+    if (m === "jev" && !jev.hasKey()) return;
 
     setBusy(true);
 
@@ -717,13 +712,17 @@ export function RumourMill() {
             </button>
           </form>
 
-          {failure && model === "jev" ? (
+          {jev.failure && model === "jev" ? (
             <LiveFailure
-              failure={failure}
-              fallback="Residents still waiting on Jev stay 'thinking'; everyone else keeps what they decided. The free in-browser model can keep the rumour moving."
+              failure={jev.failure}
+              fallback={
+                jev.failure.kind === "no-key"
+                  ? "The free in-browser model needs no key."
+                  : "Residents still waiting on Jev stay 'thinking'; everyone else keeps what they decided. The free in-browser model can keep the rumour moving."
+              }
               onRetry={() => {
                 pausedUntil.current = 0;
-                setFailure(null);
+                jev.reset();
               }}
               alt={{ label: "Use the free model", onClick: () => setModel("free") }}
             />

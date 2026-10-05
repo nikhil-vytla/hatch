@@ -12,8 +12,8 @@ import { calm, START, type Calm } from "../../../packages/arena/src/one-box/calm
 import { keyword } from "../../../packages/arena/src/one-box/keyword";
 import { QUESTIONS, type Reading } from "../../../packages/arena/src/one-box/questions";
 import { normalizeKey, TYPING } from "../../../packages/arena/src/one-box/replay";
-import { NO_KEY_MESSAGE, run, useHasKey } from "../api";
-import { describeFailure, type Failure } from "../live-failure";
+import { useHasKey } from "../api";
+import { useLiveAsk } from "../live-ask";
 import { BuildThis } from "../build-this";
 import { fromLive, Receipt, type ReceiptData } from "../receipt";
 import { LiveFailure, ModeTag } from "../trust";
@@ -28,8 +28,6 @@ const CONTESTANT: Record<LaneId, string> = {
   keyword: "code.keyword",
 };
 
-const NO_KEY_NOTE = "Connect your AI Gateway key in Settings to run Jev live.";
-
 /** Live Jev waits for a pause this long before asking. */
 const PAUSE_MS = 400;
 
@@ -41,8 +39,6 @@ type Lane = {
   note: string;
   /** The last live answer's receipt (Jev only). */
   receipt?: ReceiptData;
-  /** Why the last live request failed, until the next one succeeds. */
-  failure?: Failure;
 };
 
 const fresh = (note = ""): Lane => ({ calm: START, lastMs: null, requests: 0, note });
@@ -61,16 +57,16 @@ export function TryBox({ model: m }: { model: CardModel }) {
   const hasKey = useHasKey();
 
   const [lanes, setLanes] = useState<Record<LaneId, Lane>>({
-    jev: fresh(hasKey ? "" : NO_KEY_NOTE),
+    jev: fresh(),
     keyword: fresh(),
   });
 
   const timers = useRef(new Map<LaneId, ReturnType<typeof setTimeout>>());
 
-  const jev = useRef<{ controller: AbortController | null; queued: string | null }>({
-    controller: null,
-    queued: null,
-  });
+  // One Jev request in flight; text typed meanwhile is asked after it, newest only.
+  const jev = useLiveAsk();
+  /** The text the last Jev request was for, normalized. */
+  const asked = useRef<string | null>(null);
 
   const typer = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -83,51 +79,38 @@ export function TryBox({ model: m }: { model: CardModel }) {
         requests: l[id].requests + 1,
         note,
         receipt: receipt ?? l[id].receipt,
-        failure: undefined,
       },
     }));
 
-  /** Asks Jev about `ask`; under "latest", asks again for the newest text when it lands. */
-  const askJev = (ask: string, started: number) => {
-    const state = jev.current;
+  /** Asks Jev about `ask`, or, while a request is in flight, asks for the newest text when it lands. */
+  const askJev = (ask: string) => {
+    const behind = jev.live.status.kind === "asking";
 
-    if (state.controller) {
-      state.queued = ask;
+    void jev
+      .ask(
+        async (j) => {
+          // Text the last request already covered isn't sent again.
+          if (behind && normalizeKey(ask) === asked.current) return null;
+          asked.current = normalizeKey(ask);
+          const started = performance.now();
+          const body = await j.evaluate({ state: { text: ask }, questions: QUESTIONS }, { deadlineMs: 4000, maxAttempts: 1 });
 
-      return;
-    }
-
-    const controller = new AbortController();
-
-    state.controller = controller;
-    state.queued = null;
-
-    run({ text: ask }, QUESTIONS, controller.signal, { deadlineMs: 4000, maxAttempts: 1 })
-      .then((body: { answers?: unknown }) => {
-        if (controller.signal.aborted) return;
-        const { reading, dropped } = toReading(answersSchema.parse(body.answers));
+          return { body, ms: Math.round(performance.now() - started) };
+        },
+        { whenBusy: "queue" },
+      )
+      .then((r) => {
+        if (!r) return;
+        const { reading, dropped } = toReading(answersSchema.parse(r.body.answers));
 
         apply(
           "jev",
           reading,
           ask,
-          Math.round(performance.now() - started),
+          r.ms,
           dropped.length ? `The gateway dropped ${dropped.join(" and ")}.` : "",
-          fromLive(body, { state: { text: ask }, questions: QUESTIONS }),
+          fromLive(r.body, { state: { text: ask }, questions: QUESTIONS }),
         );
-      })
-      .catch((error: Error) => {
-        if (controller.signal.aborted) return;
-        // The box keeps its last card; the lane says why it didn't change.
-        setLanes((l) => ({ ...l, jev: { ...l.jev, note: "", failure: describeFailure(error, NO_KEY_MESSAGE) } }));
-      })
-      .finally(() => {
-        if (state.controller !== controller) return;
-        state.controller = null;
-        const next = state.queued;
-
-        if (next !== null && normalizeKey(next) !== normalizeKey(ask))
-          askJev(next, performance.now());
       });
   };
 
@@ -141,9 +124,8 @@ export function TryBox({ model: m }: { model: CardModel }) {
 
       if (blank) {
         if (id === "jev") {
-          jev.current.controller?.abort();
-          jev.current.controller = null;
-          jev.current.queued = null;
+          jev.cancel();
+          asked.current = null;
         }
 
         setLanes((l) => ({ ...l, [id]: { ...l[id], calm: calm(l[id].calm, keyword(""), text) } }));
@@ -155,7 +137,7 @@ export function TryBox({ model: m }: { model: CardModel }) {
         setTimeout(
           () => {
             if (id === "jev") {
-              if (hasKey) askJev(text, performance.now());
+              askJev(text);
 
               return;
             }
@@ -173,7 +155,6 @@ export function TryBox({ model: m }: { model: CardModel }) {
   useEffect(
     () => () => {
       for (const t of timers.current.values()) clearTimeout(t);
-      jev.current.controller?.abort();
 
       if (typer.current) clearInterval(typer.current);
     },
@@ -252,13 +233,12 @@ export function TryBox({ model: m }: { model: CardModel }) {
                 <Shown state={fromCalm(lane.calm.shown)} />
               </div>
               <p className="ob-lane-note muted small">
-                {(id === "jev" && hasKey && lane.note === NO_KEY_NOTE ? "" : lane.note) ||
-                  (lane.requests ? `${lane.requests} answers` : "")}
+                {lane.note || (lane.requests ? `${lane.requests} answers` : "")}
               </p>
-              {id === "jev" && lane.failure ? (
+              {id === "jev" && jev.failure ? (
                 <LiveFailure
-                  failure={lane.failure}
-                  onRetry={() => askJev(text, performance.now())}
+                  failure={jev.failure}
+                  onRetry={() => askJev(text)}
                   fallback={lane.requests ? "The last answer stays on screen." : "The keyword lane still answers without a key."}
                 />
               ) : id === "jev" && lane.receipt ? (

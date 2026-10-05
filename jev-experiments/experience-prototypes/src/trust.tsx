@@ -4,22 +4,14 @@
  */
 import { useHasKey } from "./api";
 import type { Failure } from "./live-failure";
+import { tagText, type TagMode } from "./mode";
 import { formatCost } from "./receipt";
 import { LIST_PRICE, resetSession, useSessionUsage } from "./session-meter";
 import "./trust.css";
 
-export type Mode = "recorded" | "live" | "browser" | "needs-key";
-
-const MODE_TEXT: Record<Mode, string> = {
-  recorded: "recorded · free",
-  live: "live · your key",
-  browser: "in your browser · free",
-  "needs-key": "live · needs your key",
-};
-
 /** A small tag on, or right beside, a control. */
-export function ModeTag({ mode }: { mode: Mode }) {
-  return <small className={`mode-tag mode-${mode}`}>{MODE_TEXT[mode]}</small>;
+export function ModeTag({ mode }: { mode: TagMode }) {
+  return <small className={`mode-tag mode-${mode}`}>{tagText(mode)}</small>;
 }
 
 /** The tag for a control that calls Jev: "live · your key", or "needs your key" until one is connected. */

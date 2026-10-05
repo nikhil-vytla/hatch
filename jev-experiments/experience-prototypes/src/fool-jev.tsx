@@ -12,10 +12,10 @@ import {
   verdict,
   type Puzzle,
 } from "../../packages/arena/src/fool/model";
-import { getApiKey, NO_KEY_MESSAGE, run, percent as pct, fetchJson } from "./api";
+import { percent as pct, fetchJson } from "./api";
+import { useLiveAsk } from "./live-ask";
 import { Receipt, USD_PER_INPUT_TOKEN } from "./receipt";
-import { describeFailure, type Failure } from "./live-failure";
-import { KeyTag, LiveFailure, ModeTag, openSettings } from "./trust";
+import { KeyTag, LiveFailure, ModeTag } from "./trust";
 import "./fool-jev.css";
 
 type Recorded = {
@@ -92,8 +92,7 @@ export function FoolJev() {
   const [index, setIndex] = useState(0);
   const [text, setText] = useState("");
   const [result, setResult] = useState<Result | null>(null);
-  const [status, setStatus] = useState<"idle" | "asking" | "unheard" | "error">("idle");
-  const [error, setError] = useState<Failure | null>(null);
+  const live = useLiveAsk();
   const [solved, setSolved] = useState<string[]>(readSolved);
   const [copied, setCopied] = useState(false);
 
@@ -139,7 +138,7 @@ export function FoolJev() {
     setIndex(i);
     setText("");
     setResult(null);
-    setStatus("idle");
+    live.reset();
     setCopied(false);
   };
 
@@ -154,11 +153,10 @@ export function FoolJev() {
     const sentence = cleanSentence(raw);
 
     setCopied(false);
-    setError(null);
 
     if (!sentence) {
       setResult(null);
-      setStatus("idle");
+      live.reset();
 
       return;
     }
@@ -166,46 +164,38 @@ export function FoolJev() {
     const key = heard.get(normal(sentence));
     const settle = (r: Result) => {
       setResult(r);
-      setStatus("idle");
 
       if (verdict(puzzle, r.pYes, base.pYes, r.pChanges).kind === "flipped") markSolved(puzzle.id);
     };
 
-    if (key !== undefined) return settle({ ...data.recorded[puzzle.id][key], sentence: key, live: false });
+    if (key !== undefined) {
+      live.reset();
 
-    if (!getApiKey()) {
-      setResult(null);
-      setStatus("unheard");
-
-      return;
+      return settle({ ...data.recorded[puzzle.id][key], sentence: key, live: false });
     }
 
-    setStatus("asking");
+    // Until it lands (or if it fails), show the recorded answer to the plain question, never a stale meter.
+    setResult(null);
 
-    try {
-      const a = answerRequest(puzzle, sentence);
-      const r = refereeRequest(puzzle, sentence);
-      const [answer, referee] = await Promise.all([run(a.state, a.questions), run(r.state, r.questions)]);
-      const tokens = (answer.usage?.input_tokens ?? 0) + (referee.usage?.input_tokens ?? 0);
+    const both = await live.ask((jev) => Promise.all([jev.evaluate(answerRequest(puzzle, sentence)), jev.evaluate(refereeRequest(puzzle, sentence))]));
 
-      settle({
-        pYes: Number(answer.answers?.q?.value),
-        pChanges: Number(referee.answers?.changes?.value),
-        latencyMs: answer.latency_ms ?? null,
-        costUsd: tokens ? tokens * USD_PER_INPUT_TOKEN : null,
-        at: new Date().toISOString(),
-        servedBy: answer.served_by ?? null,
-        answers: answer,
-        refereeAnswers: referee,
-        sentence,
-        live: true,
-      });
-    } catch (e) {
-      // Fall back to the recorded answer to the plain question, never a stale or empty meter.
-      setResult(null);
-      setStatus("error");
-      setError(describeFailure(e, NO_KEY_MESSAGE));
-    }
+    if (!both) return;
+
+    const [answer, referee] = both;
+    const tokens = (answer.usage?.input_tokens ?? 0) + (referee.usage?.input_tokens ?? 0);
+
+    settle({
+      pYes: Number(answer.answers?.q?.value),
+      pChanges: Number(referee.answers?.changes?.value),
+      latencyMs: answer.latency_ms ?? null,
+      costUsd: tokens ? tokens * USD_PER_INPUT_TOKEN : null,
+      at: new Date().toISOString(),
+      servedBy: answer.served_by ?? null,
+      answers: answer,
+      refereeAnswers: referee,
+      sentence,
+      live: true,
+    });
   };
 
   const before = puzzle.truth ? base.pYes : 1 - base.pYes;
@@ -231,7 +221,7 @@ export function FoolJev() {
         <div className="fj-top">
           <Face mood={mood} />
           <p className="fj-bubble" aria-live="polite">
-            {status === "asking" ? "Thinking…" : bubble}
+            {live.busy ? "Thinking…" : bubble}
           </p>
         </div>
 
@@ -300,7 +290,7 @@ export function FoolJev() {
               autoComplete="off"
               onChange={(e) => setText(e.target.value)}
             />
-            <button type="submit" className="fj-go" disabled={status === "asking"}>
+            <button type="submit" className="fj-go" disabled={live.busy}>
               Ask
             </button>
           </div>
@@ -325,20 +315,15 @@ export function FoolJev() {
           ))}
         </div>
 
-        {status === "unheard" && (
-          <p className="fj-note" role="status">
-            Jev hasn't heard that one. Pick a line it has heard below, or{" "}
-            <button type="button" className="fj-link" onClick={openSettings}>
-              add your own gateway key
-            </button>{" "}
-            to ask it live (about $0.00003 a go, billed to your key).
-          </p>
-        )}
-        {status === "error" && error && (
+        {live.failure && (
           <LiveFailure
-            failure={error}
+            failure={live.failure}
             onRetry={() => void ask(text)}
-            fallback="Showing Jev's recorded answer to the plain question meanwhile. Recorded lines still work."
+            fallback={
+              live.failure.kind === "no-key"
+                ? "Jev hasn't heard that one, so it would be asked live (about $0.00003 a go, billed to your key). The lines below are recorded and free."
+                : "Showing Jev's recorded answer to the plain question meanwhile. Recorded lines still work."
+            }
           />
         )}
 

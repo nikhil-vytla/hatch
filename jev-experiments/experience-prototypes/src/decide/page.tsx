@@ -16,8 +16,8 @@ import {
 } from "../../../packages/arena/src/decide/data";
 import type { Dist, WireAnswer } from "../../../packages/arena/src/decide/combine";
 import { combine, wireAnswerSchema } from "../../../packages/arena/src/decide/combine";
-import { EvaluationError, getApiKey, NO_KEY_MESSAGE, run as runJev, percent as pct } from "../api";
-import { describeFailure, type Failure } from "../live-failure";
+import { percent as pct } from "../api";
+import { useLiveAsk } from "../live-ask";
 import { fromLive, Receipt, type ReceiptData } from "../receipt";
 import { KeyTag, LiveFailure, ModeTag } from "../trust";
 import { z } from "zod";
@@ -422,7 +422,7 @@ function Reveal({ d, data, mine }: { d: DecideDecision; data: DecideData; mine: 
 
 const answersSchema = z.object({ answers: z.record(z.string(), wireAnswerSchema) });
 
-type Asked = { status: "idle" | "running" | "done" | "error"; dist?: Dist; failure?: Failure; receipt?: ReceiptData };
+type Asked = { dist?: Dist; receipt?: ReceiptData };
 
 /**
  * The visitor writes their own wording of the plain question. Jev runs it live with the
@@ -433,7 +433,8 @@ function YourWording({ d, data }: { d: DecideDecision; data: DecideData }) {
   const base = neutral.request.questions.call;
   const [text, setText] = useState(base?.instructions ?? d.ask);
   const [withContext, setWithContext] = useState(false);
-  const [jev, setJev] = useState<Asked>({ status: "idle" });
+  const [jev, setJev] = useState<Asked>({});
+  const jevAsk = useLiveAsk();
   const { live, run } = useLiveNli(d);
 
   if (!base || base.type !== "choice") return null;
@@ -447,23 +448,15 @@ function YourWording({ d, data }: { d: DecideDecision; data: DecideData }) {
     combine({ rule: "choice", question: "call" }, d.options, answers);
 
   const askJev = async () => {
-    // The key lives in Settings and can arrive after this panel rendered, so check it now.
-    if (!getApiKey()) {
-      setJev({ status: "error", failure: describeFailure(new EvaluationError(NO_KEY_MESSAGE, 401, null), NO_KEY_MESSAGE) });
+    setJev({});
 
-      return;
-    }
+    const r = await jevAsk.ask(async (j) => {
+      const raw: unknown = await j.evaluate(request);
 
-    setJev({ status: "running" });
+      return { dist: toDist(answersSchema.parse(raw).answers), receipt: fromLive(raw, request) };
+    });
 
-    try {
-      const raw: unknown = await runJev(request.state, request.questions);
-      const body = answersSchema.parse(raw);
-
-      setJev({ status: "done", dist: toDist(body.answers), receipt: fromLive(raw, request) });
-    } catch (e) {
-      setJev({ status: "error", failure: describeFailure(e, NO_KEY_MESSAGE) });
-    }
+    if (r) setJev(r);
   };
 
   const nli = live.answers.custom;
@@ -493,10 +486,10 @@ function YourWording({ d, data }: { d: DecideDecision; data: DecideData }) {
         <button
           type="button"
           className="dc-next"
-          disabled={!text.trim() || jev.status === "running"}
+          disabled={!text.trim() || jevAsk.busy}
           onClick={() => void askJev()}
         >
-          {jev.status === "running" ? "Asking Jev…" : "Ask Jev with your key"}
+          {jevAsk.busy ? "Asking Jev…" : "Ask Jev with your key"}
           <KeyTag />
         </button>
         <button
@@ -512,9 +505,9 @@ function YourWording({ d, data }: { d: DecideDecision; data: DecideData }) {
         Jev runs with the AI Gateway key you connect in Settings. It stays in this tab, and the
         request is billed to you, not the site.
       </p>
-      {jev.status === "error" && jev.failure && (
+      {jevAsk.failure && (
         <LiveFailure
-          failure={jev.failure}
+          failure={jevAsk.failure}
           onRetry={() => void askJev()}
           fallback="The recorded answers above still stand, and MobileBERT can try your wording in your browser."
         />

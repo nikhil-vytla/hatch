@@ -31,9 +31,9 @@ import { decideAll, POLICY_NAME, WEIGHT_COUNT } from "../../live-worlds/ocean/po
 import evolved from "../../live-worlds/ocean/policy.json";
 import { parseRecording, RACE, replayer, type Recording } from "../../live-worlds/ocean/replay";
 import type { Decision } from "../../live-worlds/ocean/engine";
-import { getApiKey, NO_KEY_MESSAGE, run, percent as pct } from "./api";
+import { percent as pct } from "./api";
+import { useLiveAsk } from "./live-ask";
 import { BuildThis } from "./build-this";
-import { describeFailure, type Failure } from "./live-failure";
 import { LiveFailure } from "./trust";
 import "./ocean-reef.css";
 
@@ -74,15 +74,6 @@ const ACTION_WORDS: Record<Action, string> = {
 
 /** Jev's cost per minute, from the recorded run's measured batches. */
 const JEV_USD_PER_MINUTE = 0.04;
-
-function openSettings() {
-  const details = document.querySelector<HTMLDetailsElement>("details:has(> summary[aria-label='Settings'])");
-
-  if (!details) return;
-
-  details.open = true;
-  details.querySelector("summary")?.focus();
-}
 
 async function loadRecording(): Promise<Recording> {
   const r = await fetch("/ocean/jev-heatwave.jsonl.gz");
@@ -230,8 +221,8 @@ export function OceanReef() {
   const [selected, setSelected] = useState<number | null>(null);
   const [download, setDownload] = useState<number | null>(null);
   const [error, setError] = useState("");
-  /** Why live Jev stopped, and a counter that restarts its loop on "Try again". */
-  const [failure, setFailure] = useState<Failure | null>(null);
+  /** Live Jev (its status says why it stopped), and a counter that restarts its loop on "Try again". */
+  const jev = useLiveAsk();
   const [attempt, setAttempt] = useState(0);
   const [copied, setCopied] = useState(false);
   const [raceState, setRaceState] = useState<"idle" | "loading" | "running" | "done">("idle");
@@ -385,10 +376,7 @@ export function OceanReef() {
             latencies.current.push(d.latencyMs ?? 0);
           }
         } else {
-          if (!getApiKey()) {
-            setError("Add your gateway key in Settings to run Jev. The free deciders keep working without one.");
-            return;
-          }
+          if (!jev.hasKey()) return;
 
           const views = due(w, JEV_BATCH).map((f) => view(w, f));
 
@@ -397,33 +385,28 @@ export function OceanReef() {
             continue;
           }
 
-          try {
-            const req = jevRequest(views);
+          const req = jevRequest(views);
 
-            lastJev.current = req;
-            const res = await run(req.state, req.questions);
+          lastJev.current = req;
+          const res = await jev.ask(req);
 
-            if (!live()) return;
+          if (!live()) return;
 
+          if (res) {
             const ds = fromJev(views, res.answers ?? {}, res.latency_ms ?? null);
 
             if (target() === w) applyDecisions(w, ds);
 
-            setFailure(null);
             spent.current += (res.usage?.input_tokens ?? 0) * USD_PER_TOKEN;
             latencies.current.push(res.latency_ms ?? 0);
-          } catch (e) {
-            const f = describeFailure(e, NO_KEY_MESSAGE);
-
-            if (f.kind === "cancelled") return;
-
-            setFailure(f);
+          } else {
+            const s = jev.live.status;
 
             // Fish keep their last action meanwhile. A rejected key or a spent budget won't fix
             // itself, so stop asking until the visitor acts; otherwise wait as long as asked.
-            if (!f.retryable) return;
+            if (s.kind !== "failed" || !s.failure.retryable) return;
 
-            await new Promise((r) => setTimeout(r, f.retryAfterMs ?? 2000));
+            await new Promise((r) => setTimeout(r, s.failure.retryAfterMs ?? 2000));
           }
         }
 
@@ -435,6 +418,7 @@ export function OceanReef() {
 
     return () => {
       generation.current++;
+      jev.cancel();
     };
   }, [model, raceState === "running", attempt]);
 
@@ -526,11 +510,7 @@ export function OceanReef() {
             onClick={() => {
               setError("");
 
-              if (!getApiKey()) {
-                setError("Add your gateway key in Settings to run Jev. The free deciders keep working without one.");
-
-                return;
-              }
+              if (!jev.hasKey()) return;
 
               setModel("jev");
             }}
@@ -540,12 +520,16 @@ export function OceanReef() {
         </div>
       </div>
 
-      {failure && model === "jev" && (
+      {jev.failure && (model === "jev" || jev.failure.kind === "no-key") && (
         <LiveFailure
-          failure={failure}
-          fallback="Fish keep their last action until a new decision arrives. The evolved policy can take over, free."
+          failure={jev.failure}
+          fallback={
+            jev.failure.kind === "no-key"
+              ? "The free deciders keep working without one."
+              : "Fish keep their last action until a new decision arrives. The evolved policy can take over, free."
+          }
           onRetry={() => {
-            setFailure(null);
+            jev.reset();
             setAttempt((n) => n + 1);
           }}
           alt={{ label: "Use the evolved policy", onClick: () => setModel("evolved") }}
@@ -554,12 +538,7 @@ export function OceanReef() {
 
       {error && (
         <p className="reef-note" role="alert">
-          {error}{" "}
-          {!getApiKey() && (
-            <button type="button" className="reef-link" onClick={openSettings}>
-              Open Settings
-            </button>
-          )}
+          {error}
         </p>
       )}
 

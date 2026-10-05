@@ -25,11 +25,12 @@ import { camera, hitResident, paint, toWorld } from "../../live-worlds/win-over/
 import recorded from "../../live-worlds/win-over/recorded.json";
 import { STUDENT_NAME } from "../../live-worlds/free-model/runtime";
 import studentLines from "../../live-worlds/free-model/recorded-lines.json";
-import { getApiKey, NO_KEY_MESSAGE, run, percent } from "./api";
-import { describeFailure } from "./live-failure";
+import { percent } from "./api";
+import { failureLine } from "./live-failure";
+import { useLiveAsk, type LiveAsk } from "./live-ask";
 import { BuildThis } from "./build-this";
 import { Receipt } from "./receipt";
-import { KeyTag, LiveFailure, ModeTag, openSettings } from "./trust";
+import { KeyTag, LiveFailure, ModeTag } from "./trust";
 import "./fool-jev.css";
 import "./win-over.css";
 
@@ -88,15 +89,19 @@ function localEmbedder(onProgress: (text: string) => void) {
   return { embed, warm: () => void embed("Hello.").catch(() => {}) };
 }
 
-const jevBackend: Backend = {
+/** Jev as the brain's backend, through the page's live ask (so its failures show as the page's). */
+const jevBackend = (jev: LiveAsk): Backend => ({
   kind: "jev",
   name: "Jev",
   ask: async (state, questions) => {
-    const r = await run(state, questions, undefined, { deadlineMs: 8000, maxAttempts: 2 });
+    const r = await jev.ask({ state, questions, budget: { deadlineMs: 8000, maxAttempts: 2 } });
+
+    // The brain only needs to know this job didn't land; the ask's status says why.
+    if (!r) throw new Error(jev.status.kind === "failed" ? failureLine(jev.status.failure) : "Cancelled.");
 
     return { answers: r.answers, latency_ms: r.latency_ms, usage: r.usage };
   },
-};
+});
 
 export function WinOver() {
   const world = useRef<World>(createWorld(Math.floor(Math.random() * 1e9)));
@@ -108,6 +113,8 @@ export function WinOver() {
   const [text, setText] = useState("");
   const [loading, setLoading] = useState("Loading the free model…");
   const [model, setModel] = useState<"local" | "jev">("local");
+  const live = useLiveAsk();
+  const [jev] = useState(() => jevBackend(live.live));
   const [note, setNote] = useState("");
   const [copied, setCopied] = useState(false);
   const selectedRef = useRef(selected);
@@ -196,17 +203,12 @@ export function WinOver() {
   const g = w.goal ? GOALS.find((x) => x.id === w.goal) : null;
 
   const choose = (m: "local" | "jev") => {
-    if (m === "jev" && !getApiKey()) {
-      setNote("Jev runs on your own gateway key. Add it in Settings, then switch again.");
-      openSettings();
-
-      return;
-    }
+    if (m === "jev" && !live.hasKey()) return;
 
     setNote("");
     setModel(m);
 
-    if (b) b.backend = m === "jev" ? jevBackend : (local.current ?? b.backend);
+    if (b) b.backend = m === "jev" ? jev : (local.current ?? b.backend);
   };
 
   const say = (kind: "say" | "cake" | "notice", line: string) => {
@@ -431,15 +433,22 @@ export function WinOver() {
               <button type="button" aria-pressed={model === "jev"} onClick={() => choose("jev")}>
                 Jev (your key)
               </button>
-              <span className="wo-fine">{loading || (model === "jev" && b?.lastFailure ? "" : b?.lastError) || note}</span>
+              <span className="wo-fine">{loading || (model === "jev" && live.failure ? "" : b?.lastError) || note}</span>
             </div>
-            {model === "jev" && b?.lastFailure ? (
+            {live.failure && (model === "jev" || live.failure.kind === "no-key") ? (
               <LiveFailure
-                failure={describeFailure(b.lastFailure, NO_KEY_MESSAGE)}
-                fallback="Residents who didn't get an answer keep their last plan. Bramble mini can keep judging, free."
+                failure={live.failure}
+                fallback={
+                  live.failure.kind === "no-key"
+                    ? "Bramble mini keeps judging, free."
+                    : "Residents who didn't get an answer keep their last plan. Bramble mini can keep judging, free."
+                }
                 onRetry={() => {
-                  b.lastFailure = null;
-                  b.lastError = "";
+                  if (b) {
+                    b.lastFailure = null;
+                    b.lastError = "";
+                  }
+                  live.reset();
                   setTick((t) => t + 1);
                 }}
                 alt={{ label: "Use the free model", onClick: () => choose("local") }}

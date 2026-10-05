@@ -13,8 +13,7 @@ import { blockKey, batchRequest, batchScores, BATCH } from "../../live-worlds/se
 import { RISK_THRESHOLD, score, type Scores, type Weights } from "../../live-worlds/sentry/model";
 import { HARD_TRAPS, PAGES, runHelper, TRAPS, withTrap, type Outcome, type PageBlock, type PlacedTrap, type TrapKind } from "../../live-worlds/sentry/pages";
 import weightsJson from "../../live-worlds/sentry/weights.json";
-import { NO_KEY_MESSAGE, run } from "./api";
-import { describeFailure, type Failure } from "./live-failure";
+import { useLiveAsk } from "./live-ask";
 import { fromLiveBatches, Receipt, type ReceiptData } from "./receipt";
 import { KeyTag, LiveFailure, ModeTag } from "./trust";
 import "./screen-sentry.css";
@@ -172,8 +171,7 @@ export function ScreenSentry() {
   const [decider, setDecider] = useState<Decider>("free");
   const [recorded, setRecorded] = useState<Recorded | null>(null);
   const [live, setLive] = useState<{ key: string; scores: Scores[]; receipt: ReceiptData } | null>(null);
-  const [failure, setFailure] = useState<Failure | null>(null);
-  const [asking, setAsking] = useState(false);
+  const jev = useLiveAsk();
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const base = PAGES.find((p) => p.id === pageId) ?? PAGES[0];
@@ -293,30 +291,26 @@ export function ScreenSentry() {
   };
 
   const askLive = async () => {
-    setAsking(true);
-    setFailure(null);
-
-    try {
+    const r = await jev.ask(async (j) => {
       const bodies: unknown[] = [];
       const out: Scores[] = [];
 
       for (let start = 0; start < page.blocks.length; start += BATCH) {
         const chunk = page.blocks.slice(start, start + BATCH);
-        const req = batchRequest({ task: page.task, page: page.title }, chunk);
-        const body = await run(req.state, req.questions, undefined, { deadlineMs: 8000, maxAttempts: 2 });
+        const body = await j.evaluate(batchRequest({ task: page.task, page: page.title }, chunk), { deadlineMs: 8000, maxAttempts: 2 });
 
         bodies.push(body);
         out.push(...batchScores(body.answers, chunk.length));
       }
 
-      setLive({ key: pageKey, scores: out, receipt: fromLiveBatches(bodies) });
-      setDecider("live");
-      reset();
-    } catch (e) {
-      setFailure(describeFailure(e, NO_KEY_MESSAGE));
-    } finally {
-      setAsking(false);
-    }
+      return { out, bodies };
+    });
+
+    if (!r) return;
+
+    setLive({ key: pageKey, scores: r.out, receipt: fromLiveBatches(r.bodies) });
+    setDecider("live");
+    reset();
   };
 
   const plan = step >= 0 && outcome === null ? runHelper(page, (x) => scores[page.blocks.indexOf(x)].risk >= RISK_THRESHOLD) : null;
@@ -433,8 +427,8 @@ export function ScreenSentry() {
         <button type="button" aria-pressed={decider === "recorded"} onClick={() => (setDecider("recorded"), reset())}>
           Jev <small>recorded · free</small>
         </button>
-        <button type="button" className="ss-secondary" aria-pressed={decider === "live"} disabled={asking} onClick={() => void askLive()}>
-          {asking ? "Asking Jev…" : "Try your own"} <KeyTag />
+        <button type="button" className="ss-secondary" aria-pressed={decider === "live"} disabled={jev.busy} onClick={() => void askLive()}>
+          {jev.busy ? "Asking Jev…" : "Try your own"} <KeyTag />
         </button>
       </div>
       {decider === "recorded" && missing > 0 && (
@@ -443,7 +437,7 @@ export function ScreenSentry() {
           rating is used there. Try your own key to ask Jev about your words.
         </p>
       )}
-      {failure && <LiveFailure failure={failure} fallback="The free sentry keeps checking the page in your browser, and Jev's recorded answers still work." onRetry={() => void askLive()} />}
+      {jev.failure && <LiveFailure failure={jev.failure} fallback="The free sentry keeps checking the page in your browser, and Jev's recorded answers still work." onRetry={() => void askLive()} />}
       {decider === "recorded" && recordedReceipt && <Receipt data={recordedReceipt} label="Jev's recorded check" />}
       {decider === "live" && live?.key === pageKey && <Receipt data={live.receipt} label="Jev's live check" />}
     </div>
