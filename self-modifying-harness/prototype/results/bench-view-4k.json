@@ -1,0 +1,20 @@
+{
+  "messages": 4000,
+  "budgetBytes": 128000,
+  "turnsMeasured": 487,
+  "optchat": {
+    "avgCacheReadAtMarks": 19938,
+    "avgViewChars": 127984,
+    "avgSharedPrefix": 39574,
+    "medianSharedPrefix": 34353,
+    "avgSharedPrefixLastHalf": 44145,
+    "avgLines": 297
+  },
+  "slidingWindow": {
+    "avgCacheReadAtMarks": 32854,
+    "avgChars": 122837,
+    "avgSharedPrefix": 38959,
+    "medianSharedPrefix": 3
+  },
+  "msTotal": 3595
+}
