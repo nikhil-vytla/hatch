@@ -1,5 +1,5 @@
 /**
- * A deterministic stand-in for SGLang's /v1/systemone, for trying `jev-lab` with no
+ * A deterministic stand-in for SGLang's /v1/systemone, for trying `jev-decide` with no
  * key and no GPU. Answers are a hash of the question, not a model: use it to exercise the plumbing,
  * never as a result.
  */

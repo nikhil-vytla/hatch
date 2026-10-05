@@ -17,7 +17,7 @@ Working notes, newest last.
   - 310 rumours × 72 profiles and 121 corrections × 144 profiles.
   - Validation holds out one template in five, and for reactions one persona in five.
 - **Embedding parity.** MiniLM q8 gives a text a different vector inside a padded batch than alone (up to 0.03 per dimension). The browser embeds one text at a time, so the dataset, the evaluation and the rumour presets (`vectors.json` messages) are now embedded one at a time too.
-- **Package layout.** Node scripts that need `@huggingface/transformers` live in `packages/arena/scripts/`, since `packages/` gets a `node_modules` link and `live-worlds/` does not. The browser and test runtime (`live-worlds/free-model/runtime.ts`) needs no npm package.
+- **Package layout.** Node scripts that need `@huggingface/transformers` (`dataset.ts`, `evaluate.ts`, `recorded.ts`) live here, since `live-worlds/` now gets the same `node_modules` link as `packages/`. Until 4 Oct 2026 they lived in `packages/arena/scripts/`, from before `live-worlds/` had the link. The browser and test runtime (`live-worlds/free-model/runtime.ts`) needs no npm package.
 - **Gossip.** Gossip has only 150 distinct inputs, so it isn't a network: the teacher answered all of them, and the game looks the answer up.
 
 ## 1 Oct 2026

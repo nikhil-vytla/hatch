@@ -36,7 +36,7 @@ Answers arrive whenever they arrive, and the world never waits for them. The que
 
 ## The same lines, two models
 
-`packages/arena/scripts/record-win-over.ts` said seven lines to the same five residents. It asked MobileBERT locally and Jev through the gateway: 7 calls, 376 ms median, $0.00043. Raw answers are in `recordings.jsonl`, and the page's table is `recorded.json` (rebuilt by `summarize.ts`).
+`record.ts` said seven lines to the same five residents. It asked MobileBERT locally and Jev through the gateway: 7 calls, 376 ms median, $0.00043. Raw answers are in `recordings.jsonl`, and the page's table is `recorded.json` (rebuilt by `summarize.ts`).
 
 | Line | MobileBERT took it as | Jev took it as |
 | --- | --- | --- |

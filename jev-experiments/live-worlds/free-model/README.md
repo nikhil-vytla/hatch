@@ -33,7 +33,7 @@
 
 ## Gold-set results
 
-The gold sets (`gold/`) were written by hand before any template or teacher label existed, and were never used to train or select. Behaviour is subjective, so rumour cases list every acceptable action, and unclear honest or friendly fields aren't scored. Run `packages/arena/scripts/free-model-evaluate.ts`; it writes `results.json`.
+The gold sets (`gold/`) were written by hand before any template or teacher label existed, and were never used to train or select. Behaviour is subjective, so rumour cases list every acceptable action, and unclear honest or friendly fields aren't scored. Run `evaluate.ts`; it writes `results.json`.
 
 **Who can you win over?** (144 lines; honest scored on 118, friendly on 101)
 
@@ -82,6 +82,6 @@ The student did fix the formula's known flaw on the presets. Mean share believin
 - **Data and training:** `gen.ts`, `banks.ts`, `teacher-requests.ts`, `features.ts`, `train.py`.
 - **Play time:** `model.ts`, `runtime.ts`.
 - **Gold and results:** `gold/` (hand-written sets and their embeddings), `results.json`, `recorded-lines.json`.
-- **Node scripts:** `packages/arena/scripts/free-model-{dataset,evaluate,recorded}.ts`.
+- **Node scripts:** `dataset.ts`, `evaluate.ts`, `recorded.ts`.
 - **Tests:** `free-model.test.ts` covers featurisation, Node/trainer parity and gold-score reproducibility.
 - **Notes:** `NOTES.md`.

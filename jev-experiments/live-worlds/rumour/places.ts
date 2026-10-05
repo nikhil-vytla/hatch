@@ -1,6 +1,6 @@
 /**
  * The rumour mill's keyword rule for where a message invites people; shared by the page and the
- * free-model evaluation (packages/arena/scripts/free-model-evaluate.ts).
+ * free-model evaluation (live-worlds/free-model/evaluate.ts).
  */
 import type { PlaceId } from "./town";
 

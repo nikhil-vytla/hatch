@@ -1,14 +1,14 @@
 #!/usr/bin/env bun
 /**
- * jev-lab, a CLI for the Jev experiments' studies.
+ * jev-decide, a CLI for the Jev experiments' studies.
  *
- *   jev-lab eval <fool|suggestion|decoy> --endpoint <jev|systemone:URL|decisions:URL> [--out file.jsonl]
+ *   jev-decide eval <fool|suggestion|decoy> --endpoint <jev|systemone:URL|decisions:URL> [--out file.jsonl]
  *           [--dry-run] [--max-usd 0.05] [--resume] [--limit N] [--model NAME] [--usd-per-mtok X]
- *   jev-lab report <recording.jsonl[.gz]> [--study S]
- *   jev-lab compare <a.jsonl[.gz]> <b.jsonl[.gz]>
- *   jev-lab bouncer <agent-log.json> [--endpoint ...] [--json]
- *   jev-lab serve-mock [--port 31337]
- *   jev-lab studies
+ *   jev-decide report <recording.jsonl[.gz]> [--study S]
+ *   jev-decide compare <a.jsonl[.gz]> <b.jsonl[.gz]>
+ *   jev-decide bouncer <agent-log.json> [--endpoint ...] [--json]
+ *   jev-decide serve-mock [--port 31337]
+ *   jev-decide studies
  */
 import { readFileSync } from "node:fs";
 import { decoy, fool, suggestion } from "./src/analysis";
@@ -109,7 +109,7 @@ async function main() {
   if (cmd === "compare") {
     const [a, b] = rest;
 
-    if (!a || !b) die("Usage: jev-lab compare a.jsonl b.jsonl");
+    if (!a || !b) die("Usage: jev-decide compare a.jsonl b.jsonl");
 
     const c = compare(readRows(a!), readRows(b!));
 

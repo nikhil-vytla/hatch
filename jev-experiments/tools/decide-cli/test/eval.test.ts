@@ -10,7 +10,7 @@ import { serveMock } from "../../../packages/jev-client/src/mock";
 import { readRows, receipt, run } from "../src/record";
 import { jobsFor } from "../src/studies";
 
-const dir = mkdtempSync(join(tmpdir(), "jev-lab-"));
+const dir = mkdtempSync(join(tmpdir(), "jev-decide-"));
 const ok = serveMock();
 const down = serveMock({ failWith: 503 });
 

@@ -47,6 +47,8 @@ The [local smoke output](local-smoke.json) covers 60 seconds of simulated time w
 
 Browser checks used `realtime-independent` on the integrated local route, without provider calls. Desktop 1440px and mobile 390px screenshots were opened and inspected. Keyboard movement/rotation/hold/drop and mobile drop/pause/resume worked. Mobile had no horizontal overflow and control targets were 44–52px tall; reduced motion was enabled. A run at 2220ms branched from 600ms and restored its original clocks and piece counts. Switching to recorded evidence paused at 2600ms and returned unchanged after 1.2 seconds. A fresh-controller comparison at 1740ms produced byte-identical game states with assistance settings `[true, false]`. Screenshot files are in [screenshots](screenshots/), all below 2MB.
 
+The six live Jev games on matched queues (seeds 7, 19 and 42), with their frozen protocol and recorder, are in [matched-queue/](matched-queue/README.md). They moved here from `roadmap/tetris/` on 4 Oct 2026; this folder's and the arena's Tetris tests replay them.
+
 A final [browser receipt fixture](browser-receipts.json) passed on the rebuilt preview in `tetris-cross-review`. Intercepted success and HTTP 503 replies retained their complete normalized bodies, and both recorded requests matched the actual wire body including instructions. An intercepted request cancelled by pausing retained its exact body and reason with no invented reply or pending controller. All requests were intercepted; these checks made no provider calls and measure software behavior only.
 
 ## Integration

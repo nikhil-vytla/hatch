@@ -4,17 +4,17 @@
  * per line). Raw answers go to live-worlds/win-over/recordings.jsonl; then run
  * live-worlds/win-over/summarize.ts to rebuild the page's table. Local only: 7 Jev requests.
  *
- *   bun packages/arena/scripts/record-win-over.ts
+ *   bun live-worlds/win-over/record.ts
  */
-import "../../../experience-prototypes/scripts/credentials";
+import "../../experience-prototypes/scripts/credentials";
 import { pipeline } from "@huggingface/transformers";
 import { writeFileSync } from "node:fs";
-import { evaluate, type Payload } from "../../jev-client/src/index";
-import { answerLocally, lineRequest, merge, reactionRequest, split, toHearDecision, type Event } from "../../../live-worlds/win-over/decide";
-import { createWorld, goal } from "../../../live-worlds/win-over/engine";
-import { NLI_MODEL, type ZeroShot } from "../src/decide/nli";
-import { jevCostUsd } from "../../jev-client/src/price";
-import { requireKey } from "../../jev-client/src/recorder";
+import { evaluate, type Payload } from "../../packages/jev-client/src/index";
+import { answerLocally, lineRequest, merge, reactionRequest, split, toHearDecision, type Event } from "./decide";
+import { createWorld, goal } from "./engine";
+import { NLI_MODEL, type ZeroShot } from "../../packages/arena/src/decide/nli";
+import { jevCostUsd } from "../../packages/jev-client/src/price";
+import { requireKey } from "../../packages/jev-client/src/recorder";
 
 const key = requireKey();
 
@@ -64,5 +64,5 @@ for (const e of LINES) {
   console.log(e.text, `MobileBERT ${localMs} ms, Jev ${reply.latency_ms} ms`);
 }
 
-writeFileSync(new URL("../../../live-worlds/win-over/recordings.jsonl", import.meta.url), rows.join("\n") + "\n");
+writeFileSync(new URL("./recordings.jsonl", import.meta.url), rows.join("\n") + "\n");
 console.log(`Jev: ${LINES.length} calls, $${cost.toFixed(5)} at list price. Now run live-worlds/win-over/summarize.ts.`);

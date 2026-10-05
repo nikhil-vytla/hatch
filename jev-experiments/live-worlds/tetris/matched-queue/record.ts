@@ -1,6 +1,6 @@
-import '../../experience-prototypes/scripts/credentials';
-import {evaluate} from '../../packages/jev-client/src/index';
-import {TetrisSession,type Ticket} from '../../live-worlds/tetris/session';
+import '../../../experience-prototypes/scripts/credentials';
+import {evaluate} from '../../../packages/jev-client/src/index';
+import {TetrisSession,type Ticket} from '../session';
 import {appendFileSync,writeFileSync,existsSync,readFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';
 const key=process.env.AI_GATEWAY_API_KEY;

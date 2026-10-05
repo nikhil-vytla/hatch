@@ -1,12 +1,12 @@
-# jev-lab
+# jev-decide
 
-A small kept tool in `jev-experiments/tools/decide-cli/`. It isn't published to npm; run it from the repo, or `bun link` it.
+A small kept tool in `jev-experiments/tools/decide-cli/`. It isn't published to npm; run it from the repo, or `bun link` it. It was called `jev-lab` until 4 Oct 2026. It was renamed because the Python research runner (`src/jev_lab/cli.py`) installs a `jev-lab` command too.
 
-`jev-lab` runs the site's typed-decision studies against any endpoint that speaks Jev's request format. It writes recordings in the same row format as ours, so you can compare your model with our Jev run request for request. It also checks agent logs for invented tool arguments.
+`jev-decide` runs the site's typed-decision studies against any endpoint that speaks Jev's request format. It writes recordings in the same row format as ours, so you can compare your model with our Jev run request for request. It also checks agent logs for invented tool arguments.
 
 ```sh
 cd jev-experiments
-bun tools/decide-cli/cli.ts studies          # or: bun link in tools/decide-cli, then jev-lab studies
+bun tools/decide-cli/cli.ts studies          # or: bun link in tools/decide-cli, then jev-decide studies
 ```
 
 ## Commands
@@ -15,20 +15,20 @@ bun tools/decide-cli/cli.ts studies          # or: bun link in tools/decide-cli,
 
 ```sh
 # See exactly what would be sent, and the most it could cost. Sends nothing.
-jev-lab eval suggestion --endpoint jev --dry-run
+jev-decide eval suggestion --endpoint jev --dry-run
 
 # Jev through the Vercel AI Gateway, on your key, capped at five cents.
 export AI_GATEWAY_API_KEY=...
-jev-lab eval decoy --endpoint jev --max-usd 0.05 --out decoy.jev.jsonl
+jev-decide eval decoy --endpoint jev --max-usd 0.05 --out decoy.jev.jsonl
 
 # An open model: SGLang's /v1/systemone (or our MLX port, packages/arena/open-decisions/server.py).
-jev-lab eval fool --endpoint systemone:http://localhost:30000 --out fool.qwen.jsonl
+jev-decide eval fool --endpoint systemone:http://localhost:30000 --out fool.qwen.jsonl
 
 # SGLang's /v1/decisions shape instead (yes/no and choice questions).
-jev-lab eval decoy --endpoint decisions:http://localhost:30000
+jev-decide eval decoy --endpoint decisions:http://localhost:30000
 
 # Pick up where a run stopped.
-jev-lab eval fool --endpoint systemone:http://localhost:30000 --out fool.qwen.jsonl --resume
+jev-decide eval fool --endpoint systemone:http://localhost:30000 --out fool.qwen.jsonl --resume
 ```
 
 | Study | Requests | What it asks |
@@ -49,14 +49,14 @@ After a run it prints a receipt (calls, tokens, cost, p50, p90 and p99 latency) 
 ### report: tables for any recording, including ours
 
 ```sh
-jev-lab report packages/arena/prose/recordings/prose.jsonl.gz --study suggestion
-jev-lab report packages/arena/recordings/fool.jsonl
+jev-decide report packages/arena/prose/recordings/prose.jsonl.gz --study suggestion
+jev-decide report packages/arena/recordings/fool.jsonl
 ```
 
 ### compare: two recordings of the same study
 
 ```sh
-jev-lab compare packages/arena/prose/recordings/prose.jsonl.gz decoy.qwen.jsonl
+jev-decide compare packages/arena/prose/recordings/prose.jsonl.gz decoy.qwen.jsonl
 ```
 
 This prints top-answer agreement on shared questions, each recording's flip count, and for the decoy, each run's effect with its 95% bootstrap interval, plus a paired interval on the difference.
@@ -64,9 +64,9 @@ This prints top-answer agreement on shared questions, each recording's flip coun
 ### bouncer: invented tool arguments in an agent log
 
 ```sh
-jev-lab bouncer agent-log.json                       # free: schema checks + a grounding heuristic
-jev-lab bouncer agent-log.json --endpoint jev        # plus one typed yes/no per suspect argument
-jev-lab bouncer agent-log.json --json                # machine-readable; exit code 1 on errors
+jev-decide bouncer agent-log.json                       # free: schema checks + a grounding heuristic
+jev-decide bouncer agent-log.json --endpoint jev        # plus one typed yes/no per suspect argument
+jev-decide bouncer agent-log.json --json                # machine-readable; exit code 1 on errors
 ```
 
 It reads OpenAI-style logs (`messages[].tool_calls`, `tools[].function.parameters`) and Anthropic-style logs (`tool_use` blocks, `tools[].input_schema`). For each call it reports:
@@ -77,7 +77,7 @@ It reads OpenAI-style logs (`messages[].tool_calls`, `tools[].function.parameter
 ### serve-mock: a stand-in endpoint
 
 ```sh
-jev-lab serve-mock --port 31337
+jev-decide serve-mock --port 31337
 ```
 
 This is a `/v1/systemone` server that answers with a hash of each question. It's for trying the plumbing without a key or a GPU. Its answers mean nothing.
@@ -87,16 +87,16 @@ This is a `/v1/systemone` server that answers with a hash of each question. It's
 This is `bash tools/decide-cli/examples/demo.sh`, run against the mock (full text in `examples/session.txt`):
 
 ```text
-$ jev-lab eval suggestion --endpoint jev --dry-run | tail -1
+$ jev-decide eval suggestion --endpoint jev --dry-run | tail -1
 dry run: 100 requests, about 47,047 input tokens, at most $0.001976 on Jev via the Vercel AI Gateway. Nothing was sent.
 
-$ jev-lab compare packages/arena/prose/recordings/prose.jsonl.gz decoy.mock.jsonl
+$ jev-decide compare packages/arena/prose/recordings/prose.jsonl.gz decoy.mock.jsonl
 studies in both: decoy
 top-answer agreement: 18 of 48 shared questions (0.375)
 
 decoy effect: A +0.473 [+0.381, +0.555] · B −0.058 [−0.161, +0.049] · A − B +0.531 [+0.412, +0.650] over 8 scenarios
 
-$ jev-lab bouncer tools/decide-cli/fixtures/openai-booking.json
+$ jev-decide bouncer tools/decide-cli/fixtures/openai-booking.json
 3 tool calls, 2 errors, 2 warnings
 
 call  tool        argument  value                         finding              P(grounded)
@@ -118,7 +118,7 @@ On our recordings, `report` reproduces the published numbers. A test (`test/pari
 - **Not exercised here:** live `jev` and live SGLang, because building it spent nothing. The `jev` path is the shared Jev client (`packages/jev-client`), the same one the site's API uses, and the `systemone` path is the open-decisions adapter. `/v1/decisions` choice and score shapes follow the SGLang docs and are untested against a server.
 - **Not done:** concurrency, a published npm package, more studies (the full prose set or One box), and the bouncer's judge prompt has never been evaluated.
 
-No model here is trained on Jev's outputs. TypeSafe's Master Customer Agreement §2.3(b) forbids it. `jev-lab` only asks and measures.
+No model here is trained on Jev's outputs. TypeSafe's Master Customer Agreement §2.3(b) forbids it. `jev-decide` only asks and measures.
 
 ## Tests
 

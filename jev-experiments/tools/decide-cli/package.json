@@ -1,9 +1,9 @@
 {
-  "name": "jev-lab",
+  "name": "jev-decide",
   "version": "0.1.0",
   "private": true,
   "description": "Run the Jev experiments' typed-decision studies against any endpoint, compare recordings, and check agent tool calls.",
   "type": "module",
-  "bin": { "jev-lab": "./cli.ts" },
+  "bin": { "jev-decide": "./cli.ts" },
   "scripts": { "test": "bun test", "demo": "cd ../.. && bash tools/decide-cli/examples/demo.sh" }
 }

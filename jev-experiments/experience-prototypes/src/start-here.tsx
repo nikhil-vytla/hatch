@@ -55,7 +55,7 @@ export const START_PATHS: StartPath[] = [
     cards: [
       { href: "#/arena/one-box", title: "One box", action: "Type and watch one text box become the right card, with timing per keystroke." },
       scene("handoff", "Set how sure Jev must be before software acts."),
-      { href: `${REPO}/tools/decide-cli`, title: "The jev-lab CLI", action: "Run our studies against Jev or any decision endpoint, with a spend cap.", external: true },
+      { href: `${REPO}/tools/decide-cli`, title: "The jev-decide CLI", action: "Run our studies against Jev or any decision endpoint, with a spend cap.", external: true },
       { href: `${REPO}/extensions/screen-sentry`, title: "Screen sentry extension", action: "Load the Chrome extension that flags injected text on any page.", external: true },
     ],
   },

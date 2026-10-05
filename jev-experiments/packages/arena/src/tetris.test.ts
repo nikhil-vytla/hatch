@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { heuristic, randomPlayer, recorded, TetrisArena, type RecordedEvent } from "./tetris";
 
-const games = readFileSync(new URL("../../../roadmap/tetris/games.jsonl", import.meta.url), "utf8")
+const games = readFileSync(new URL("../../../live-worlds/tetris/matched-queue/games.jsonl", import.meta.url), "utf8")
   .trim()
   .split("\n")
   .map((line) => JSON.parse(line));

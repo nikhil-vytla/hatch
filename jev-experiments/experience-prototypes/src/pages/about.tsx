@@ -1,5 +1,5 @@
 import { ArrowUpRight } from "lucide-react";
-import { BuilderCredits } from "../../../roadmap/credits";
+import { BuilderCredits } from "../credits";
 import { StartHereList } from "../start-here";
 import "./play.css";
 

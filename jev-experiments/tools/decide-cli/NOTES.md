@@ -1,4 +1,4 @@
-# Notes: jev-lab
+# Notes: jev-decide
 
 2 Oct 2026, built on branch `proto/decide-cli`; moved into `main` as a kept tool the same day (not published to npm).
 
@@ -8,3 +8,4 @@
 - **Bouncer noise.** The first pass flagged a not-in-enum argument twice (schema and grounding), and flagged a phone number with spaces as free text. Arguments that failed a schema check are now skipped for grounding, and free text needs at least 4 tokens containing letters.
 - **Sandbox.** The worktree sandbox refused compound shell commands and an `rm` on a variable path. The demo moved into `examples/demo.sh`, which uses `mktemp -d` and stops the mock it starts via `trap`.
 - **Spending:** none. Nothing sent to Jev or any paid endpoint, and no MLX server started.
+- **Rename (4 Oct 2026).** The bin was `jev-lab`, the same name as the Python runner's console script in `pyproject.toml`. With both installed, whichever came first on `PATH` won. The TypeScript one is now `jev-decide`; the Python one keeps `jev-lab`.

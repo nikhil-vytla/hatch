@@ -3,14 +3,14 @@
  * float32 training matrices (X, soft targets Y, masks, split) for train.py. Features come from
  * features.ts, the same code the browser runs.
  *
- *   cd jev-experiments/experience-prototypes && bun ../packages/arena/scripts/free-model-dataset.ts JOBS LABELS OUT [--honest-from-intent]
+ *   bun live-worlds/free-model/dataset.ts JOBS LABELS OUT [--honest-from-intent]
  */
 import { pipeline } from "@huggingface/transformers";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import type { Profile } from "../../../live-worlds/rumour/profiles";
-import { allProfiles } from "../../../live-worlds/rumour/profiles";
-import type { Event } from "../../../live-worlds/win-over/decide";
+import type { Profile } from "../rumour/profiles";
+import { allProfiles } from "../rumour/profiles";
+import type { Event } from "../win-over/decide";
 import {
   ACTIONS_WO,
   EMBED_MODEL,
@@ -21,7 +21,7 @@ import {
   profileInput,
   reactionInput,
   RUMOUR_ACTIONS,
-} from "../../../live-worlds/free-model/features";
+} from "./features";
 
 const [jobsDir, labelsDir, outDir] = process.argv.slice(2).filter((a) => !a.startsWith("--"));
 const HONEST_FROM_INTENT = process.argv.includes("--honest-from-intent");

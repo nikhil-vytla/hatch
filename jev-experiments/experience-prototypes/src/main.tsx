@@ -6,7 +6,7 @@ import { lookup, retiredScene } from "./scenes";
 import { Button, Field } from "./shared";
 import { getApiKey, setApiKey } from "./api";
 import { SessionMeter } from "./trust";
-import { BuilderCredits } from "../../roadmap/credits";
+import { BuilderCredits } from "./credits";
 import { PlayPage } from "./pages/play";
 import "./style.css";
 import "./pages/reading-workspace.css";

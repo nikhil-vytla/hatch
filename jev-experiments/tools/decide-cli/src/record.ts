@@ -1,5 +1,5 @@
 /**
- * `jev-lab eval`'s recorder: the shared recorder (packages/jev-client/src/recorder.ts) with the
+ * `jev-decide eval`'s recorder: the shared recorder (packages/jev-client/src/recorder.ts) with the
  * CLI's defaults. Sends a study's requests one at a time and appends one JSONL row per attempt
  * (id, at, status, latencyMs, inputTokens, costUsd, answers, ...). Fail-fast, and capped before a
  * request could pass --max-usd; resumes only with --resume.

@@ -174,7 +174,7 @@ describe("real-time recordings", () => {
 });
 
 describe("every recorded lane, lock by lock", () => {
-  const live = jsonl(new URL("../../../roadmap/tetris/games.jsonl", import.meta.url));
+  const live = jsonl(new URL("../../../live-worlds/tetris/matched-queue/games.jsonl", import.meta.url));
 
   for (const game of live) {
     const seed = game.summary.seed,

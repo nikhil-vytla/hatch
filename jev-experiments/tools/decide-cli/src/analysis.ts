@@ -1,6 +1,6 @@
 /**
  * Per-study analysis of a recording, using the prose studies' own metric code
- * (packages/arena/prose/metrics.ts) with the same bootstrap seeds, so `jev-lab` reproduces the
+ * (packages/arena/prose/metrics.ts) with the same bootstrap seeds, so `jev-decide` reproduces the
  * published numbers on our recordings (see test/parity.test.ts).
  */
 import { MENU, PUZZLES, sentencesFor, verdict } from "../../../packages/arena/src/fool/model";

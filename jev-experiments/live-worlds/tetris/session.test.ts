@@ -5,7 +5,7 @@ import { DECISION_INSTRUCTIONS, snapshot, TetrisSession, type Ticket } from "./s
 
 type RecordedEvent = { lane: number; sentAt: number; receivedAt?: number; status: string; answer?: string; reason?: string; latencyMs: number; response?: unknown; httpStatus?: number };
 type RecordedLane = { status: string; lines: number; pieces: number; score: number; stats: unknown };
-const recordedGames = readFileSync(new URL("../../roadmap/tetris/games.jsonl", import.meta.url), "utf8").trim().split("\n").map(line => JSON.parse(line));
+const recordedGames = readFileSync(new URL("./matched-queue/games.jsonl", import.meta.url), "utf8").trim().split("\n").map(line => JSON.parse(line));
 
 /**
  * Replays a recorded live session through the page's own ticket loop. The recorder collected

@@ -2,9 +2,9 @@
  * Scores every free decider against the hand-written gold sets (gold/), never against Jev.
  *
  *   cd jev-experiments/experience-prototypes
- *   bun ../packages/arena/scripts/free-model-evaluate.ts jobs OUT_DIR      # teacher jobs for the gold items
+ *   bun live-worlds/free-model/evaluate.ts jobs OUT_DIR      # teacher jobs for the gold items
  *   teacher_fireworks.py OUT_DIR/gold-lines.jsonl OUT_DIR/labels-gold-lines.jsonl  (and gold-rumours)
- *   bun ../packages/arena/scripts/free-model-evaluate.ts score TEACHER_DIR [QWEN3_4B_DIR]  # results.json
+ *   bun live-worlds/free-model/evaluate.ts score TEACHER_DIR [QWEN3_4B_DIR]  # results.json
  *
  * Models: the student (this package), MobileBERT zero-shot (Win over's previous free model), the
  * MiniLM similarity formula (the rumour mill's previous free model), the shipped teacher
@@ -13,16 +13,16 @@
 import { pipeline } from "@huggingface/transformers";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { answerWithNli, NLI_MODEL, type ZeroShot } from "../src/decide/nli";
-import { placeIn } from "../../../live-worlds/rumour/places";
-import { allProfiles, jevRequest, type Profile } from "../../../live-worlds/rumour/profiles";
-import { features, profileDist, type Vectors } from "../../../live-worlds/rumour/similarity";
-import vectorsDoc from "../../../live-worlds/rumour/vectors.json";
-import { lineRequest, type Answer, type Event } from "../../../live-worlds/win-over/decide";
-import { EMBED_MODEL, eventText, INTENTS, RUMOUR_ACTIONS } from "../../../live-worlds/free-model/features";
-import { teacherLineRequest } from "../../../live-worlds/free-model/teacher-requests";
-import goldLines from "../../../live-worlds/free-model/gold/win-over-lines.json";
-import goldRumours from "../../../live-worlds/free-model/gold/rumours.json";
+import { answerWithNli, NLI_MODEL, type ZeroShot } from "../../packages/arena/src/decide/nli";
+import { placeIn } from "../rumour/places";
+import { allProfiles, jevRequest, type Profile } from "../rumour/profiles";
+import { features, profileDist, type Vectors } from "../rumour/similarity";
+import vectorsDoc from "../rumour/vectors.json";
+import { lineRequest, type Answer, type Event } from "../win-over/decide";
+import { EMBED_MODEL, eventText, INTENTS, RUMOUR_ACTIONS } from "./features";
+import { teacherLineRequest } from "./teacher-requests";
+import goldLines from "./gold/win-over-lines.json";
+import goldRumours from "./gold/rumours.json";
 
 type GoldLine = { kind: Event["kind"]; text: string; intent: string; honest: boolean | null; friendly: boolean | null };
 type GoldRumour = { text: string; place: string | null } & Record<"A" | "B" | "C" | "D", string[]>;
@@ -54,8 +54,8 @@ if (mode === "jobs") {
 // ---------- scoring ----------
 
 // Loaded here so writing the jobs works before any weights exist.
-const { judgeLine } = await import("../../../live-worlds/free-model/runtime");
-const { profileDists } = await import("../../../live-worlds/free-model/runtime-rumour");
+const { judgeLine } = await import("./runtime");
+const { profileDists } = await import("./runtime-rumour");
 
 const readLabels = (d: string | undefined, name: string) =>
   d && existsSync(join(d, name))
@@ -237,13 +237,13 @@ const results = {
   rumourActions: RUMOUR_ACTIONS,
 };
 
-writeFileSync(new URL("../../../live-worlds/free-model/results.json", import.meta.url), JSON.stringify(results, null, 1) + "\n");
+writeFileSync(new URL("./results.json", import.meta.url), JSON.stringify(results, null, 1) + "\n");
 
 // The gold embeddings, so the student's gold scores can be re-checked without the encoder.
 const b64 = (v: number[]) => Buffer.from(new Float32Array(v).buffer).toString("base64");
 
 writeFileSync(
-  new URL("../../../live-worlds/free-model/gold/embeddings.json", import.meta.url),
+  new URL("./gold/embeddings.json", import.meta.url),
   JSON.stringify({ model: EMBED_MODEL, dtype: "q8", lines: vecs.map(b64), rumours: rvecs.map(b64) }) + "\n",
 );
 console.log(JSON.stringify(results, null, 1));

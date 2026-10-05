@@ -1,23 +1,23 @@
 /**
  * The free model's column in Who can you win over?'s "same lines" table: the same seven lines
- * and five residents as record-win-over.ts, answered by the student. It reads none of Jev's
+ * and five residents as win-over/record.ts, answered by the student. It reads none of Jev's
  * recorded answers. Writes live-worlds/free-model/recorded-lines.json.
  *
- *   cd jev-experiments/experience-prototypes && bun ../packages/arena/scripts/free-model-recorded.ts
+ *   bun live-worlds/free-model/recorded.ts
  */
 import { pipeline } from "@huggingface/transformers";
 import { writeFileSync } from "node:fs";
-import { EMBED_MODEL, eventText } from "../../../live-worlds/free-model/features";
-import { judgeLine, judgeReaction, STUDENT_NAME } from "../../../live-worlds/free-model/runtime";
-import { toHearDecision, type Event } from "../../../live-worlds/win-over/decide";
-import { createWorld, goal } from "../../../live-worlds/win-over/engine";
+import { EMBED_MODEL, eventText } from "./features";
+import { judgeLine, judgeReaction, STUDENT_NAME } from "./runtime";
+import { toHearDecision, type Event } from "../win-over/decide";
+import { createWorld, goal } from "../win-over/engine";
 
 type Extractor = (texts: string[], options: { pooling: "mean"; normalize: boolean }) => Promise<{ tolist: () => number[][] }>;
 
 // SAFETY: transformers.js types the pipeline loosely; this is the feature-extraction call shape.
 const embed = (await pipeline("feature-extraction", EMBED_MODEL, { dtype: "q8" })) as unknown as Extractor;
 
-// The lines record-win-over.ts said; kept in step by hand.
+// The lines win-over/record.ts said; kept in step by hand.
 const LINES: Event[] = [
   { kind: "say", text: "Hi! I just moved in next to the bakery." },
   { kind: "say", text: "Why did the scarecrow win an award? He was outstanding in his field." },
@@ -66,7 +66,7 @@ for (const e of LINES) {
 }
 
 writeFileSync(
-  new URL("../../../live-worlds/free-model/recorded-lines.json", import.meta.url),
+  new URL("./recorded-lines.json", import.meta.url),
   JSON.stringify({ model: STUDENT_NAME, ranOn: new Date().toISOString().slice(0, 10), lines }, null, 2) + "\n",
 );
 console.log(lines.map((l) => `${l.text} -> ${l.student.intent}; ${l.student.actions}`).join("\n"));

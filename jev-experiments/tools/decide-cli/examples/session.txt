@@ -1,7 +1,7 @@
-$ jev-lab eval suggestion --endpoint jev --dry-run | tail -1
+$ jev-decide eval suggestion --endpoint jev --dry-run | tail -1
 dry run: 100 requests, about 47,047 input tokens, at most $0.001976 on Jev via the Vercel AI Gateway. Nothing was sent.
 
-$ jev-lab eval decoy --endpoint systemone:http://localhost:31337 --out decoy.mock.jsonl
+$ jev-decide eval decoy --endpoint systemone:http://localhost:31337 --out decoy.mock.jsonl
 decoy on /v1/systemone at http://localhost:31337: sent 48, 48 ok, 0 errors, 0 already recorded, $0.000000 this run.
 receipt: 48 ok of 48 attempts · 3,850 input tokens · $0.000000 · p50 0 ms · p90 1 ms · p99 6 ms
 recording: decoy.mock.jsonl
@@ -19,7 +19,7 @@ hotel               0.30     0.49     0.65   −0.16
 
 attraction effect −0.058 [−0.161, +0.049], 2 of 8 scenarios in the human direction
 
-$ jev-lab compare packages/arena/prose/recordings/prose.jsonl.gz decoy.mock.jsonl
+$ jev-decide compare packages/arena/prose/recordings/prose.jsonl.gz decoy.mock.jsonl
 studies in both: decoy
 top-answer agreement: 18 of 48 shared questions (0.375)
 
@@ -28,7 +28,7 @@ decoy effect: A +0.473 [+0.381, +0.555] · B −0.058 [−0.161, +0.049] · A �
 A: 2625 ok · 882,391 tokens · $0.037075 · p50 249 ms
 B: 48 ok · 3,850 tokens · $0.000000 · p50 0 ms
 
-$ jev-lab bouncer tools/decide-cli/fixtures/openai-booking.json
+$ jev-decide bouncer tools/decide-cli/fixtures/openai-booking.json
 3 tool calls, 2 errors, 2 warnings
 
 call  tool        argument  value                         finding              P(grounded)

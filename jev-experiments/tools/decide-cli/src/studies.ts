@@ -1,5 +1,5 @@
 /**
- * The studies `jev-lab eval` can run, built from the same job definitions the site's
+ * The studies `jev-decide eval` can run, built from the same job definitions the site's
  * recordings came from, so a new run is comparable request for request with ours.
  *
  * - fool: Fool Jev's 5 puzzles x 18 sentences (answer + referee requests), packages/arena/src/fool.

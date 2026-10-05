@@ -1,5 +1,5 @@
 /**
- * Where `jev-lab` sends requests: `--endpoint` specs over the shared adapters in
+ * Where `jev-decide` sends requests: `--endpoint` specs over the shared adapters in
  * packages/jev-client/src/endpoints.ts.
  *
  *   jev                         Jev through the Vercel AI Gateway (AI_GATEWAY_API_KEY, billed to you)
