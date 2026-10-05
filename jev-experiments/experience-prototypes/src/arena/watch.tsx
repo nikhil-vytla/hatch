@@ -15,7 +15,7 @@ import {
   perfectReader,
   recordedFraming,
 } from "../../../packages/arena/src/tetris-framings";
-import { run } from "../api";
+import { evaluateOnce } from "../live-ask";
 import { BuildThis } from "../build-this";
 import { formatNumber, loadChunk } from "./data";
 import { Face, type Mood } from "./face";
@@ -122,7 +122,7 @@ async function playerFor(
     return {
       ...framedJev(
         "spot-clean-confident",
-        notingSend((body, signal) => run(body.state, body.questions, signal, budget), note),
+        notingSend((body, signal) => evaluateOnce(body, { signal, budget }), note),
       ),
       name,
     };

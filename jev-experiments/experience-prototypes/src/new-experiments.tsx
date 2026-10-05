@@ -17,7 +17,9 @@ import {
   getSortedRowModel,
   type ColumnDef,
 } from "@tanstack/react-table";
-import { run, choice, judge, pretty, percent, download } from "./api";
+import { choice, judge, pretty, percent, download } from "./api";
+import { useLiveAsk } from "./live-ask";
+import { LiveFailure } from "./trust";
 import { fromLive, fromLiveBatches, fromRecorded, Receipt } from "./receipt";
 import {
   Button,
@@ -26,8 +28,6 @@ import {
   Field,
   Pills,
   State,
-  useRun,
-  ErrorText,
 } from "./shared";
 import { MoreControls } from "./more-controls";
 import { extractLineFacts, fillEmpty, undoFill, pasteBatches, type Patch } from "./paste-transactions";
@@ -99,11 +99,9 @@ export function Paste({ record }: { record: any }) {
     [last, setLast] = useState<any>(null),
     [mode, setMode] = useState("Whole form"),
     [focused, setFocused] = useState("f0");
-  const [busy, setBusy] = useState(false), [error, setError] = useState("");
-  const revision = useRef(0), controller = useRef<AbortController|null>(null);
+  const jev = useLiveAsk(), busy = jev.busy;
   const valuesRef = useRef(values); valuesRef.current = values;
-  const invalidate = () => { revision.current++; controller.current?.abort(); setBusy(false); setReviewed({}); setSuggestions({}); setLast(null); };
-  useEffect(() => () => { revision.current++; controller.current?.abort(); }, []);
+  const invalidate = () => { jev.reset(); setReviewed({}); setSuggestions({}); setLast(null); };
   const facts = useMemo(() => extractFacts(source), [source]);
   useEffect(() => {
     const r = record?.rows?.find((r: any) => r.preset === preset && !r.error);
@@ -130,16 +128,18 @@ export function Paste({ record }: { record: any }) {
     invalidate(); setPreset(p); setSource(pasteSources[p]); setFields(pasteFields[p]); setValues({}); valuesRef.current={}; setHistory([]); setActive(null);
   };
   async function findSuggestions() {
-    invalidate(); const version=revision.current, abort=new AbortController(); controller.current=abort; setBusy(true); setError("");
+    invalidate();
     const input={source,destination:preset}, questions=pasteQuestions(fields,facts,preset);
-    try {
+    // Editing the fields or the source aborts this (invalidate), so a late answer never fills the old form.
+    const found = await jev.ask(async (j) => {
       const answers:Record<string,any>={}, batches=pasteBatches(input,questions), responses:any[]=[];
-      for(const batch of batches){const response=await run(input,batch,abort.signal);if(revision.current!==version)return;Object.assign(answers,response.answers);responses.push(response);}
-      if(revision.current!==version)return;
-      setSuggestions(Object.fromEntries(Object.entries(answers).map(([k,a])=>[k,a.value])));
-      setLast({source:"live",answers,request:{state:input,questions},responses,latency_ms:responses.reduce((n,r)=>n+r.latency_ms,0)});
-    } catch(e) {if(!abort.signal.aborted)setError(e instanceof Error?e.message:String(e));}
-    finally {if(revision.current===version)setBusy(false);}
+      for(const batch of batches){const response=await j.evaluate({ state: input, questions: batch });Object.assign(answers,response.answers);responses.push(response);}
+      return {answers,responses};
+    });
+    if(!found)return;
+    const {answers,responses}=found;
+    setSuggestions(Object.fromEntries(Object.entries(answers).map(([k,a])=>[k,a.value])));
+    setLast({source:"live",answers,request:{state:input,questions},responses,latency_ms:responses.reduce((n,r)=>n+r.latency_ms,0)});
   }
   return (
     <div className="workbench">
@@ -329,7 +329,7 @@ export function Paste({ record }: { record: any }) {
               onClick={() => void findSuggestions()}
             />
           </MoreControls>
-          <ErrorText error={error} />
+          {jev.failure && <LiveFailure failure={jev.failure} onRetry={() => void findSuggestions()} fallback="The form keeps what you've filled. The recorded examples work without a key." />}
           {last && <Receipt data={pasteReceipt(last)} />}
           <State
             value={{ facts, fields, suggestions, filled: values, run: last }}
@@ -405,7 +405,7 @@ export function SemanticTable({ record }: { record: any }) {
     [selected, setSelected] = useState<string | null>(null),
     [only, setOnly] = useState(false),
     [last, setLast] = useState<any>(null);
-  const { busy, error, execute } = useRun();
+  const jev = useLiveAsk(), busy = jev.busy;
   useEffect(() => {
     if (record?.answers) {
       setRows(
@@ -548,22 +548,19 @@ export function SemanticTable({ record }: { record: any }) {
             busy={busy}
             label="Evaluate the column"
             onClick={() =>
-              execute(async () => {
-                const r = await run(
-                  {
+              void jev.ask(async (j) => {
+                const r = await j.evaluate({ state: {
                     conversations: Object.fromEntries(
                       rows.map((r) => [r.id, r.text]),
                     ),
-                  },
-                  Object.fromEntries(
+                  }, questions: Object.fromEntries(
                     rows.map((r) => [
                       r.id,
                       judge(
                         `For conversation ${r.id}: ${query} Use only that conversation as evidence.`,
                       ),
                     ]),
-                  ),
-                );
+                  ) });
                 setRows((rs) =>
                   rs.map((row) => ({ ...row, score: r.answers[row.id].value })),
                 );
@@ -571,7 +568,7 @@ export function SemanticTable({ record }: { record: any }) {
               })
             }
           />
-          <ErrorText error={error} />
+          {jev.failure && <LiveFailure failure={jev.failure} fallback="The scores on screen stay as they were." />}
           {last && <Receipt data={last === record ? { ...fromRecorded(last), raw: { request: recordedRequests.semanticTable(), response: last } } : fromLive(last)} />}
           <Button
             secondary
@@ -638,7 +635,7 @@ export function UndoExperiment({ record }: { record: any }) {
     [chosen, setChosen] = useState<string[]>([]),
     [applied, setApplied] = useState(false),
     [last, setLast] = useState<any>(null);
-  const { busy, error, execute } = useRun();
+  const jev = useLiveAsk(), busy = jev.busy;
   const current = Object.fromEntries(edits.map((e) => [e.field, e.after]));
   const design = {
     ...current,
@@ -739,18 +736,15 @@ export function UndoExperiment({ record }: { record: any }) {
             busy={busy}
             label="Find those changes"
             onClick={() =>
-              execute(async () => {
-                const r = await run(
-                  { request: query, edits },
-                  Object.fromEntries(
+              void jev.ask(async (j) => {
+                const r = await j.evaluate({ state: { request: query, edits }, questions: Object.fromEntries(
                     edits.map((e) => [
                       e.id,
                       judge(
                         `Should edit ${e.id} be undone to satisfy the user's request? Preserve unrelated edits.`,
                       ),
                     ]),
-                  ),
-                );
+                  ) });
                 setChosen(
                   edits
                     .filter((e) => r.answers[e.id].value >= 0.5)
@@ -769,7 +763,7 @@ export function UndoExperiment({ record }: { record: any }) {
               ? "Restore all changes"
               : `Undo ${chosen.length} selected changes`}
           </Button>
-          <ErrorText error={error} />
+          {jev.failure && <LiveFailure failure={jev.failure} fallback="The changes on screen stay as they were." />}
           {last && <Receipt data={last === record ? { ...fromRecorded(last), raw: { request: recordedRequests.undo(), response: last } } : fromLive(last)} />}
           <State
             value={{
@@ -826,7 +820,7 @@ export function Changes({ record }: { record: any }) {
     [value, setValue] = useState("Waterfront Pavilion, Portland"),
     [answers, setAnswers] = useState<any>(record?.answers ?? null),
     [last, setLast] = useState<any>(record);
-  const { busy, error, execute } = useRun();
+  const jev = useLiveAsk(), busy = jev.busy;
   useEffect(() => {
     setAnswers(record?.answers ?? null);
     setLast(record);
@@ -918,28 +912,25 @@ export function Changes({ record }: { record: any }) {
             busy={busy}
             label="Trace the impact"
             onClick={() =>
-              execute(async () => {
-                const r = await run(
-                  {
+              void jev.ask(async (j) => {
+                const r = await j.evaluate({ state: {
                     before: impactFacts,
                     after: { ...impactFacts, [field]: value },
                     conclusions: conclusionsForJev,
-                  },
-                  Object.fromEntries(
+                  }, questions: Object.fromEntries(
                     conclusions.map((c) => [
                       c.id,
                       judge(
                         `Does conclusion ${c.id} need review because the facts changed? Ignore spelling-only changes.`,
                       ),
                     ]),
-                  ),
-                );
+                  ) });
                 setAnswers(r.answers);
                 setLast(r);
               })
             }
           />
-          <ErrorText error={error} />
+          {jev.failure && <LiveFailure failure={jev.failure} fallback="The conclusions on screen stay as they were." />}
           {last && <Receipt data={last === record ? { ...fromRecorded(last), raw: { request: recordedRequests.changes(), response: last } } : fromLive(last)} />}
           <State
             value={{

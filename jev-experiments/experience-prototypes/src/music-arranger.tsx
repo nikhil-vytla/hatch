@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Play, Square, Download, LockKeyhole, LockKeyholeOpen, Volume2, VolumeX, Undo2, RotateCcw, ArrowUp, ArrowDown, Sparkles, Headphones } from "lucide-react";
 import { Button, Field, Notice, State, Fold, Bars } from "./shared";
-import { run, download, getApiKey } from "./api";
+import { download } from "./api";
+import { useLiveAsk } from "./live-ask";
 import { fromLive, fromRecorded, Receipt } from "./receipt";
-import { KeyTag, ModeTag } from "./trust";
+import { KeyTag, LiveFailure, ModeTag } from "./trust";
 import { MoreControls } from "./more-controls";
 import { starterScore, makeCandidates, applyCandidate, phraseRequest, globalRequest, settingsFromAnswers, blankScore, playbackEvents, populateMidi, editNote, setTrack, stepPitch, noteName, keyName, CONTOURS, INSTRUMENTS, BarScore, Generation, type Score, type ScoreEvent, type Candidate, type InstrumentId } from "../../music-arranger-v2/engine";
 import "./music-arranger.css";
@@ -88,16 +89,16 @@ export function Music({ result }: { result: any }) {
   const [comparison, setComparison] = useState("jev");
   const [rowIndex, setRowIndex] = useState(0), [score, setScore] = useState<Score>(() => rows[0]?.score ?? starterScore()), [heard, setHeard] = useState<Score | null>(null);
   const [phrase, setPhrase] = useState(0), [selected, setSelected] = useState(""), [beat, setBeat] = useState(-1), [status, setStatus] = useState<"idle" | "starting" | "playing">("idle"), [pending, setPending] = useState(false), [audition, setAudition] = useState("");
-  const [busy, setBusy] = useState(false), [error, setError] = useState(""), [message, setMessage] = useState(""), [recommendation, setRecommendation] = useState<{ candidate: Candidate; result: any; version: number; phrase: number; request: any } | null>(null), [history, setHistory] = useState<Score[]>([]);
-  const engine = useRef<AudioEngine | null>(null), startGeneration = useRef(new Generation()), modelGeneration = useRef(new Generation()), latest = useRef(score), abort = useRef<AbortController | null>(null), alive = useRef(true);
+  const jev = useLiveAsk(), busy = jev.busy, [error, setError] = useState(""), [message, setMessage] = useState(""), [recommendation, setRecommendation] = useState<{ candidate: Candidate; result: any; version: number; phrase: number; request: any } | null>(null), [history, setHistory] = useState<Score[]>([]);
+  const engine = useRef<AudioEngine | null>(null), startGeneration = useRef(new Generation()), latest = useRef(score), alive = useRef(true);
   const playing = status === "playing", locked = score.phrases[phrase].locked, candidates = useMemo(() => makeCandidates(score, phrase), [score, phrase]);
   // The selected phrase's Jev decision: {request, result} when asked live here, the recorded decision otherwise.
   const decision: any = score.phrases[phrase].source === "jev" ? score.phrases[phrase].decision : null;
   const phraseDecision = decision ? (decision.result ? fromLive(decision.result, decision.request) : fromRecorded(decision, { raw: { request: (rows[rowIndex]?.calls ?? []).filter((c: any) => c.stage === decision.stage).pop()?.request, response: decision } })) : null;
   const note = score.events.find(e => e.id === selected), displayedScore = playing && heard ? heard : score, displayedPhrase = playing && beat >= 0 ? Math.floor(beat / 8) : phrase;
   function stop() { startGeneration.current.next(); engine.current?.dispose(); engine.current = null; setStatus("idle"); setBeat(-1); setPending(false); setHeard(null); setAudition(""); }
-  function cancelRequest() { modelGeneration.current.next(); abort.current?.abort(); abort.current = null; setBusy(false); }
-  useEffect(() => { alive.current = true; return () => { alive.current = false; startGeneration.current.next(); modelGeneration.current.next(); abort.current?.abort(); engine.current?.dispose(); engine.current = null; }; }, []);
+  function cancelRequest() { jev.cancel(); }
+  useEffect(() => { alive.current = true; return () => { alive.current = false; startGeneration.current.next(); engine.current?.dispose(); engine.current = null; }; }, []);
   function commit(next: Score, remember = true) {
     if (next === latest.current) return;
     cancelRequest(); setRecommendation(null);
@@ -118,41 +119,41 @@ export function Music({ result }: { result: any }) {
       engine.current = next; setHeard(target); setStatus("playing");
     } catch (e) { if (alive.current && startGeneration.current.valid(token)) { stop(); setError(e instanceof Error ? e.message : String(e)); } }
   }
+  /** The live action that failed, for "Try again". */
+  const again = useRef<(() => Promise<void>) | null>(null);
   async function askJev() {
-    if (!getApiKey()) { setError("Connect your Vercel AI Gateway key above to ask Jev. Recorded arrangements, editing and playback work without a key."); return; }
-    cancelRequest(); const token = modelGeneration.current.next(), version = latest.current.version, index = phrase, snapshot = latest.current;
-    const controller = new AbortController(); abort.current = controller; setBusy(true); setError(""); setMessage("");
+    again.current = askJev;
+    const version = latest.current.version, index = phrase, snapshot = latest.current;
+    setError(""); setMessage("");
     const pool = makeCandidates(snapshot, index), request = phraseRequest(snapshot, index, pool);
-    try {
-      const response = await run(request.state, request.questions, controller.signal);
-      if (!alive.current || !modelGeneration.current.valid(token) || latest.current.version !== version || latest.current.phrases[index].locked) return;
-      const candidate = pool.find(c => c.id === response.answers?.phrase?.value);
-      if (!candidate) throw new Error("Jev returned a candidate outside this phrase's pool.");
-      setRecommendation({ candidate, result: response, version, phrase: index, request }); setMessage(`Jev recommends “${candidate.title}”. Audition it, then accept it when you are ready.`);
-    } catch (e) { if (!controller.signal.aborted && alive.current) setError(e instanceof Error ? e.message : String(e)); }
-    finally { if (alive.current && modelGeneration.current.valid(token)) setBusy(false); }
+    const response = await jev.ask(request);
+    // The score moved on (an edit, a lock) while Jev was choosing: the answer is for another score.
+    if (!response || latest.current.version !== version || latest.current.phrases[index].locked) return;
+    const candidate = pool.find(c => c.id === response.answers?.phrase?.value);
+    if (!candidate) { setError("Jev returned a candidate outside this phrase's pool."); return; }
+    setRecommendation({ candidate, result: response, version, phrase: index, request }); setMessage(`Jev recommends “${candidate.title}”. Audition it, then accept it when you are ready.`);
   }
   async function arrange() {
-    if (!getApiKey()) { setError("Connect your Vercel AI Gateway key above to arrange a new brief. The recorded examples work without a key."); return; }
     if (score.phrases.some(p => p.locked)) { setError("Unlock all phrases before arranging a whole new score. Ask Jev about the selected unlocked phrase to preserve the rest."); return; }
-    cancelRequest(); const token = modelGeneration.current.next(), originalVersion = latest.current.version, snapshot = latest.current, controller = new AbortController(); abort.current = controller;
-    setBusy(true); setError(""); setMessage("Choosing a palette, then four phrases in musical context…");
-    try {
-      const request = globalRequest(snapshot.brief), response = await run(request.state, request.questions, controller.signal);
+    again.current = arrange;
+    const originalVersion = latest.current.version, snapshot = latest.current;
+    setError(""); setMessage("Choosing a palette, then four phrases in musical context…");
+    const next = await jev.ask(async (j) => {
+      const request = globalRequest(snapshot.brief), response = await j.evaluate(request);
       let next = blankScore(snapshot.brief, settingsFromAnswers(response.answers), snapshot.seed + 1);
       next.phrases = snapshot.phrases.map(p => ({ ...p, candidateId: "", source: "procedural", decision: undefined }));
       next.provenance = { kind: "Live Jev settings and contextual selections from procedural candidates.", decisions: [{ stage: "global", request, result: response }], edits: [] };
       for (let i = 0; i < 4; i++) {
-        if (!modelGeneration.current.valid(token) || latest.current.version !== originalVersion) return;
+        if (latest.current.version !== originalVersion) return null;
         setMessage(`Choosing phrase ${i + 1} of 4…`);
-        const pool = makeCandidates(next, i), input = phraseRequest(next, i, pool), output = await run(input.state, input.questions, controller.signal);
+        const pool = makeCandidates(next, i), input = phraseRequest(next, i, pool), output = await j.evaluate(input);
         const candidate = pool.find(c => c.id === output.answers?.phrase?.value); if (!candidate) throw new Error("Jev returned an unknown phrase candidate.");
         next = applyCandidate(next, i, candidate, "jev", { request: input, result: output });
       }
-      if (!alive.current || !modelGeneration.current.valid(token) || latest.current.version !== originalVersion) return;
-      next.version = originalVersion + 1; commit(next); setMessage("Four contextual choices are ready. Changes enter at the next bar while playing.");
-    } catch (e) { if (!controller.signal.aborted && alive.current) setError(e instanceof Error ? e.message : String(e)); }
-    finally { if (alive.current && modelGeneration.current.valid(token)) setBusy(false); }
+      return next;
+    });
+    if (!next || latest.current.version !== originalVersion) return;
+    next.version = originalVersion + 1; commit(next); setMessage("Four contextual choices are ready. Changes enter at the next bar while playing.");
   }
   function choose(candidate: Candidate, source: "user" | "jev", decision?: unknown) {
     if (score.phrases[phrase].locked) return;
@@ -185,6 +186,7 @@ export function Music({ result }: { result: any }) {
       {recommendation && recommendation.phrase===phrase && <div className="ma-recommendation"><span>Jev recommends</span><strong>{recommendation.candidate.title}</strong><p>{recommendation.candidate.description}</p><Button disabled={locked || recommendation.version!==score.version} onClick={()=>choose(recommendation.candidate,"jev",{request:recommendation.request,result:recommendation.result})}>Accept phrase</Button><Fold title="Choice distribution"><Bars values={recommendation.result.answers.phrase.probabilities ?? {}} selected={recommendation.candidate.id}/><p className="ma-fine-print">These values describe the model's choice, not listener ratings.</p></Fold></div>}
       </section>
     </aside></div>
+    {jev.failure&&<LiveFailure failure={jev.failure} onRetry={()=>void again.current?.()} fallback="Your score is preserved. Recorded arrangements, editing and playback work without a key."/>}
     {error&&<Notice error>{error}</Notice>}{message&&<Notice>{message}</Notice>}
     <section className="ma-candidate-section"><div className="ma-candidate-heading"><div><span className="ma-eyebrow">Procedural candidates · phrase {phrase+1}</span><h3>Six ways to carry the scene.</h3></div><p>These notes come from code. Jev selects for the brief and preceding phrase. You can choose any candidate yourself.</p></div><div className="ma-candidates">{candidates.map(c=><article key={c.id} className={score.phrases[phrase].candidateId===c.id?"selected":""}><div className="ma-candidate-title"><strong>{c.title}</strong><span>{c.contour}</span></div><MiniContour candidate={c}/><p>{c.description}</p><div><button aria-label={`Audition ${c.title}`} onClick={()=>{ const preview={...score, phrases:score.phrases.map((p,i)=>i===phrase?{...p,locked:false}:p)}; play(applyCandidate(preview,phrase,c,"user"),c.title,phrase); }}><Play size={12}/> Listen</button><button disabled={locked} onClick={()=>choose(c,"user")}>{score.phrases[phrase].candidateId===c.id?"Selected":"Use phrase"}</button></div></article>)}</div></section>
     <section className="ma-evidence"><div><strong>{rows.length} recorded arrangements</strong><span>{rows.filter((r:any)=>r.set==="original").length}/8 original briefs · {rows.filter((r:any)=>r.set==="contour").length}/6 additional contour briefs</span></div><p>Jev chooses among generated phrases using symbolic musical context. It does not hear this audio. {rows.length > 0 && `${rows.filter((r:any)=>r.set==="original").reduce((n:number,r:any)=>n+r.score.phrases.filter((p:any)=>p.contour==="arch").length,0)}/${rows.filter((r:any)=>r.set==="original").length*4} original-brief phrases use the arch shape, so selection diversity remains limited. `}Mechanical checks cover the score and MIDI; musical quality still needs independent listening.</p></section>

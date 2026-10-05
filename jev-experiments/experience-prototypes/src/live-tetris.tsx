@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { ArrowDown, ArrowLeft, ArrowRight, Pause, Play, RotateCcw, RotateCw } from "lucide-react";
-import { download, EvaluationError, getApiKey, run } from "./api";
+import { download, EvaluationError, getApiKey, useHasKey } from "./api";
+import { noKeyFailure, useLiveAsk } from "./live-ask";
+import { failureLine } from "./live-failure";
+import { LiveFailure } from "./trust";
 import { BuildThis } from "./build-this";
 import { boardFeatures, cells, ghost, PIECES, type Command, type Game, type Piece } from "../../packages/arena/src/tetris-engine";
 import { DECISION_INSTRUCTIONS as instructions, TetrisSession, type DecisionEvent, type Lane, type Settings, type Ticket } from "../../live-worlds/tetris/session";
@@ -31,30 +34,31 @@ export function LiveTetris({ active = true }: { result?: unknown; active?: boole
   const session = sessionRef.current;
   const [, setVersion] = useState(0), [focus, setFocus] = useState(0);
   const arena = useRef<(HTMLElement | null)[]>([]);
-  const liveRequests = useRef(new Map<string, { abort: AbortController; timer?: ReturnType<typeof setTimeout> }>());
+  // One Jev decision in flight per lane; a newer ticket for a lane supersedes its last.
+  const jevLanes = [useLiveAsk(), useLiveAsk()], hasKey = useHasKey();
+  const liveRequests = useRef(new Map<string, { lane: number; stopped: boolean; timer?: ReturnType<typeof setTimeout> }>());
   const refresh = () => setVersion(n => n + 1);
   function mutate(fn: () => void) { fn(); refresh(); }
   useEffect(() => {
     if (!active) { session.pause(); refresh(); return; }
     let disposed = false, last = performance.now(), lastPaint = 0, raf = 0;
     const launch = (ticket: Ticket) => {
-      const abort = new AbortController(), started = performance.now();
-      const entry: { abort: AbortController; timer?: ReturnType<typeof setTimeout> } = { abort };
+      const started = performance.now();
+      const entry: { lane: number; stopped: boolean; timer?: ReturnType<typeof setTimeout> } = { lane: ticket.lane, stopped: false };
       liveRequests.current.set(ticket.id, entry);
       const finish = (answer?: string, error?: string, response?: unknown, httpStatus?: number) => {
-        if (disposed || abort.signal.aborted) return;
+        if (disposed || entry.stopped) return;
         session.receive(ticket, answer, performance.now() - started, error, response, httpStatus); liveRequests.current.delete(ticket.id);
       };
       if (ticket.settings.source === "local") entry.timer = setTimeout(() => finish(ticket.suggested, undefined, { source: "local-timing-demo", modelCalled: false, artificialDelayMs: ticket.settings.delayMs, choice: ticket.suggested }), ticket.settings.delayMs);
-      else void run(ticket.request.state, ticket.request.questions, abort.signal)
-        .then(response => finish(response.answers?.decision?.value, undefined, response, 200))
-        .catch(error => { if (!abort.signal.aborted) finish(undefined, error instanceof Error ? error.message : String(error), error instanceof EvaluationError ? error.response : undefined, error instanceof EvaluationError ? error.status : undefined); });
+      else void jevLanes[ticket.lane].ask(ticket.request, { onFailure: (f, error) => finish(undefined, failureLine(f), error instanceof EvaluationError ? error.response : undefined, error instanceof EvaluationError ? error.status : undefined) })
+        .then(response => { if (response) finish(response.answers?.decision?.value, undefined, response, 200); });
     };
     const loop = (now: number) => {
       const elapsed = now - last; last = now;
       session.advance(elapsed);
       for (const [id, pending] of liveRequests.current) {
-        if (!session.pair.lanes.some(l => l.pending === id)) { pending.abort.abort(); clearTimeout(pending.timer); liveRequests.current.delete(id); }
+        if (!session.pair.lanes.some(l => l.pending === id)) { pending.stopped = true; jevLanes[pending.lane].cancel(); clearTimeout(pending.timer); liveRequests.current.delete(id); }
       }
       session.requests(Boolean(getApiKey())).forEach(launch);
       if (now - lastPaint >= 50) { lastPaint = now; refresh(); }
@@ -62,7 +66,7 @@ export function LiveTetris({ active = true }: { result?: unknown; active?: boole
     };
     const hide = () => { if (document.hidden) { session.pause(); last = performance.now(); refresh(); } };
     document.addEventListener("visibilitychange", hide); raf = requestAnimationFrame(loop);
-    return () => { disposed = true; cancelAnimationFrame(raf); document.removeEventListener("visibilitychange", hide); session.pause(); for (const request of liveRequests.current.values()) { request.abort.abort(); clearTimeout(request.timer); } liveRequests.current.clear(); };
+    return () => { disposed = true; cancelAnimationFrame(raf); document.removeEventListener("visibilitychange", hide); session.pause(); for (const request of liveRequests.current.values()) { request.stopped = true; clearTimeout(request.timer); } for (const lane of jevLanes) lane.cancel(); liveRequests.current.clear(); };
   }, [session, active]);
   const shown = session.shown, replay = session.cursor >= 0, seed = shown.seed;
   const update = (i: number, settings: Partial<Settings>) => mutate(() => session.configure(i, settings));
@@ -102,7 +106,7 @@ export function LiveTetris({ active = true }: { result?: unknown; active?: boole
         <Coverage lane={lane} />
         <DecisionStatus events={session.eventsThrough(shown.clockMs)} lane={i} />
         <details className="lt-lane-details"><summary>Timing and returned decisions</summary><label>{lane.settings.source === "local" ? "Artificial response delay" : "Local demo delay, inactive for Jev"}<input type="range" min="0" max="2400" step="50" disabled={replay || lane.settings.source === "jev"} value={lane.settings.delayMs} onChange={e => update(i, { delayMs: Number(e.target.value) })} /><output>{lane.settings.delayMs}ms</output></label><label>Time between request starts<input type="range" min="200" max="2400" step="100" disabled={replay} value={lane.settings.intervalMs} onChange={e => update(i, { intervalMs: Number(e.target.value) })} /><output>{lane.settings.intervalMs}ms</output></label><p>{lane.stats.accepted} accepted · {lane.stats.stale} stale · {lane.stats.failed} failed · {lane.stats.cancelled} cancelled</p><p>{instructions[lane.settings.framing]}</p></details>
-        {lane.settings.source === "jev" && !getApiKey() && <p className="lt-note">Connect your Gateway key above for Jev decisions. Gravity and the chosen fallback keep running without a key.</p>}
+        {lane.settings.source === "jev" && (!hasKey || jevLanes[i].failure) && <LiveFailure failure={hasKey ? jevLanes[i].failure! : noKeyFailure()} fallback={hasKey ? "Gravity and the chosen fallback keep running; the next decision is asked on schedule." : "Gravity and the chosen fallback keep running without a key."} />}
       </section>)}
     </div>
     <section className="lt-timeline"><div><h3>Same moment. A different next move.</h3><span>{session.history.length} paired checkpoints</span></div><label>Rewind both worlds<input aria-label="Rewind both Tetris boards" type="range" min="0" max={session.history.length - 1} value={replay ? session.cursor : session.history.length - 1} onChange={e => mutate(() => session.scrub(Number(e.target.value)))} /></label><div className="lt-timeline-actions"><button onClick={() => mutate(() => session.branch())}>Branch from this moment</button><button disabled={!replay} onClick={() => mutate(() => session.latest())}>Return to latest</button><button onClick={() => download("live-tetris-trajectory.json", session.export())}>Export trajectory</button></div><p>Scrubbing pauses both boards and sends no requests. A branch preserves both worlds, piece queues, controls and scores. Each preserved run can be restored.</p><div className="lt-timeline-actions"><button onClick={() => mutate(() => session.compareFrom(0))}>Compare both from board A</button><button onClick={() => mutate(() => session.compareFrom(1))}>Compare both from board B</button></div><p>Start a matched comparison from either board's current checkpoint. Both receive that board and piece queue; controllers start fresh and coverage counters restart. Each lane keeps its chosen source and assistance setting.</p><div className="lt-saved">{session.saved.map(saved => <button key={saved.id} onClick={() => mutate(() => session.restore(saved.id))}>{saved.label} · {(saved.tail.clockMs / 1000).toFixed(1)}s</button>)}</div></section>

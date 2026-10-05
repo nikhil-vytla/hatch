@@ -2,7 +2,7 @@ import { Tabs } from "radix-ui";
 import { useEffect, useRef, useState } from "react";
 import { toast, Toaster } from "sonner";
 import type { ArenaIndex, Card } from "../../../packages/arena/src/data/schema";
-import { getApiKey } from "../api";
+import { useHasKey } from "../api";
 import { CaseView } from "./case";
 import { Bars, Calibration, PerSeed, Scatter } from "./charts";
 import { defaults, formatValue, loadIndex, readView, viewHash, type View } from "./data";
@@ -222,7 +222,7 @@ function LensBody({ model: m }: { model: CardModel }) {
 }
 
 function CardArticle({ card, view }: { card: Card; view: View }) {
-  const m = useCardModel(card, view, Boolean(getApiKey()));
+  const m = useCardModel(card, view, useHasKey());
   const heading = useRef<HTMLHeadingElement>(null);
   const scene = SCENE_FOR.get(card.id);
   const measureApplies = m.lens === "bars" || m.lens === "per-item";

@@ -1,9 +1,11 @@
 import { memo, useEffect, useMemo, useReducer, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
 import { ArrowDownToLine, ArrowRight, Check, ChevronDown, Eraser, GitBranch, LoaderCircle, Pause, Play, Redo2, Sparkles, Undo2, X } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
-import { download, getApiKey, run } from "./api";
+import { download } from "./api";
+import { useLiveAsk } from "./live-ask";
+import { failureLine } from "./live-failure";
 import { fromLive, fromRecorded, Receipt } from "./receipt";
-import { KeyTag, ModeTag } from "./trust";
+import { KeyTag, LiveFailure, ModeTag } from "./trust";
 import { MoreControls } from "./more-controls";
 import { ENGINE_VERSION, HEIGHT, RECIPES, WIDTH, exportSvg, fitStroke, marks, point, recipe, sampleStroke, type Stroke } from "../../live-worlds/ghost-brush/engine";
 import { PROTOCOL, fingerprint, lexicalRank, parseRanking, requestFor } from "../../live-worlds/ghost-brush/model";
@@ -33,7 +35,8 @@ export function GhostBrush(_props: { result?: unknown } = {}) {
   const [keyboardPen, setKeyboardPen] = useState({ x: 360, y: 300, down: false, visible: false });
   const [keyError, setKeyError] = useState("");
   const reducedMotion = useReducedMotion(), svgRef = useRef<SVGSVGElement>(null), serial = useRef(0);
-  const inFlight = useRef<{ token: Token; controller: AbortController } | null>(null);
+  // The Jev request in flight, and the reducer token it answers.
+  const jev = useLiveAsk(), inFlight = useRef<Token | null>(null);
   const visibleStrokes = session.strokes.slice(0, session.cursor);
   const lastStroke = visibleStrokes.find(s => s.id === compareStroke) ?? visibleStrokes.at(-1);
   const demo = useMemo(() => sampleStroke(), []);
@@ -45,33 +48,34 @@ export function GhostBrush(_props: { result?: unknown } = {}) {
 
   useEffect(() => {
     const pending = inFlight.current;
-    if (pending && (pending.token.revision !== session.revision || pending.token.epoch !== session.epoch)) { pending.controller.abort(); inFlight.current = null; }
+    if (pending && (pending.revision !== session.revision || pending.epoch !== session.epoch)) { jev.cancel(); inFlight.current = null; }
   }, [session.revision, session.epoch]);
   useEffect(() => () => {
     const pending = inFlight.current;
     inFlight.current = null;
-    pending?.controller.abort();
+    jev.cancel();
     if (pending) dispatch({ type: "cancel" });
     dispatch({ type: "end" });
     setKeyboardPen(p => p.down ? { ...p, down: false } : p);
   }, []);
   useEffect(() => { if (!session.active) setKeyboardPen(p => p.down ? { ...p, down: false } : p); }, [session.active]);
 
-  function changePrompt(value: string) { setPrompt(value); setKeyError(""); dispatch({ type: "edit" }); }
+  function changePrompt(value: string) { setPrompt(value); setKeyError(""); jev.reset(); dispatch({ type: "edit" }); }
   async function interpret(source: "lexical" | "jev") {
     if (!prompt.trim()) { setKeyError("Write a style phrase first."); return; }
-    if (source === "jev" && !getApiKey()) { setKeyError("Connect your Jev key using the app's key control, then try again. Local preview is ready now."); return; }
-    setKeyError(""); inFlight.current?.controller.abort();
+    setKeyError(""); jev.reset();
+    if (source === "jev" && !jev.hasKey()) return;
     const token = { id: ++serial.current, epoch: session.epoch, revision: session.revision + 1 }, request = requestFor(prompt);
     dispatch({ type: "request", token, source, request });
     if (source === "lexical") { dispatch({ type: "resolve", token, ranking: lexicalRank(prompt), response: { algorithm: "Exact token or tag-prefix matches; count matches; bank order breaks ties.", modelCalled: false } }); return; }
-    const controller = new AbortController(); inFlight.current = { token, controller };
-    try { const response = await run(request.state, request.questions, controller.signal); if (controller.signal.aborted || inFlight.current?.token !== token) return; dispatch({ type: "resolve", token, ranking: parseRanking(response), response }); }
-    catch (error) { if (!controller.signal.aborted && inFlight.current?.token === token) dispatch({ type: "fail", token, error: error instanceof Error ? error.message : "Jev could not complete this request. The current brush is unchanged." }); }
-    finally { if (inFlight.current?.token === token) inFlight.current = null; }
+    inFlight.current = token;
+    const response = await jev.ask(request, { onFailure: f => { if (inFlight.current === token) dispatch({ type: "fail", token, error: failureLine(f) }); } });
+    if (inFlight.current !== token) return;
+    inFlight.current = null;
+    if (response) dispatch({ type: "resolve", token, ranking: parseRanking(response), response });
   }
   function loadExample(example: RecordedExample) {
-    inFlight.current?.controller.abort(); setPrompt(example.prompt); setKeyError("");
+    jev.reset(); inFlight.current = null; setPrompt(example.prompt); setKeyError("");
     const token = { id: ++serial.current, epoch: session.epoch, revision: session.revision + 1 };
     if (JSON.stringify(example.request.state.candidates) !== JSON.stringify(RECIPES)) { setKeyError("This recording belongs to a different recipe bank."); return; }
     dispatch({ type: "request", token, source: "recorded", request: example.request });
@@ -116,7 +120,7 @@ export function GhostBrush(_props: { result?: unknown } = {}) {
           <div><button title="Undo stroke" aria-label="Undo stroke" disabled={!session.cursor || !!session.active} onClick={() => dispatch({ type: "rewind", cursor: session.cursor - 1 })}><Undo2 size={17} /></button><button title="Redo stroke" aria-label="Redo stroke" disabled={session.cursor >= session.strokes.length || !!session.active} onClick={() => dispatch({ type: "rewind", cursor: session.cursor + 1 })}><Redo2 size={17} /></button><button onClick={drawExample} disabled={!!session.active || session.cursor >= 80}>Draw a sample</button><button onClick={() => dispatch({ type: "clear" })} disabled={!session.strokes.length || !!session.active}><Eraser size={15} /> Fresh sheet</button></div>
           <button className={compare ? "gb-active" : ""} onClick={() => setCompare(!compare)}><GitBranch size={15} /> Compare one stroke</button>
         </div>
-        <div className="gb-status" role="status" aria-live="polite">{busy && <LoaderCircle className="spin" size={14} />}{keyError || session.notice}</div>
+        <div className="gb-status" role="status" aria-live="polite">{busy && <LoaderCircle className="spin" size={14} />}{keyError || (jev.failure ? "" : session.notice)}</div>
         {compare && <motion.div className="gb-compare" initial={reducedMotion ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}><div className="gb-section-title"><div><strong>One gesture. Two materials.</strong><span>Same seed and path, fitted identically to both previews.</span></div><button aria-label="Close comparison" onClick={() => setCompare(false)}><X size={16} /></button></div><div className="gb-compare-controls"><label>Gesture<select value={lastStroke?.id ?? "sample"} onChange={e => setCompareStroke(Number(e.target.value))}>{!visibleStrokes.length && <option value="sample">Built-in sample</option>}{visibleStrokes.map((s, i) => <option key={s.id} value={s.id}>Stroke {i + 1} · {recipe(s.recipeId).name}</option>)}</select></label><label>Compare with<select value={rightId} onChange={e => setRightId(e.target.value)}>{RECIPES.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}</select></label></div><div className="gb-comparison-pair"><div><Sample stroke={compared} id={session.brushId} /><strong>{current.name}</strong></div><div><Sample stroke={compared} id={rightId} /><strong>{recipe(rightId).name}</strong><button onClick={() => dispatch({ type: "select", id: rightId })}>Use for next stroke <ArrowRight size={14} /></button></div></div><p>Comparison never repaints your sheet. Each finished stroke keeps its original recipe.</p></motion.div>}
         <MoreControls id="ghost-brush-history" what="Rewind, preserved variants and downloads">
         <details className="gb-history"><summary><span><GitBranch size={15} /> History & preserved variants</span><span>{session.variants.length} saved <ChevronDown size={14} /></span></summary><div className="gb-history-body"><label>Rewind to stroke {session.cursor} of {session.strokes.length}<input type="range" min="0" max={session.strokes.length || 1} value={session.cursor} disabled={!session.strokes.length || !!session.active} onChange={e => dispatch({ type: "rewind", cursor: Number(e.target.value) })} /></label><p>Drawing from an earlier point saves the old future. Restoring or clearing also preserves your current sheet. Variants live in this tab; export evidence before reloading.</p><div className="gb-save"><input aria-label="Variant name" placeholder="Name this version" value={variantName} onChange={e => setVariantName(e.target.value)} /><button disabled={!session.cursor || !!session.active} onClick={() => { dispatch({ type: "save", name: variantName }); setVariantName(""); }}>Preserve</button></div><div className="gb-variants">{session.variants.map(v => <button key={v.id} onClick={() => dispatch({ type: "restore", id: v.id })} disabled={!!session.active}><span>{v.name}</span><small>{v.cursor} strokes · restore</small></button>)}</div></div></details>
@@ -124,7 +128,7 @@ export function GhostBrush(_props: { result?: unknown } = {}) {
         </MoreControls>
       </div>
       <aside className="gb-studio">
-        <div className="gb-prompt-box">{EXAMPLES.length > 0 && <div className="gb-recorded gb-recorded-first"><span>Start with a recorded Jev decision <ModeTag mode="recorded" /></span><div>{EXAMPLES.map(e => <button key={e.id} data-first-action={e === EXAMPLES[0] || undefined} className="gb-primary" onClick={() => loadExample(e)}>{e.id === "quiet-fabric" ? "Blue fabric" : "Violet coral"}<ArrowRight size={12} /></button>)}</div><small>{EXAMPLES.length}/2 curated demos · {EXAMPLES.length * RECIPES.length} real judgments · no key needed. These are demonstrations, not a quality benchmark.</small></div>}<MoreControls id="ghost-brush-intent" what="Describe your own line and match a brush"><label htmlFor="gb-intent">What should the line feel like?</label><textarea id="gb-intent" value={prompt} maxLength={1200} onChange={e => changePrompt(e.target.value)} rows={3} /><div className="gb-prompt-chips">{PHRASES.slice(1).map((phrase, i) => <button key={phrase} onClick={() => changePrompt(phrase)}>{["Windblown", "Branching", "Golden dust"][i]}</button>)}</div><div className="gb-prompt-actions"><button onClick={() => void interpret("lexical")} disabled={!prompt.trim()}>Local preview</button><button onClick={() => void interpret("jev")} disabled={!prompt.trim() || busy}>{busy ? <LoaderCircle size={15} className="spin" /> : <Sparkles size={15} />} Try your own<KeyTag /></button></div><p>Local preview counts matching tags. Jev reads all 10 recipe descriptions using your key. Neither sees the drawing. Changes wait until you lift the pen.</p></MoreControls>{busy && <div className="gb-prompt-actions"><button aria-label="Cancel Jev request" onClick={() => dispatch({ type: "cancel" })}><X size={15} /></button></div>}</div>
+        <div className="gb-prompt-box">{EXAMPLES.length > 0 && <div className="gb-recorded gb-recorded-first"><span>Start with a recorded Jev decision <ModeTag mode="recorded" /></span><div>{EXAMPLES.map(e => <button key={e.id} data-first-action={e === EXAMPLES[0] || undefined} className="gb-primary" onClick={() => loadExample(e)}>{e.id === "quiet-fabric" ? "Blue fabric" : "Violet coral"}<ArrowRight size={12} /></button>)}</div><small>{EXAMPLES.length}/2 curated demos · {EXAMPLES.length * RECIPES.length} real judgments · no key needed. These are demonstrations, not a quality benchmark.</small></div>}<MoreControls id="ghost-brush-intent" what="Describe your own line and match a brush"><label htmlFor="gb-intent">What should the line feel like?</label><textarea id="gb-intent" value={prompt} maxLength={1200} onChange={e => changePrompt(e.target.value)} rows={3} /><div className="gb-prompt-chips">{PHRASES.slice(1).map((phrase, i) => <button key={phrase} onClick={() => changePrompt(phrase)}>{["Windblown", "Branching", "Golden dust"][i]}</button>)}</div><div className="gb-prompt-actions"><button onClick={() => void interpret("lexical")} disabled={!prompt.trim()}>Local preview</button><button onClick={() => void interpret("jev")} disabled={!prompt.trim() || busy}>{busy ? <LoaderCircle size={15} className="spin" /> : <Sparkles size={15} />} Try your own<KeyTag /></button></div><p>Local preview counts matching tags. Jev reads all 10 recipe descriptions using your key. Neither sees the drawing. Changes wait until you lift the pen.</p>{jev.failure && <LiveFailure failure={jev.failure} onRetry={() => void interpret("jev")} fallback={jev.failure.kind === "no-key" ? "Local preview is ready now." : "The current brush is unchanged, and local preview still works."} />}</MoreControls>{busy && <div className="gb-prompt-actions"><button aria-label="Cancel Jev request" onClick={() => dispatch({ type: "cancel" })}><X size={15} /></button></div>}</div>
         <div className="gb-bank-heading"><div><h3>The brush cabinet</h3><span>{latestRanking ? latest?.source !== "lexical" ? "Ordered by Jev's description fit" : "Ordered by local tag matches" : "10 recipes · 5 ways to make a mark"}</span></div><button title={motionOn ? "Pause sample animation" : "Animate samples"} aria-label={motionOn ? "Pause sample animation" : "Animate samples"} onClick={() => setMotionOn(!motionOn)}>{motionOn && !reducedMotion ? <Pause size={14} /> : <Play size={14} />}</button></div>
         {latestRanking && <p className="gb-score-note">{latest?.source !== "lexical" ? "Fit scores are model judgments, not calibrated confidence. " : "Counts are a simple lexical baseline. "}{latestRanking[0].score === 0 ? "No tags matched; bank order breaks the tie." : "Equal scores keep the original bank order."}{latest?.events.at(-1)?.status === "discarded" && " This result is archived and was not applied to the current phrase."}{latest?.request.state.intent !== prompt.trim() && <span className="gb-prior-phrase">These scores belong to “{latest?.request.state.intent}”. The edited phrase has not been evaluated.</span>}</p>}
         {latest?.source === "jev" ? <Receipt label="This ranking" data={fromLive(latest.response, latest.request)} /> : latest?.source === "recorded" ? <Receipt label="This ranking" data={{ ...recordedReceipt(latest.response), raw: { request: latest.request, response: latest.response } }} /> : null}

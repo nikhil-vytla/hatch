@@ -24,7 +24,9 @@ import { freeAnswers, fromJev, jevRequest, LOOKBACK, type TextAnswers } from "..
 import { attribute, match, score, type Truth } from "../../live-worlds/who-said-that/score";
 import type { Heard } from "../../live-worlds/who-said-that/signals";
 import { markdown, renumber } from "../../live-worlds/who-said-that/transcript";
-import { fetchJson, percent, run, useHasKey } from "./api";
+import { fetchJson, percent, useHasKey } from "./api";
+import { useLiveAsk } from "./live-ask";
+import { LiveFailure } from "./trust";
 import { formatCost, fromLiveBatches, fromRecorded, Receipt, type ReceiptData } from "./receipt";
 import "./who-said-that.css";
 
@@ -264,7 +266,7 @@ export function WhoSaidThat() {
   const audio = useRef<HTMLAudioElement>(null);
   const mic = useRef<{ stop: () => Promise<Float32Array> } | null>(null);
   const micTimer = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
-  const liveAbort = useRef<AbortController | null>(null);
+  const jevLive = useLiveAsk();
   const hasKey = useHasKey();
 
   useEffect(() => {
@@ -274,7 +276,7 @@ export function WhoSaidThat() {
   useEffect(() => {
     let alive = true;
 
-    liveAbort.current?.abort();
+    jevLive.reset();
     setTruth(null);
     setSignals(null);
     setJev(null);
@@ -328,8 +330,6 @@ export function WhoSaidThat() {
 
     return () => cancelAnimationFrame(raf);
   }, []);
-
-  useEffect(() => () => liveAbort.current?.abort(), []);
 
   const recordedJev = source === "recorded" && jev ? jev : null;
   const effectiveLane: Lane = lane === "jev" && !recordedJev ? "free" : lane === "live" && (!live || live.for !== heard) ? "free" : lane;
@@ -461,44 +461,45 @@ export function WhoSaidThat() {
 
   /** Jev answers the three text questions for every line, live on the visitor's key, four at a time. */
   const askJevLive = async () => {
-    liveAbort.current?.abort();
-
-    const abort = new AbortController();
     const target = heard;
     const bodies: unknown[] = new Array(target.length);
     const requests = target.map((_, i) => jevRequest(target, i));
-    let next = 0;
-    let done = 0;
 
-    liveAbort.current = abort;
-    setLiveNote(`Asking Jev about ${target.length} lines…`);
+    setLiveNote("");
 
-    const worker = async () => {
-      while (next < target.length && !abort.signal.aborted) {
-        const i = next++;
+    const ok = await jevLive.ask(async (j) => {
+      let next = 0;
+      let done = 0;
 
-        bodies[i] = await run(requests[i].state, requests[i].questions, abort.signal, { deadlineMs: 15_000, maxAttempts: 2 });
-        done++;
-        setLiveNote(`Jev has answered ${done} of ${target.length} lines…`);
-      }
-    };
+      setLiveNote(`Asking Jev about ${target.length} lines…`);
 
-    try {
+      const worker = async () => {
+        while (next < target.length && !j.signal.aborted) {
+          const i = next++;
+
+          bodies[i] = await j.evaluate(requests[i], { deadlineMs: 15_000, maxAttempts: 2 });
+          done++;
+          setLiveNote(`Jev has answered ${done} of ${target.length} lines…`);
+        }
+      };
+
+      // The first failure ends the ask, which aborts the other workers' requests.
       await Promise.all([worker(), worker(), worker(), worker()]);
 
-      if (abort.signal.aborted) return;
+      return true;
+    });
 
-      const answers = bodies.map((b, i) => fromJev((b as { answers: Record<string, Count & { value?: unknown }> }).answers, Math.min(LOOKBACK, i)));
+    // A newer ask has its own progress note.
+    if (jevLive.live.status.kind === "asking") return;
 
-      setLive({ answers, receipt: fromLiveBatches(bodies, requests), for: target });
-      setLane("live");
-      setLiveNote("");
-    } catch (e) {
-      if (abort.signal.aborted) return;
+    setLiveNote("");
 
-      abort.abort();
-      setLiveNote(`${e instanceof Error ? e.message : "Jev could not be reached."} The free answers are still shown.`);
-    }
+    if (!ok) return;
+
+    const answers = bodies.map((b, i) => fromJev((b as { answers: Record<string, Count & { value?: unknown }> }).answers, Math.min(LOOKBACK, i)));
+
+    setLive({ answers, receipt: fromLiveBatches(bodies, requests), for: target });
+    setLane("live");
   };
 
   const recordedCost = recordedJev ? recordedJev.receipts.reduce((s, r) => s + (r.costUsd ?? 0), 0) : null;
@@ -623,9 +624,8 @@ export function WhoSaidThat() {
         <button
           type="button"
           aria-pressed={effectiveLane === "live"}
-          disabled={!hasKey || !heard.length || liveNote.startsWith("Asking") || liveNote.startsWith("Jev has")}
+          disabled={!heard.length || jevLive.busy}
           onClick={() => (live && live.for === heard ? setLane("live") : void askJevLive())}
-          title={hasKey ? undefined : "Connect your AI Gateway key in Settings"}
         >
           Jev, live <small>{hasKey ? `your key · about ${formatCost(perLine * heard.length)}` : "needs your key"}</small>
         </button>
@@ -635,6 +635,7 @@ export function WhoSaidThat() {
           {liveNote}
         </p>
       )}
+      {jevLive.failure && <LiveFailure failure={jevLive.failure} onRetry={() => void askJevLive()} fallback="The free answers are still shown." />}
       {effectiveLane === "live" && live && <Receipt data={live.receipt} label="Jev, live" />}
 
       {scored && (

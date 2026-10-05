@@ -14,9 +14,9 @@ import {
   ReceiptText,
   SlidersHorizontal,
 } from "lucide-react";
-import { getApiKey, run } from "./api";
+import { useLiveAsk } from "./live-ask";
 import { fromLive, fromRecorded, Receipt } from "./receipt";
-import { KeyTag, ModeTag } from "./trust";
+import { KeyTag, LiveFailure, ModeTag } from "./trust";
 import { MoreControls } from "./more-controls";
 import {
   CONTRACT_VERSION,
@@ -396,16 +396,16 @@ export function Beverage({ result }: { result: any }) {
   const [scene, setScene] = useState<Scene>(() => fresh());
   const [mode, setMode] = useState<Source>("recorded");
   const [draft, setDraft] = useState("");
-  const [busy, setBusy] = useState(false),
-    [preparing, setPreparing] = useState(false),
+  const jev = useLiveAsk(),
+    busy = jev.busy;
+  const [preparing, setPreparing] = useState(false),
     [error, setError] = useState("");
   const [history, setHistory] = useState<Scene[]>([]),
     [decisions, setDecisions] = useState<Decision[]>([]);
   const [preferenceEditor, setPreferenceEditor] = useState(false),
     [revealed, setRevealed] = useState(false);
   const current = useRef<RequestTicket>({ session: 1, revision: 0 });
-  const request = useRef<AbortController | null>(null),
-    timer = useRef<ReturnType<typeof setTimeout> | null>(null),
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null),
     initialized = useRef(false);
   const rows: any[] = Array.isArray(result?.rows)
     ? result.rows.filter(
@@ -423,11 +423,10 @@ export function Beverage({ result }: { result: any }) {
       ...current.current,
       revision: current.current.revision + 1,
     };
-    request.current?.abort();
-    request.current = null;
+    // Aborts the request in flight and clears its failure: what's on screen moved on.
+    jev.reset();
     if (timer.current) clearTimeout(timer.current);
     timer.current = null;
-    setBusy(false);
     setPreparing(false);
   }
   function commit(next: Scene, label: string, remember = true) {
@@ -458,7 +457,6 @@ export function Beverage({ result }: { result: any }) {
   }, [result]);
   useEffect(
     () => {
-      setBusy(false);
       setPreparing(false);
       return () => invalidate();
     },
@@ -577,12 +575,6 @@ export function Beverage({ result }: { result: any }) {
     );
   }
   async function askJev() {
-    if (!getApiKey()) {
-      setError(
-        "Connect your Vercel AI Gateway key using the key control above, then try again.",
-      );
-      return;
-    }
     if (scene.transcript.length >= 12 && draft.trim()) {
       setError(
         "This visit has reached 12 turns. Start a new customer to continue.",
@@ -591,8 +583,6 @@ export function Beverage({ result }: { result: any }) {
     }
     invalidate();
     const ticket = { ...current.current };
-    const aborter = new AbortController();
-    request.current = aborter;
     const transcript: Turn[] = draft.trim()
       ? [
           ...scene.transcript,
@@ -612,44 +602,25 @@ export function Beverage({ result }: { result: any }) {
       inventory: scene.inventory,
       explicit: scene.explicit,
     };
-    setBusy(true);
     setError("");
-    try {
-      const response = await run(
-        publicState(input),
-        modelQuestions(),
-        aborter.signal,
-      );
-      if (aborter.signal.aborted || !isCurrent(ticket, current.current)) return;
-      const interpreted = interpret(response, input);
-      commit(
-        {
-          ...scene,
-          ...input,
-          preferences: interpreted.preferences,
-          recipe: interpreted.suggested,
-          question: interpreted.question,
-          source: "live",
-          response,
-          errors: interpreted.errors,
-          confirmed: false,
-        },
-        `Live Jev · turn ${transcript.length}`,
-      );
-      setDraft("");
-    } catch (e) {
-      if (isCurrent(ticket, current.current) && !aborter.signal.aborted)
-        setError(
-          e instanceof Error
-            ? e.message
-            : "Jev could not finish this request. Your draft is preserved.",
-        );
-    } finally {
-      if (isCurrent(ticket, current.current)) {
-        setBusy(false);
-        request.current = null;
-      }
-    }
+    const response = await jev.ask({ state: publicState(input), questions: modelQuestions() });
+    if (!response || !isCurrent(ticket, current.current)) return;
+    const interpreted = interpret(response, input);
+    commit(
+      {
+        ...scene,
+        ...input,
+        preferences: interpreted.preferences,
+        recipe: interpreted.suggested,
+        question: interpreted.question,
+        source: "live",
+        response,
+        errors: interpreted.errors,
+        confirmed: false,
+      },
+      `Live Jev · turn ${transcript.length}`,
+    );
+    setDraft("");
   }
   function changeCustomer(id: string) {
     const customer = CUSTOMERS.find((c) => c.id === id) ?? null;
@@ -1349,6 +1320,13 @@ export function Beverage({ result }: { result: any }) {
         </aside>
       </div>
 
+      {jev.failure && (
+        <LiveFailure
+          failure={jev.failure}
+          onRetry={() => void askJev()}
+          fallback="Your draft is preserved, and the drink on screen stays as it was. Recorded customers work without a key."
+        />
+      )}
       {error && (
         <div className="cafe-alert" role="alert">
           <Info size={17} />

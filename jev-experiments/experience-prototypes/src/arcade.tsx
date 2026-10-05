@@ -8,10 +8,11 @@ import {
   Gamepad2,
   Radio,
 } from "lucide-react";
-import { Pane, Button, Stat, Fold, State as StateView, Notice } from "./shared";
+import { Pane, Button, Stat, Fold, State as StateView } from "./shared";
 
 const OrbitalScene = lazy(() => import("./orbital-scene"));
-import { run, getApiKey } from "./api";
+import { useLiveAsk } from "./live-ask";
+import { LiveFailure } from "./trust";
 import { fromLive, fromRecorded, Receipt } from "./receipt";
 import {
   initial,
@@ -112,11 +113,10 @@ export function Arcade({ game, result }: { game: Game; result: any }) {
     [playing, setPlaying] = useState(false),
     [speed, setSpeed] = useState(350),
     [local, setLocal] = useState<State>(() => initial(game, 7)),
-    [liveRows, setLiveRows] = useState<any[]>([]),
-    [busy, setBusy] = useState(false),
-    [error, setError] = useState("");
-  const abort = useRef<AbortController | null>(null),
-    epoch = useRef(0),
+    [liveRows, setLiveRows] = useState<any[]>([]);
+  // One move in flight; hiding or leaving the scene aborts it.
+  const jev = useLiveAsk(),
+    busy = jev.busy,
     latest = useRef(local);
   latest.current = local;
   const episode =
@@ -129,30 +129,15 @@ export function Arcade({ game, result }: { game: Game; result: any }) {
       ? (entry?.state ?? episode?.state ?? initial(game, seed))
       : local;
   function reset(nextMode = mode, nextSeed = seed) {
-    abort.current?.abort();
-    epoch.current++;
-    setBusy(false);
+    jev.reset();
     setMode(nextMode);
     setPlaying(false);
     setIndex(0);
     setLocal(initial(game, nextSeed));
     setLiveRows([]);
-    setError("");
   }
-  useEffect(
-    () => {
-      setBusy(false);
-      setPlaying(false);
-      return () => {
-        epoch.current++;
-        abort.current?.abort();
-        abort.current = null;
-        setBusy(false);
-        setPlaying(false);
-      };
-    },
-    [],
-  );
+  // Coming back to the scene, it waits to be played again.
+  useEffect(() => () => setPlaying(false), []);
   useEffect(() => {
     if (!playing || mode !== "replay") return;
     const t = setInterval(
@@ -177,54 +162,31 @@ export function Arcade({ game, result }: { game: Game; result: any }) {
   }
   async function tick() {
     if (busy || latest.current.status !== "playing") return;
-    if (!getApiKey()) {
-      setError(
-        "Use Connect live in the header to provide your Vercel AI Gateway key.",
-      );
-      setPlaying(false);
-      return;
-    }
-    const generation = ++epoch.current;
     const current = latest.current;
-    setBusy(true);
-    setError("");
-    const controller = new AbortController();
-    abort.current?.abort();
-    abort.current = controller;
-    try {
-      const r = await run(
-        { policy: "Play the game described in the independent question." },
-        { action: question(current) },
-        controller.signal,
-      );
-      if (generation !== epoch.current || controller.signal.aborted) return;
-      const a = r.answers.action;
-      setLiveRows((rows) => {
-        setIndex(rows.length);
-        return [
-          ...rows,
-          {
-            state: current,
-            action: a.value,
-            probabilities: a.probabilities,
-            source: "typesafe-ai/jev",
-            latency_ms: r.latency_ms,
-            response: r,
-          },
-        ];
-      });
-      setLocal(advance(current, a.value));
-    } catch (e) {
-      if (generation === epoch.current && !controller.signal.aborted) {
-        setError(e instanceof Error ? e.message : String(e));
-        setPlaying(false);
-      }
-    } finally {
-      if (generation === epoch.current) {
-        setBusy(false);
-        abort.current = null;
-      }
-    }
+    const r = await jev.ask(
+      {
+        state: { policy: "Play the game described in the independent question." },
+        questions: { action: question(current) },
+      },
+      { onFailure: () => setPlaying(false) },
+    );
+    if (!r) return;
+    const a = r.answers.action;
+    setLiveRows((rows) => {
+      setIndex(rows.length);
+      return [
+        ...rows,
+        {
+          state: current,
+          action: a.value,
+          probabilities: a.probabilities,
+          source: "typesafe-ai/jev",
+          latency_ms: r.latency_ms,
+          response: r,
+        },
+      ];
+    });
+    setLocal(advance(current, a.value));
   }
   useEffect(() => {
     if (mode === "live" && playing && !busy && local.status === "playing") {
@@ -422,7 +384,13 @@ export function Arcade({ game, result }: { game: Game; result: any }) {
                 : "arrow keys to move horizontally, W to rise, and S to descend."}
             </p>
           )}
-          {error && <Notice error>{error}</Notice>}
+          {jev.failure && (
+            <LiveFailure
+              failure={jev.failure}
+              onRetry={() => void tick()}
+              fallback="The game stays paused on this move. Replays and manual play work without a key."
+            />
+          )}
           <div className="arcade-score-strip">
             <Stat label="Food or cores" value={String(state.score)} />
             <Stat label="Current decision" value={action?.action ?? "Ready"} />

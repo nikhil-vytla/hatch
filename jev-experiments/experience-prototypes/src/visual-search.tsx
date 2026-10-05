@@ -2,10 +2,11 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "motion/react";
 import { Search, ArrowUpRight, ArrowUp, ArrowDown, X, SlidersHorizontal, Sparkles, ImageOff, Download, LoaderCircle, RotateCcw, ChevronDown, Check } from "lucide-react";
 import { Button, Fold, Notice } from "./shared";
-import { download, getApiKey, run } from "./api";
+import { download } from "./api";
+import { useLiveAsk } from "./live-ask";
 import { fromRecorded, Receipt } from "./receipt";
 import { fromLog } from "./request-log";
-import { KeyTag } from "./trust";
+import { KeyTag, LiveFailure } from "./trust";
 import { MoreControls } from "./more-controls";
 /** Saved searches shown up front; the rest sit behind "More controls". */
 const FIRST_PRESETS = 4;
@@ -37,7 +38,7 @@ function ArtworkDetails({ work, query, scores, ranks, onClose, onRefine, manifes
 export function VisualSearch({ result }: { result: any }) {
   const works: Artwork[] = result.works ?? [], presets: any[] = result.queries?.length ? result.queries : PRESETS;
   const first = presets[0], [query, setQuery] = useState(first?.query ?? ""), [method, setMethod] = useState<Mode>(Object.keys(first?.scores?.caption ?? {}).length ? "caption" : Object.keys(first?.scores?.metadata ?? {}).length ? "metadata" : "lexical");
-  const [filter, setFilter] = useState("All media"), [limit, setLimit] = useState(24), [selected, setSelected] = useState<Artwork | null>(null), [busy, setBusy] = useState(false), [error, setError] = useState(""), [notice, setNotice] = useState("");
+  const [filter, setFilter] = useState("All media"), [limit, setLimit] = useState(24), [selected, setSelected] = useState<Artwork | null>(null), jev = useLiveAsk(), busy = jev.busy, [notice, setNotice] = useState("");
   const [live, setLive] = useState<Record<string, SearchRun>>({}), session = useRef(new SearchSession()), action = useRef(0), reduce = useReducedMotion();
   const normalized = normalizeQuery(query), preset = presets.find(p => normalizeQuery(p.query) === normalized), currentLive = live[normalized], recorded = preset?.scores;
   const lexical = useMemo(() => lexicalScores(works, normalized), [works, normalized]);
@@ -49,21 +50,24 @@ export function VisualSearch({ result }: { result: any }) {
   // The batches each live ranking sent, by query, for its receipt's "Build this".
   const sent = useRef<Record<string, unknown[]>>({});
   useEffect(() => () => session.current.cancel(), []);
-  function changeQuery(next: string, preferSaved = false) { session.current.cancel(); action.current++; setBusy(false); setError(""); setNotice(""); setQuery(next); setLimit(24); const saved = presets.find(p => normalizeQuery(p.query) === normalizeQuery(next)); setMethod(preferSaved && Object.keys(saved?.scores?.caption ?? {}).length ? "caption" : preferSaved && Object.keys(saved?.scores?.metadata ?? {}).length ? "metadata" : "lexical"); }
+  function changeQuery(next: string, preferSaved = false) { session.current.cancel(); action.current++; jev.reset(); setNotice(""); setQuery(next); setLimit(24); const saved = presets.find(p => normalizeQuery(p.query) === normalizeQuery(next)); setMethod(preferSaved && Object.keys(saved?.scores?.caption ?? {}).length ? "caption" : preferSaved && Object.keys(saved?.scores?.metadata ?? {}).length ? "metadata" : "lexical"); }
   async function rankWithJev() {
     if (!normalized) return;
-    if (!getApiKey()) { setError("Connect your own gateway key using Connect live, then rank this query. The key stays in memory."); return; }
-    const tag = ++action.current; setBusy(true); setError(""); setNotice(""); setMethod("caption");
+    if (!jev.hasKey()) return;
+    const tag = ++action.current; setNotice(""); setMethod("caption");
     const initial = currentLive && currentLive.completed < total ? currentLive.scores : undefined;
     if (!initial) sent.current[normalized] = [];
     if (!initial) setLive(previous => ({ ...previous, [normalized]: { query: normalized, scores: { metadata: {}, caption: {} }, completed: 0, total, batches: 0, elapsed_ms: 0, source: "live", errors: [] } }));
-    try {
-      const completedRun = await runSearch({ works, query: normalized, session: session.current, initial, evaluate: (batch, signal) => { (sent.current[normalized] ??= []).push(batch.payload); return run(batch.payload.state, batch.payload.questions, signal); }, onProgress: progress => { if (tag === action.current) { setLive(previous => ({ ...previous, [normalized]: progress })); if (progress.errors.length) setError(progress.errors.join(" ")); } } });
-      if (tag === action.current && completedRun) { setLive(previous => ({ ...previous, [normalized]: completedRun })); if (completedRun.errors.length) setError(completedRun.errors.join(" ")); }
-    } catch (e) { if (tag === action.current) setError(e instanceof Error ? e.message : String(e)); }
-    finally { if (tag === action.current) setBusy(false); }
+    const completedRun = await jev.ask(async (j) => {
+      // runSearch keeps the scores it got and stops at the first failed batch; that failure is the ask's.
+      let failed: unknown = null;
+      const run = await runSearch({ works, query: normalized, session: session.current, initial, evaluate: (batch) => { (sent.current[normalized] ??= []).push(batch.payload); return j.evaluate(batch.payload).catch(e => { failed = e; throw e; }); }, onProgress: progress => { if (tag === action.current) setLive(previous => ({ ...previous, [normalized]: progress })); } });
+      if (failed) throw failed;
+      return run;
+    });
+    if (tag === action.current && completedRun) setLive(previous => ({ ...previous, [normalized]: completedRun }));
   }
-  function cancel() { session.current.cancel(); action.current++; setBusy(false); setNotice("Stopped. Completed scores stay available for this query; late answers cannot change the gallery."); }
+  function cancel() { session.current.cancel(); action.current++; jev.cancel(); setNotice("Stopped. Completed scores stay available for this query; late answers cannot change the gallery."); }
   function exportRanking() { download("visual-search-ranking.json", { query: normalized, method, evidence: currentLive ? "live exploratory" : method === "lexical" ? "deterministic lexical" : "recorded", collection_sha256: result.manifest?.collection_sha256, protocol: result.protocol, works: all.map(r => ({ artwork_id: r.work.id, title: r.work.title, source: r.work.sourceUrl, score: r.score, rank: r.rank, tied: r.tied, unavailable: r.missing })) }); }
   return <div className="visual-search">
     <header className="vs-hero"><div className="vs-eyebrow"><span className="vs-dot" /> An open collection · {works.length} artworks</div><h2>Find a feeling.</h2><p>A place, a color, a little atmosphere.<br />Search the collection in your own words.</p><form className="vs-search-box" onSubmit={e => { e.preventDefault(); if (method !== "lexical") rankWithJev(); else setNotice("Keyword matches update as you type. Run Jev to compare the two semantic rankings."); }}><Search size={22} /><input aria-label="Describe the artwork you are looking for" value={query} onChange={e => changeQuery(e.target.value)} maxLength={800} placeholder="A quiet blue evening, reflected in water…" /><button type="button" onClick={() => changeQuery("")} aria-label="Clear search"><X size={16} /></button></form><div className="vs-presets" aria-label="Saved search queries">{presets.slice(0, FIRST_PRESETS).map((p, i) => <button key={p.id} data-first-action={i === 0 || undefined} className={preset?.id === p.id ? "selected" : ""} onClick={() => changeQuery(p.query, true)}>{p.title}</button>)}</div>{presets.length > FIRST_PRESETS && <MoreControls id="visual-search-presets" what={`${presets.length - FIRST_PRESETS} more saved searches`}><div className="vs-presets" aria-label="More saved search queries">{presets.slice(FIRST_PRESETS).map(p => <button key={p.id} className={preset?.id === p.id ? "selected" : ""} onClick={() => changeQuery(p.query, true)}>{p.title}</button>)}</div></MoreControls>}</header>
@@ -71,7 +75,7 @@ export function VisualSearch({ result }: { result: any }) {
     <div className="vs-rank-note"><div><strong>{method === "lexical" ? "Words in the museum record" : method === "metadata" ? "What the catalogue tells us" : "A little more context"}</strong><span>{method === "lexical" ? "Deterministic keyword overlap across titles, tags, metadata and captions." : method === "metadata" ? "Jev sees the title, artist, medium, place and museum tags. The caption is excluded." : "Jev sees the same metadata plus the museum's curatorial description. This is caption-based search, not direct vision."}</span></div>{busy && <div className="vs-run-control"><button onClick={cancel}><X size={13} /> Stop ranking</button></div>}</div>
     <MoreControls id="visual-search-tools" what="Media filter, export, and ranking your own query with Jev"><div className="vs-controls"><div className="vs-controls-right"><label><SlidersHorizontal size={13} /><span className="vs-sr-only">Media filter</span><select value={filter} onChange={e => { setFilter(e.target.value); setLimit(24); }}>{facets.map(f => <option key={f}>{f}</option>)}</select></label><button className="vs-export" onClick={exportRanking} aria-label="Export the complete ranking"><Download size={15} /></button></div>{!busy && <div className="vs-run-control"><button onClick={rankWithJev} disabled={!normalized}><Sparkles size={13} /> {currentLive && currentLive.completed < total ? "Continue Jev ranking" : "Rank all with Jev"}</button><KeyTag /><small>{currentLive ? "Your live query" : preset?.availability?.completed ? "Recorded query" : "Use your own key"} · both Jev methods</small></div>}</div></MoreControls>
     {method !== "lexical" && (currentLive ? <Receipt label="Your ranking" data={{ mode: "live", ms: currentLive.elapsed_ms, questions: currentLive.completed, at: new Date().toISOString(), raw: { request: sent.current[normalized], response: { ...currentLive, scores: undefined }, note: `${currentLive.batches} requests; the scores are in the exported ranking.` } }} /> : preset?.latency_ms ? <Receipt label="This ranking" data={{ ...fromRecorded(preset, { questions: completed || null, raw: { response: { ...preset, scores: undefined }, note: "The scores are in the exported ranking." } }), loadRequest: fromLog("/visual-search/evidence.jsonl", rows => rows.filter(r => r.event === "request" && r.query === preset.query && r.mode === method).map(r => r.payload)) }} /> : null)}
-    {error && <Notice error>{error} {completed > 0 && `${completed}/${total} responses are preserved; unfinished works remain marked unavailable.`}</Notice>}{notice && <Notice>{notice}</Notice>}
+    {jev.failure && <LiveFailure failure={jev.failure} onRetry={() => void rankWithJev()} fallback={completed > 0 ? `${completed}/${total} responses are preserved; unfinished works remain marked unavailable.` : "Keyword match and the recorded queries work without a key."} />}{notice && <Notice>{notice}</Notice>}
     {busy && <div className="vs-progress" role="status"><div><span><LoaderCircle size={13} className="spin" /> Reading the full collection</span><b>{completed}/{total}</b></div><i><motion.span animate={{ width: `${100 * completed / total}%` }} transition={{ duration: reduce ? 0 : .25 }} /></i></div>}
     {preset?.refinements?.length > 0 && <div className="vs-refinements"><span>Refine the scene</span>{preset.refinements.map((refinement: string) => <button key={refinement} onClick={() => changeQuery(`${normalized.replace(/[.!?]$/, "")}, ${refinement}.`)}>+ {refinement}</button>)}</div>}
     <div className="vs-gallery-heading"><span>{filtered.length} works{filter !== "All media" ? ` · ${filter.toLowerCase()}` : ""}{method !== "lexical" && ` · ${scored}/${works.length} scored`}</span><div>{comparison.complete && <span>{comparison.shared}/{comparison.k} top works shared across Jev methods <span title={comparison.note}>ⓘ</span></span>}{method !== "lexical" && scored < works.length && <em>{scored ? "Partial ranking" : "No model ranking yet"}</em>}</div></div>

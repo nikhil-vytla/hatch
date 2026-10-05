@@ -1,6 +1,4 @@
 import { useSyncExternalStore } from "react";
-import { describeFailure, failureLine } from "./live-failure";
-import { recordCall } from "./session-meter";
 
 // Deliberately in memory. Reloading or disconnecting forgets the key.
 let apiKey = "";
@@ -39,7 +37,7 @@ export class EvaluationError extends Error {
     this.name = "EvaluationError";
   }
 }
-/** What every live control says when no key is connected, before any request is sent. */
+/** What a request without a key is rejected with; live-ask.ts turns it into the shared no-key failure. */
 export const NO_KEY_MESSAGE =
   "Connect your AI Gateway key in Settings to run Jev live. Recorded examples work without one, and live runs are billed to your key.";
 
@@ -59,50 +57,6 @@ export const rememberRequest = (body: unknown, request: { state: unknown; questi
   if (body && typeof body === "object") sentRequests.set(body, request);
 };
 
-export async function run(
-  state: unknown,
-  questions: Record<string, unknown>,
-  signal?: AbortSignal,
-  /** Real-time callers set a short budget so a slow request fails fast instead of retrying for up to 48 s. */
-  budget?: { deadlineMs: number; maxAttempts: number },
-) {
-  requireKey();
-  let response: Response;
-  try {
-    response = await fetch("/api/evaluate", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${getApiKey()}`,
-        ...(budget ? { "x-jev-deadline-ms": String(budget.deadlineMs), "x-jev-max-attempts": String(budget.maxAttempts) } : {}),
-      },
-      body: JSON.stringify({ state, questions }),
-      signal,
-    });
-  } catch (e) {
-    // A cancelled request stays an AbortError; anything else never reached the server.
-    if (e instanceof DOMException && e.name === "AbortError") throw e;
-    throw new EvaluationError(failureLine(describeFailure(new TypeError(String(e)))), 0, null);
-  }
-  // The request reached the server, so it counts on the session meter whatever came back.
-  let body;
-  try {
-    body = await readResponse(response);
-  } catch (e) {
-    recordCall(false);
-    throw new EvaluationError(e instanceof Error ? e.message : String(e), response.status, null);
-  }
-  recordCall(response.ok, body);
-  if (!response.ok) {
-    const failed = new EvaluationError(body.error ?? "The run could not complete.", response.status, body);
-    const f = describeFailure(failed, NO_KEY_MESSAGE);
-    // Known states read the same everywhere; anything else keeps the server's own words.
-    failed.message = f.kind === "error" ? failed.message : failureLine(f);
-    throw failed;
-  }
-  if (body && typeof body === "object") sentRequests.set(body, { state, questions });
-  return body;
-}
 export const choice = (
   instructions: string,
   options: string[] | Record<string, string>,

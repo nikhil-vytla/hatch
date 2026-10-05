@@ -16,7 +16,8 @@ import {
   Volume2,
   X,
 } from "lucide-react";
-import { getApiKey, run } from "./api";
+import { useLiveAsk } from "./live-ask";
+import { LiveFailure } from "./trust";
 import { fromLive, fromRecorded, Receipt } from "./receipt";
 import {
   CATALOG,
@@ -71,7 +72,6 @@ export function Wardrobe({ result }: { result: any }) {
   const lastJevTurn = [...turns].reverse().find((t) => t.raw && t.provenance !== "manual");
   const [transcriptSource, setTranscriptSource] = useState("typed"),
     [text, setText] = useState(""),
-    [busy, setBusy] = useState(false),
     [message, setMessage] = useState(
       "Start with a jacket. Then add a little attitude.",
     ),
@@ -82,8 +82,10 @@ export function Wardrobe({ result }: { result: any }) {
     [inspect, setInspect] = useState(false),
     [speak, setSpeak] = useState(false),
     [listening, setListening] = useState(false);
+  // The command in flight; a newer command, an edit, or leaving the scene aborts it.
+  const jev = useLiveAsk(),
+    busy = jev.busy;
   const ticket = useRef({ session: 0, revision: 0 }),
-    request = useRef<AbortController | null>(null),
     recognition = useRef<any>(null),
     speaking = useRef(false),
     mounted = useRef(true);
@@ -117,9 +119,7 @@ export function Wardrobe({ result }: { result: any }) {
       ...ticket.current,
       revision: ticket.current.revision + 1,
     };
-    request.current?.abort();
-    request.current = null;
-    setBusy(false);
+    jev.reset();
   };
   const say = (value: string) => {
     setMessage(value);
@@ -146,7 +146,6 @@ export function Wardrobe({ result }: { result: any }) {
   };
   useEffect(() => {
     mounted.current = true;
-    setBusy(false);
     setListening(false);
     const controller = new AbortController();
     const remote = remoteVideo.current;
@@ -355,40 +354,13 @@ export function Wardrobe({ result }: { result: any }) {
   };
   const submit = async (command = text, commandSource = transcriptSource) => {
     if (!command.trim()) return;
-    if (!getApiKey()) {
-      say(
-        "Connect your Jev key in Live mode above to interpret a new command. You can still use the wardrobe controls.",
-      );
-      return;
-    }
     invalidate();
-    const controller = new AbortController();
-    request.current = controller;
     const sent = { ...ticket.current };
-    setBusy(true);
     setText(command);
-    try {
-      const response = await run(
-        editState(outfitRef.current, command),
-        editQuestions(outfitRef.current),
-        controller.signal,
-      );
-      if (controller.signal.aborted || !mounted.current || !currentTicket(sent, ticket.current)) return;
-      accept(response, command, "live-jev", commandSource);
-      setText("");
-    } catch (e) {
-      if (!controller.signal.aborted && mounted.current && currentTicket(sent, ticket.current))
-        say(
-          e instanceof Error
-            ? e.message
-            : "Jev could not interpret that change.",
-        );
-    } finally {
-      if (currentTicket(sent, ticket.current)) {
-        setBusy(false);
-        request.current = null;
-      }
-    }
+    const response = await jev.ask({ state: editState(outfitRef.current, command), questions: editQuestions(outfitRef.current) });
+    if (!response || !mounted.current || !currentTicket(sent, ticket.current)) return;
+    accept(response, command, "live-jev", commandSource);
+    setText("");
   };
   const replay = () => {
     const index = demoStep >= DEMO_COMMANDS.length ? 0 : demoStep,
@@ -788,6 +760,13 @@ export function Wardrobe({ result }: { result: any }) {
                   <ArrowRight size={16} />
                 </button>
               </div>
+              {jev.failure && (
+                <LiveFailure
+                  failure={jev.failure}
+                  onRetry={() => void submit()}
+                  fallback="The outfit stays as it is, and the wardrobe controls still work."
+                />
+              )}
               <small>
                 Dictation starts only when pressed. Your browser may send audio
                 to its speech service. Review the transcript before sending; Jev

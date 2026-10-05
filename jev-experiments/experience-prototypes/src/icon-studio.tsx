@@ -1,11 +1,12 @@
-import { createElement, useEffect, useMemo, useRef, useState } from "react";
+import { createElement, useEffect, useMemo, useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
 import { ArrowUpRight, Check, Copy, Download, Pin, Search, X } from "lucide-react";
 import { Button, Fold, Notice } from "./shared";
-import { download, getApiKey, run } from "./api";
+import { download } from "./api";
+import { useLiveAsk } from "./live-ask";
 import { fromLiveBatches, fromRecorded, Receipt } from "./receipt";
 import { fromLog } from "./request-log";
-import { KeyTag, ModeTag } from "./trust";
+import { KeyTag, LiveFailure, ModeTag } from "./trust";
 import { MoreControls } from "./more-controls";
 import { presets, shards, shardQuestion, finalQuestion, finalists, lexical, type LibraryIcon } from "../../icon-studio/protocol";
 import "./icon-studio.css";
@@ -25,8 +26,8 @@ export function IconStudio({ result }: { result: any }) {
   const [selected, setSelected] = useState(""), [pinned, setPinned] = useState<string[]>([]), [filter, setFilter] = useState("");
   const [mode, setMode] = useState<"all" | "finalists" | "pinned">("finalists"), [limit, setLimit] = useState(48);
   const [stroke, setStroke] = useState(1.7), [size, setSize] = useState(24), [color, setColor] = useState("#678a76");
-  const [busy, setBusy] = useState(false), [progress, setProgress] = useState(0), [error, setError] = useState(""), [notice, setNotice] = useState("");
-  const [live, setLive] = useState<any>(null), generation = useRef(0), controller = useRef<AbortController | null>(null), reduce = useReducedMotion();
+  const jev = useLiveAsk(), busy = jev.busy, [progress, setProgress] = useState(0), [error, setError] = useState(""), [notice, setNotice] = useState("");
+  const [live, setLive] = useState<any>(null), reduce = useReducedMotion();
   const saved = result.rows?.find((r: any) => r.title === title && r.context === context && r.status === "complete"), evidence = live ?? saved;
   const icons = library?.icons ?? [], byId = useMemo(() => new Map(icons.map(i => [i.id, i])), [icons]);
   const pick = selected || (evidence?.picked !== "none" ? evidence?.picked : ""), icon = byId.get(pick);
@@ -42,34 +43,30 @@ export function IconStudio({ result }: { result: any }) {
     }).catch(e => { if (!abort.signal.aborted) setError(e.message); });
     return () => abort.abort();
   }, [result.library.sha256]);
-  useEffect(() => {
-    setBusy(false);
-    return () => { generation.current++; controller.current?.abort(); controller.current = null; setBusy(false); };
-  }, [result.library.sha256]);
-  function stop(message = "Stopped. A partial tournament is not presented as a final choice.") { generation.current++; controller.current?.abort(); controller.current = null; setBusy(false); setNotice(message); }
-  function change(nextTitle: string, nextContext: string) { stop(""); setTitle(nextTitle); setContext(nextContext); setLive(null); setSelected(""); setError(""); setProgress(0); setLimit(48); }
+  // A new library ends any search over the old one.
+  useEffect(() => () => jev.cancel(), [result.library.sha256]);
+  function stop(message = "Stopped. A partial tournament is not presented as a final choice.") { jev.cancel(); setNotice(message); }
+  function change(nextTitle: string, nextContext: string) { stop(""); jev.reset(); setTitle(nextTitle); setContext(nextContext); setLive(null); setSelected(""); setError(""); setProgress(0); setLimit(48); }
   async function match() {
-    if (!getApiKey()) { setError("Connect your own Gateway key using Connect live, then find an icon. The key stays in memory."); return; }
     if (!library || !title.trim()) return;
-    const tag = ++generation.current, abort = new AbortController(); controller.current?.abort(); controller.current = abort;
-    setBusy(true); setError(""); setNotice(""); setProgress(0); setLive(null); setSelected("");
-    const groups = shards(icons), answers: Record<string, any> = {}, calls: any[] = [], state = { title, context }, started = performance.now();
-    try {
+    setError(""); setNotice(""); setProgress(0); setLive(null); setSelected("");
+    const groups = shards(icons), state = { title, context }, started = performance.now();
+    const found = await jev.ask(async (j) => {
+      const answers: Record<string, any> = {}, calls: any[] = [];
       for (let start = 0; start < groups.length; start += 8) {
         const questions = Object.fromEntries(groups.slice(start, start + 8).map((g, i) => ["shard_" + (start + i), shardQuestion(g)]));
-        const output = await run(state, questions, abort.signal);
-        if (tag !== generation.current || abort.signal.aborted) return;
+        const output = await j.evaluate({ state, questions });
         Object.assign(answers, output.answers); calls.push({ state, questions, output }); setProgress(Math.min(start + 8, groups.length));
       }
       const winners = finalists(groups, answers), questions = { icon: finalQuestion(winners) };
-      const output = winners.length ? await run(state, questions, abort.signal) : null;
-      if (tag !== generation.current || abort.signal.aborted) return;
+      const output = winners.length ? await j.evaluate({ state, questions }) : null;
       if (output) calls.push({ state, questions, output });
       const answer = output?.answers.icon, picked = answer?.value ?? "none";
       if (picked !== "none" && !winners.some(i => i.id === picked)) throw Error("The final answer is outside the candidate set.");
-      setLive({ title, context, status: "complete", finalists: winners.map(i => i.id), shardAnswers: answers, answer, picked, calls, elapsed_ms: performance.now() - started }); setMode("finalists");
-    } catch (e) { if (tag === generation.current && !abort.signal.aborted) setError(e instanceof Error ? e.message : String(e)); }
-    finally { if (tag === generation.current) { setBusy(false); controller.current = null; } }
+      return { title, context, status: "complete", finalists: winners.map(i => i.id), shardAnswers: answers, answer, picked, calls, elapsed_ms: performance.now() - started };
+    });
+    if (!found) return;
+    setLive(found); setMode("finalists");
   }
   function pin(id: string) { setPinned(items => items.includes(id) ? items.filter(i => i !== id) : [...items, id]); }
   async function copy(kind: "svg" | "react") {
@@ -84,6 +81,7 @@ export function IconStudio({ result }: { result: any }) {
     <div className="is-presets" aria-label="Recorded icon searches"><span className="is-presets-label">Recorded searches <ModeTag mode="recorded" /></span>{presets.map((p, i) => <button key={p.id} data-first-action={i === 0 || undefined} className={title === p.title && context === p.context ? "selected" : ""} onClick={() => change(p.title, p.context)}>{p.title}</button>)}</div>
     <div className="is-workbench"><section className="is-intent"><label>What does the element say?<input value={title} maxLength={200} onChange={e => change(e.target.value, context)} /></label><MoreControls id="icon-studio-search" what="Describe where it's used and search with Jev"><label>Where will someone use it?<textarea rows={3} value={context} maxLength={1500} onChange={e => change(title, e.target.value)} /></label>{!busy && <div className="is-run"><Button secondary onClick={match} disabled={!library || !title.trim()}><Search size={14} /> Try your own<KeyTag /></Button></div>}<p className="is-help">Jev chooses among {icons.length || result.library.count} existing Lucide icons using their names. The artwork comes from the library. Group winners meet in a final comparison.</p></MoreControls><div className="is-run">{busy && <Button secondary onClick={() => stop()}><X size={14} /> Stop search</Button>}<small>{busy ? `${progress}/${Math.ceil(icons.length / 64)} groups evaluated` : live ? "Your live search" : saved ? "Recorded search" : "Browse locally or connect a key"}</small></div>{busy && <div className="is-progress"><motion.i animate={{ width: `${progress / Math.ceil(icons.length / 64) * 100}%` }} transition={{ duration: reduce ? 0 : .25 }} /></div>}{live?.calls?.length ? <Receipt label={`${live.calls.length} requests`} data={fromLiveBatches(live.calls.map((c: any) => c.output))} /> : !live && saved?.requests?.length ? <Receipt label={`${saved.requests.length} requests`} data={{ ...fromRecorded({}, { questions: Object.keys(saved.shardAnswers ?? {}).length + (saved.answer ? 1 : 0) || null, raw: { response: { requests: saved.requests, picked: saved.picked, answer: saved.answer }, note: "Request timestamps are in the downloadable request log." } }), loadRequest: fromLog("/icon-studio/evidence.jsonl", rows => saved.requests.map((id: string) => rows.find(r => r.kind === "request" && r.id === id)?.body).filter(Boolean)) }} /> : null}</section>
     <section className="is-preview" aria-label="Selected icon in product contexts"><div className="is-preview-top"><span>{selected ? "Your selection" : evidence ? "Jev’s selection" : "Select an icon below"}</span><button disabled={!icon} onClick={() => icon && pin(icon.id)} aria-label={icon && pinned.includes(icon.id) ? "Unpin selected icon" : "Pin selected icon"}><Pin size={15} fill={icon && pinned.includes(icon.id) ? "currentColor" : "none"} /></button></div><div className="is-specimen"><motion.div key={pick} initial={{ opacity: reduce ? 1 : 0, scale: reduce ? 1 : .85 }} animate={{ opacity: 1, scale: 1 }}><Glyph icon={icon} size={76} stroke={stroke} color={color} /></motion.div><strong>{icon?.label ?? (evidence?.picked === "none" ? "No suitable icon" : "A symbol belongs here")}</strong></div><div className="is-contexts"><div className="is-context-nav"><span>Workspace</span><div className="is-context-item"><Glyph icon={icon} size={size} stroke={stroke} color={color} /><span>{title || "Your label"}</span><small>12</small></div></div><div className="is-context-card"><Glyph icon={icon} size={Math.max(24, size)} stroke={stroke} color={color} /><strong>{title || "Your label"}</strong><span>See it as a feature card</span></div><div className="is-context-action"><span className="is-preview-button"><Glyph icon={icon} size={size} stroke={stroke} color={color} />{title || "Your label"}</span><small>Button preview</small></div></div><MoreControls id="icon-studio-style" what="Stroke, size, color, and copy as SVG or React"><div className="is-style"><label>Stroke <b>{stroke.toFixed(1)}</b><input aria-label="Icon stroke width" type="range" min="1" max="3" step="0.1" value={stroke} onChange={e => setStroke(Number(e.target.value))} /></label><label>Size <b>{size}px</b><input aria-label="Icon size" type="range" min="16" max="32" step="2" value={size} onChange={e => setSize(Number(e.target.value))} /></label><label>Color<input aria-label="Icon color" type="color" value={color} onChange={e => setColor(e.target.value)} /></label></div><div className="is-export"><button disabled={!icon} onClick={() => copy("svg")}><Copy size={12} /> Copy SVG</button><button disabled={!icon} onClick={() => copy("react")}>React</button><button disabled={!icon} onClick={() => icon && download(`${icon.id}.svg`, svgText(icon, stroke, color, size), "image/svg+xml")}><Download size={12} /> SVG</button></div></MoreControls></section></div>
+    {jev.failure && <LiveFailure failure={jev.failure} onRetry={() => void match()} fallback="A partial tournament is not presented as a final choice. The recorded search and local browsing still work." />}
     {error && <Notice error>{error}</Notice>}{notice && <Notice>{notice}</Notice>}
     <MoreControls id="icon-studio-gallery" what={`Whole library, pinned icons${pinned.length ? ` (${pinned.length})` : ""} and filter by name`}><div className="is-gallery-toolbar"><div>{(["finalists", "all", "pinned"] as const).map(m => <button className={mode === m ? "selected" : ""} key={m} onClick={() => { setMode(m); setLimit(48); }}>{m === "finalists" ? "Jev finalists" : m === "all" ? "Whole library" : `Pinned · ${pinned.length}`}</button>)}</div><label><Search size={14} /><input aria-label="Filter icons by name" placeholder="Filter by icon name" value={filter} onChange={e => { setFilter(e.target.value); setLimit(48); }} /></label></div></MoreControls>
     <p className="is-gallery-note">{mode === "finalists" && evidence ? `${candidates.length} group winners. Shown alphabetically, not as a global ranking.` : mode === "pinned" ? "Your shortlist stays here while you explore other contexts. Pins stay in this page only." : "All library icons, ordered by a simple keyword match. This local baseline does not understand your intent."}{evidence?.picked === "none" && " Jev abstained in the final comparison."}</p>
