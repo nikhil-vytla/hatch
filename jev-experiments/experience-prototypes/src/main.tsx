@@ -2,7 +2,7 @@ import { Activity, useEffect, useState, useRef, Suspense, lazy } from "react";
 import { createRoot } from "react-dom/client";
 import { MotionConfig } from "motion/react";
 import { ArrowUpRight, ArrowRight, KeyRound, Settings2, X } from "lucide-react";
-import { lookup, retiredScene } from "./catalog";
+import { lookup, retiredScene } from "./scenes";
 import { Button, Field } from "./shared";
 import { getApiKey, setApiKey } from "./api";
 import { SessionMeter } from "./trust";

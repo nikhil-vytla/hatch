@@ -10,6 +10,7 @@ import { AnswerKey } from "../answer-key";
 import { fetchJson, percent1 as pct } from "../api";
 import { RecordDate } from "../receipt";
 import { REPO } from "../repo";
+import type { SceneIdIn } from "../scenes";
 import { Cite } from "./cite";
 import { Report } from "./report";
 
@@ -21,7 +22,10 @@ const Source = ({ path, children }: { path: string; children: ReactNode }) => (
 );
 
 /** What each benchmark page measures, said without its results: the headline strip above states those. */
-const SCOPE: Record<string, { title: string; abstract: (result: any) => ReactNode; data: string; source: { path: string; label: string } }> = {
+type Scope = { title: string; abstract: (result: any) => ReactNode; data: string; source: { path: string; label: string } };
+
+/** Every report scene but the answer key, which has its own report below. */
+const SCOPE: Record<Exclude<SceneIdIn<"report">, "answer-key">, Scope> = {
   "open-decisions": {
     title: "Open decisions",
     abstract: () => (
@@ -123,7 +127,7 @@ function DataLinks({ file, source }: { file: string; source: { path: string; lab
 }
 
 /** A benchmark scene inside the report frame: scope, the scene as its results, data and a citation. */
-export function BenchmarkReport({ id, result, children }: { id: string; result: any; children: ReactNode }) {
+export function BenchmarkReport({ id, result, children }: { id: keyof typeof SCOPE; result: any; children: ReactNode }) {
   const scope = SCOPE[id];
   const recorded = useRecorded(id, result);
 

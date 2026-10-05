@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { experiments, retiredScene } from "./catalog";
+import { scenes, retiredScene } from "./scenes";
 import { START_PATHS } from "./start-here";
 
 describe("start here", () => {
@@ -13,7 +13,7 @@ describe("start here", () => {
   });
 
   test("every scene card points at a live catalog scene", () => {
-    const ids = new Set(experiments.map((e) => e.id));
+    const ids = new Set<string>(scenes.map((s) => s.id));
 
     for (const c of START_PATHS.flatMap((p) => p.cards)) {
       if (!c.scene) continue;

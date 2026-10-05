@@ -4,10 +4,10 @@
  */
 import type React from "react";
 import { ArrowUpRight } from "lucide-react";
-import { lookup } from "./catalog";
+import { lookup, type SceneId } from "./scenes";
 import { REPO } from "./repo";
 import { cardLineFor } from "./headline-strip";
-import { DIAGRAMS, diagramText, SceneDiagram } from "./scene-diagrams";
+import { diagramText, SceneDiagram } from "./scene-diagrams";
 
 
 type Card = {
@@ -16,13 +16,13 @@ type Card = {
   /** What you'll do there, in a few words. */
   action: string;
   /** The catalog scene whose diagram and result line the card shows, if it is one. */
-  scene?: string;
+  scene?: SceneId;
   external?: boolean;
 };
 
 export type StartPath = { id: string; title: string; who: string; cards: Card[] };
 
-const scene = (id: string, action: string): Card => ({ href: `#experiment/${id}`, title: lookup(id).title, action, scene: id });
+const scene = (id: SceneId, action: string): Card => ({ href: `#experiment/${id}`, title: lookup(id).title, action, scene: id });
 
 export const START_PATHS: StartPath[] = [
   {
@@ -61,14 +61,12 @@ export const START_PATHS: StartPath[] = [
   },
 ];
 
-function Diagram({ id }: { id: string }) {
-  const d = DIAGRAMS[id];
-
-  if (!d) return null;
+function Diagram({ id }: { id: SceneId }) {
+  const d = lookup(id).diagram;
 
   return (
     <span className="card-diagram">
-      <SceneDiagram id={id} />
+      <SceneDiagram d={d} />
       <span className="sr-only">{diagramText(d)}</span>
     </span>
   );

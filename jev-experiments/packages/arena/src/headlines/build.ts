@@ -9,7 +9,7 @@ import { join } from "node:path";
 import { scamComparison, type RecordedRow } from "../../../../live-worlds/rumour/compare";
 import type { Vectors } from "../../../../live-worlds/rumour/similarity";
 import { createTown } from "../../../../live-worlds/rumour/town";
-import { experiments } from "../../../../experience-prototypes/src/catalog";
+import { scenes } from "../../../../experience-prototypes/src/scenes";
 import {
   answerKeyHeadline,
   decisionsInUiHeadline,
@@ -113,7 +113,7 @@ export function loadHeadlineInputs(lab: string, app: string): HeadlineInputs {
     oneBox: arena?.cards.find((c) => c.id === "one-box") ?? null,
     spine,
     count,
-    records: experiments.map((e) => ({ id: e.id, result: e.data ? (read<{ result?: RecordResult }>(join(app, `public/data/${e.data}.json`))?.result ?? null) : null })),
+    records: scenes.map((s) => ({ id: s.id, result: s.record ? (read<{ result?: RecordResult }>(join(app, `public/data/${s.record}.json`))?.result ?? null) : null })),
   };
 }
 

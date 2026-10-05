@@ -2,43 +2,7 @@
  * How each scene asks Jev, as a tiny schematic for the collection cards: what goes in, and the
  * typed answer that comes out. Monochrome ink with one accent for the answer.
  */
-export type Diagram = { from: string[]; to: string };
-
-export const DIAGRAMS: Record<string, Diagram> = {
-  paste: { from: ["copied page", "form"], to: "fact per field" },
-  ui: { from: ["request"], to: "layout choices" },
-  games: { from: ["what it sees"], to: "next move" },
-  music: { from: ["motif"], to: "arrangement" },
-  "semantic-table": { from: ["each row"], to: "yes/no per column" },
-  beverage: { from: ["craving"], to: "next question" },
-  verify: { from: ["claim", "trace"], to: "supported?" },
-  search: { from: ["query", "sources"], to: "which answers" },
-  classify: { from: ["request"], to: "1 of 77 intents" },
-  handoff: { from: ["answer", "confidence"], to: "act or ask" },
-  "decisions-in-ui": { from: ["keystrokes", "confidence"], to: "card or ask" },
-  "open-decisions": { from: ["prompt"], to: "label odds" },
-  decoy: { from: ["A", "B", "A′"], to: "choice" },
-  prose: { from: ["question", "78 rewordings"], to: "yes/no shift" },
-  spine: { from: ["claim", "your push"], to: "hold or update" },
-  judge: { from: ["answer A", "answer B"], to: "which is better" },
-  rewardbench2: { from: ["prompt", "answer"], to: "preferred?" },
-  snake: { from: ["board"], to: "next move" },
-  "local-models": { from: ["state"], to: "typed answers" },
-  "answer-key": { from: ["5 models' answers"], to: "whose key?" },
-  tetris: { from: ["board"], to: "landing" },
-  "drawing-framing": { from: ["canvas"], to: "pixel or shape" },
-  "visual-search": { from: ["query", "artwork"], to: "relevance" },
-  wardrobe: { from: ["spoken edit"], to: "outfit" },
-  "icon-studio": { from: ["idea"], to: "1 of 1,703 icons" },
-  "rumour-mill": { from: ["rumour", "resident"], to: "share or argue" },
-  "win-over": { from: ["your line", "listener"], to: "intent · mood · move" },
-  ocean: { from: ["fish's view"], to: "next move" },
-  "who-said-that": { from: ["a line", "lines before"], to: "continues · replies" },
-  eyes: { from: ["screenshot", "or facts"], to: "next move" },
-  count: { from: ["photo", "or its boxes"], to: "how many" },
-  "ghost-brush": { from: ["gesture", "feeling"], to: "brush style" },
-  "screen-sentry": { from: ["page block"], to: "hijack risk" },
-};
+import type { Diagram } from "./scenes";
 
 /** The diagram as words, for screen readers and search. */
 export const diagramText = (d: Diagram) => `Asks Jev: ${d.from.join(", ")} → ${d.to}`;
@@ -51,11 +15,7 @@ const ARROW = 20;
 
 const width = (s: string) => Math.ceil(s.length * CHAR) + PAD * 2;
 
-export function SceneDiagram({ id }: { id: string }) {
-  const d = DIAGRAMS[id];
-
-  if (!d) return null;
-
+export function SceneDiagram({ d }: { d: Diagram }) {
   let x = 1;
 
   const boxes = d.from.map((label) => {

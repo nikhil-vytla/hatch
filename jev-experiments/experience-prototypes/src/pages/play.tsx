@@ -1,10 +1,10 @@
 import { useState } from "react";
 import { ArrowUpRight, Search } from "lucide-react";
-import { experiments, categories } from "../catalog";
+import { scenes, categories, type Diagram } from "../scenes";
 import { listedNotes } from "../notes/manifest";
 import { FoolJev } from "../fool-jev";
 import { cardLineFor, homeHeadline, ShareCardButton } from "../headline-strip";
-import { DIAGRAMS, diagramText, SceneDiagram } from "../scene-diagrams";
+import { diagramText, SceneDiagram } from "../scene-diagrams";
 import { StartHere } from "../start-here";
 import "./play.css";
 
@@ -13,14 +13,10 @@ import "./play.css";
 const home = homeHeadline();
 
 /** How the scene asks Jev, drawn small, with the same thing in words for screen readers. */
-function CardDiagram({ id }: { id: string }) {
-  const d = DIAGRAMS[id];
-
-  if (!d) return null;
-
+function CardDiagram({ d }: { d: Diagram }) {
   return (
     <span className="card-diagram">
-      <SceneDiagram id={id} />
+      <SceneDiagram d={d} />
       <span className="sr-only">{diagramText(d)}</span>
     </span>
   );
@@ -34,7 +30,7 @@ function CardResult({ id }: { id: string }) {
 }
 
 // A plan for future work is available from About, not advertised as a playground.
-const catalog = experiments;
+const catalog = scenes;
 export function PlayPage() {
   const [category, setCategory] = useState("All");
   const [query, setQuery] = useState("");
@@ -130,7 +126,7 @@ export function PlayPage() {
         <div className="play-catalog-list">
           {matches.map((experiment) => (
             <a key={experiment.id} href={`#experiment/${experiment.id}`}>
-              <CardDiagram id={experiment.id} />
+              <CardDiagram d={experiment.diagram} />
               <span className="play-catalog-category">{experiment.category}</span>
               <h3>{experiment.title}</h3>
               <CardResult id={experiment.id} />

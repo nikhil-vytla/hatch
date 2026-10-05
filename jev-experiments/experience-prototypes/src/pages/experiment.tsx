@@ -1,184 +1,31 @@
-import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { ArrowLeft } from "lucide-react";
-import { experiments, lookup, retiredScene, type Experiment } from "../catalog";
+import { liveScene, lookup, retiredScene, type Scene } from "../scenes";
+import { sceneViews, type ViewProps } from "../scene-views";
 import { Pane, Notice } from "../shared";
 import { Provenance, SourceCredit } from "../provenance";
 import { HeadlineStrip } from "../headline-strip";
 import { experimentNotes } from "../notes/manifest";
 import { RecordDate } from "../receipt";
 import { EvidenceDrawer } from "../formats/evidence-drawer";
-import { GAME_PAGES, gameEvidence } from "../formats/game-evidence";
-import { REPORT_PAGES } from "../formats/report-pages";
+import { gameEvidence } from "../formats/game-evidence";
 import "./experiment.css";
 
-/** Game pages: the headline result comes after the game, so play starts first. Benchmark pages lead with it. */
-const STRIP_AFTER = new Set(["ocean", "win-over", "rumour-mill", "screen-sentry", "eyes", "count"]);
-
-const Paste = lazy(() => import("../new-experiments").then(m => ({ default: m.Paste })));
-const LayoutStudy = lazy(() => import("../layout-study").then(m => ({ default: m.LayoutStudy })));
-const JudgmentsScene = lazy(() => import("../judgments-scene").then(m => ({ default: m.JudgmentsScene })));
-const GeneratedUI = lazy(() => import("../generated-ui").then(m => ({ default: m.GeneratedUI })));
-const Games = lazy(() => import("../games").then(m => ({ default: m.Games })));
-const IntentRecognition = lazy(() => import("../intent-recognition").then(m => ({ default: m.IntentRecognition })));
-const Handoff = lazy(() => import("../handoff").then(m => ({ default: m.Handoff })));
-const DecisionsArticle = lazy(() => import("../formats/decisions-article").then(m => ({ default: m.DecisionsArticle })));
-const DecoyArticle = lazy(() => import("../formats/decoy-article").then(m => ({ default: m.DecoyArticle })));
-const SpineArticle = lazy(() => import("../formats/spine-article").then(m => ({ default: m.SpineArticle })));
-const ProseArticle = lazy(() => import("../formats/prose-article").then(m => ({ default: m.ProseArticle })));
-const ScreenSentry = lazy(() => import("../screen-sentry").then(m => ({ default: m.ScreenSentry })));
-const OpenDecisions = lazy(() => import("../open-decisions").then(m => ({ default: m.OpenDecisions })));
-const OceanReef = lazy(() => import("../ocean-reef").then(m => ({ default: m.OceanReef })));
-const AnswerKeyReport = lazy(() => import("../formats/reports").then(m => ({ default: m.AnswerKeyReport })));
-const BenchmarkReport = lazy(() => import("../formats/reports").then(m => ({ default: m.BenchmarkReport })));
-const RewardBench = lazy(() => import("../rewardbench").then(m => ({ default: m.RewardBench })));
-const LocalModels = lazy(() => import("../local-models").then(m => ({ default: m.LocalModels })));
-const AgentExperiment = lazy(() => import("../agent-experiments").then(m => ({ default: m.AgentExperiment })));
-const Music = lazy(() => import("../music-arranger").then(m => ({ default: m.Music })));
-const JudgeBench = lazy(() => import("../judgment-reliability").then(m => ({ default: m.JudgeBench })));
-const Beverage = lazy(() => import("../cafe-jev").then(m => ({ default: m.Beverage })));
-const VisualSearch = lazy(() => import("../visual-search").then(m => ({ default: m.VisualSearch })));
-const Wardrobe = lazy(() => import("../wardrobe").then(m => ({ default: m.Wardrobe })));
-const IconStudio = lazy(() => import("../icon-studio").then(m => ({ default: m.IconStudio })));
-const TetrisExperience = lazy(() => import("../tetris-experience").then(m => ({ default: m.TetrisExperience })));
-const GhostBrush = lazy(() => import("../ghost-brush").then(m => ({ default: m.GhostBrush })));
-const RumourMill = lazy(() => import("../rumour-mill").then(m => ({ default: m.RumourMill })));
-const WinOver = lazy(() => import("../win-over").then(m => ({ default: m.WinOver })));
-const DrawingFraming = lazy(() => import("../outcome-framing").then(m => ({ default: m.DrawingFraming })));
-const WhoSaidThat = lazy(() => import("../who-said-that").then(m => ({ default: m.WhoSaidThat })));
-const ArcadeScene = lazy(() => import("../arcade-scene").then(m => ({ default: m.ArcadeScene })));
-const EyesVsState = lazy(() => import("../eyes-vs-state").then(m => ({ default: m.EyesVsState })));
-const CountWithMe = lazy(() => import("../count-with-me").then(m => ({ default: m.CountWithMe })));
-
 const cache = new Map<string, any>();
-async function load(name: string) {
-  if (!cache.has(name)) {
-    // RewardBench's full document holds every case's answer texts; its page loads a light
-    // index and fetches one case at a time. The full document stays at /data for download.
-    const response = await fetch(name === "rewardbench2" ? "/rewardbench2/index.json" : `/data/${name}.json`);
+async function load(url: string) {
+  if (!cache.has(url)) {
+    const response = await fetch(url);
     if (!response.ok) throw new Error("No recorded run is attached yet.");
-    cache.set(name, await response.json());
+    cache.set(url, await response.json());
   }
-  return cache.get(name);
+  return cache.get(url);
 }
 
-function View({
-  exp,
-  result,
-  composition,
-}: {
-  exp: Experiment;
-  result: any;
-  composition: any;
-}) {
-  switch (exp.id) {
-    case "eyes":
-      return <EyesVsState />;
-    case "count":
-      return <CountWithMe />;
-    case "snake":
-      return <ArcadeScene result={result} />;
-    case "local-models":
-      return (
-        <BenchmarkReport id="local-models" result={result}>
-          <LocalModels result={result} />
-        </BenchmarkReport>
-      );
-    case "answer-key":
-      return <AnswerKeyReport result={result} />;
-    case "paste":
-      return <Paste record={result} />;
-    case "semantic-table":
-      return <JudgmentsScene record={result} />;
-    case "ui":
-      return (
-        <>
-          <GeneratedUI record={composition} />
-          <LayoutStudy result={result} />
-        </>
-      );
-    case "music":
-      return <Music result={result} />;
-    case "games":
-      return <Games result={result} />;
-    case "beverage":
-      return <Beverage result={result} />;
-    case "judge":
-      return (
-        <BenchmarkReport id="judge" result={result}>
-          <JudgeBench result={result} />
-        </BenchmarkReport>
-      );
-    case "tetris":
-      return <TetrisExperience result={result} />;
-    case "drawing-framing":
-      return <DrawingFraming result={result} />;
-    case "visual-search":
-      return <VisualSearch result={result} />;
-    case "wardrobe":
-      return <Wardrobe result={result} />;
-    case "icon-studio":
-      return <IconStudio result={result} />;
-    case "ghost-brush":
-      return <GhostBrush />;
-    case "rumour-mill":
-      return <RumourMill />;
-    case "win-over":
-      return <WinOver />;
-    case "who-said-that":
-      return <WhoSaidThat />;
-    case "classify":
-      return (
-        <BenchmarkReport id="classify" result={result}>
-          <IntentRecognition result={result} />
-        </BenchmarkReport>
-      );
-    case "handoff":
-      return (
-        <>
-          <Handoff result={result} />
-          <p className="fine">
-            <a href="#experiment/decisions-in-ui">Decisions in an interface</a> reads this beside One box: what the same
-            confidence does while someone types.
-          </p>
-        </>
-      );
-    case "decisions-in-ui":
-      return <DecisionsArticle result={result} />;
-    case "ocean":
-      return <OceanReef />;
-    case "decoy":
-      return <DecoyArticle />;
-    case "prose":
-      return <ProseArticle />;
-    case "spine":
-      return <SpineArticle />;
-    case "screen-sentry":
-      return <ScreenSentry />;
-    case "open-decisions":
-      return (
-        <BenchmarkReport id="open-decisions" result={result}>
-          <OpenDecisions />
-        </BenchmarkReport>
-      );
-    case "rewardbench2":
-      return (
-        <BenchmarkReport id="rewardbench2" result={result}>
-          <RewardBench result={result} />
-        </BenchmarkReport>
-      );
-    case "verify":
-    case "search":
-      return <AgentExperiment id={exp.id} result={result} />;
-    default:
-      return (
-        <Pane title="Experiment unavailable">
-          <Notice>
-            This experiment does not have a view yet.{" "}
-            <a href="#/">Return to experiments</a>.
-          </Notice>
-        </Pane>
-      );
-  }
+/** The URL of a published record. */
+const recordUrl = (record: string) => `/data/${record}.json`;
+
+function View({ scene, ...props }: ViewProps & { scene: Scene }) {
+  return sceneViews[scene.id](props);
 }
 /** An old link to a scene taken out of the catalog: say why, where to go, and keep its record. */
 function RetiredScene({ id }: { id: string }) {
@@ -231,7 +78,7 @@ function UnknownScene({ id }: { id: string }) {
 export function ExperimentPage({ id }: { id: string }) {
   if (retiredScene(id)) return <RetiredScene id={id} />;
 
-  return experiments.some((e) => e.id === id) ? <LiveExperimentPage id={id} /> : <UnknownScene id={id} />;
+  return liveScene(id) ? <LiveExperimentPage id={id} /> : <UnknownScene id={id} />;
 }
 
 function LiveExperimentPage({ id }: { id: string }) {
@@ -241,7 +88,7 @@ function LiveExperimentPage({ id }: { id: string }) {
     [error, setError] = useState(""),
     [aboutOpen, setAboutOpen] = useState(false);
   // Game pages keep play first and open their evidence in a drawer instead of the inline fold.
-  const drawer = GAME_PAGES.has(id);
+  const drawer = exp.format === "game";
   const record = recordSlot?.id === id ? recordSlot.value : null;
   const loadedRecord = useRef(recordSlot);
   loadedRecord.current = recordSlot;
@@ -256,13 +103,13 @@ function LiveExperimentPage({ id }: { id: string }) {
     setError("");
     setAboutOpen(false);
     // Scenes without a published record bring their own data.
-    if (exp.data === "") {
+    if (exp.record === null) {
       setRecord({ result: {} });
       return () => {
         alive = false;
       };
     }
-    load(exp.data)
+    load(exp.loads ?? recordUrl(exp.record))
       .then((r) => {
         if (alive) setRecord(r);
       })
@@ -279,9 +126,10 @@ function LiveExperimentPage({ id }: { id: string }) {
   useEffect(() => {
     // The second UI recording may still be loading when the scene is hidden.
     // Its lifecycle must not depend on whether the main recording has arrived.
-    if (id !== "ui" || composition) return;
+    const companion = exp.companion;
+    if (!companion || composition) return;
     let alive = true;
-    load("composed-ui")
+    load(recordUrl(companion))
       .then((r) => alive && setComposition(r.result))
       .catch(() => {});
     return () => { alive = false; };
@@ -289,11 +137,11 @@ function LiveExperimentPage({ id }: { id: string }) {
   const about = (
     <>
       {note && <p><a href={`#/notes/${note.slug}`}>Read the note: {note.title} →</a></p>}
-      {record && exp.id !== "local-models" && <Provenance result={record.result ?? {}} />}
+      {record && !exp.ownProvenance && <Provenance result={record.result ?? {}} />}
     </>
   );
   const downloadLink = (
-    <a href={`/data/${id === "ui" ? "composed-ui" : exp.data}.json`} download>
+    <a href={recordUrl(exp.companion ?? exp.record ?? "")} download>
       Download evidence ↓
     </a>
   );
@@ -331,7 +179,7 @@ function LiveExperimentPage({ id }: { id: string }) {
           {about}
         </section>
       )}
-      {!STRIP_AFTER.has(id) && <HeadlineStrip id={id} title={exp.title} />}
+      {exp.strip !== "after" && <HeadlineStrip id={id} title={exp.title} />}
       {error && <Notice error>{error}</Notice>}
       {record ? (
         <Suspense
@@ -344,7 +192,7 @@ function LiveExperimentPage({ id }: { id: string }) {
           <RecordDate.Provider value={String(record.manifest?.created ?? record.manifest?.prepared_at ?? "") || null}>
             <View
               key={id}
-              exp={exp}
+              scene={exp}
               result={record.result ?? {}}
               composition={composition}
             />
@@ -355,9 +203,9 @@ function LiveExperimentPage({ id }: { id: string }) {
           <span className="loader" /> Opening the experiment…
         </div>
       )}
-      {STRIP_AFTER.has(id) && record && <HeadlineStrip id={id} title={exp.title} />}
+      {exp.strip === "after" && record && <HeadlineStrip id={id} title={exp.title} />}
       {/* Report pages give their data and date in their own Data and Cite sections. */}
-      {record?.manifest && !REPORT_PAGES.has(id) && (
+      {record?.manifest && exp.format !== "report" && (
         <p className="record-footer">
           {/* Older records name their date prepared_at; say only what's there. */}
           {(() => {

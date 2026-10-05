@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { retiredScene } from "../catalog";
+import { retiredScene } from "../scenes";
 import { noteRetirement, type Note } from "./manifest";
 
 /** "2026-09-22" → "22 September 2026", read as a calendar date (no time zone shift). */

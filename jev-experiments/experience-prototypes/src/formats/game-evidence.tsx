@@ -12,10 +12,8 @@ import { SENTRY_CAVEATS, SentryData, SentryMethod, SentryResults } from "../scre
 import { SPINE_CAVEATS, SpineData, SpineMethod, SpineResults } from "../spine-evidence";
 import { COUNT_CAVEATS, CountDataNote, CountMethod, CountResults } from "../count-with-me-evidence";
 import { WHO_CAVEATS, WhoData, WhoMethod, WhoResults } from "../who-said-that-evidence";
+import type { SceneIdIn } from "../scenes";
 import type { EvidenceTab } from "./evidence-drawer";
-
-/** Pages that use the game format: play first, evidence in a drawer. */
-export const GAME_PAGES = new Set(["ocean", "rumour-mill", "win-over", "snake", "games", "tetris", "eyes", "screen-sentry", "who-said-that", "spine", "count"]);
 
 
 const source = (path: string, label = path) => (
@@ -72,7 +70,8 @@ function ReefResults() {
 
 type Scene = { results?: ReactNode; method?: ReactNode; caveats: ReactNode[]; data: ReactNode };
 
-const SCENES: Record<string, Scene> = {
+/** Every game-format scene's drawer; a game scene without one is a type error. */
+const SCENES: Record<SceneIdIn<"game">, Scene> = {
   "screen-sentry": {
     results: <SentryResults />,
     method: <SentryMethod />,
@@ -197,7 +196,7 @@ const SCENES: Record<string, Scene> = {
 
 /** The drawer's tabs for a game page; `about` is the page's existing About material, or null when it has none. */
 export function gameEvidence(id: string, about: ReactNode | null, download: ReactNode): EvidenceTab[] {
-  const s = SCENES[id];
+  const s: Scene | undefined = Object.hasOwn(SCENES, id) ? SCENES[id as SceneIdIn<"game">] : undefined;
   const aboutTab: EvidenceTab[] = about === null ? [] : [{ id: "about", label: "About", content: about }];
 
   if (!s) return aboutTab;
