@@ -9,10 +9,10 @@ import { clusteredAgreement, KEY_MODELS, type Interval, type Key, type Question 
 import { AnswerKey } from "../answer-key";
 import { fetchJson, percent1 as pct } from "../api";
 import { RecordDate } from "../receipt";
+import { REPO } from "../repo";
 import { Cite } from "./cite";
 import { Report } from "./report";
 
-const REPO = "https://github.com/nikhil-vytla/hatch/tree/main/jev-experiments";
 
 const Source = ({ path, children }: { path: string; children: ReactNode }) => (
   <a href={`${REPO}/${path}`} target="_blank" rel="noreferrer">

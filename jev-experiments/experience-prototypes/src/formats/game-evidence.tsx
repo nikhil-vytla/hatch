@@ -6,6 +6,7 @@
 import type { ReactNode } from "react";
 import heldout from "../../../live-worlds/ocean/heldout.json";
 import { percent } from "../api";
+import { REPO } from "../repo";
 import { PROMPTS } from "../../../live-worlds/eyes/model";
 import { SENTRY_CAVEATS, SentryData, SentryMethod, SentryResults } from "../screen-sentry-evidence";
 import { SPINE_CAVEATS, SpineData, SpineMethod, SpineResults } from "../spine-evidence";
@@ -16,7 +17,6 @@ import type { EvidenceTab } from "./evidence-drawer";
 /** Pages that use the game format: play first, evidence in a drawer. */
 export const GAME_PAGES = new Set(["ocean", "rumour-mill", "win-over", "snake", "games", "tetris", "eyes", "screen-sentry", "who-said-that", "spine", "count"]);
 
-const REPO = "https://github.com/nikhil-vytla/hatch/tree/main/jev-experiments";
 
 const source = (path: string, label = path) => (
   <a href={`${REPO}/${path}`} target="_blank" rel="noreferrer">

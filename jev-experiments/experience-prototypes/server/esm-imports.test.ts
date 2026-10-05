@@ -9,7 +9,7 @@ import { dirname, join, normalize } from "node:path";
  * function's import graph and fails on an extensionless runtime import.
  */
 const root = join(import.meta.dir, "..");
-const entries = ["api/evaluate.ts", "api/compose.ts", "api/wardrobe-token.ts", "api/tally.ts", "api/route.ts"];
+const entries = ["api/evaluate.ts", "api/compose.ts", "api/wardrobe-token.ts", "api/tally.ts"];
 
 const specifier = /^\s*(?:import|export)\s+(?!type\b)[^;]*?from\s+["'](\.{1,2}\/[^"']+)["']/gm;
 

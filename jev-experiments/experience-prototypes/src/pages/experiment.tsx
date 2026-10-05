@@ -19,7 +19,6 @@ const LayoutStudy = lazy(() => import("../layout-study").then(m => ({ default: m
 const JudgmentsScene = lazy(() => import("../judgments-scene").then(m => ({ default: m.JudgmentsScene })));
 const GeneratedUI = lazy(() => import("../generated-ui").then(m => ({ default: m.GeneratedUI })));
 const Games = lazy(() => import("../games").then(m => ({ default: m.Games })));
-const Learning = lazy(() => import("../benchmarks").then(m => ({ default: m.Learning })));
 const IntentRecognition = lazy(() => import("../intent-recognition").then(m => ({ default: m.IntentRecognition })));
 const Handoff = lazy(() => import("../handoff").then(m => ({ default: m.Handoff })));
 const DecisionsArticle = lazy(() => import("../formats/decisions-article").then(m => ({ default: m.DecisionsArticle })));
@@ -167,7 +166,6 @@ function View({
           <RewardBench result={result} />
         </BenchmarkReport>
       );
-      return <Learning id={exp.id} result={result} />;
     case "verify":
     case "search":
       return <AgentExperiment id={exp.id} result={result} />;
@@ -257,7 +255,8 @@ function LiveExperimentPage({ id }: { id: string }) {
     setRecord(null);
     setError("");
     setAboutOpen(false);
-    if (id === "eyes" || id === "count" || id === "decoy" || id === "prose" || id === "spine" || id === "rumour-mill" || id === "win-over" || id === "ocean" || id === "open-decisions" || id === "screen-sentry" || id === "who-said-that") {
+    // Scenes without a published record bring their own data.
+    if (exp.data === "") {
       setRecord({ result: {} });
       return () => {
         alive = false;

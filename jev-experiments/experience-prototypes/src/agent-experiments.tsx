@@ -19,7 +19,7 @@ import {
 } from "./shared";
 import { run, choice, judge, pretty, percent } from "./api";
 import { fromLive, fromRecorded, Receipt } from "./receipt";
-import { drinkMenu } from "./journeys";
+import { drinkMenu } from "./drink-menu";
 const routes = {
   calculator: "Exact arithmetic and conversions",
   search: "Find evidence in documents",

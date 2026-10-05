@@ -5,10 +5,10 @@
 import type React from "react";
 import { ArrowUpRight } from "lucide-react";
 import { lookup } from "./catalog";
+import { REPO } from "./repo";
 import { cardLineFor } from "./headline-strip";
 import { DIAGRAMS, diagramText, SceneDiagram } from "./scene-diagrams";
 
-const REPO = "https://github.com/nikhil-vytla/hatch/tree/main/jev-experiments";
 
 type Card = {
   href: string;
