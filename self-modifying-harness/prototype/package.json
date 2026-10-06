@@ -18,6 +18,8 @@
   "scripts": {
     "typecheck": "tsc -p .",
     "lint": "oxlint -c oxlint.config.ts src",
+    "test": "node --test --experimental-strip-types --no-warnings test/*.test.ts",
+    "bench:cells": "node --experimental-strip-types --no-warnings src/bench-cells.ts",
     "check": "npm run typecheck && npm run lint",
     "vendor": "bash scripts/vendor-anti-slop.sh"
   }
