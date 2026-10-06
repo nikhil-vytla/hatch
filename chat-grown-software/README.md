@@ -6,12 +6,18 @@ interactive, with no compilation steps." His answer is [Jiti](https://github.com
 kernel. You ask for a capability, the model writes Lisp, and the running image keeps it.
 
 This folder rebuilds that idea without Lisp and concentrates on the hard part: **how do you know a program grown
-one chat turn at a time is still right?** It contains a small kernel in TypeScript and an expense tracker grown in
-eight turns. A mutation study of 245 model-style mistakes measures which verification layer catches which kind of
-mistake.
+one chat turn at a time is still right?** It contains:
+
+- a small kernel in TypeScript;
+- a chat loop in which a model calls the kernel's tools and the user, not the model, decides what "done" means;
+- two apps grown through it: an expense tracker (8 turns) and a shop's stock (6 turns, with a data migration);
+- two studies:
+  - 474 model-style slips (mutants), measuring which verification layer catches which kind of mistake;
+  - 38 hand-written *misunderstandings*: coherent programs that do the wrong thing (37 of them observably).
 
 > Note: ghuntley.com was blocked in this environment. The post's substance came from the Jiti repository (README, 14
 > ADRs, examples) and Geoff's ["CS50-style tour" gist](https://gist.github.com/ghuntley/b8e28634090c51895d7972ff6a7c5619).
+> No model API key was available either, so the chat loop has only run with a scripted model (see Limits).
 
 ## The short answer
 
@@ -21,142 +27,196 @@ by the model**, plus machinery that needs nothing from anyone:
 | layer | owned by | what it catches best |
 |---|---|---|
 | **static** | kernel | calls to functions that don't exist; forms that are not pure declarations |
-| **invariants** | caller, from the start | stray writes into state, corrupt data (the only layer that saw `state.cache = {}`) |
+| **invariants** | caller, from the start | stray writes into state, corrupt data |
 | **ratchet** | user, accumulated | regressions of anything confirmed in an earlier turn |
 | **properties** | user, agreed in chat | arithmetic and logic slips ("categories always add up to the total") |
 | **fuzz** | kernel | hangs; out-of-scope behaviour changes and validation regressions on boundary inputs nobody typed |
 | **traces** | kernel, from real use | drive-by edits to functions the request was not about |
 | **goals** | user, this turn | "did it do what I asked?" (the most unique catches) |
 
-The results across three configurations, on 238 mutants that change observable behaviour:
+The contract comes from **questions the kernel asks**. The model proposes example *calls*, never expected answers.
+The kernel runs each call on the candidate and shows the user what it returns and what it does to the state, and
+only the user's answer counts. The kernel adds its own questions:
 
-| configuration | all layers | safety layers only | machinery needing nothing from the user |
-|---|---|---|---|
-| as written | 96% | 89% | n/a |
-| + fuzz layer | 97% | 90% | 73% |
-| + the 2 examples a coverage-enforcing kernel would ask for | **100%** | 92% | 75% |
+- **argument boundaries** from the user's words: "zero or less" gives 0 and -1;
+- **data boundaries**: "fewer than 5" gives a state with exactly 5 left;
+- **repetition**: the same call twice in a row, to tell "set" from "add to";
+- **coverage**: a direct call for any function in scope whose result no question observes.
 
-Two takeaways:
+The kernel refuses "done" until the user's answers pass and every function in scope is covered.
 
-- **Machinery catches about three quarters.** That covers static checks, invariants, fuzzing and replay of real use:
-  stray writes, hangs, and edits to unrelated functions. It cannot know what the user wanted.
-- **The user's confirmed examples carry the rest.** Every miss in the first round traced back to a gap in the
-  contract, not in the gates:
-  - a new function (`setBudget`) that no example called, where even an infinite loop in it passed every check;
-  - a boundary the user stated in words ("zero or less") but no example tried (0).
+Results on mutants that change observable behaviour (no legitimate change was ever rejected):
 
-  So the kernel should:
-  - make the model end each change by proposing concrete examples, including the boundaries the user's words imply;
-  - count only the examples the user confirms;
-  - refuse "done" while a function in scope is uncovered. The kernel reports this automatically.
+| contract | expenses (238 mutants) | shop (224 mutants, held out until v3) |
+|---|---|---|
+| examples as the user wrote them | 96-97% | 90% |
+| + the 2 examples a coverage-enforcing kernel would ask for (added by hand) | 100% | n/a |
+| **the kernel's questions** (rules v1, before the shop existed) | **100%** | n/a |
+| the kernel's questions, rules v2 (+ repetition) | 100% | 92% |
+| the kernel's questions, rules v3 (+ data boundaries, observed coverage) | 100% | **96%** |
+| machinery that needs nothing from the user (static, invariants, fuzz, traces) | 75% | 67% |
+
+And on misunderstandings, coherent but wrong programs (counting the ones that differ observably from what the user
+meant):
+
+| contract | expenses (21) | shop (16) |
+|---|---|---|
+| self-graded (the model's own calls and answers) | 6 (29%) | 4 (25%) |
+| examples as the user wrote them | 14 (67%) | 12 (75%) |
+| the kernel's questions, rules v1 / v2 | 16 / 17 (81%) | 12 (75%, held out) |
+| the kernel's questions, rules v3 | 17 (81%) | 13 (81%) |
+
+Three takeaways:
+
+- **Machinery catches two thirds to three quarters of slips and few misunderstandings.** That covers stray writes,
+  hangs and edits to unrelated functions. A misunderstanding passes it unless it breaks something already pinned
+  down: a stated property, an invariant, or an earlier answer.
+- **The user's answers carry the rest, and the kernel can collect them.** On the expense tracker the kernel's
+  questions reach 100% with nothing added by hand. They find the two examples I had added by hand after round 1,
+  and also catch the one slip my hand-added example let through.
+- **What no one asks about stays unverified.** The kernel can only ask about inputs it can derive. The question rules
+  were designed on the expense tracker. On the held-out shop scenario they tied the user's own examples (12/16
+  misreadings) and missed boundaries that live in the data. Rules added after seeing that (v3) recovered some (96%,
+  13/16). Seven misreadings still pass every contract, each needing an input nobody mentioned: a capital letter, a
+  third decimal, spending exactly at the budget, a sale of exactly the stock.
 
 ## What's here
 
 ```
 prototype/
-  src/world.ts          the live "image": late-bound functions + JSON state in a node:vm realm; redefinition is live
-  src/store.ts          revisions + atomic CURRENT pointer + journal + traces of real use (after Jiti's store)
-  src/gates.ts          the seven layers, each runnable alone; scope-aware trace replay; fuzz; coverage report
-  src/kernel.ts         develop / execute / preview / rollback with generations and checkpoints (after Jiti's loop)
-  src/scenario.ts       the expense tracker in 8 turns: what the user said, the change, confirmed examples, real use
-  src/demo.ts           grows the app, shows what is refused, recovers in a fresh process, rolls back
-  src/mutation-eval.ts  the mutation study
-  src/tamper-check.ts   can a proposal neuter the checks? (it could; now it can't)
-  results/              demo output, three rounds of the study (markdown + per-mutant JSON), tamper check
+  src/world.ts               the live "image": late-bound functions + JSON state in a node:vm realm
+  src/store.ts               revisions (code id + data id) + atomic CURRENT + journal + traces + request ids
+  src/gates.ts               the seven layers, each runnable alone; scope-aware trace replay; fuzz; coverage
+  src/kernel.ts              ask / develop / execute / preview / rollback / why, with generations and checkpoints
+  src/ask.ts                 the kernel's questions: proposed calls, boundaries, repetition, coverage
+  src/chat.ts                the chat loop over the kernel's tools (Messages API wire format), scripted model
+  src/model-claude.ts        Claude as the model (Anthropic SDK; only loaded with MODEL=claude)
+  src/sim-user.ts            a simulated user who answers from the intended program
+  src/scenario.ts            the expense tracker in 8 turns
+  src/scenario-shop.ts       the shop's stock in 6 turns, its misreadings and probes
+  src/scenarios.ts           SCENARIO=expenses|shop
+  src/misreadings.ts         21 misreadings of the expense turns
+  src/demo.ts                grows the app; refusals; recovery; why; code-only rollback; crash + retried request
+  src/mutation-eval.ts       the mutation study (CONTRACT=written|fixed|chat, SCENARIO=...)
+  src/misunderstanding-eval.ts  the misunderstanding study (self / written / chat)
+  src/tamper-check.ts        can a proposal neuter the checks? (it could; now it can't)
+  results/                   outputs of every run named in NOTES.md
 ```
 
-Run it (Node 22.6+ and no dependencies):
+Run it (Node 22.6+; the kernel, demo and evals need no dependencies):
 
 ```sh
 cd prototype
 node --experimental-strip-types --no-warnings src/demo.ts
-node --experimental-strip-types --no-warnings src/mutation-eval.ts                 # about 2 min
-CONTRACT=fixed EVAL_TAG=fixed node --experimental-strip-types --no-warnings src/mutation-eval.ts
+node --experimental-strip-types --no-warnings src/chat.ts                              # scripted model, simulated user
+SCENARIO=shop node --experimental-strip-types --no-warnings src/chat.ts
+node --experimental-strip-types --no-warnings src/misunderstanding-eval.ts            # about 30 s
+CONTRACT=chat EVAL_TAG=x node --experimental-strip-types --no-warnings src/mutation-eval.ts   # about 2 min
+npm install && MODEL=claude node --experimental-strip-types --no-warnings src/chat.ts  # needs ANTHROPIC_API_KEY
+npx tsc -p .                                                                           # type-check (after npm install)
 ```
+
+`ASK_RULES=v1|v2|v3` picks the question rules (v3 by default) to reproduce earlier rounds. NOTES.md maps every
+result file to the command that produced it.
 
 ## How the kernel works
 
 It follows Jiti's design, translated to JavaScript:
 
 ```
-observe -> model proposes {intent, scope, forms, examples}  (tagged with the generation it saw)
-        -> generation check (stale proposals refused)
-        -> build candidate world: live functions + state, then the forms
-        -> gates: static, invariants, ratchet, properties, fuzz, traces, goals
-        -> all safety layers pass?  accept: publish a revision, examples join the contract, generation++
-           otherwise:               the live world is untouched
-execute(expr) -> traced call -> invariants on the new state (undo if broken) -> record trace -> revision if data changed
+user says something
+  -> model: observe, then develop {intent, scope, forms, example calls}  (tagged with the generation it saw)
+  -> kernel: generation check; build the candidate; ask the user about what the candidate actually does
+  -> user answers: the answers are this turn's examples (the model's expectations never count)
+  -> gates: static, invariants, ratchet, properties, fuzz, traces, goals
+  -> safety layers pass?  the change goes live as a revision recording the chat message that asked for it
+                          "accepted" only if the user's answers pass and every function in scope is observed,
+                          otherwise "accepted-incomplete" with what is missing
+     otherwise:           the live world is untouched
+execute(expr, request_id) -> traced call -> invariants on the new state (undo if broken)
+                          -> revision with the request id and result (exactly-once) -> trace
 ```
 
 - **Live, no compilation.** Functions are top-level declarations in one `node:vm` context. Calls go through global
   names, so redefining `cents` changes what `total()` computes on its next call. That is the same late binding that
   makes Lisp images live, and JS has it too.
 - **Checkpoints and revisions.** Every attempt runs on a candidate built from a snapshot. Accepted changes publish an
-  immutable revision and atomically swap `CURRENT`. A fresh process recovers it with the whole contract. Rollback
-  publishes an old revision as a new one, so history is kept.
+  immutable revision and atomically swap `CURRENT`. A fresh process recovers it with the whole contract.
+- **Code and data roll back separately.** Each revision has a `codeId` (functions + contract) and a `dataId`
+  (state). `rollback(id)` restores code and contract and keeps today's data; `"data"` and `"both"` are explicit. A
+  combination that breaks the invariants is refused and needs a migration. In the demo, rolling code back to before
+  notes now keeps the expense recorded with a note. Jiti-style `"both"` drops it.
+- **Exactly-once requests.** The request id and result are written in the revision file that commits the state
+  change. In the demo a process dies right after committing `addExpense(2, "fun")`. The client retries with the
+  same id and gets `{"value": 6, "replayed": true}`, and there are still 6 expenses.
+- **The chat is the change log.** Each revision stores the index and words of the chat message that asked for it.
+  `why("topCategory")` answers "Which category do I spend the most on? If two tie, pick the alphabetically first."
 - **Scope makes use-replay decidable.** Each proposal declares which functions the request is about. When a recorded
   real call would now behave differently:
   - if the call involves a function in scope, the diff is *surfaced* to the user ("`total()`: 59.75 → 59, confirm?");
   - otherwise it is rejected;
   - edits to functions outside scope must replay every trace identically on the old world plus just those edits.
-- **Fuzzing has two outputs.** A *blocking* one covers hangs, out-of-scope changes and validation regressions
-  against the accepted version. An *advisory* one reports inputs that would corrupt state where the accepted version
-  allowed that too. Advisories found two real gaps in the code I wrote as the model's answers: `addExpense(1, 2.5)`
-  passes validation with a numeric category, and `setBudget` accepts `NaN`.
+- **Fuzzing has two outputs.** A *blocking* one covers hangs, out-of-scope changes and validation regressions. An
+  *advisory* one reports inputs that would corrupt state where the accepted version allowed that too. Advisories
+  found two real gaps in the code I wrote as the model's answers: `addExpense(1, 2.5)` passes validation with a
+  numeric category, and `setBudget` accepts `NaN`.
 
 ## Findings beyond the numbers
 
+- **A self-graded check can only fail through a bug in the harness.** In the first misunderstanding run the
+  self-graded contract "caught" 3 misreadings. The cause was my `?? "error"` turning a `null` answer into the
+  expected value. After the fix it catches 0, as it must by construction. Jiti's ADR 0008 makes the caller own
+  acceptance for this reason. Here the model only proposes calls.
+- **Coverage of a function is not observation of its value.** Round 3's survivor dropped `return amount;` because
+  the example checked only the state. The fix, every question shows both the value and the state, killed it. Then
+  the shop produced the same bug in a new form: `setPrice` was called only inside `(setPrice(...), stockValue())`,
+  where the comma throws its value away. Rules v3 count a function as covered only when a question observes its own
+  result.
+- **Boundaries live in the data as often as in the arguments.** "Zero or less" names an argument; "fewer than 5" and
+  "never below zero" name stock levels. The second kind needs states (or arguments derived from them) that nobody
+  typed. The remaining shop misses are of that kind.
+- **A request id must name the request, not its content.** The scripted model first derived ids from the expression,
+  so a second identical `byCategory()` in the same turn came back "replayed" with a stale value.
+- **A missing migration is invisible until data that needs it exists.** At the shop's turn 6 all live names are lower
+  case, so the misreading that skips the migration behaves identically. It would only show once a capitalised name
+  had been stored before the change.
 - **A "function" can carry top-level statements.** A form of `function helper() {...}` followed by
-  `Array.prototype.every = () => true` was accepted. It made every invariant check pass, and it left the live world
-  different from the stored revision, because only declarations are stored. Two fixes: forms may only declare
-  functions, and the realm's intrinsics are frozen so function bodies can't tamper either
-  (`results/tamper-check.txt`). The general rule is that **the checks must not share mutable machinery with the code
-  they check.**
-- **Rollback of code can silently roll back data.** Like Jiti, a revision holds code and managed data together. The
-  demo's rollback to "before notes existed" also dropped the expense recorded with a note. Code identity and data
-  identity probably want to be separate, with explicit migrations (see the next section).
-- **Examples must observe both the value and the effect.** The one survivor in round 3 drops `return amount;` from
-  `setBudget`, because my added example checked the state and ignored the return value.
-- **Self-graded checks catch nothing by construction.** If the model writes the expectations from its own code, a
-  wrong program passes its own tests. Jiti's ADR 0008 makes the caller own acceptance for this reason. Here the model
-  may *propose* examples, but they count only once the user confirms them.
+  `Array.prototype.every = () => true` was accepted and made every invariant pass. The fixes are two: forms may only
+  declare functions, and the realm's intrinsics are frozen (`results/tamper-check.txt`). **The checks must not share
+  mutable machinery with the code they check.**
 
 ## Lessons that transfer from building a self-modifying agent harness
 
 A sibling experiment built a durable agent harness that writes and hot-installs its own tools, on
 [pi-durable](https://github.com/earendil-works/pi/tree/main/packages/durable),
 [OptChat](https://gist.github.com/VictorTaelin/91837951a5ce5b38f341ec1ba1df6449)-style memory and
-[celld](https://github.com/denoland/celld)-style cells. Several of its lessons apply directly here:
+[celld](https://github.com/denoland/celld)-style cells. Its lessons, and where they ended up here:
 
-1. **Separate code identity from state identity.** celld's Worker Loader loads code under a version id, and a
-   *facet* gives that code a SQLite database keyed by name, so state outlives code versions. A grown app would do
-   better to version functions and data on separate lines: rollback of code keeps data, and a change that alters data
-   shape must carry a migration that is verified on a copy of live state. celld's README warns about exactly this:
-   state is not migrated, "so an object can keep a value that the new configuration rejects. The failure then looks
-   unrelated to the change."
-2. **Exactly-once effects through an id stored with the effect.** If a chat client retries an `execute` after a crash,
-   the effect must not apply twice. Writing the request id in the same transaction as the state change makes a retry
-   return the original result. Jiti avoids the problem by never replaying, but a chat UI that retries needs this.
-3. **The kernel must be out of the model's reach, and install order is a security boundary.** In pi-durable, a later
-   extension's same-name tool replaces an earlier one, so agent-written tools could shadow the kernel's unless the
-   kernel is installed last. The tampering finding above is the same class of bug.
-4. **The chat is the change log.** OptChat keeps every message forever and lets the agent zoom from a summary to the
-   verbatim message. Store, with each revision, the log index of the user's words that asked for it. "Why does
-   `topCategory` break ties alphabetically?" is then one lookup away, however long the chat gets. OptChat's compactor
-   ranks the user's own words highest for the same reason this kernel makes confirmed examples the contract: they are
-   the only ground truth.
-5. **Keep the prompt prefix stable as the app grows.** pi-durable announces new tools as positional system messages,
-   rather than rewriting the head of the prompt, so provider caches stay warm. A kernel that tells a model its function
-   catalogue should append catalogue changes in the same way.
+1. **Separate code identity from state identity** (celld's version ids and facets). *Implemented:* code and data
+   ids per revision, code-only rollback by default, refusal when the old code cannot hold today's data. Still
+   missing: a verified migration path for that refusal. celld warns that unmigrated state "can keep a value that the
+   new configuration rejects. The failure then looks unrelated to the change."
+2. **Exactly-once effects through an id stored with the effect.** *Implemented* for `execute`, with a crash test.
+3. **The kernel must be out of the model's reach; install order is a security boundary.** Same class as the tamper
+   finding above.
+4. **The chat is the change log** (OptChat keeps every message and ranks the user's own words highest).
+   *Implemented:* revisions point at the chat message that asked for them, and `why()` follows the pointer.
+5. **Keep the prompt prefix stable as the app grows.** The chat loop's system prompt and tool list never change; the
+   function catalogue arrives through `observe` results, so a provider cache stays warm.
 
 ## Limits
 
-- The mutants are first-order syntactic slips. A model's worst failures are coherent programs that do the wrong
-  thing; only user-confirmed examples catch those.
-- There is one scenario (8 turns). The "is this mutant equivalent?" oracle is a differential test over about 60
-  generated states, not a proof.
-- No model API key was available, so the scenario's proposals stand in for model output. The chat loop is the same
-  one Jiti runs: a model calling `develop`, `execute`, `preview` and `rollback` as tools against `observe()`. It is
-  described here, not run.
+- **No real model has run the chat loop.** `ANTHROPIC_API_KEY` is not set, and no other credential source (an
+  `ant` profile) exists in this environment. The Claude adapter type-checks against the SDK and fails at
+  authentication. Every chat result comes from the scripted model, which sends the scenario's proposals as tool
+  calls. How a real model uses `accepted-incomplete`, user corrections and behaviour diffs is untested.
+- **The simulated user never errs.** They answer from the intended program, so the chat numbers are an upper bound
+  on what confirmation catches. Real users mis-confirm, and a long list of questions (up to 11 in one turn here)
+  costs attention.
+- **I wrote the misreadings, the question rules, and the scenarios.** The shop scenario and its misreadings were
+  written before any run, so the v2 shop numbers are held out. The v3 rules were then tuned on both scenarios.
+- Mutants are first-order syntactic slips; the "is it equivalent?" oracle is a differential test, not a proof.
+- The boundary lexicon is crude: "without a price" produced `setPrice("", 1.25)`, and coverage calls pick argument
+  values by kind, not by the parameter's type (`cents("food")`).
 - `node:vm` with frozen intrinsics and a timeout is cooperative isolation. Hostile code needs a process or isolate
   boundary, as Jiti's README also says.

@@ -25,7 +25,7 @@ turn 5  user> Don't let me add an expense of zero or less, or one without a cate
   use addExpense(9.99, "fun") => {"ok":true,"value":5}
 
 turn 6  user> Let me set a monthly budget per category and tell me which ones I'm over.
-  develop [setBudget, overBudget] -> accepted (rev-0012)
+  develop [setBudget, overBudget] -> accepted-incomplete (rev-0012)
      ? no example you confirmed calls setBudget(): give one?
      ! fuzzing found inputs that would corrupt state (the kernel undoes such calls): setBudget(NaN, true) leaves budgets-shape is false; setBudget("food", NaN) leaves budgets-shape is false (+15 more)
   use setBudget("food", 15) => {"ok":true,"value":15}
@@ -71,6 +71,15 @@ fresh process recovered rev-0017 ("data: addExpense(4.5, "food", "coffee with Sa
   total() = {"ok":true,"value":77.34}, overBudget() = {"ok":true,"value":["food"]}
   contract carried over: 17 confirmed examples, 4 properties, 3 invariants
 
-Rollback to before notes existed:
-  published rev-0018 as a copy of rev-0015; history keeps 18 revisions
+Why is topCategory the way it is?
+  rev-0015 ("top category"), asked for in chat message 6: "Which category do I spend the most on? If two tie, pick the alphabetically first."
+
+Rollback of code to before notes existed (data stays):
+  published rev-0018: its code id equals rev-0015's; its data id equals the data before the rollback; expenses with a note kept: 1
   addExpense(1, "food", "x") => {"ok":true,"value":{"amount":1,"category":"food"}} (the note is ignored again)
+  Jiti-style rollback of code and data (rev-0020) instead: expenses with a note kept: 0, and the expense just added is gone too
+
+Exactly-once execute: a client sends addExpense(2, "fun") with request id req-retry-1; the kernel dies after the commit, before replying:
+  the process exited with 86; recovered rev-0021 ("data: addExpense(2, "fun")"), 6 expenses (was 5)
+  the client retries the same id => {"ok":true,"value":6,"replayed":true}; expenses: 6
+  a new id applies again => {"ok":true,"value":7}

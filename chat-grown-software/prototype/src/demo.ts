@@ -11,6 +11,12 @@ import { GENERATORS, INVARIANTS, TURNS } from "./scenario.ts";
 const DIR = join(import.meta.dirname, "..", "data", "demo");
 const open = () => new Kernel(DIR, { spec: { invariants: INVARIANTS, examples: [], properties: [] }, generators: GENERATORS });
 
+if (process.argv[2] === "crash") {
+	// Executes with a request id and dies after the commit, before it can reply (CRASH_AFTER_COMMIT=1).
+	open().execute(`addExpense(2, "fun")`, "req-retry-1");
+	process.exit(0);
+}
+
 if (process.argv[2] === "recover") {
 	const k = open();
 	console.log(`fresh process recovered ${k.revision!.id} ("${k.revision!.reason}"): functions ${k.observe().functions.join(", ")}`);
@@ -33,7 +39,7 @@ const show = (label: string, r: ReturnType<Kernel["develop"]>) => {
 
 for (const [i, turn] of TURNS.entries()) {
 	console.log(`\nturn ${i + 1}  user> ${turn.user}`);
-	show(`develop [${turn.proposal.scope.join(", ")}]`, k.develop(turn.proposal, k.generation));
+	show(`develop [${turn.proposal.scope.join(", ")}]`, k.develop(turn.proposal, k.generation, { asked: { message: i, text: turn.user } }));
 	for (const expr of turn.use) console.log(`  use ${expr} => ${JSON.stringify(k.execute(expr))}`);
 }
 
@@ -64,8 +70,25 @@ show("addExpense with an accidental infinite loop", k.develop({ ...TURNS[7].prop
 console.log(`\nA fresh process:`);
 spawnSync(process.execPath, ["--experimental-strip-types", "--no-warnings", import.meta.filename, "recover"], { stdio: "inherit" });
 
-console.log(`\nRollback to before notes existed:`);
+console.log(`\nWhy is topCategory the way it is?`);
+const why = k.why("topCategory")!;
+console.log(`  ${why.revision} ("${why.reason}"), asked for in chat message ${why.asked?.message}: "${why.asked?.text}"`);
+
+console.log(`\nRollback of code to before notes existed (data stays):`);
 const beforeNotes = k.store.revisions().filter((r) => r.reason === "top category").at(-1)!;
+const noted = () => (k.world.state() as { expenses: { note?: string }[] }).expenses.filter((e) => e.note !== undefined).length;
+const dataBefore = k.revision!.dataId;
 const rb = k.rollback(beforeNotes.id);
-console.log(`  published ${rb.id} as a copy of ${beforeNotes.id}; history keeps ${k.store.revisions().length} revisions`);
+console.log(`  published ${rb.id}: its code id ${rb.codeId === beforeNotes.codeId ? "equals" : "DIFFERS FROM"} ${beforeNotes.id}'s; its data id ${rb.dataId === dataBefore ? "equals" : "DIFFERS FROM"} the data before the rollback; expenses with a note kept: ${noted()}`);
 console.log(`  addExpense(1, "food", "x") => ${JSON.stringify(k.execute(`(addExpense(1, "food", "x"), state.expenses.at(-1))`))} (the note is ignored again)`);
+const both = k.rollback(beforeNotes.id, "both");
+console.log(`  Jiti-style rollback of code and data (${both.id}) instead: expenses with a note kept: ${noted()}, and the expense just added is gone too`);
+
+console.log(`\nExactly-once execute: a client sends addExpense(2, "fun") with request id req-retry-1; the kernel dies after the commit, before replying:`);
+const count = () => (k.world.state() as { expenses: unknown[] }).expenses.length;
+const n0 = count();
+const crash = spawnSync(process.execPath, ["--experimental-strip-types", "--no-warnings", import.meta.filename, "crash"], { env: { ...process.env, CRASH_AFTER_COMMIT: "1" } });
+const k2 = open();
+console.log(`  the process exited with ${crash.status}; recovered ${k2.revision!.id} ("${k2.revision!.reason}"), ${(k2.world.state() as { expenses: unknown[] }).expenses.length} expenses (was ${n0})`);
+console.log(`  the client retries the same id => ${JSON.stringify(k2.execute(`addExpense(2, "fun")`, "req-retry-1"))}; expenses: ${(k2.world.state() as { expenses: unknown[] }).expenses.length}`);
+console.log(`  a new id applies again => ${JSON.stringify(k2.execute(`addExpense(2, "fun")`, "req-retry-2"))}`);

@@ -17,7 +17,7 @@
 import { declaredFunctions, type Snapshot, World } from "./world.ts";
 import type { Trace } from "./store.ts";
 
-export type Example = { fixture: unknown; expr: string; expect: unknown; turn?: number };
+export type Example = { fixture: unknown; expr: string; expect: unknown; turn?: number; call?: string };
 export type Invariant = { name: string; check: string }; // an expression over `state` (and world functions) that must be true
 export type Property = { name: string; gen: string; check: string; runs?: number };
 export type Proposal = { intent: string; scope: string[]; forms: string[]; removes?: string[]; migrate?: string; examples: Example[]; properties?: Property[] };

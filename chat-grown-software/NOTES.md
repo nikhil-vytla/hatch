@@ -214,3 +214,196 @@ The question: can a proposal neuter the caller's checks? `src/tamper-check.ts`, 
 - Re-ran rounds 2 and 3 after the hardening to confirm the catch rates are unchanged.
 - The general rule: the checks must not share mutable machinery with the code they check. It is the same lesson as
   the agent harness's "the kernel is installed last".
+
+## Session 2 (2026-10-06): chat loop, code/data separation, request ids, coverage refusal, misunderstandings
+
+- Environment check: `ANTHROPIC_API_KEY` is **not set**, and the `ant` CLI is not installed, so no credential source
+  exists. A real model run is therefore not possible here. Other credentials in the container (cloud, GitHub) were
+  not given for model calls and I did not use them.
+- Baseline: the demo reproduces `results/demo-output.txt` byte for byte before any change.
+- Plan, in the given priority order: (1) a chat loop with a model adapter for Claude (SDK, loaded only with a key) and
+  a scripted model that issues the same tool calls; (2) code rollback that keeps data, plus exactly-once request ids;
+  (3) each revision records the chat message that asked for it; (4) the kernel refuses "done" while a function in
+  scope is uncovered and asks boundary questions; (5) misunderstanding-style failures; (6) a second scenario if time.
+
+### Items 2-4: store, kernel, questions (`store.ts`, `kernel.ts`, `ask.ts`)
+
+- Revisions now carry `codeId` (hash of functions + contract) and `dataId` (hash of state). `rollback(id, what)`
+  takes `"code"` (the new default: old code and contract, today's data), `"data"` or `"both"` (Jiti's behaviour).
+  The combination must satisfy the invariants of the contract it lands under, or the rollback is refused and asks for
+  a migration. Demo: rolling code back to before notes keeps the expense with a note (1 kept); `"both"` drops it, plus
+  the expense added after the code rollback.
+- Exactly-once `execute(expr, requestId)`: the id and the result go into the same revision file as the state change
+  (the atomic `CURRENT` swap is the commit point); the trace is written after. A retry finds the id and returns the
+  first result. Demo: a child process with `CRASH_AFTER_COMMIT=1` dies after committing `addExpense(2, "fun")`; the
+  recovered kernel has 6 expenses, the retry with the same id returns `{"value":6,"replayed":true}` and still 6.
+- **Bug found while wiring the chat loop:** the scripted model first built request ids from the expression text
+  (`req-3-byCategory()`), so the second `byCategory()` in a turn was "replayed" and returned a stale result. A request
+  id must name the request, not its content; two identical reads are two requests. Fixed with positional ids.
+- Each develop records `asked: {message, text}`, the chat-log index and words of the user message that asked for it.
+  `kernel.why("topCategory")` returns the revision and "Which category do I spend the most on? If two tie, pick the
+  alphabetically first." A rollback does not count as the change that shaped a function.
+- "Done" is now the user's: `develop` returns `accepted` only if this turn's confirmed examples pass *and* call every
+  function in scope; otherwise `accepted-incomplete` with `uncovered`. The old demo's turn 6 now says
+  `accepted-incomplete` (setBudget uncovered), which is the intended change.
+- `ask.ts` makes the questions. The model proposes example *calls*; the kernel runs each on the candidate and shows
+  the user the value **and** the state after (wrapped by `watch()`), and the user's answer becomes the expectation.
+  Extra questions: boundary variants from the user's words (a small lexicon: "zero" -> 0, "less"/"negative" -> -1,
+  "without"/"empty" -> ""), substituted into the literal arguments of proposed calls; and, for each function in scope
+  that no question calls, a call built from argument values already typed in the chat, keeping only tuples whose
+  result satisfies the invariants (otherwise `setBudget("food", "food")` would be the first tuple tried).
+- On the scenario: turn 5 gets `addExpense(0, "food")` and `addExpense(-1, ...)` from "zero or less"; turn 6 gets
+  `setBudget("food", 12.5)` because setBudget was uncovered. Those are the two examples I added by hand in round 3.
+
+### Item 1: the chat loop (`chat.ts`, `model-claude.ts`, `sim-user.ts`)
+
+- The loop speaks the Messages API wire format (tool_use / tool_result blocks, all results of a turn in one user
+  message, assistant content appended unchanged). Tools: observe, develop, execute, preview, rollback, why.
+  `develop` is where the user comes in: kernel.ask -> user answers -> kernel.develop with only the user's answers.
+- Two models: `ScriptedModel` (the scenario's proposals, sent as tool calls: observe, then develop with the observed
+  generation, then the turn's real use with request ids), and `ClaudeModel` (Anthropic TypeScript SDK 0.131,
+  `claude-opus-5-5`, effort high, server-side refusal fallback, cached system prompt). The SDK is only imported when
+  `MODEL=claude`; the kernel and evals still need no dependencies. `npx tsc -p .` type-checks everything, including
+  the adapter.
+- **Not run against a real model.** `MODEL=claude` gets as far as the first request and stops with the SDK's "Could
+  not resolve authentication method". The adapter's request shape is type-checked, not exercised.
+- `SimulatedUser` answers the kernel's questions from the *intended* program (the scenario's forms up to that turn).
+  It never errs, so it is an upper bound on what confirmation can catch.
+- Scripted run (`results/chat-scripted.txt`): 8 turns all `accepted`, 49 chat-log entries, 23 confirmed examples,
+  0 corrections.
+
+### Round 4 of the mutation study: `CONTRACT=chat` (`results/mutation-eval-v4-chat-contract.md`)
+
+Each turn's contract is exactly what the kernel's questions collected in the scripted chat run. Nothing added by
+hand. Rounds 2 and 3 were re-run first and reproduce exactly (identical per-mutant JSON; only the timing line moved).
+
+| configuration | all layers | safety only | machinery only | ratchet alone | goals alone | silent misses |
+|---|---|---|---|---|---|---|
+| v3: 2 examples added by hand | 100% | 92% | 75% | 66% | 37% | 1 |
+| v4: contract from the kernel's questions | **100%** | 92% | 75% | 78% | 45% | **0** |
+
+- The round-3 survivor (setBudget dropping `return amount;`) is now caught, because every question records the
+  value and the state.
+- Invariants' unique catches went from 8 to 0: the confirmed examples now see the state, so they also see
+  `state.cache = {}`. Invariants stay useful for the states nobody asked about (execute-time and fuzz), but on this
+  scenario they no longer carry anything alone.
+
+### Item 5: misunderstandings (`misreadings.ts`, `misunderstanding-eval.ts`)
+
+21 hand-written misreadings of the 8 expense turns: coherent programs, no slips, each a plausible reading of the
+user's words (e.g. "zero or less" read as "less than zero"; ties go to the alphabetically last; "spend the most on"
+read as "most often"; a note folded into the category). All 21 behave differently from the intended program on the
+probes. Each goes through every layer under three contracts: **self** (the model's own calls with its own program's
+answers), **written** (the scenario's user-confirmed examples), **chat** (the kernel's questions, answered by the
+simulated user from the intended program).
+
+- First run had a bug in the self-graded column: `?? "error"` turned a `null` answer into the expectation "error", so
+  self-graded goals "caught" 3 misreadings. Fixed; self-graded goals now catch 0, which is what must happen by
+  construction. Worth recording: a self-graded check can only fail through a harness bug.
+- v1 (`results/misunderstanding-eval-v1.md`), rules as designed before seeing any misreading:
+
+  | contract | caught | by safety layers | by this turn's examples | silent misses |
+  |---|---|---|---|---|
+  | self | 6/21 (29%) | 6/21 | 0/21 | 14 (+1 behaviour diff shown) |
+  | written | 14/21 (67%) | 6/21 | 14/21 | 7 |
+  | chat | 16/21 (76%) | 8/21 | 16/21 | 5 |
+
+  - Safety layers catch only misreadings that break something else: a stated property (categories sum to the
+    total), an invariant (empty category), or an earlier confirmed answer. 6 of 21.
+  - Chat beats written on `validate-negative-only` (the "zero" boundary question) and `add-newest-first` (the
+    question shows the state, so the order of expenses is visible).
+  - Chat misses 5: `add-lowercases` (no question uses a capital letter), `cents-truncate` (no question has a third
+    decimal), `budget-at-limit` (no question has spending exactly at the budget), `budget-accumulates` (each call is
+    asked once, on an empty state), `note-required-text` (no whitespace note). In every case the distinguishing input
+    is one nobody asked about.
+- Post-hoc rule (motivated by `budget-accumulates`, so tuned on this set): every state-changing call is also asked
+  twice in a row, which separates "set" from "add to". v2 (`results/misunderstanding-eval-v2-repeat.md`): chat
+  17/21 (81%); the others unchanged. `ASK_RULES=v1` turns the rule off.
+- The mutation study under the chat contract with the v2 rule gave per-mutant kills identical to round 4, so I kept
+  no separate result files for it; round 4 itself reproduces exactly with `ASK_RULES=v1`.
+
+### Item 6: a second scenario, as a held-out test (`scenario-shop.ts`, `scenarios.ts`)
+
+Stock for a small shop in 6 turns: add stock, sell (refuse below zero), low stock ("fewer than 5"), prices and
+stock value, a restock list ("back to 10"), and case/space-insensitive names with a **data migration** of the live
+state (the first turn in either scenario that uses `migrate`; the chat tool gained a `migrate` field). 17 misreadings
+were written before any run. `SCENARIO=shop` selects it in the chat loop and both evals; the expense results
+reproduce exactly after the refactor (misunderstanding v2 compared byte for byte).
+
+- Chat run (`results/chat-scripted-shop.txt`): 6 turns all `accepted`, 25 confirmed examples, the migration
+  applied. One noisy question: "without a price" produced `setPrice("", 1.25)`. The lexicon is crude.
+- Misreadings, held out (`results/misunderstanding-eval-shop.md`): self 4/16, written 12/16, **chat 12/16**. On
+  expenses chat had beaten written; here it ties. The expense wins came from boundary *arguments* ("zero or less").
+  The shop's boundaries are in the *data*: "fewer than 5" is about a stock level of exactly 5, and "never below zero"
+  is about a sale of exactly what is on the shelf. No rule puts those into a question. Misses: `sell-keeps-one`,
+  `low-inclusive`, `value-unrounded`, `restock-under-10`.
+- `key-no-migration` showed "no observable difference", and that is true: the live data at turn 6 is all lower case,
+  so the migration is a no-op on it. A missing migration is invisible until data that needs it exists. (I also made
+  the oracle compare the live state after building, so a migration that does differ would count.)
+- Mutation study on the shop (`results/mutation-eval-shop-written.md`, `-shop-chat.md`): 229 mutants, 224 real,
+  0 false positives. All layers: written **90%**, chat **92%** (vs 100% on expenses). Machinery only: 67% (75% on
+  expenses). The silent misses are the same data boundaries: `<` -> `<=` and `5` -> `6` in lowStock, `>` -> `>=` in
+  sell, plus drive-by versions of those that traces and fuzz cannot see because no recorded or generated state sits
+  exactly on the boundary.
+- The round-3 lesson came back in a new form: under the chat contract, `setPrice` dropping `return price;` survives.
+  setPrice *is* covered, but the only call is `(setPrice("pear", 1.25), stockValue())`, and the comma expression
+  throws the return value away before `watch()` sees it. Coverage of a function is not observation of its value.
+
+### Question rules v3, post-hoc after the shop (`ask.ts`; `ASK_RULES=v1|v2|v3`, v3 is the default)
+
+Two rules, both motivated by what the held-out scenario missed, so the v3 numbers below are tuned on both scenarios
+and are no longer a held-out measurement:
+
+- **Data boundaries.** Numbers the user says ("fewer than 5", "back to 10", "below zero" -> 0) are also put into the
+  *state* each proposed call runs on, one numeric field at a time, keeping only states that satisfy the invariants.
+  `lowStock()` is then asked on a shelf with exactly 5 pears.
+- **Coverage needs an observed result.** A function counts as covered only if a question observes its own return
+  value (a direct call, an array element, or the last part of a comma expression). That turns `setPrice`, `cents`,
+  `key` and the turn-5/8 `addExpense` into coverage questions with direct calls.
+- Bug on the way: the number regex skipped "10." at the end of a sentence (the lookahead refused the period), so the
+  restock turn got no data questions until fixed.
+- The coverage call builder is crude: it tries seen strings before numbers, so `cents` gets asked as `cents("food")`
+  (NaN, shown as null). Harmless, but a real kernel should use the parameter's observed types.
+
+Results:
+
+| | expenses mutants | shop mutants | expense misreadings | shop misreadings |
+|---|---|---|---|---|
+| as-written examples | 96-97% (v1/v2), 100% with 2 hand-added (v3) | 90% | 14/21 | 12/16 |
+| chat, rules v1 | 100% (round 4) | n/a | 16/21 | n/a |
+| chat, rules v2 | 100% (identical to round 4) | 92% | 17/21 | 12/16 (held out) |
+| chat, rules v3 | 100% (`v5-chat-v3-rules`) | **96%** | 17/21 | **13/16** |
+
+- Shop mutants still missed under v3 (7 silent): all in `sell`. `qty > have` -> `>=` (a sale of exactly what is on the
+  shelf), and `|| 0` -> `|| 1` (selling an item never stocked). Both need an *argument* derived from the data (qty
+  equal to the stock; a name not in the stock), which no rule produces. The misreading `sell-keeps-one` is the
+  same boundary.
+- Misreadings missed by every contract (both scenarios): `add-lowercases`, `cents-truncate`, `budget-at-limit`,
+  `note-required-text`, `sell-keeps-one`, `value-unrounded`, `restock-under-10`. Each needs a specific input nobody
+  mentioned: a capital letter, a third decimal, spending exactly at a budget, a whitespace note, an exact sale, a
+  fractional product, a stock between 5 and 9.
+- Machinery alone (static, invariants, fuzz, traces) catches 67% of shop mutants and 75% of expense mutants, and the
+  user's examples carry the rest in both. The pattern from round 3 holds on the second scenario.
+
+### Reproducing every result file (from `prototype/`, prefix each with `node --experimental-strip-types --no-warnings`)
+
+| file | command |
+|---|---|
+| `demo-output.txt` | `src/demo.ts` |
+| `tamper-check.txt` | `src/tamper-check.ts` |
+| `chat-scripted.txt`, `chat-scripted-shop.txt` | `src/chat.ts`, `SCENARIO=shop src/chat.ts` |
+| `mutation-eval-v1-no-fuzz.md` | remove `"fuzz"` from `LAYERS` in `gates.ts`, then `EVAL_TAG=v1-no-fuzz src/mutation-eval.ts` |
+| `mutation-eval-v2-fuzz.*` | `EVAL_TAG=v2-fuzz src/mutation-eval.ts` |
+| `mutation-eval-v3-fixed-contract.*` | `CONTRACT=fixed EVAL_TAG=v3-fixed-contract src/mutation-eval.ts` |
+| `mutation-eval-v4-chat-contract.*` | `ASK_RULES=v1 CONTRACT=chat EVAL_TAG=v4-chat-contract src/mutation-eval.ts` |
+| `mutation-eval-v5-chat-v3-rules.*` | `CONTRACT=chat EVAL_TAG=v5-chat-v3-rules src/mutation-eval.ts` |
+| `mutation-eval-shop-written.*` | `SCENARIO=shop EVAL_TAG=shop-written src/mutation-eval.ts` |
+| `mutation-eval-shop-chat-v2.*` | `ASK_RULES=v2 SCENARIO=shop CONTRACT=chat EVAL_TAG=shop-chat-v2 src/mutation-eval.ts` |
+| `mutation-eval-shop-chat-v3.*` | `SCENARIO=shop CONTRACT=chat EVAL_TAG=shop-chat-v3 src/mutation-eval.ts` |
+| `misunderstanding-eval-v1.*`, `-v2-repeat.*`, `-v3.*` | `ASK_RULES=v1 EVAL_TAG=v1`, `ASK_RULES=v2 EVAL_TAG=v2-repeat`, `EVAL_TAG=v3`, each `src/misunderstanding-eval.ts` |
+| `misunderstanding-eval-shop-v2-heldout.*`, `-shop-v3.*` | `SCENARIO=shop` with `ASK_RULES=v2 EVAL_TAG=v2-heldout` / `EVAL_TAG=v3` |
+
+Checks done at the end: `npx tsc -p .` clean; demo and tamper check reproduce their committed outputs; rounds 2 and 3
+reproduce (only the timing line differs); round 4 reproduces with `ASK_RULES=v1`; the expense misunderstanding v2
+reproduces byte for byte after the scenario refactor. `MODEL=claude src/chat.ts` stops at the SDK's authentication
+error: no real model run was possible.

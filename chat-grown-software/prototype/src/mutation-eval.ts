@@ -16,7 +16,8 @@ import { join } from "node:path";
 import { buildCandidate, LAYERS, type Layer, type Proposal, type Spec, verify } from "./gates.ts";
 import { Kernel } from "./kernel.ts";
 import type { Trace } from "./store.ts";
-import { GENERATORS, INVARIANTS, TURNS } from "./scenario.ts";
+import { chatContract } from "./chat.ts";
+import { pick } from "./scenarios.ts";
 import { declaredFunctions, extractDeclaration, type Snapshot, type World } from "./world.ts";
 
 type Mutant = { turn: number; cls: string; where: string; proposal: Proposal };
@@ -91,7 +92,7 @@ function probes(spec: Spec, proposal: Proposal, traces: Trace[]): string[] {
 	const exprs = new Set<string>([...spec.examples, ...proposal.examples].map((e) => e.expr));
 	for (const t of traces) exprs.add(t.expr);
 	for (const p of [...spec.properties, ...(proposal.properties ?? [])]) exprs.add(p.check);
-	for (const f of ["total()", "byCategory()", "topCategory()", "overBudget()", `addExpense(5, "food")`, `addExpense(0, "food")`, `addExpense(-1, "x")`, `addExpense(2, "")`, `addExpense(1.5, "fun", "n")`, `setBudget("food", 20)`, `setBudget("rent", 0)`, "cents(0.125)", "cents(10)"]) exprs.add(f);
+	for (const f of SCENARIO.probes) exprs.add(f);
 	return [...exprs];
 }
 
@@ -117,6 +118,12 @@ function differs(base: Snapshot, original: Proposal, mutant: Proposal, exprs: st
 	return false;
 }
 
+// CONTRACT=chat: each turn's examples are exactly what the kernel's questions collected in a chat run (the model's
+// proposed calls, boundaries from the user's words, coverage calls), answered by the simulated user. Nothing added by hand.
+const SCENARIO = pick();
+const { invariants: INVARIANTS, generators: GENERATORS } = SCENARIO;
+const TURNS = process.env.CONTRACT === "chat" ? await chatContract(SCENARIO) : SCENARIO.turns;
+
 // --- replay the scenario to get each turn's starting point ---
 const dir = mkdtempSync(join(tmpdir(), "grown-eval-"));
 const kernel = new Kernel(dir, { spec: { invariants: INVARIANTS, examples: [], properties: [] }, generators: GENERATORS });
@@ -124,7 +131,8 @@ const starts: { base: Snapshot; spec: Spec; traces: Trace[] }[] = [];
 for (const turn of TURNS) {
 	starts.push({ base: kernel.world.snapshot(), spec: structuredClone(kernel.spec), traces: kernel.store.traces() });
 	const r = kernel.develop(turn.proposal, kernel.generation);
-	if (r.status !== "accepted") throw new Error(`scenario turn "${turn.proposal.intent}" was ${r.status}: ${JSON.stringify(r.report?.verdicts)}`);
+	// "accepted-incomplete" only for coverage (the as-written contract leaves setBudget uncovered); every layer must pass.
+	if (r.revision === undefined || (r.failed ?? []).length > 0) throw new Error(`scenario turn "${turn.proposal.intent}" was ${r.status}: ${JSON.stringify(r.report?.verdicts)}`);
 	for (const expr of turn.use) kernel.execute(expr);
 }
 
@@ -133,7 +141,7 @@ const rand = () => {
 	seed = (seed * 16807) % 2147483647;
 	return (seed - 1) / 2147483646;
 };
-const fixtures: unknown[] = [{}, ...Array.from({ length: 60 }, () => GENERATORS.expenses(rand))];
+const fixtures: unknown[] = [{}, ...Array.from({ length: 60 }, () => GENERATORS[Object.keys(GENERATORS)[0]](rand)), ...SCENARIO.fixtures];
 
 type Row = { turn: number; cls: string; where: string; equivalent: boolean; killed: Record<Layer, boolean>; surfaced: number; advisories: number };
 const rows: Row[] = [];

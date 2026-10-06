@@ -1,4 +1,4 @@
-mutants: 245 (238 with an observable difference, 7 likely equivalent); legit proposals rejected: 0; 135207 ms
+mutants: 245 (238 with an observable difference, 7 likely equivalent); legit proposals rejected: 0; 111451 ms
 
 | class | mutants | static | invariants | ratchet | properties | fuzz | traces | goals | all safety layers | + goals | missed, but surfaced to the user | missed, silent |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|

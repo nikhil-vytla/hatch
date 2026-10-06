@@ -4,12 +4,37 @@
 //
 // One addition for verification: `traces.jsonl`, the record of real use (each executed expression with the state
 // before and after and the functions it ran). That record is the regression oracle in gates.ts.
+//
+// Two more, from the self-modifying-harness lessons:
+//   - each revision carries a `codeId` (functions + contract) and a `dataId` (managed state) as separate content
+//     hashes, so a rollback can move one line and keep the other;
+//   - an `execute` with a request id writes that id and its result into the same revision file as the state change,
+//     so a retried request finds its first result instead of applying twice.
+import { createHash } from "node:crypto";
 import { closeSync, existsSync, fsyncSync, mkdirSync, openSync, readFileSync, readdirSync, renameSync, writeFileSync, writeSync } from "node:fs";
 import { join } from "node:path";
 import type { Snapshot } from "./world.ts";
 
-export type Revision = { id: string; number: number; parent?: string; at: string; reason: string; rollbackOf?: string; world: Snapshot; specs: unknown };
-export type Trace = { expr: string; before: unknown; after: unknown; value: unknown; calls: string[]; revision: string };
+/** The chat message that asked for a change: its index in the chat log and the user's words. */
+export type Asked = { message: number; text: string };
+export type Revision = {
+	id: string;
+	number: number;
+	parent?: string;
+	at: string;
+	reason: string;
+	rollbackOf?: string;
+	world: Snapshot;
+	specs: unknown;
+	codeId: string;
+	dataId: string;
+	asked?: Asked;
+	requestId?: string;
+	result?: unknown;
+};
+export type Trace = { expr: string; before: unknown; after: unknown; value: unknown; calls: string[]; revision: string; requestId?: string };
+
+export const contentId = (value: unknown) => createHash("sha256").update(JSON.stringify(value)).digest("hex").slice(0, 12);
 
 export class Store {
 	readonly dir: string;
@@ -33,9 +58,11 @@ export class Store {
 	}
 
 	/** Write the revision directory, fsync it, then swap CURRENT with an atomic rename. */
-	publish(revision: Omit<Revision, "id" | "number" | "at">): Revision {
+	publish(revision: Omit<Revision, "id" | "number" | "at" | "codeId" | "dataId">): Revision {
 		const number = (this.current()?.number ?? 0) + 1;
-		const full: Revision = { ...revision, id: `rev-${String(number).padStart(4, "0")}`, number, at: new Date().toISOString() };
+		const codeId = contentId([revision.world.functions, revision.specs]);
+		const dataId = contentId(revision.world.state);
+		const full: Revision = { ...revision, id: `rev-${String(number).padStart(4, "0")}`, number, at: new Date().toISOString(), codeId, dataId };
 		const dir = join(this.dir, "revisions", full.id);
 		mkdirSync(dir, { recursive: true });
 		writeDurably(join(dir, "revision.json"), JSON.stringify(full, null, 1));
@@ -50,6 +77,13 @@ export class Store {
 
 	recordTrace(trace: Trace): void {
 		appendDurably(join(this.dir, "traces.jsonl"), trace);
+	}
+
+	/** The first result of a request id, from the revision that carries it (a state change) or its trace (a read). */
+	request(id: string): { value: unknown } | undefined {
+		for (const r of this.revisions()) if (r.requestId === id) return { value: r.result };
+		for (const t of this.traces()) if (t.requestId === id) return { value: t.value };
+		return undefined;
 	}
 
 	traces(): Trace[] {

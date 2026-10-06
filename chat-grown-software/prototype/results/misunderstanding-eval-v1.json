@@ -1,0 +1,1136 @@
+[
+ {
+  "id": "add-returns-expense",
+  "turn": 1,
+  "reading": "returns the recorded expense, not the count",
+  "real": true,
+  "contract": "self",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": false
+  },
+  "surfaced": 0,
+  "corrections": 0
+ },
+ {
+  "id": "add-returns-expense",
+  "turn": 1,
+  "reading": "returns the recorded expense, not the count",
+  "real": true,
+  "contract": "written",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 0,
+  "corrections": 0
+ },
+ {
+  "id": "add-returns-expense",
+  "turn": 1,
+  "reading": "returns the recorded expense, not the count",
+  "real": true,
+  "contract": "chat",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 0,
+  "corrections": 2
+ },
+ {
+  "id": "add-lowercases",
+  "turn": 1,
+  "reading": "normalises categories to lower case",
+  "real": true,
+  "contract": "self",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": false
+  },
+  "surfaced": 0,
+  "corrections": 0
+ },
+ {
+  "id": "add-lowercases",
+  "turn": 1,
+  "reading": "normalises categories to lower case",
+  "real": true,
+  "contract": "written",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": false
+  },
+  "surfaced": 0,
+  "corrections": 0
+ },
+ {
+  "id": "add-lowercases",
+  "turn": 1,
+  "reading": "normalises categories to lower case",
+  "real": true,
+  "contract": "chat",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": false
+  },
+  "surfaced": 0,
+  "corrections": 0
+ },
+ {
+  "id": "add-newest-first",
+  "turn": 1,
+  "reading": "keeps the newest expense first",
+  "real": true,
+  "contract": "self",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": false
+  },
+  "surfaced": 0,
+  "corrections": 0
+ },
+ {
+  "id": "add-newest-first",
+  "turn": 1,
+  "reading": "keeps the newest expense first",
+  "real": true,
+  "contract": "written",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": false
+  },
+  "surfaced": 0,
+  "corrections": 0
+ },
+ {
+  "id": "add-newest-first",
+  "turn": 1,
+  "reading": "keeps the newest expense first",
+  "real": true,
+  "contract": "chat",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 0,
+  "corrections": 1
+ },
+ {
+  "id": "total-formatted",
+  "turn": 2,
+  "reading": "the total as display text",
+  "real": true,
+  "contract": "self",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": false
+  },
+  "surfaced": 0,
+  "corrections": 0
+ },
+ {
+  "id": "total-formatted",
+  "turn": 2,
+  "reading": "the total as display text",
+  "real": true,
+  "contract": "written",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 0,
+  "corrections": 0
+ },
+ {
+  "id": "total-formatted",
+  "turn": 2,
+  "reading": "the total as display text",
+  "real": true,
+  "contract": "chat",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 0,
+  "corrections": 2
+ },
+ {
+  "id": "total-count",
+  "turn": 2,
+  "reading": "how many expenses so far",
+  "real": true,
+  "contract": "self",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": false
+  },
+  "surfaced": 0,
+  "corrections": 0
+ },
+ {
+  "id": "total-count",
+  "turn": 2,
+  "reading": "how many expenses so far",
+  "real": true,
+  "contract": "written",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 0,
+  "corrections": 0
+ },
+ {
+  "id": "total-count",
+  "turn": 2,
+  "reading": "how many expenses so far",
+  "real": true,
+  "contract": "chat",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 0,
+  "corrections": 1
+ },
+ {
+  "id": "by-category-pairs",
+  "turn": 3,
+  "reading": "a ranked list of [category, amount]",
+  "real": true,
+  "contract": "self",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": true,
+   "fuzz": false,
+   "traces": false,
+   "goals": false
+  },
+  "surfaced": 0,
+  "corrections": 0
+ },
+ {
+  "id": "by-category-pairs",
+  "turn": 3,
+  "reading": "a ranked list of [category, amount]",
+  "real": true,
+  "contract": "written",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": true,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 0,
+  "corrections": 0
+ },
+ {
+  "id": "by-category-pairs",
+  "turn": 3,
+  "reading": "a ranked list of [category, amount]",
+  "real": true,
+  "contract": "chat",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": true,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 0,
+  "corrections": 2
+ },
+ {
+  "id": "by-category-share",
+  "turn": 3,
+  "reading": "each category's share of the total, in percent",
+  "real": true,
+  "contract": "self",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": true,
+   "fuzz": false,
+   "traces": false,
+   "goals": false
+  },
+  "surfaced": 0,
+  "corrections": 0
+ },
+ {
+  "id": "by-category-share",
+  "turn": 3,
+  "reading": "each category's share of the total, in percent",
+  "real": true,
+  "contract": "written",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": true,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 0,
+  "corrections": 0
+ },
+ {
+  "id": "by-category-share",
+  "turn": 3,
+  "reading": "each category's share of the total, in percent",
+  "real": true,
+  "contract": "chat",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": true,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 0,
+  "corrections": 1
+ },
+ {
+  "id": "cents-truncate",
+  "turn": 4,
+  "reading": "cut to cents (floor) rather than round",
+  "real": true,
+  "contract": "self",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": false
+  },
+  "surfaced": 0,
+  "corrections": 0
+ },
+ {
+  "id": "cents-truncate",
+  "turn": 4,
+  "reading": "cut to cents (floor) rather than round",
+  "real": true,
+  "contract": "written",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": false
+  },
+  "surfaced": 0,
+  "corrections": 0
+ },
+ {
+  "id": "cents-truncate",
+  "turn": 4,
+  "reading": "cut to cents (floor) rather than round",
+  "real": true,
+  "contract": "chat",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": false
+  },
+  "surfaced": 0,
+  "corrections": 0
+ },
+ {
+  "id": "cents-integer",
+  "turn": 4,
+  "reading": "report money as integer cents",
+  "real": true,
+  "contract": "self",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": true,
+   "fuzz": false,
+   "traces": false,
+   "goals": false
+  },
+  "surfaced": 3,
+  "corrections": 0
+ },
+ {
+  "id": "cents-integer",
+  "turn": 4,
+  "reading": "report money as integer cents",
+  "real": true,
+  "contract": "written",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": true,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 3,
+  "corrections": 0
+ },
+ {
+  "id": "cents-integer",
+  "turn": 4,
+  "reading": "report money as integer cents",
+  "real": true,
+  "contract": "chat",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": true,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 3,
+  "corrections": 1
+ },
+ {
+  "id": "validate-negative-only",
+  "turn": 5,
+  "reading": "\"zero or less\" as \"less than zero\"",
+  "real": true,
+  "contract": "self",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": false
+  },
+  "surfaced": 0,
+  "corrections": 0
+ },
+ {
+  "id": "validate-negative-only",
+  "turn": 5,
+  "reading": "\"zero or less\" as \"less than zero\"",
+  "real": true,
+  "contract": "written",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": false
+  },
+  "surfaced": 0,
+  "corrections": 0
+ },
+ {
+  "id": "validate-negative-only",
+  "turn": 5,
+  "reading": "\"zero or less\" as \"less than zero\"",
+  "real": true,
+  "contract": "chat",
+  "killed": {
+   "static": false,
+   "invariants": true,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 0,
+  "corrections": 1
+ },
+ {
+  "id": "validate-skip",
+  "turn": 5,
+  "reading": "ignore bad input instead of throwing",
+  "real": true,
+  "contract": "self",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": false
+  },
+  "surfaced": 0,
+  "corrections": 0
+ },
+ {
+  "id": "validate-skip",
+  "turn": 5,
+  "reading": "ignore bad input instead of throwing",
+  "real": true,
+  "contract": "written",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 0,
+  "corrections": 0
+ },
+ {
+  "id": "validate-skip",
+  "turn": 5,
+  "reading": "ignore bad input instead of throwing",
+  "real": true,
+  "contract": "chat",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 0,
+  "corrections": 7
+ },
+ {
+  "id": "validate-undefined-category",
+  "turn": 5,
+  "reading": "\"without a category\" as \"category not given\"",
+  "real": true,
+  "contract": "self",
+  "killed": {
+   "static": false,
+   "invariants": true,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": false
+  },
+  "surfaced": 0,
+  "corrections": 0
+ },
+ {
+  "id": "validate-undefined-category",
+  "turn": 5,
+  "reading": "\"without a category\" as \"category not given\"",
+  "real": true,
+  "contract": "written",
+  "killed": {
+   "static": false,
+   "invariants": true,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 0,
+  "corrections": 0
+ },
+ {
+  "id": "validate-undefined-category",
+  "turn": 5,
+  "reading": "\"without a category\" as \"category not given\"",
+  "real": true,
+  "contract": "chat",
+  "killed": {
+   "static": false,
+   "invariants": true,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 0,
+  "corrections": 1
+ },
+ {
+  "id": "budget-at-limit",
+  "turn": 6,
+  "reading": "\"over\" includes exactly at the budget",
+  "real": true,
+  "contract": "self",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": false
+  },
+  "surfaced": 0,
+  "corrections": 0
+ },
+ {
+  "id": "budget-at-limit",
+  "turn": 6,
+  "reading": "\"over\" includes exactly at the budget",
+  "real": true,
+  "contract": "written",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": false
+  },
+  "surfaced": 0,
+  "corrections": 0
+ },
+ {
+  "id": "budget-at-limit",
+  "turn": 6,
+  "reading": "\"over\" includes exactly at the budget",
+  "real": true,
+  "contract": "chat",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": false
+  },
+  "surfaced": 0,
+  "corrections": 0
+ },
+ {
+  "id": "budget-accumulates",
+  "turn": 6,
+  "reading": "setting a budget adds to the existing one",
+  "real": true,
+  "contract": "self",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": false
+  },
+  "surfaced": 0,
+  "corrections": 0
+ },
+ {
+  "id": "budget-accumulates",
+  "turn": 6,
+  "reading": "setting a budget adds to the existing one",
+  "real": true,
+  "contract": "written",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": false
+  },
+  "surfaced": 0,
+  "corrections": 0
+ },
+ {
+  "id": "budget-accumulates",
+  "turn": 6,
+  "reading": "setting a budget adds to the existing one",
+  "real": true,
+  "contract": "chat",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": false
+  },
+  "surfaced": 0,
+  "corrections": 0
+ },
+ {
+  "id": "budget-overage",
+  "turn": 6,
+  "reading": "how much over, per category",
+  "real": true,
+  "contract": "self",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": true,
+   "fuzz": false,
+   "traces": false,
+   "goals": false
+  },
+  "surfaced": 0,
+  "corrections": 0
+ },
+ {
+  "id": "budget-overage",
+  "turn": 6,
+  "reading": "how much over, per category",
+  "real": true,
+  "contract": "written",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": true,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 0,
+  "corrections": 0
+ },
+ {
+  "id": "budget-overage",
+  "turn": 6,
+  "reading": "how much over, per category",
+  "real": true,
+  "contract": "chat",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": true,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 0,
+  "corrections": 2
+ },
+ {
+  "id": "top-tie-last",
+  "turn": 7,
+  "reading": "ties go to the alphabetically last",
+  "real": true,
+  "contract": "self",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": false
+  },
+  "surfaced": 0,
+  "corrections": 0
+ },
+ {
+  "id": "top-tie-last",
+  "turn": 7,
+  "reading": "ties go to the alphabetically last",
+  "real": true,
+  "contract": "written",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 0,
+  "corrections": 0
+ },
+ {
+  "id": "top-tie-last",
+  "turn": 7,
+  "reading": "ties go to the alphabetically last",
+  "real": true,
+  "contract": "chat",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 0,
+  "corrections": 1
+ },
+ {
+  "id": "top-by-count",
+  "turn": 7,
+  "reading": "\"spend the most on\" as \"most often\"",
+  "real": true,
+  "contract": "self",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": true,
+   "fuzz": false,
+   "traces": false,
+   "goals": false
+  },
+  "surfaced": 0,
+  "corrections": 0
+ },
+ {
+  "id": "top-by-count",
+  "turn": 7,
+  "reading": "\"spend the most on\" as \"most often\"",
+  "real": true,
+  "contract": "written",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": true,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 0,
+  "corrections": 0
+ },
+ {
+  "id": "top-by-count",
+  "turn": 7,
+  "reading": "\"spend the most on\" as \"most often\"",
+  "real": true,
+  "contract": "chat",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": true,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 0,
+  "corrections": 1
+ },
+ {
+  "id": "top-tie-insertion",
+  "turn": 7,
+  "reading": "ties go to the category seen first",
+  "real": true,
+  "contract": "self",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": false
+  },
+  "surfaced": 0,
+  "corrections": 0
+ },
+ {
+  "id": "top-tie-insertion",
+  "turn": 7,
+  "reading": "ties go to the category seen first",
+  "real": true,
+  "contract": "written",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 0,
+  "corrections": 0
+ },
+ {
+  "id": "top-tie-insertion",
+  "turn": 7,
+  "reading": "ties go to the category seen first",
+  "real": true,
+  "contract": "chat",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 0,
+  "corrections": 1
+ },
+ {
+  "id": "note-empty-default",
+  "turn": 8,
+  "reading": "every expense gets a note, empty by default",
+  "real": true,
+  "contract": "self",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": false
+  },
+  "surfaced": 5,
+  "corrections": 0
+ },
+ {
+  "id": "note-empty-default",
+  "turn": 8,
+  "reading": "every expense gets a note, empty by default",
+  "real": true,
+  "contract": "written",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 5,
+  "corrections": 0
+ },
+ {
+  "id": "note-empty-default",
+  "turn": 8,
+  "reading": "every expense gets a note, empty by default",
+  "real": true,
+  "contract": "chat",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 5,
+  "corrections": 1
+ },
+ {
+  "id": "note-in-category",
+  "turn": 8,
+  "reading": "the note is folded into the category",
+  "real": true,
+  "contract": "self",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": false
+  },
+  "surfaced": 0,
+  "corrections": 0
+ },
+ {
+  "id": "note-in-category",
+  "turn": 8,
+  "reading": "the note is folded into the category",
+  "real": true,
+  "contract": "written",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 0,
+  "corrections": 0
+ },
+ {
+  "id": "note-in-category",
+  "turn": 8,
+  "reading": "the note is folded into the category",
+  "real": true,
+  "contract": "chat",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 0,
+  "corrections": 1
+ },
+ {
+  "id": "note-required-text",
+  "turn": 8,
+  "reading": "a note must be text, so a non-string note is dropped silently",
+  "real": true,
+  "contract": "self",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": false
+  },
+  "surfaced": 0,
+  "corrections": 0
+ },
+ {
+  "id": "note-required-text",
+  "turn": 8,
+  "reading": "a note must be text, so a non-string note is dropped silently",
+  "real": true,
+  "contract": "written",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": false
+  },
+  "surfaced": 0,
+  "corrections": 0
+ },
+ {
+  "id": "note-required-text",
+  "turn": 8,
+  "reading": "a note must be text, so a non-string note is dropped silently",
+  "real": true,
+  "contract": "chat",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": false
+  },
+  "surfaced": 0,
+  "corrections": 0
+ }
+]

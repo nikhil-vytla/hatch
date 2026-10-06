@@ -5,12 +5,18 @@
 //
 // `develop` changes functions; `execute` uses them (and may change managed data); `preview` runs and always restores.
 // Every accepted change is a durable revision; a fresh process recovers the latest one and replays nothing.
-import { checkInvariants, type Layer, LAYERS, type Proposal, type Report, type Spec, verify } from "./gates.ts";
-import { type Revision, Store } from "./store.ts";
+//
+// "Done" is the user's, not the model's: a change whose safety layers pass goes live, but it is only `accepted` when
+// this turn's confirmed examples pass AND call every function in scope. Otherwise it is `accepted-incomplete`, and
+// `ask` says what to ask the user next.
+import { type Question, questions } from "./ask.ts";
+import { buildCandidate, checkInvariants, type Layer, LAYERS, type Proposal, type Report, type Spec, verify } from "./gates.ts";
+import { type Asked, type Revision, Store } from "./store.ts";
 import { World } from "./world.ts";
 
 export type Generators = Record<string, (rand: () => number) => unknown>;
-export type DevelopResult = { status: "stale" | "rejected" | "accepted" | "accepted-incomplete"; report?: Report; revision?: string; failed?: Layer[] };
+export type DevelopResult = { status: "stale" | "rejected" | "accepted" | "accepted-incomplete"; report?: Report; revision?: string; failed?: Layer[]; uncovered?: string[] };
+export type ExecuteResult = ({ ok: true; value: unknown } | { ok: false; error: string }) & { replayed?: true };
 
 const SAFETY: readonly Layer[] = ["static", "invariants", "ratchet", "properties", "traces"];
 
@@ -44,7 +50,18 @@ export class Kernel {
 		return { generation: this.generation, revision: this.revision?.id, functions: [...this.world.functions.keys()], state: this.world.state() };
 	}
 
-	develop(proposal: Proposal, seenGeneration: number): DevelopResult {
+	/** The questions to put to the user about a proposal, answered by the candidate it would build. */
+	ask(proposal: Proposal, words: string): { questions: Question[]; uncovered: string[] } | { error: string } {
+		const built = buildCandidate(this.world.snapshot(), proposal);
+		if (built.world === undefined) return { error: built.error ?? "does not load" };
+		const history = [...this.spec.examples.map((e) => e.call ?? e.expr), ...this.store.traces().map((t) => t.expr)];
+		const valid = (state: unknown) => checkInvariants(built.world!, this.spec.invariants, state) === undefined;
+		const result = questions({ candidate: built.world, proposal, words, history, valid });
+		built.world.setState(this.world.state());
+		return result;
+	}
+
+	develop(proposal: Proposal, seenGeneration: number, options: { asked?: Asked } = {}): DevelopResult {
 		this.turn++;
 		if (seenGeneration !== this.generation) {
 			this.store.journal({ event: "stale", intent: proposal.intent, seen: seenGeneration, now: this.generation });
@@ -63,13 +80,25 @@ export class Kernel {
 			examples: [...this.spec.examples, ...proposal.examples.map((e) => ({ ...e, turn }))],
 			properties: [...this.spec.properties, ...(proposal.properties ?? [])],
 		};
-		this.revision = this.store.publish({ parent: this.revision?.id, reason: proposal.intent, world: this.world.snapshot(), specs: this.spec });
+		this.revision = this.store.publish({ parent: this.revision?.id, reason: proposal.intent, world: this.world.snapshot(), specs: this.spec, asked: options.asked });
 		this.generation++;
-		return { status: failed.includes("goals") ? "accepted-incomplete" : "accepted", report, revision: this.revision.id, failed };
+		const done = !failed.includes("goals") && report.uncovered.length === 0;
+		return { status: done ? "accepted" : "accepted-incomplete", report, revision: this.revision.id, failed, uncovered: report.uncovered };
 	}
 
-	/** Use the application. A call that leaves the state breaking an invariant is undone. Every call is recorded. */
-	execute(expr: string): { ok: true; value: unknown } | { ok: false; error: string } {
+	/**
+	 * Use the application. A call that leaves the state breaking an invariant is undone. Every call is recorded.
+	 * With a request id the effect is exactly-once: the id and the result are written in the same revision file as the
+	 * state change, so a retry (after a crash or a lost reply) returns the first result and changes nothing.
+	 */
+	execute(expr: string, requestId?: string): ExecuteResult {
+		if (requestId !== undefined) {
+			const seen = this.store.request(requestId);
+			if (seen) {
+				this.store.journal({ event: "execute-replayed", expr, requestId });
+				return { ok: true, value: seen.value, replayed: true };
+			}
+		}
 		const checkpoint = this.world.snapshot();
 		try {
 			const { value, calls } = this.world.traced(expr);
@@ -80,11 +109,13 @@ export class Kernel {
 				this.store.journal({ event: "execute-rejected", expr, invariant: broken });
 				return { ok: false, error: `undone: ${broken}` };
 			}
-			this.store.recordTrace({ expr, before: checkpoint.state, after, value, calls, revision: this.revision!.id });
 			if (JSON.stringify(after) !== JSON.stringify(checkpoint.state)) {
-				this.revision = this.store.publish({ parent: this.revision?.id, reason: `data: ${expr}`, world: this.world.snapshot(), specs: this.spec });
+				// The revision (with the request id and result) is the commit point; the trace is written after it.
+				this.revision = this.store.publish({ parent: this.revision?.id, reason: `data: ${expr}`, world: this.world.snapshot(), specs: this.spec, requestId, result: value });
 				this.generation++;
+				if (process.env.CRASH_AFTER_COMMIT === "1") process.exit(86); // test hook: die before replying
 			}
+			this.store.recordTrace({ expr, before: checkpoint.state, after, value, calls, revision: this.revision!.id, requestId });
 			return { ok: true, value };
 		} catch (error) {
 			this.world.restore(checkpoint);
@@ -102,17 +133,40 @@ export class Kernel {
 		}
 	}
 
-	/** Publish an earlier revision's code, contract and data as a new revision; history is kept. */
-	rollback(id: string): Revision {
+	/**
+	 * Publish an earlier revision as a new one; history is kept. Code and data roll back separately:
+	 *   "code" (the default): that revision's functions and contract, with today's data;
+	 *   "data": today's functions and contract, with that revision's data;
+	 *   "both": the whole revision, as Jiti does.
+	 * The combination must satisfy the invariants of the contract it ends up under, or the rollback is refused (data the
+	 * old code cannot hold needs an explicit migration, not a silent drop).
+	 */
+	rollback(id: string, what: "code" | "data" | "both" = "code"): Revision {
 		const target = this.store.revisions().find((r) => r.id === id);
 		if (target === undefined) throw new Error(`no revision ${id}`);
-		const broken = checkInvariants(new World(target.world), (target.specs as Spec).invariants, target.world.state);
-		if (broken) throw new Error(`rollback target breaks ${broken}`);
-		this.world.restore(target.world);
-		this.spec = target.specs as Spec;
-		this.revision = this.store.publish({ parent: this.revision?.id, reason: `rollback to ${id}`, rollbackOf: id, world: target.world, specs: target.specs });
+		const functions = what === "data" ? this.world.snapshot().functions : target.world.functions;
+		const specs = (what === "data" ? this.spec : target.specs) as Spec;
+		const state = what === "code" ? this.world.state() : target.world.state;
+		const world = { functions, state };
+		const broken = checkInvariants(new World(world), specs.invariants, state);
+		if (broken) throw new Error(`rolling back ${what} to ${id} would break ${broken}; it needs a migration`);
+		this.world.restore(world);
+		this.spec = specs;
+		this.revision = this.store.publish({ parent: this.revision?.id, reason: `rollback ${what} to ${id}`, rollbackOf: id, world, specs });
 		this.generation++;
 		return this.revision;
+	}
+
+	/** Why does a function look the way it does? The revision that last changed it and the chat message that asked. */
+	why(name: string): { revision: string; reason: string; asked?: Asked } | undefined {
+		let last: Revision | undefined;
+		let prev: string | undefined;
+		for (const r of this.store.revisions()) {
+			const src = r.world.functions[name];
+			if (src !== undefined && src !== prev && !r.rollbackOf) last = r;
+			prev = src;
+		}
+		return last && { revision: last.id, reason: last.reason, asked: last.asked };
 	}
 }
 
