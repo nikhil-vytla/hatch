@@ -27,6 +27,7 @@ export type CellVersion = {
 	migrate?: string; // run once, against the cell's state, when this version is accepted
 	checks: Check[]; // examples this version must pass
 	retired: Check[]; // earlier checks this version is allowed to break, each named in `why`
+	invariants: Invariant[]; // model-proposed; ratcheted like checks, but never retirable (the caller's own live elsewhere)
 	parent?: string;
 	why?: number; // OptChat log index of the user message that asked for this version
 	replay: "safe" | "unsafe"; // whether the tool may rerun after a crash (pure cells only)
@@ -45,7 +46,19 @@ export type Trace = {
 	version: string | null; // the cell version that ran it
 };
 
-export type ReplayOutcome = { result: JsonValue; after: JsonObject } | { error: string };
+export type ReplayOutcome = { result: JsonValue; after: JsonObject } | { error: string } | { migrationError: string };
+
+/**
+ * Invariants of two origins. Each list runs in its own sandbox execution (so a model-proposed body that tampers with
+ * built-ins cannot make a caller-owned body pass), the caller-owned list first.
+ */
+export type InvariantSets = { owned: Invariant[]; proposed: Invariant[] };
+
+function groupsOf(invariants: Invariant[] | InvariantSets): Invariant[][] {
+	const groups = Array.isArray(invariants) ? [invariants] : [invariants.owned, invariants.proposed];
+
+	return groups.filter((group) => group.length > 0);
+}
 
 export type Verdict = { ok: true } | { ok: false; reason: string };
 
@@ -110,6 +123,8 @@ function openState(stateFile: string): DatabaseSync {
 	// Exactly-once: the harness's call id is recorded in the same transaction as the call's effects, so a rerun
 	// after a crash finds its own result instead of applying the effects again. The other columns are the call's trace.
 	db.exec("CREATE TABLE IF NOT EXISTS calls (id TEXT PRIMARY KEY, result TEXT NOT NULL)");
+	// Crash-safe migration: `migrated_to` is written in the same transaction as the migration it records.
+	db.exec("CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT NOT NULL)");
 	const have = new Set(db.prepare("PRAGMA table_info(calls)").all().map((column) => String(column.name)));
 
 	for (const column of TRACE_COLUMNS) {
@@ -127,6 +142,12 @@ type ActiveDb = {
 	keys: StatementSync;
 	readOnly: boolean;
 };
+
+function migratedMarker(db: DatabaseSync): string | null {
+	const row = db.prepare("SELECT v FROM meta WHERE k = 'migrated_to'").get();
+
+	return row === undefined ? null : String(row.v);
+}
 
 function keyOf(argv: JsonValue[]): string {
 	return String(argv[0]);
@@ -167,6 +188,8 @@ export class CellRuntime {
 	lastWrites = 0;
 	/** Calls answered from the `calls` table instead of being run again. */
 	replayed = 0;
+	/** Sandbox executions so far (each is a worker and a VM, about 75 to 165 ms), so callers can budget them. */
+	executions = 0;
 
 	/** Release the sandbox. Calls after this fail. */
 	async close(): Promise<void> {
@@ -220,6 +243,7 @@ export class CellRuntime {
 	}
 
 	private async execute(db: DatabaseSync, code: string, readOnly: boolean): Promise<JsonValue> {
+		this.executions++;
 		this.active = {
 			get: db.prepare("SELECT v FROM kv WHERE k = ?"),
 			put: db.prepare("INSERT INTO kv (k, v) VALUES (?, ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v"),
@@ -239,10 +263,13 @@ export class CellRuntime {
 		}
 	}
 
-	// Evaluated against the call's own uncommitted state, so a failure can still roll the call back.
-	private async checkInvariants(db: DatabaseSync, invariants: Invariant[]): Promise<void> {
-		if (invariants.length === 0) return;
+	// Evaluated against the call's own uncommitted state, so a failure can still roll the call back. One execution per
+	// non-empty list, so lists of different origin never share a VM.
+	private async checkInvariants(db: DatabaseSync, invariants: Invariant[] | InvariantSets): Promise<void> {
+		for (const group of groupsOf(invariants)) await this.checkGroup(db, group);
+	}
 
+	private async checkGroup(db: DatabaseSync, invariants: Invariant[]): Promise<void> {
 		let verdicts: (string | null)[] | undefined;
 
 		try {
@@ -259,7 +286,7 @@ export class CellRuntime {
 		}
 	}
 
-	private async runLocked(source: string, args: JsonValue, stateFile: string, callId: string | undefined, invariants: Invariant[], version: string | undefined): Promise<JsonValue> {
+	private async runLocked(source: string, args: JsonValue, stateFile: string, callId: string | undefined, invariants: Invariant[] | InvariantSets, version: string | undefined, marker?: string): Promise<JsonValue> {
 		this.lastWrites = 0;
 		const db = openState(stateFile);
 
@@ -278,6 +305,13 @@ export class CellRuntime {
 			db.exec("BEGIN");
 
 			try {
+				// A migration already recorded for this version is not run twice.
+				if (marker !== undefined && migratedMarker(db) === marker) {
+					db.exec("ROLLBACK");
+
+					return null;
+				}
+
 				const before = callId === undefined ? null : snapshot(db, SNAPSHOT_LIMIT_BYTES);
 				const value = await this.execute(db, `const args = ${JSON.stringify(args ?? {})};\n${source}`, false);
 				await this.checkInvariants(db, invariants);
@@ -296,6 +330,8 @@ export class CellRuntime {
 					);
 				}
 
+				if (marker !== undefined) db.prepare("INSERT INTO meta (k, v) VALUES ('migrated_to', ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v").run(marker);
+
 				db.exec("COMMIT");
 
 				return value;
@@ -313,12 +349,12 @@ export class CellRuntime {
 	 * before commit, `invariants` are checked against the same transaction; a violation rolls the call back and throws
 	 * an `InvariantError`.
 	 */
-	run(source: string, args: JsonValue, stateFile: string, callId?: string, invariants: Invariant[] = [], version?: string): Promise<JsonValue> {
+	run(source: string, args: JsonValue, stateFile: string, callId?: string, invariants: Invariant[] | InvariantSets = [], version?: string): Promise<JsonValue> {
 		return this.serialized(() => this.runLocked(source, args, stateFile, callId, invariants, version));
 	}
 
 	/** Run a live cell's code against its real state. */
-	call(cell: CellVersion, name: string, args: JsonValue, callId?: string, invariants: Invariant[] = []): Promise<JsonValue> {
+	call(cell: CellVersion, name: string, args: JsonValue, callId?: string, invariants: Invariant[] | InvariantSets = []): Promise<JsonValue> {
 		return this.run(cell.source, args, this.statePath(name), callId, invariants, cell.version);
 	}
 
@@ -352,9 +388,11 @@ export class CellRuntime {
 
 	/**
 	 * Run a candidate's source on a scratch database seeded with a trace's kv-before, with the trace's args. The real
-	 * state is never opened. Comparing `after` with `trace.after` shows whether the candidate behaves the same.
+	 * state is never opened. Comparing `after` with `trace.after` shows whether the candidate behaves the same. A
+	 * candidate with a `migrate` runs it on the seeded state first (the before-state has the old shape), so the result
+	 * is comparable but the after-state is in the new shape.
 	 */
-	replay(name: string, candidate: Pick<CellVersion, "source">, trace: Trace, invariants: Invariant[] = []): Promise<ReplayOutcome> {
+	replay(name: string, candidate: Pick<CellVersion, "source" | "migrate">, trace: Trace, invariants: Invariant[] | InvariantSets = []): Promise<ReplayOutcome> {
 		return this.serialized(async () => {
 			const scratch = join(this.dir, "state", `.replay-${name}-${process.pid}-${this.scratchCount++}.sqlite`);
 			rmSync(scratch, { force: true });
@@ -368,6 +406,14 @@ export class CellRuntime {
 					for (const [key, value] of Object.entries(trace.before)) put.run(key, JSON.stringify(value));
 				} finally {
 					seed.close();
+				}
+
+				if (candidate.migrate) {
+					try {
+						await this.runLocked(candidate.migrate, {}, scratch, undefined, [], undefined);
+					} catch (error) {
+						return { migrationError: error instanceof Error ? error.message : String(error) };
+					}
 				}
 
 				try {
@@ -396,7 +442,7 @@ export class CellRuntime {
 	 *     from an empty state, so a group's expectations never depend on another group's writes or on live data. The
 	 *     invariants are checked after every check.
 	 */
-	async verify(name: string, candidate: CellVersion, owed: Check[][], invariants: Invariant[] = []): Promise<Verdict> {
+	async verify(name: string, candidate: CellVersion, owed: Check[][], invariants: Invariant[] | InvariantSets = []): Promise<Verdict> {
 		const scratch = join(this.dir, "state", `.verify-${name}-${process.pid}.sqlite`);
 
 		try {
@@ -443,9 +489,30 @@ export class CellRuntime {
 		}
 	}
 
-	/** Apply an accepted version's migration to the real state. */
-	async migrate(name: string, cell: CellVersion, invariants: Invariant[] = []): Promise<void> {
-		if (cell.migrate) await this.run(cell.migrate, {}, this.statePath(name), undefined, invariants, cell.version);
+	/**
+	 * Step 2 of the crash-safe accept: run the version's migration (if any) against the real state and record
+	 * `migrated_to = <version>` in the same SQLite transaction, so the marker is there exactly when the migration is. A
+	 * version already recorded is not migrated again.
+	 */
+	migrateTo(name: string, cell: CellVersion, invariants: Invariant[] | InvariantSets = []): Promise<void> {
+		return this.serialized(async () => {
+			await this.runLocked(cell.migrate ?? "", {}, this.statePath(name), undefined, invariants, cell.version, cell.version);
+		});
+	}
+
+	/** The version whose migration last committed on this cell's real state, or null if none did. */
+	migratedTo(name: string): Promise<string | null> {
+		return this.serialized(async () => {
+			if (!existsSync(this.statePath(name))) return null;
+
+			const db = openState(this.statePath(name));
+
+			try {
+				return migratedMarker(db);
+			} finally {
+				db.close();
+			}
+		});
 	}
 }
 

@@ -26,8 +26,28 @@ export default defineConfig({
     { name: "anti-slop", specifier: "./tools/oxlint/anti-slop/index.ts" },
     ...gdpPreset.jsPlugins,
   ],
-  overrides: [...gdpPreset.overrides],
+  overrides: [
+    ...gdpPreset.overrides,
+    // Only the writers of the catalogue document (and the tests that build one) may hold its token: every other module
+    // changes the catalogue through catalogue.ts, where each write demands a proof.
+    {
+      files: ["src/catalogue.ts", "src/proofs/**", "test/**"],
+      rules: { "no-restricted-imports": "off" },
+    },
+  ],
   rules: {
+    "no-restricted-imports": [
+      "error",
+      {
+        patterns: [
+          {
+            group: ["**/catalogue-doc.ts"],
+            importNames: ["CellsDoc"],
+            message: "The catalogue document is written only by src/catalogue.ts (behind proofs) and read only by src/proofs.",
+          },
+        ],
+      },
+    ],
     "oxc/no-accumulating-spread": "error",
     "anti-slop/no-array-filter-map": "error",
     "anti-slop/no-reduce-accumulator-copy": "error",
