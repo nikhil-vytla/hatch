@@ -135,11 +135,34 @@ What applies here:
 6. **Machinery catches about three quarters; the user's confirmed examples catch the rest.** The model may propose
    checks, but self-graded checks pass by construction.
 
-## Gaps
+## Round 2: verification, enforced by types
 
-- The migration runs on the real state before the catalogue commit, in two databases. A crash between the two
-  leaves migrated state under the old code. On celld both would live in one Durable Object's SQLite and share a
-  transaction.
+A second round implemented the transferable lessons, with [rauchg/gdp-ts](https://github.com/rauchg/gdp-ts)
+(compile-time proofs) and [dmmulroy/anti-slop](https://github.com/dmmulroy/anti-slop) (Oxlint rules) added to a strict
+`tsc` setup. Details in [NOTES.md](NOTES.md#round-2-brief-a-with-gdp-ts-and-anti-slop).
+
+- **Two proofs guard the two doors.** Only `acceptVersion` writes a version into the catalogue, and it demands
+  `CellVerified<C>` about that exact candidate (fingerprinted, so a candidate edited after the gate is refused). Only
+  `installCells` puts agent code into the registry, and it demands `CatalogueCommitted<K>`, which only a read of the
+  session document can mint. `src/mistakes.ts` type-checks 15 mistakes this rules out.
+- **The gate grew** compare-and-swap on the live version, caller-owned and ratcheted invariants (enforced at call time
+  inside the call's transaction), coverage of every action, replay of real calls against the actions a proposal
+  declares it changes, and boundary fuzzing from each tool's JSON Schema. The demo now shows a stale proposal, an
+  untested action, a drive-by edit and a hang each rejected.
+- **Migrations are crash-safe**: pending, then migration plus marker in one cell transaction, then live; boot
+  reconciles. A test crashes between the steps and recovers with the state migrated exactly once.
+- **Found in review:** invariants sharing one VM let a model-proposed invariant tamper with built-ins so a later
+  caller-owned invariant passed. They now run in separate executions.
+- **Found about anti-slop:** without a schema library, `(line): T => JSON.parse(line)` satisfies every rule and checks
+  nothing, because `JSON.parse` returns `any`.
+- **Not improved:** sandbox cost. pi-codemode starts a worker per execution (~75 ms warm), so a full gate costs 4-5 s.
+- The remaining ways unverified code could get through (the public `registry.install`, raw code accepted by the
+  runtime, caller-owned invariants passed as a plain argument) are listed in NOTES as accepted limits.
+
+## Gaps (round 1; see round 2 above for what changed)
+
+- ~~The migration runs on the real state before the catalogue commit, in two databases.~~ Fixed in round 2 with a
+  pending/marker/live protocol reconciled on boot.
 - The checks are written by the agent. The ratchet stops silent regressions, but nothing stops weak checks for new
   behaviour (see lessons 1 and 5).
 - The QuickJS cold start is about 140 ms per call; a pooled sandbox per cell version would remove it.
@@ -149,7 +172,10 @@ What applies here:
 ## Run it
 
 ```sh
-cd prototype && npm install          # pi-durable, pi-ai, chord, pi-codemode 1.0.3 from npm
+cd prototype && npm install          # pi-durable, pi-ai, chord, pi-codemode 1.0.3, @gdp-ts/core; tsc, oxlint
+npm run vendor                       # fetches anti-slop at a pinned commit (gitignored)
+npm run check                        # tsc + oxlint (anti-slop + gdp-ts)
+npm test                             # 59 tests, about a minute
 node --experimental-strip-types --no-warnings src/demo.ts           # three processes: grow, crash, recover
 node --experimental-strip-types --no-warnings src/bench-view.ts 20000
 node --experimental-strip-types --no-warnings src/shadow-check.ts
