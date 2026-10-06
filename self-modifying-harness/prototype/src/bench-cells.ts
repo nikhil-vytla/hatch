@@ -22,7 +22,7 @@ async function time<T>(work: () => Promise<T>): Promise<number> {
 }
 
 function cell(name: string, source: string): CellVersion {
-	return { version: `${name}@bench`, description: "", parameters: {}, source, checks: [], retired: [], replay: "unsafe" };
+	return { version: `${name}@bench`, description: "", parameters: {}, source, checks: [], retired: [], invariants: [], replay: "unsafe" };
 }
 
 const dir = mkdtempSync(join(tmpdir(), "bench-cells-"));

@@ -8,7 +8,7 @@ import { CellRuntime, type CellVersion, InvariantError, type Invariant } from ".
 import { generateArgs } from "../src/schema-fuzz.ts";
 
 function cell(name: string, source: string, extra: Partial<CellVersion> = {}): CellVersion {
-	return { version: `${name}@test`, description: "", parameters: {}, source, checks: [], retired: [], replay: "unsafe", ...extra };
+	return { version: `${name}@test`, description: "", parameters: {}, source, checks: [], retired: [], replay: "unsafe", ...extra, invariants: extra.invariants ?? [] };
 }
 
 const COUNTER = cell("counter", "const n = (await kv.get('n')) ?? 0; await kv.put('n', n + args.by); return n + args.by;");
@@ -92,6 +92,79 @@ describe("invariants", () => {
 		assert.equal(verdict.ok, false);
 		assert.match(verdict.ok ? "" : verdict.reason, /group 1 check 1 .* broke invariant "n is never negative"/);
 		assert.deepEqual(await rt.verify("v", candidate, groups.slice(0, 1), [NON_NEGATIVE]), { ok: true });
+	});
+});
+
+describe("invariants of two origins", () => {
+	// Rewrites Array.prototype.push so that every later verdict is recorded as a pass. In one VM, a model-proposed body
+	// running first can therefore make a caller-owned body after it pass; in its own execution it cannot.
+	const TAMPER: Invariant = { name: "tamper", source: "const push = Array.prototype.push; Array.prototype.push = function () { return push.call(this, null); }; return true;" };
+
+	test("one list shares a VM, so a tampering body hides a later violation (why the lists are kept apart)", async () => {
+		const rt = fresh();
+		await rt.call(COUNTER, "c", { by: 5 });
+		assert.equal(await rt.call(COUNTER, "c", { by: -9 }, undefined, [TAMPER, NON_NEGATIVE]), -4, "the violation went unnoticed");
+	});
+
+	test("caller-owned and model-proposed lists run in separate executions", async () => {
+		const rt = fresh();
+		await rt.call(COUNTER, "c", { by: 5 });
+		await assert.rejects(
+			rt.call(COUNTER, "c", { by: -9 }, undefined, { owned: [NON_NEGATIVE], proposed: [TAMPER] }),
+			(error: Error) => error instanceof InvariantError && error.invariant === "n is never negative",
+		);
+		const started = rt.executions;
+		await rt.call(COUNTER, "c", { by: 1 }, undefined, { owned: [NON_NEGATIVE], proposed: [TAMPER] });
+		assert.equal(rt.executions - started, 3, "the call and one execution per non-empty list");
+		await rt.call(COUNTER, "c", { by: 1 }, undefined, { owned: [], proposed: [] });
+	});
+
+	test("verify, replay and run take the same two lists", async () => {
+		const rt = fresh();
+		const candidate = cell("v", COUNTER.source);
+		const verdict = await rt.verify("v", candidate, [[{ args: { by: -3 }, expect: -3 }]], { owned: [NON_NEGATIVE], proposed: [TAMPER] });
+		assert.equal(verdict.ok, false);
+		assert.match(verdict.ok ? "" : verdict.reason, /broke invariant "n is never negative"/);
+	});
+});
+
+describe("crash-safe migration marker", () => {
+	const MIGRATING = cell("m", "return 1;", { migrate: "await kv.put('n', ((await kv.get('n')) ?? 0) * 10);" });
+
+	test("the migration and its marker commit together, and a recorded version is not migrated twice", async () => {
+		const rt = fresh();
+		await rt.call(COUNTER, "m", { by: 3 });
+		assert.equal(await rt.migratedTo("m"), null);
+		await rt.migrateTo("m", MIGRATING);
+		assert.equal(await rt.migratedTo("m"), "m@test");
+		await rt.migrateTo("m", MIGRATING);
+		assert.equal(await rt.call(cell("g", "return await kv.get('n');"), "m", {}), 30, "migrated once, not 300");
+	});
+
+	test("a failing migration leaves neither its writes nor a marker", async () => {
+		const rt = fresh();
+		await rt.call(COUNTER, "m", { by: 3 });
+		const bad = cell("m", "return 1;", { migrate: "await kv.put('n', 99); throw new Error('half done');" });
+		await assert.rejects(rt.migrateTo("m", bad), /half done/);
+		assert.equal(await rt.migratedTo("m"), null);
+		assert.equal(await rt.call(cell("g", "return await kv.get('n');"), "m", {}), 3);
+	});
+
+	test("a version without a migration is still marked", async () => {
+		const rt = fresh();
+		await rt.migrateTo("p", cell("p", "return 1;"));
+		assert.equal(await rt.migratedTo("p"), "p@test");
+		assert.equal(await rt.migratedTo("never-seen"), null);
+	});
+
+	test("replay runs the candidate's migration on the seeded before-state and compares results", async () => {
+		const rt = fresh();
+		await rt.call(COUNTER, "r", { by: 4 }, "task:a");
+		const [trace] = await rt.traces("r", 1);
+		const wrapping = { source: "const n = (await kv.get('n')) ?? 0; return n + args.by;", migrate: "await kv.put('n', ((await kv.get('n')) ?? 0) * 10);" };
+		assert.deepEqual(await rt.replay("r", wrapping, trace), { result: 4, after: { n: 0 } });
+		const failing = { source: "return 1;", migrate: "throw new Error('cannot');" };
+		assert.deepEqual(await rt.replay("r", failing, trace), { migrationError: "script: cannot" });
 	});
 });
 
@@ -183,7 +256,7 @@ describe("schema fuzzing", () => {
 		const actions = new Set<string>();
 
 		for (const args of generated) {
-			assert.ok(schema.properties.action.enum.includes(args.action));
+			assert.ok(schema.properties.action.enum.includes(String(args.action)));
 			actions.add(String(args.action));
 			assert.ok(Number.isInteger(args.count) && Number(args.count) >= 0 && Number(args.count) <= 10);
 

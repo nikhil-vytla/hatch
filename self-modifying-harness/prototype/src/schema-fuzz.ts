@@ -63,7 +63,7 @@ function kindOf(value: JsonValue): Kind {
 	}
 }
 
-function isObject(value: JsonValue | undefined): value is JsonObject {
+export function isObject(value: JsonValue | undefined): value is JsonObject {
 	return value !== undefined && kindOf(value) === "object";
 }
 
