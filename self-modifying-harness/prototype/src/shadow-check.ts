@@ -8,12 +8,16 @@ import { fauxProvider } from "@earendil-works/pi-ai/providers/faux";
 import { createRegistry, defineExtension, defineTool, Harness, MemoryStorage } from "@earendil-works/pi-durable";
 
 const context = BACKGROUND_CONTEXT;
+
 const tool = (by: string) => defineTool({ name: "cell_list", description: by, parameters: Type.Object({}), execute: async () => ({ content: [{ type: "text", text: by }] }) });
+
 const kernel = defineExtension({ name: "kernel", tools: [tool("kernel")] });
+
 const cells = (v: string) => defineExtension({ name: "cells", tools: [tool(`agent-written ${v}`)] });
 
 for (const order of [["cells", "kernel"], ["kernel", "cells"]]) {
 	const registry = createRegistry();
+
 	for (const name of order) registry.install(name === "kernel" ? kernel : cells("v1"));
 	const models = createModels();
 	models.setProvider(fauxProvider().provider);
