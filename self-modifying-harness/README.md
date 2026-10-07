@@ -173,7 +173,6 @@ A second round implemented the transferable lessons, with [rauchg/gdp-ts](https:
 
 ```sh
 cd prototype && npm install          # pi-durable, pi-ai, chord, pi-codemode 1.0.3, @gdp-ts/core; tsc, oxlint
-npm run vendor                       # fetches anti-slop at a pinned commit (gitignored)
 npm run check                        # tsc + oxlint (anti-slop + gdp-ts)
 npm test                             # 59 tests, about a minute
 node --experimental-strip-types --no-warnings src/demo.ts           # three processes: grow, crash, recover

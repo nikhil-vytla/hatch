@@ -190,8 +190,10 @@ rejecting low-evidence TypeScript; its `install-anti-slop` skill was followed).
 - `tsc` 7.0.2 strict, Oxlint 1.87.0, anti-slop's 18 generic rules plus `oxc/no-accumulating-spread` at error, and the
   gdp-ts Oxlint preset (default mode, `proofs: ["src/proofs/**"]`). The gdp preset returns only
   `{ jsPlugins, overrides }`, so it is merged rather than spread over the config.
-- anti-slop is meant to be vendored, but this repo commits only code we wrote, so `scripts/vendor-anti-slop.sh` fetches
-  it at a pinned commit (`c44ef22`) into a gitignored `tools/oxlint/anti-slop/`. Run `npm run vendor` after cloning.
+- anti-slop is meant to be vendored and owned: its README says to copy the rules in and change them to match your
+  standards. It lives in `tools/oxlint/anti-slop/` (from commit `c44ef22`, with Dillon Mulroy's MIT license and an
+  `UPSTREAM.md` recording provenance and local changes). An earlier version fetched it with a script into a gitignored
+  directory, on a too-broad reading of AGENTS.md's rule against committing code fetched for an investigation.
 - Baseline on the round-1 code: 24 type errors (one root: `Catalogue` did not fit pi-durable's `JsonObject`) and 228
   anti-slop findings (184 of them `require-readable-spacing`; the rest unknown params/returns, `typeof` narrowing,
   unjustified `as`). Now: 0 and 0.
