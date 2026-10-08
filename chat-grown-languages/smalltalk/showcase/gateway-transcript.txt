@@ -17,7 +17,7 @@
   * traffic burst 2: 60 calls -> 55 recorded, refused: 4x "tokens must be a positive whole number", 1x "over quota"
 
 === 4. THE OPERATOR OPENS THE LIVE IMAGE (read-only console: inspect, changes, try) ===
-  * the app is an object: an ExpenseApp, a ExpenseApp (superclass ExpenseBase), instance variables ["state"]
+  * the app is an object: an ExpenseApp (class ExpenseApp, superclass ExpenseBase), instance variables ["state"]
   * its state keys ["calls","prices","quotas"]; 92 calls recorded; methods: cost:  record_usage:model:tokens:  set_price:cents:  set_quota:tokens:  top_spender  usage:
   who sent what (live, from the object):
     alice     23 calls   4060 tokens  models claude/gpt
@@ -40,20 +40,20 @@
 
 === 6. HOT-FIX IN ONE METHOD, NO RESTART ===
   * recompile ExpenseApp>>cost: -> accepted as rev-0008; nobody was disconnected
-  * cost("scraper") now $0.10799999999999997
-  * top_spender() (a caller of cost:, untouched) now answers "bob": it saw the new method on its next send
+  * cost("scraper") now $0.108
+  * top_spender() calls cost: and was not touched; it still answers "bob", now computed with the new method (late binding: the next send finds the new one)
   * traffic burst 3, on the patched method: 20 calls -> 13 recorded, refused: 5x "over quota", 2x "tokens must be a positive whole number"
 
 === 7. WHICH REVISION INTRODUCED THE BUG, AND WHO ASKED FOR IT? ===
   revision history of this world (kept with the image):
-    rev-0001  08:57:41  usage  changed #('record_usage' 'usage')  asked #10 'I run an LLM API gateway. Record usage per API key: record_usage(key, model, tokens) stores the call and returns that key''s total tokens so far; usage(key) returns the total (0 for a key never seen).'
-    rev-0002  08:57:41  prices  changed #('cost' 'set_price')  asked #20 'Now prices: set_price(model, cents_per_1k_tokens) sets a model''s price and returns it. cost(key) is what that key has spent in dollars, rounded to cents. A model without a price costs nothing.'
-    rev-0003  08:57:41  quotas  changed #('record_usage' 'set_quota')  asked #30 'Rate limits: set_quota(key, tokens) caps a key''s total tokens and returns the quota; it throws if the key has already used more. record_usage must throw if the call would take the key over its quota. Keys without a quota are unlimited.'
-    rev-0004  08:57:41  validation  changed #('record_usage')  asked #40 'Reject bad input: tokens must be a positive whole number, and key and model non-empty strings. Throw an error.'
-    rev-0005  08:57:41  top spender  changed #(#top_spender)  asked #50 'Who spends the most? top_spender() returns the key with the highest cost; ties go to the alphabetically first key; null when nothing is recorded.'
-    rev-0006  08:57:42  invoice per call  changed #('cost')  asked #60 'Invoices must add up: bill every call in whole cents.'
-    rev-0007  08:57:42  price validation  changed #('set_price')  asked #70 'Refuse negative prices.'
-    rev-0008  08:57:43  hotfix cost  changed #('cost')  asked #80 'operator: stop under-billing tiny calls (hotfix)'
+    rev-0001  08:58:24  usage  changed #('record_usage' 'usage')  asked #10 'I run an LLM API gateway. Record usage per API key: record_usage(key, mode...
+    rev-0002  08:58:24  prices  changed #('cost' 'set_price')  asked #20 'Now prices: set_price(model, cents_per_1k_tokens) sets a model''s price and r...
+    rev-0003  08:58:24  quotas  changed #('record_usage' 'set_quota')  asked #30 'Rate limits: set_quota(key, tokens) caps a key''s total tokens and re...
+    rev-0004  08:58:24  validation  changed #('record_usage')  asked #40 'Reject bad input: tokens must be a positive whole number, and key and model n...
+    rev-0005  08:58:24  top spender  changed #('top_spender')  asked #50 'Who spends the most? top_spender() returns the key with the highest cost; tie...
+    rev-0006  08:58:24  invoice per call  changed #('cost')  asked #60 'Invoices must add up: bill every call in whole cents.'
+    rev-0007  08:58:24  price validation  changed #('set_price')  asked #70 'Refuse negative prices.'
+    rev-0008  08:58:25  hotfix cost  changed #('cost')  asked #80 'operator: stop under-billing tiny calls (hotfix)'
   * suspect: rev-0006 "invoice per call", chat message #60 "Invoices must add up: bill every call in whole cents."
   * that revision rounded each call separately: 9 tokens at 50c/1k is 0.45c, which rounds to 0
   Epicea agrees, newest last:
@@ -64,7 +64,7 @@
 
 === 8. ROLL BACK ONE METHOD (set_price's validation from rev-0007 stays) ===
   * rollback of cost to rev-0005 -> {"ok":true,"generation":9,"revision":"rev-0005","new_revision":"rev-0009"}
-  * ExpenseApp>>cost: is the original again (stamp 10/8/2026 08:57); its source:
+  * ExpenseApp>>cost: is the original again (stamp 10/8/2026 08:58); its source:
       cost: key
       	| prices cents |
       	prices := state at: 'prices' ifAbsent: [ Dictionary new ].
@@ -78,12 +78,12 @@
   * traffic burst 4: 20 calls -> 14 recorded, refused: 5x "over quota", 1x "tokens must be a positive whole number"
 
 === 9. SAVE THE IMAGE, RESTART, THE WHOLE WORLD COMES BACK ===
-  * stdin closed: the kernel saved world.image (57 MB) and world.json (366 KB) in 209 ms
-  * new VM, first answer after 182 ms: generation 9 (was 9), revision rev-0009
+  * stdin closed: the kernel saved world.image (57 MB) and world.json (366 KB) in 236 ms
+  * new VM, first answer after 177 ms: generation 9 (was 9), revision rev-0009
   * data: 119 calls recorded (was 119), state identical: true
   * code: 6 methods, sources identical: true
-  * history: 9 revisions, identical: false ...except the rollback entry that came after: rev-0009  08:57:44  rollback of cost to rev-0005
-  * why cost -> rev-0009 "rollback of cost to rev-0005", asked by message #50: "Who spends the most? top_spender() returns the key with the highest cost; ties go to the alphabetically first key; null when nothing is recorded."
+  * history: 9 revisions; the first 8 are identical to before: true; newest: rev-0009  08:58:26  rollback of cost to rev-0005
+  * why cost (a rollback keeps the chat message of the code it restored) -> rev-0009 "rollback of cost to rev-0005", asked by message #50: "Who spends the most? top_spender() returns the key with the highest cost; ties go to the alphabetically first key; null when nothing is recorded."
   * exactly-once survives: replaying request t-1 -> replayed=true
   * traffic burst 5, on the restarted image: 10 calls -> 8 recorded, refused: 1x "tokens must be a positive whole number", 1x "over quota"
 

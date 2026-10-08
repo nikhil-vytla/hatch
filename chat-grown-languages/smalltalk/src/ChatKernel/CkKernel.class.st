@@ -222,7 +222,7 @@ CkKernel >> runQuestion: q on: aClass [
 { #category : #candidate }
 CkKernel >> nameOf: selector [
 
-	^ selector copyUpTo: $:
+	^ (selector copyUpTo: $:) asString
 ]
 
 { #category : #candidate }
@@ -425,7 +425,7 @@ CkKernel >> record: intent scope: scope asked: asked parent: parent code: newCod
 		       at: 'scope' put: scope;
 		       at: 'asked' put: asked;
 		       at: 'code' put: (CkJson toJson: newCode);
-		       at: 'changed' put: changed asSortedCollection asArray;
+		       at: 'changed' put: (changed collect: #asString) asSortedCollection asArray;
 		       yourself.
 	revisions add: rev.
 	current := id.
