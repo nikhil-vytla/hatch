@@ -9,3 +9,4 @@ node_modules/
 *.image
 *.changes
 *.sources
+results/   # untracked while benchmark runs are in progress; committed once complete
