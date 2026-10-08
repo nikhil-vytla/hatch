@@ -1,10 +1,16 @@
 name = "chat_grown"
-defaultTargets = ["kernel"]
+defaultTargets = ["kernel", "kernel_gateway"]
 
 [[lean_lib]]
 name = "Chat"
+roots = ["Chat.Codec", "Chat.Prelude", "Chat.Gateway"]
 
 [[lean_exe]]
 name = "kernel"
 root = "Kernel"
+supportInterpreter = true
+
+[[lean_exe]]
+name = "kernel_gateway"
+root = "KernelGateway"
 supportInterpreter = true

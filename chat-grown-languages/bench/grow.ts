@@ -191,6 +191,7 @@ const summary = {
 	corrections: stats.reduce((a, s) => a + s.corrections, 0),
 	rejected_by_layer: stats.reduce((acc, s) => { for (const [l, n] of Object.entries(s.rejected)) acc[l] = (acc[l] ?? 0) + n; return acc; }, {} as Record<string, number>),
 	usage: model.usage,
+	max_tokens_hits: events.filter((e) => e.text.includes("(response hit max_tokens)")).length,
 	minutes: Math.round((Date.now() - t0) / 600) / 100,
 	final_functions: Object.keys(live.functions ?? {}),
 	per_turn: stats,

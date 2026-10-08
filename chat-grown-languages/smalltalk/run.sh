@@ -12,5 +12,6 @@ if [ ! -f "$DATA/world.image" ]; then
   ln -sf /opt/pharo/*.sources "$DATA/"
 fi
 export CK_DATA="$DATA"
+export SCENARIO="${SCENARIO:-expenses}"
 cd "$DATA"
 exec /opt/pharo/vm/pharo --headless "$DATA/world.image" eval "CkKernel runFromEnvironment" 2>&2

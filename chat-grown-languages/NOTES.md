@@ -80,3 +80,9 @@ benchmark them with DeepSeek, and record demos.
   corrections, tokens, minutes. Three repetitions per language and scenario, since single runs are noisy.
 - First runs with the fixed simulated user: corrections fell from 16 to 5-6 per expenses run (the old user was
   "correcting" toward invariant-breaking answers).
+- **Output cap:** the DeepSeek adapter capped responses at 8000 tokens. Lean's first run hit it on turns 6 and 7
+  (DeepSeek reasons at length before writing Lean, then the reply is cut before any tool call): 0/3 goals on both
+  turns. Clojure hit it once too. Raised to 32000 (`DEEPSEEK_MAX_TOKENS`), discarded every run so far (kept in
+  scratch, not committed), and re-ran all languages x 3. `summary.json` now counts `max_tokens_hits`.
+  Discarded first-run numbers, for the record (8000 cap): goal checks expenses js 20/20, clojure 20/20, elixir 20/20,
+  racket 17/20, lean 14/20; gateway js 18/19, clojure 19/19, elixir 19/19, racket 19/19.

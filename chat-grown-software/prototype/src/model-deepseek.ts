@@ -34,7 +34,7 @@ export class DeepSeekModel implements Model {
 			headers: { "content-type": "application/json", ...(this.key ? { authorization: `Bearer ${this.key}` } : {}) },
 			body: JSON.stringify({
 				model: MODEL_ID,
-				max_tokens: 8000,
+				max_tokens: Number(process.env.DEEPSEEK_MAX_TOKENS ?? 32000),
 				messages: [{ role: "system", content: system }, ...toOpenAI(messages)],
 				tools: tools.map((t) => ({ type: "function", function: { name: t.name, description: t.description, parameters: t.input_schema } })),
 			}),

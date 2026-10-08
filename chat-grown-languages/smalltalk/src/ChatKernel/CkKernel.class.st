@@ -27,6 +27,7 @@ CkKernel class >> runFromEnvironment [
 
 	| k |
 	k := self new.
+	CkJson scenario: (Smalltalk os environment at: 'SCENARIO' ifAbsent: [ 'expenses' ]).
 	k dataDir: (Smalltalk os environment at: 'CK_DATA').
 	k load.
 	k serve.

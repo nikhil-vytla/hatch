@@ -5,6 +5,9 @@ arrays become OrderedCollections (mutable), numbers stay Integer/Float.
 Class {
 	#name : #CkJson,
 	#superclass : #Object,
+	#classVars : [
+		'Scenario'
+	],
 	#category : #ChatKernel
 }
 
@@ -107,7 +110,54 @@ CkJson class >> sameOutcome: a to: b [
 ]
 
 { #category : #invariants }
+CkJson class >> scenario: aString [
+	"'expenses' (default) or 'gateway': which invariants the kernel enforces. Set at every start."
+
+	Scenario := aString
+]
+
+{ #category : #invariants }
 CkJson class >> violation: s [
+
+	^ Scenario = 'gateway' ifTrue: [ self gatewayViolation: s ] ifFalse: [ self expensesViolation: s ]
+]
+
+{ #category : #invariants }
+CkJson class >> isWhole: n [
+
+	^ n isNumber and: [ n isInteger or: [ n isFloat and: [ n fractionPart = 0 ] ] ]
+]
+
+{ #category : #invariants }
+CkJson class >> gatewayViolation: s [
+	"The gateway scenario's five invariants: calls-shape, prices-shape, quotas-shape, within-quota, known-keys."
+
+	| calls prices quotas |
+	s isDictionary ifFalse: [ ^ 'known-keys: state is not an object' ].
+	s keysDo: [ :k | (#( 'calls' 'prices' 'quotas' ) includes: k) ifFalse: [ ^ 'known-keys: unexpected top-level key ' , k printString ] ].
+	calls := (s at: 'calls' ifAbsent: [ nil ]) ifNil: [ #(  ) ].
+	(calls isCollection and: [ calls isString not and: [ calls isDictionary not ] ]) ifFalse: [ ^ 'calls-shape: calls is not a list' ].
+	calls do: [ :c |
+		c isDictionary ifFalse: [ ^ 'calls-shape: a call is not an object' ].
+		(c size = 3 and: [ (c includesKey: 'key') and: [ (c includesKey: 'model') and: [ c includesKey: 'tokens' ] ] ]) ifFalse: [ ^ 'calls-shape: a call must be exactly {key, model, tokens}' ].
+		((c at: 'key') isString and: [ (c at: 'key') isEmpty not ]) ifFalse: [ ^ 'calls-shape: key must be a non-empty string' ].
+		((c at: 'model') isString and: [ (c at: 'model') isEmpty not ]) ifFalse: [ ^ 'calls-shape: model must be a non-empty string' ].
+		((self isWhole: (c at: 'tokens')) and: [ (c at: 'tokens') > 0 ]) ifFalse: [ ^ 'calls-shape: tokens must be a positive whole number, got ' , (c at: 'tokens') printString ] ].
+	prices := (s at: 'prices' ifAbsent: [ nil ]) ifNil: [ Dictionary new ].
+	prices isDictionary ifFalse: [ ^ 'prices-shape: prices is not an object' ].
+	prices keysAndValuesDo: [ :k :v | (v isNumber and: [ v >= 0 ]) ifFalse: [ ^ 'prices-shape: price of ' , k printString , ' must be a number >= 0' ] ].
+	quotas := (s at: 'quotas' ifAbsent: [ nil ]) ifNil: [ Dictionary new ].
+	quotas isDictionary ifFalse: [ ^ 'quotas-shape: quotas is not an object' ].
+	quotas keysAndValuesDo: [ :k :v | ((self isWhole: v) and: [ v >= 0 ]) ifFalse: [ ^ 'quotas-shape: quota of ' , k printString , ' must be a whole number >= 0' ] ].
+	quotas keysAndValuesDo: [ :k :q |
+		| used |
+		used := calls inject: 0 into: [ :sum :c | (c at: 'key') = k ifTrue: [ sum + (c at: 'tokens') ] ifFalse: [ sum ] ].
+		used <= q ifFalse: [ ^ 'within-quota: ' , k printString , ' used ' , used printString , ' > quota ' , q printString ] ].
+	^ nil
+]
+
+{ #category : #invariants }
+CkJson class >> expensesViolation: s [
 	"nil when the state (plain JSON) satisfies the three scenario invariants, else a description."
 
 	| exp bud |
