@@ -63,3 +63,11 @@ benchmark them with DeepSeek, and record demos.
   writes), and turn 3's `set_quota` on `{}` differed the same way. No question covered an empty state, so the user
   never saw it; later rewrites fixed both by accident. The question rules could add the empty fixture for every
   function in scope.
+
+## Port status (verified by re-running conformance myself)
+
+- Clojure: expenses 51/51, gateway 28/28. Elixir: 51/51, 28/28. Racket: 51/51 (gateway in progress).
+- Elixir caps recorded traces (`HATCH_MAX_TRACES`, default 1000): without it `world.json` grew quadratically
+  under load (every trace stores its full before-state). The cost: the traces gate then replays only recent use.
+  Same trade-off any real system makes; a content-addressed state store (Clojure's structural sharing, on disk)
+  would avoid it.

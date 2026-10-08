@@ -1,11 +1,10 @@
 // Showcase part 1: the live image over the JSON-lines protocol. Run: node showcase/demo.mjs (from smalltalk/)
 import { spawn } from "node:child_process";
-import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createInterface } from "node:readline";
 
-const dir = mkdtempSync(join(tmpdir(), "st-demo-"));
+const dir = process.env.DEMO_DIR ?? mkdtempSync(join(tmpdir(), "st-demo-"));
 const proc = spawn(join(import.meta.dirname, "..", "run.sh"), [dir]);
 const lines = []; const waiting = [];
 createInterface({ input: proc.stdout }).on("line", (l) => { const w = waiting.shift(); w ? w(l) : lines.push(l); });
@@ -13,7 +12,7 @@ const ask = (req, note) => new Promise((resolve) => {
 	if (note) console.log(`\n# ${note}`);
 	console.log(`> ${JSON.stringify(req).slice(0, 300)}`);
 	proc.stdin.write(`${JSON.stringify(req)}\n`);
-	const done = (l) => { console.log(`< ${l.slice(0, 400)}`); resolve(JSON.parse(l)); };
+	const done = (l) => { console.log(`< ${l.slice(0, 1000)}`); resolve(JSON.parse(l)); };
 	const l = lines.shift(); l ? done(l) : waiting.push(done);
 });
 const cents = "cents: x\n\t^ (x * 100) rounded / 100.0";
@@ -43,5 +42,3 @@ await ask({ op: "changes", limit: 5 }, "the rollback is just more entries in the
 await ask({ op: "observe" });
 proc.stdin.end();
 await new Promise((r) => proc.on("exit", r));
-console.log(`\n(world dir kept for part 2: ${dir})`);
-console.log(`WORLD=${dir}`);

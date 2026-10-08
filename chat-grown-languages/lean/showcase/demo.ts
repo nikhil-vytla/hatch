@@ -96,7 +96,7 @@ console.log("what the bug does, on a state with one $1500 rent payment (nothing 
 const t = await k.request({ op: "try", forms: [bug1], removes: [], questions: [{ fixture: { expenses: [{ amount: 1500, category: "rent" }] }, calls: [{ fn: "by_category", args: [] }, { fn: "total", args: [] }] }] });
 console.log("  by_category -> " + JSON.stringify((await k.request({ op: "try", forms: [bug1], removes: [], questions: [{ fixture: { expenses: [{ amount: 1500, category: "rent" }] }, calls: [{ fn: "by_category", args: [] }] }] })).outcomes[0].value) + ", total -> " + JSON.stringify(t.outcomes[0].value));
 
-head("4. A bug that tests miss: over_budget uses >= (spending exactly the budget is not 'over')");
+head("4. A bug that tests almost miss: over_budget uses >= (spending exactly the budget is not over)");
 const bug2 = ref.turns[5].forms[2].replace("> p.2", "≥ p.2");
 console.log(indent(bug2));
 console.log("tests:");
