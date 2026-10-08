@@ -1,0 +1,13 @@
+{
+  "total": "(defn total []\n  (let [dollars (reduce + 0 (map (fn [e] (get e \"amount\")) (get (state) \"expenses\")))]\n    (if (== dollars 0) 0 (cents_to_amount (to_cents dollars)))))",
+  "cents_to_amount": "(defn cents_to_amount [c] (/ c 100))",
+  "top_category": "(defn top_category [& args]\n  (let [spent (by_category)]\n    (if (empty? spent)\n      nil\n      (first (sort-by (fn [c] [(- (to_cents (get spent c))) c]) (keys spent))))))",
+  "over_budget": "(defn over_budget []\n  (let [spent (by_category)\n        budgets (get (state) \"budgets\")\n        over (reduce-kv (fn [acc c b] (if (budget_over (get spent c 0) b) (conj acc c) acc)) [] budgets)]\n    (vec (sort over))))",
+  "set_budget": "(defn set_budget [category amount]\n  (when-not (and (number? amount) (not (neg? amount))) (throw (ex-info \"budget must not be negative\" {})))\n  (swap-state! assoc-in [\"budgets\" category] amount)\n  amount)",
+  "add_expense_entry": "(defn add_expense_entry [amount category with_note note]\n  (when-not (and (number? amount) (pos? amount)) (throw (ex-info \"amount must be positive\" {})))\n  (when-not (and (string? category) (pos? (count category))) (throw (ex-info \"category is required\" {})))\n  (when (and with_note (not (string? note))) (throw (ex-info \"breaks expenses-shape\" {})))\n  (let [e (if with_note\n            {\"amount\" amount \"category\" category \"note\" note}\n            {\"amount\" amount \"category\" category})]\n    (swap-state! update \"expenses\" (fnil conj []) e)\n    (count (get (state) \"expenses\"))))",
+  "by_category": "(defn by_category []\n  (let [sums (reduce (fn [acc e] (update acc (get e \"category\") (fnil + 0) (get e \"amount\"))) {} (get (state) \"expenses\"))\n        cent-map (reduce-kv (fn [acc c v] (assoc acc c (to_cents v))) {} sums)\n        parts (reduce + 0 (vals cent-map))\n        target (to_cents (reduce + 0 (vals sums)))\n        fixed (if (and (seq cent-map) (not (== parts target)))\n                (let [biggest (first (sort-by (fn [c] [(- (get cent-map c)) c]) (keys cent-map)))]\n                  (assoc cent-map biggest (+ (get cent-map biggest) (- target parts))))\n                cent-map)]\n    (reduce-kv (fn [acc c v] (assoc acc c (cents_to_amount v))) {} fixed)))",
+  "expense_amounts": "(defn expense-amounts []\n  (map (fn [e] (get e \"amount\")) (get (state) \"expenses\")))",
+  "to_cents": "(defn to_cents [amount] (round (* 100 amount)))",
+  "budget_over": "(defn budget_over [spent budget]\n  (> (to_cents spent) (to_cents budget)))",
+  "add_expense": "(defn add_expense\n  ([amount category] (add_expense_entry amount category false nil))\n  ([amount category note] (add_expense_entry amount category true note)))"
+}

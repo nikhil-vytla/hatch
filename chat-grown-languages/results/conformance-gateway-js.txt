@@ -1,0 +1,30 @@
+PASS  starts empty  (123 ms)
+PASS  turn 1 try: reference forms do what the user intends
+PASS  turn 1 develop accepted  (32 ms)
+PASS  turn 1 execute record_usage
+PASS  turn 1 execute record_usage
+PASS  turn 1 execute record_usage
+PASS  turn 1 execute usage
+PASS  turn 2 try: reference forms do what the user intends
+PASS  turn 2 develop accepted  (78 ms)
+PASS  turn 2 execute set_price
+PASS  turn 2 execute set_price
+PASS  turn 2 execute cost
+PASS  turn 2 execute cost
+PASS  turn 3 try: reference forms do what the user intends
+PASS  turn 3 develop accepted  (104 ms)
+PASS  turn 3 execute set_quota
+PASS  turn 3 execute record_usage
+PASS  turn 3 execute usage
+PASS  turn 4 try: reference forms do what the user intends
+PASS  turn 4 develop accepted  (116 ms)
+PASS  turn 4 execute record_usage
+PASS  turn 5 try: reference forms do what the user intends
+PASS  turn 5 develop accepted  (122 ms)
+PASS  turn 5 execute top_spender
+PASS  turn 5 execute cost
+PASS  live state matches the reference program's
+PASS  observe lists the public functions by snake_case name
+PASS  restart resumes the same world
+
+js (gateway): 28/28 checks pass

@@ -1,0 +1,59 @@
+PASS  starts empty  (1323 ms)
+PASS  turn 1 try: reference forms do what the user intends
+PASS  turn 1 develop accepted  (3 ms)
+PASS  turn 1 execute add_expense
+PASS  turn 1 execute add_expense
+PASS  turn 1 execute add_expense
+PASS  turn 2 try: reference forms do what the user intends
+PASS  turn 2 develop accepted  (9 ms)
+PASS  turn 2 execute total
+PASS  turn 3 try: reference forms do what the user intends
+PASS  turn 3 develop accepted  (48 ms)
+PASS  turn 3 execute by_category
+PASS  turn 3 execute add_expense
+PASS  turn 3 execute by_category
+PASS  turn 4 try: reference forms do what the user intends
+PASS  turn 4 develop accepted  (83 ms)
+PASS  turn 4 execute total
+PASS  turn 5 try: reference forms do what the user intends
+PASS  turn 5 develop accepted  (89 ms)
+PASS  turn 5 execute add_expense
+PASS  turn 6 try: reference forms do what the user intends
+PASS  turn 6 develop accepted  (156 ms)
+PASS  turn 6 execute set_budget
+PASS  turn 6 execute over_budget
+PASS  turn 6 execute set_budget
+PASS  turn 6 execute over_budget
+PASS  turn 7 try: reference forms do what the user intends
+PASS  turn 7 develop accepted  (221 ms)
+PASS  turn 7 execute top_category
+PASS  turn 8 try: reference forms do what the user intends
+PASS  turn 8 develop accepted  (208 ms)
+PASS  turn 8 execute add_expense
+PASS  turn 8 execute top_category
+PASS  turn 8 execute total
+PASS  live state matches the reference program's
+PASS  observe lists the public functions by snake_case name
+PASS  probe side_effect refused  (1 ms)
+      layers: static
+PASS  probe breaks_ratchet refused  (106 ms)
+      layers: ratchet
+PASS  probe breaks_invariant refused  (112 ms)
+      layers: ratchet
+PASS  probe loops refused  (1096 ms)
+      layers: ratchet
+PASS  probe calls_missing refused  (1 ms)
+      layers: static
+PASS  probe breaks_trace refused  (128 ms)
+      layers: ratchet
+PASS  stale generation refused
+PASS  execute is exactly-once by request_id
+PASS  a throwing execute reports the error and changes nothing
+PASS  why(over_budget) names the turn that asked for it
+PASS  rollback is code-only and clean (refused: rollback refused: trace 14 {"args":[4.5,"food","coffee with Sam"],"fn":"add_expe)
+PASS  why() after rollback still answers
+PASS  restart resumes the same world  (352 ms)
+PASS  exactly-once survives a restart
+PASS  unknown op answers with an error and keeps running
+
+racket: 51/51 checks pass; develop avg 102 ms; start 1323 ms

@@ -1,0 +1,102 @@
+{
+  "lang": "clojure",
+  "scenario": "gateway",
+  "model": "deepseek-flash",
+  "turns_accepted": 5,
+  "turns": 5,
+  "goal_ok": 19,
+  "goal_n": 19,
+  "final_regression": "19/19",
+  "develops": 9,
+  "load_errors": 0,
+  "corrections": 13,
+  "rejected_by_layer": {
+    "ratchet": 13,
+    "invariants": 6
+  },
+  "usage": {
+    "calls": 28,
+    "prompt": 522802,
+    "completion": 25324
+  },
+  "max_tokens_hits": 0,
+  "minutes": 2.14,
+  "final_functions": [
+    "usage",
+    "top_spender",
+    "token_quota",
+    "whole_count",
+    "cost",
+    "call_keys",
+    "set_price",
+    "record_usage",
+    "set_quota"
+  ],
+  "per_turn": [
+    {
+      "turn": 1,
+      "accepted": true,
+      "develops": 2,
+      "rejected": {
+        "ratchet": 6,
+        "invariants": 6
+      },
+      "load_errors": 0,
+      "corrections": 6,
+      "goal": "✓✓✓",
+      "goal_ok": 3,
+      "goal_n": 3,
+      "ms": 32705
+    },
+    {
+      "turn": 2,
+      "accepted": true,
+      "develops": 1,
+      "rejected": {},
+      "load_errors": 0,
+      "corrections": 0,
+      "goal": "✓✓✓✓",
+      "goal_ok": 4,
+      "goal_n": 4,
+      "ms": 16122
+    },
+    {
+      "turn": 3,
+      "accepted": true,
+      "develops": 1,
+      "rejected": {},
+      "load_errors": 0,
+      "corrections": 0,
+      "goal": "✓✓✓✓",
+      "goal_ok": 4,
+      "goal_n": 4,
+      "ms": 11191
+    },
+    {
+      "turn": 4,
+      "accepted": true,
+      "develops": 4,
+      "rejected": {
+        "ratchet": 7
+      },
+      "load_errors": 0,
+      "corrections": 7,
+      "goal": "✓✓✓✓✓",
+      "goal_ok": 5,
+      "goal_n": 5,
+      "ms": 33185
+    },
+    {
+      "turn": 5,
+      "accepted": true,
+      "develops": 1,
+      "rejected": {},
+      "load_errors": 0,
+      "corrections": 0,
+      "goal": "✓✓✓",
+      "goal_ok": 3,
+      "goal_n": 3,
+      "ms": 34320
+    }
+  ]
+}

@@ -1,0 +1,99 @@
+{
+  "lang": "smalltalk",
+  "scenario": "gateway",
+  "model": "deepseek-flash",
+  "turns_accepted": 5,
+  "turns": 5,
+  "goal_ok": 19,
+  "goal_n": 19,
+  "final_regression": "19/19",
+  "develops": 7,
+  "load_errors": 0,
+  "corrections": 3,
+  "rejected_by_layer": {
+    "ratchet": 3,
+    "invariants": 4
+  },
+  "usage": {
+    "calls": 21,
+    "prompt": 238840,
+    "completion": 17305
+  },
+  "max_tokens_hits": 0,
+  "minutes": 1.47,
+  "final_functions": [
+    "cost",
+    "set_price",
+    "record_usage",
+    "top_spender",
+    "set_quota",
+    "valid_tokens",
+    "valid_text",
+    "usage"
+  ],
+  "per_turn": [
+    {
+      "turn": 1,
+      "accepted": true,
+      "develops": 3,
+      "rejected": {
+        "ratchet": 3,
+        "invariants": 4
+      },
+      "load_errors": 0,
+      "corrections": 3,
+      "goal": "✓✓✓",
+      "goal_ok": 3,
+      "goal_n": 3,
+      "ms": 20530
+    },
+    {
+      "turn": 2,
+      "accepted": true,
+      "develops": 1,
+      "rejected": {},
+      "load_errors": 0,
+      "corrections": 0,
+      "goal": "✓✓✓✓",
+      "goal_ok": 4,
+      "goal_n": 4,
+      "ms": 24477
+    },
+    {
+      "turn": 3,
+      "accepted": true,
+      "develops": 1,
+      "rejected": {},
+      "load_errors": 0,
+      "corrections": 0,
+      "goal": "✓✓✓✓",
+      "goal_ok": 4,
+      "goal_n": 4,
+      "ms": 10928
+    },
+    {
+      "turn": 4,
+      "accepted": true,
+      "develops": 1,
+      "rejected": {},
+      "load_errors": 0,
+      "corrections": 0,
+      "goal": "✓✓✓✓✓",
+      "goal_ok": 5,
+      "goal_n": 5,
+      "ms": 20480
+    },
+    {
+      "turn": 5,
+      "accepted": true,
+      "develops": 1,
+      "rejected": {},
+      "load_errors": 0,
+      "corrections": 0,
+      "goal": "✓✓✓",
+      "goal_ok": 3,
+      "goal_n": 3,
+      "ms": 11285
+    }
+  ]
+}

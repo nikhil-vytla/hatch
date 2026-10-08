@@ -1,0 +1,116 @@
+{
+  "lang": "lean",
+  "scenario": "gateway",
+  "model": "deepseek-flash",
+  "turns_accepted": 5,
+  "turns": 5,
+  "goal_ok": 19,
+  "goal_n": 19,
+  "final_regression": "19/19",
+  "develops": 10,
+  "load_errors": 0,
+  "corrections": 7,
+  "rejected_by_layer": {
+    "ratchet": 7,
+    "proof": 6
+  },
+  "usage": {
+    "calls": 33,
+    "prompt": 1526110,
+    "completion": 167424
+  },
+  "max_tokens_hits": 0,
+  "minutes": 11.38,
+  "final_functions": [
+    "add_call",
+    "best_key",
+    "best_key_ne_none",
+    "best_key_none",
+    "best_key_spec",
+    "call_units",
+    "cost",
+    "keys_of",
+    "keys_of_cons_ne_nil",
+    "price_of",
+    "quota_of",
+    "quota_of_eq_lookup",
+    "quota_of_filter_ne",
+    "record_usage",
+    "set_price",
+    "set_quota",
+    "top_spender",
+    "total_units",
+    "usage",
+    "used_append_singleton"
+  ],
+  "per_turn": [
+    {
+      "turn": 1,
+      "accepted": true,
+      "develops": 4,
+      "rejected": {
+        "ratchet": 4,
+        "proof": 1
+      },
+      "load_errors": 0,
+      "corrections": 4,
+      "goal": "✓✓✓",
+      "goal_ok": 3,
+      "goal_n": 3,
+      "ms": 75059
+    },
+    {
+      "turn": 2,
+      "accepted": true,
+      "develops": 2,
+      "rejected": {
+        "ratchet": 3,
+        "proof": 2
+      },
+      "load_errors": 0,
+      "corrections": 3,
+      "goal": "✓✓✓✓",
+      "goal_ok": 4,
+      "goal_n": 4,
+      "ms": 123125
+    },
+    {
+      "turn": 3,
+      "accepted": true,
+      "develops": 1,
+      "rejected": {},
+      "load_errors": 0,
+      "corrections": 0,
+      "goal": "✓✓✓✓",
+      "goal_ok": 4,
+      "goal_n": 4,
+      "ms": 204045
+    },
+    {
+      "turn": 4,
+      "accepted": true,
+      "develops": 1,
+      "rejected": {},
+      "load_errors": 0,
+      "corrections": 0,
+      "goal": "✓✓✓✓✓",
+      "goal_ok": 5,
+      "goal_n": 5,
+      "ms": 27696
+    },
+    {
+      "turn": 5,
+      "accepted": true,
+      "develops": 2,
+      "rejected": {
+        "proof": 3
+      },
+      "load_errors": 0,
+      "corrections": 0,
+      "goal": "✓✓✓",
+      "goal_ok": 3,
+      "goal_n": 3,
+      "ms": 250596
+    }
+  ]
+}

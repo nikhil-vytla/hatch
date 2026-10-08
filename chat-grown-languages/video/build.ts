@@ -10,7 +10,8 @@ const speed = Number(speedArg);
 type E = { t: number; kind: string; text: string; score?: string };
 
 function run(dir: string): { title: string; events: E[]; summary: any } {
-	const events: E[] = readFileSync(`${dir}/events.jsonl`, "utf8").trim().split("\n").map((l) => JSON.parse(l));
+	const only = process.env.TURNS?.split(",").map(Number); // e.g. TURNS=2 keeps the third turn only
+	const events: E[] = readFileSync(`${dir}/events.jsonl`, "utf8").trim().split("\n").map((l) => JSON.parse(l)).filter((e: any) => !only || only.includes(e.turn));
 	const summary = existsSync(`${dir}/summary.json`) ? JSON.parse(readFileSync(`${dir}/summary.json`, "utf8")) : {};
 	let ok = 0, n = 0;
 	for (const e of events) if (e.kind === "goal") { const m = e.text.match(/^(\d+)\/(\d+)/); if (m) { ok += +m[1]; n += +m[2]; e.score = `goal ${ok}/${n}`; } }

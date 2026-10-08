@@ -1,0 +1,140 @@
+{
+  "lang": "clojure",
+  "scenario": "expenses",
+  "model": "deepseek-flash",
+  "turns_accepted": 8,
+  "turns": 8,
+  "goal_ok": 20,
+  "goal_n": 20,
+  "final_regression": "20/20",
+  "develops": 12,
+  "load_errors": 1,
+  "corrections": 11,
+  "rejected_by_layer": {
+    "ratchet": 11
+  },
+  "usage": {
+    "calls": 38,
+    "prompt": 659273,
+    "completion": 40096
+  },
+  "max_tokens_hits": 0,
+  "minutes": 3.46,
+  "final_functions": [
+    "total",
+    "cents_to_amount",
+    "top_category",
+    "over_budget",
+    "set_budget",
+    "add_expense_entry",
+    "by_category",
+    "expense_amounts",
+    "to_cents",
+    "budget_over",
+    "add_expense"
+  ],
+  "per_turn": [
+    {
+      "turn": 1,
+      "accepted": true,
+      "develops": 1,
+      "rejected": {},
+      "load_errors": 0,
+      "corrections": 0,
+      "goal": "✓✓",
+      "goal_ok": 2,
+      "goal_n": 2,
+      "ms": 5671
+    },
+    {
+      "turn": 2,
+      "accepted": true,
+      "develops": 1,
+      "rejected": {},
+      "load_errors": 0,
+      "corrections": 0,
+      "goal": "✓✓",
+      "goal_ok": 2,
+      "goal_n": 2,
+      "ms": 5492
+    },
+    {
+      "turn": 3,
+      "accepted": true,
+      "develops": 1,
+      "rejected": {},
+      "load_errors": 0,
+      "corrections": 0,
+      "goal": "✓✓",
+      "goal_ok": 2,
+      "goal_n": 2,
+      "ms": 16566
+    },
+    {
+      "turn": 4,
+      "accepted": true,
+      "develops": 1,
+      "rejected": {},
+      "load_errors": 0,
+      "corrections": 0,
+      "goal": "✓✓",
+      "goal_ok": 2,
+      "goal_n": 2,
+      "ms": 87364
+    },
+    {
+      "turn": 5,
+      "accepted": true,
+      "develops": 2,
+      "rejected": {
+        "ratchet": 1
+      },
+      "load_errors": 0,
+      "corrections": 1,
+      "goal": "✓✓✓✓",
+      "goal_ok": 4,
+      "goal_n": 4,
+      "ms": 14267
+    },
+    {
+      "turn": 6,
+      "accepted": true,
+      "develops": 3,
+      "rejected": {
+        "ratchet": 5
+      },
+      "load_errors": 1,
+      "corrections": 5,
+      "goal": "✓✓✓",
+      "goal_ok": 3,
+      "goal_n": 3,
+      "ms": 36032
+    },
+    {
+      "turn": 7,
+      "accepted": true,
+      "develops": 1,
+      "rejected": {},
+      "load_errors": 0,
+      "corrections": 0,
+      "goal": "✓✓✓",
+      "goal_ok": 3,
+      "goal_n": 3,
+      "ms": 7519
+    },
+    {
+      "turn": 8,
+      "accepted": true,
+      "develops": 2,
+      "rejected": {
+        "ratchet": 5
+      },
+      "load_errors": 0,
+      "corrections": 5,
+      "goal": "✓✓",
+      "goal_ok": 2,
+      "goal_n": 2,
+      "ms": 33756
+    }
+  ]
+}

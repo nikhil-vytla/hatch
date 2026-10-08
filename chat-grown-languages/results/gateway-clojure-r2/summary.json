@@ -1,0 +1,108 @@
+{
+  "lang": "clojure",
+  "scenario": "gateway",
+  "model": "deepseek-flash",
+  "turns_accepted": 5,
+  "turns": 5,
+  "goal_ok": 19,
+  "goal_n": 19,
+  "final_regression": "19/19",
+  "develops": 7,
+  "load_errors": 0,
+  "corrections": 6,
+  "rejected_by_layer": {
+    "ratchet": 6,
+    "invariants": 5
+  },
+  "usage": {
+    "calls": 24,
+    "prompt": 359669,
+    "completion": 17170
+  },
+  "max_tokens_hits": 0,
+  "minutes": 1.44,
+  "final_functions": [
+    "positive_whole_number",
+    "call_cost_dollars",
+    "usage",
+    "top_spender",
+    "over_quota",
+    "model_price_cents",
+    "cost",
+    "non_empty_string",
+    "usage_record",
+    "set_price",
+    "quota_for_key",
+    "usage_total_for_key",
+    "record_usage",
+    "set_quota",
+    "key_calls"
+  ],
+  "per_turn": [
+    {
+      "turn": 1,
+      "accepted": true,
+      "develops": 2,
+      "rejected": {
+        "ratchet": 5,
+        "invariants": 5
+      },
+      "load_errors": 0,
+      "corrections": 5,
+      "goal": "✓✓✓",
+      "goal_ok": 3,
+      "goal_n": 3,
+      "ms": 27063
+    },
+    {
+      "turn": 2,
+      "accepted": true,
+      "develops": 1,
+      "rejected": {},
+      "load_errors": 0,
+      "corrections": 0,
+      "goal": "✓✓✓✓",
+      "goal_ok": 4,
+      "goal_n": 4,
+      "ms": 12331
+    },
+    {
+      "turn": 3,
+      "accepted": true,
+      "develops": 1,
+      "rejected": {},
+      "load_errors": 0,
+      "corrections": 0,
+      "goal": "✓✓✓✓",
+      "goal_ok": 4,
+      "goal_n": 4,
+      "ms": 13573
+    },
+    {
+      "turn": 4,
+      "accepted": true,
+      "develops": 1,
+      "rejected": {},
+      "load_errors": 0,
+      "corrections": 0,
+      "goal": "✓✓✓✓✓",
+      "goal_ok": 5,
+      "goal_n": 5,
+      "ms": 18274
+    },
+    {
+      "turn": 5,
+      "accepted": true,
+      "develops": 2,
+      "rejected": {
+        "ratchet": 1
+      },
+      "load_errors": 0,
+      "corrections": 1,
+      "goal": "✓✓✓",
+      "goal_ok": 3,
+      "goal_n": 3,
+      "ms": 14280
+    }
+  ]
+}

@@ -90,3 +90,13 @@ benchmark them with DeepSeek, and record demos.
   called `develop`, so the user was never asked and the turn ended with no budgets. Its `over_budget` sorted by
   overage instead of by name; it kept previewing variants. A model behaviour failure (dithering), not a language
   failure; the hidden goal check is what exposes it. A driver could nudge after N previews without a develop.
+
+## Final (all 36 runs with the 32000 cap and the fixed simulated user)
+
+- See `results/benchmark.md`. Expenses: js 100%, clojure 98%, elixir 100%, smalltalk 100%, racket 95%, lean 83%.
+  Gateway: all 100% except lean 84% (final regression 91%). Lean costs 3-12x the output tokens and 3-10x the time;
+  its losses are turns ending at the 10-step limit while re-proving.
+- Videos recorded with Playwright (`video/record.ts`) from the recorded transcripts; the race needed crf 38 to stay
+  under 2 MB with six panes.
+- README claims were checked against the transcripts and conformance outputs (the Elixir numbers in the agent's
+  report came from an earlier run; the README quotes the committed transcript).

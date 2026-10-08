@@ -1,0 +1,59 @@
+PASS  starts empty  (494 ms)
+PASS  turn 1 try: reference forms do what the user intends
+PASS  turn 1 develop accepted  (111 ms)
+PASS  turn 1 execute add_expense
+PASS  turn 1 execute add_expense
+PASS  turn 1 execute add_expense
+PASS  turn 2 try: reference forms do what the user intends
+PASS  turn 2 develop accepted  (38 ms)
+PASS  turn 2 execute total
+PASS  turn 3 try: reference forms do what the user intends
+PASS  turn 3 develop accepted  (36 ms)
+PASS  turn 3 execute by_category
+PASS  turn 3 execute add_expense
+PASS  turn 3 execute by_category
+PASS  turn 4 try: reference forms do what the user intends
+PASS  turn 4 develop accepted  (47 ms)
+PASS  turn 4 execute total
+PASS  turn 5 try: reference forms do what the user intends
+PASS  turn 5 develop accepted  (54 ms)
+PASS  turn 5 execute add_expense
+PASS  turn 6 try: reference forms do what the user intends
+PASS  turn 6 develop accepted  (51 ms)
+PASS  turn 6 execute set_budget
+PASS  turn 6 execute over_budget
+PASS  turn 6 execute set_budget
+PASS  turn 6 execute over_budget
+PASS  turn 7 try: reference forms do what the user intends
+PASS  turn 7 develop accepted  (52 ms)
+PASS  turn 7 execute top_category
+PASS  turn 8 try: reference forms do what the user intends
+PASS  turn 8 develop accepted  (57 ms)
+PASS  turn 8 execute add_expense
+PASS  turn 8 execute top_category
+PASS  turn 8 execute total
+PASS  live state matches the reference program's
+PASS  observe lists the public functions by snake_case name
+PASS  probe side_effect refused  (2 ms)
+      layers: static
+PASS  probe breaks_ratchet refused  (31 ms)
+      layers: ratchet
+PASS  probe breaks_invariant refused  (36 ms)
+      layers: ratchet, invariants
+PASS  probe loops refused  (2031 ms)
+      layers: ratchet, traces
+PASS  probe calls_missing refused  (14 ms)
+      layers: static
+PASS  probe breaks_trace refused  (31 ms)
+      layers: ratchet, traces
+PASS  stale generation refused
+PASS  execute is exactly-once by request_id
+PASS  a throwing execute reports the error and changes nothing
+PASS  why(over_budget) names the turn that asked for it
+PASS  rollback is code-only and clean (refused: rollback refused: trace {"args":[4.5,"food","coffee with Sam"],"fn":"add_expense)
+PASS  why() after rollback still answers
+PASS  restart resumes the same world  (553 ms)
+PASS  exactly-once survives a restart
+PASS  unknown op answers with an error and keeps running
+
+elixir: 51/51 checks pass; develop avg 56 ms; start 494 ms
