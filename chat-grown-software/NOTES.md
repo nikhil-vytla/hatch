@@ -419,3 +419,8 @@ error: no real model run was possible.
   rejects, so the model sees the error. `npx tsc -p .` is clean; without a key it stops with "DEEPSEEK_API_KEY is
   not set"; the scripted chat output is unchanged.
 - A run with it would test a non-Claude model in the loop and should be reported as that.
+- The remote branch had been rewritten onto a reorganised repo (no common history with my local branch; the
+  folder's content was identical). I re-applied this commit on top of it instead of force-pushing, and kept the old
+  local commit on a local backup branch.
+- README: the adapter is listed under What's here and Limits. Ran the repo's `summarize` skill (new in AGENTS.md):
+  the summary already describes the README accurately, so `_summary.md` is unchanged apart from naming both adapters.

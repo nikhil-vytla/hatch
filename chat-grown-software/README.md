@@ -91,6 +91,7 @@ prototype/
   src/ask.ts                 the kernel's questions: proposed calls, boundaries, repetition, coverage
   src/chat.ts                the chat loop over the kernel's tools (Messages API wire format), scripted model
   src/model-claude.ts        Claude as the model (Anthropic SDK; only loaded with MODEL=claude)
+  src/model-deepseek.ts      DeepSeek as the model (OpenAI-style API over fetch; MODEL=deepseek)
   src/sim-user.ts            a simulated user who answers from the intended program
   src/scenario.ts            the expense tracker in 8 turns
   src/scenario-shop.ts       the shop's stock in 6 turns, its misreadings and probes
@@ -208,7 +209,9 @@ A sibling experiment built a durable agent harness that writes and hot-installs 
 
 - **No real model has run the chat loop.** `ANTHROPIC_API_KEY` is not set, and no other credential source (an
   `ant` profile) exists in this environment. The Claude adapter type-checks against the SDK and fails at
-  authentication. Every chat result comes from the scripted model, which sends the scenario's proposals as tool
+  authentication. A DeepSeek adapter (`MODEL=deepseek`, `src/model-deepseek.ts`, plain `fetch`) is ready too;
+  its host is now reachable, but no `DEEPSEEK_API_KEY` has reached this session yet. Every chat result comes from
+  the scripted model, which sends the scenario's proposals as tool
   calls. How a real model uses `accepted-incomplete`, user corrections and behaviour diffs is untested.
 - **The simulated user never errs.** They answer from the intended program, so the chat numbers are an upper bound
   on what confirmation catches. Real users mis-confirm, and a long list of questions (up to 11 in one turn here)
