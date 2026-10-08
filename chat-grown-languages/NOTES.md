@@ -71,3 +71,12 @@ benchmark them with DeepSeek, and record demos.
   under load (every trace stores its full before-state). The cost: the traces gate then replays only recent use.
   Same trade-off any real system makes; a content-addressed state store (Clojure's structural sharing, on disk)
   would avoid it.
+
+## Benchmark metric
+
+- "Turns accepted" undercounts good behaviour: in the Clojure expenses run, DeepSeek made no change at turn 5
+  ("reject zero or less") because its turn-1 `add_expense` already validated, and the hidden goal checks pass.
+  Primary metric: hidden goal checks (per turn) and final regression; cost metrics: develops, load errors, user
+  corrections, tokens, minutes. Three repetitions per language and scenario, since single runs are noisy.
+- First runs with the fixed simulated user: corrections fell from 16 to 5-6 per expenses run (the old user was
+  "correcting" toward invariant-breaking answers).
