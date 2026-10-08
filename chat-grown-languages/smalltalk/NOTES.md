@@ -42,3 +42,12 @@
 ## Latencies (conformance run, 4 cores)
 start (first observe, new dir) ~130 ms; develop avg 24 ms (8 turns incl. compile of candidate + replay); `loops` probe 1.03 s
 (the 1 s limit); restart 115 ms.
+
+## Gateway scenario (follow-up)
+- `SCENARIO=gateway` (run.sh passes it through; default expenses) switches `CkJson violation:` to the gateway's 5 invariants.
+  `reference-gateway.json` has the 5 turns (record_usage: key model: model tokens: tokens, usage: key, set_price: model cents: ...).
+  `SCENARIO=gateway conformance.ts smalltalk`: 28/28; default still 51/51.
+- Extra ops: `inspect` (read-only fixed views: object, senders, who, history, method), `rollback` with `fn` (restore ONE function
+  from a revision, keep the rest), revisions carry a wall-clock `at`. I first tried an `eval` op (Smalltalk console) for the
+  operator; the sandbox policy denied it as a remote-code-execution surface, so the console is fixed read-only queries instead.
+- Showcase: `showcase/gateway-demo.sh` -> `showcase/gateway-transcript.txt`.

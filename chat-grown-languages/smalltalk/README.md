@@ -56,3 +56,8 @@ that uses the variable is refused before and accepted after, executed on the exi
 
 ## Files
 `setup.sh`, `run.sh`, `build.st`, `src/ChatKernel/*.st` (Tonel), `reference.json` (8 turns, 6 probes), `prompt.md`, `showcase/`, `NOTES.md`.
+
+## Gateway scenario
+`SCENARIO=gateway ./run.sh <dir>` enforces the gateway's five invariants (default stays expenses); `reference-gateway.json` holds its
+5 turns. Extra ops: `inspect` (read-only views of the live object), `rollback` with `fn` (one method). Showcase:
+`showcase/gateway-transcript.txt` (live image as an operations console: traffic, hot-fix, history, one-method rollback, image restart).
