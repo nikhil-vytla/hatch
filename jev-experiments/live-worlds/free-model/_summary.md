@@ -1,5 +1,0 @@
-Who can you win over? now runs on Bramble mini: [all-MiniLM-L6-v2](https://huggingface.co/Xenova/all-MiniLM-L6-v2) embeddings feed small networks trained in the browser game's own question format. The labels come from the open-weights [Qwen3.8-2.4T-A95B](https://huggingface.co/Qwen/Qwen3.8-2.4T-A95B) on Fireworks, about $8.45 for 7,212 synthetic situations, and no Jev output was used anywhere. On a hand-written gold set of 144 lines it identifies intent 74% of the time, against 31% for the MobileBERT zero-shot model it replaces, at 1–2 ms per decision instead of 250–390 ms. A network trained the same way for the rumour mill scored 0.744 against the existing formula's 0.813 on the gold rumours, so that page keeps its formula.
-
-- Win over gold results, student against MobileBERT: honest 0.80 vs 0.32, friendly 0.92 vs 0.44.
-- A first teacher, Qwen3-4B on MLX, rated every line honest when asked directly, boasts included; it was replaced, and its gold scores are kept as a comparison.
-- A trained "where does this rumour invite people" head mostly answered "nowhere" and was dropped for the keyword rule.

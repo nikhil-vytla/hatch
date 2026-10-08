@@ -1,2 +1,0 @@
-# Built by build.ts during `bun run build` (prepare.ts); bundled by the pages that import it.
-headlines.json

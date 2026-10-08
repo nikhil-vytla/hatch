@@ -1,5 +1,0 @@
-A [deployed Jev laboratory](https://jev-experiments.vercel.app) tests what TypeSafe's typed decision model [Jev](https://docs.typesafe.ai/introduction) is good and bad at, through playable scenes, an arena of contestants and recorded studies. Its strongest results come from the prose studies. Rewording almost never moves Jev's answers. But a sentence of doubt ("I'm pretty sure the answer is no") flips them, and an option nobody should pick swings its choices by tens of points. Simulations such as the reef and Win over run on free models in the browser, trained from open teachers or inside the simulation itself, never on Jev's outputs, and use Jev only for comparison. Every answer is recorded with its request, cost and timing, and live runs use the visitor's own gateway key.
-
-- Banking77: Jev lost to a trained linear baseline. CLINC: it was better at recognizing out-of-scope requests.
-- 7 sentence forms changed 0 of 140 answers. "I'm pretty sure the answer is no" flipped all 5 Fool Jev puzzles.
-- On held-out reefs, a 257-weight evolved policy kept 89% of fish alive through a heatwave, against 79% when nobody decides.
