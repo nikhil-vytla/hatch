@@ -5,12 +5,12 @@ Working notes, chronological. The report is in [README.md](README.md).
 ## Scope and constraints
 
 Approved unit from the upstream design audit
-([PR #21](https://github.com/nikhil-vytla/hatch/pull/21), branch
+(now [`../upstream-design-audit/`](../upstream-design-audit/README.md), branch
 `research/upstream-design-audit`): build the admission QC layer's
 research-and-skill half. Another agent is rewriting `parallax/src` on the
-PR #20 branch (`cursor/parallax-screening-run`), so this unit does **not**
+SWE-bench verifier-safety branch (`cursor/parallax-screening-run`), so this unit does **not**
 touch `parallax/src`. Deliverables: distilled best practices with citations,
-precise gate specifications for the in-code half (referencing PR #20 branch
+precise gate specifications for the in-code half (referencing that branch's
 module/type names so the implementer can build without redesign), and a
 project skill for the judgment-side review.
 
@@ -30,7 +30,7 @@ User constraints on the skill:
   in a way a reviewer argues about, it is a skill" dividing line, and the
   recommended gate list (schema, sealed-leakage, no-op, gold with
   flaky-retry, budget matching, simulation viability).
-- PR #20 branch (`cursor/parallax-screening-run`), read read-only from the
+- The verifier-safety branch (`cursor/parallax-screening-run`), read read-only from the
   live worktree at `/Users/nikhil/work/hatch-parallax-ei` (base commit
   `5984ce4` plus the other agent's in-flight changes). Files that matter for
   gate placement:
@@ -157,7 +157,7 @@ re-derived.
   gold, budget-matching. The audit's Q2 also recommended simulation
   viability (the evolving-intent 23-config lesson: admit only sources that
   support every arm, or you silently change the population between
-  conditions). On the PR #20 branch this is real: `build_swe_script_family`
+  conditions). On the verifier-safety branch this is real: `build_swe_script_family`
   raises `SweBenchError` mid-population. Included as G6 (arm-completeness),
   since dropping it would rebuild the population-drift confound the audit
   called out.

@@ -202,7 +202,7 @@ per-instance images.
 
 ## 2026-08-02 implementation
 
-PR #20 implements the first target from this design. `TaskSpecV1` and
+The SWE-bench verifier-safety PR implements the first target from this design. `TaskSpecV1` and
 `EnvSpecV1` rearrange the existing SWE models into a structural public and
 sealed split. `compile_hud` emits audience-tagged artifacts and a digest
 receipt. Its agent renderer accepts only `PublicTaskV1`. The evaluator reloads

@@ -10,15 +10,16 @@ deterministic replay, no paid inference in this unit.
 ## Work log
 
 - Branched `parallax-checkpoint-evolution` from `origin/main` at `5fae166`
-  (Gate SWE-bench screening on verifier safety, #20). The concurrent
-  worktree `hatch-parallax-ei` and PR #25 are untouched.
+  (Gate SWE-bench screening on verifier safety). The concurrent
+  worktree `hatch-parallax-ei` and the open SWE-bench
+  experiment-prerequisites PR are untouched.
 - Read the authoritative design inputs: the four research docs in
   `parallax/research/slopcodebench-method/`, the draft method doc, the EI
   implementation (`types.py`, `evolving_intent.py`, `gsm8k.py`,
   `runner.py`, `report.py`, `outcome.py`, `canonical.py`, `swebench.py`),
   `RESEARCH-PROCESS.md`, and the decision records.
 - Checked `parallax/research/admission-qc/`: **not on main** — it lives on
-  the open PR #22 branch (`parallax/admission-qc`). Per instruction
+  the open admission-QC PR's branch (`parallax/admission-qc`). Per instruction
   ("reuse/adapt existing gate machinery … if present on main"), the gate
   *specifications* from that branch were read and adapted conceptually
   (gold/no-op bidirectional pair, per-source recorded rejection, retry
@@ -137,7 +138,8 @@ naive build" caveat.
 
 ### Delivery invariant (deliverable 3)
 
-Adapted from the upstream-design-audit finding (PR #21): turn delivery
+Adapted from the upstream-design-audit finding
+([`../upstream-design-audit/`](../upstream-design-audit/README.md)): turn delivery
 must be harness-owned and unskippable. Here checkpoint delivery is owned
 by the runner loop — the agent is a pure function of
 (public spec, carried workspace, budget) and has no advance channel — and
@@ -151,7 +153,7 @@ RunFailure at stage k.
 
 ### Admission gates (deliverable 4)
 
-Executable, recorded, bidirectional — adapted from the PR #22
+Executable, recorded, bidirectional — adapted from the admission-QC
 specifications and the six-gate design in
 `../slopcodebench-method/synthesis-workflow.md` §2:
 
@@ -165,7 +167,7 @@ specifications and the six-gate design in
 
 Deferred, recorded as such: G3 mutant/ambiguity (needs dual references),
 G4 churn ratio (needs the naive build), G6 headroom (compute-priced),
-and the judgment-side review skill (PR #22 ships it; not on main).
+and the judgment-side review skill (the admission-QC PR ships it; not on main).
 
 ## Implementation log
 
@@ -222,13 +224,13 @@ dry-run mode that proves the whole screening path.
 
 ### Main-merge interlude
 
-PR #26 (`parallax-docs-math`) rewrote the LaTeX delimiters in
+The docs-math PR (`parallax-docs-math`) rewrote the LaTeX delimiters in
 `docs/methods/checkpoint-evolution.md` on main while this branch had
 rewritten the same file. Merged `origin/main` into the branch (merge,
 not rebase), kept the as-implemented content, converted the surviving
 `\( \)` delimiters to the GitHub-renderable `$...$` / ```math syntax
-PR #26 established, and verified no old delimiters remain in any
-markdown this branch touches. PR #27 reports `MERGEABLE`/`CLEAN`.
+that PR established, and verified no old delimiters remain in any
+markdown this branch touches. This branch's PR reports `MERGEABLE`/`CLEAN`.
 
 ### Provider adapter (`src/parallax/checkpoint_agent.py`)
 

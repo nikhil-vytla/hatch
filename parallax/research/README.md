@@ -8,8 +8,8 @@ not maintained as product documentation after their investigation closes.
 
 New investigations committed against `main` create their folder here. The
 former `hard-repo-tasks/` namespace is the archive of a superseded
-experiment and lives only on its
-[archive branch](https://github.com/nikhil-vytla/hatch/pull/5); it must not
+experiment (counterfactual hard tasks compiled from familiar repositories,
+closed unmerged) and lives only in an unpublished archive; it must not
 be recreated on `main`.
 
 - [`admission-qc/`](admission-qc/README.md) — best-practices research and

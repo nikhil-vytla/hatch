@@ -1,7 +1,7 @@
 # Primary-source pins
 
-This page promotes the primary-source pin table from the archived
-[literature review](https://github.com/nikhil-vytla/hatch/blob/cursor/hard-repo-tasks-5fc8/hard-repo-tasks/architecture/evolving-intent-pipeline/LITERATURE-REVIEW.md).
+This page promotes the primary-source pin table from the archived,
+unpublished literature review of the superseded `hard-repo-tasks` experiment.
 It records the exact papers, repository revisions, and release records that
 [`ADR-001.md`](ADR-001.md) and [`DESIGN-SELECTION.md`](DESIGN-SELECTION.md)
 were checked against, and what each source does and does not fix.

@@ -74,7 +74,8 @@ surface). Output: a **decomposability brief** that scores the seed on:
 - **Contamination exposure**: if seeded from a public repo, the plan must
   add counterfactual twists so no memorized implementation satisfies the
   sealed suite (same principle as the counterfactual-contract work in the
-  [hard-repo-tasks archive experiment](https://github.com/nikhil-vytla/hatch/pull/5):
+  superseded `hard-repo-tasks` experiment, which compiled pinned
+  repositories into counterfactual coding tasks:
   familiar repositories are a distribution of constraints, not a source of
   old answers).
 
@@ -112,7 +113,7 @@ loops back to S3.
 ### Stage S5 — Admit: gates G1–G6
 
 The Evolving Intent-era admission matrix
-([`scripts/admit.py` on the archive branch](https://github.com/nikhil-vytla/hatch/blob/cursor/hard-repo-tasks-5fc8/hard-repo-tasks/scripts/admit.py))
+(`scripts/admit.py` in the unpublished `hard-repo-tasks` archive)
 checks four things about a single task: gold passes, no-op fails, plausible
 mutants fail, tampering fails. Checkpoint evolution needs the sequence-level
 analog. A family is admissible iff all gates pass at every stage:

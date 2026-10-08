@@ -63,7 +63,8 @@
 
 ## Spec translation
 
-- Merged the design record from PR #19 before implementation. The old
+- Merged the spec-translation design record
+  ([`../spec-translation/`](../spec-translation/README.md)) before implementation. The old
   `render_environment(family)` entry point received both public and sealed data.
   It is deleted.
 - `TaskSpecV1` contains `public: PublicTaskV1` and

@@ -163,8 +163,8 @@ Documentation and formal modeling only; no implementation.
 ## Promotion follow-up
 
 - The no-touching-parallax constraint was lifted after the concurrent
-  parallax rewrites merged. Rebased onto origin/main (picked up #12
-  RESEARCH-PROCESS.md and #14 parallax/docs/decisions/; evolving-intent.md
+  parallax rewrites merged. Rebased onto origin/main (picked up the new
+  RESEARCH-PROCESS.md and the promoted parallax/docs/decisions/; evolving-intent.md
   unchanged) — clean, no conflicts.
 - `git mv`'d the draft to parallax/docs/methods/checkpoint-evolution.md.
   Edits during promotion: dropped the "currently lives in" placement note,
@@ -181,7 +181,7 @@ Documentation and formal modeling only; no implementation.
 ## Placement fix
 
 - hard-repo-tasks/ does not exist on origin/main — it is the superseded
-  experiment's namespace, alive only on the PR #5 archive branch. New
+  experiment's namespace, alive only on its archive branch. New
   research committed against main must not resurrect it.
 - Established parallax/research/<topic>/ as the on-main home for research
   trails (rule stated in parallax/research/README.md) and moved this folder
