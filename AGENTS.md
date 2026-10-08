@@ -13,6 +13,6 @@ Your final commit should include just that folder and selected items from its co
 
 Do NOT include full copies of code that you fetched as part of your investigation. Your final commit should include only new files you created or diffs showing changes you made to existing code.
 
-At the end, use the following prompt when creating a  _summary.md file:
+Open README.md with a one-paragraph summary of what you did and found: 3-5 sentences, specific, with 1-2 links to key tools or projects, no emoji, and don't start with "This report" or "This research". The root README's index uses that paragraph (or `_summary.md`, if a folder has one).
 
-SUMMARY PROMPT: "Summarize this research project concisely. Write just 1 paragraph (3-5 sentences) followed by an optional short bullet list if there are key findings. Vary your opening - don't start with 'This report' or 'This research'. Include 1-2 links to key tools/projects. Be specific but brief. No emoji."
+Don't edit the index in the root README.md: CI rebuilds it after every push to main (`python3 .github/index.py`).
