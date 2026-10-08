@@ -52,6 +52,16 @@ export class Kernel {
 
 	/** The questions to put to the user about a proposal, answered by the candidate it would build. */
 	ask(proposal: Proposal, words: string): { questions: Question[]; uncovered: string[] } | { error: string } {
+		// A call must be one expression: `watch` wraps it in parentheses, where `a(); b()` is a syntax error that the
+		// user would then "confirm" as the expected answer, and that no code can ever pass.
+		for (const ex of proposal.examples) {
+			const call = ex.call ?? ex.expr;
+			try {
+				new Function(`return (${call});`);
+			} catch {
+				return { error: `example call is not a single expression: ${call} (join steps with commas, not semicolons)` };
+			}
+		}
 		const built = buildCandidate(this.world.snapshot(), proposal);
 		if (built.world === undefined) return { error: built.error ?? "does not load" };
 		const history = [...this.spec.examples.map((e) => e.call ?? e.expr), ...this.store.traces().map((t) => t.expr)];

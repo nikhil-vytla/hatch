@@ -17,7 +17,8 @@ one chat turn at a time is still right?** It contains:
 
 > Note: ghuntley.com was blocked in this environment. The post's substance came from the Jiti repository (README, 14
 > ADRs, examples) and Geoff's ["CS50-style tour" gist](https://gist.github.com/ghuntley/b8e28634090c51895d7972ff6a7c5619).
-> No model API key was available either, so the chat loop has only run with a scripted model (see Limits).
+> No Claude API key was available, so the results come from a scripted model. DeepSeek has also driven the chat
+> loop; that run found a kernel bug, and its scores depend on the simulated user (see Limits).
 
 ## The short answer
 
@@ -91,7 +92,7 @@ prototype/
   src/ask.ts                 the kernel's questions: proposed calls, boundaries, repetition, coverage
   src/chat.ts                the chat loop over the kernel's tools (Messages API wire format), scripted model
   src/model-claude.ts        Claude as the model (Anthropic SDK; only loaded with MODEL=claude)
-  src/model-deepseek.ts      DeepSeek as the model (OpenAI-style API over fetch; MODEL=deepseek)
+  src/model-deepseek.ts      DeepSeek as the model (OpenAI-style API over fetch; MODEL=deepseek, NODE_USE_ENV_PROXY=1 behind a proxy)
   src/sim-user.ts            a simulated user who answers from the intended program
   src/scenario.ts            the expense tracker in 8 turns
   src/scenario-shop.ts       the shop's stock in 6 turns, its misreadings and probes
@@ -181,6 +182,11 @@ execute(expr, request_id) -> traced call -> invariants on the new state (undo if
 - **A missing migration is invisible until data that needs it exists.** At the shop's turn 6 all live names are lower
   case, so the misreading that skips the migration behaves identically. It would only show once a capitalised name
   had been stored before the change.
+- **A syntax error can become a confirmed answer.** The first real-model run (DeepSeek) wrote calls as
+  `a(); b()`. Wrapped in parentheses for the question, that is a syntax error, which the candidate and the user
+  both "answer" as an error. The ratchet then fails that example forever ("gave `error`, confirmed `error`"), and
+  the model spent the whole chat on it: 1 of 17 changes landed. The kernel now refuses a call that is not one
+  expression. In the second run 7 of 24 landed, and the remaining rejections come from the simulated user (above).
 - **A "function" can carry top-level statements.** A form of `function helper() {...}` followed by
   `Array.prototype.every = () => true` was accepted and made every invariant pass. The fixes are two: forms may only
   declare functions, and the realm's intrinsics are frozen (`results/tamper-check.txt`). **The checks must not share
@@ -207,12 +213,11 @@ A sibling experiment built a durable agent harness that writes and hot-installs 
 
 ## Limits
 
-- **No real model has run the chat loop.** `ANTHROPIC_API_KEY` is not set, and no other credential source (an
-  `ant` profile) exists in this environment. The Claude adapter type-checks against the SDK and fails at
-  authentication. A DeepSeek adapter (`MODEL=deepseek`, `src/model-deepseek.ts`, plain `fetch`) is ready too;
-  its host is now reachable, but no `DEEPSEEK_API_KEY` has reached this session yet. Every chat result comes from
-  the scripted model, which sends the scenario's proposals as tool
-  calls. How a real model uses `accepted-incomplete`, user corrections and behaviour diffs is untested.
+- **One real model has run the chat loop: DeepSeek (V4.1-Flash), not Claude.** `ANTHROPIC_API_KEY` is not set, so
+  the Claude adapter is untested. The DeepSeek runs (`results/chat-deepseek-flash-v1.txt`, `-v2.txt`) are judged
+  by the simulated user, who knows only the scripted program's function names. A model that names things
+  differently (`totalExpenses` for `total`) is "corrected" toward functions that throw. Their numbers measure
+  agreement with the script as much as the model, so they are not comparable with the scripted results.
 - **The simulated user never errs.** They answer from the intended program, so the chat numbers are an upper bound
   on what confirmation catches. Real users mis-confirm, and a long list of questions (up to 11 in one turn here)
   costs attention.

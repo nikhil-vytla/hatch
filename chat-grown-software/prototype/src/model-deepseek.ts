@@ -4,6 +4,7 @@
 //   tool_result blocks -> one role:"tool" message each
 //
 //   DEEPSEEK_API_KEY=... MODEL=deepseek node --experimental-strip-types --no-warnings src/chat.ts
+// Without DEEPSEEK_API_KEY the request goes out with no authorization header, for a proxy that injects the key.
 import type { Block, Message, Model, ToolDef } from "./chat.ts";
 
 const URL = process.env.DEEPSEEK_BASE_URL ?? "https://api.deepseek.com/chat/completions";
@@ -16,21 +17,19 @@ type OpenAIMessage =
 	| { role: "tool"; tool_call_id: string; content: string };
 
 export class DeepSeekModel implements Model {
-	private readonly key: string;
-	private constructor(key: string) {
+	private readonly key: string | undefined;
+	private constructor(key: string | undefined) {
 		this.key = key;
 	}
 
 	static async create(): Promise<DeepSeekModel> {
-		const key = process.env.DEEPSEEK_API_KEY;
-		if (!key) throw new Error("DEEPSEEK_API_KEY is not set");
-		return new DeepSeekModel(key);
+		return new DeepSeekModel(process.env.DEEPSEEK_API_KEY || undefined);
 	}
 
 	async next(system: string, messages: Message[], tools: ToolDef[]): Promise<{ content: Block[]; stop: string }> {
 		const response = await fetch(URL, {
 			method: "POST",
-			headers: { "content-type": "application/json", authorization: `Bearer ${this.key}` },
+			headers: { "content-type": "application/json", ...(this.key ? { authorization: `Bearer ${this.key}` } : {}) },
 			body: JSON.stringify({
 				model: MODEL_ID,
 				max_tokens: 8000,

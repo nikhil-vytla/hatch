@@ -12,7 +12,7 @@
 //
 //   node --experimental-strip-types --no-warnings src/chat.ts               # scripted model + simulated user
 //   MODEL=claude node --experimental-strip-types --no-warnings src/chat.ts  # Claude (npm install first) + simulated user
-//   MODEL=deepseek node --experimental-strip-types --no-warnings src/chat.ts  # DeepSeek (DEEPSEEK_API_KEY) + simulated user
+//   MODEL=deepseek node --experimental-strip-types --no-warnings src/chat.ts  # DeepSeek (DEEPSEEK_API_KEY, or a key-injecting proxy) + simulated user
 import { appendFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import type { Question } from "./ask.ts";
@@ -44,7 +44,7 @@ const exampleSchema = {
 	type: "object",
 	properties: {
 		fixture: { type: "object", description: "the state to run the call on, e.g. {} or {expenses: [...]}" },
-		call: { type: "string", description: "a JS expression that calls the app's functions" },
+		call: { type: "string", description: "one JS expression that calls the app's functions; join steps with commas, e.g. (addX(1), getX())" },
 	},
 	required: ["fixture", "call"],
 };

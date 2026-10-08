@@ -424,3 +424,34 @@ error: no real model run was possible.
   local commit on a local backup branch.
 - README: the adapter is listed under What's here and Limits. Ran the repo's `summarize` skill (new in AGENTS.md):
   the summary already describes the README accurately, so `_summary.md` is unchanged apart from naming both adapters.
+
+### Session 4 (2026-10-08): first real-model run, DeepSeek
+
+- The key arrives through the session's proxy, not the environment: the proxy adds `Authorization` to requests for
+  `api.deepseek.com` only when the request carries none. A placeholder key got a 401 for that reason. The adapter
+  now sends the header only when `DEEPSEEK_API_KEY` is set.
+- Node's built-in `fetch` ignores `HTTPS_PROXY`; it needs `NODE_USE_ENV_PROXY=1` (Node >= 22.21). Without it the
+  request went straight out and got DeepSeek's own 401 ("governor").
+- `deepseek-chat` is served as `deepseek-flash` (DeepSeek-V4.1-Flash); `/models` also lists `deepseek-v4-pro`.
+- Run 1 (`results/chat-deepseek-flash-v1.txt`, 2 min): 1 of 17 `develop` calls landed (accepted-incomplete),
+  5 confirmed examples, 13 corrections. The model spent the whole chat on one ratchet case that read
+  "gave `error`, confirmed `error`".
+  - **Kernel bug, found only by a real model:** DeepSeek wrote calls as `addExpense(3, "coffee"); listExpenses()`.
+    `watch()` puts the call inside `( ... )`, where `;` is a syntax error. Both the candidate and the simulated
+    user evaluate to "error", so a syntax error became a confirmed answer, and the ratchet (which fails any run
+    that errors) could never pass it. 97 of the kernel's questions in that run were unparseable. The scripted
+    model always joins steps with commas, so it never hit this.
+  - Fix: `Kernel.ask` refuses a proposed call that is not one expression, with "join steps with commas, not
+    semicolons"; the tool schema says the same. Scripted chat transcripts (both scenarios) and the demo output are
+    unchanged; `tsc` is clean.
+- Run 2 (`results/chat-deepseek-flash-v2.txt`, 2.7 min): 7 of 24 `develop` calls landed (4 accepted,
+  3 accepted-incomplete), 60 confirmed examples, 0 single-expression refusals, 106 corrections.
+  - **The remaining blocker is the simulated user, not the model.** It answers by running the *scripted* program,
+    so it knows only the scripted names (`total`, `byCategory`, `overBudget`...). DeepSeek chose `getExpenses`,
+    `totalExpenses`, `expensesByCategory`; every question about those "should throw" in the user's answers. The
+    model then has to build functions that throw, against the user's words. The budget turn (17 rejections) is
+    where this piles up. So the simulated user tests agreement with the script's names as much as behaviour.
+  - Not fixed here. Options: give the model the function names in the user's messages (changes the scenario), or
+    let the simulated user map unknown names onto intended functions by behaviour (hard to do honestly).
+- `why topCategory()` prints undefined after the DeepSeek run because the model never defined a function by that
+  name; the line is hard-coded to the scripted names.
