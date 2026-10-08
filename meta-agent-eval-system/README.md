@@ -14,6 +14,7 @@ uv sync
 cp .env.example .env
 # Edit .env and add your OPENAI_API_KEY
 ```
+Without a key, the agent and judges run in mock mode, so the app still works end to end.
 
 3. Run the Streamlit app:
 ```bash
@@ -38,7 +39,7 @@ streamlit run app.py
 ## Usage
 
 1. **Agent Chat**: Interact with the customer support agent
-2. **Run Evals**: Execute eval pipeline on CSV data
+2. **Run Evals**: Execute eval pipeline on CSV data. The eval datasets used in development aren't in this repository (`data/` is gitignored), so bring your own CSV under `data/evals/`. Each row needs the user input and agent output (single-turn) or the conversation text (multi-turn), in columns you pick in the UI. Optional columns: `Eval ID`, `Methodology`, `Tier A category`, `Tier B category`, `Tier C category`.
 3. **Eval Results**: View and filter eval results
 5. **Taxonomy Generator & Explorer**: Generate and browse category hierarchy and methodologies
 
