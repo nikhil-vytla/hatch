@@ -12,6 +12,7 @@
 //
 //   node --experimental-strip-types --no-warnings src/chat.ts               # scripted model + simulated user
 //   MODEL=claude node --experimental-strip-types --no-warnings src/chat.ts  # Claude (npm install first) + simulated user
+//   MODEL=deepseek node --experimental-strip-types --no-warnings src/chat.ts  # DeepSeek (DEEPSEEK_API_KEY) + simulated user
 import { appendFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import type { Question } from "./ask.ts";
@@ -274,6 +275,9 @@ if (import.meta.main) {
 	if (process.env.MODEL === "claude") {
 		const { ClaudeModel } = await import("./model-claude.ts");
 		model = await ClaudeModel.create();
+	} else if (process.env.MODEL === "deepseek") {
+		const { DeepSeekModel } = await import("./model-deepseek.ts");
+		model = await DeepSeekModel.create();
 	} else model = new ScriptedModel(scenario.turns);
 	const user = new SimulatedUser(scenario.turns);
 	const run = await runChat({ kernel, model, user, logFile: join(dir, "chat.jsonl"), print: console.log });

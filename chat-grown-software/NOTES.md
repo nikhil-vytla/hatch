@@ -407,3 +407,15 @@ Checks done at the end: `npx tsc -p .` clean; demo and tamper check reproduce th
 reproduce (only the timing line differs); round 4 reproduces with `ASK_RULES=v1`; the expense misunderstanding v2
 reproduces byte for byte after the scenario refactor. `MODEL=claude src/chat.ts` stops at the SDK's authentication
 error: no real model run was possible.
+
+### Session 3 (2026-10-08): DeepSeek adapter, not yet run
+
+- The user offered a DeepSeek key in `~/.pi/agent/auth.json`. That file is not in this cloud container, and
+  `DEEPSEEK_API_KEY` is not set (environment changes reach only new sessions). After the user updated the network
+  policy, `api.deepseek.com` is reachable.
+- Added `src/model-deepseek.ts` (`MODEL=deepseek`): DeepSeek's OpenAI-style chat completions over plain `fetch`, no
+  SDK. It translates the loop's Messages API blocks on every call (tool_use <-> `tool_calls` with JSON-string
+  arguments, one `role: "tool"` message per tool_result). Unparseable arguments become an input the tool handler
+  rejects, so the model sees the error. `npx tsc -p .` is clean; without a key it stops with "DEEPSEEK_API_KEY is
+  not set"; the scripted chat output is unchanged.
+- A run with it would test a non-Claude model in the loop and should be reported as that.
