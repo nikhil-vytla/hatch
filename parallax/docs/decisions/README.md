@@ -18,8 +18,7 @@ they do not define implemented behavior.
 
 The full experimental archive — the formal model, the complete literature
 review, the arena candidate files and judge record, the episode-spine and
-synthesis-kernel investigations, and all working notes — lives on the
-archive branch
-[`cursor/hard-repo-tasks-5fc8`](https://github.com/nikhil-vytla/hatch/tree/cursor/hard-repo-tasks-5fc8/hard-repo-tasks),
-under `hard-repo-tasks/architecture/`. That branch is an archive of a
-superseded experiment, not a merge candidate.
+synthesis-kernel investigations, and all working notes — lives in an
+unpublished archive of the superseded `hard-repo-tasks` experiment, under
+`hard-repo-tasks/architecture/`. That archive is a record, not a merge
+candidate.

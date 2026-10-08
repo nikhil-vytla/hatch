@@ -204,10 +204,12 @@
 
 ## SWE-bench Verified Slice 2
 
-- Started `cursor/parallax-swebench-slice-2` on the final PR #11 head. The
-  unchanged baseline passed 62 tests and `uvx ty check src`. After PR #11
-  merged, the branch rebased cleanly onto `origin/main`.
-- Read the benchmark decision from PR #13. The selected source is
+- Started `cursor/parallax-swebench-slice-2` on the final head of the GSM8K
+  Evolving Intent slice PR. The unchanged baseline passed 62 tests and
+  `uvx ty check src`. After that PR merged, the branch rebased cleanly onto
+  `origin/main`.
+- Read the benchmark decision (SWE-bench Verified under Evolving Intent,
+  chosen over BIRD-SQL). The selected source is
   `SWE-bench/SWE-bench_Verified` at
   `91aa3ed51b709be6457e12d00300a6a596d4c6a3`. The admissible source set is the
   50 IDs published by Evolving Intent at

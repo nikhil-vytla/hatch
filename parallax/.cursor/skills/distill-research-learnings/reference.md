@@ -58,8 +58,8 @@ repository is documentation-only. No synthesis or experiment execution exists.
 - `parallax/NOTES.md` holds the chronological decision trail.
 
 ## Evidence and reproduction
-The separation landed in merge commit `7d3d35f`
-([pull request](https://github.com/nikhil-vytla/hatch/pull/6)).
+The separation landed in merge commit `7d3d35f`, the documentation-only
+change that first defined the research model and the Evolving Intent method.
 
 ```
 git log --oneline -- parallax/docs

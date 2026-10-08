@@ -3,19 +3,18 @@
 ## Provenance
 
 The architecture arena produced four candidate files. Their exact bytes are
-preserved in the experimental archive:
+preserved in the unpublished experimental archive; their SHA-256 digests are:
 
-- [Candidate A](https://github.com/nikhil-vytla/hatch/blob/cursor/hard-repo-tasks-5fc8/hard-repo-tasks/architecture/evolving-intent-pipeline/arena/candidate-A.md):
+- Candidate A:
   `eaad4ba0aa9918480ccce55c2b8f9b2a5efcb39bf30e13823e126e3dcac3e09b`
-- [Candidate B](https://github.com/nikhil-vytla/hatch/blob/cursor/hard-repo-tasks-5fc8/hard-repo-tasks/architecture/evolving-intent-pipeline/arena/candidate-B.md):
+- Candidate B:
   `b129a8f9f0d3d808a7f161619a3686fc302706d11594dfcfd25f5da563460847`
-- [Candidate C](https://github.com/nikhil-vytla/hatch/blob/cursor/hard-repo-tasks-5fc8/hard-repo-tasks/architecture/evolving-intent-pipeline/arena/candidate-C.md):
+- Candidate C:
   `dac5065bdecf2b32679d00598f4e5b8eb84a66d5579ce02d3d32659e61140ddc`
-- [Candidate D](https://github.com/nikhil-vytla/hatch/blob/cursor/hard-repo-tasks-5fc8/hard-repo-tasks/architecture/evolving-intent-pipeline/arena/candidate-D.md):
+- Candidate D:
   `ee3deff3a39647b90a70eafa05a904b6099f4ff026e1d3c59e10c23fd929148e`
 
-The archived
-[cross-judge result](https://github.com/nikhil-vytla/hatch/blob/cursor/hard-repo-tasks-5fc8/hard-repo-tasks/architecture/evolving-intent-pipeline/arena/judge.md),
+The archived cross-judge result (unpublished),
 SHA-256
 `f77e17d3f66b48232be9907c85d91870ec4d9a208606da518b8fc1fa102cb1cc`,
 preserves the final scorecard, winner, grafts, rejections, and unresolved asset

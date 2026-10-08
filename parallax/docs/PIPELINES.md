@@ -13,8 +13,8 @@ Three flows are implemented:
    copy-paste runnable right now.
 2. [Evolving Intent on SWE-bench Verified](#2-evolving-intent-on-swe-bench-verified)
    — three paid stages already run once; real artifacts shown.
-3. [Checkpoint evolution](#3-checkpoint-evolution-landing-in-pr-27) — offline
-   slice landing in [PR #27](https://github.com/nikhil-vytla/hatch/pull/27).
+3. [Checkpoint evolution](#3-checkpoint-evolution) — offline
+   slice, merged 2026-08-04.
 
 The honest counterpart is [What is NOT automated yet](#what-is-not-automated-yet).
 
@@ -148,7 +148,8 @@ direction. Details in
 
 ### 2b. Admission: gate the three instances (compute only)
 
-Landing in [PR #25](https://github.com/nikhil-vytla/hatch/pull/25). **Run:**
+Landed with the SWE-bench experiment prerequisites (harness-owned turn
+delivery plus admission gates, Aug 2026). **Run:**
 
 ```bash
 DOCKER_DEFAULT_PLATFORM=linux/amd64 uv run --with pyarrow python \
@@ -196,8 +197,8 @@ reconciliation. Real results:
 **Conclude:** point estimate +0.111 for static-minus-evolved, but with 3
 source clusters the minimum detectable effect is 1.568, so the interval is
 the trivial [-1, 1]: the data neither advances nor rejects the hypothesis.
-Unique metered spend was $1.219080. Both stages 2b and 2c land in
-[PR #25](https://github.com/nikhil-vytla/hatch/pull/25) under
+Unique metered spend was $1.219080. Both stages 2b and 2c landed together
+(Aug 2026), under
 `research/swebench-experiment-prerequisites-20260803/` and
 `research/swebench-single-vs-evolved-20260803/`. Note one design gap stated
 plainly: this experiment compared static against evolved only — the
@@ -205,14 +206,13 @@ turn-matched control arm that the GSM8K design treats as mandatory was not
 part of the 18-unit design, so conversation length is not yet controlled for
 on SWE-bench.
 
-## 3. Checkpoint evolution (landing in PR #27)
+## 3. Checkpoint evolution
 
 The second synthesis strategy, from
 [SlopCodeBench](https://arxiv.org/abs/2603.24755): instead of one task whose
 *intent* evolves across turns, one workspace persists across separately
-scored checkpoints whose *requirements* accumulate. Everything below is on
-the [PR #27](https://github.com/nikhil-vytla/hatch/pull/27) branch and still
-in flux.
+scored checkpoints whose *requirements* accumulate. Everything below
+merged to `main` on 2026-08-04.
 
 **Start with:** a hand-authored three-checkpoint family, `ce-tally-1`, in
 `tests/fixtures/checkpoint_family.json` — a CLI tool built up in stages
@@ -223,7 +223,7 @@ stdin/argv/exit-code cases. Real spec excerpt from checkpoint 1:
 > `python3 tally.py total`. … `total` prints the sum of all counts as a
 > decimal integer followed by a single newline, then exits 0.
 
-**Run** (offline, on the PR branch, from `parallax/`):
+**Run** (offline, from `parallax/`):
 
 ```bash
 uv run python research/checkpoint-evolution-slice/make_seed_family.py  # rebuild fixture; 5 admission gates
@@ -243,7 +243,7 @@ checkpoint's new cases only), `core_pass`.
 the slice establishes is that skipped/reordered checkpoints, workspace-chain
 drift, and answer leakage are structurally unrepresentable in the evidence.
 Contract: [`methods/checkpoint-evolution.md`](methods/checkpoint-evolution.md);
-trail: `research/checkpoint-evolution-slice/` (PR #27), including a
+trail: [`research/checkpoint-evolution-slice/`](../research/checkpoint-evolution-slice/README.md), including a
 preregistration draft for the first paid run.
 
 ## What is NOT automated yet
@@ -266,6 +266,6 @@ preregistration draft for the first paid run.
   experiment lacks the matched control (see 2c). No single flow yet has both
   the complete design and real-model evidence — that is the current gap
   between what the docs describe and what has been measured.
-- **Checkpoint evolution has no report module or paid run.** PR #27 stops at
+- **Checkpoint evolution has no report module or paid run.** The slice stops at
   admission, two arms, and evidence; estimands and decisions are deferred to
   its preregistration draft.

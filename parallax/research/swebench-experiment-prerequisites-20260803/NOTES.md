@@ -35,14 +35,15 @@ checks but no paid inference.
 
 ## Provenance
 
-- Upstream turn delivery is characterized in PR #21 against
+- Upstream turn delivery is characterized in the upstream design audit
+  ([`../upstream-design-audit/`](../upstream-design-audit/README.md)) against
   `microsoft/evolving-intent` commit
   `993d6be9597ac03854b46362ccd647eb1bfd267a`. The relevant upstream locations
   are `evaluation/common/swe_minisweagent_scaffold.py:408-424` for the update
   wrapper, `:714-749` for submission interception, and `:750-787` for
   per-turn budget exhaustion.
-- Admission predicates G1 through G6 come from PR #22,
-  `parallax/research/admission-qc/README.md`.
+- Admission predicates G1 through G6 come from the admission-QC gate specs,
+  [`../admission-qc/README.md`](../admission-qc/README.md).
 
 ## Decisions
 
@@ -59,9 +60,9 @@ checks but no paid inference.
 
 ## Work log
 
-- 2026-08-03: Confirmed PR #24 is open and clean. Created
+- 2026-08-03: Confirmed the boundary-screening round-2 PR is open and clean. Created
   `cursor/parallax-experiment-prerequisites` stacked on its head.
-- 2026-08-03: Read PR #21 and PR #22 source material. Confirmed the two design
+- 2026-08-03: Read the upstream design audit and admission-QC source material. Confirmed the two design
   traps: the agent-visible director is skippable, and an empty model patch
   short-circuits the official harness before tests execute.
 - 2026-08-03: Deleted the director and its MCP capability. Added

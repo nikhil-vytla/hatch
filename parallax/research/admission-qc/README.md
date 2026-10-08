@@ -1,7 +1,7 @@
 # Admission QC: gate specifications and the judgment-review split
 
 The upstream design audit
-([PR #21](https://github.com/nikhil-vytla/hatch/pull/21), Q2) surveyed how
+([`../upstream-design-audit/`](../upstream-design-audit/README.md), Q2) surveyed how
 task-generation efforts actually do QC and recommended a split: mechanically
 checkable admission gates in code, and a Cursor skill for the judgment calls.
 Its dividing line, adopted here verbatim:
@@ -12,12 +12,12 @@ Its dividing line, adopted here verbatim:
 
 This folder delivers both halves' specifications: distilled best practices
 from the open-source task-quality literature (§1), precise specifications
-for six in-code admission gates against the PR #20 branch's actual types
+for six in-code admission gates against the SWE-bench verifier-safety branch's actual types
 (§2), and the design rationale for the judgment-side skill that ships in
 this same PR at `parallax/.cursor/skills/review-task-admission/` (§3).
 
 The gates are **specifications, not code** — implementation belongs to the
-`parallax/src` owner on the PR #20 branch
+`parallax/src` owner on that verifier-safety branch
 (`cursor/parallax-screening-run`), which this unit deliberately does not
 touch. All module and type names below were read from that branch
 (read-only, base commit `5984ce4` plus in-flight changes, 2026-08-02) so
@@ -34,8 +34,8 @@ the implementer can build without redesign.
 | [SWE-smith validation docs](https://swesmith.com/guides/harnesses/) + [paper](https://proceedings.neurips.cc/paper_files/paper/2025/file/8b86cf5ace600c48fd188efbb8dedec8-Paper-Datasets_and_Benchmarks_Track.pdf) | pre/post-patch F2P validation; runtime cap; per-candidate evidence folder; the unvalidated-issue-text cautionary tale | docs + paper §2, 2026-08-02 |
 | [Anthropic, "Demystifying evals for AI agents"](https://www.anthropic.com/engineering/demystifying-evals-for-ai-agents) | grader taxonomy; two-experts ambiguity test; 0%-pass-means-broken-task triage prior; "read the transcripts" | full text, 2026-08-02 |
 | [METR Task Standard](https://github.com/METR/task-standard) | in-environment pytest pattern asserting scores of known-good and known-incorrect solutions | README, 2026-08-02 |
-| Parallax upstream design audit ([PR #21](https://github.com/nikhil-vytla/hatch/pull/21)) | Q2 survey table and code/skill split; evolving-intent App. D semantics; SWE-Gym summary | branch `research/upstream-design-audit`, commit `a1fbe6b` |
-| PR #20 branch `cursor/parallax-screening-run` | all module/type names in §2 | read-only worktree, 2026-08-02 |
+| Parallax upstream design audit ([`../upstream-design-audit/`](../upstream-design-audit/README.md)) | Q2 survey table and code/skill split; evolving-intent App. D semantics; SWE-Gym summary | branch `research/upstream-design-audit`, commit `a1fbe6b` |
+| SWE-bench verifier-safety branch `cursor/parallax-screening-run` | all module/type names in §2 | read-only worktree, 2026-08-02 |
 
 OpenAI was searched for a current eval-authoring guide comparable to
 Anthropic's; their present evals documentation is API/product reference,
@@ -123,7 +123,7 @@ asks whether a proposed fix changes the population selectively.*
 
 ### Pipeline placement
 
-The construction→admission→scheduling pipeline on the PR #20 branch, with
+The construction→admission→scheduling pipeline on the verifier-safety branch, with
 gates inserted (existing functions in parentheses; `parallax.` prefix
 omitted):
 
@@ -422,7 +422,7 @@ External sources: URLs in the table above, all fetched 2026-08-02.
 
 ## Claim limits
 
-- The gate predicates were checked against the PR #20 branch *as read on
+- The gate predicates were checked against the verifier-safety branch *as read on
   2026-08-02*; that branch is under active rewrite, and names may drift
   before implementation. The pipeline seats and evidence model are stable
   against such drift; the exact validator names may not be.

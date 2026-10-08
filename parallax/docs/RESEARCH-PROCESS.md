@@ -239,7 +239,7 @@ documented research phase, and each load-bearing choice has a citable origin.
   contract catalog whose adversarial review concluded that typed schemas
   without one executable end-to-end path were premature complexity, and a
   content-addressed verifier core
-  ([closed pull request](https://github.com/nikhil-vytla/hatch/pull/9)) that
+  (closed unmerged in August 2026) that
   was over-engineered for the same reason. The current harness inverts the
   order: one complete journey first, with structure added only where a review
   demanded it. The architecture that replaced those directions was selected
@@ -265,9 +265,8 @@ The decision records behind this section live in
 formal-model ancestor of `MODEL.md`, the complete literature review, the
 arena candidate files, the typed knowledge base of source, concept, and
 synthesis notes, the timestamped decision log, and the full adversarial
-review — lives on the
-[archive branch](https://github.com/nikhil-vytla/hatch/tree/cursor/hard-repo-tasks-5fc8/hard-repo-tasks)
-of the superseded experiment that preceded this harness.
+review — lives in the unpublished archive of `hard-repo-tasks`, the
+superseded experiment that preceded this harness.
 
 ## Deliberately out of scope
 
