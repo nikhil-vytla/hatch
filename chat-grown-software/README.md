@@ -128,7 +128,8 @@ Needs Node 22.6+ and a DeepSeek key (the model defaults to `deepseek-flash`; `DE
 
 ```
 cd chat-grown-software/prototype && npm ci
-DEEPSEEK_API_KEY=sk-... INTERACTIVE=1 MODEL=deepseek node --experimental-strip-types --no-warnings src/chat.ts
+export DEEPSEEK_API_KEY=sk-...
+npm run play     # = INTERACTIVE=1 MODEL=deepseek node --experimental-strip-types --no-warnings src/chat.ts
 ```
 
 Type what you want ("Let me record expenses: an amount and a category."). When the model calls `develop`, the

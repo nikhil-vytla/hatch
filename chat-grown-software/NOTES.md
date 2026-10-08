@@ -464,3 +464,6 @@ error: no real model run was possible.
   (accept every answer) through DeepSeek: 7 questions, `addExpense` accepted at rev-0003, 13 confirmed examples.
   Scripted transcripts are unchanged.
 - In this mode the user's own judgement replaces the scripted program, so the naming problem from session 4 goes away.
+- First local run by the user failed with DeepSeek's "Authentication Fails (governor)": outside this container there
+  is no proxy adding the key, and `DEEPSEEK_API_KEY` was unset. A 401 without a key now says so. Added
+  `npm run play` for the interactive command (a typo'd `-- experimental-strip-types` made node look for a file).

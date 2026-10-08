@@ -38,7 +38,10 @@ export class DeepSeekModel implements Model {
 			}),
 			signal: AbortSignal.timeout(300_000),
 		});
-		if (!response.ok) throw new Error(`DeepSeek ${response.status}: ${(await response.text()).slice(0, 300)}`);
+		if (!response.ok) {
+			const hint = response.status === 401 && !this.key ? " (DEEPSEEK_API_KEY is not set)" : "";
+			throw new Error(`DeepSeek ${response.status}${hint}: ${(await response.text()).slice(0, 300)}`);
+		}
 		const body = (await response.json()) as { choices: { message: { content: string | null; tool_calls?: ToolCall[] }; finish_reason: string }[] };
 		const { message, finish_reason } = body.choices[0];
 		const content: Block[] = [];
