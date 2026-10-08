@@ -86,3 +86,7 @@ benchmark them with DeepSeek, and record demos.
   scratch, not committed), and re-ran all languages x 3. `summary.json` now counts `max_tokens_hits`.
   Discarded first-run numbers, for the record (8000 cap): goal checks expenses js 20/20, clojure 20/20, elixir 20/20,
   racket 17/20, lean 14/20; gateway js 18/19, clojure 19/19, elixir 19/19, racket 19/19.
+- Racket expenses r2 ended 17/20: at turn 6 DeepSeek spent all 10 steps in `try` (54 forms previewed), never
+  called `develop`, so the user was never asked and the turn ended with no budgets. Its `over_budget` sorted by
+  overage instead of by name; it kept previewing variants. A model behaviour failure (dithering), not a language
+  failure; the hidden goal check is what exposes it. A driver could nudge after N previews without a develop.
