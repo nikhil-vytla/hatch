@@ -5,8 +5,8 @@
 //     `registry.install()` swaps the "cells" extension in place, so the next request offers the new tools while a running
 //     call finishes on the code it started with. After a crash the catalogue is reinstalled from the document.
 //   - celld: each tool is a cell (cells.ts): immutable versioned code plus state that outlives code versions.
-//   - OptChat: each turn starts fresh from a view of the whole chat (optchat.ts), and every cell version records the
-//     log index of the user words that asked for it, so "why does this tool exist?" is always one zoom away.
+//   - OptChat: each turn starts fresh from a view of the whole chat (optchat.ts, wired in by memory-extension.ts), and
+//     every cell version records the log index of the user words that asked for it, so "why does this tool exist?" is always one zoom away.
 //
 // The kernel (this file's `kernel` extension) is the part the agent cannot rewrite. It is installed after the cells
 // extension so that a cell named like a kernel tool can never replace it (pi-durable: a later extension's tool with the
@@ -15,21 +15,11 @@
 // The two places where unverified code could reach the live system are behind gdp-ts proofs (src/proofs/): a version
 // enters the catalogue only through `acceptVersion` (needs `CellVerified`), and code enters the registry only through
 // `installCells` (needs `CatalogueCommitted`). The kernel tools below are the callers; they cannot skip either.
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
 import type { Context } from "@earendil-works/chord";
-import {
-	type Message,
-	type SystemMessage,
-	type TextContent,
-	type Tool,
-	Type,
-} from "@earendil-works/pi-ai";
+import { Type } from "@earendil-works/pi-ai";
 import {
 	defineExtension,
 	defineTool,
-	GenerationTask,
-	hook,
 	type Harness,
 	type Registry,
 	section,
@@ -48,7 +38,7 @@ import {
 import { type Catalogue, entryOf, staleReason } from "./catalogue-doc.ts";
 import type { CellRuntime, CellVersion } from "./cells.ts";
 import type { GateReport } from "./gate.ts";
-import type { Kind, Memory } from "./optchat.ts";
+import type { Memory } from "./optchat.ts";
 import { type CatalogueCommitted, withCommittedCatalogue } from "./proofs/catalogue-committed.ts";
 import { withAcceptedVersion } from "./proofs/cell-accepted.ts";
 import { verifyCell } from "./proofs/cell-verified.ts";
@@ -220,149 +210,19 @@ export function kernelExtension(options: KernelOptions) {
 		execute: async (args) => text(memory.zoom(args.id, args.n)),
 	});
 
+	const date = defineTool({
+		name: "date",
+		description: "The date and time of message id.",
+		parameters: Type.Object({ id: Type.Number() }),
+		replay: "safe",
+		execute: async (args) => text(memory.date(args.id)),
+	});
+
 	return defineExtension({
 		name: "kernel",
-		tools: [propose, rollback, list, source, zoom],
+		tools: [propose, rollback, list, source, zoom, date],
 		sections: [
 			section("preamble", () => "You are an agent that grows its own tools. When the user needs something you cannot do, write a tool for it with cell_propose, with checks. Say in your reply what you learned that will matter later.", { tag: false }),
 		],
 	});
-}
-
-/**
- * OptChat's turn shape on pi-durable: a `beforeRequest` hook that mirrors the transcript into the memory log and
- * replaces everything before the current run with the rendered view. The current run (its user message and tool rounds)
- * stays verbatim, as in the spec ("each user message starts a fresh model call"; steps within the call are kept).
- */
-export type MirrorState = { logged: number; runStartLog?: number; lastRequestChars?: number };
-
-/** How far the transcript is mirrored into the log survives restarts in the memory's own directory. */
-export function loadMirror(memory: Memory): MirrorState {
-	const path = join(memory.dir, "mirror.json");
-
-	return existsSync(path) ? JSON.parse(readFileSync(path, "utf8")) : { logged: 0 };
-}
-
-function isSystem(message: Message): message is SystemMessage {
-	return message.role === "system";
-}
-
-export function memoryExtension(memory: Memory, state: MirrorState) {
-	return defineExtension({
-		name: "memory",
-		hooks: [
-			hook(GenerationTask, {
-				beforeRequest: (request) => {
-					const messages = request.messages;
-					let cut = messages.length;
-
-					while (cut > 0) {
-						const prev = messages[cut - 1];
-
-						if (prev.role === "assistant" && prev.stopReason !== "toolUse") break;
-
-						cut--;
-					}
-
-					// Mirror every message not yet logged (the transcript is immutable, so a count is enough).
-					for (let k = state.logged; k < messages.length; k++) {
-						if (k === cut) state.runStartLog = memory.length;
-
-						for (const [kind, line] of toLog(messages[k])) memory.log(kind, line);
-					}
-
-					if (state.logged <= cut && cut === messages.length) state.runStartLog = memory.length;
-
-					state.logged = messages.length;
-					writeFileSync(join(memory.dir, "mirror.json"), JSON.stringify(state));
-
-					const viewUpTo = state.runStartLog ?? memory.length;
-					const view: Message = { role: "user", content: [{ type: "text", text: memory.render(viewUpTo) }], timestamp: 0 };
-					// pi-durable announces prompt sections and tools as positional system messages. The leading one stays first
-					// (constant, cacheable); later ones before the cut are folded into one delta placed after the view, so a
-					// self-written tool stays on offer without rewriting the head of every cached prefix.
-					const head = messages[0]?.role === "system" ? [messages[0]] : [];
-					const delta = foldSystem(messages.slice(head.length, cut).filter(isSystem));
-					const out = [...head, view, ...(delta === undefined ? [] : [delta]), ...messages.slice(cut)];
-					state.lastRequestChars = JSON.stringify(out).length;
-
-					return { messages: out };
-				},
-				// A final answer is logged as it happens (the spec logs everything as it happens); the next request's
-				// transcript will hold it as one more message, already mirrored.
-				onYield: (answer) => {
-					for (const [kind, line] of toLog(answer)) memory.log(kind, line);
-
-					state.logged += 1;
-					writeFileSync(join(memory.dir, "mirror.json"), JSON.stringify(state));
-
-					return undefined;
-				},
-			}),
-		],
-	});
-}
-
-function foldSystem(systems: SystemMessage[]): SystemMessage | undefined {
-	if (systems.length === 0) return undefined;
-
-	const sections: Record<string, string | null> = {};
-	const tools = new Map<string, Tool>();
-	const removed = new Set<string>();
-	const content: string[] = [];
-
-	for (const m of systems) {
-		const written = Array.isArray(m.content) ? m.content.map((part) => part.text).join("") : m.content;
-
-		if (written) content.push(written);
-
-		Object.assign(sections, m.sections ?? {});
-
-		for (const t of m.toolsRemoved ?? []) {
-			tools.delete(t.name);
-			removed.add(t.name);
-		}
-
-		for (const t of m.toolsAdded ?? []) {
-			tools.set(t.name, t);
-			removed.delete(t.name);
-		}
-	}
-
-	const folded: SystemMessage = { role: "system", content: content.join("\n"), timestamp: systems[systems.length - 1].timestamp };
-
-	if (Object.keys(sections).length > 0) folded.sections = sections;
-
-	if (tools.size > 0) folded.toolsAdded = [...tools.values()];
-
-	if (removed.size > 0) folded.toolsRemoved = [...removed].map((toolName) => ({ name: toolName }));
-
-	return folded;
-}
-
-function textParts(parts: string | (TextContent | { type: string })[]): string {
-	return Array.isArray(parts) ? parts.flatMap((p) => (p.type === "text" && "text" in p ? [String(p.text)] : [])).join("\n") : parts;
-}
-
-function toLog(m: Message): [Kind, string][] {
-	switch (m.role) {
-		case "system":
-			return [];
-		case "user":
-			return [["user", textParts(m.content)]];
-		case "toolResult":
-			return [["echo", textParts(m.content).slice(0, 30_000)]];
-		case "assistant": {
-			const out: [Kind, string][] = [];
-			const talk = textParts(m.content);
-
-			if (talk) out.push(["talk", talk]);
-
-			for (const p of m.content) {
-				if (p.type === "toolCall") out.push(["tool", `${p.name} ${JSON.stringify(p.arguments)}`]);
-			}
-
-			return out;
-		}
-	}
 }

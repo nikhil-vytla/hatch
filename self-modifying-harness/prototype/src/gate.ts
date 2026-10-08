@@ -12,7 +12,7 @@ import { type CatalogueEntry, cellName, staleReason } from "./catalogue-doc.ts";
 import { type CellRuntime, type CellVersion, type Check, deepEqual, InvariantError, type Invariant, type InvariantSets, type ReplayOutcome, type Trace, versionId } from "./cells.ts";
 import { generateArgs, isObject } from "./schema-fuzz.ts";
 
-export const KERNEL_TOOLS = new Set(["cell_propose", "cell_rollback", "cell_list", "cell_source", "zoom"]);
+export const KERNEL_TOOLS = new Set(["cell_propose", "cell_rollback", "cell_list", "cell_source", "zoom", "date"]);
 
 export const NAME = /^[a-z][a-z0-9_]{1,40}$/;
 

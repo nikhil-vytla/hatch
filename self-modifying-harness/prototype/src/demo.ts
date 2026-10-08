@@ -27,7 +27,8 @@ import { openNodeSqliteStorage } from "@earendil-works/pi-durable/storage/sqlite
 import { type CallerInvariants, reinstallCells, reserveCellsSlot } from "./catalogue.ts";
 import { entryOf } from "./catalogue-doc.ts";
 import { CellRuntime } from "./cells.ts";
-import { kernelExtension, loadMirror, memoryExtension } from "./forge.ts";
+import { kernelExtension } from "./forge.ts";
+import { loadMirror, memoryExtension } from "./memory-extension.ts";
 import { Memory } from "./optchat.ts";
 import { withCommittedCatalogue } from "./proofs/catalogue-committed.ts";
 
@@ -66,7 +67,8 @@ if (phase === undefined) {
 // --- one process ---
 const runtime = new CellRuntime(join(DATA, "cells"));
 
-const memory = new Memory(join(DATA, "chat"), { budget: 4_000 }); // a tiny budget so the view visibly coarsens
+// Tiny marks so the sawtooth is visible: the view grows to 4,000 bytes, then one batch merges it down to 2,000.
+const memory = new Memory(join(DATA, "chat"), { low: 2_000, high: 4_000, compactionLow: 1_000, compactionHigh: 2_000 });
 
 const memState = loadMirror(memory);
 
@@ -117,6 +119,10 @@ const lastResult = (ctx: TranscriptContext): string => {
 
 /** A scripted step that first checks what the model was shown. */
 const step = (expect: (ctx: TranscriptContext) => string | undefined, reply: () => AssistantMessage | Promise<AssistantMessage>): FauxResponseStep => (ctx) => {
+	const head = ctx.messages[0];
+
+	// UniiChat's constant system prompt leads every request, ahead of the view.
+	if (head?.role !== "system" || !head.sections?.["optchat-view"]?.startsWith("You are Forge,")) throw new Error("scripted model saw a request without the OptChat system prompt");
 	const problem = expect(ctx);
 
 	if (problem) throw new Error(`scripted model saw something unexpected: ${problem}`);
@@ -273,6 +279,8 @@ if (phase === "grow") {
 	await ask("Make me a tool that adds up 1 to n.");
 	const final = await withCommittedCatalogue(harness, context, (read) => read.value);
 	console.log(`\ncatalogue log:\n  ${final.log.map((l) => l.event).join("\n  ")}`);
+	await memory.idle();
+	console.log(`\nOptChat so far: ${memory.length} messages in ${memory.view.length} lines (${memory.viewBytes()} bytes); the view grew to 4,000 bytes ${memory.stats.batches} times and each time one batch merged it down to 2,000 (${memory.stats.merges} pairs merged in all)`);
 	await harness.close(context);
 }
 
@@ -318,9 +326,10 @@ if (phase === "recover") {
 	console.log(`  cell calls answered from their committed result instead of rerun: ${runtime.replayed}`);
 	await ask("Why does coffee track decaf? Who asked for that?");
 	await watch.stop();
-	console.log(`\nthe OptChat view now (budget 4,000 bytes, ${memory.length} messages, ${memory.view.length} lines):\n${memory.render()}`);
+	await memory.idle();
+	console.log(`\nthe OptChat view now (sawtooth 2,000 to 4,000 bytes: ${memory.viewBytes()} bytes, ${memory.length} messages in ${memory.view.length} lines):\n${memory.render()}`);
 	await harness.close(context);
-	console.log(`\nfiles: ${["session.sqlite", "chat/main.jsonl", "chat/tree.jsonl", "cells/state/coffee.sqlite"].map((f) => `${f}${existsSync(join(DATA, f)) ? "" : " (missing)"}`).join(", ")}`);
+	console.log(`\nfiles: ${["session.sqlite", "chat/view.json", "cells/state/coffee.sqlite"].map((f) => `${f}${existsSync(join(DATA, f)) ? "" : " (missing)"}`).join(", ")}`);
 }
 
 /** The live version of a cell right now, as a model would read it from cell_list before proposing a replacement. */
