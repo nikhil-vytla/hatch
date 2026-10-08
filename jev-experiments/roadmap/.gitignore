@@ -1,6 +1,0 @@
-node_modules/
-*.local.*
-__pycache__/
-.venv/
-.cache/
-dist/
