@@ -12,7 +12,7 @@ worth its cost right now.
 | Source | Identity | How consulted |
 |---|---|---|
 | microsoft/evolving-intent | commit `993d6be9597ac03854b46362ccd647eb1bfd267a` (repo HEAD on 2026-08-02 equals the pin in `parallax/docs/methods/evolving-intent.md`) | read-only clone in `/tmp` |
-| "LLMs Get Lost in Evolving User Intent" (Tack, Laban, Neville) | [arXiv:2607.20734](https://arxiv.org/abs/2607.20734) — exact ID confirmed from the repo README badge and BibTeX block | full text |
+| "LLMs Get Lost in Evolving User Intent" (Tack, Laban, Neville) | [arXiv:2607.20734](https://arxiv.org/abs/2607.20734), exact ID confirmed from the repo README badge and BibTeX block | full text |
 | SprocketLab/slop-code-bench | commit `8e3a8b693f3c5e48143aeb7cb5b1beda1f19c44b` (repo HEAD on 2026-08-02, same commit pinned in `parallax/docs/methods/checkpoint-evolution.md`) | read-only clone in `/tmp` |
 | "SlopCodeBench" (Orlanski et al.) | [arXiv:2603.24755](https://arxiv.org/abs/2603.24755) | full text (v1 and current) |
 | Parallax | `parallax/docs/` (MODEL.md, methods/, decisions/) and `parallax/src/parallax/swebench_env.py` on `origin/main`; archived `UPSTREAM-SWE-OVERLAY.md` on branch `cursor/hard-repo-tasks-5fc8` | this repo |
@@ -22,7 +22,7 @@ All file:line citations below are against the pinned commits.
 
 ---
 
-## Q1 — Does upstream have controlled experimental arms, or post-hoc aggregate comparison?
+## Q1: Does upstream have controlled experimental arms, or post-hoc aggregate comparison?
 
 **Answer: post-hoc aggregate comparison over a shared source subset. The
 three-arm paired design with paired statistics is a Parallax addition.**
@@ -61,7 +61,7 @@ three-arm paired design with paired statistics is a Parallax addition.**
 - Main result (Table 1): Single vs Evolve mean accuracy per model/dataset
   with relative-change percentages and a color scale. No error bars, no
   tests, no paired analysis.
-- The turn-matched no-evolution control **does exist in the paper — but
+- The turn-matched no-evolution control **does exist in the paper, but
   only as Appendix F.4**, run after the fact on GSM8K: they repeat prior
   turns without intent changes and observe accuracy "remains comparable,"
   concluding degradation is driven by intent changes rather than turn
@@ -71,7 +71,7 @@ three-arm paired design with paired statistics is a Parallax addition.**
 
 ### slop-code-bench
 
-No arms at all in the Parallax sense — it is a benchmark. The paper reports
+No arms at all in the Parallax sense. It is a benchmark. The paper reports
 aggregate solve rates, fraction-of-trajectories degradation statistics,
 medians and per-checkpoint slopes against a 473-repo human panel, plus a
 prompt-intervention study. Descriptive statistics only; no hypothesis
@@ -81,9 +81,9 @@ tests in the paper or in `src/`.
 
 Parallax's three-arm paired design (static / matched / evolved, matched
 budgets, preregistered trial units, paired cluster-averaged reporting with
-Hoeffding intervals — `parallax/docs/methods/evolving-intent.md`
+Hoeffding intervals. `parallax/docs/methods/evolving-intent.md`
 "Controlled comparison" and "GSM8K slice choices") is **our addition**. It
-is not "wrong" — it fixes real inferential holes in the upstream design:
+is not "wrong". It fixes real inferential holes in the upstream design:
 
 - What the upstream comparison **can** conclude: a large aggregate delta on
   the same source IDs is real evidence that the evolved presentation is
@@ -91,19 +91,19 @@ is not "wrong" — it fixes real inferential holes in the upstream design:
   the paper doesn't need a t-test to make its qualitative point.
 - What it **cannot** conclude: *why*. Turn count, per-turn budget shape,
   total budget (explicitly unequal in SWE), and prompt-surface changes all
-  co-vary with "evolution." The paper itself felt this gap — that's why
-  F.4 exists — but addressed it post-hoc, on one dataset, in an appendix.
+  co-vary with "evolution." The paper itself felt this gap. That's why
+  F.4 exists, but addressed it post-hoc, on one dataset, in an appendix.
 - What arms buy: attribution (matched arm isolates the schedule effect from
   the turn-count/budget effect) and honest uncertainty at small n (paired
   per-source contrasts remove between-source variance, which dominates at
   n=50). What arms cost: a third arm is +50% inference cost over the
   two-condition design, plus the matched-arm construction, budget-matching,
-  and reporting machinery — which is exactly the machinery that has been
+  and reporting machinery, which is exactly the machinery that has been
   absorbing Parallax implementation effort.
 
 **Recommendation: sequence, don't simplify away.** Run the upstream-shaped
 two-condition comparison (static vs evolved, same sources, aggregate
-accuracy) as the *screening gate* for each new domain slice — it is cheap,
+accuracy) as the *screening gate* for each new domain slice. It is cheap,
 it is literally the paper's design, and if the aggregate delta does not
 reproduce there is nothing for the third arm to explain. Keep the matched
 arm and paired statistics as the *confirmation stage*, run only after the
@@ -123,14 +123,14 @@ budgets cost nothing and remove the most embarrassing confound.
 
 ---
 
-## Q2 — What QC do task-generation efforts actually perform?
+## Q2: What QC do task-generation efforts actually perform?
 
 ### Survey
 
 | Effort | Automated structural | Execution-based | LLM-judge | Human review |
 |---|---|---|---|---|
 | evolving-intent | schema/viability filter across all 23 eval configs (`evaluation/scripts/filter_valid_samples.py`) | solvability: reference solver must reproduce the gold answer from the extracted intent (paper App. D.1; `dataset_impl/gsm8k/verifier.py:44-74`) | coverage check; counterfactual minimal-substitution check (App. D.2); predecessor function-validity + answer-preservation + cross-turn independence, majority of 3 runs with 2 feedback retries (App. D.3; `generate_predecessors.py:518-651`); BIRD eval-time lenient re-grading (`llm_judge_bird_sql.py`) | none |
-| slop-code-bench | `slop-code problems status` (test/spec/solution layout checks, `docs/commands/problems.md`) | pytest suites are the verifier; validation phase attempted each checkpoint with an agent; reference solutions exist but several fail their own tests (`docs/KNOWN_ISSUES.md` — "tests are authoritative") | none | primary mechanism: author drafting + ≥1 other-author review, proposal-phase culling, final solvability pass (paper §2 "Problem Construction"); two published checklists (`docs/contributing-problems/checklist.md`, `review-checklist.md`) covering leakage, ambiguity ("could two correct implementations differ?"), determinism |
+| slop-code-bench | `slop-code problems status` (test/spec/solution layout checks, `docs/commands/problems.md`) | pytest suites are the verifier; validation phase attempted each checkpoint with an agent; reference solutions exist but several fail their own tests (`docs/KNOWN_ISSUES.md`, "tests are authoritative") | none | primary mechanism: author drafting + ≥1 other-author review, proposal-phase culling, final solvability pass (paper §2 "Problem Construction"); two published checklists (`docs/contributing-problems/checklist.md`, `review-checklist.md`) covering leakage, ambiguity ("could two correct implementations differ?"), determinism |
 | SWE-smith | runtime cap (2 min) | core gate: candidate bug must break ≥1 previously passing test (F2P) in the containerized env | issue text generated by LLM, *not* validated (paper admits no checks for under-specification or solution leakage) | ~8 min/repo (install parsing, output parser) |
 | SWE-Gym | versioning scripts | gold patch must pass more unit tests than the base repo (SWE-bench validation script); failures filtered out | none | ~200 annotation hours manually configuring per-instance dependencies |
 | Prime Intellect Environments Hub | packaging/spec conformance (verifiers taskset/harness spec) | strongest found: **no-op validation** (tests must fail with zero edits), **gold-patch validation** (reference fix must pass; up to 10 retries to separate flaky from broken), independent second passes; `uv run validate` ships as a model-free tool | judge-based rubrics exist in some tasksets but are not the admission bar | exclusions persisted in verified re-uploads for public audit |
@@ -141,7 +141,7 @@ Patterns worth noting:
 - Every serious *code* effort anchors admission on an executable check with
   a known answer: F2P breakage (SWE-smith), gold-patch pass (SWE-Gym,
   Prime Intellect), gold-answer reproduction (evolving-intent solvability).
-- The one bidirectional check — Prime Intellect's no-op + gold pair — is
+- The one bidirectional check, Prime Intellect's no-op + gold pair, is
   the state of the art: it bounds both false positives (task solvable with
   zero edits) and false negatives (reference fix fails), and it retries to
   separate flakiness from brokenness.
@@ -158,7 +158,7 @@ Patterns worth noting:
 
 ### Recommendation for Parallax: (c) combination, with a clear split
 
-**In-code (blocking admission gates)** — everything with an executable or
+**In-code (blocking admission gates).** Everything with an executable or
 mechanical oracle:
 
 - schema validity, frozen-model parsing, sealed-leakage lint (already the
@@ -176,7 +176,7 @@ mechanical oracle:
   silently change the population between conditions);
 - budget/turn-count matching verification across arms.
 
-**Cursor skill (agent-driven review workflow)** — everything that is a
+**Cursor skill (agent-driven review workflow).** Everything that is a
 judgment call over a spec, where slop-code-bench's checklists are the
 model:
 
@@ -185,7 +185,7 @@ model:
 - ambiguity review ("could two correct agents interpret this turn
   differently?"), naturalness/coherence of rendered turns;
 - review of *declared deviations* from upstream (evolving-intent.md already
-  requires a rationale for each — a skill can enforce that the rationale
+  requires a rationale for each, a skill can enforce that the rationale
   exists and is coherent);
 - triage of gate failures (the skill reads gate evidence and decides
   retry / fix / reject, like Prime Intellect's debug CLI workflow).
@@ -194,13 +194,13 @@ The dividing line: **if a check can be wrong in a way a regression test
 would catch, it is code; if a check can only be wrong in a way a reviewer
 argues about, it is a skill.** LLM-judge checks (counterfactual minimality
 etc.) sit in code but below the primary gates: majority-voted, retained
-with transcripts, and never the sole basis for admission — matching both
+with transcripts, and never the sole basis for admission, matching both
 upstream practice and the existing `checkpoint-evolution.md` stance that
 rubric judgments are "excluded from admission."
 
 ---
 
-## Q3 — How does upstream deliver turns at runtime, and how does it grade?
+## Q3: How does upstream deliver turns at runtime, and how does it grade?
 
 **Answer: harness-side, unskippable, submission-interception delivery;
 grading via the official SWE-bench harness. Parallax's agent-callable
@@ -222,8 +222,8 @@ grading via the official SWE-bench harness. Parallax's agent-callable
   patch as final." Implementation: the `except Submitted` branch at
   `swe_minisweagent_scaffold.py:714-749`.
 - Injected turns are wrapped with an authority prefix:
-  `_wrap_intent_update` at `swe_minisweagent_scaffold.py:408-424` — "Hold
-  on — before you finalize, the user has new information… Do not submit
+  `_wrap_intent_update` at `swe_minisweagent_scaffold.py:408-424`, "Hold
+  on, before you finalize, the user has new information… Do not submit
   yet unless this update has been fully incorporated."
 - The second delivery trigger is per-turn budget exhaustion: the
   `except LimitsExceeded` branch at `swe_minisweagent_scaffold.py:750-787`
@@ -283,8 +283,8 @@ Move turn delivery harness-side to match upstream semantics: the eval loop
 user turn when the agent attempts to finalize or exhausts its per-turn
 budget, and refuses final grading until all turns are delivered. If the
 `advance()` tool is retained for infrastructure reasons, it must at
-minimum (a) be invisible to the policy as a choice — i.e., called by the
-scaffold, not the model — and (b) gate `_grade()` on
+minimum (a) be invisible to the policy as a choice, meaning called by the
+scaffold and not the model, and (b) gate `_grade()` on
 `index == len(turns) - 1`. Otherwise every evolved-arm result carries an
 unmeasured "did the agent actually experience the evolution?" confound,
 and the n_user_turns_delivered-style evidence upstream records
@@ -296,7 +296,7 @@ and the n_user_turns_delivered-style evidence upstream records
 
 1. **Arms**: upstream = two conditions, shared source IDs, aggregate means;
    turn-matched control only as a post-hoc appendix. Our three-arm paired
-   design is an addition — sound, but sequence it: replicate the cheap
+   design is an addition, sound, but sequence it: replicate the cheap
    two-condition screen first, add the matched arm and paired stats only
    where the screening delta reproduces.
 2. **QC**: the field's admission bar is executable checks (gold must pass,

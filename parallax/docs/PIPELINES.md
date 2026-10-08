@@ -1,22 +1,24 @@
-# Parallax pipelines: input → command → output
+# Parallax pipelines: input, command, output
 
-This document shows, start to finish, what actually happens when you use
-Parallax today. Each walkthrough names the concrete input, the exact command
-that exists in this repository, the artifacts that come out, and what you may
-conclude from them. The theory lives in [`MODEL.md`](MODEL.md) and
-[`RESEARCH-PROCESS.md`](RESEARCH-PROCESS.md); this page is only the
-mechanics. Where something is designed but not built, it says so.
+What actually happens when you use Parallax today. Each walkthrough names the
+concrete input, the exact command that exists in this repository, the artifacts
+that come out, and what you may conclude from them. Theory lives in
+[`MODEL.md`](MODEL.md) and [`RESEARCH-PROCESS.md`](RESEARCH-PROCESS.md); results
+live in [`FINDINGS.md`](FINDINGS.md). This page is only the mechanics. Where
+something is designed but not built, it says so.
 
 Three flows are implemented:
 
-1. [Evolving Intent on GSM8K](#1-evolving-intent-on-gsm8k) — offline, free,
-   copy-paste runnable right now.
-2. [Evolving Intent on SWE-bench Verified](#2-evolving-intent-on-swe-bench-verified)
-   — three paid stages already run once; real artifacts shown.
-3. [Checkpoint evolution](#3-checkpoint-evolution-landing-in-pr-27) — offline
-   slice landing in [PR #27](https://github.com/nikhil-vytla/hatch/pull/27).
+1. [Evolving Intent on GSM8K](#1-evolving-intent-on-gsm8k). Offline, free,
+   copy-paste runnable right now. The same design has since run live over 144
+   sources, which is where the project's one real result came from.
+2. [Evolving Intent on SWE-bench Verified](#2-evolving-intent-on-swe-bench-verified).
+   Three paid stages, already run once, with the real artifacts shown.
+3. [Checkpoint evolution](#3-checkpoint-evolution-056). One family, two arms, and
+   two paid screening runs, the second of which retracted the first.
 
-The honest counterpart is [What is NOT automated yet](#what-is-not-automated-yet).
+Then [what is not automated yet](#what-is-not-automated-yet), which is the part
+worth reading before you believe any of the above scales.
 
 ## 1. Evolving Intent on GSM8K
 
@@ -24,7 +26,7 @@ The honest counterpart is [What is NOT automated yet](#what-is-not-automated-yet
 `tests/fixtures/gsm8k.jsonl` holds GSM8K problem #1:
 
 > Janet's ducks lay 16 eggs per day. She eats 3 for breakfast and bakes
-> muffins with 4. She sells each remaining egg for $2. How many dollars does
+> muffins with 4. She sells each remaining egg for \$2. How many dollars does
 > she make each day?
 
 The `#### 18` answer is stripped from everything the agent sees and sealed as
@@ -66,9 +68,9 @@ print({key: report[key] for key in ("difference", "identification_bounds", "inte
 PY
 ```
 
-**What comes out.** First, the one source problem has become three arms — a
-single-turn baseline plus two nine-turn scripts that differ only in whether
-the intent evolves. Real output, evolved arm truncated:
+**What comes out.** First, the one source problem has become three arms: a
+single-turn baseline plus two nine-turn scripts that differ only in whether the
+intent evolves. Real output, evolved arm truncated:
 
 ```text
 --- static: 1 turn(s) ---
@@ -89,7 +91,7 @@ the intent evolves. Real output, evolved arm truncated:
   Correction: change eggs baked from 5 to 4.
 ```
 
-Second, `/tmp/parallax-demo/evidence.jsonl`: 8 canonical JSONL records — one
+Second, `/tmp/parallax-demo/evidence.jsonl`: 8 canonical JSONL records. One
 preregistered manifest, one family record (the only place the sealed `18`
 appears), and six run records (2 trials × 3 arms). A real run row, trimmed:
 
@@ -110,13 +112,21 @@ Third, `/tmp/parallax-demo/report.json`. Real output:
 
 **What you can conclude.** With a history-reading scripted agent every arm
 passes, the matched-vs-evolved difference is 0, and the interval resolves
-nothing: one source cluster gives a minimum detectable effect of 2.72, so
-the interval is the trivial [-1, 1]. Swap `HistoryAgent` for
-`LastMessageAgent` and the multi-turn arms flip to `wrong` — the mechanics
-of history sensitivity, shown in `tests/test_end_to_end.py`. Nothing here is
-evidence about real models; that is exactly what this run demonstrates the
-harness records. Real experiments keep their evidence under
-`research/<investigation>/evidence/`.
+nothing: one source cluster gives a minimum detectable effect of 2.72 against an
+estimand bounded in [-1, 1], so the interval is the whole range. Swap
+`HistoryAgent` for `LastMessageAgent` and the multi-turn arms flip to `wrong`,
+which is history sensitivity in its crudest form, shown in
+`tests/test_end_to_end.py`. Nothing here is evidence about real models. What it
+demonstrates is what the harness records. Real experiments keep their evidence
+under `research/<investigation>/evidence/`.
+
+This same design has run live: 144 sources, three arms, three trials, 1,296 Haiku
+4.5 episodes for \$10.96, with evolved minus base at -0.109 [-0.160, -0.060] and
+the matched arm splitting that into -0.086 multi-turn and -0.023 evolution. The
+numbers are in [`FINDINGS.md`](FINDINGS.md#most-of-the-evolving-intent-penalty-on-gsm8k-is-just-multi-turn).
+Going live also broke three things this offline path cannot expose, the worst being
+that no prompt ever stated the `FINAL_ANSWER:` contract the grader enforces, since
+the scripted agents above already know it.
 
 ## 2. Evolving Intent on SWE-bench Verified
 
@@ -124,7 +134,7 @@ The same intervention on a real benchmark, with a real model (Claude Opus
 4.8) and the official SWE-bench harness as sealed verifier. This flow has
 three stages and each costs money; the recorded spends below are actuals.
 
-### 2a. Screening: find boundary instances ($2.97)
+### 2a. Screening: find boundary instances (\$2.97)
 
 **Start with:** the pinned SWE-bench Verified dataset (medium-difficulty
 stratum). **Run:** the bespoke driver
@@ -141,9 +151,9 @@ excerpt:
  "recommended_model": "claude-opus-4-8"}
 ```
 
-**Conclude:** three instances sit at the 2/3 pass boundary — solvable but not
-saturated, so an intent-evolution effect has room to show in either
-direction. Details in
+**Conclude:** three instances sit at the 2/3 pass boundary, solvable but not
+saturated, so an intent-evolution effect has room to show in either direction.
+Details in
 [`../research/swebench-screening-round2-20260803/README.md`](../research/swebench-screening-round2-20260803/README.md).
 
 ### 2b. Admission: gate the three instances (compute only)
@@ -155,14 +165,14 @@ DOCKER_DEFAULT_PLATFORM=linux/amd64 uv run --with pyarrow python \
   research/swebench-experiment-prerequisites-20260803/run_admission.py
 ```
 
-No inference — Docker only. Six gates per instance, including: the compiled
+No inference, Docker only. Six gates per instance, including: the compiled
 agent bundle contains no sealed bytes, an inert no-op patch must fail the
 official tests, and the sealed gold patch must pass them. **Out:**
 `evidence/admission-summary.json` and one `admission.json` per instance; all
 three admitted. The same folder preregisters the 18-unit experiment design
 (digest `e230043c…`) before any paid unit runs.
 
-### 2c. The experiment: single-turn vs evolved ($1.22)
+### 2c. The experiment: single-turn vs evolved (\$1.22)
 
 **Start with:** an admitted instance's public issue text plus a
 Haiku-constructed intent decomposition. Real construction record for
@@ -178,7 +188,7 @@ Haiku-constructed intent decomposition. Real construction record for
 The static arm delivers the raw issue in one 12-step phase. The evolved arm
 splits the same 12 steps into two phases: first *"Work toward this
 intermediate intent: CreateModel.reduce. … Do not implement the final issue
-yet."*, then the harness interjects *"Hold on — before you finalize, the user
+yet."*, then the harness interjects *"Hold on, before you finalize, the user
 has new information…"* and delivers the full issue. The agent cannot skip or
 reorder phases; the harness owns the schedule and grades a delivery receipt.
 
@@ -196,26 +206,26 @@ reconciliation. Real results:
 **Conclude:** point estimate +0.111 for static-minus-evolved, but with 3
 source clusters the minimum detectable effect is 1.568, so the interval is
 the trivial [-1, 1]: the data neither advances nor rejects the hypothesis.
-Unique metered spend was $1.219080. Both stages 2b and 2c land in
+Unique metered spend was \$1.219080. Both stages 2b and 2c land in
 [PR #25](https://github.com/nikhil-vytla/hatch/pull/25) under
 `research/swebench-experiment-prerequisites-20260803/` and
 `research/swebench-single-vs-evolved-20260803/`. Note one design gap stated
-plainly: this experiment compared static against evolved only — the
+plainly: this experiment compared static against evolved only. The
 turn-matched control arm that the GSM8K design treats as mandatory was not
 part of the 18-unit design, so conversation length is not yet controlled for
 on SWE-bench.
 
-## 3. Checkpoint evolution (landing in PR #27)
+## 3. Checkpoint evolution (\$0.56)
 
 The second synthesis strategy, from
 [SlopCodeBench](https://arxiv.org/abs/2603.24755): instead of one task whose
 *intent* evolves across turns, one workspace persists across separately
-scored checkpoints whose *requirements* accumulate. Everything below is on
-the [PR #27](https://github.com/nikhil-vytla/hatch/pull/27) branch and still
-in flux.
+scored checkpoints whose *requirements* accumulate. Merged in
+[PR #27](https://github.com/nikhil-vytla/hatch/pull/27), with one paid
+screening run behind it.
 
 **Start with:** a hand-authored three-checkpoint family, `ce-tally-1`, in
-`tests/fixtures/checkpoint_family.json` — a CLI tool built up in stages
+`tests/fixtures/checkpoint_family.json`, a CLI tool built up in stages
 (totals → top-name aggregation → file input) with 10 sealed
 stdin/argv/exit-code cases. Real spec excerpt from checkpoint 1:
 
@@ -223,28 +233,35 @@ stdin/argv/exit-code cases. Real spec excerpt from checkpoint 1:
 > `python3 tally.py total`. … `total` prints the sum of all counts as a
 > decimal integer followed by a single newline, then exits 0.
 
-**Run** (offline, on the PR branch, from `parallax/`):
+**Run** (from `parallax/`; the first two are offline and free, the third spends
+money):
 
 ```bash
 uv run python research/checkpoint-evolution-slice/make_seed_family.py  # rebuild fixture; 5 admission gates
 uv run python -m pytest tests/test_checkpoint_runner.py -q             # both arms end to end
+uv run python research/checkpoint-evolution-slice/run_screening.py     # offline dry run; add --live --approve-spend to pay
 ```
 
 **Out:** an `AdmissionReceipt` (five gates: schema round-trip, completeness,
 leakage, incremental gold build, per-stage no-op rejection), then evidence
-JSONL from `checkpoint_runner.run_ce_experiment` with two arms — `evolved`
+JSONL from `checkpoint_runner.run_ce_experiment` with two arms, `evolved`
 (the agent's own stage-N workspace feeds stage N+1, digest-chained) and
 `carry-reference` (each stage starts from the frozen reference build). Each
 stage is graded into a verdict vector: `strict_pass` (all accumulated
 obligations, prior checkpoints re-run as regressions), `isolated_pass` (this
 checkpoint's new cases only), `core_pass`.
 
-**Conclude:** with scripted agents only, nothing yet about real models. What
-the slice establishes is that skipped/reordered checkpoints, workspace-chain
-drift, and answer leakage are structurally unrepresentable in the evidence.
-Contract: [`methods/checkpoint-evolution.md`](methods/checkpoint-evolution.md);
-trail: `research/checkpoint-evolution-slice/` (PR #27), including a
-preregistration draft for the first paid run.
+**Conclude:** the slice establishes that skipped or reordered checkpoints,
+workspace-chain drift, and answer leakage are structurally unrepresentable in
+the evidence. Two live runs added 120 Haiku 4.5 stage calls for \$0.56. The first
+split the arms completely at stage 3 on the declared byte cap; the second raised
+the cap, changed nothing else, and the split vanished. So the cap was the effect,
+and the arms do not differ on verdicts at this scale. Read
+[`FINDINGS.md`](FINDINGS.md#the-checkpoint-evolution-separation-was-our-byte-cap)
+before quoting either run. Contract:
+[`methods/checkpoint-evolution.md`](methods/checkpoint-evolution.md); trail:
+[`../research/checkpoint-evolution-slice/`](../research/checkpoint-evolution-slice/README.md),
+including the preregistration and the screening report.
 
 ## What is NOT automated yet
 
@@ -260,12 +277,19 @@ preregistration draft for the first paid run.
   `run_admission.py`, `run_experiment.py`), plus resume scripts written
   mid-incident. Reproducing a paid flow means reading that folder's
   `NOTES.md`, not invoking a stable tool.
-- **GSM8K has never run against a real provider.** The full
-  static/matched/evolved design is implemented and tested offline, but all
-  GSM8K evidence uses scripted agents. Conversely, the real-model SWE-bench
-  experiment lacks the matched control (see 2c). No single flow yet has both
-  the complete design and real-model evidence — that is the current gap
-  between what the docs describe and what has been measured.
-- **Checkpoint evolution has no report module or paid run.** PR #27 stops at
-  admission, two arms, and evidence; estimands and decisions are deferred to
-  its preregistration draft.
+- **Trials are not replicates.** Every run records trial seeds and the gateway
+  ignores the `seed` parameter it accepts, verified by measurement. Trials are
+  temperature-1.0 samples, so clustered intervals are sound and exact replay is
+  not available on any flow.
+- **The matched arm exists only on GSM8K.** The live GSM8K run used all three arms
+  and the matched control is what let it attribute the effect. The real-model
+  SWE-bench experiment has no matched control (see 2c), so any delta it produced
+  would be unattributable even at a sample size that could detect one.
+- **Checkpoint evolution has no report module.** Admission, two arms, evidence,
+  and two paid screening runs exist. The stage-indexed and slope estimands do
+  not, so every CE number so far is descriptive.
+- **Checkpoint evolution has one task family.** Both paid runs used `ce-tally-1`.
+  The byte-budget confound that broke the first run is settled and now gated by
+  `budget_headroom_violations`, which refuses a family whose cap schedule cannot
+  cover reference growth. Sample size is the remaining problem, and no gate
+  fixes that.

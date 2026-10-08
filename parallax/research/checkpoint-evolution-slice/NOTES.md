@@ -1,4 +1,4 @@
-# NOTES — checkpoint-evolution executable slice
+# NOTES: checkpoint-evolution executable slice
 
 Goal: implement checkpoint evolution (the SlopCodeBench-derived synthesis
 method designed in `../slopcodebench-method/` and specified in
@@ -17,7 +17,7 @@ deterministic replay, no paid inference in this unit.
   implementation (`types.py`, `evolving_intent.py`, `gsm8k.py`,
   `runner.py`, `report.py`, `outcome.py`, `canonical.py`, `swebench.py`),
   `RESEARCH-PROCESS.md`, and the decision records.
-- Checked `parallax/research/admission-qc/`: **not on main** — it lives on
+- Checked `parallax/research/admission-qc/`: **not on main**. It lives on
   the open PR #22 branch (`parallax/admission-qc`). Per instruction
   ("reuse/adapt existing gate machinery … if present on main"), the gate
   *specifications* from that branch were read and adapted conceptually
@@ -60,13 +60,13 @@ Options considered:
    the SWE-bench slice). Rejected: GSM8K has no workspace or entrypoint
    contract, so a "checkpointed GSM8K" would not exercise the persistent
    file-tree state, subprocess verification, or regression obligations
-   that are the whole point of the method — it would be a shortcut
+   that are the whole point of the method. It would be a shortcut
    scaffold. SWE-bench repositories have workspaces but building a
    3-checkpoint decomposition of a Django instance offline would mean
    inventing sealed suites we cannot validate without containers and paid
    agent calls, and the synthesis-workflow doc (S1–S6) says agent-drafted
    families need gates G3/G4/G6 (mutants, churn ratio, headroom) that are
-   compute-priced — out of scope for a no-inference unit.
+   compute-priced and out of scope for a no-inference unit.
 2. **Small hand-verified seed family** (chosen). One hand-authored CLI
    tool family, `tally`, 3 checkpoints, in the upstream problem shape:
    spec prose with examples and pinned normalization, sealed
@@ -79,9 +79,9 @@ Options considered:
 
 Family shape (operators from the closed set in algorithmic-model §2.4):
 
-- C1 `core`: `tally.py total` — sum `<name> <count>` records from stdin;
+- C1 `core`: `tally.py total`, sum `<name> <count>` records from stdin;
   malformed record → exit 2, message to stderr, nothing on stdout.
-- C2 `extension`: new subcommand `top` — name with the largest
+- C2 `extension`: new subcommand `top`, returning the name with the largest
   aggregated total, ties broken by lexicographically smallest name
   (normalization pinned in the spec); `total` behavior untouched.
 - C3 `input-source`: optional `--input FILE` before the subcommand reads
@@ -91,7 +91,7 @@ Family shape (operators from the closed set in algorithmic-model §2.4):
 Design pressure exists but is mild by construction: a C1 solution that
 keeps only a running sum must restructure to per-name aggregation at C2,
 and a hardcoded-stdin reader must abstract its input source at C3. No
-churn-ratio measurement (G4) is claimed — that gate is explicitly
+churn-ratio measurement (G4) is claimed. That gate is explicitly
 deferred, consistent with the workflow doc's "automatable, given the
 naive build" caveat.
 
@@ -123,7 +123,7 @@ naive build" caveat.
   classified as a budget RunFailure (no workspace produced). Declared
   interpretation, recorded in the method doc.
 - **Regression reclassification** is automatic and unconditional
-  (`include_prior_tests: false` has no representation — dropping
+  (`include_prior_tests: false` has no representation. Dropping
   obligations would be a declared verifier intervention and is simply not
   constructible in this slice).
 - **Arms**: `evolved` and `carry-reference` (the recommended first
@@ -139,8 +139,8 @@ naive build" caveat.
 
 Adapted from the upstream-design-audit finding (PR #21): turn delivery
 must be harness-owned and unskippable. Here checkpoint delivery is owned
-by the runner loop — the agent is a pure function of
-(public spec, carried workspace, budget) and has no advance channel — and
+by the runner loop. The agent is a pure function of (public spec, carried
+workspace, budget) and has no advance channel, and
 `FamilyRun` model validators make a graded episode with missing, skipped,
 reordered, or spec-drifted checkpoint delivery unrepresentable:
 receipt indices must be exactly 1..k, each receipt's spec digest must
@@ -151,7 +151,7 @@ RunFailure at stage k.
 
 ### Admission gates (deliverable 4)
 
-Executable, recorded, bidirectional — adapted from the PR #22
+Executable, recorded, bidirectional, adapted from the PR #22
 specifications and the six-gate design in
 `../slopcodebench-method/synthesis-workflow.md` §2:
 
@@ -173,7 +173,7 @@ and the judgment-side review skill (PR #22 ships it; not on main).
   `checkpoint_runner.py` (delivery loop, arms, receipts, manifest,
   evidence JSONL) with strict frozen models and discriminated unions.
 - Generated `tests/fixtures/checkpoint_family.json` with
-  `make_seed_family.py` (this folder) — deterministic canonical JSON;
+  `make_seed_family.py` (this folder), deterministic canonical JSON;
   regenerate with `python3 make_seed_family.py` from this directory.
 - Test suite: `test_checkpoint_evolution.py` (domain validators, verifier
   semantics, verdict vector, admission gates both directions) and
@@ -184,7 +184,7 @@ and the judgment-side review skill (PR #22 ships it; not on main).
   targeted mutants to the two new modules and requires the offline suite
   to fail for each; see gauntlet results below.
 - First full test run: 32/33 new tests passed; the one failure was a test
-  bug, not a code bug — with the reference-mimicking agent on
+  bug, not a code bug. With the reference-mimicking agent on
   carry-reference, the stage-2 *output* digest equals the frozen
   reference digest, so swapping it into the stage-3 input was a no-op.
   Switched that test to the myopic agent, whose outputs differ from the
@@ -194,16 +194,16 @@ and the judgment-side review skill (PR #22 ships it; not on main).
 
 ## Verification gate results
 
-- `uv run python -m pytest -q` — 153 passed (120 pre-existing + 33 new).
-- `uv run python -O -m pytest -q` — 153 passed; only the expected
+- `uv run python -m pytest -q`: 153 passed (120 pre-existing + 33 new).
+- `uv run python -O -m pytest -q`: 153 passed; only the expected
   warning that `-O` disables test assertions (source invariants are
   exceptions and model validation).
 - `uv run ruff check src tests research/checkpoint-evolution-slice` and
-  `ruff format --check` — clean.
-- `uvx ty check src` — clean.
-- `uv run python -m compileall -q src` — clean.
-- `uv build` — sdist and wheel built.
-- Mutation gauntlet — 14/14 killed:
+  `ruff format --check`: both clean.
+- `uvx ty check src`: clean.
+- `uv run python -m compileall -q src`: clean.
+- `uv build`: sdist and wheel built.
+- Mutation gauntlet: 14/14 killed.
   M01 regression obligations dropped; M02 strict ignores regression;
   M03 all cases labeled new; M04 no-op gate inverted; M05 gold accepts
   isolated; M06 leakage gate blind; M07 exit codes not compared;
@@ -238,7 +238,7 @@ markdown this branch touches. PR #27 reports `MERGEABLE`/`CLEAN`.
   The agent stays a pure function of the delivered stage: rendering
   depends only on (public spec, carried workspace, declared budgets)
   plus frozen construction arguments, and rendering has no access to
-  sealed material *by construction* — `render_stage_messages` takes only
+  sealed material *by construction*: `render_stage_messages` takes only
   the contract and the public `CheckpointDelivery`.
 - Reply protocol: one JSON object `{"files": {path: content}}`; the
   carried workspace is serialized to the agent in the same shape.
@@ -261,7 +261,7 @@ markdown this branch touches. PR #27 reports `MERGEABLE`/`CLEAN`.
 - `SandboxCaseExecution` runs every sealed case in a disposable
   container: image pinned by immutable digest
   (`python@sha256:57cd7c…710de`, resolved from `python:3.12-slim` for
-  `linux/amd64` per the repo's SWE-bench Docker discipline — explicit
+  `linux/amd64` per the repo's SWE-bench Docker discipline, with explicit
   `--platform=linux/amd64` on an arm64 daemon), `--network=none`,
   `--read-only` rootfs with only the materialized working directory
   writable, `--pull=never`, non-root `--user=1000:1000`,
@@ -278,7 +278,7 @@ markdown this branch touches. PR #27 reports `MERGEABLE`/`CLEAN`.
   `execute: CaseExecution` seam. The host path was renamed
   `run_case_trusted` and documented as trusted-code-only; admission
   gates run reference builds (our own code) through it. The *live*
-  screening branch constructs the sandbox unconditionally — there is no
+  screening branch constructs the sandbox unconditionally. There is no
   host-execution fallback on that path, and mutant M15 proves removing
   it kills the suite.
 - Real-container integration tests (skipped when Docker or the pinned
@@ -296,7 +296,7 @@ markdown this branch touches. PR #27 reports `MERGEABLE`/`CLEAN`.
   makes no network calls; even-indexed stages reply inside an exact
   ```json fence so the fence unwrap is exercised in committed evidence.
 - Live mode adds: spend approval (`SpendApprovalRequired` unless
-  `approve_spend=True`, upper-bound estimate against the repo's $5
+  `approve_spend=True`, upper-bound estimate against the repo's \$5
   cap), a per-call affordability check in the agent factory (a stage
   that could exceed the cap raises `BudgetError` before any request),
   the reported-model drift check (`claude-haiku-4-5-20251001` expected,
@@ -304,9 +304,9 @@ markdown this branch touches. PR #27 reports `MERGEABLE`/`CLEAN`.
 - Execution identity (`trusted-fixture` vs `sandbox:<image@digest>`) is
   bound into `model_config_digest`, so evidence records which
   verification path produced them.
-- Committed evidence (`evidence/`): `dry-run.jsonl` — the full
+- Committed evidence (`evidence/`): `dry-run.jsonl`, the full
   preregistered 10-seed shape, 20 runs, 60/60 stages verified,
-  estimated cost $0; `dry-run-sandbox.jsonl` — 2 seeds routed through
+  estimated cost \$0; `dry-run-sandbox.jsonl`, 2 seeds routed through
   the real pinned Docker sandbox, 12/12 stages verified (84 container
   executions).
 
@@ -333,7 +333,7 @@ drift accepted, fence unwrap disabled, spend approval removed.
   gateway connection. Independent probes (models endpoint, minimal
   completion, the exact stage-1 body via curl, and a direct
   `urllib` call with the Python user agent) all answered in ≤ 2.5 s,
-  and the run then finished on schedule — the `docker events` window
+  and the run then finished on schedule. The `docker events` window
   arguments were producing empty output regardless of activity, and
   the stack sample had simply caught a normal in-flight provider call.
   Lesson: verify the observability query against known activity before
@@ -341,11 +341,11 @@ drift accepted, fence unwrap disabled, spend approval removed.
 - Outcome summary (details in [screening-report.md](screening-report.md)):
   60/60 stage calls delivered and validated; receipt digest chain
   confirmed for all 60; stages 1–2 strict in both arms on all seeds;
-  stage 3 split completely — carry-reference 10/10 strict, evolved
+  stage 3 split completely, carry-reference 10/10 strict, evolved
   10/10 budget RunFailures (replies 4802–4864 bytes over the 4096-byte
   workspace cap). RunFailure rate 16.7% (< 30% stop rule), zero
-  infrastructure failures. Spend $0.2813 vs the $0.25–$0.50 estimate
-  and $5 cap; the evolved arm cost 1.6× the carry arm because its own
+  infrastructure failures. Spend \$0.2813 vs the \$0.25–\$0.50 estimate
+  and \$5 cap; the evolved arm cost 1.6× the carry arm because its own
   accumulated verbosity returns as billed input tokens.
 - Analysis artifacts: `summarize_screening.py` validates every record
   against the typed models, re-derives the digest chain, and writes
