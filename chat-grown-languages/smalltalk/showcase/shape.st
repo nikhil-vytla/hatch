@@ -1,6 +1,6 @@
 "Showcase part 2: the same world, seen from inside the image. Run by showcase/demo.sh with CK_DATA set,
  on the world.image that the kernel saved at clean shutdown."
-| say k app before dev req ex entries |
+| bang say k app before dev req ex entries |
 say := [ :s | Stdio stdout nextPutAll: s asString; nextPut: Character lf; flush ].
 say value: '== Part 2: the image itself =='.
 say value: '# 1. The saved image already contains the world''s code (nothing loaded from world.json yet):'.
@@ -37,4 +37,6 @@ say value: '# 5. Revert the newest method change through Epicea (owner level, ou
 (entries detect: [ :c | c class name = #EpMethodAddition and: [ c methodAffected selector = #count_categories ] ]) asRevertedCodeChange applyCodeChange.
 say value: '   count_categories understood after revert? ' , (ExpenseApp canUnderstand: #count_categories) printString.
 say value: '# 6. The .changes file holds the source of every method compiled in this world (tail):'.
-say value: (((FileLocator workingDirectory / 'world.changes') binaryReadStream contents last: 700) asString).
+bang := String with: (Character value: 33).
+((((FileLocator workingDirectory / 'world.changes') binaryReadStream contents asString substrings: bang) select: [ :c | c trimBoth notEmpty ]) last: 10) do: [ :c | say value: '   ' , bang , ((c trimBoth copyReplaceAll: String lf with: ' / ') copyReplaceAll: String tab with: ' ') ].
+Smalltalk quitPrimitive.

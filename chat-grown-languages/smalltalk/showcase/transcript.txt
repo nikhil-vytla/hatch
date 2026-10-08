@@ -54,3 +54,38 @@
 > {"op":"observe"}
 < {"generation":5,"revision":"rev-0005","functions":{"by_category":"by_category\n\t| out |\n\tout := Dictionary new.\n\t(state at: 'expenses' ifAbsent: [ #() ]) do: [ :e |\n\t\tout at: (e at: 'category') put: (out at: (e at: 'category') ifAbsent: [ 0 ]) + (e at: 'amount') ].\n\t^ out","over_budget":"over_budget\n\t| spent budgets |\n\tspent := self by_category.\n\tbudgets := state at: 'budgets' ifAbsent: [ Dictionary new ].\n\t^ (budgets keys select: [ :c | (spent at: c ifAbsent: [ 0 ]) > (budgets at: c) ]) sorted","add_expense":"add_expense: amount category: category\n\t| list |\n\tlist := state at: 'expenses' ifAbsentPut: [ OrderedCollection new ].\n\tlist add: { 'amount' -> amount. 'category' -> category } asDictionary.\n\t^ list size","set_budget":"set_budget: category amount: amount\n\t(state at: 'budgets' ifAbsentPut: [ Dictionary new ]) at: category put: amount.\n\t^ amount"},"state":{"expenses":[{"amount":0.1,"category":"food"},{"amount":0.2,"category":"food"}],"budgets":{"food":
 
+== Part 2: the image itself ==
+# 1. The saved image already contains the world's code (nothing loaded from world.json yet):
+   ExpenseApp selectors = #(#add_expense:category: #by_category #over_budget #set_budget:amount:)
+   ExpenseApp >> #over_budget sourceCode =
+over_budget
+	| spent budgets |
+	spent := self by_category.
+	budgets := state at: 'budgets' ifAbsent: [ Dictionary new ].
+	^ (budgets keys select: [ :c | (spent at: c ifAbsent: [ 0 ]) > (budgets at: c) ]) sorted
+# 2. World state resumed from world.json into the live instance: {"expenses":[{"amount":0.1,"category":"food"},{"amount":0.2,"category":"food"}],"budgets":{"food":0.3}}
+# 3. Change the SHAPE of the state holder: add an instance variable to the live class.
+   ExpenseBase instVarNames before = #(#state)
+   a form that uses the not-yet-existing variable is refused: {"status":"rejected","generation":5,"failed":[{"layer":"static","detail":"unknown variable lastCount"}]}
+   after addInstVarNamed: instVarNames = #(#state #lastCount)
+   the LIVE instance was migrated by the image: same object? true, state kept (identical)? true, new slot = nil
+   the same form now passes the gates: {"status":"accepted","generation":6,"revision":"rev-0006","failed":[]}
+   executing it on the existing instance: {"ok":true,"value":1,"replayed":false} ; the slot now holds 1
+# 4. Epicea, the image's change log, ExpenseApp method changes of this session (newest first;
+#    the ExpenseCandidate entries are the scratch class rebuilt by every try / develop and are not shown):
+   EpMethodAddition ExpenseApp count_categories
+# 5. Revert the newest method change through Epicea (owner level, outside the kernel, so the kernel's own record is now one method ahead of the image):
+   count_categories understood after revert? false
+# 6. The .changes file holds the source of every method compiled in this world (tail):
+   !set_budget: category amount: amount /  (state at: 'budgets' ifAbsentPut: [ Dictionary new ]) at: category put: amount. /  ^ amount
+   !ExpenseCandidate methodsFor: 'app' stamp: '10/8/2026 08:53'
+   !add_expense: amount category: category /  | list | /  list := state at: 'expenses' ifAbsentPut: [ OrderedCollection new ]. /  list add: { 'amount' -> amount. 'category' -> category } asDictionary. /  ^ list size
+   !ExpenseCandidate methodsFor: 'app' stamp: '10/8/2026 08:53'
+   !over_budget /  | spent budgets | /  spent := self by_category. /  budgets := state at: 'budgets' ifAbsent: [ Dictionary new ]. /  ^ (budgets keys select: [ :c | (spent at: c ifAbsent: [ 0 ]) > (budgets at: c) ]) sorted
+   !ExpenseCandidate methodsFor: 'app' stamp: '10/8/2026 08:53'
+   !count_categories /  lastCount := self by_category size. /  ^ lastCount
+   !ExpenseApp methodsFor: 'app' stamp: '10/8/2026 08:53'
+   !count_categories /  lastCount := self by_category size. /  ^ lastCount
+   !ExpenseApp removeSelector: #count_categories
+
+world image on disk: 55374880 bytes; world.json: 7173 bytes
