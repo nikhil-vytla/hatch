@@ -351,5 +351,14 @@ blocks, mark on the last whole block):
 Tests: 93 (31 for the memory, 3 for the request shaping). tsc 0 errors, oxlint 0 findings.
 
 Not done: the spec's "one process owns a chat (hold a lock)"; the batch-in-progress flag is not saved in
-`view.json`, so a batch interrupted by a crash resumes only once the view is over 128 KB again; cache marking is
-modeled, not sent (pi-ai's request API was not checked for `cache_control`).
+`view.json`, so a batch interrupted by a crash resumes only once the view is over 128 KB again (both checked in
+`optchat.ts`: no lock of any kind; at load `draining` is set only when the view is over `high`).
+
+**Cache marking cannot follow the spec through pi-ai** (checked in `pi-ai/dist/api/anthropic-messages.js`, after the
+first write-up wrongly said it was "not checked"). pi-ai adds Anthropic `cache_control` itself, at fixed places: the
+system prompt, the last tool definition and the last block of the last message. A caller cannot place a mark. The
+spec's scheme needs a mark on the last whole 4-line block *inside the view*, so the next turn can reuse the view.
+Here the view is one text block that is never last, so across turns the cache should hold only the system prompt and
+tools, and every turn would rewrite the view; within a turn (tool steps) the end mark still works. This is inferred
+from the adapter's code, not measured: there is no API key here. The 98.8% in the table is the spec's scheme,
+modeled; getting it for real needs explicit breakpoints in pi-ai or a direct Messages API call.
