@@ -1,0 +1,140 @@
+{
+  "turns": [
+    {
+      "intent": "add expenses",
+      "scope": [
+        "add_expense"
+      ],
+      "forms": [
+        "function add_expense(amount, category) {\n  state.expenses = state.expenses || [];\n  state.expenses.push({ amount, category });\n  return state.expenses.length;\n}"
+      ],
+      "removes": []
+    },
+    {
+      "intent": "total",
+      "scope": [
+        "total"
+      ],
+      "forms": [
+        "function total() {\n  return (state.expenses || []).reduce((sum, e) => sum + e.amount, 0);\n}"
+      ],
+      "removes": []
+    },
+    {
+      "intent": "by category",
+      "scope": [
+        "by_category"
+      ],
+      "forms": [
+        "function by_category() {\n  const out = {};\n  for (const e of state.expenses || []) out[e.category] = (out[e.category] || 0) + e.amount;\n  return out;\n}"
+      ],
+      "removes": []
+    },
+    {
+      "intent": "round to cents",
+      "scope": [
+        "total",
+        "by_category",
+        "cents"
+      ],
+      "forms": [
+        "function cents(x) {\n  return Math.round(x * 100) / 100;\n}",
+        "function total() {\n  return cents((state.expenses || []).reduce((sum, e) => sum + e.amount, 0));\n}",
+        "function by_category() {\n  const out = {};\n  for (const e of state.expenses || []) out[e.category] = cents((out[e.category] || 0) + e.amount);\n  return out;\n}"
+      ],
+      "removes": []
+    },
+    {
+      "intent": "validate expenses",
+      "scope": [
+        "add_expense"
+      ],
+      "forms": [
+        "function add_expense(amount, category) {\n  if (!(typeof amount === \"number\" && amount > 0)) throw new Error(\"amount must be positive\");\n  if (!category) throw new Error(\"category required\");\n  state.expenses = state.expenses || [];\n  state.expenses.push({ amount, category });\n  return state.expenses.length;\n}"
+      ],
+      "removes": []
+    },
+    {
+      "intent": "budgets",
+      "scope": [
+        "set_budget",
+        "over_budget"
+      ],
+      "forms": [
+        "function set_budget(category, amount) {\n  state.budgets = state.budgets || {};\n  state.budgets[category] = amount;\n  return amount;\n}",
+        "function over_budget() {\n  const spent = by_category();\n  return Object.keys(state.budgets || {}).filter(c => (spent[c] || 0) > state.budgets[c]).sort();\n}"
+      ],
+      "removes": []
+    },
+    {
+      "intent": "top category",
+      "scope": [
+        "top_category"
+      ],
+      "forms": [
+        "function top_category() {\n  const spent = by_category();\n  let best = null;\n  for (const c of Object.keys(spent).sort()) if (best === null || spent[c] > spent[best]) best = c;\n  return best;\n}"
+      ],
+      "removes": []
+    },
+    {
+      "intent": "notes",
+      "scope": [
+        "add_expense"
+      ],
+      "forms": [
+        "function add_expense(amount, category, note) {\n  if (!(typeof amount === \"number\" && amount > 0)) throw new Error(\"amount must be positive\");\n  if (!category) throw new Error(\"category required\");\n  state.expenses = state.expenses || [];\n  state.expenses.push(note === undefined ? { amount, category } : { amount, category, note });\n  return state.expenses.length;\n}"
+      ],
+      "removes": []
+    }
+  ],
+  "probes": {
+    "side_effect": {
+      "scope": [
+        "total"
+      ],
+      "forms": [
+        "function total() { return 0; }\nArray.prototype.every = () => true;"
+      ]
+    },
+    "breaks_ratchet": {
+      "scope": [
+        "total"
+      ],
+      "forms": [
+        "function total() { return 0; }"
+      ]
+    },
+    "breaks_invariant": {
+      "scope": [
+        "add_expense"
+      ],
+      "forms": [
+        "function add_expense(amount, category, note) {\n  if (!(typeof amount === \"number\" && amount > 0)) throw new Error(\"amount must be positive\");\n  if (!category) throw new Error(\"category required\");\n  state.expenses = state.expenses || [];\n  state.expenses.push(note === undefined ? { amount: -amount, category } : { amount: -amount, category, note });\n  return state.expenses.length;\n}"
+      ]
+    },
+    "loops": {
+      "scope": [
+        "total"
+      ],
+      "forms": [
+        "function total() { while (true) {} }"
+      ]
+    },
+    "calls_missing": {
+      "scope": [
+        "total"
+      ],
+      "forms": [
+        "function total() { return sumOfAll(state.expenses); }"
+      ]
+    },
+    "breaks_trace": {
+      "scope": [
+        "total"
+      ],
+      "forms": [
+        "function top_category() { throw new Error(\"broken\"); }"
+      ]
+    }
+  }
+}

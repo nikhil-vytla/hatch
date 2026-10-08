@@ -1,0 +1,55 @@
+
+== 1. Code is data: forms are read with *read-eval* false and checked BEFORE anything runs
+   (defn total [] (reduce + 0 (map (fn [e] (get e "amount")) (get (state) "expenses"))))
+     -> ACCEPTED, evaluated form: (clojure.core/defn total [] (kernel.api/tick) (reduce + 0 (map (fn [e] (kernel.api/tick) (get e "amount")) (get (state) "expenses"))))
+   (defn total [] (def x 1) 0)
+     -> REJECTED: unresolved symbol def (not a core function, a state function, or an app function)
+   (defn total [] (alter-var-root (var +) (constantly -)) 0)
+     -> REJECTED: unresolved symbol alter-var-root (not a core function, a state function, or an app function)
+   (defn total [] (eval '(+ 1 2)))
+     -> REJECTED: unresolved symbol eval (not a core function, a state function, or an app function)
+   (defn total [] (System/exit 0))
+     -> REJECTED: qualified symbol System/exit is not allowed
+   (defn total [] (slurp "/etc/passwd"))
+     -> REJECTED: unresolved symbol slurp (not a core function, a state function, or an app function)
+   (defn total [] (. System (getenv "HOME")))
+     -> REJECTED: unresolved symbol . (not a core function, a state function, or an app function)
+   (defn total [] (new java.io.File "/"))
+     -> REJECTED: unresolved symbol new (not a core function, a state function, or an app function)
+   (defn total [] (clojure.core/println 1))
+     -> REJECTED: qualified symbol clojure.core/println is not allowed
+   (defn total [] (+ 1 (no_such_fn)))
+     -> REJECTED: unresolved symbol no_such_fn (not a core function, a state function, or an app function)
+   (defn total [] #=(+ 1 2))
+     -> REJECTED: unreadable form: EvalReader not allowed when *read-eval* is false.
+   (def total 5)
+     -> REJECTED: each form must be exactly (defn name [params] body...), got def
+   (defn total [] 1) (println "hi")
+     -> REJECTED: each form must be exactly one (defn ...), got 2 top-level forms
+   (defn + [a b] 0)
+     -> REJECTED: bad function name +: use snake_case or kebab-case
+   (defn total [] (try 1 (catch Throwable t 0)))
+     -> REJECTED: catch only supports Exception, got Throwable
+
+== 2. The injected deadline checks (what the walker rewrote a loop into)
+  in : (defn spin [] (loop [i 0] (recur (inc i))))
+  out: (clojure.core/defn spin [] (kernel.api/tick) (loop [i 0] (kernel.api/tick) (recur (inc i))))
+
+== 3. A runaway loop is stopped, and stops burning CPU
+  try (loop forever) -> {"ok":true,"outcomes":[{"timeout":true}]} after 1053 ms
+  process CPU during the 1 s run: 1110 ms; during the next 1 s of idle: 10 ms (no thread left spinning)
+
+== 4. Persistent data: every state the app ever had, kept for free
+  20001 states in history, final state has 20000 expenses
+  heap used by the whole history (structural sharing): 7.7 MB
+  ONE deep copy of the final state: 4.7 MB, so copying every state would need about 47502 MB
+  time travel: state #1234 has 1234 expenses, total 59521.00
+  rollback of a failing call is just keeping the old value: before == after? true
+
+== 5. The same history inside the real kernel (history / at ops)
+  history: {"states":5}
+  at 0: {"state":{}}
+  at 1: {"state":{"expenses":[{"amount":12.5,"category":"food"}]}}
+  at 2: {"state":{"expenses":[{"amount":12.5,"category":"food"},{"amount":40,"category":"transport"}]}}
+  at 3: {"state":{"expenses":[{"amount":12.5,"category":"food"},{"amount":40,"category":"transport"},{"amount":7.25,"category":"food"}]}}
+  total() now: {"ok":true,"value":59.75,"replayed":true}

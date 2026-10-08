@@ -1,0 +1,168 @@
+{
+ "turns": [
+  {
+   "intent": "add expenses",
+   "scope": [
+    "add_expense"
+   ],
+   "forms": [
+    "(define (add_expense amount category)\n  (let* ([s (get-state)]\n         [es (hash-ref s 'expenses '())])\n    (set-state! (hash-set s 'expenses (append es (list (hasheq 'amount amount 'category category)))))\n    (add1 (length es))))"
+   ],
+   "removes": [],
+   "laws": []
+  },
+  {
+   "intent": "total",
+   "scope": [
+    "total"
+   ],
+   "forms": [
+    "(define (total)\n  (for/fold ([sum 0]) ([e (in-list (hash-ref (get-state) 'expenses '()))])\n    (+ sum (hash-ref e 'amount))))"
+   ],
+   "removes": [],
+   "laws": []
+  },
+  {
+   "intent": "by category",
+   "scope": [
+    "by_category"
+   ],
+   "forms": [
+    "(define (by_category)\n  (for/fold ([out (hasheq)]) ([e (in-list (hash-ref (get-state) 'expenses '()))])\n    (hash-update out (string->symbol (hash-ref e 'category)) (lambda (x) (+ x (hash-ref e 'amount))) 0)))"
+   ],
+   "removes": [],
+   "laws": [
+    {
+     "name": "categories-sum-to-total",
+     "check": "(< (abs (- (apply + (hash-values (by_category))) (total))) 0.005)"
+    }
+   ]
+  },
+  {
+   "intent": "round to cents",
+   "scope": [
+    "total",
+    "by_category",
+    "cents"
+   ],
+   "forms": [
+    "(define (cents x)\n  (/ (round (* x 100)) 100))",
+    "(define (total)\n  (cents (for/fold ([sum 0]) ([e (in-list (hash-ref (get-state) 'expenses '()))])\n           (+ sum (hash-ref e 'amount)))))",
+    "(define (by_category)\n  (for/fold ([out (hasheq)]) ([e (in-list (hash-ref (get-state) 'expenses '()))])\n    (hash-update out (string->symbol (hash-ref e 'category)) (lambda (x) (cents (+ x (hash-ref e 'amount)))) 0)))"
+   ],
+   "removes": [],
+   "laws": [
+    {
+     "name": "total-in-cents",
+     "check": "(= (/ (round (* (total) 100)) 100) (total))"
+    }
+   ]
+  },
+  {
+   "intent": "validate expenses",
+   "scope": [
+    "add_expense"
+   ],
+   "forms": [
+    "(define (add_expense amount category)\n  (unless (and (real? amount) (> amount 0)) (error 'add_expense \"amount must be positive\"))\n  (unless (and (string? category) (> (string-length category) 0)) (error 'add_expense \"category required\"))\n  (let* ([s (get-state)]\n         [es (hash-ref s 'expenses '())])\n    (set-state! (hash-set s 'expenses (append es (list (hasheq 'amount amount 'category category)))))\n    (add1 (length es))))"
+   ],
+   "removes": [],
+   "laws": []
+  },
+  {
+   "intent": "budgets",
+   "scope": [
+    "set_budget",
+    "over_budget"
+   ],
+   "forms": [
+    "(define (set_budget category amount)\n  (update-state! (lambda (s)\n                   (hash-set s 'budgets (hash-set (hash-ref s 'budgets (hasheq)) (string->symbol category) amount))))\n  amount)",
+    "(define (over_budget)\n  (let ([spent (by_category)])\n    (sort (for/list ([(c b) (in-hash (hash-ref (get-state) 'budgets (hasheq)))]\n                     #:when (> (hash-ref spent c 0) b))\n            (symbol->string c))\n          string<?)))"
+   ],
+   "removes": [],
+   "laws": [
+    {
+     "name": "over-budget-is-over",
+     "check": "(andmap (lambda (c) (> (hash-ref (by_category) (string->symbol c) 0) (hash-ref (hash-ref (get-state) 'budgets (hasheq)) (string->symbol c)))) (over_budget))"
+    }
+   ]
+  },
+  {
+   "intent": "top category",
+   "scope": [
+    "top_category"
+   ],
+   "forms": [
+    "(define (top_category)\n  (let ([spent (by_category)])\n    (for/fold ([best 'null]) ([c (in-list (sort (map symbol->string (hash-keys spent)) string<?))])\n      (if (or (eq? best 'null)\n              (> (hash-ref spent (string->symbol c)) (hash-ref spent (string->symbol best))))\n          c\n          best))))"
+   ],
+   "removes": [],
+   "laws": [
+    {
+     "name": "top-is-max",
+     "check": "(let ([t (top_category)] [spent (by_category)]) (or (eq? t 'null) (andmap (lambda (v) (<= v (hash-ref spent (string->symbol t)))) (hash-values spent))))"
+    }
+   ]
+  },
+  {
+   "intent": "notes",
+   "scope": [
+    "add_expense"
+   ],
+   "forms": [
+    "(define (add_expense amount category [note 'null])\n  (unless (and (real? amount) (> amount 0)) (error 'add_expense \"amount must be positive\"))\n  (unless (and (string? category) (> (string-length category) 0)) (error 'add_expense \"category required\"))\n  (let* ([s (get-state)]\n         [es (hash-ref s 'expenses '())]\n         [e (hasheq 'amount amount 'category category)])\n    (set-state! (hash-set s 'expenses (append es (list (if (eq? note 'null) e (hash-set e 'note note))))))\n    (add1 (length es))))"
+   ],
+   "removes": [],
+   "laws": []
+  }
+ ],
+ "probes": {
+  "side_effect": {
+   "scope": [
+    "total"
+   ],
+   "forms": [
+    "(define (total) (set! car cdr) 0)"
+   ]
+  },
+  "breaks_ratchet": {
+   "scope": [
+    "total"
+   ],
+   "forms": [
+    "(define (total) 0)"
+   ]
+  },
+  "breaks_invariant": {
+   "scope": [
+    "add_expense"
+   ],
+   "forms": [
+    "(define (add_expense amount category [note 'null])\n  (let* ([s (get-state)]\n         [es (hash-ref s 'expenses '())])\n    (set-state! (hash-set s 'expenses (append es (list (hasheq 'amount (- amount) 'category category)))))\n    (add1 (length es))))"
+   ]
+  },
+  "loops": {
+   "scope": [
+    "total"
+   ],
+   "forms": [
+    "(define (total) (let loop () (loop)))"
+   ]
+  },
+  "calls_missing": {
+   "scope": [
+    "total"
+   ],
+   "forms": [
+    "(define (total) (+ 1 (no_such_function)))"
+   ]
+  },
+  "breaks_trace": {
+   "scope": [
+    "total"
+   ],
+   "forms": [
+    "(define (top_category) (error 'top_category \"boom\"))"
+   ]
+  }
+ }
+}

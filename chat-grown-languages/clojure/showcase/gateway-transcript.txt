@@ -1,0 +1,71 @@
+
+== 1. Growing the gateway in 5 chat turns (each change passes the kernel's gates)
+  turn 1 usage        -> accepted rev-0001 (2 functions live)
+  turn 2 prices       -> accepted rev-0002 (4 functions live)
+  turn 3 quotas       -> accepted rev-0003 (5 functions live)
+  turn 4 validation   -> accepted rev-0004 (5 functions live)
+  turn 5 top spender  -> accepted rev-0005 (6 functions live)
+
+== 2. Real traffic (every request is a recorded, exactly-once transaction)
+  request 1  set gpt price 50c/1k                 -> ok 50
+  request 2  set claude price 300c/1k             -> ok 300
+  request 3  alice calls gpt, 1200 tok            -> ok 1200
+  request 4  bob calls claude, 500 tok            -> ok 500
+  request 5  alice calls claude, 300              -> ok 1500
+  request 6  alice quota 2500                     -> ok 2500
+  request 7  alice calls gpt, 600                 -> ok 2100
+  request -- alice calls gpt, 500 (over quota)    -> REFUSED: over quota
+  request 8  claude price rises to 1000           -> ok 1000
+  request 9  bob calls gpt, 700                   -> ok 1200
+  request 10 carol calls claude, 400              -> ok 400
+  live top_spender(): "bob"  live cost(alice): 3.9
+
+== 3. Audit: the live code as data (no execution, just reading forms)
+  call graph (caller -> callees):
+    cost          -> (none)
+    record_usage  -> usage
+    set_price     -> (none)
+    set_quota     -> usage
+    top_spender   -> cost
+    usage         -> (none)
+  can CHANGE state (calls swap-state!, directly or via callees): record_usage, set_price, set_quota
+  READ-ONLY functions:                                          cost, top_spender, usage
+  depend on the PRICE table (reads "prices", directly or via callees): cost, set_price, top_spender
+  depend on QUOTAS: record_usage, set_quota
+  billing (cost, top_spender) is read-only; only this price reader also writes: set_price
+  throw sites: record_usage: key required/model required/tokens must be a positive whole number/over quota; set_quota: already over that quota
+
+== 4. Structural diff of record_usage between revisions
+  rev-0001 -> rev-0003: 2 body forms -> 3; 2 unchanged
+    +  (let [quota (get-in (state) ["quotas" key])] (when (and quota (> (+ (usage key) tokens) quota)) (throw (ex-info "over quota" {}))))
+  rev-0003 -> rev-0004: 3 body forms -> 6; 3 unchanged
+    +  (when-not (and (string? key) (not= key "")) (throw (ex-info "key required" {})))
+    +  (when-not (and (string? model) (not= model "")) (throw (ex-info "model required" {})))
+    +  (when-not (and (integer? tokens) (pos? tokens)) (throw (ex-info "tokens must be a positive whole number" {})))
+  who asked for it: {"revision":"rev-0004","intent":"validation","asked":{"message":3,"text":"turn 4: validation"}}
+
+== 5. Time travel: every state the gateway ever had (immutable, shared structure)
+  13 states = initial + 12 successful requests (10 writes, 2 live queries); live state untouched below
+  after request 3 : alice used 1200  tokens, alice cost $0.6   total calls 1
+  after request 5 : alice used 1500  tokens, alice cost $1.5   total calls 3
+  after request 6 : alice used 1500  tokens, alice cost $1.5   total calls 3
+  after request 7 : alice used 2100  tokens, alice cost $1.8   total calls 4
+  after request 10: alice used 2100  tokens, alice cost $3.9   total calls 6
+  (the app's own usage()/cost() functions were run on past states; nothing was replayed or stored twice)
+
+== 6. What-if: replay billing under a new price table, live state untouched
+  at request 5  old prices {"gpt":50,"claude":300}  top_spender="alice" | new prices {"gpt":80,"claude":250}  top_spender="alice"
+      alice  old $1.5    new $1.71  
+      bob    old $1.5    new $1.25  
+      carol  old $0.0    new $0.0   
+  at request 10 old prices {"gpt":50,"claude":1000}  top_spender="bob" | new prices {"gpt":80,"claude":250}  top_spender="alice"
+      alice  old $3.9    new $2.19  
+      bob    old $5.35   new $1.81  
+      carol  old $4.0    new $1.0   
+  live state identical after the what-if: true  generation unchanged: true
+  live prices are still: {"gpt":50,"claude":1000}
+
+== Summary
+  6 functions read as data; 3 can change state, 3 depend on prices; call graph and diffs came from reading forms
+  13 historical states answered point-in-time questions by running the app's own code on old values
+  the what-if re-billed history under a new price table and changed nothing live

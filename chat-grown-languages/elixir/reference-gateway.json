@@ -1,0 +1,60 @@
+{
+ "turns": [
+  {
+   "intent": "usage",
+   "scope": [
+    "record_usage",
+    "usage"
+   ],
+   "forms": [
+    "def record_usage(state, key, model, tokens) do\n  new_state = Map.put(state, \"calls\", Map.get(state, \"calls\", []) ++ [%{\"key\" => key, \"model\" => model, \"tokens\" => tokens}])\n  {usage(new_state, key), new_state}\nend",
+    "def usage(state, key) do\n  state |> Map.get(\"calls\", []) |> Enum.filter(fn c -> c[\"key\"] == key end) |> Enum.reduce(0, fn c, s -> s + c[\"tokens\"] end)\nend"
+   ],
+   "removes": []
+  },
+  {
+   "intent": "prices",
+   "scope": [
+    "set_price",
+    "cost"
+   ],
+   "forms": [
+    "def set_price(state, model, cents), do: {cents, Map.put(state, \"prices\", Map.put(Map.get(state, \"prices\", %{}), model, cents))}",
+    "def cost(state, key) do\n  prices = Map.get(state, \"prices\", %{})\n\n  cents =\n    state\n    |> Map.get(\"calls\", [])\n    |> Enum.filter(fn c -> c[\"key\"] == key end)\n    |> Enum.reduce(0, fn c, s -> s + c[\"tokens\"] / 1000 * Map.get(prices, c[\"model\"], 0) end)\n\n  round(cents) / 100\nend"
+   ],
+   "removes": []
+  },
+  {
+   "intent": "quotas",
+   "scope": [
+    "set_quota",
+    "record_usage"
+   ],
+   "forms": [
+    "def set_quota(state, key, tokens) do\n  if usage(state, key) > tokens, do: raise(\"already over that quota\")\n  {tokens, Map.put(state, \"quotas\", Map.put(Map.get(state, \"quotas\", %{}), key, tokens))}\nend",
+    "def record_usage(state, key, model, tokens) do\n  quota = Map.get(Map.get(state, \"quotas\", %{}), key)\n  if quota != nil and usage(state, key) + tokens > quota, do: raise(\"over quota\")\n  new_state = Map.put(state, \"calls\", Map.get(state, \"calls\", []) ++ [%{\"key\" => key, \"model\" => model, \"tokens\" => tokens}])\n  {usage(new_state, key), new_state}\nend"
+   ],
+   "removes": []
+  },
+  {
+   "intent": "validation",
+   "scope": [
+    "record_usage"
+   ],
+   "forms": [
+    "def record_usage(state, key, model, tokens) do\n  if not (is_binary(key) and key != \"\"), do: raise(\"key required\")\n  if not (is_binary(model) and model != \"\"), do: raise(\"model required\")\n  if not (is_integer(tokens) and tokens > 0), do: raise(\"tokens must be a positive whole number\")\n  quota = Map.get(Map.get(state, \"quotas\", %{}), key)\n  if quota != nil and usage(state, key) + tokens > quota, do: raise(\"over quota\")\n  new_state = Map.put(state, \"calls\", Map.get(state, \"calls\", []) ++ [%{\"key\" => key, \"model\" => model, \"tokens\" => tokens}])\n  {usage(new_state, key), new_state}\nend"
+   ],
+   "removes": []
+  },
+  {
+   "intent": "top spender",
+   "scope": [
+    "top_spender"
+   ],
+   "forms": [
+    "def top_spender(state) do\n  state\n  |> Map.get(\"calls\", [])\n  |> Enum.map(fn c -> c[\"key\"] end)\n  |> Enum.uniq()\n  |> Enum.sort()\n  |> Enum.reduce(nil, fn k, best -> if best == nil or cost(state, k) > cost(state, best), do: k, else: best end)\nend"
+   ],
+   "removes": []
+  }
+ ]
+}

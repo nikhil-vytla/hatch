@@ -1,0 +1,806 @@
+
+===============================================================================
+Notice: Errors in script loaded from /home/user/hatch/chat-grown-languages/smalltalk/build.st
+===============================================================================
+THERE_BE_DRAGONS_HERE
+KeyNotFound: key #ExpenseBase not found in SystemDictionary
+8 October 2026 8:42:27.773806 am
+
+VM: unix - x86_64 - linux-gnu - CoInterpreter VMMaker-tonel.1 uuid: aaa54a53-2018-0e00-83cd-e23b0be5cca3 Sep 18 2026
+StackToRegisterMappingCogit VMMaker-tonel.1 uuid: aaa54a53-2018-0e00-83cd-e23b0be5cca3 Sep 18 2026
+v10.3.11+0.a585304 - Commit: a585304 - Date: 2026-09-16 09:19:54 +0200
+
+Image: Pharo12.0.0SNAPSHOT [Build information: Pharo-12.0.0+SNAPSHOT.build.1599.sha.7d5f14cb47c000853271e85a27706569614966e7 (64 Bit)]
+
+SystemDictionary(Dictionary)>>errorKeyNotFound:
+	Receiver: a SystemDictionary(lots of globals)
+	Arguments and temporary variables: 
+		aKey: 	#ExpenseBase
+	Receiver's instance variables: 
+		tally: 	10469
+		array: 	an Array(#OmSessionStore->OmSessionStore nil #IceRepositoryAnnouncem[..]
+		cachedClassNames: 	nil
+		cachedNonClassNames: 	nil
+		cachedBehaviors: 	nil
+		pseudoVariables: 	a Dictionary(#self->self #super->super #thisContext->thisC[..]
+
+
+[self errorKeyNotFound: key] in SystemDictionary(Dictionary)>>at:
+	Receiver: a SystemDictionary(lots of globals)
+	Arguments and temporary variables: 
+		key: 	#ExpenseBase
+	Receiver's instance variables: 
+		tally: 	10469
+		array: 	an Array(#OmSessionStore->OmSessionStore nil #IceRepositoryAnnouncem[..]
+		cachedClassNames: 	nil
+		cachedNonClassNames: 	nil
+		cachedBehaviors: 	nil
+		pseudoVariables: 	a Dictionary(#self->self #super->super #thisContext->thisC[..]
+
+
+SystemDictionary(Dictionary)>>at:ifAbsent:
+	Receiver: a SystemDictionary(lots of globals)
+	Arguments and temporary variables: 
+		key: 	#ExpenseBase
+		aBlock: 	[self errorKeyNotFound: key]
+	Receiver's instance variables: 
+		tally: 	10469
+		array: 	an Array(#OmSessionStore->OmSessionStore nil #IceRepositoryAnnouncem[..]
+		cachedClassNames: 	nil
+		cachedNonClassNames: 	nil
+		cachedBehaviors: 	nil
+		pseudoVariables: 	a Dictionary(#self->self #super->super #thisContext->thisC[..]
+
+
+SystemDictionary(Dictionary)>>at:
+	Receiver: a SystemDictionary(lots of globals)
+	Arguments and temporary variables: 
+		key: 	#ExpenseBase
+	Receiver's instance variables: 
+		tally: 	10469
+		array: 	an Array(#OmSessionStore->OmSessionStore nil #IceRepositoryAnnouncem[..]
+		cachedClassNames: 	nil
+		cachedNonClassNames: 	nil
+		cachedBehaviors: 	nil
+		pseudoVariables: 	a Dictionary(#self->self #super->super #thisContext->thisC[..]
+
+
+MCClassDefinition>>createClass
+	Receiver: a MCClassDefinition(ExpenseApp)
+	Arguments and temporary variables: 
+		superClass: 	nil
+	Receiver's instance variables: 
+		name: 	#ExpenseApp
+		superclassName: 	#ExpenseBase
+		variables: 	an OrderedCollection()
+		packageName: 	#ChatKernel
+		type: 	#normal
+		comment: 	'The LIVE app. Every accepted function is a method of this class ([..]
+		commentStamp: 	''
+		tagName: 	nil
+		traitComposition: 	'{}'
+		classTraitComposition: 	'{}'
+
+
+MCClassDefinition>>load
+	Receiver: a MCClassDefinition(ExpenseApp)
+	Arguments and temporary variables: 
+x
+	Receiver's instance variables: 
+		name: 	#ExpenseApp
+		superclassName: 	#ExpenseBase
+		variables: 	an OrderedCollection()
+		packageName: 	#ChatKernel
+		type: 	#normal
+		comment: 	'The LIVE app. Every accepted function is a method of this class ([..]
+		commentStamp: 	''
+		tagName: 	nil
+		traitComposition: 	'{}'
+		classTraitComposition: 	'{}'
+
+
+[ :d | d load ] in UndefinedObject>>DoIt
+	Receiver: nil
+	Arguments and temporary variables: 
+		ref: 	a TonelReader
+		d: 	a MCClassDefinition(ExpenseApp)
+	Receiver's instance variables: 
+nil
+
+Array(SequenceableCollection)>>do:
+	Receiver: an Array(a MCOrganizationDefinition(#(#ChatKernel)) a MCClassDefinition(CkError) a MCC[..]
+	Arguments and temporary variables: 
+		aBlock: 	[ :d | d load ]
+		index: 	62
+	Receiver's instance variables: 
+an Array(a MCOrganizationDefinition(#(#ChatKernel)) a MCClassDefinition(CkError) a MCC[..]
+
+UndefinedObject>>DoIt
+	Receiver: nil
+	Arguments and temporary variables: 
+		ref: 	a TonelReader
+	Receiver's instance variables: 
+nil
+
+OCReceiverDoItSemanticScope(OCDoItSemanticScope)>>evaluateDoIt:
+	Receiver: an OCReceiverDoItSemanticScope
+	Arguments and temporary variables: 
+		doItMethod: 	UndefinedObject>>#DoIt
+	Receiver's instance variables: 
+		outerScope: 	nil
+		targetReceiver: 	nil
+
+
+OpalCompiler>>evaluate
+	Receiver: an OpalCompiler
+	Arguments and temporary variables: 
+		value: 	nil
+		doItMethod: 	UndefinedObject>>#DoIt
+	Receiver's instance variables: 
+		ast: 	DoIt
+
+	| ref |
+	ref := TonelReader
+		       on: (FileLocator workingDi[..]
+		source: 	'| ref |
+ref := (TonelReader on: (FileLocator workingDirectory / ''[..]
+		compilationContext: 	a CompilationContext
+		compilationContextClass: 	nil
+		permitFaulty: 	false
+		permitUndeclared: 	false
+		failBlock: 	nil
+		logged: 	true
+		changeStamp: 	nil
+		protocol: 	nil
+		requestor: 	nil
+		priorMethod: 	nil
+
+
+DoItChunk>>importFor:logSource:
+	Receiver: a DoItChunk(| ref |
+ref := (TonelReader on: (FileLocator workingDirectory / 'src') asF[..]
+	Arguments and temporary variables: 
+		requestor: 	nil
+		logSource: 	true
+		ast: 	RBSequenceNode(| ref |
+ref := TonelReader
+	       on: (FileLocator wor[..]
+	Receiver's instance variables: 
+		contents: 	'| ref |
+ref := (TonelReader on: (FileLocator workingDirectory / [..]
+
+
+[ :declaration |
+		value := declaration importFor: nil logSource: logSource  ] in CodeImporter>>evaluate
+	Receiver: a CodeImporter
+	Arguments and temporary variables: 
+		value: 	nil
+		declaration: 	a DoItChunk(| ref |
+ref := (TonelReader on: (FileLocator worki[..]
+	Receiver's instance variables: 
+		readStream: 	a ZnCharacterReadStream
+		codeDeclarations: 	an OrderedCollection(a DoItChunk(| ref |
+ref := (TonelRea[..]
+		parserClass: 	ChunkFileFormatParser
+		logSource: 	true
+
+
+OrderedCollection>>do:
+	Receiver: an OrderedCollection(a DoItChunk(| ref |
+ref := (TonelReader on: (FileLocator workingD[..]
+	Arguments and temporary variables: 
+		aBlock: 	[ :declaration |
+		value := declaration importFor: nil logSource: l[..]
+		index: 	1
+	Receiver's instance variables: 
+		array: 	an Array(a DoItChunk(| ref |
+ref := (TonelReader on: (FileLocator wo[..]
+		firstIndex: 	1
+		lastIndex: 	1
+
+
+CodeImporter>>evaluate
+	Receiver: a CodeImporter
+	Arguments and temporary variables: 
+		value: 	nil
+	Receiver's instance variables: 
+		readStream: 	a ZnCharacterReadStream
+		codeDeclarations: 	an OrderedCollection(a DoItChunk(| ref |
+ref := (TonelRea[..]
+		parserClass: 	ChunkFileFormatParser
+		logSource: 	true
+
+
+[ codeImporter evaluate ] in STCommandLineHandler>>installSourceFile:
+	Receiver: a STCommandLineHandler
+	Arguments and temporary variables: 
+		aReference: 	a File
+		codeImporter: 	a CodeImporter
+	Receiver's instance variables: 
+		commandLine: 	a CommandLineArguments
+		session: 	a WorkingSession
+		stdout: 	a VTermOutputDriver
+		stderr: 	a VTermOutputDriver
+		sourceFiles: 	an OrderedCollection(a File)
+
+
+FullBlockClosure(BlockClosure)>>on:do:
+	Receiver: [ codeImporter evaluate ]
+	Arguments and temporary variables: 
+		exception: 	Error
+		handlerAction: 	[ :e | self handleError: e reference: aReference ]
+	Receiver's instance variables: 
+		outerContext: 	STCommandLineHandler>>installSourceFile:
+		compiledBlock: 	a CompiledBlock: [ codeImporter evaluate ]
+		numArgs: 	0
+		receiver: 	a STCommandLineHandler
+
+
+STCommandLineHandler>>handleErrorsDuring:reference:
+	Receiver: a STCommandLineHandler
+	Arguments and temporary variables: 
+		aBlock: 	[ codeImporter evaluate ]
+		aReference: 	a File
+	Receiver's instance variables: 
+		commandLine: 	a CommandLineArguments
+		session: 	a WorkingSession
+		stdout: 	a VTermOutputDriver
+		stderr: 	a VTermOutputDriver
+		sourceFiles: 	an OrderedCollection(a File)
+
+
+STCommandLineHandler>>installSourceFile:
+	Receiver: a STCommandLineHandler
+	Arguments and temporary variables: 
+		codeImporter: 	a CodeImporter
+		aReference: 	a File
+	Receiver's instance variables: 
+		commandLine: 	a CommandLineArguments
+		session: 	a WorkingSession
+		stdout: 	a VTermOutputDriver
+		stderr: 	a VTermOutputDriver
+		sourceFiles: 	an OrderedCollection(a File)
+
+
+[ :reference |
+		self installSourceFile: reference ] in [ sourceFiles do: [ :reference |
+		self installSourceFile: reference ]
+	] in STCommandLineHandler>>installSourceFiles
+	Receiver: a STCommandLineHandler
+	Arguments and temporary variables: 
+		reference: 	a File
+	Receiver's instance variables: 
+		commandLine: 	a CommandLineArguments
+		session: 	a WorkingSession
+		stdout: 	a VTermOutputDriver
+		stderr: 	a VTermOutputDriver
+		sourceFiles: 	an OrderedCollection(a File)
+
+
+OrderedCollection>>do:
+	Receiver: an OrderedCollection(a File)
+	Arguments and temporary variables: 
+		aBlock: 	[ :reference |
+		self installSourceFile: reference ]
+		index: 	1
+	Receiver's instance variables: 
+		array: 	an Array(a File)
+		firstIndex: 	1
+		lastIndex: 	1
+
+
+[ sourceFiles do: [ :reference |
+		self installSourceFile: reference ]
+	] in STCommandLineHandler>>installSourceFiles
+	Receiver: a STCommandLineHandler
+	Arguments and temporary variables: 
+x
+	Receiver's instance variables: 
+		commandLine: 	a CommandLineArguments
+		session: 	a WorkingSession
+		stdout: 	a VTermOutputDriver
+		stderr: 	a VTermOutputDriver
+		sourceFiles: 	an OrderedCollection(a File)
+
+
+FullBlockClosure(BlockClosure)>>ensure:
+	Receiver: [ sourceFiles do: [ :reference |
+		self installSourceFile: reference ]
+	]
+	Arguments and temporary variables: 
+		aBlock: 	[ sourceFiles := nil ]
+		handler: 	[ sourceFiles := nil ]
+		complete: 	nil
+		returnValue: 	nil
+	Receiver's instance variables: 
+		outerContext: 	STCommandLineHandler>>installSourceFiles
+		compiledBlock: 	a CompiledBlock: [ sourceFiles do: [ :reference |
+		self ins[..]
+		numArgs: 	0
+		receiver: 	a STCommandLineHandler
+
+
+STCommandLineHandler>>installSourceFiles
+	Receiver: a STCommandLineHandler
+	Arguments and temporary variables: 
+x
+	Receiver's instance variables: 
+		commandLine: 	a CommandLineArguments
+		session: 	a WorkingSession
+		stdout: 	a VTermOutputDriver
+		stderr: 	a VTermOutputDriver
+		sourceFiles: 	an OrderedCollection(a File)
+
+
+STCommandLineHandler>>activate
+	Receiver: a STCommandLineHandler
+	Arguments and temporary variables: 
+x
+	Receiver's instance variables: 
+		commandLine: 	a CommandLineArguments
+		session: 	a WorkingSession
+		stdout: 	a VTermOutputDriver
+		stderr: 	a VTermOutputDriver
+		sourceFiles: 	an OrderedCollection(a File)
+
+
+STCommandLineHandler class(CommandLineHandler class)>>activateWith:
+	Receiver: STCommandLineHandler
+	Arguments and temporary variables: 
+		aCommandLine: 	a CommandLineArguments
+	Receiver's instance variables: 
+		superclass: 	CommandLineHandler
+		methodDict: 	a MethodDictionary(#activate->STCommandLineHandler>>#activate #[..]
+		format: 	65541
+		layout: 	a FixedLayout
+		protocols: 	an Array(Protocol (installing) - 4 selector(s) Protocol (activat[..]
+		subclasses: 	{EvaluateCommandLineHandler}
+		name: 	#STCommandLineHandler
+		classPool: 	nil
+		sharedPools: 	an OrderedCollection()
+		environment: 	a SystemDictionary(lots of globals)
+		commentSourcePointer: 	58562120
+		packageTag: 	a PackageTag(Base)
+
+
+[ aCommandLinehandler activateWith: commandLine ] in PharoCommandLineHandler(BasicCommandLineHandler)>>activateSubCommand:
+	Receiver: a PharoCommandLineHandler
+	Arguments and temporary variables: 
+		aCommandLinehandler: 	STCommandLineHandler
+	Receiver's instance variables: 
+		commandLine: 	a CommandLineArguments
+		session: 	a WorkingSession
+		stdout: 	a VTermOutputDriver
+		stderr: 	a VTermOutputDriver
+
+
+FullBlockClosure(BlockClosure)>>on:do:
+	Receiver: [ aCommandLinehandler activateWith: commandLine ]
+	Arguments and temporary variables: 
+		exception: 	Exit
+		handlerAction: 	[ :exit |
+		^ self handleExit: exit for: aCommandLinehandler ]
+	Receiver's instance variables: 
+		outerContext: 	PharoCommandLineHandler(BasicCommandLineHandler)>>activateSub[..]
+		compiledBlock: 	a CompiledBlock: [ aCommandLinehandler activateWith: command[..]
+		numArgs: 	0
+		receiver: 	a PharoCommandLineHandler
+
+
+PharoCommandLineHandler(BasicCommandLineHandler)>>activateSubCommand:
+	Receiver: a PharoCommandLineHandler
+	Arguments and temporary variables: 
+		aCommandLinehandler: 	STCommandLineHandler
+	Receiver's instance variables: 
+		commandLine: 	a CommandLineArguments
+		session: 	a WorkingSession
+		stdout: 	a VTermOutputDriver
+		stderr: 	a VTermOutputDriver
+
+
+PharoCommandLineHandler(BasicCommandLineHandler)>>handleSubcommand
+	Receiver: a PharoCommandLineHandler
+	Arguments and temporary variables: 
+		handlers: 	an OrderedCollection(STCommandLineHandler)
+	Receiver's instance variables: 
+		commandLine: 	a CommandLineArguments
+		session: 	a WorkingSession
+		stdout: 	a VTermOutputDriver
+		stderr: 	a VTermOutputDriver
+
+
+PharoCommandLineHandler(BasicCommandLineHandler)>>handleArgument:
+	Receiver: a PharoCommandLineHandler
+	Arguments and temporary variables: 
+		aString: 	'st'
+	Receiver's instance variables: 
+		commandLine: 	a CommandLineArguments
+		session: 	a WorkingSession
+		stdout: 	a VTermOutputDriver
+		stderr: 	a VTermOutputDriver
+
+
+[ self handleArgument: self firstArgument ] in [ [ self handleArgument: self firstArgument ]
+		on: Exit
+		do: [ :exit |
+			"If the command line is protected by password, we just exit the image because in non-headless mode the handleExit will let the image open. If the password protection is enabled, it is to avoid to let the access to the image."
+			self class commandLinePasswordManager hasPasswordSet
+				ifTrue: [ Smalltalk snapshot: false andQuit: true ].
+			self handleExit: exit ] ] in PharoCommandLineHandler(BasicCommandLineHandler)>>activate
+	Receiver: a PharoCommandLineHandler
+	Arguments and temporary variables: 
+x
+	Receiver's instance variables: 
+		commandLine: 	a CommandLineArguments
+		session: 	a WorkingSession
+		stdout: 	a VTermOutputDriver
+		stderr: 	a VTermOutputDriver
+
+
+FullBlockClosure(BlockClosure)>>on:do:
+	Receiver: [ self handleArgument: self firstArgument ]
+	Arguments and temporary variables: 
+		exception: 	Exit
+		handlerAction: 	[ :exit |
+			"If the command line is protected by password, [..]
+	Receiver's instance variables: 
+		outerContext: 	[ [ self handleArgument: self firstArgument ]
+		on: Exit
+		do[..]
+		compiledBlock: 	a CompiledBlock: [ self handleArgument: self firstArgument ]
+		numArgs: 	0
+		receiver: 	a PharoCommandLineHandler
+
+
+[ [ self handleArgument: self firstArgument ]
+		on: Exit
+		do: [ :exit |
+			"If the command line is protected by password, we just exit the image because in non-headless mode the handleExit will let the image open. If the password protection is enabled, it is to avoid to let the access to the image."
+			self class commandLinePasswordManager hasPasswordSet
+				ifTrue: [ Smalltalk snapshot: false andQuit: true ].
+			self handleExit: exit ] ] in PharoCommandLineHandler(BasicCommandLineHandler)>>activate
+	Receiver: a PharoCommandLineHandler
+	Arguments and temporary variables: 
+x
+	Receiver's instance variables: 
+		commandLine: 	a CommandLineArguments
+		session: 	a WorkingSession
+		stdout: 	a VTermOutputDriver
+		stderr: 	a VTermOutputDriver
+
+
+[self value.
+			"IMPORTANT: Do not step over next line of code. See method comments for details"
+			Processor terminateRealActive] in FullBlockClosure(BlockClosure)>>newProcess
+	Receiver: [ [ self handleArgument: self firstArgument ]
+		on: Exit
+		do: [ :exit |
+			"If the co[..]
+	Arguments and temporary variables: 
+x
+	Receiver's instance variables: 
+		outerContext: 	PharoCommandLineHandler(BasicCommandLineHandler)>>activate
+		compiledBlock: 	a CompiledBlock: [ [ self handleArgument: self firstArgument[..]
+		numArgs: 	0
+		receiver: 	a PharoCommandLineHandler
+
+
+
+--- The full stack ---
+SystemDictionary(Dictionary)>>errorKeyNotFound:
+[self errorKeyNotFound: key] in SystemDictionary(Dictionary)>>at:
+SystemDictionary(Dictionary)>>at:ifAbsent:
+SystemDictionary(Dictionary)>>at:
+MCClassDefinition>>createClass
+MCClassDefinition>>load
+[ :d | d load ] in UndefinedObject>>DoIt
+Array(SequenceableCollection)>>do:
+UndefinedObject>>DoIt
+OCReceiverDoItSemanticScope(OCDoItSemanticScope)>>evaluateDoIt:
+OpalCompiler>>evaluate
+DoItChunk>>importFor:logSource:
+[ :declaration |
+		value := declaration importFor: nil logSource: logSource  ] in CodeImporter>>evaluate
+OrderedCollection>>do:
+CodeImporter>>evaluate
+[ codeImporter evaluate ] in STCommandLineHandler>>installSourceFile:
+FullBlockClosure(BlockClosure)>>on:do:
+STCommandLineHandler>>handleErrorsDuring:reference:
+STCommandLineHandler>>installSourceFile:
+[ :reference |
+		self installSourceFile: reference ] in [ sourceFiles do: [ :reference |
+		self installSourceFile: reference ]
+	] in STCommandLineHandler>>installSourceFiles
+OrderedCollection>>do:
+[ sourceFiles do: [ :reference |
+		self installSourceFile: reference ]
+	] in STCommandLineHandler>>installSourceFiles
+FullBlockClosure(BlockClosure)>>ensure:
+STCommandLineHandler>>installSourceFiles
+STCommandLineHandler>>activate
+STCommandLineHandler class(CommandLineHandler class)>>activateWith:
+[ aCommandLinehandler activateWith: commandLine ] in PharoCommandLineHandler(BasicCommandLineHandler)>>activateSubCommand:
+FullBlockClosure(BlockClosure)>>on:do:
+PharoCommandLineHandler(BasicCommandLineHandler)>>activateSubCommand:
+PharoCommandLineHandler(BasicCommandLineHandler)>>handleSubcommand
+PharoCommandLineHandler(BasicCommandLineHandler)>>handleArgument:
+[ self handleArgument: self firstArgument ] in [ [ self handleArgument: self firstArgument ]
+		on: Exit
+		do: [ :exit |
+			"If the command line is protected by password, we just exit the image because in non-headless mode the handleExit will let the image open. If the password protection is enabled, it is to avoid to let the access to the image."
+			self class commandLinePasswordManager hasPasswordSet
+				ifTrue: [ Smalltalk snapshot: false andQuit: true ].
+			self handleExit: exit ] ] in PharoCommandLineHandler(BasicCommandLineHandler)>>activate
+FullBlockClosure(BlockClosure)>>on:do:
+[ [ self handleArgument: self firstArgument ]
+		on: Exit
+		do: [ :exit |
+			"If the command line is protected by password, we just exit the image because in non-headless mode the handleExit will let the image open. If the password protection is enabled, it is to avoid to let the access to the image."
+			self class commandLinePasswordManager hasPasswordSet
+				ifTrue: [ Smalltalk snapshot: false andQuit: true ].
+			self handleExit: exit ] ] in PharoCommandLineHandler(BasicCommandLineHandler)>>activate
+[self value.
+			"IMPORTANT: Do not step over next line of code. See method comments for details"
+			Processor terminateRealActive] in FullBlockClosure(BlockClosure)>>newProcess
+-------------------------------------------------------------------------------
+
+Processes and their stacks: 
+Process: a Process in AtomicSharedQueue>>waitForNewItems
+  stack:
+
+AtomicSharedQueue>>waitForNewItems
+AtomicSharedQueue>>next
+TKTWorkerProcess>>privateNextTask
+TKTWorkerProcess>>workerLoop
+MessageSend>>value
+[ aValuable value ] in TKTPharoProcessProvider>>createProcessDoing:named:
+[self value.
+			"IMPORTANT: Do not step over next line of code. See method comments for details"
+			Processor terminateRealActive] in FullBlockClosure(BlockClosure)>>newProcess
+------------------------------
+
+Process: a Process in Process>>endProcess
+  stack:
+
+Process>>endProcess
+------------------------------
+
+Process: a Process in Process>>endProcess
+  stack:
+
+Process>>endProcess
+------------------------------
+
+Process: a Process in Process>>endProcess
+  stack:
+
+Process>>endProcess
+------------------------------
+
+Process: a Process in Process>>endProcess
+  stack:
+
+Process>>endProcess
+------------------------------
+
+Process: a Process in DelayMicrosecondTicker>>waitForUserSignalled:orExpired:
+  stack:
+
+DelayMicrosecondTicker>>waitForUserSignalled:orExpired:
+[  [runTimerEventLoop] whileTrue:
+		[	|nowTick|
+			"Warning! Stepping <Over> the following line may lock the Image. Use <Into> or <Proceed>."
+		 	ticker waitForUserSignalled: timingSemaphore orExpired: activeDelay.
+
+			"Invoke the api back-ends, which set the transfer-variable to nil"
+			suspendSemaphore ifNotNil: [ self suspendAtTimingPriority    ].
+			delayToStart     ifNotNil: [ self scheduleAtTimingPriority   ].
+			delayToStop      ifNotNil: [ self unscheduleAtTimingPriority ].
+
+			"Signal any expired delays"
+			nowTick := ticker nowTick.
+			[ 	activeDelay isNotNil and: [nowTick >= activeDelay resumptionTick] ]
+					whileTrue: [
+						activeDelay timingPrioritySignalExpired.
+						activeDelay := suspendedDelays removeFirstOrNil ].
+		]
+	] in DelaySemaphoreScheduler(DelayBasicScheduler)>>runBackendLoopAtTimingPriority
+FullBlockClosure(BlockClosure)>>ensure:
+DelaySemaphoreScheduler(DelayBasicScheduler)>>runBackendLoopAtTimingPriority
+[ self runBackendLoopAtTimingPriority ] in DelaySemaphoreScheduler(DelayBasicScheduler)>>startTimerEventLoopPriority:
+[self value.
+			"IMPORTANT: Do not step over next line of code. See method comments for details"
+			Processor terminateRealActive] in FullBlockClosure(BlockClosure)>>newProcess
+------------------------------
+
+Process: a Process in MorphicRenderLoop>>doOneCycleWhile:
+  stack:
+
+MorphicRenderLoop>>doOneCycleWhile:
+[ MorphicRenderLoop new doOneCycleWhile: [ true ] ] in MorphicUIManager>>spawnNewProcess
+[self value.
+			"IMPORTANT: Do not step over next line of code. See method comments for details"
+			Processor terminateRealActive] in FullBlockClosure(BlockClosure)>>newProcess
+------------------------------
+
+Process: a Process in Process>>endProcess
+  stack:
+
+Process>>endProcess
+------------------------------
+
+Process: a Process in SmalltalkImage>>lowSpaceWatcher
+  stack:
+
+SmalltalkImage>>lowSpaceWatcher
+[ self lowSpaceWatcher ] in SmalltalkImage>>installLowSpaceWatcher
+[self value.
+			"IMPORTANT: Do not step over next line of code. See method comments for details"
+			Processor terminateRealActive] in FullBlockClosure(BlockClosure)>>newProcess
+------------------------------
+
+Process: a Process in [self value.
+			"IMPORTANT: Do not step over next line of code. See method comments for details"
+			Processor terminateRealActive] in FullBlockClosure(BlockClosure)>>newProcess
+  stack:
+
+[self value.
+			"IMPORTANT: Do not step over next line of code. See method comments for details"
+			Processor terminateRealActive] in FullBlockClosure(BlockClosure)>>newProcess
+------------------------------
+
+Process: a Process in FinalizationProcess class>>finalizationProcess
+  stack:
+
+FinalizationProcess class>>finalizationProcess
+[self finalizationProcess] in FinalizationProcess class>>restartFinalizationProcess
+[self value.
+			"IMPORTANT: Do not step over next line of code. See method comments for details"
+			Processor terminateRealActive] in FullBlockClosure(BlockClosure)>>newProcess
+------------------------------
+
+Process: a Process in nil
+  stack:
+
+Array(SequenceableCollection)>>do:
+[:logger |
+		logger nextPutAll: 'Processes and their stacks: ';cr.
+
+		Process allInstances do: [:each | | ctx |
+			logger nextPutAll: 'Process: '; print: each; cr; nextPutAll: '  stack:'; cr; cr.
+
+			ctx := each isActive ifTrue: [ thisContext sender ] ifFalse: [ each suspendedContext ].
+			ctx ifNotNil: [
+				(ctx stackOfSize: 20) do: [:s | logger print: s; cr ]].
+			logger nextPutAll: '------------------------------'; cr; cr.
+		]] in [ Smalltalk
+		logError: aString
+		inContext: aContext.
+
+	" Print stacks of all current processes "
+
+	Smalltalk logDuring: [:logger |
+		logger nextPutAll: 'Processes and their stacks: ';cr.
+
+		Process allInstances do: [:each | | ctx |
+			logger nextPutAll: 'Process: '; print: each; cr; nextPutAll: '  stack:'; cr; cr.
+
+			ctx := each isActive ifTrue: [ thisContext sender ] ifFalse: [ each suspendedContext ].
+			ctx ifNotNil: [
+				(ctx stackOfSize: 20) do: [:s | logger print: s; cr ]].
+			logger nextPutAll: '------------------------------'; cr; cr.
+		]].
+	] in NonInteractiveUIManager(CommandLineUIManager)>>quitFrom:withMessage:
+[
+		logStream := self openLog.
+		aMonadicBlock value: logStream.
+	] in SmalltalkImage>>logDuring:
+FullBlockClosure(BlockClosure)>>ensure:
+SmalltalkImage>>logDuring:
+[ Smalltalk
+		logError: aString
+		inContext: aContext.
+
+	" Print stacks of all current processes "
+
+	Smalltalk logDuring: [:logger |
+		logger nextPutAll: 'Processes and their stacks: ';cr.
+
+		Process allInstances do: [:each | | ctx |
+			logger nextPutAll: 'Process: '; print: each; cr; nextPutAll: '  stack:'; cr; cr.
+
+			ctx := each isActive ifTrue: [ thisContext sender ] ifFalse: [ each suspendedContext ].
+			ctx ifNotNil: [
+				(ctx stackOfSize: 20) do: [:s | logger print: s; cr ]].
+			logger nextPutAll: '------------------------------'; cr; cr.
+		]].
+	] in NonInteractiveUIManager(CommandLineUIManager)>>quitFrom:withMessage:
+FullBlockClosure(BlockClosure)>>ensure:
+NonInteractiveUIManager(CommandLineUIManager)>>quitFrom:withMessage:
+NonInteractiveUIManager(CommandLineUIManager)>>handleError:log:
+NonInteractiveUIManager(UIManager)>>handleError:
+Process>>handleError:
+KeyNotFound(Exception)>>unhandledErrorAction
+UnhandledError>>defaultAction
+UndefinedObject>>handleSignal:
+Context>>handleSignal:
+Context>>handleSignal:
+Context>>handleSignal:
+UnhandledError(Exception)>>signal
+UnhandledError class>>signalForException:
+KeyNotFound(Exception)>>raiseUnhandledError
+------------------------------
+
+Process: a Process in DelaySemaphoreScheduler>>schedule:
+  stack:
+
+DelaySemaphoreScheduler>>schedule:
+Delay>>schedule
+Delay>>wait
+Duration>>wait
+[
+		"Loop until enough time passed since last #schedule"
+		[ DateAndTime now < (lastSchedule + duration) ]
+			whileTrue: [ duration wait ].
+
+		"Execute deferred action (if not flushed before) and clean up"
+		self flush.
+	] in OmDeferrer>>runMessageProcess
+[self value.
+			"IMPORTANT: Do not step over next line of code. See method comments for details"
+			Processor terminateRealActive] in FullBlockClosure(BlockClosure)>>newProcess
+------------------------------
+
+Process: a Process in Process>>endProcess
+  stack:
+
+Process>>endProcess
+------------------------------
+
+Process: a Process in Process>>endProcess
+  stack:
+
+Process>>endProcess
+------------------------------
+
+Process: a Process in Process>>endProcess
+  stack:
+
+Process>>endProcess
+------------------------------
+
+Process: a Process in Process>>endProcess
+  stack:
+
+Process>>endProcess
+------------------------------
+
+Process: a Process in Process>>endProcess
+  stack:
+
+Process>>endProcess
+------------------------------
+
+Process: a Process in Process>>endProcess
+  stack:
+
+Process>>endProcess
+------------------------------
+
+Process: a Process in [
+		[ true ] whileTrue: [
+			semaphore wait.
+			[self executeCallback: self nextPendingCallback]
+				on: Exception fork:  [:ex | ex pass ] ] ] in TFCallbackQueue>>forkCallbackProcess
+  stack:
+
+[
+		[ true ] whileTrue: [
+			semaphore wait.
+			[self executeCallback: self nextPendingCallback]
+				on: Exception fork:  [:ex | ex pass ] ] ] in TFCallbackQueue>>forkCallbackProcess
+[self value.
+			"IMPORTANT: Do not step over next line of code. See method comments for details"
+			Processor terminateRealActive] in FullBlockClosure(BlockClosure)>>newProcess
+------------------------------
+

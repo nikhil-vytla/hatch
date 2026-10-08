@@ -18,6 +18,8 @@ type OpenAIMessage =
 
 export class DeepSeekModel implements Model {
 	private readonly key: string | undefined;
+	/** Tokens and calls so far (for benchmarks). */
+	readonly usage = { calls: 0, prompt: 0, completion: 0 };
 	private constructor(key: string | undefined) {
 		this.key = key;
 	}
@@ -42,7 +44,10 @@ export class DeepSeekModel implements Model {
 			const hint = response.status === 401 && !this.key ? " (DEEPSEEK_API_KEY is not set)" : "";
 			throw new Error(`DeepSeek ${response.status}${hint}: ${(await response.text()).slice(0, 300)}`);
 		}
-		const body = (await response.json()) as { choices: { message: { content: string | null; tool_calls?: ToolCall[] }; finish_reason: string }[] };
+		const body = (await response.json()) as { choices: { message: { content: string | null; tool_calls?: ToolCall[] }; finish_reason: string }[]; usage?: { prompt_tokens: number; completion_tokens: number } };
+		this.usage.calls++;
+		this.usage.prompt += body.usage?.prompt_tokens ?? 0;
+		this.usage.completion += body.usage?.completion_tokens ?? 0;
 		const { message, finish_reason } = body.choices[0];
 		const content: Block[] = [];
 		if (message.content) content.push({ type: "text", text: message.content });

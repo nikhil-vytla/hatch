@@ -1,0 +1,178 @@
+
+=== 1. Grow the app turn by turn (every turn carries Lean theorems about the functions it writes) ===
+turn 1 "add expenses": accepted in 87 ms; laws: add_expense_count
+turn 2 "total": accepted in 38 ms; laws: (none)
+turn 3 "by category": accepted in 197 ms; laws: by_category_sums_to_total
+
+=== 2. A refactor that keeps every example green but breaks an earlier proof ===
+Turn 4 rewrites `total` through a new helper `sum_cents`. If the model forgets to re-state the turn-3 law's proof against the new `total`:
+  -> rejected (227 ms)
+     [proof] law by_category_sums_to_total: 24:2: Type mismatch: After simplification, term
+         this
+        has type
+         @Eq Int (List.map (fun x => x.snd) (List.foldl (fun m e => add_to m e.category e.cents) [] s.expenses)).sum
+           (List.map (fun x => x.cents) s.expenses).sum
+       but is expected to have type
+         @Eq Int (List.map (fun x => x.snd) (List.foldl (fun m e => add_to m e.category e.cents) [] s.expenses)).sum
+           (sum_cents s.expenses)
+With the repaired proof (same law name replaces the old one) and a new law `total_is_exact_sum`:
+  -> accepted (277 ms), 3 proved laws re-checked
+turn 5 "validate expenses": accepted in 362 ms; 5 laws now proved
+turn 6 "budgets": accepted in 422 ms; 7 laws now proved
+turn 7 "top category": accepted in 587 ms; 8 laws now proved
+turn 8 "notes": accepted in 767 ms; 8 laws now proved
+
+=== 3. A bug that tests miss: by_category silently drops expenses over $1000 ===
+    def by_category (s : State) : List (String × Int) :=
+      s.expenses.foldl (fun m e => if e.cents > 100000 then m else add_to m e.category e.cents) []
+tests:
+  20/20 user-confirmed examples pass
+  property 'categories add up to total', JS-style: 300/300 random states pass
+proof: develop with the same forms, law `by_category_sums_to_total` carried from turn 3/4
+  -> rejected (703 ms)
+     [proof] law by_category_sums_to_total: 24:2: Type mismatch: After simplification, term
+         this
+        has type
+         (List.map (fun x => x.snd) (List.foldl (fun m e => add_to m e.category e.cents) [] s.expenses)).sum =
+           (List.map (fun x => x.cents) s.expenses).sum
+       but is expected to have type
+         (List.map (fun x => x.snd)
+               (List.foldl (fun m e => if 100000 < e.cents then m else add_to m e.category e.cents) [] s.expenses)).sum =
+           (List.map (fun x => x.cents) s.expenses).sum
+what the bug does, on a state with one $1500 rent payment (nothing installed, `try` only):
+  by_category -> {}, total -> 1500
+
+=== 4. A bug that tests miss: over_budget uses >= (spending exactly the budget is not 'over') ===
+    def over_budget (s : State) : List String :=
+      let spent := by_category s
+      ((s.budgets.filter fun p => ((spent.lookup p.1).getD 0) ≥ p.2).map (·.1)).mergeSort (fun a b => decide (a ≤ b))
+tests:
+  20/20 user-confirmed examples pass
+  property 'every category in over_budget() has spent more than its budget': 299/300 random states pass
+  -> rejected (609 ms)
+     [proof] law over_budget_means_over: 6:16: Application type mismatch: The argument
+         hlt
+       has type
+         b ≤ (List.lookup c (by_category s)).getD 0
+       but is expected to have type
+         b < (List.lookup c (by_category s)).getD 0
+       in the application
+         ⟨hb, hlt⟩
+
+=== 5. A claimed law that is false ===
+law add_expense_never_fails:
+  -> rejected (480 ms)
+     [proof] law add_expense_never_fails: 2:40: unsolved goals
+       s : State
+       a : Int
+       c : String
+       n : Option String
+       ⊢ ∃ a_1 b,
+           (if a ≤ 0 then Except.error "amount must be positive"
+             else
+               if c = "" then Except.error "category required"
+               else
+                 Except.ok
+                   (s.expenses.length + 1,
+                     { expenses := s.expenses ++ [{ cents := a, category := c, note := n }], budgets := s.budgets })) =
+             Except.ok (a_1, b)
+law top_category_is_never_null:
+  -> rejected (521 ms)
+     [proof] law top_category_is_never_null: 1:74: unsolved goals
+       s : State
+       ⊢ ¬best_of
+               ((List.foldl (fun m e => add_to m e.category e.cents) [] s.expenses).mergeSort fun a b =>
+                 decide (a.fst ≤ b.fst)) =
+             none
+a true law the same model could state instead (no forms, just the proof):
+  -> accepted (540 ms), 9 proved laws re-checked
+a law that is true but says nothing about the app (rejected: must mention an app function):
+  -> rejected (523 ms)
+     [proof] law vacuous: the statement does not mention any app function
+a law proved by cheating (sorry / native_decide / axiom):
+  -> rejected (625 ms)
+     [static] law cheat: forbidden keyword `sorry`
+  -> rejected (577 ms)
+     [static] law cheat: forbidden keyword `native_decide`
+  -> rejected (534 ms)
+     [static] law cheat: only `def` and `theorem` are allowed here, found Lean.Parser.Command.axiom
+
+=== 6. Static gate: what a form may be ===
+not a definition:
+  -> rejected (0 ms)
+     [static] #eval IO.println "hello": not a plain declaration (found Lean.Parser.Command.eval): only `def` and `theorem` are allowed, no commands, notation, macros, instances or options
+partial (can loop):
+  -> rejected (1 ms)
+     [static] partial def total (s : State) : Int := total s: forbidden keyword `partial`
+unsafe / IO escape hatch:
+  -> rejected (0 ms)
+     [static] def total (s : State) : Int := unsafeBaseIO (pure 0): forbidden identifier `unsafeBaseIO` (no IO, unsafe or reflection)
+IO:
+  -> rejected (1 ms)
+     [static] def total (s : State) : IO Int := pure 0: forbidden identifier `IO` (no IO, unsafe or reflection)
+option change:
+  -> rejected (0 ms)
+     [static] set_option maxRecDepth 1 in: not a plain declaration (found Lean.Parser.Command.in): only `def` and `theorem` are allowed, no commands, notation, macros, instances or options
+@[implemented_by]:
+  -> rejected (1 ms)
+     [static] @[implemented_by total] def total2 (s : State) : Int := 0: attribute `implemented_by` is not allowed
+two commands in one form:
+  -> rejected (1 ms)
+     [static] def a := 1: a form must be exactly one definition, found 2 commands
+patching a global instance:
+  -> rejected (1 ms)
+     [static] instance : Add Int := ⟨fun _ _ => 0⟩: only `def` and `theorem` are allowed here, found Lean.Parser.Command.instance
+non-terminating recursion (caught by the termination checker):
+  -> rejected (198 ms)
+     [termination] total: 1:4: fail to show termination for
+         total
+       with errors
+       failed to infer structural recursion:
+       Not considering parameter s of total:
+         it is unchanged in the recursive calls
+       no parameters suitable for structural recursion
+       
+       well-founded recursion cannot be used, `total` does not take any (non-fixed) arguments
+call to a function that does not exist:
+  -> rejected (153 ms)
+     [static] total: 1:31: Unknown identifier `sum_everything`
+type error:
+  -> rejected (162 ms)
+     [static] total: 1:31: Type mismatch
+         "three"
+       has type
+         String
+       but is expected to have type
+         Int
+terminating but too slow (3e9 iterations): the 1 s limit, via `try` and via `develop`:
+  try -> [{"timeout":true}]
+  -> rejected (9306 ms)
+     [ratchet] [{"args":[],"fn":"total"}] on {"expenses":[{"amount":12.5,"category":"food"},{"amount":40,"category":"transport"},{"amount":7.25,"category":"food"}]}: got {"timeout":true}, expected {"state":{"expenses":[{"amount":12.5,"category":"food"},{"amount":40,"category":"transport"},{"amount":7.25,"category":"food"}]},"value":59.75}
+     [ratchet] [{"args":[],"fn":"total"}] on {}: got {"timeout":true}, expected {"state":{},"value":0}
+     [ratchet] [{"args":[],"fn":"total"}] on {"expenses":[{"amount":0.1,"category":"a"},{"amount":0.2,"category":"a"}]}: got {"timeout":true}, expected {"state":{"expenses":[{"amount":0.1,"category":"a"},{"amount":0.2,"category":"a"}]},"value":0.3}
+     [traces] {"args":[],"fn":"total"} used to run, now times out
+     [traces] {"args":[],"fn":"total"} used to run, now times out
+     [traces] {"args":[],"fn":"total"} used to run, now times out
+     [traces] {"args":[],"fn":"total"} used to run, now times out
+     [proof] law by_category_sums_to_total: 24:2: maximum recursion depth has been reached
+       use `set_option maxRecDepth <num>` to increase limit
+       use `set_option diagnostics true` to get diagnostic information
+     [proof] law total_is_exact_sum: 1:85: unsolved goals
+       s : State
+       ⊢ List.foldl (fun b a => b + ↑a) 0 (List.range' 0 3000000000) = (List.map (fun x => x.cents) s.expenses).sum
+     [proof] law add_expense_adds_exactly_the_amount: 2:72: unsolved goals
+       case neg
+       s : State
+       a : Int
+       c : String
+       n : Option String
+       r : Nat
+       h1 : ¬a ≤ 0
+       h2 : ¬c = ""
+       left✝ : s.expenses.length + 1 = r
+       ⊢ List.foldl (fun b a => b + ↑a) 0 (List.range' 0 3000000000) =
+           List.foldl (fun b a => b + ↑a) 0 (List.range' 0 3000000000) + a
+
+=== 7. The live image after all of that ===
+generation 9, revision rev-0009, 10 functions, state {"budgets":{"food":15,"fun":100},"expenses":[{"amount":12.5,"category":"food"},{"amount":40,"category":"transport"},{"am...
+(total elapsed 23842 ms)

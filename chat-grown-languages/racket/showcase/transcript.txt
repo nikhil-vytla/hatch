@@ -1,0 +1,121 @@
+=== PART 1: Racket kernel (static gate + racket/sandbox) ===
+Live world before attacks: generation 8, revision rev-0008, state {"budgets":{"food":15},"expenses":[{"amount":12.5,"category":"food"},{"amount":40,"category":"transport"}]}
+
+1. read-passwd  (read /etc/passwd)
+   form: (define (total) (call-with-input-file "/etc/passwd" read-line))
+   kernel develop -> rejected (1.0 ms) [static] total uses forbidden call-with-input-file (filesystem access)
+   bare racket/base sandbox, no static gate -> error: open-input-file: `read' access denied for /etc/passwd  [3.0 ms, evaluator still alive afterwards]
+   live world unchanged: #t; canary: CANARY-UNTOUCHED
+
+2. delete-file  (delete a file outside the sandbox (the canary))
+   form: (define (total) (delete-file "/var/tmp/rkt-showcase17914488421791448842261/canary.txt"))
+   kernel develop -> rejected (2.0 ms) [static] total uses forbidden delete-file (filesystem access)
+   bare racket/base sandbox, no static gate -> error: delete-file: `delete' access denied for /var/tmp/rkt-showcase17914488421791448842261/canary.txt  [2.0 ms, evaluator still alive afterwards]
+   live world unchanged: #t; canary: CANARY-UNTOUCHED
+
+3. network  (open a TCP socket to an outside host)
+   form: (define (total) ((dynamic-require 'racket/tcp 'tcp-connect) "example.com" 80))
+   kernel develop -> rejected (1.0 ms) [static] total uses forbidden dynamic-require (metaprogramming / namespace / module access)
+   bare racket/base sandbox, no static gate -> error: tcp-connect: network access denied: '("example.com" 80 client)  [3.0 ms, evaluator still alive afterwards]
+   live world unchanged: #t; canary: CANARY-UNTOUCHED
+
+4. subprocess  (spawn a shell)
+   form: (define (total) (subprocess #f #f #f "/bin/sh" "-c" "id > /tmp/pwned"))
+   kernel develop -> rejected (1.0 ms) [static] total uses forbidden subprocess (process creation)
+   bare racket/base sandbox, no static gate -> error: subprocess: `execute' access denied for /bin/sh  [2.0 ms, evaluator still alive afterwards]
+   live world unchanged: #t; canary: CANARY-UNTOUCHED
+
+5. eval-escape  (escape via eval + a fresh namespace)
+   form: (define (total) (eval '(delete-file "/var/tmp/rkt-showcase17914488421791448842261/canary.txt") (make-base-name...
+   kernel develop -> rejected (1.0 ms) [static] total uses forbidden eval (metaprogramming / namespace / module access)
+   bare racket/base sandbox, no static gate -> error: delete-file: `delete' access denied for /var/tmp/rkt-showcase17914488421791448842261/canary.txt  [9.0 ms, evaluator still alive afterwards]
+   live world unchanged: #t; canary: CANARY-UNTOUCHED
+
+6. reader-escape  (smuggle a #reader form to run arbitrary module code at read time)
+   form: #reader"/tmp/evil.rkt"(define (total) 0)
+   kernel develop -> rejected (1.0 ms) [static] form does not read: string::1: read: `#reader` not enabled
+   bare racket/base sandbox, no static gate -> error: string::1: read: `#reader` not enabled  [0.0 ms, evaluator still alive afterwards]
+   live world unchanged: #t; canary: CANARY-UNTOUCHED
+
+7. mutate-builtin  (patch a builtin (the Array.prototype.every trick))
+   form: (define (total) (set! car cdr) 0)
+   kernel develop -> rejected (2.0 ms) [static] does not expand: set!: cannot mutate module-required identifier
+   bare racket/base sandbox, no static gate -> error: eval:1:0: set!: cannot mutate module-required identifier  [1.0 ms, evaluator still alive afterwards]
+   live world unchanged: #t; canary: CANARY-UNTOUCHED
+
+8. shadow-builtin  (redefine a builtin so every later caller gets it)
+   form: (define (car x) 0)
+   kernel develop -> rejected (1.0 ms) [static] car redefines a builtin of the app language; choose another name
+   bare racket/base sandbox, no static gate -> returned 0  [2.0 ms, evaluator still alive afterwards]
+   live world unchanged: #t; canary: CANARY-UNTOUCHED
+
+9. toplevel-effect  (top-level statement that rewrites the live state)
+   form: (begin (set-state! (hasheq 'evil #t)) (define (total) 0))
+   kernel develop -> rejected (2.0 ms) [static] form must be exactly (define (name param ...) body ...+); got (begin (set-state! (hasheq (quote evil) #t)) (define (total) 0))
+   bare racket/base sandbox, no static gate -> error: set-state!: undefined;  [1.0 ms, evaluator still alive afterwards]
+   live world unchanged: #t; canary: CANARY-UNTOUCHED
+
+10. continuation  (leak a continuation out of a call)
+   form: (define (total) (call/cc (lambda (k) (set! k 1) 1)))
+   kernel develop -> rejected (1.0 ms) [static] total uses forbidden call/cc (continuation capture)
+   bare racket/base sandbox, no static gate -> returned 1  [2.0 ms, evaluator still alive afterwards]
+   live world unchanged: #t; canary: CANARY-UNTOUCHED
+
+11. env-secret  (read environment secrets)
+   form: (define (total) (getenv "HOME"))
+   kernel develop -> rejected (2.0 ms) [static] total uses forbidden getenv (thread / custodian / environment / unsafe access)
+   bare racket/base sandbox, no static gate -> returned "/root"  [2.0 ms, evaluator still alive afterwards]
+   live world unchanged: #t; canary: CANARY-UNTOUCHED
+
+12. stdout-forgery  (forge a protocol reply on stdout)
+   form: (define (total) (displayln "{\"ok\":true,\"hacked\":1}"))
+   kernel develop -> rejected (1.0 ms) [static] total calls or references unknown identifier displayln (not a builtin, not defined by this candidate)
+   bare racket/base sandbox, no static gate -> returned #<void>  [3.0 ms, evaluator still alive afterwards]
+   live world unchanged: #t; canary: CANARY-UNTOUCHED
+
+13. alloc-bomb  (allocate without bound (legal in-language code))
+   form: (define (total) (build-list 400000000 (lambda (i) (list i i i))))
+   kernel develop -> rejected (747.0 ms) [ratchet] [{"args":[],"fn":"total"}] on {"expenses":[{"amount":12.5,"category":"food"},{"amount":40,"category":"transport"},{"amount":7.25,"category":"food"}]}: got {"error":"evaluator: terminated (out-of-memory)","state":{"expenses":[{"amo...
+   bare racket/base sandbox, no static gate -> error: evaluator: terminated (out-of-memory)  [748.0 ms, evaluator dead and discarded afterwards]
+   live world unchanged: #t; canary: CANARY-UNTOUCHED
+
+14. bignum-bomb  (exponent tower)
+   form: (define (total) (expt 9 (expt 9 9)))
+   kernel develop -> rejected (119.0 ms) [ratchet] [{"args":[],"fn":"total"}] on {"expenses":[{"amount":12.5,"category":"food"},{"amount":40,"category":"transport"},{"amount":7.25,"category":"food"}]}: got {"error":"out of memory","state":{"expenses":[{"amount":12.5,"category":"fo...
+   bare racket/base sandbox, no static gate -> error: out of memory  [2.0 ms, evaluator still alive afterwards]
+   live world unchanged: #t; canary: CANARY-UNTOUCHED
+
+15. infinite-loop  (loop forever (legal in-language code))
+   form: (define (total) (let loop () (loop)))
+   kernel develop -> rejected (1125.0 ms) [ratchet] [{"args":[],"fn":"total"}] on {"expenses":[{"amount":12.5,"category":"food"},{"amount":40,"category":"transport"},{"amount":7.25,"category":"food"}]}: got {"timeout":true}, expected {"state":{"expenses":[{"amount":12.5,"category":...
+   bare racket/base sandbox, no static gate -> KILLED by resource limit (time): with-limit: out of time  [1003.0 ms, evaluator still alive afterwards]
+   live world unchanged: #t; canary: CANARY-UNTOUCHED
+
+16. state-poison  (valid code that writes a key outside the schema)
+   form: (define (set_budget category amount) (update-state! (lambda (s) (hash-set s 'admin #t))) amount)
+   kernel develop -> rejected (112.0 ms) [invariants] after replaying trace 5 {"args":["food",15],"fn":"set_budget"}: known-keys: unexpected top-level key admin
+   bare racket/base sandbox, no static gate -> error: update-state!: undefined;  [5.0 ms, evaluator still alive afterwards]
+   live world unchanged: #t; canary: CANARY-UNTOUCHED
+
+Kernel still serving: total() = {"ok":true,"replayed":false,"value":52.5}
+/tmp/pwned exists: #f
+
+=== PART 2: the same class of attacks against node:vm (the chat-grown-software prototype's isolation) ===
+read /etc/passwd
+   node:vm -> SUCCEEDED: root:x:0:0:root:/root:/bin/bash
+delete the canary file
+   node:vm -> SUCCEEDED: deleted
+spawn a shell
+   node:vm -> SUCCEEDED: uid=0(root) gid=0(root) groups=0(root)
+open a socket (net.connect function reachable)
+   node:vm -> SUCCEEDED: function
+read environment (HOME)
+   node:vm -> SUCCEEDED: /root
+patch a host builtin through a state object passed in
+   node:vm -> SUCCEEDED: patched Object.prototype
+loop forever (vm timeout option set to 200ms)
+   node:vm -> stopped: Script execution timed out after 200ms
+
+host after attacks: canary exists = false; ({}).polluted = "yes"
+allocate without bound (host heap capped at 64 MB for the demo)
+   node:vm -> host process exit code null, signal SIGABRT; stdout=""; stderr mentions OOM=true

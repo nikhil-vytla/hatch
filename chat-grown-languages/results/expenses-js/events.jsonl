@@ -1,0 +1,50 @@
+{"t":193,"turn":0,"kind":"user","text":"Let me record expenses: an amount and a category. Call it add_expense(amount, category)."}
+{"t":2804,"turn":0,"kind":"form","text":"function add_expense(amount, category) {\n  state.expenses = state.expenses || [];\n  state.expenses.push({ amount, category });\n  return state.expenses.length;\n}"}
+{"t":2856,"turn":0,"kind":"ask","text":"4 questions, user corrected 0"}
+{"t":2894,"turn":0,"kind":"develop","text":"[add_expense] -> accepted (rev-0001)"}
+{"t":3877,"turn":0,"kind":"model","text":"Done — `add_expense(amount, category)` now appends `{amount, category}` to `state.expenses` and returns the new total number of recorded expenses."}
+{"t":3902,"turn":0,"kind":"goal","text":"2/2 of the scenario's examples behave as intended ✓✓"}
+{"t":3905,"turn":0,"kind":"use","text":"add_expense(12.5, \"food\") => {\"ok\":true,\"value\":1,\"replayed\":false}"}
+{"t":3910,"turn":0,"kind":"use","text":"add_expense(40, \"transport\") => {\"ok\":true,\"value\":2,\"replayed\":false}"}
+{"t":3920,"turn":0,"kind":"use","text":"add_expense(7.25, \"food\") => {\"ok\":true,\"value\":3,\"replayed\":false}"}
+{"t":3920,"turn":1,"kind":"user","text":"What's my total so far? Call it total()."}
+{"t":6276,"turn":1,"kind":"form","text":"function total() {\n  const expenses = state.expenses || [];\n  let sum = 0;\n  for (const e of expenses) {\n    sum += e.amount;\n  }\n  return sum;\n}"}
+{"t":6306,"turn":1,"kind":"ask","text":"3 questions, user corrected 0"}
+{"t":6352,"turn":1,"kind":"develop","text":"[total] -> accepted (rev-0002)"}
+{"t":8299,"turn":1,"kind":"form","text":"function total() {\n  const expenses = state.expenses || [];\n  let sum = 0;\n  for (const e of expenses) {\n    sum += e.amount;\n  }\n  return sum;\n}"}
+{"t":11576,"turn":1,"kind":"form","text":"function total() {\n  const expenses = state.expenses || [];\n  let sum = 0;\n  for (const e of expenses) {\n    sum += e.amount;\n  }\n  return Math.round(sum * 100) / 100;\n}"}
+{"t":11614,"turn":1,"kind":"ask","text":"4 questions, user corrected 0"}
+{"t":11661,"turn":1,"kind":"develop","text":"[total] -> accepted (rev-0003)"}
+{"t":13095,"turn":1,"kind":"model","text":"`total()` now adds up all your recorded expenses, returning `0` when there's nothing recorded and rounding to cents (so `10 + 0.1 + 0.2` gives `10.3`, not `10.299999999999999`)."}
+{"t":13110,"turn":1,"kind":"goal","text":"2/2 of the scenario's examples behave as intended ✓✓"}
+{"t":13114,"turn":1,"kind":"use","text":"total() => {\"ok\":true,\"value\":59.75,\"replayed\":false}"}
+{"t":13114,"turn":2,"kind":"user","text":"Break it down by category: by_category() gives a map from category to amount. The categories should always add up to the total."}
+{"t":27057,"turn":2,"kind":"form","text":"function total() {\n  const expenses = state.expenses || [];\n  let cents = 0;\n  for (const e of expenses) {\n    cents += Math.round(e.amount * 100);\n  }\n  return cents / 100;\n}"}
+{"t":27058,"turn":2,"kind":"form","text":"function by_category() {\n  const expenses = state.expenses || [];\n  const cents = {};\n  for (const e of expenses) {\n    const c = Math.round(e.amount * 100);\n    cents[e.category] = (cents[e.category] || 0) + c;\n  }\n  const result = {};\n  for (const key of Object.keys(cents)) {\n    result[key] = cents[key] / 100;\n  }\n  return result;\n}"}
+{"t":30941,"turn":2,"kind":"form","text":"function total() {\n  const expenses = state.expenses || [];\n  let cents = 0;\n  for (const e of expenses) {\n    cents += Math.round(e.amount * 100);\n  }\n  return cents / 100;\n}"}
+{"t":30941,"turn":2,"kind":"form","text":"function by_category() {\n  const expenses = state.expenses || [];\n  const cents = {};\n  for (const e of expenses) {\n    const c = Math.round(e.amount * 100);\n    cents[e.category] = (cents[e.category] || 0) + c;\n  }\n  const result = {};\n  for (const key of Object.keys(cents)) {\n    result[key] = cents[key] / 100;\n  }\n  return result;\n}"}
+{"t":31489,"turn":2,"kind":"ask","text":"7 questions, user corrected 0"}
+{"t":31763,"turn":2,"kind":"develop","text":"[by_category, total] -> accepted (rev-0004)"}
+{"t":33121,"turn":2,"kind":"model","text":"`by_category()` now returns a map of category to amount (e.g. `{food: 16.75, coffee: 3}`, `{}` when nothing is recorded), and both it and `total()` now add up in whole cents, so the category amounts always sum to the total."}
+{"t":33160,"turn":2,"kind":"goal","text":"2/2 of the scenario's examples behave as intended ✓✓"}
+{"t":33191,"turn":2,"kind":"use","text":"by_category() => {\"ok\":true,\"value\":{\"food\":19.75,\"transport\":40},\"replayed\":false}"}
+{"t":33209,"turn":2,"kind":"use","text":"add_expense(3.1, \"fun\") => {\"ok\":true,\"value\":4,\"replayed\":false}"}
+{"t":33223,"turn":2,"kind":"use","text":"by_category() => {\"ok\":true,\"value\":{\"food\":19.75,\"transport\":40,\"fun\":3.1},\"replayed\":false}"}
+{"t":33223,"turn":3,"kind":"user","text":"Money should be in cents. When I add 0.10 and 0.20 the total should say 0.3, not 0.30000000000000004. Same for by_category."}
+{"t":46151,"turn":3,"kind":"form","text":"function add_expense(amount, category) {\n  state.expenses = state.expenses || [];\n  state.expenses.push({ amount: Math.round(amount * 100) / 100, category });\n  return state.expenses.length;\n}"}
+{"t":46151,"turn":3,"kind":"form","text":"function total() {\n  const expenses = state.expenses || [];\n  let cents = 0;\n  for (const e of expenses) {\n    cents += Math.round(e.amount * 100);\n  }\n  return cents / 100;\n}"}
+{"t":46151,"turn":3,"kind":"form","text":"function by_category() {\n  const expenses = state.expenses || [];\n  const cents = {};\n  for (const e of expenses) {\n    cents[e.category] = (cents[e.category] || 0) + Math.round(e.amount * 100);\n  }\n  const result = {};\n  for (const key of Object.keys(cents)) {\n    result[key] = cents[key] / 100;\n  }\n  return result;\n}"}
+{"t":50130,"turn":3,"kind":"form","text":"function add_expense(amount, category) {\n  state.expenses = state.expenses || [];\n  state.expenses.push({ amount: Math.round(amount * 100) / 100, category });\n  return state.expenses.length;\n}"}
+{"t":50130,"turn":3,"kind":"form","text":"function total() {\n  const expenses = state.expenses || [];\n  let cents = 0;\n  for (const e of expenses) {\n    cents += Math.round(e.amount * 100);\n  }\n  return cents / 100;\n}"}
+{"t":50130,"turn":3,"kind":"form","text":"function by_category() {\n  const expenses = state.expenses || [];\n  const cents = {};\n  for (const e of expenses) {\n    cents[e.category] = (cents[e.category] || 0) + Math.round(e.amount * 100);\n  }\n  const result = {};\n  for (const key of Object.keys(cents)) {\n    result[key] = cents[key] / 100;\n  }\n  return result;\n}"}
+{"t":50430,"turn":3,"kind":"ask","text":"11 questions, user corrected 2: add_expense(0.105, \"misc\"); total() should be {\"value\":0.11,\"state\":{\"expenses\":[{\"amount\":0.105,\"category\":\"misc\"}]}} | add_expense(0.105, \"misc\"); total(); total() should be {\"value\":0.11,\"state\":{\"expenses\":[{\"amount\":0.105,\"category\":\"misc\"}]}}"}
+{"t":50638,"turn":3,"kind":"develop","text":"[add_expense, total, by_category] -> rejected: ratchet: [{\"args\":[0.105,\"misc\"],\"fn\":\"add_expense\"},{\"args\":[],\"fn\":\"total\"}] gave {\"value\":0.11,\"state\":{\"expenses\":[{\"amount\":0.11,\"category\":\"misc\"}]}}, confirmed {\""}
+{"t":54978,"turn":3,"kind":"form","text":"function add_expense(amount, category) {\n  state.expenses = state.expenses || [];\n  state.expenses.push({ amount, category });\n  return state.expenses.length;\n}"}
+{"t":54979,"turn":3,"kind":"form","text":"function total() {\n  const expenses = state.expenses || [];\n  let cents = 0;\n  for (const e of expenses) {\n    cents += Math.round(e.amount * 100);\n  }\n  return cents / 100;\n}"}
+{"t":54979,"turn":3,"kind":"form","text":"function by_category() {\n  const expenses = state.expenses || [];\n  const cents = {};\n  for (const e of expenses) {\n    cents[e.category] = (cents[e.category] || 0) + Math.round(e.amount * 100);\n  }\n  const result = {};\n  for (const key of Object.keys(cents)) {\n    result[key] = cents[key] / 100;\n  }\n  return result;\n}"}
+{"t":55219,"turn":3,"kind":"ask","text":"11 questions, user corrected 0"}
+{"t":55454,"turn":3,"kind":"develop","text":"[add_expense, total, by_category] -> accepted (rev-0005)"}
+{"t":57138,"turn":3,"kind":"model","text":"`total()` and `by_category()` now add up in whole cents and convert back, so `0.10 + 0.20` reads `0.3` (and ten `0.01`s read `0.1`) with no floating point noise, while `add_expense` still stores the amount exactly as you gave it and the categories always sum to the total."}
+{"t":57154,"turn":3,"kind":"goal","text":"2/2 of the scenario's examples behave as intended ✓✓"}
+{"t":57159,"turn":3,"kind":"use","text":"total() => {\"ok\":true,\"value\":62.85,\"replayed\":false}"}
+{"t":57160,"turn":4,"kind":"user","text":"Don't let me add an expense of zero or less, or one without a category. Throw an error."}

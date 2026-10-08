@@ -1,0 +1,10 @@
+name = "chat_grown"
+defaultTargets = ["kernel"]
+
+[[lean_lib]]
+name = "Chat"
+
+[[lean_exe]]
+name = "kernel"
+root = "Kernel"
+supportInterpreter = true

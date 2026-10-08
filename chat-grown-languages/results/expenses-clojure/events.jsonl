@@ -1,0 +1,20 @@
+{"t":479,"turn":0,"kind":"user","text":"Let me record expenses: an amount and a category. Call it add_expense(amount, category)."}
+{"t":4075,"turn":0,"kind":"form","text":"(defn add_expense [amount category]\n  (when-not (and (number? amount) (pos? amount)) (throw (ex-info \"amount must be positive\" {})))\n  (when-not (and (string? category) (not (blank? category))) (throw (ex-info \"category must be a non-blank string\" {})))\n  (swap-state! update \"expenses\" (fnil conj []) {\"amount\" amount \"category\" category})\n  (count (get (state) \"expenses\")))"}
+{"t":6231,"turn":0,"kind":"form","text":"(defn add_expense [amount category]\n  (when-not (and (number? amount) (pos? amount)) (throw (ex-info \"amount must be positive\" {})))\n  (when-not (and (string? category) (not (blank? category))) (throw (ex-info \"category must be a non-blank string\" {})))\n  (swap-state! update \"expenses\" (fnil conj []) {\"amount\" amount \"category\" category})\n  (count (get (state) \"expenses\")))"}
+{"t":6359,"turn":0,"kind":"ask","text":"5 questions, user corrected 0"}
+{"t":6446,"turn":0,"kind":"develop","text":"[add_expense] -> accepted (rev-0001)"}
+{"t":7660,"turn":0,"kind":"model","text":"`add_expense(amount, category)` appends `{\"amount\" ... \"category\" ...}` to the expenses list and returns the new total count; it rejects non-positive amounts and blank/missing categories."}
+{"t":7683,"turn":0,"kind":"goal","text":"2/2 of the scenario's examples behave as intended ✓✓"}
+{"t":7688,"turn":0,"kind":"use","text":"add_expense(12.5, \"food\") => {\"ok\":true,\"value\":1,\"replayed\":false}"}
+{"t":7693,"turn":0,"kind":"use","text":"add_expense(40, \"transport\") => {\"ok\":true,\"value\":2,\"replayed\":false}"}
+{"t":7697,"turn":0,"kind":"use","text":"add_expense(7.25, \"food\") => {\"ok\":true,\"value\":3,\"replayed\":false}"}
+{"t":7697,"turn":1,"kind":"user","text":"What's my total so far? Call it total()."}
+{"t":9333,"turn":1,"kind":"form","text":"(defn total []\n  (let [es (get (state) \"expenses\" [])]\n    (/ (round (* 100 (reduce + 0 (map #(get % \"amount\") es)))) 100)))"}
+{"t":11551,"turn":1,"kind":"form","text":"(defn total []\n  (let [es (get (state) \"expenses\" [])]\n    (/ (round (* 100 (reduce + 0 (map #(get % \"amount\") es)))) 100)))"}
+{"t":11621,"turn":1,"kind":"ask","text":"4 questions, user corrected 0"}
+{"t":11652,"turn":1,"kind":"develop","text":"[total] -> accepted (rev-0002)"}
+{"t":12756,"turn":1,"kind":"model","text":"`total()` now returns the sum of all recorded expense amounts, rounded to the nearest cent (0 when there are no expenses)."}
+{"t":12787,"turn":1,"kind":"goal","text":"2/2 of the scenario's examples behave as intended ✓✓"}
+{"t":12792,"turn":1,"kind":"use","text":"total() => {\"ok\":true,\"value\":59.75,\"replayed\":false}"}
+{"t":12792,"turn":2,"kind":"user","text":"Break it down by category: by_category() gives a map from category to amount. The categories should always add up to the total."}
+{"t":19153,"turn":2,"kind":"form","text":"(defn by_category []\n  (let [es (get (state) \"expenses\" [])\n        raw (reduce (fn [acc e]\n                      (update acc (get e \"category\") (fnil + 0) (get e \"amount\")))\n                    {} es)\n        rounded (reduce-kv (fn [m k v] (assoc m k (/ (round (* 100 v)) 100))) {} raw)\n        t (total)\n        diff (- t (reduce + 0 (vals rounded)))]\n    (if (or (== diff 0) (empty? rounded))\n      rounded\n      (let [biggest (first (sort-by (fn [kv] (- (second kv))) (seq rounded)))]\n        (assoc rounded (first biggest)\n               (/ (round (* 100 (+ (second biggest) diff))) 100))))))"}
