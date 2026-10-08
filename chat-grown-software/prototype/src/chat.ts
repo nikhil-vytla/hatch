@@ -13,6 +13,7 @@
 //   node --experimental-strip-types --no-warnings src/chat.ts               # scripted model + simulated user
 //   MODEL=claude node --experimental-strip-types --no-warnings src/chat.ts  # Claude (npm install first) + simulated user
 //   MODEL=deepseek node --experimental-strip-types --no-warnings src/chat.ts  # DeepSeek (DEEPSEEK_API_KEY, or a key-injecting proxy) + simulated user
+//   INTERACTIVE=1 MODEL=deepseek node --experimental-strip-types --no-warnings src/chat.ts  # you are the user
 import { appendFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import type { Question } from "./ask.ts";
@@ -279,9 +280,11 @@ if (import.meta.main) {
 		const { DeepSeekModel } = await import("./model-deepseek.ts");
 		model = await DeepSeekModel.create();
 	} else model = new ScriptedModel(scenario.turns);
-	const user = new SimulatedUser(scenario.turns);
+	const user = process.env.INTERACTIVE ? new (await import("./terminal-user.ts")).TerminalUser() : new SimulatedUser(scenario.turns);
+	if (process.env.INTERACTIVE) console.log(`Growing an app with ${process.env.MODEL ?? "the scripted model"} in ${dir}. Say what you want; an empty line ends the chat.`);
 	const run = await runChat({ kernel, model, user, logFile: join(dir, "chat.jsonl"), print: console.log });
-	console.log(`\n${run.log.length} chat log entries; ${kernel.spec.examples.length} confirmed examples in the contract; the simulated user corrected ${user.corrections} answers`);
+	console.log(`\n${run.log.length} chat log entries; ${kernel.spec.examples.length} confirmed examples in the contract; ${process.env.INTERACTIVE ? "you" : "the simulated user"} corrected ${user.corrections} answers`);
+	if (process.env.INTERACTIVE) process.exit(0);
 	const fn = scenario.name === "shop" ? "addItem" : "topCategory";
 	const w = kernel.why(fn);
 	console.log(`why is ${fn}() the way it is? ${w?.revision} ("${w?.reason}") was asked for by chat message ${w?.asked?.message}: "${w?.asked?.text}"`);

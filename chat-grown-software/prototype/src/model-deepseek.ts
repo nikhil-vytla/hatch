@@ -8,7 +8,7 @@
 import type { Block, Message, Model, ToolDef } from "./chat.ts";
 
 const URL = process.env.DEEPSEEK_BASE_URL ?? "https://api.deepseek.com/chat/completions";
-const MODEL_ID = process.env.DEEPSEEK_MODEL ?? "deepseek-chat";
+const MODEL_ID = process.env.DEEPSEEK_MODEL ?? "deepseek-flash";
 
 type ToolCall = { id: string; type: "function"; function: { name: string; arguments: string } };
 type OpenAIMessage =

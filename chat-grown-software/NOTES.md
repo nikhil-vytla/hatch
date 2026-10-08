@@ -455,3 +455,12 @@ error: no real model run was possible.
     let the simulated user map unknown names onto intended functions by behaviour (hard to do honestly).
 - `why topCategory()` prints undefined after the DeepSeek run because the model never defined a function by that
   name; the line is hard-coded to the scripted names.
+
+### Session 5 (2026-10-08): deepseek-flash by default, interactive mode
+
+- The adapter's default model is now `deepseek-flash` (what `deepseek-chat` was already served as).
+- Added `src/terminal-user.ts` (`INTERACTIVE=1`): a person replaces the simulated user. It reads stdin synchronously
+  (`readSync` on fd 0) because the `User` interface is synchronous. Smoke test piped one request plus empty lines
+  (accept every answer) through DeepSeek: 7 questions, `addExpense` accepted at rev-0003, 13 confirmed examples.
+  Scripted transcripts are unchanged.
+- In this mode the user's own judgement replaces the scripted program, so the naming problem from session 4 goes away.

@@ -94,6 +94,7 @@ prototype/
   src/model-claude.ts        Claude as the model (Anthropic SDK; only loaded with MODEL=claude)
   src/model-deepseek.ts      DeepSeek as the model (OpenAI-style API over fetch; MODEL=deepseek, NODE_USE_ENV_PROXY=1 behind a proxy)
   src/sim-user.ts            a simulated user who answers from the intended program
+  src/terminal-user.ts       you as the user (INTERACTIVE=1): type requests, confirm or correct the kernel's questions
   src/scenario.ts            the expense tracker in 8 turns
   src/scenario-shop.ts       the shop's stock in 6 turns, its misreadings and probes
   src/scenarios.ts           SCENARIO=expenses|shop
@@ -120,6 +121,22 @@ npx tsc -p .                                                                    
 
 `ASK_RULES=v1|v2|v3` picks the question rules (v3 by default) to reproduce earlier rounds. NOTES.md maps every
 result file to the command that produced it.
+
+## Try it yourself
+
+Needs Node 22.6+ and a DeepSeek key (the model defaults to `deepseek-flash`; `DEEPSEEK_MODEL` overrides it):
+
+```
+cd chat-grown-software/prototype && npm ci
+DEEPSEEK_API_KEY=sk-... INTERACTIVE=1 MODEL=deepseek node --experimental-strip-types --no-warnings src/chat.ts
+```
+
+Type what you want ("Let me record expenses: an amount and a category."). When the model calls `develop`, the
+kernel shows each question's call, what it returns and the state it leaves: press Enter if that's right, `t` if it
+should throw, `v <json>` for a different return value, or a full `{"value": ..., "state": ...}`. An empty line ends
+the chat. The app lives in `prototype/data/chat-expenses/` (revisions, journal, `chat.jsonl`); each run starts it
+fresh. The expense scenario's invariants still apply (`SCENARIO=shop` for the shop's). Behind an HTTPS proxy, add
+`NODE_USE_ENV_PROXY=1`.
 
 ## How the kernel works
 
