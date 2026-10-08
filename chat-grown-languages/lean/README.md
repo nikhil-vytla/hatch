@@ -49,3 +49,9 @@ calls_missing: static (unknown identifier). breaks_trace: ratchet, traces, proof
 No `Float`, no mutual recursion between forms, helper names must not collide with core names, strict arity, laws are only as good as
 the statement (the kernel only insists it mentions an app function), runaway threads after a timeout are abandoned, a stack overflow in model code would abort the kernel.
 The JSON-to-State boundary (cent rounding, codecs) and the kernel itself are trusted; only the app's functions are proved.
+
+## Second scenario: LLM gateway (`SCENARIO=gateway`)
+`SCENARIO=gateway node ... bench/conformance.ts lean` -> 28/28. Same kernel code, gateway prelude and invariants (see NOTES.md);
+`reference-gateway.json` carries proved laws including "no key's usage ever exceeds its quota" (for every state within quota and every call)
+and "top_spender is a key and a maximum". `showcase/gateway-transcript.txt` (script `showcase/gateway-demo.ts`) shows three changes that pass
+all 19 examples and 300 random tests (an off-by-one, "quota 0 = unlimited", a quota exemption for one key) and are refused because the proof fails.

@@ -134,6 +134,7 @@ CkKernel >> dispatch: req [
 	op = 'rollback' ifTrue: [ ^ self opRollback: req ].
 	op = 'why' ifTrue: [ ^ self opWhy: req ].
 	op = 'changes' ifTrue: [ ^ self opChanges: req ].
+	op = 'inspect' ifTrue: [ ^ self opInspect: req ].
 	CkError signal: 'unknown op ' , op printString
 ]
 
@@ -419,6 +420,7 @@ CkKernel >> record: intent scope: scope asked: asked parent: parent code: newCod
 		       at: 'parent' put: parent;
 		       at: 'code_id' put: (self codeId: newCode);
 		       at: 'data_id' put: self dataId;
+		       at: 'at' put: DateAndTime now asString;
 		       at: 'intent' put: intent;
 		       at: 'scope' put: scope;
 		       at: 'asked' put: asked;
@@ -513,7 +515,12 @@ CkKernel >> opRollback: req [
 	target := revisions detect: [ :r | (r at: 'id') = tid ] ifNone: [ ^ self refuse: 'unknown revision ' , tid printString ].
 	base := (target at: 'code') asDictionary.
 	newCode := Dictionary new.
-	base keysAndValuesDo: [ :k :v | newCode at: k asSymbol put: v ].
+	(req at: 'fn' ifAbsent: [ nil ])
+		ifNil: [ base keysAndValuesDo: [ :k :v | newCode at: k asSymbol put: v ] ]
+		ifNotNil: [ :fn |
+			"one function only: keep the current code, swap in that function's methods from the target revision"
+			code keysAndValuesDo: [ :k :v | (self nameOf: k) = fn ifFalse: [ newCode at: k put: v ] ].
+			base keysAndValuesDo: [ :k :v | (self nameOf: k) = fn ifTrue: [ newCode at: k asSymbol put: v ] ] ].
 	cand := [ self buildCandidate: newCode ] on: CkError do: [ :e | ^ self refuse: 'old code does not load: ' , e messageText ].
 	changedNames := Set new.
 	(code keys , newCode keys) do: [ :s | (code at: s ifAbsent: [ nil ]) = (newCode at: s ifAbsent: [ nil ]) ifFalse: [ changedNames add: (self nameOf: s) ] ].
@@ -521,7 +528,7 @@ CkKernel >> opRollback: req [
 	failed isEmpty ifFalse: [ ^ self refuse: 'refused by ' , (failed first at: 'layer') , ': ' , (failed first at: 'detail') ].
 	parent := target at: 'parent'.
 	self installCode: newCode.
-	id := self record: 'rollback to ' , tid scope: changedNames asArray asSortedCollection asArray asked: (target at: 'asked') parent: parent code: newCode changed: changedNames.
+	id := self record: 'rollback' , ((req at: 'fn' ifAbsent: [ nil ]) ifNil: [ '' ] ifNotNil: [ :f | ' of ' , f ]) , ' to ' , tid scope: changedNames asArray asSortedCollection asArray asked: (target at: 'asked') parent: parent code: newCode changed: changedNames.
 	self persist.
 	^ Dictionary new
 		  at: 'ok' put: true;
@@ -529,6 +536,79 @@ CkKernel >> opRollback: req [
 		  at: 'generation' put: generation;
 		  at: 'new_revision' put: id;
 		  yourself
+]
+
+{ #category : #ops }
+CkKernel >> opInspect: req [
+	"Read-only operator views of the live image (fixed queries, no code evaluation):
+	 object, senders, who, history, method."
+
+	| what arg |
+	what := req at: 'what' ifAbsent: [ CkError signal: 'inspect needs what' ].
+	arg := req at: 'arg' ifAbsent: [ nil ].
+	what = 'object' ifTrue: [
+		| calls |
+		calls := liveApp state at: 'calls' ifAbsent: [ #(  ) ].
+		^ Dictionary new
+			  at: 'ok' put: true;
+			  at: 'object' put: liveApp printString;
+			  at: 'class' put: liveApp class name asString;
+			  at: 'superclass' put: liveApp class superclass name asString;
+			  at: 'instVars' put: liveApp class allInstVarNames asArray;
+			  at: 'state keys' put: liveApp state keys sorted;
+			  at: 'calls recorded' put: calls size;
+			  at: 'methods' put: (ExpenseApp selectors sorted collect: #asString) asArray;
+			  yourself ].
+	what = 'senders' ifTrue: [
+		^ Dictionary new
+			  at: 'ok' put: true;
+			  at: 'selector' put: arg;
+			  at: 'senders' put: ((ExpenseApp selectors select: [ :sel | (ExpenseApp >> sel) sendsSelector: arg asSymbol ]) sorted collect: #asString) asArray;
+			  yourself ].
+	what = 'who' ifTrue: [
+		| by |
+		by := Dictionary new.
+		(liveApp state at: 'calls' ifAbsent: [ #(  ) ]) do: [ :c |
+			| row |
+			row := by at: (c at: 'key') ifAbsentPut: [ Dictionary new at: 'calls' put: 0; at: 'tokens' put: 0; at: 'models' put: Set new; yourself ].
+			row at: 'calls' put: (row at: 'calls') + 1.
+			row at: 'tokens' put: (row at: 'tokens') + (c at: 'tokens').
+			(row at: 'models') add: (c at: 'model') ].
+		by valuesDo: [ :row | row at: 'models' put: (row at: 'models') asArray sorted ].
+		^ Dictionary new at: 'ok' put: true; at: 'keys' put: by; yourself ].
+	what = 'history' ifTrue: [ ^ Dictionary new at: 'ok' put: true; at: 'history' put: self history lines asArray; yourself ].
+	what = 'method' ifTrue: [
+		| sel |
+		sel := ExpenseApp selectors detect: [ :x | (self nameOf: x) = arg ] ifNone: [ ^ self refuse: 'no method ' , arg printString ].
+		^ Dictionary new
+			  at: 'ok' put: true;
+			  at: 'selector' put: sel asString;
+			  at: 'source' put: (ExpenseApp >> sel) sourceCode;
+			  at: 'protocol' put: (ExpenseApp >> sel) protocol asString;
+			  at: 'stamp' put: (ExpenseApp >> sel) timeStamp asString;
+			  yourself ].
+	CkError signal: 'inspect: unknown view ' , what printString
+]
+
+{ #category : #accessing }
+CkKernel >> history [
+	"One line per revision: id, time, intent, the functions it changed, and the chat message that asked."
+
+	^ String streamContents: [ :out |
+		  revisions do: [ :r |
+			  out
+				  nextPutAll: (r at: 'id');
+				  nextPutAll: '  ';
+				  nextPutAll: ((r at: 'at' ifAbsent: [ '' ]) copyFrom: 12 to: 19);
+				  nextPutAll: '  ';
+				  nextPutAll: (r at: 'intent');
+				  nextPutAll: '  changed ';
+				  nextPutAll: (r at: 'changed') asArray printString;
+				  nextPutAll: '  asked #';
+				  nextPutAll: ((r at: 'asked') ifNil: [ '-' ] ifNotNil: [ :a | (a at: 'message') printString ]);
+				  nextPutAll: ' ';
+				  nextPutAll: ((r at: 'asked') ifNil: [ '' ] ifNotNil: [ :a | (a at: 'text') printString ]);
+				  nextPut: Character lf ] ]
 ]
 
 { #category : #ops }

@@ -7,7 +7,7 @@
 // become questions (plus repetition and coverage questions), the kernel shows what the candidate does, the
 // simulated user answers from the JS reference program, only those answers go to the kernel's gates.
 // After each turn a hidden goal check runs the scenario's own examples on the live code (the model never sees them).
-import { appendFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Block, Message, Model, ToolDef } from "../../chat-grown-software/prototype/src/chat.ts";
@@ -43,7 +43,7 @@ const SYSTEM = `You grow a small app by changing its code while it runs, one cha
 - When done, tell the user in one or two sentences what changed. Don't ask questions back; decide sensibly.
 
 How to write code for this kernel:
-${readFileSync(join(ROOT, lang, "prompt.md"), "utf8")}`;
+${readFileSync(existsSync(join(ROOT, lang, `prompt-${SCENARIO_NAME}.md`)) ? join(ROOT, lang, `prompt-${SCENARIO_NAME}.md`) : join(ROOT, lang, "prompt.md"), "utf8")}`;
 
 type Event = { t: number; turn: number; kind: string; text: string };
 const t0 = Date.now();

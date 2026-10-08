@@ -1,0 +1,95 @@
+
+=== 1. BOOT: an empty image grows the gateway, one chat turn at a time ===
+  * turn 1 "usage": accepted as rev-0001  (methods: record_usage, usage)
+  * turn 2 "prices": accepted as rev-0002  (methods: set_price, cost)
+  * turn 3 "quotas": accepted as rev-0003  (methods: set_quota, record_usage)
+  * turn 4 "validation": accepted as rev-0004  (methods: record_usage)
+  * turn 5 "top spender": accepted as rev-0005  (methods: top_spender)
+  * prices gpt=50c/1k, claude=300c/1k; carol has a quota of 4000 tokens
+
+=== 2. TRAFFIC FLOWS ===
+  * traffic burst 1: 40 calls -> 37 recorded, refused: 3x "tokens must be a positive whole number"
+
+=== 3. A MODEL CHANGE SHIPS WHILE TRAFFIC KEEPS FLOWING ===
+  * user: "Invoices must add up: bill every call in whole cents."  -> accepted as rev-0006
+  * ratchet, invariants and trace replay all pass: the confirmed examples have whole-cent calls, so they cannot see the bug
+  * user: "Refuse negative prices."  -> accepted as rev-0007
+  * traffic burst 2: 60 calls -> 55 recorded, refused: 4x "tokens must be a positive whole number", 1x "over quota"
+
+=== 4. THE OPERATOR OPENS THE LIVE IMAGE (read-only console: inspect, changes, try) ===
+  * the app is an object: an ExpenseApp, a ExpenseApp (superclass ExpenseBase), instance variables ["state"]
+  * its state keys ["calls","prices","quotas"]; 92 calls recorded; methods: cost:  record_usage:model:tokens:  set_price:cents:  set_quota:tokens:  top_spender  usage:
+  who sent what (live, from the object):
+    alice     23 calls   4060 tokens  models claude/gpt
+    bob       23 calls   4220 tokens  models claude/gpt
+    carol     22 calls   3960 tokens  models claude/gpt
+    scraper   24 calls    216 tokens  models gpt
+  * senders of #cost: -> ["top_spender"]
+  the image's own change log (Epicea), last 6 of 10 method changes to ExpenseApp:
+    MethodModification ExpenseApp>>record_usage:model:tokens:
+    MethodAddition     ExpenseApp>>set_quota:tokens:
+    MethodModification ExpenseApp>>record_usage:model:tokens:
+    MethodAddition     ExpenseApp>>top_spender
+    MethodModification ExpenseApp>>cost:
+    MethodModification ExpenseApp>>set_price:cents:
+
+=== 5. SOMETHING LOOKS WRONG ===
+  * scraper sent 24 calls = 216 tokens of gpt at 50c/1k, so it should owe about $0.11
+  * cost("scraper") says $0  <-- free traffic
+  * top_spender() right now (preview, nothing recorded): "bob"
+
+=== 6. HOT-FIX IN ONE METHOD, NO RESTART ===
+  * recompile ExpenseApp>>cost: -> accepted as rev-0008; nobody was disconnected
+  * cost("scraper") now $0.10799999999999997
+  * top_spender() (a caller of cost:, untouched) now answers "bob": it saw the new method on its next send
+  * traffic burst 3, on the patched method: 20 calls -> 13 recorded, refused: 5x "over quota", 2x "tokens must be a positive whole number"
+
+=== 7. WHICH REVISION INTRODUCED THE BUG, AND WHO ASKED FOR IT? ===
+  revision history of this world (kept with the image):
+    rev-0001  08:57:41  usage  changed #('record_usage' 'usage')  asked #10 'I run an LLM API gateway. Record usage per API key: record_usage(key, model, tokens) stores the call and returns that key''s total tokens so far; usage(key) returns the total (0 for a key never seen).'
+    rev-0002  08:57:41  prices  changed #('cost' 'set_price')  asked #20 'Now prices: set_price(model, cents_per_1k_tokens) sets a model''s price and returns it. cost(key) is what that key has spent in dollars, rounded to cents. A model without a price costs nothing.'
+    rev-0003  08:57:41  quotas  changed #('record_usage' 'set_quota')  asked #30 'Rate limits: set_quota(key, tokens) caps a key''s total tokens and returns the quota; it throws if the key has already used more. record_usage must throw if the call would take the key over its quota. Keys without a quota are unlimited.'
+    rev-0004  08:57:41  validation  changed #('record_usage')  asked #40 'Reject bad input: tokens must be a positive whole number, and key and model non-empty strings. Throw an error.'
+    rev-0005  08:57:41  top spender  changed #(#top_spender)  asked #50 'Who spends the most? top_spender() returns the key with the highest cost; ties go to the alphabetically first key; null when nothing is recorded.'
+    rev-0006  08:57:42  invoice per call  changed #('cost')  asked #60 'Invoices must add up: bill every call in whole cents.'
+    rev-0007  08:57:42  price validation  changed #('set_price')  asked #70 'Refuse negative prices.'
+    rev-0008  08:57:43  hotfix cost  changed #('cost')  asked #80 'operator: stop under-billing tiny calls (hotfix)'
+  * suspect: rev-0006 "invoice per call", chat message #60 "Invoices must add up: bill every call in whole cents."
+  * that revision rounded each call separately: 9 tokens at 50c/1k is 0.45c, which rounds to 0
+  Epicea agrees, newest last:
+    MethodAddition     ExpenseApp>>top_spender
+    MethodModification ExpenseApp>>cost:
+    MethodModification ExpenseApp>>set_price:cents:
+    MethodModification ExpenseApp>>cost:
+
+=== 8. ROLL BACK ONE METHOD (set_price's validation from rev-0007 stays) ===
+  * rollback of cost to rev-0005 -> {"ok":true,"generation":9,"revision":"rev-0005","new_revision":"rev-0009"}
+  * ExpenseApp>>cost: is the original again (stamp 10/8/2026 08:57); its source:
+      cost: key
+      	| prices cents |
+      	prices := state at: 'prices' ifAbsent: [ Dictionary new ].
+      	cents := (state at: 'calls' ifAbsent: [ #() ]) inject: 0 into: [ :sum :c |
+      		(c at: 'key') = key
+      			ifTrue: [ sum + ((c at: 'tokens') / 1000.0 * (prices at: (c at: 'model') ifAbsent: [ 0 ])) ]
+      			ifFalse: [ sum ] ].
+      	^ cents rounded / 100.0
+  * cost("scraper") = $0.13 (rounded once, on the total)
+  * set_price("x", -1) -> {"ok":false,"error":"price must be >= 0","replayed":false} (rev-0007 survived)
+  * traffic burst 4: 20 calls -> 14 recorded, refused: 5x "over quota", 1x "tokens must be a positive whole number"
+
+=== 9. SAVE THE IMAGE, RESTART, THE WHOLE WORLD COMES BACK ===
+  * stdin closed: the kernel saved world.image (57 MB) and world.json (366 KB) in 209 ms
+  * new VM, first answer after 182 ms: generation 9 (was 9), revision rev-0009
+  * data: 119 calls recorded (was 119), state identical: true
+  * code: 6 methods, sources identical: true
+  * history: 9 revisions, identical: false ...except the rollback entry that came after: rev-0009  08:57:44  rollback of cost to rev-0005
+  * why cost -> rev-0009 "rollback of cost to rev-0005", asked by message #50: "Who spends the most? top_spender() returns the key with the highest cost; ties go to the alphabetically first key; null when nothing is recorded."
+  * exactly-once survives: replaying request t-1 -> replayed=true
+  * traffic burst 5, on the restarted image: 10 calls -> 8 recorded, refused: 1x "tokens must be a positive whole number", 1x "over quota"
+
+=== SUMMARY ===
+  - 5 chat turns grew the gateway as methods of one live class; 2 later changes shipped under traffic
+  - a bad revision (per-call rounding) passed every gate: the examples could not see it
+  - the operator found it from the live object, hot-fixed one method with no restart; callers saw it at once
+  - revision history + Epicea named the revision and the chat message; one method was rolled back, the rest kept
+  - the saved image plus world.json restored code, data and history in a new VM
