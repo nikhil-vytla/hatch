@@ -23,11 +23,11 @@ Working with Claude Fable 5 turns out to require two distinct shifts, drawn from
 
 ### [Markov Chain Simulator](markov-chain-sim/) (2025-12-04)
 
-Lightweight Markov Chain simulator for visualizing state transitions and the memoryless property.
+A small, self-contained Markov chain simulator for watching state transitions play out and seeing the memoryless property in action: the next state depends only on the current one. It is a lightweight single-page tool, [markov.html](markov.html), so it needs no build step or dependencies. The README is brief and gives no results, parameters, or usage notes, so what the simulator can do beyond visualizing transitions is not documented. For background on the underlying idea, see the [Markov chain article on Wikipedia](https://en.wikipedia.org/wiki/Markov_chain).
 
 ### [Multi-Turn Eval System (standardization for agents)](meta-agent-eval-system/) (2025-11-21)
 
-Demo of multi-turn eval pipeline and incident-to-eval taxonomy for (customer support) AI agents.
+A demo of a multi-turn evaluation pipeline and an incident-to-eval taxonomy for customer support AI agents, built as a Streamlit app. It includes a support chatbot with two tools (refund policy lookup and booking status check), LLM judges that score multi-turn conversations from CSV data, and a taxonomy explorer that maps real incidents (the Air Canada chatbot case) to eval categories and methodologies. Without an OpenAI key the agent and judges run in mock mode, so the whole flow works end to end. The design draws on [Snowglobe](https://snowglobe.so/) for chatbot simulation and [Verifiers](https://github.com/PrimeIntellect-ai/verifiers) for RL environments and agent evals.
 
 ### [llabel - Lightweight Labeling Widgets](lightweight-labeling-tool/) (2025-11-08)
 
