@@ -283,3 +283,73 @@ caller inside the kernel) this prototype does not have.
 ### Not done
 
 - A model-backed OptChat summarizer: no API key in this environment.
+
+## Round 3: OptChat to the revised (UniiChat) spec
+
+Victor Taelin rewrote the gist on 2026-10-07 (commit `3c190e0`, +403/-706 lines; retitled "UniiChat"). A Sonnet agent
+implemented the changes from a spec I wrote; I verified the result independently.
+
+What changed in the spec, and in the code:
+
+- **Merge priority.** `due = (T - last) / 2^l`, the pair's age measured from its *last* message in units of its own
+  line size, ties to the oldest pair. The spec derives it from Taelin's rollback `push` (a binary counter: newest
+  entries churn, old ones almost never change) and says the old rule, measured from the *first* message, was the bug
+  that made old lines churn. Verified two ways: my own scratch `push` + fold script gives 20,001/20,001 for the new
+  rule and exactly 481/20,001 for the old one (the spec's numbers), and the agent's exported `mergeDown` gives the
+  same against my `push`. Round 1 used the old rule (`(T - start)/2^(l+2)`).
+- **Sawtooth.** Append only; past 128 KB, one batch merges down to 64 KB. Between batches the view only grows at its
+  end, so each call's view is a prefix of the next one's.
+- **Persistence.** The view is saved to `view.json` (atomic write) and never rebuilt from the log, because a rebuilt
+  view differs from the live one and kills every cache entry. Round 1 refolded at load. A missing `view.json` with an
+  existing log is folded once, as a migration path. The compaction view is not persisted; it is rebuilt at load.
+- **Compactions.** Now async: FIFO queues (pending messages, ready merges, retries), up to 8 calls, a message node
+  starts when fewer than 8 earlier lines are unbuilt, a merge when both halves are built, no tree scans (load-time
+  recovery is two linear passes). `settle(id)` lets a turn wait until everything before it is summarized. Each call
+  gets its own view (merged further, 16-32 KB sawtooth, ending at the node, only built lines) and the verbatim task
+  with the 512-dash ruler; the "Too long ... ← LIMIT" retry runs in the same conversation, at most 5 tries, shortest
+  kept (tested with fake models that overshoot). `ModelSummarizer(complete)` is ready for a real model; there is still
+  no API key here, so the deterministic summarizer is the default.
+- **Log.** Kinds `user | agent | tool | echo | work | note` (the spec's `unii` renamed), day-split
+  `main/` and `tree/` files read with real structural parsers (malformed lines are rejected like torn ones, unlike the
+  round-2 `(line): T => JSON.parse(line)` parsers), tool output clipped to 15,000 + 15,000 characters of head and
+  tail, any other long text split into 30,000-character messages.
+- **Prompt.** The spec's system prompt (renamed to Forge, minus the device/computer paragraph and `zoom("Name")`,
+  which Forge has no use for) is a constant pi-durable section; a `date(id)` tool sits next to `zoom` (and is a
+  reserved name for cells). The memory glue moved from `forge.ts` to `src/memory-extension.ts`.
+
+**A round-1 bug, found by the agent and confirmed here.** pi-durable places the first system message *after* the
+first user message (a probe of the raw request shows `user, system`, then `user, system, assistant, user`). Round 1's
+"keep the leading system message first" checked index 0, never matched, and folded the system prompt and every tool
+into a delta after the view on every request: the opposite of the cacheable head it was written for. The request is
+now `[system prompt] [view] [delta of later tool announcements] [current run]`.
+
+**Benchmark** (`results/bench-view-v2-*.json`; seeded synthetic log; averages skip the first 500 messages; "per
+message" is a call after every message, as in the spec's simulation; cache read uses the spec's marking: 4-line
+blocks, mark on the last whole block):
+
+| messages | policy | line-inputs / message | cache read | avg view |
+|---|---|---|---|---|
+| 4,000 | sawtooth 64-128 KB | 1.68 | 98.8% | 96 KB |
+| 4,000 | round-1 policy (merge every message, first-message rule, 96 KB) | 71.9 | 31.4% | 96 KB |
+| 4,000 | sliding window 96 KB | 18.1 | 73.3% | 90 KB |
+| 20,000 | sawtooth | 1.60 | 98.8% | 96 KB |
+| 20,000 | round-1 policy | 52.7 | 31.2% | 96 KB |
+| 20,000 | sliding window | 17.7 | 73.4% | 90 KB |
+| 100,000 | sawtooth | 1.52 | 98.8% | 96 KB |
+| 100,000 | round-1 policy | 40.7 | 31.5% | 96 KB |
+| 100,000 | sliding window | 16.8 | 74.5% | 90 KB |
+
+- Called only at user turns, the sawtooth reads 94% from cache: a batch every ~110 messages invalidates it, and a turn
+  adds about 8 lines.
+- This reverses round 1's finding that a sliding window caches better at short histories: that was an artifact of the
+  old merge rule, not of OptChat.
+- Against the spec: its 98.6% cache read reproduces (98.8%). A pure line simulation (30,000 messages) gives 57.9 lines
+  per message for a fixed 192-line view merged every message and 1.77 for a 96-192 line sawtooth, matching the spec's
+  §3.3 text ("about 53 of 192", "about 2"). Its "21 vs 80 line-inputs per message" does not reproduce and is
+  inconsistent with that text; it may count compaction-call inputs, which this benchmark does not model.
+
+Tests: 93 (31 for the memory, 3 for the request shaping). tsc 0 errors, oxlint 0 findings.
+
+Not done: the spec's "one process owns a chat (hold a lock)"; the batch-in-progress flag is not saved in
+`view.json`, so a batch interrupted by a crash resumes only once the view is over 128 KB again; cache marking is
+modeled, not sent (pi-ai's request API was not checked for `cache_control`).

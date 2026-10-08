@@ -88,12 +88,15 @@ Checks can be retired, but only explicitly, and the retirement is logged.
 4. **OptChat on pi-durable has to fold tool announcements, not drop them.** pi-durable announces tools and prompt
    sections as positional system messages. My first `beforeRequest` replaced everything before the current run with
    the OptChat view and silently removed every tool. The fix that also keeps the cache warm:
-   - keep the leading system message first;
+   - keep the leading system message first (round 3 found this never worked: pi-durable puts the first system
+     message *after* the first user message, so the check at index 0 always failed and the prompt and tools were
+     folded after the view on every request; it now finds the system prompt wherever it is and moves it first);
    - put the view next;
    - fold all later tool and section changes into one delta placed *after* the view;
    - keep the current run verbatim.
-5. **OptChat's view is cacheable, and gets more so as the chat grows** (`src/bench-view.ts`, 128 KB budget,
-   seeded synthetic agent log, truncating summarizer):
+5. *(Superseded in round 3: this measured the old merge rule. See "Round 3" below.)* **OptChat's view is cacheable,
+   and gets more so as the chat grows** (`src/bench-view.ts`, 128 KB budget, seeded synthetic agent log, truncating
+   summarizer):
 
    | messages | avg shared prefix between consecutive turns | median | prompt-cache read at 50k/80k/100k marks |
    |---|---|---|---|
@@ -159,7 +162,35 @@ A second round implemented the transferable lessons, with [rauchg/gdp-ts](https:
 - The remaining ways unverified code could get through (the public `registry.install`, raw code accepted by the
   runtime, caller-owned invariants passed as a plain argument) are listed in NOTES as accepted limits.
 
-## Gaps (round 1; see round 2 above for what changed)
+## Round 3: OptChat to the revised spec
+
+Victor Taelin revised the OptChat gist on 2026-10-07 (now "UniiChat"). The memory now follows it; details in
+[NOTES.md](NOTES.md#round-3-optchat-to-the-revised-uniichat-spec).
+
+- **Which lines merge.** The priority is now `due = (T - last) / 2^l`, measured from a pair's last message. Held at
+  the length of Taelin's rollback `push` list, it reproduces `push` exactly at all 20,001 steps; the old rule,
+  measured from the first message, matches at 481. Both numbers are the spec's, and both reproduce against a `push`
+  written independently of the implementation.
+- **When they merge.** Appending only adds a line; once the view passes 128 KB, one batch merges it down to 64 KB. The
+  view is saved to `view.json` and never rebuilt from the log.
+- **What it buys** (`results/bench-view-v2-*.json`, a call after every message):
+
+  | messages | policy | lines written per message | view read from cache |
+  |---|---|---|---|
+  | 20,000 | sawtooth (new) | 1.6 | 98.8% |
+  | 20,000 | merge every message, first-message rule (round 1) | 52.7 | 31.2% |
+  | 20,000 | sliding window | 17.7 | 73.4% |
+
+  The spec reports 98.6% cache reads; this gets 98.8% (94% when a call happens only at user turns). Its "about 2
+  lines per message" for the batched view and "53 of 192" for a fixed one reproduce (1.77 and 57.9); its separate
+  "21 vs 80" figure does not, and is inconsistent with those.
+- **Compactions** are async: queues, never tree scans, up to 8 at once, a turn waits until everything before it is
+  summarized. Each gets its own 16-32 KB view ending at its node and the spec's verbatim task with the 512-dash ruler
+  and "Too long" retry. `ModelSummarizer` takes any `complete()` function; with no API key here, the deterministic
+  summarizer is still the default.
+- **Bug found in round-1 code** (finding 4 above): the system prompt never actually led the request. Fixed.
+
+## Gaps (round 1; see rounds 2 and 3 above for what changed)
 
 - ~~The migration runs on the real state before the catalogue commit, in two databases.~~ Fixed in round 2 with a
   pending/marker/live protocol reconciled on boot.
@@ -174,13 +205,20 @@ A second round implemented the transferable lessons, with [rauchg/gdp-ts](https:
 ```sh
 cd prototype && npm install          # pi-durable, pi-ai, chord, pi-codemode 1.0.3, @gdp-ts/core; tsc, oxlint
 npm run check                        # tsc + oxlint (anti-slop + gdp-ts)
-npm test                             # 59 tests, about a minute
+npm test                             # 93 tests, about a minute
 node --experimental-strip-types --no-warnings src/demo.ts           # three processes: grow, crash, recover
 node --experimental-strip-types --no-warnings src/bench-view.ts 20000
 node --experimental-strip-types --no-warnings src/shadow-check.ts
 FORGE_EXACTLY_ONCE=0 node --experimental-strip-types --no-warnings src/demo.ts   # the "interrupted" behaviour
 ```
 
-Files: `src/cells.ts` (cell runtime and gate checks), `src/forge.ts` (kernel, cells and memory extensions),
-`src/optchat.ts` (log, tree, view fold, zoom), `src/demo.ts`, `src/bench-view.ts`, `src/shadow-check.ts`. The working
-log is in [NOTES.md](NOTES.md).
+Files in `prototype/src/`:
+- cell runtime: `cells.ts` (sandbox, per-cell SQLite, exactly-once calls, invariants, traces) and `schema-fuzz.ts`;
+- the gate and the catalogue: `gate.ts`, `proofs/` (the only modules that mint gdp-ts proofs), `catalogue.ts` (the
+  only writer and installer, migrations, boot reconcile), `catalogue-doc.ts`, `proposal.ts`, and `mistakes.ts`
+  (type-checked mistakes, never run);
+- memory: `optchat.ts` (log, tree, view, compactor), `compaction.ts` (tasks, ruler, retry), `optchat-prompt.ts`, and
+  `memory-extension.ts` (the pi-durable glue);
+- `forge.ts` (the kernel's tools) and the scripts `demo.ts`, `bench-view.ts`, `bench-cells.ts`, `shadow-check.ts`.
+
+The working log is in [NOTES.md](NOTES.md).
