@@ -12,10 +12,13 @@ from .checkpoint_agent import (
     StagePricing,
 )
 from .checkpoint_evolution import (
+    BUDGET_HEADROOM_FACTOR,
+    BudgetMatchingError,
     CaseExecution,
     CheckpointFamily,
     SeedFamilyFixture,
     admit_family,
+    budget_headroom_violations,
     load_seed_family,
     run_case_trusted,
 )
@@ -215,6 +218,8 @@ def run_ce_screening(
     dry_run_execution: CeDryRunExecution = "trusted-fixture",
     approve_spend: bool = False,
     spend_cap_usd: float = SCREENING_SPEND_CAP_USD,
+    max_output_tokens: int = CE_MAX_OUTPUT_TOKENS,
+    min_budget_headroom: float = BUDGET_HEADROOM_FACTOR,
     transport: Transport | None = None,
     environment: Mapping[str, str] | None = None,
     sandbox_runner: SandboxRunner | None = None,
@@ -235,9 +240,25 @@ def run_ce_screening(
             else SandboxCaseExecution(PINNED_SANDBOX, runner=sandbox_runner)
         )
         execution_identity = f"sandbox:{PINNED_SANDBOX.image}"
+        # Refuse budget-confounded designs before any money is spent: with
+        # full-file-map replies, arms whose caps fail the headroom rule are
+        # nominally matched but effectively unmatched (the evolved arm's
+        # guaranteed budget for new content is the cap increment).
+        headroom = budget_headroom_violations(
+            fixture.family, fixture.references, factor=min_budget_headroom
+        )
+        if headroom:
+            raise BudgetMatchingError(
+                "live screening refused, arms are not budget-matched: "
+                + "; ".join(headroom)
+            )
         if not math.isfinite(spend_cap_usd) or spend_cap_usd <= 0:
             raise ValueError("screening spend cap must be finite and positive")
-        upper = ce_cost_upper_usd(fixture.family, trial_seeds=trial_seeds)
+        upper = ce_cost_upper_usd(
+            fixture.family,
+            trial_seeds=trial_seeds,
+            max_output_tokens=max_output_tokens,
+        )
         if upper > spend_cap_usd:
             raise SpendApprovalRequired(
                 f"screening upper estimate ${upper:.2f} exceeds "
@@ -261,7 +282,7 @@ def run_ce_screening(
             admitted,
             provider,
             expected_response_model=expected_response_model,
-            max_output_tokens=CE_MAX_OUTPUT_TOKENS,
+            max_output_tokens=max_output_tokens,
             pricing=pricing,
             spend_cap_usd=spend_cap_usd,
         )
@@ -296,7 +317,7 @@ def run_ce_screening(
                 provider,
                 contract=admitted.family.contract,
                 expected_response_model=expected_response_model,
-                max_output_tokens=CE_MAX_OUTPUT_TOKENS,
+                max_output_tokens=max_output_tokens,
                 pricing=pricing,
             )
 
@@ -304,7 +325,7 @@ def run_ce_screening(
         "mode": mode,
         "endpoint": HUD_GATEWAY_ENDPOINT,
         "expected_response_model": expected_response_model,
-        "max_output_tokens": CE_MAX_OUTPUT_TOKENS,
+        "max_output_tokens": max_output_tokens,
         "pricing": pricing.model_dump(mode="json"),
         "execution": execution_identity,
         "spend_cap_usd": spend_cap_usd,

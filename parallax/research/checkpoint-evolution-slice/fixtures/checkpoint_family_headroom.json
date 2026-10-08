@@ -1,0 +1,201 @@
+{
+  "family": {
+    "checkpoints": [
+      {
+        "cases": [
+          {
+            "argv": [
+              "total"
+            ],
+            "case_id": "t1-total-basic",
+            "category": "core",
+            "expect_stderr": false,
+            "expected_exit_code": 0,
+            "expected_stdout": "10\n",
+            "input_files": [],
+            "stdin_text": "alpha 2\nbeta 3\nalpha 5\n"
+          },
+          {
+            "argv": [
+              "total"
+            ],
+            "case_id": "t1-total-empty",
+            "category": "functionality",
+            "expect_stderr": false,
+            "expected_exit_code": 0,
+            "expected_stdout": "0\n",
+            "input_files": [],
+            "stdin_text": ""
+          },
+          {
+            "argv": [
+              "total"
+            ],
+            "case_id": "t1-total-malformed",
+            "category": "error",
+            "expect_stderr": true,
+            "expected_exit_code": 2,
+            "expected_stdout": "",
+            "input_files": [],
+            "stdin_text": "alpha two\n"
+          }
+        ],
+        "index": 1,
+        "max_output_bytes": 4096,
+        "operator": "core",
+        "public_spec": "# tally, checkpoint 1: totals\n\nBuild a command-line tool whose entrypoint is `tally.py`, invoked as:\n\n    python3 tally.py total\n\nInput arrives on standard input as event records, one per line. A record\nis `<name> <count>` separated by exactly one space, where `<name>` is one\nor more lowercase ASCII letters and `<count>` is a non-negative decimal\ninteger. Blank lines are ignored. Input with no records is valid.\n\n`total` prints the sum of all counts as a decimal integer followed by a\nsingle newline, then exits 0.\n\nExample: input `gamma 7` then `delta 4` prints `11` and exits 0. Empty\ninput prints `0` and exits 0.\n\nErrors: for any malformed record, or for an unknown or missing\nsubcommand, write a message to standard error, print nothing to standard\noutput, and exit 2. The wording of error messages is not constrained.\n\nNormalization: output ends with exactly one trailing newline; no other\nwhitespace is emitted on standard output.\n"
+      },
+      {
+        "cases": [
+          {
+            "argv": [
+              "top"
+            ],
+            "case_id": "t2-top-basic",
+            "category": "core",
+            "expect_stderr": false,
+            "expected_exit_code": 0,
+            "expected_stdout": "alpha\n",
+            "input_files": [],
+            "stdin_text": "alpha 2\nbeta 3\nalpha 5\n"
+          },
+          {
+            "argv": [
+              "top"
+            ],
+            "case_id": "t2-top-tie",
+            "category": "functionality",
+            "expect_stderr": false,
+            "expected_exit_code": 0,
+            "expected_stdout": "alpha\n",
+            "input_files": [],
+            "stdin_text": "beta 4\nalpha 4\n"
+          },
+          {
+            "argv": [
+              "top"
+            ],
+            "case_id": "t2-top-empty",
+            "category": "error",
+            "expect_stderr": true,
+            "expected_exit_code": 1,
+            "expected_stdout": "",
+            "input_files": [],
+            "stdin_text": ""
+          }
+        ],
+        "index": 2,
+        "max_output_bytes": 8192,
+        "operator": "extension",
+        "public_spec": "# tally, checkpoint 2: top name\n\nExtend `tally.py` with a second subcommand:\n\n    python3 tally.py top\n\n`top` aggregates counts per name and prints the name with the largest\naggregated total, followed by a single newline, then exits 0. If two or\nmore names tie for the largest total, print the lexicographically\nsmallest of the tied names (bytewise comparison of the ASCII names).\n\nExample: input `gamma 2`, `delta 9`, `gamma 8` prints `gamma` (gamma\ntotals 10, delta 9). Example: input `epsilon 5`, `delta 5` prints\n`delta` (tie broken lexicographically).\n\nIf the input contains no records, `top` writes a message to standard\nerror, prints nothing to standard output, and exits 1.\n\nAll checkpoint 1 behavior is unchanged, including `total` output and the\nexit-2 error contract for malformed records and unknown subcommands.\n"
+      },
+      {
+        "cases": [
+          {
+            "argv": [
+              "--input",
+              "data.txt",
+              "total"
+            ],
+            "case_id": "t3-file-total",
+            "category": "core",
+            "expect_stderr": false,
+            "expected_exit_code": 0,
+            "expected_stdout": "3\n",
+            "input_files": [
+              {
+                "content": "alpha 2\nbeta 1\n",
+                "path": "data.txt"
+              }
+            ],
+            "stdin_text": ""
+          },
+          {
+            "argv": [
+              "--input",
+              "data.txt",
+              "top"
+            ],
+            "case_id": "t3-file-top",
+            "category": "functionality",
+            "expect_stderr": false,
+            "expected_exit_code": 0,
+            "expected_stdout": "alpha\n",
+            "input_files": [
+              {
+                "content": "beta 3\nalpha 3\n",
+                "path": "data.txt"
+              }
+            ],
+            "stdin_text": ""
+          },
+          {
+            "argv": [
+              "total"
+            ],
+            "case_id": "t3-stdin-preserved",
+            "category": "functionality",
+            "expect_stderr": false,
+            "expected_exit_code": 0,
+            "expected_stdout": "1\n",
+            "input_files": [],
+            "stdin_text": "alpha 1\n"
+          },
+          {
+            "argv": [
+              "--input",
+              "absent.txt",
+              "total"
+            ],
+            "case_id": "t3-missing-file",
+            "category": "error",
+            "expect_stderr": true,
+            "expected_exit_code": 3,
+            "expected_stdout": "",
+            "input_files": [],
+            "stdin_text": ""
+          }
+        ],
+        "index": 3,
+        "max_output_bytes": 12288,
+        "operator": "input-source",
+        "public_spec": "# tally, checkpoint 3: file input\n\nExtend `tally.py` to read records from a file as an alternative to\nstandard input:\n\n    python3 tally.py --input FILE total\n    python3 tally.py --input FILE top\n\nWhen `--input FILE` is present (it always precedes the subcommand), read\nrecords from FILE, resolved relative to the working directory, and\nignore standard input entirely. When it is absent, behavior is exactly\nas before: records come from standard input for both subcommands.\n\nExample: with a file `events.txt` containing `gamma 1` and `gamma 2`,\n`python3 tally.py --input events.txt total` prints `3` and exits 0.\n\nIf FILE cannot be opened, write a message to standard error, print\nnothing to standard output, and exit 3. Malformed records inside FILE\nkeep the existing exit-2 error contract. `--input` without a following\npath is a usage error: exit 2, message to standard error.\n"
+      }
+    ],
+    "contract": {
+      "entry_file": "tally.py",
+      "interpreter": "python3",
+      "timeout_seconds": 15.0
+    },
+    "family_id": "ce-tally-1-headroom"
+  },
+  "references": {
+    "family_digest": "f3693a94df8884df956fcffb1804e14924c48ad34b95a98abdf9b25388215812",
+    "stages": [
+      {
+        "files": [
+          {
+            "content": "import sys\n\n\ndef read_records(stream):\n    records = []\n    for line in stream:\n        text = line.strip(\"\\n\")\n        if not text:\n            continue\n        parts = text.split(\" \")\n        if (\n            len(parts) != 2\n            or not parts[0].isalpha()\n            or not parts[0].islower()\n            or not parts[0].isascii()\n            or not (parts[1].isdigit() and parts[1].isascii())\n        ):\n            raise ValueError(\"malformed record: \" + text)\n        records.append((parts[0], int(parts[1])))\n    return records\n\n\ndef main(argv):\n    if len(argv) != 1 or argv[0] != \"total\":\n        print(\"usage: tally.py total\", file=sys.stderr)\n        return 2\n    try:\n        records = read_records(sys.stdin)\n    except ValueError as error:\n        print(error, file=sys.stderr)\n        return 2\n    print(sum(count for _, count in records))\n    return 0\n\n\nif __name__ == \"__main__\":\n    sys.exit(main(sys.argv[1:]))\n",
+            "path": "tally.py"
+          }
+        ]
+      },
+      {
+        "files": [
+          {
+            "content": "import sys\n\n\ndef read_records(stream):\n    records = []\n    for line in stream:\n        text = line.strip(\"\\n\")\n        if not text:\n            continue\n        parts = text.split(\" \")\n        if (\n            len(parts) != 2\n            or not parts[0].isalpha()\n            or not parts[0].islower()\n            or not parts[0].isascii()\n            or not (parts[1].isdigit() and parts[1].isascii())\n        ):\n            raise ValueError(\"malformed record: \" + text)\n        records.append((parts[0], int(parts[1])))\n    return records\n\n\ndef totals_by_name(records):\n    totals = {}\n    for name, count in records:\n        totals[name] = totals.get(name, 0) + count\n    return totals\n\n\ndef main(argv):\n    if len(argv) != 1 or argv[0] not in (\"total\", \"top\"):\n        print(\"usage: tally.py total|top\", file=sys.stderr)\n        return 2\n    try:\n        records = read_records(sys.stdin)\n    except ValueError as error:\n        print(error, file=sys.stderr)\n        return 2\n    if argv[0] == \"total\":\n        print(sum(count for _, count in records))\n        return 0\n    totals = totals_by_name(records)\n    if not totals:\n        print(\"no records for top\", file=sys.stderr)\n        return 1\n    print(min(totals, key=lambda name: (-totals[name], name)))\n    return 0\n\n\nif __name__ == \"__main__\":\n    sys.exit(main(sys.argv[1:]))\n",
+            "path": "tally.py"
+          }
+        ]
+      },
+      {
+        "files": [
+          {
+            "content": "import sys\n\n\ndef read_records(stream):\n    records = []\n    for line in stream:\n        text = line.strip(\"\\n\")\n        if not text:\n            continue\n        parts = text.split(\" \")\n        if (\n            len(parts) != 2\n            or not parts[0].isalpha()\n            or not parts[0].islower()\n            or not parts[0].isascii()\n            or not (parts[1].isdigit() and parts[1].isascii())\n        ):\n            raise ValueError(\"malformed record: \" + text)\n        records.append((parts[0], int(parts[1])))\n    return records\n\n\ndef totals_by_name(records):\n    totals = {}\n    for name, count in records:\n        totals[name] = totals.get(name, 0) + count\n    return totals\n\n\ndef run(command, records):\n    if command == \"total\":\n        print(sum(count for _, count in records))\n        return 0\n    totals = totals_by_name(records)\n    if not totals:\n        print(\"no records for top\", file=sys.stderr)\n        return 1\n    print(min(totals, key=lambda name: (-totals[name], name)))\n    return 0\n\n\ndef main(argv):\n    path = None\n    if argv[:1] == [\"--input\"]:\n        if len(argv) < 2:\n            print(\"usage: tally.py [--input FILE] total|top\", file=sys.stderr)\n            return 2\n        path = argv[1]\n        argv = argv[2:]\n    if len(argv) != 1 or argv[0] not in (\"total\", \"top\"):\n        print(\"usage: tally.py [--input FILE] total|top\", file=sys.stderr)\n        return 2\n    if path is None:\n        stream = sys.stdin\n    else:\n        try:\n            stream = open(path, encoding=\"utf-8\")\n        except OSError as error:\n            print(error, file=sys.stderr)\n            return 3\n    try:\n        records = read_records(stream)\n    except ValueError as error:\n        print(error, file=sys.stderr)\n        return 2\n    finally:\n        if path is not None:\n            stream.close()\n    return run(argv[0], records)\n\n\nif __name__ == \"__main__\":\n    sys.exit(main(sys.argv[1:]))\n",
+            "path": "tally.py"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -7,7 +7,7 @@ from conftest import CHECKPOINT_FIXTURE
 from test_checkpoint_sandbox import LOCKDOWN_FLAGS, SimulatedDockerRunner
 
 from parallax.checkpoint_agent import HAIKU_STAGE_PRICING
-from parallax.checkpoint_evolution import StageVerification
+from parallax.checkpoint_evolution import BudgetMatchingError, StageVerification
 from parallax.checkpoint_runner import (
     CeFamilyRecord,
     CeManifestRecord,
@@ -126,6 +126,25 @@ def test_execution_identity_is_bound_into_the_manifest(seed_fixture, tmp_path) -
     )
 
 
+def test_live_screening_refuses_budget_confounded_designs(
+    seed_fixture, tmp_path
+) -> None:
+    """The original flat-cap family is refused before approval or spend."""
+    transport, calls = _live_transport(seed_fixture)
+    with pytest.raises(BudgetMatchingError, match="not budget-matched"):
+        run_ce_screening(
+            mode="live",
+            seed_path=CHECKPOINT_FIXTURE,
+            output_path=tmp_path / "live.jsonl",
+            trial_seeds=SEEDS,
+            approve_spend=True,
+            transport=transport,
+            environment={"HUD_API_KEY": "offline-test-credential"},
+            sandbox_runner=SimulatedDockerRunner(),
+        )
+    assert calls == []
+
+
 def test_live_screening_requires_spend_approval_before_any_call(
     seed_fixture, tmp_path
 ) -> None:
@@ -136,6 +155,7 @@ def test_live_screening_requires_spend_approval_before_any_call(
             seed_path=CHECKPOINT_FIXTURE,
             output_path=tmp_path / "live.jsonl",
             trial_seeds=SEEDS,
+            min_budget_headroom=0.0,
             transport=transport,
             environment={"HUD_API_KEY": "offline-test-credential"},
             sandbox_runner=SimulatedDockerRunner(),
@@ -153,6 +173,7 @@ def test_live_screening_rejects_designs_over_the_cap(seed_fixture, tmp_path) -> 
             trial_seeds=SEEDS,
             approve_spend=True,
             spend_cap_usd=0.001,
+            min_budget_headroom=0.0,
             transport=transport,
             environment={"HUD_API_KEY": "offline-test-credential"},
             sandbox_runner=SimulatedDockerRunner(),
@@ -172,6 +193,7 @@ def test_live_screening_sandboxes_every_model_written_case(
         output_path=output,
         trial_seeds=SEEDS,
         approve_spend=True,
+        min_budget_headroom=0.0,
         transport=transport,
         environment={"HUD_API_KEY": "offline-test-credential"},
         sandbox_runner=runner,
@@ -211,6 +233,7 @@ def test_live_reported_model_drift_is_an_agent_fault(seed_fixture, tmp_path) -> 
         output_path=tmp_path / "live.jsonl",
         trial_seeds=(7,),
         approve_spend=True,
+        min_budget_headroom=0.0,
         transport=drifted,
         environment={"HUD_API_KEY": "offline-test-credential"},
         sandbox_runner=SimulatedDockerRunner(),
