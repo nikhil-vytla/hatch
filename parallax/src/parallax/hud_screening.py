@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import json
 import subprocess
 from pathlib import Path
 from typing import Any, cast
@@ -14,32 +13,19 @@ from hud.agents.types import ToolStep
 from hud.eval import DockerRuntime, Task
 from hud.types import Step
 from hud.utils.time import now_iso
-from pydantic import Field
 
 from .canonical import atomic_write, canonical_bytes
 from .delivery import CompleteDeliveryReceiptV1, TurnDeliveryController
 from .hud_compile import CompiledBundleV1, compile_hud, load_evaluator_specs
+from .hud_wire import WireFormatError, parse_wire, raise_stream_frame_limit
+from .metering import MeteredUsage, meter
 from .outcome import FailureKind
+from .preflight import require_docker
 from .screening import ScreeningExecution, ScreeningExecutionError, ScreeningUnit
 from .specs import freeze_swe_specs
 from .swebench import SweScriptFamily
 from .swebench_harness import OfficialHarnessError, run_official_harness
-from .types import NonEmptyText, StrictModel
-
-
-class TokenPricing(StrictModel):
-    input_usd_per_million: float = Field(gt=0)
-    output_usd_per_million: float = Field(gt=0)
-
-
-CLAUDE_OPUS_PRICING = TokenPricing(
-    input_usd_per_million=5.0,
-    output_usd_per_million=25.0,
-)
-CLAUDE_HAIKU_PRICING = TokenPricing(
-    input_usd_per_million=1.0,
-    output_usd_per_million=5.0,
-)
+from .types import NonEmptyText, NonNegativeInt, StrictModel
 
 
 def _docker_runtime(image: str) -> DockerRuntime:
@@ -47,12 +33,27 @@ def _docker_runtime(image: str) -> DockerRuntime:
 
 
 class HudEpisode(StrictModel):
+    """One paid episode, stored as tokens rather than as dollars.
+
+    A cached episode outlives the rate card that was current when it ran, and
+    a resume that trusted a stored price would carry a retired rate into fresh
+    evidence — which is exactly how a screening round came to be reported at
+    three times its cost. Price is therefore never stored, only derived.
+    """
+
     model_patch: str
     delivery: CompleteDeliveryReceiptV1
     reported_model: NonEmptyText
-    prompt_tokens: int = Field(ge=0)
-    completion_tokens: int = Field(ge=0)
-    estimated_cost_usd: float = Field(ge=0)
+    prompt_tokens: NonNegativeInt
+    completion_tokens: NonNegativeInt
+
+    @property
+    def usage(self) -> MeteredUsage:
+        return meter(
+            self.reported_model,
+            prompt_tokens=self.prompt_tokens,
+            completion_tokens=self.completion_tokens,
+        )
 
 
 class HarnessTurnAgent(Agent):
@@ -144,17 +145,8 @@ class HarnessTurnAgent(Agent):
         )
 
 
-def parse_delivery_receipt(value: object) -> CompleteDeliveryReceiptV1:
-    """Parse a delivery receipt from HUD grade info.
-
-    The receipt crosses the HUD wire as JSON, so tuple fields arrive as
-    lists. Strict python-mode validation rejects those, so validation must
-    go through JSON mode.
-    """
-    return CompleteDeliveryReceiptV1.model_validate_json(json.dumps(value))
-
-
 def _docker_build(directory: Path, image: str) -> None:
+    require_docker()
     result = subprocess.run(
         [
             "docker",
@@ -187,7 +179,6 @@ async def _run_episode(
     turns: tuple[NonEmptyText, ...],
     step_budgets: tuple[int, ...],
     model: str,
-    pricing: TokenPricing,
 ) -> HudEpisode:
     policy = create_agent(
         model,
@@ -231,10 +222,11 @@ async def _run_episode(
         if usage is not None:
             prompt_tokens += usage.prompt_tokens or 0
             completion_tokens += usage.completion_tokens or 0
-    cost = (
-        prompt_tokens * pricing.input_usd_per_million
-        + completion_tokens * pricing.output_usd_per_million
-    ) / 1_000_000
+    usage = meter(
+        model,
+        prompt_tokens=prompt_tokens,
+        completion_tokens=completion_tokens,
+    )
 
     def episode_error(
         failure_kind: FailureKind,
@@ -246,9 +238,7 @@ async def _run_episode(
             failure_kind,
             message,
             reported_model=models[-1] if models else None,
-            prompt_tokens=prompt_tokens,
-            completion_tokens=completion_tokens,
-            estimated_cost_usd=cost,
+            usage=usage,
         )
 
     if run.trace.stop_reason == "length":
@@ -259,8 +249,11 @@ async def _run_episode(
     if not isinstance(patch, str):
         raise episode_error("agent", "HUD run omitted the candidate patch")
     try:
-        delivery = parse_delivery_receipt(run.grade.info.get("delivery"))
-    except ValueError as error:
+        delivery = parse_wire(
+            CompleteDeliveryReceiptV1,
+            run.grade.info.get("delivery"),
+        )
+    except WireFormatError as error:
         raise episode_error(
             "agent", "HUD run omitted a complete delivery receipt"
         ) from error
@@ -272,7 +265,6 @@ async def _run_episode(
         reported_model=models[-1],
         prompt_tokens=prompt_tokens,
         completion_tokens=completion_tokens,
-        estimated_cost_usd=cost,
     )
 
 
@@ -283,13 +275,24 @@ class HudExecutor:
         *,
         model: str,
         work_directory: Path,
-        pricing: TokenPricing = CLAUDE_OPUS_PRICING,
     ) -> None:
         self.families = families
         self.model = model
         self.work_directory = work_directory
-        self.pricing = pricing
         self._compiled: dict[str, tuple[str, CompiledBundleV1]] = {}
+
+    def _unit_directory(self, root: str, unit: ScreeningUnit) -> Path:
+        """Every per-unit path carries the whole unit identity.
+
+        A path built from instance and trial alone collides across arms, which
+        silently serves one arm's cached episode to another.
+        """
+        return (
+            self.work_directory
+            / root
+            / str(self.families[str(unit.source_id)].static.problem.instance_id)
+            / f"{unit.arm}-trial-{unit.trial_index}"
+        )
 
     def _compile(self, family: SweScriptFamily) -> tuple[str, CompiledBundleV1]:
         problem = family.static.problem
@@ -313,38 +316,30 @@ class HudExecutor:
         problem = family.static.problem
         image, bundle = self._compile(family)
         task_spec, env_spec = load_evaluator_specs(bundle)
-        episode_path = (
-            self.work_directory
-            / "episodes"
-            / str(problem.instance_id)
-            / f"trial-{unit.trial_index}.json"
-        )
+        script = getattr(family, unit.arm)
+        episode_path = self._unit_directory("episodes", unit).with_suffix(".json")
         if episode_path.exists():
             episode = HudEpisode.model_validate_json(episode_path.read_bytes())
         else:
+            raise_stream_frame_limit()
             episode = asyncio.run(
                 _run_episode(
                     image=image,
                     environment_name=f"parallax-{problem.instance_id}",
                     arm=str(unit.arm),
-                    turns=tuple(turn.text for turn in getattr(family, unit.arm).turns),
-                    step_budgets=getattr(family, unit.arm).agent_steps,
+                    turns=tuple(turn.text for turn in script.turns),
+                    step_budgets=script.agent_steps,
                     model=self.model,
-                    pricing=self.pricing,
                 )
             )
             atomic_write(episode_path, canonical_bytes(episode) + b"\n")
             print(
                 f"SCREENING_USAGE source={problem.instance_id} "
-                f"trial={unit.trial_index} cost_usd={episode.estimated_cost_usd:.6f}",
+                f"trial={unit.trial_index} arm={unit.arm} "
+                f"cost_usd={episode.usage.cost_usd:.6f}",
                 flush=True,
             )
-        harness_directory = (
-            self.work_directory
-            / "official-harness"
-            / source_id
-            / f"trial-{unit.trial_index}"
-        )
+        harness_directory = self._unit_directory("official-harness", unit)
         try:
             evaluation = run_official_harness(
                 task_spec,
@@ -361,16 +356,12 @@ class HudExecutor:
                 "verifier",
                 str(error),
                 reported_model=episode.reported_model,
-                prompt_tokens=episode.prompt_tokens,
-                completion_tokens=episode.completion_tokens,
-                estimated_cost_usd=episode.estimated_cost_usd,
+                usage=episode.usage,
             ) from error
         return ScreeningExecution(
             outcome=evaluation.outcome,
             reported_model=episode.reported_model,
-            prompt_tokens=episode.prompt_tokens,
-            completion_tokens=episode.completion_tokens,
-            estimated_cost_usd=episode.estimated_cost_usd,
+            usage=episode.usage,
             verifier_report_digest=evaluation.report_digest,
             harness_revision=evaluation.harness_revision,
             image_digest=evaluation.image_digest,

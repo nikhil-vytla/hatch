@@ -206,7 +206,10 @@ future slices:
    recorded the simplifications that were rejected because they would weaken
    method or evidence fidelity.
 4. **Behavioral mutation testing**, which mutated contract-bearing lines and
-   required the test suite to kill every active mutant.
+   required the test suite to kill every active mutant. The gauntlet is
+   committed as `tests/test_mutation_gauntlet.py` and runs under
+   `pytest -m mutation`; scores reported in reports dated before 2026-08-04
+   came from gauntlets that were never committed and are not reproducible.
 
 ## Why it is built this way
 

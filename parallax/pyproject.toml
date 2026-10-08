@@ -20,6 +20,7 @@ where = ["src"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+markers = ["mutation: mutates a contract-bearing line and asserts the suite notices"]
 
 [tool.ruff]
 line-length = 88

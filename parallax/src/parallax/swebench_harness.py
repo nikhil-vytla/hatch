@@ -9,6 +9,7 @@ from typing import Annotated
 from pydantic import BaseModel, ConfigDict, Field
 
 from .canonical import atomic_write, canonical_bytes, canonical_digest
+from .hud_wire import parse_wire
 from .outcome import Verdict, Verification
 from .specs import EnvSpecV1, TaskSpecV1
 from .swebench import SWE_BENCH_HARNESS_REVISION
@@ -256,7 +257,7 @@ def run_official_harness(
         if len(summaries) == 1:
             summary_bytes = summaries[0].read_bytes()
             try:
-                summary = _OfficialSummary.model_validate_json(summary_bytes)
+                summary = parse_wire(_OfficialSummary, summary_bytes)
             except ValueError as error:
                 raise OfficialHarnessError(
                     "official harness summary is invalid"
@@ -281,9 +282,7 @@ def run_official_harness(
     report_bytes = reports[0].read_bytes()
     try:
         envelope = json.loads(report_bytes)
-        report = _OfficialReport.model_validate_json(
-            json.dumps(envelope[source.instance_id])
-        )
+        report = parse_wire(_OfficialReport, envelope[source.instance_id])
     except (KeyError, TypeError, ValueError) as error:
         raise OfficialHarnessError("official harness report is invalid") from error
     statuses = report.tests_status

@@ -320,18 +320,19 @@ as `ManifestRecord`. The one structural change is the split at the top:
 ```python
 class TaskSpecV1(StrictModel):
     schema_version: Literal[1] = 1
-    public: PublicTaskV1        # g, c, x_pub: statement, repo, base_commit,
-                                # arm scripts, budgets, schedule
-    sealed: SealedAuthorityV1   # V, R, x_seal: test patch, test lists,
-                                # test command, expected answer, normalization
+    public: PublicTaskV1  # g, c, x_pub: statement, repo, base_commit,
+    # arm scripts, budgets, schedule
+    sealed: SealedAuthorityV1  # V, R, x_seal: test patch, test lists,
+    # test command, expected answer, normalization
     # digests: public_digest over `public` only, spec_digest over both
+
 
 class EnvSpecV1(StrictModel):
     schema_version: Literal[1] = 1
-    image: ImageIdentity        # ref + digest (already pinned today)
+    image: ImageIdentity  # ref + digest (already pinned today)
     workspace: WorkspacePolicy  # root, network, reset semantics
-    tools: tuple[ToolDecl, ...] # U: director MCP, shell, ...
-    budget: BudgetDecl          # H, B: steps, tokens, timeouts
+    tools: tuple[ToolDecl, ...]  # U: director MCP, shell, ...
+    budget: BudgetDecl  # H, B: steps, tokens, timeouts
 ```
 
 Sealing becomes structural through the compiler contract, not a review

@@ -16,7 +16,7 @@ from parallax.delivery import (
     PhaseActivityV1,
     TurnDeliveryController,
 )
-from parallax.hud_screening import HarnessTurnAgent, parse_delivery_receipt
+from parallax.hud_screening import HarnessTurnAgent
 
 
 class ScriptedPolicy:
@@ -124,36 +124,6 @@ def test_controller_cannot_be_drained_after_completion() -> None:
 
     with pytest.raises(RuntimeError, match="already complete"):
         controller.observe_step(submitted=True)
-
-
-def test_delivery_receipt_parses_from_json_wire_shape() -> None:
-    receipt = CompleteDeliveryReceiptV1(
-        turn_count=2,
-        total_step_budget=12,
-        phases=(
-            PhaseActivityV1(
-                turn_index=0,
-                step_budget=6,
-                steps_consumed=6,
-                advance_trigger="budget_exhaustion",
-            ),
-            PhaseActivityV1(
-                turn_index=1,
-                step_budget=6,
-                steps_consumed=6,
-                advance_trigger="terminal_budget_exhaustion",
-            ),
-        ),
-    )
-    wire = receipt.model_dump(mode="json")
-
-    assert isinstance(wire["phases"], list)
-    assert parse_delivery_receipt(wire) == receipt
-
-
-def test_missing_delivery_receipt_is_rejected() -> None:
-    with pytest.raises(ValueError):
-        parse_delivery_receipt(None)
 
 
 def test_harness_agent_intercepts_early_submission() -> None:

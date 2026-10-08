@@ -7,8 +7,9 @@ to the session that actually incurred it and cross-checks the total.
 Session history (see NOTES.md):
 - run 1 (delivery-wire defect): all failure rows recorded $0 while roughly
   four episodes of real spend went unmetered (the old failure path raised
-  before collecting token counts). Estimated $0.40-0.80 by round-2
-  averages; a standing accounting gap, not recoverable.
+  before collecting token counts). A standing accounting gap, not
+  recoverable; the estimate below prices the same astropy units at what they
+  cost when they were re-run and metered.
 - run 2 (frame-limit defect): paid astropy static trial-0/trial-1 and the
   destroyed evolved trial-0 episode; its orphaned process also paid the
   evolved trial-1 episode whose cost is first recorded in the run-3 file.
@@ -28,7 +29,14 @@ from parallax.screening import ScreeningRun, read_screening_jsonl
 
 EVIDENCE = Path(__file__).parent / "evidence"
 OUTPUT = EVIDENCE / "cross-session-spend.json"
-RUN1_UNMETERED_ESTIMATE_USD = (0.40, 0.80)
+# The three astropy units recorded at $0 in run 1, plus the evolved trial-1
+# episode in flight when it aborted, cost $0.128415, $0.087925, $0.095215 and
+# $0.080445 when they were later re-run and metered. The upper end bounds four
+# episodes at this experiment's most expensive single episode. A first estimate
+# of $0.40-0.80 extrapolated from round-2 averages that were priced at the
+# retired Opus 4.1 rate card; see research/spend-audit-20260803/.
+RUN1_UNMETERED_ESTIMATE_USD = (0.311555, 0.52)
+SUPERSEDED_RUN1_ESTIMATE_USD = (0.40, 0.80)
 
 ASTROPY = "swebench:astropy__astropy-14508"
 XARRAY = "swebench:pydata__xarray-4695"
@@ -117,9 +125,12 @@ def main() -> None:
             "run1_delivery_wire": {
                 "metered_usd": 0.0,
                 "unmetered_episode_estimate_usd": list(RUN1_UNMETERED_ESTIMATE_USD),
+                "superseded_estimate_usd": list(SUPERSEDED_RUN1_ESTIMATE_USD),
                 "note": (
                     "roughly four episodes of real spend lost to the "
-                    "pre-fix failure path that raised before usage capture"
+                    "pre-fix failure path that raised before usage capture; "
+                    "the superseded estimate used round-2 averages priced at "
+                    "the retired Opus 4.1 rate card"
                 ),
             },
             "run2_frame_limit": {
