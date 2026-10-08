@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import subprocess
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, cast
 
@@ -16,30 +17,22 @@ from hud.types import Step
 from hud.utils.time import now_iso
 from pydantic import Field
 
+from .admission import AdmissionRecord, check_admission
 from .canonical import atomic_write, canonical_bytes
 from .delivery import CompleteDeliveryReceiptV1, TurnDeliveryController
-from .hud_compile import CompiledBundleV1, compile_hud, load_evaluator_specs
+from .experiment import Execution, ExecutionError, Unit
 from .outcome import FailureKind
-from .screening import ScreeningExecution, ScreeningExecutionError, ScreeningUnit
-from .specs import freeze_swe_specs
-from .swebench import SweScriptFamily
+from .perturbation import VariantSet
+from .provider import TokenPricing, pricing_for
+from .swebench import SweBenchTask
 from .swebench_harness import OfficialHarnessError, run_official_harness
-from .types import NonEmptyText, StrictModel
-
-
-class TokenPricing(StrictModel):
-    input_usd_per_million: float = Field(gt=0)
-    output_usd_per_million: float = Field(gt=0)
-
-
-CLAUDE_OPUS_PRICING = TokenPricing(
-    input_usd_per_million=5.0,
-    output_usd_per_million=25.0,
+from .swebench_specs import (
+    CompiledBundle,
+    compile_bundle,
+    freeze_swe_task,
+    load_evaluator_specs,
 )
-CLAUDE_HAIKU_PRICING = TokenPricing(
-    input_usd_per_million=1.0,
-    output_usd_per_million=5.0,
-)
+from .types import NonEmptyText, SourceId, StrictModel
 
 
 def _docker_runtime(image: str) -> DockerRuntime:
@@ -174,16 +167,14 @@ def _docker_build(directory: Path, image: str) -> None:
         check=False,
     )
     if result.returncode:
-        raise ScreeningExecutionError(
-            "verifier", f"HUD image build failed: {result.stderr}"
-        )
+        raise ExecutionError("verifier", f"HUD image build failed: {result.stderr}")
 
 
 async def _run_episode(
     *,
     image: str,
     environment_name: str,
-    arm: str,
+    condition: str,
     turns: tuple[NonEmptyText, ...],
     step_budgets: tuple[int, ...],
     model: str,
@@ -196,15 +187,13 @@ async def _run_episode(
         auto_respond=False,
     )
     if not isinstance(policy, ToolAgent):
-        raise ScreeningExecutionError(
-            "agent", "HUD model did not create a tool-capable policy"
-        )
+        raise ExecutionError("agent", "HUD model did not create a tool-capable policy")
     agent = HarnessTurnAgent(
         policy,
         turns=turns,
         step_budgets=step_budgets,
     )
-    task = Task(env=environment_name, id="episode", args={"arm": arm})
+    task = Task(env=environment_name, id="episode", args={"condition": condition})
     try:
         job = await task.run(
             agent,
@@ -212,13 +201,11 @@ async def _run_episode(
             rollout_timeout=3600,
         )
     except TimeoutError as error:
-        raise ScreeningExecutionError("agent", "HUD episode timed out") from error
+        raise ExecutionError("agent", "HUD episode timed out") from error
     except Exception as error:
-        raise ScreeningExecutionError(
-            "agent", f"HUD episode failed: {error}"
-        ) from error
+        raise ExecutionError("agent", f"HUD episode failed: {error}") from error
     if len(job.runs) != 1:
-        raise ScreeningExecutionError("agent", "HUD returned an invalid run count")
+        raise ExecutionError("agent", "HUD returned an invalid run count")
     run = job.runs[0]
     models: list[str] = []
     prompt_tokens = 0
@@ -231,18 +218,15 @@ async def _run_episode(
         if usage is not None:
             prompt_tokens += usage.prompt_tokens or 0
             completion_tokens += usage.completion_tokens or 0
-    cost = (
-        prompt_tokens * pricing.input_usd_per_million
-        + completion_tokens * pricing.output_usd_per_million
-    ) / 1_000_000
+    cost = pricing.cost_usd(prompt_tokens, completion_tokens)
 
     def episode_error(
         failure_kind: FailureKind,
         message: str,
-    ) -> ScreeningExecutionError:
+    ) -> ExecutionError:
         # The episode already ran, so its metered usage must survive into
         # the failure receipt instead of being reported as zero spend.
-        return ScreeningExecutionError(
+        return ExecutionError(
             failure_kind,
             message,
             reported_model=models[-1] if models else None,
@@ -265,7 +249,7 @@ async def _run_episode(
             "agent", "HUD run omitted a complete delivery receipt"
         ) from error
     if not models:
-        raise ScreeningExecutionError("agent", "HUD run omitted response.model")
+        raise ExecutionError("agent", "HUD run omitted response.model")
     return HudEpisode(
         model_patch=patch,
         delivery=delivery,
@@ -276,79 +260,89 @@ async def _run_episode(
     )
 
 
-class HudExecutor:
+class SweBenchExecutor:
+    """Build, run, and grade one SWE-bench episode per experiment unit.
+
+    Compilation is memoized per task and episodes are cached on disk, so a
+    relaunch reuses both. A replayed episode is reported with `fresh=False`:
+    it still carries the cost of the episode it replays, which is what makes a
+    single journal readable, but only fresh rows are summed as spend.
+    """
+
     def __init__(
         self,
-        families: dict[str, SweScriptFamily],
+        tasks: Mapping[SourceId, SweBenchTask],
+        variants: Mapping[SourceId, VariantSet],
+        admissions: Mapping[SourceId, AdmissionRecord],
         *,
         model: str,
         work_directory: Path,
-        pricing: TokenPricing = CLAUDE_OPUS_PRICING,
+        pricing: TokenPricing | None = None,
     ) -> None:
-        self.families = families
+        self.tasks = tasks
+        self.variants = variants
+        self.admissions = admissions
         self.model = model
         self.work_directory = work_directory
-        self.pricing = pricing
-        self._compiled: dict[str, tuple[str, CompiledBundleV1]] = {}
+        self.pricing = pricing or pricing_for(model)
+        self._compiled: dict[SourceId, tuple[str, CompiledBundle]] = {}
 
-    def _compile(self, family: SweScriptFamily) -> tuple[str, CompiledBundleV1]:
-        problem = family.static.problem
-        key = str(problem.record_id)
-        instance_id = str(problem.instance_id)
-        if key in self._compiled:
-            return self._compiled[key]
+    def _compile(self, task: SweBenchTask) -> tuple[str, CompiledBundle]:
+        if task.record_id in self._compiled:
+            return self._compiled[task.record_id]
+        instance_id = str(task.instance_id)
         directory = self.work_directory / "environments" / instance_id
         directory.mkdir(parents=True, exist_ok=True)
-        task_spec, env_spec = freeze_swe_specs(family)
-        bundle = compile_hud(task_spec, env_spec)
+        spec, environment = freeze_swe_task(task)
+        check_admission(spec, environment, self.admissions[task.record_id])
+        bundle = compile_bundle(
+            spec,
+            environment,
+            self.variants[task.record_id],
+        )
         bundle.write_agent_context(directory)
-        image = f"parallax-screening-{instance_id.lower()}:local"
+        image = f"parallax-swebench-{instance_id.lower()}:local"
         _docker_build(directory, image)
-        self._compiled[key] = (image, bundle)
+        self._compiled[task.record_id] = (image, bundle)
         return image, bundle
 
-    def __call__(self, unit: ScreeningUnit) -> ScreeningExecution:
-        source_id = str(unit.source_id)
-        family = self.families[source_id]
-        problem = family.static.problem
-        image, bundle = self._compile(family)
-        task_spec, env_spec = load_evaluator_specs(bundle)
+    def __call__(self, unit: Unit) -> Execution:
+        task = self.tasks[unit.task_id]
+        variant = self.variants[unit.task_id].variant(unit.condition)
+        image, bundle = self._compile(task)
+        spec, environment = load_evaluator_specs(bundle)
         episode_path = (
             self.work_directory
             / "episodes"
-            / str(problem.instance_id)
-            / f"trial-{unit.trial_index}.json"
+            / str(task.instance_id)
+            / f"{unit.condition}-trial-{unit.trial_index}.json"
         )
-        if episode_path.exists():
-            episode = HudEpisode.model_validate_json(episode_path.read_bytes())
-        else:
+        fresh = not episode_path.exists()
+        if fresh:
             episode = asyncio.run(
                 _run_episode(
                     image=image,
-                    environment_name=f"parallax-{problem.instance_id}",
-                    arm=str(unit.arm),
-                    turns=tuple(turn.text for turn in getattr(family, unit.arm).turns),
-                    step_budgets=getattr(family, unit.arm).agent_steps,
+                    environment_name=f"parallax-{task.instance_id}",
+                    condition=str(unit.condition),
+                    turns=self.variants[unit.task_id].prompts(unit.condition),
+                    step_budgets=tuple(turn.steps for turn in variant.turns),
                     model=self.model,
                     pricing=self.pricing,
                 )
             )
             atomic_write(episode_path, canonical_bytes(episode) + b"\n")
-            print(
-                f"SCREENING_USAGE source={problem.instance_id} "
-                f"trial={unit.trial_index} cost_usd={episode.estimated_cost_usd:.6f}",
-                flush=True,
-            )
+        else:
+            episode = HudEpisode.model_validate_json(episode_path.read_bytes())
         harness_directory = (
             self.work_directory
             / "official-harness"
-            / source_id
-            / f"trial-{unit.trial_index}"
+            / str(unit.task_id)
+            / f"{unit.condition}-trial-{unit.trial_index}"
         )
         try:
             evaluation = run_official_harness(
-                task_spec,
-                env_spec,
+                spec,
+                environment,
                 episode.model_patch,
                 model=episode.reported_model,
                 run_directory=harness_directory,
@@ -357,20 +351,21 @@ class HudExecutor:
                 ),
             )
         except OfficialHarnessError as error:
-            raise ScreeningExecutionError(
+            raise ExecutionError(
                 "verifier",
                 str(error),
                 reported_model=episode.reported_model,
                 prompt_tokens=episode.prompt_tokens,
                 completion_tokens=episode.completion_tokens,
-                estimated_cost_usd=episode.estimated_cost_usd,
+                estimated_cost_usd=episode.estimated_cost_usd if fresh else 0.0,
             ) from error
-        return ScreeningExecution(
+        return Execution(
             outcome=evaluation.outcome,
             reported_model=episode.reported_model,
             prompt_tokens=episode.prompt_tokens,
             completion_tokens=episode.completion_tokens,
             estimated_cost_usd=episode.estimated_cost_usd,
+            fresh=fresh,
             verifier_report_digest=evaluation.report_digest,
             harness_revision=evaluation.harness_revision,
             image_digest=evaluation.image_digest,

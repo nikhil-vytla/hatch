@@ -1,49 +1,30 @@
 from __future__ import annotations
 
 import json
-from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, ValidationError
 
 from .checkpoint_evolution import CheckpointError, EntrypointContract, Workspace
 from .checkpoint_runner import CheckpointDelivery, MeteredWorkspace, StageUsage
-from .evolving_intent import Message
 from .outcome import BudgetError
 from .provider import (
+    Message,
     OpenAICompatibleProvider,
     ProviderMessage,
     ProviderRequest,
     ProviderResponse,
+    TokenPricing,
+    unfence,
 )
-from .types import NonEmptyText, StrictModel
+from .types import NonEmptyText
 
-JSON_FENCE_PREFIX = "```json\n"
-JSON_FENCE_SUFFIX = "\n```"
-
-STAGE_PROTOCOL = (
-    "You are completing one checkpoint of an evolving command-line "
-    "programming task. Reply with the complete workspace as one JSON "
-    'object: {"files": {"<relative path>": "<full file content>"}}. '
-    "Include every file the program needs; any file you omit is deleted. "
-    "Do not use Markdown fences and do not add commentary. The program "
-    "must behave exactly as specified when run through the declared "
-    "entry file."
+STAGE_ROLE = (
+    "You are completing one checkpoint of an evolving command-line programming task."
 )
 
 
 class AgentReplyError(ValueError):
     pass
-
-
-class StagePricing(StrictModel):
-    input_usd_per_million: Annotated[float, Field(ge=0, allow_inf_nan=False)]
-    output_usd_per_million: Annotated[float, Field(ge=0, allow_inf_nan=False)]
-
-
-HAIKU_STAGE_PRICING = StagePricing(
-    input_usd_per_million=1.0,
-    output_usd_per_million=5.0,
-)
 
 
 class _FileMapReply(BaseModel):
@@ -72,15 +53,13 @@ def render_stage_messages(
         f"{current}"
     )
     return (
-        Message(role="system", content=STAGE_PROTOCOL),
+        Message(role="system", content=STAGE_ROLE),
         Message(role="user", content=user),
     )
 
 
 def parse_file_map(text: str) -> Workspace:
-    payload = text
-    if payload.startswith(JSON_FENCE_PREFIX) and payload.endswith(JSON_FENCE_SUFFIX):
-        payload = payload[len(JSON_FENCE_PREFIX) : -len(JSON_FENCE_SUFFIX)]
+    payload = unfence(text)
     try:
         reply = _FileMapReply.model_validate_json(payload)
     except ValidationError as error:
@@ -94,18 +73,17 @@ def parse_file_map(text: str) -> Workspace:
         raise AgentReplyError(f"stage reply file map is invalid: {error}") from error
 
 
-def _stage_usage(response: ProviderResponse, pricing: StagePricing) -> StageUsage:
+def _stage_usage(response: ProviderResponse, pricing: TokenPricing) -> StageUsage:
     usage = response.usage
     if usage is None:
         raise AgentReplyError("provider response omitted usage; stage is unmeterable")
-    cost = (
-        usage.prompt_tokens * pricing.input_usd_per_million
-        + usage.completion_tokens * pricing.output_usd_per_million
-    ) / 1_000_000
     return StageUsage(
         prompt_tokens=usage.prompt_tokens,
         completion_tokens=usage.completion_tokens,
-        estimated_cost_usd=cost,
+        estimated_cost_usd=pricing.cost_usd(
+            usage.prompt_tokens,
+            usage.completion_tokens,
+        ),
     )
 
 
@@ -132,7 +110,7 @@ class ProviderCheckpointAgent:
         contract: EntrypointContract,
         expected_response_model: NonEmptyText,
         max_output_tokens: int,
-        pricing: StagePricing,
+        pricing: TokenPricing,
     ) -> None:
         self._provider = provider
         self._contract = contract

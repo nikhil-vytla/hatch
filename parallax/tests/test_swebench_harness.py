@@ -6,16 +6,16 @@ from pathlib import Path
 
 import pytest
 from test_swebench import INSTANCE_ID
-from test_swebench_env import family
+from test_swebench_env import task
 
 from parallax.outcome import Verdict
-from parallax.specs import freeze_swe_specs
 from parallax.swebench import SWE_BENCH_HARNESS_REVISION
 from parallax.swebench_harness import OfficialHarnessError, run_official_harness
+from parallax.swebench_specs import freeze_swe_task
 
 
 def specs():
-    return freeze_swe_specs(family())
+    return freeze_swe_task(task())
 
 
 def report(*, resolved: bool = True, missing_test: bool = False):
