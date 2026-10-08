@@ -1,3 +1,5 @@
+<!-- Adapted from https://github.com/simonw/research/blob/main/AGENTS.md -->
+
 Start by creating a new folder for your work with an appropriate name.
 
 Create a NOTES.md file in that folder and append notes to it as you work, tracking what you tried and anything you learned along the way.
@@ -13,6 +15,6 @@ Your final commit should include just that folder and selected items from its co
 
 Do NOT include full copies of code that you fetched as part of your investigation. Your final commit should include only new files you created or diffs showing changes you made to existing code.
 
-Open README.md with a one-paragraph summary of what you did and found: 3-5 sentences, specific, with 1-2 links to key tools or projects, no emoji, and don't start with "This report" or "This research". The root README's index uses that paragraph (or `_summary.md`, if a folder has one).
+When the README is done, run the `summarize` skill (`.agents/skills/summarize/SKILL.md`) to write the folder's `_summary.md`. The root README's index shows it.
 
 Don't edit the index in the root README.md: CI rebuilds it after every push to main (`python3 .github/index.py`).
