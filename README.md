@@ -7,7 +7,11 @@ For these experiments, all I hope is that I get to learn something new! I have a
 ## Experiments
 
 <!-- index:start -->
-6 experiments, newest first.
+7 experiments, newest first.
+
+### [Growing software by talking to it, and how to verify it](chat-grown-software/) (2026-10-08)
+
+Geoffrey Huntley's [Jiti](https://github.com/ghuntley/jiti) grows an application by chatting with a live Common Lisp image. Here the idea is rebuilt in TypeScript on a `node:vm` realm, with a focus on verification. The model proposes code and example calls but never the expected answers: the kernel shows the user what each call actually returns and does to the state, asks its own boundary, repetition and coverage questions, and only the user's answers become the contract. With contracts built that way, seven verification layers caught 100% of 238 behavior-changing slips in an expense tracker and 96% of 224 in a held-out shop scenario. They also caught 30 of 37 hand-written misunderstandings, against 10 when the model graded itself. A follow-up in `languages/` rebuilt the kernel in Clojure, Elixir, Pharo Smalltalk, Racket and Lean 4 and had [DeepSeek](https://api-docs.deepseek.com/) grow two apps in each, 3 runs per language, scored by hidden checks.
 
 ### [Exhausting the design space for an RL rollout data layer](rl-env-filesystem/) (2026-08-03)
 
