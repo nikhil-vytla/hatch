@@ -1,2 +1,0 @@
-install order cells -> kernel: cell_list is "kernel"; after reloading cells: "kernel"
-install order kernel -> cells: cell_list is "agent-written v1"; after reloading cells: "agent-written v2"
