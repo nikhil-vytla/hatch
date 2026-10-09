@@ -3,11 +3,11 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { createInterface } from "node:readline";
-import { INVARIANTS as EXPENSE_INVARIANTS } from "../../chat-grown-software/prototype/src/scenario.ts";
+import { INVARIANTS as EXPENSE_INVARIANTS } from "../../prototype/src/scenario.ts";
 import { INVARIANTS as GATEWAY_INVARIANTS } from "../scenario/gateway.reference.js";
 
 const INVARIANTS = process.env.SCENARIO === "gateway" ? GATEWAY_INVARIANTS : EXPENSE_INVARIANTS;
-import { World } from "../../chat-grown-software/prototype/src/world.ts";
+import { World } from "../../prototype/src/world.ts";
 
 type Call = { fn: string; args: unknown[] };
 type Question = { fixture: unknown; calls: Call[] };

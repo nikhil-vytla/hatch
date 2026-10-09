@@ -1,9 +1,9 @@
 # Chat-grown software in five languages: Clojure, Elixir, Smalltalk, Racket, Lean
 
-[`chat-grown-software/`](../chat-grown-software/) rebuilt Geoffrey Huntley's
+The [parent folder](../README.md) rebuilt Geoffrey Huntley's
 [Jiti](https://github.com/ghuntley/jiti) idea (grow an application by chatting with a live Lisp image) in
 TypeScript, and worked out how to verify it: the model proposes code and example calls, the kernel shows the user
-what the code actually does, and only the user's answers become the contract. This folder asks the follow-up: **is
+what the code actually does, and only the user's answers become the contract. This subfolder asks the follow-up: **is
 TypeScript the right language for that kernel, and what does each language with a strong live-programming or
 verification story give for free?**
 
@@ -154,7 +154,7 @@ video/               player.html, build.ts, record.ts (Playwright + ffmpeg), sho
 videos/              the seven recordings (mp4, each under 2 MB)
 ```
 
-Run a kernel's conformance check (after its `setup.sh`):
+Run a kernel's conformance check from `chat-grown-software/languages/` (after the kernel's `setup.sh`):
 
 ```
 node --experimental-strip-types --no-warnings bench/conformance.ts clojure
@@ -174,6 +174,8 @@ Toolchains used: Elixir 1.14 (OTP 24/25), Racket 8.10 CS, Clojure CLI 1.12 on Ja
 - One model (`deepseek-flash`), 3 repetitions, two small scenarios. Differences of one or two checks are noise.
   Token counts include DeepSeek's reasoning and depend on how verbose each language's prompt makes it.
 - The user is simulated and never wrong; real users are slower and sometimes are. Results are upper bounds.
+- The JS baseline kernel and the simulated user reuse `../prototype/src/` (`world.ts`, `scenario.ts`, `sim-user.ts`),
+  and the driver uses the prototype's chat-loop types and DeepSeek adapter: changing those changes these results.
 - Each kernel was written by a Sonnet subagent in about 10-25 minutes and verified by re-running its conformance;
   their code is reviewed through those checks and the showcases, not line by line.
 - The sandboxes are in-process (Racket's sandbox, Elixir processes, Pharo processes): containment, not an OS

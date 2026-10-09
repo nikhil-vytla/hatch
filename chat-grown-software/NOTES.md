@@ -467,3 +467,13 @@ error: no real model run was possible.
 - First local run by the user failed with DeepSeek's "Authentication Fails (governor)": outside this container there
   is no proxy adding the key, and `DEEPSEEK_API_KEY` was unset. A 401 without a key now says so. Added
   `npm run play` for the interactive command (a typo'd `-- experimental-strip-types` made node look for a file).
+
+### Session 6 (2026-10-08/09): five more languages, merged here
+
+- Built Clojure, Elixir, Pharo Smalltalk, Racket and Lean 4 kernels behind one protocol, benchmarked them with
+  DeepSeek and recorded seven demos. Worked as a separate top-level folder first, then moved into `languages/`
+  at the user's request so the whole investigation is self-contained. Its own notes: `languages/NOTES.md`.
+- The move: `git mv`, four import prefixes `../../chat-grown-software/prototype/` -> `../../prototype/`, every
+  kernel rebuilt from scratch at the new path (ignored build output deleted first, so each setup ran as on a fresh
+  clone: Lean 2 min, the others 5-12 s), then 6 kernels x 2 scenarios of conformance (all pass), the prototype's scripted
+  chat output unchanged and `tsc` clean.

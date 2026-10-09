@@ -1,4 +1,4 @@
-// Showcase: proved laws vs tests, on the Lean kernel.  Run from chat-grown-languages/:
+// Showcase: proved laws vs tests, on the Lean kernel.  Run from chat-grown-software/languages/:
 //   node --experimental-strip-types --no-warnings lean/showcase/demo.ts | tee lean/showcase/transcript.txt
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";

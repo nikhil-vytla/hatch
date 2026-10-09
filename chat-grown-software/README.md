@@ -13,7 +13,9 @@ one chat turn at a time is still right?** It contains:
 - two apps grown through it: an expense tracker (8 turns) and a shop's stock (6 turns, with a data migration);
 - two studies:
   - 474 model-style slips (mutants), measuring which verification layer catches which kind of mistake;
-  - 38 hand-written *misunderstandings*: coherent programs that do the wrong thing (37 of them observably).
+  - 38 hand-written *misunderstandings*: coherent programs that do the wrong thing (37 of them observably);
+- a follow-up in [`languages/`](languages/README.md): is TypeScript the right language for this kernel? The same
+  kernel in Clojure, Elixir, Pharo Smalltalk, Racket and Lean 4, benchmarked with DeepSeek, with seven recorded demos.
 
 > Note: ghuntley.com was blocked in this environment. The post's substance came from the Jiti repository (README, 14
 > ADRs, examples) and Geoff's ["CS50-style tour" gist](https://gist.github.com/ghuntley/b8e28634090c51895d7972ff6a7c5619).
@@ -81,9 +83,31 @@ Three takeaways:
   13/16). Seven misreadings still pass every contract, each needing an input nobody mentioned: a capital letter, a
   third decimal, spending exactly at the budget, a sale of exactly the stock.
 
+## Follow-up: which language should the kernel be written in?
+
+[`languages/`](languages/README.md) rebuilt the kernel five more times behind one JSON-lines protocol, then had
+DeepSeek grow two apps (this expense tracker and an LLM API gateway) in each, 3 runs per language, scored by hidden
+checks the model never sees:
+
+| kernel | expenses | gateway | output tokens / run | what the language adds |
+|---|---|---|---|---|
+| JavaScript (this prototype's `World`) | 100% | 100% | 15-22k | baseline |
+| Clojure | 98% | 100% | 20-35k | code as data: missing functions and side effects refused statically |
+| Elixir | 100% | 100% | 13-39k | hot code loading with live state migration (564 requests, 0 failures during a reshape) |
+| Pharo Smalltalk | 100% | 100% | 18-28k | the live image: 25 ms changes, change log, per-method rollback, save/restart |
+| Racket | 95% | 100% | 25-41k | a real sandbox: attacks that escape `node:vm` are contained |
+| Lean 4 | 83% | 84% | 130-160k | proofs: "no key exceeds its quota" proved for all inputs |
+
+The language barely changes whether the model gets the code right; it changes what the kernel can know before
+running anything and what it can safely do to a live system. Lean is the exception both ways: the strongest
+guarantees, at 3-12x the tokens and with turns lost to re-proving. Details, the showcases and their videos are in
+[`languages/README.md`](languages/README.md).
+
 ## What's here
 
 ```
+languages/                   the follow-up: PROTOCOL.md, bench/ (DeepSeek driver, simulated user, conformance),
+                             js/ clojure/ elixir/ smalltalk/ racket/ lean/ kernels, results/, videos/
 prototype/
   src/world.ts               the live "image": late-bound functions + JSON state in a node:vm realm
   src/store.ts               revisions (code id + data id) + atomic CURRENT + journal + traces + request ids
@@ -235,7 +259,8 @@ A sibling experiment built a durable agent harness that writes and hot-installs 
   the Claude adapter is untested. The DeepSeek runs (`results/chat-deepseek-flash-v1.txt`, `-v2.txt`) are judged
   by the simulated user, who knows only the scripted program's function names. A model that names things
   differently (`totalExpenses` for `total`) is "corrected" toward functions that throw. Their numbers measure
-  agreement with the script as much as the model, so they are not comparable with the scripted results.
+  agreement with the script as much as the model, so they are not comparable with the scripted results. (The
+  `languages/` benchmark avoids this by naming each function in the user's message.)
 - **The simulated user never errs.** They answer from the intended program, so the chat numbers are an upper bound
   on what confirmation catches. Real users mis-confirm, and a long list of questions (up to 11 in one turn here)
   costs attention.
@@ -244,5 +269,5 @@ A sibling experiment built a durable agent harness that writes and hot-installs 
 - Mutants are first-order syntactic slips; the "is it equivalent?" oracle is a differential test, not a proof.
 - The boundary lexicon is crude: "without a price" produced `setPrice("", 1.25)`, and coverage calls pick argument
   values by kind, not by the parameter's type (`cents("food")`).
-- `node:vm` with frozen intrinsics and a timeout is cooperative isolation. Hostile code needs a process or isolate
-  boundary, as Jiti's README also says.
+- `node:vm` with frozen intrinsics and a timeout is cooperative isolation (`languages/racket/showcase/` runs the
+  same attacks against both). Hostile code needs a process or isolate boundary, as Jiti's README also says.

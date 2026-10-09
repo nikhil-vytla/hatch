@@ -2,9 +2,9 @@
 // It answers a question {fixture, calls} after turn i by what the intended program does (PROTOCOL.md outcomes).
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { INVARIANTS as EXPENSE_INVARIANTS, TURNS } from "../../chat-grown-software/prototype/src/scenario.ts";
-import { intendedFunctions } from "../../chat-grown-software/prototype/src/sim-user.ts";
-import { World } from "../../chat-grown-software/prototype/src/world.ts";
+import { INVARIANTS as EXPENSE_INVARIANTS, TURNS } from "../../prototype/src/scenario.ts";
+import { intendedFunctions } from "../../prototype/src/sim-user.ts";
+import { World } from "../../prototype/src/world.ts";
 import { ROOT } from "./kernel-client.ts";
 
 export type Call = { fn: string; args: unknown[] };

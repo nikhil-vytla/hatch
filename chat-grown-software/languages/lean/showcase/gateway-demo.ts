@@ -1,4 +1,4 @@
-// Showcase: proofs vs tests on an LLM API gateway (quotas / rate limits).  Run from chat-grown-languages/:
+// Showcase: proofs vs tests on an LLM API gateway (quotas / rate limits).  Run from chat-grown-software/languages/:
 //   SCENARIO=gateway node --experimental-strip-types --no-warnings lean/showcase/gateway-demo.ts > lean/showcase/gateway-transcript.txt
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";

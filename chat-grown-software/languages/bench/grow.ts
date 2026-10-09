@@ -10,8 +10,8 @@
 import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { Block, Message, Model, ToolDef } from "../../chat-grown-software/prototype/src/chat.ts";
-import { DeepSeekModel } from "../../chat-grown-software/prototype/src/model-deepseek.ts";
+import type { Block, Message, Model, ToolDef } from "../../prototype/src/chat.ts";
+import { DeepSeekModel } from "../../prototype/src/model-deepseek.ts";
 import { KernelClient, ROOT } from "./kernel-client.ts";
 import { type Call, fixture, intended, type Outcome, type Question, SCENARIO, SCENARIO_NAME, same, show } from "./reference.ts";
 

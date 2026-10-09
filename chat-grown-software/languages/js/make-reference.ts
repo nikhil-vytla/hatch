@@ -1,6 +1,6 @@
 // js/reference.json from the chat-grown-software scenario: the same forms with the protocol's snake_case names.
 import { writeFileSync } from "node:fs";
-import { TURNS } from "../../chat-grown-software/prototype/src/scenario.ts";
+import { TURNS } from "../../prototype/src/scenario.ts";
 
 const NAMES: [RegExp, string][] = [[/\baddExpense\b/g, "add_expense"], [/\bbyCategory\b/g, "by_category"], [/\bsetBudget\b/g, "set_budget"], [/\boverBudget\b/g, "over_budget"], [/\btopCategory\b/g, "top_category"]];
 const snake = (s: string) => NAMES.reduce((acc, [re, to]) => acc.replace(re, to), s);
