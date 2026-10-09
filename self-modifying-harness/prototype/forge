@@ -1,0 +1,33 @@
+#!/bin/sh
+# Start the forge with one command. This script only prepares the environment: it checks Node, installs dependencies on
+# first run, and hands off to src/start.ts (which parses the flags and resolves the models). NODE_USE_ENV_PROXY makes
+# Node honor HTTP(S)_PROXY, which the egress proxy relies on; it is harmless when no proxy is set.
+set -eu
+
+if ! command -v node >/dev/null 2>&1; then
+	echo "forge: Node 22.6 or newer is required, but node was not found" >&2
+	exit 1
+fi
+
+version=$(node -p 'process.versions.node')
+major=${version%%.*}
+rest=${version#*.}
+minor=${rest%%.*}
+
+if [ "$major" -lt 22 ] || { [ "$major" -eq 22 ] && [ "$minor" -lt 6 ]; }; then
+	echo "forge: Node 22.6 or newer is required (found $version)" >&2
+	exit 1
+fi
+
+# Stay in the caller's directory (so a relative --data means what they typed); only npm ci runs in the script's directory.
+here=$(cd "$(dirname "$0")" && pwd)
+
+if [ ! -d "$here/node_modules" ]; then
+	echo "forge: node_modules is missing; running npm ci..." >&2
+	(cd "$here" && npm ci)
+fi
+
+NODE_USE_ENV_PROXY=1
+export NODE_USE_ENV_PROXY
+
+exec node --experimental-strip-types --no-warnings "$here/src/start.ts" "$@"

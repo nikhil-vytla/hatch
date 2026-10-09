@@ -21,7 +21,11 @@
     "test": "node --test --experimental-strip-types --no-warnings test/*.test.ts",
     "bench:cells": "node --experimental-strip-types --no-warnings src/bench-cells.ts",
     "check": "npm run typecheck && npm run lint",
+    "start": "./forge",
     "chat": "NODE_USE_ENV_PROXY=1 node --experimental-strip-types --no-warnings src/chat.ts",
     "live-run": "NODE_USE_ENV_PROXY=1 node --experimental-strip-types --no-warnings src/live-run.ts"
+  },
+  "engines": {
+    "node": ">=22.6"
   }
 }

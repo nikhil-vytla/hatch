@@ -430,3 +430,32 @@ A Sonnet agent wrote `src/live.ts`, `src/chat.ts` and `src/live-run.ts`; I verif
   which stops a facet and keeps its database; calling it after the catalog flips `live` fixes both. `ctx.facets.delete`
   also works, so the scratch facet used for checks is now deleted without a guard.
 - Not covered: the agent loop on celld, concurrent calls, a crash mid-call, a multi-node fleet.
+
+## Round 6: one command, any model
+
+- **Ask.** Make it as easy to start as other harnesses, and make the model pluggable. A TUI came up too; it would be a
+  TypeScript layer on pi's own `@earendil-works/pi-tui` (a Rust TUI would only add a second process and a protocol for
+  no speed gain, since a turn waits seconds on the model), and it comes after this round, so this round stays plain text.
+- **Who did what.** pi's coding agent on `deepseek-flash` wrote `model-config.ts`, `start.ts`, `chat-loop.ts`, the
+  `forge` script and 20 tests from a brief that banned real model calls. Its report matched the diff, and check and
+  tests passed when I reran them. I then fixed what review turned up:
+  - a model named explicitly was accepted even when its provider had no key, so the error came at the first turn; it
+    is now refused up front, with a test;
+  - `forge` changed into its own directory, so a relative `--data` landed inside `prototype/`; it now stays in the
+    caller's directory and only `npm ci` runs in the script's;
+  - the auto-pick defaults were a year old (Haiku 4.5, gpt-5-mini, gemini-2.5-flash); they are now current mid-priced
+    models, and a test checks each exists in pi-ai's catalog;
+  - the library cap (60 calls, $0.25) fits a scripted run but a chat on a mid-priced model outgrows it in a few turns,
+    mostly through compactions, so `./forge` uses 300 calls or $1, still a hard stop.
+- **Pricing.** The meter took DeepSeek's prices as a fallback; it now uses the request's own `model.cost` from pi-ai's
+  catalog when pi-ai reports no cost. A custom `--base-url` model is priced at zero.
+- **End-to-end runs (all here, through `./forge`):** no key → the demo, then the hint; `--model deepseek/...` without a
+  key → refused, exit 1; a real chat ("keep a tally of books") → the model's first proposal was rejected by its own check
+  (a whitespace title), the second accepted with 12 checks and 40 fuzzed inputs, then used: 26 calls, $0.0194, about 70%
+  cache reads; the same `--data` again → "15 messages so far", and the answer came from the existing tool; `--base-url
+  https://api.deepseek.com/v1 --model deepseek-flash` with `FORGE_API_KEY` → a reply, priced $0, 0% cache (the generic
+  OpenAI-compatible parser does not read DeepSeek's cache field, and the custom model has no catalog price).
+- **The environment quirk.** Here the proxy injects the DeepSeek key, so the runs set `DEEPSEEK_API_KEY=proxy-injected`
+  on the command line; the code no longer sets it itself.
+- Not done: the TUI; a per-model smoke comparison (the round 4 script on several models); a check that a model supports
+  tool calls (pi-ai's catalog has no such flag).

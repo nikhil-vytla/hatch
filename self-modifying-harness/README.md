@@ -202,7 +202,7 @@ number. Details and the full transcript: [NOTES.md](NOTES.md#round-4-a-real-mode
   so replay of past calls could only report the change, not reject it.
 - **96 calls cost $0.071**, 81% of input read from cache: DeepSeek caches prefixes automatically, so the memory view is
   reused across turns. Compactions were 82 of the 96 calls.
-- Try it: `cd prototype && npm run chat` (needs the same DeepSeek access).
+- Try it: `cd prototype && ./forge --model deepseek/deepseek-flash` (any other model works too; see round 6).
 
 ## Round 5: the celld sketch, run on celld
 
@@ -218,7 +218,29 @@ digests), and pi's coding agent on DeepSeek V4.1 Flash wrote the test and the fi
   With it, all 7 scenarios pass (`celld-sketch/test.mjs`, details in `celld-sketch/RESULTS.md`).
 - Not covered: the agent loop on celld, concurrent calls, a crash mid-call, and a multi-node fleet.
 
-## Gaps (round 1; see rounds 2-5 above for what changed)
+## Round 6: one command, any model
+
+`./forge` (or `npm start`) in `prototype/` is the whole setup: it checks Node, installs on first run, picks a model and
+starts the chat. pi's coding agent on DeepSeek V4.1 Flash wrote it from a brief; I fixed two bugs it left and verified
+each path below by running it.
+
+- **No key: the demo.** With no credential it runs the scripted offline demo on pi-ai's faux provider and says which
+  variables to set. Without a model the harness has nothing to show, so the first run shows the demo instead of an error.
+- **Any pi-ai model.** `--model provider/modelId` or `FORGE_MODEL` (`--list-models` shows what your keys unlock). With
+  neither, it takes the first of Anthropic, OpenAI, Google, OpenRouter, DeepSeek, Groq and xAI that has a key.
+  `--base-url` points it at any OpenAI-compatible server (Ollama, llama.cpp, vLLM, LM Studio). Prices come from pi-ai's
+  catalog, so the spend cap means the same thing on every model.
+- **A separate summary model.** OptChat compactions are most of the calls (82 of 96 in round 4), so `--summary-model`
+  lets a cheap model keep the memory while a stronger one does the work.
+- **State persists.** A chat lives in `~/.forge/default` (or `--data`, `$FORGE_HOME`); running again resumes it with
+  its tools. `--fresh` starts over. The first line printed is the models, the data directory and the spend cap
+  (300 calls or $1 by default).
+- Checked by running it here: the no-key demo; a refused model whose provider has no key; a real DeepSeek chat that
+  grew a `books` tool (one rejection, then accepted, 26 calls, $0.019); a second run that resumed it and used the tool;
+  and the `--base-url` path against DeepSeek's OpenAI-compatible endpoint. That last one reports $0 and no cache reads,
+  because a custom endpoint has no catalog price and its usage is parsed generically.
+
+## Gaps (round 1; see rounds 2-6 above for what changed)
 
 - ~~The migration runs on the real state before the catalog commit, in two databases.~~ Fixed in round 2 with a
   pending/marker/live protocol reconciled on boot.
@@ -231,10 +253,10 @@ digests), and pi's coding agent on DeepSeek V4.1 Flash wrote the test and the fi
 ## Run it
 
 ```sh
-cd prototype && npm install          # pi-durable, pi-ai, chord, pi-codemode 1.0.3, @gdp-ts/core; tsc, oxlint
+cd prototype && ./forge              # installs on first run; demo with no key, chat with one (round 6)
+./forge --help                       # --model, --summary-model, --base-url, --data, --fresh, caps, --list-models
 npm run check                        # tsc + oxlint (anti-slop + gdp-ts)
-npm test                             # 100 tests, about a minute
-npm run chat                         # talk to it (DeepSeek; see round 4)
+npm test                             # 121 tests, about a minute
 node --experimental-strip-types --no-warnings src/demo.ts           # three processes: grow, crash, recover
 node --experimental-strip-types --no-warnings src/bench-view.ts 20000
 node --experimental-strip-types --no-warnings src/shadow-check.ts
@@ -248,6 +270,8 @@ Files in `prototype/src/`:
   (type-checked mistakes, never run);
 - memory: `optchat.ts` (log, tree, view, compactor), `compaction.ts` (tasks, ruler, retry), `optchat-prompt.ts`, and
   `memory-extension.ts` (the pi-durable glue);
+- running it: `start.ts` (`./forge`), `model-config.ts` (choosing models and keys), `live.ts` (the forge on a real
+  model, with the spend meter), `chat-loop.ts`, `chat.ts`, `live-run.ts`;
 - `forge.ts` (the kernel's tools) and the scripts `demo.ts`, `bench-view.ts`, `bench-cells.ts`, `shadow-check.ts`.
 
 The working log is in [NOTES.md](NOTES.md).

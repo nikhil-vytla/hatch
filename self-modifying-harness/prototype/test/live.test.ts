@@ -1,12 +1,14 @@
 // The spending cap and the usage accounting of src/live.ts, over pi-ai's faux provider (no network).
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import type { Usage } from "@earendil-works/pi-ai";
+import type { ModelCost, Usage } from "@earendil-works/pi-ai";
 import { createModels } from "@earendil-works/pi-ai/models";
 import { fauxAssistantMessage, fauxProvider } from "@earendil-works/pi-ai/providers/faux";
-import { cachePercent, CapExceeded, Meter, meteredProvider, PRICE } from "../src/live.ts";
+import { cachePercent, CapExceeded, Meter, meteredProvider } from "../src/live.ts";
 
 const usage = (input: number, cacheRead: number, output: number, total = 0): Usage => ({ input, output, cacheRead, cacheWrite: 0, totalTokens: input + cacheRead + output, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total } });
+
+const COST: ModelCost = { input: 0.3, output: 1.2, cacheRead: 0.006, cacheWrite: 0.1 };
 
 /** A models collection whose only provider is the faux one, behind `meter`. */
 function fauxModels(meter: Meter, replies: number) {
@@ -22,13 +24,13 @@ function fauxModels(meter: Meter, replies: number) {
 }
 
 describe("the meter's accounting", () => {
-	test("a row keeps DeepSeek's cache hits apart from the misses, and prices them when pi-ai reports no cost", () => {
+	test("a row keeps the cache hits apart from the misses, and prices them from the model when pi-ai reports no cost", () => {
 		const meter = new Meter();
-		const row = meter.record("turn", usage(100, 900, 50), "stop");
+		const row = meter.record("turn", usage(100, 900, 50), "stop", COST);
 		assert.deepEqual([row.input, row.cacheRead, row.output], [100, 900, 50]);
 		assert.equal(cachePercent(row), 90);
-		assert.ok(Math.abs(row.costUsd - (100 * PRICE.input + 900 * PRICE.cacheRead + 50 * PRICE.output) / 1_000_000) < 1e-12);
-		assert.equal(meter.record("compaction", usage(10, 0, 5, 0.5), "stop").costUsd, 0.5, "a cost pi-ai reports is used as given");
+		assert.ok(Math.abs(row.costUsd - (100 * COST.input + 900 * COST.cacheRead + 50 * COST.output) / 1_000_000) < 1e-12);
+		assert.equal(meter.record("compaction", usage(10, 0, 5, 0.5), "stop", COST).costUsd, 0.5, "a cost pi-ai reports is used as given");
 	});
 
 	test("totals are split by kind and add up", () => {

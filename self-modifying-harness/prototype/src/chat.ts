@@ -1,69 +1,34 @@
-// An interactive chat with the forge on DeepSeek. One directory is one chat: running it again over the same directory
-// resumes the same session, reinstalls the agent-written tools from the catalog and keeps the OptChat memory.
+// An interactive chat with the forge: a thin entry that picks the models exactly like `./forge` does (src/model-config.ts)
+// and then hands the open forge to the shared loop in src/chat-loop.ts. One directory is one chat: running it again over
+// the same directory resumes the same session, reinstalls the agent-written tools from the catalog and keeps the memory.
 //
-//   node --experimental-strip-types --no-warnings src/chat.ts [dataDir]      (default: data/live; `npm run chat`)
+//   node --experimental-strip-types --no-warnings src/chat.ts [--model provider/modelId] [--data DIR]      (`npm run chat`)
 //
-// Commands: /usage (spend so far), /cells (the catalog), /view (the OptChat view the model is shown), /verbose
-// (toggle full tool text), /quit. Ctrl-C leaves cleanly. Environment: see the `chat` script in package.json.
-import { createInterface } from "node:readline/promises";
+// Flags and environment: --model/--summary-model/--base-url, FORGE_MODEL/FORGE_SUMMARY_MODEL/FORGE_BASE_URL, and each
+// provider's standard API-key variable. With no credential at all, run the offline demo with `./forge --demo`.
 import { join } from "node:path";
-import { cachePercent, describeCatalogue, type Live, openLive, show } from "./live.ts";
+import { runChat } from "./chat-loop.ts";
+import { openLive } from "./live.ts";
+import { chooseModels, describeModel, flagValue } from "./model-config.ts";
 
-const dataDir = process.argv[2] ?? join(import.meta.dirname, "..", "data", "live");
+const argv = process.argv.slice(2);
 
-function usage(live: Live): string {
-	const rows = live.meter.rows.map((r) => `  #${r.n} ${r.kind.padEnd(10)} input ${r.input} cache-read ${r.cacheRead} (${cachePercent(r)}%) output ${r.output} $${r.costUsd.toFixed(5)}`);
+const choice = await chooseModels({ env: process.env, argv });
 
-	return [...rows, live.meter.summary()].join("\n");
+if (choice.kind === "error") {
+	console.error(choice.message);
+	process.exit(1);
 }
 
-const live = await openLive(dataDir);
-
-const lines = createInterface({ input: process.stdin, output: process.stdout });
-
-let verbose = false;
-
-let leaving = false;
-
-const leave = async (): Promise<void> => {
-	if (leaving) return;
-	leaving = true;
-	lines.close();
-	await live.close();
-	console.log(live.meter.summary());
-	process.exit(0);
-};
-
-// readline swallows SIGINT while a prompt is open, so listen on both.
-process.on("SIGINT", () => void leave());
-
-lines.on("SIGINT", () => void leave());
-
-console.log(`forge chat over ${dataDir} (${live.memory.length} messages so far). /usage /cells /view /verbose /quit`);
-
-for await (const line of lines) {
-	const text = line.trim();
-
-	if (text === "") continue;
-
-	if (text === "/quit") break;
-
-	if (text === "/usage") console.log(usage(live));
-	else if (text === "/cells") console.log(describeCatalogue(await live.catalogue()));
-	else if (text === "/view") console.log(live.memory.render());
-	else if (text === "/verbose") {
-		verbose = !verbose;
-		console.log(`verbose ${verbose ? "on" : "off"}`);
-	} else {
-		const turn = await live.ask(text, (event) => console.log(show(event, verbose)));
-
-		if (turn.status !== "done") console.log(`  -> ${turn.status} ${turn.reason}`);
-
-		if (turn.capped !== undefined) {
-			console.log(turn.capped.message);
-			break;
-		}
-	}
+if (choice.kind === "demo") {
+	console.error(`no model configured (${choice.why}); run ./forge --demo for the scripted demo`);
+	process.exit(1);
 }
 
-await leave();
+const dataDir = flagValue(argv, "--data") ?? join(import.meta.dirname, "..", "data", "live");
+
+const live = await openLive(dataDir, { turn: choice.turn, summary: choice.summary });
+
+console.log(`turn ${describeModel(choice.turn)} | summary ${describeModel(choice.summary)} | data ${dataDir} | cap ${live.meter.limits.maxCalls} calls or $${live.meter.limits.maxCostUsd.toFixed(2)}`);
+
+await runChat(live);
