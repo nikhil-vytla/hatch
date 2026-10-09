@@ -10,9 +10,6 @@ Build software that can modify itself, using three pieces:
 - [OptChat](https://gist.github.com/VictorTaelin/91837951a5ce5b38f341ec1ba1df6449): an endless chat whose memory is a binary tree of summaries.
 - [celld](https://github.com/denoland/celld): self-hosted Durable Objects.
 
-Keep this folder self-contained. A sibling folder, `chat-grown-software/`, covers Geoffrey Huntley's "grow an app by
-talking to it" idea. Lessons may cross between the two folders, but code may not.
-
 ## Environment
 
 - The egress proxy blocks `ghuntley.com`, `celld.dev`, `gist.githubusercontent.com` and `web.archive.org`. It allows
@@ -169,8 +166,8 @@ The system is called the "forge": the agent writes its own tools.
   they are two databases. A fix would record a "migrating to version X" intent in the cell's SQLite, inside the
   migration transaction, and finish or undo it on boot.
 - Checks are example-based and written by the agent. Ratcheting stops silent regressions, but nothing stops the agent
-  from writing weak checks for a new feature. The sibling folder works on this (caller-owned goals and invariants,
-  use-trace replay).
+  from writing weak checks for a new feature. Caller-owned invariants and replay of real calls would help (both added
+  in round 2).
 - QuickJS cold start of about 140 ms per call is fine for tools but not for hot paths. A pooled sandbox per cell
   version would fix it, and celld's isolates are warm by design.
 - The truncating summarizer is a placeholder. OptChat's value depends on a good compactor, and the `Summarizer`
@@ -178,7 +175,7 @@ The system is called the "forge": the agent writes its own tools.
 - The agent cannot (yet) modify its own system prompt sections or the memory hook. That is deliberate, since both are
   kernel, but a "skills" layer of prompt sections as cells would be the natural next step.
 
-## Round 2: Brief A, with gdp-ts and anti-slop
+## Round 2: verification, with gdp-ts and anti-slop
 
 Sonnet subagents wrote the code; every step was re-verified here before committing (tsc, oxlint, tests, demo, and a
 read of the trusted modules). Sources: [rauchg/gdp-ts](https://github.com/rauchg/gdp-ts) (Ghosts of Departed Proofs,

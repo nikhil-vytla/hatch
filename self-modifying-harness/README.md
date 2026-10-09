@@ -113,36 +113,34 @@ Checks can be retired, but only explicitly, and the retirement is logged.
    the user message that started its run. However coarse the view gets (the demo uses a 4 KB budget), `zoom(id, 1)`
    returns the user's words verbatim.
 
-## Lessons that transfer from growing an app by chatting with it
+## Design ideas from Jiti
 
-A sibling experiment rebuilt Geoffrey Huntley's [Jiti](https://github.com/ghuntley/jiti) idea, an application grown
-by chat in a live image, and ran a mutation study of 245 model-style mistakes against seven verification layers.
-What applies here:
+Geoffrey Huntley's [Jiti](https://github.com/ghuntley/jiti) grows an application by chat in a live Lisp image, and
+its design records (ADRs) address the same problem as the gate: accepting model-written changes into a running system.
+What applies to the forge:
 
 1. **Separate goals from safety.** Jiti distinguishes caller-owned *goals* ("is it done?", which may stay unmet
-   during intermediate progress) from *invariants* ("must never break", which reject). The forge has only examples.
-   It should also take caller-owned invariants over each cell's state, for example a schema. In the study, invariants
-   were the only layer that caught stray state writes.
+   during intermediate progress) from *invariants* ("must never break", which reject). The forge had only examples.
+   It should also take caller-owned invariants over each cell's state, for example a schema, which also catch stray
+   writes that no example looks for.
 2. **Use generations or compare-and-swap.** Jiti tags every proposal with the observation generation it was made
    from and refuses stale ones. `cell_propose` should take the live version it expects to replace, so that two
    subagents, or a model working from an old view, cannot silently overwrite each other.
 3. **The exactly-once `calls` table is already a regression oracle.** Real calls, with their arguments and results,
-   are stored per cell. Replaying them against a candidate, and rejecting diffs the request didn't ask for, was the
-   best detector of "drive-by" edits in the study (92% alone).
+   are stored per cell. Replaying them against a candidate, and rejecting diffs the change didn't declare, catches
+   "drive-by" edits that no example covers.
 4. **Fuzz from the schema.** Each cell declares a JSON Schema for its arguments. Generating boundary inputs from it
-   catches hangs and validation regressions that no example names. In the study, fuzzing caught every injected
-   infinite loop.
-5. **Check coverage, not just pass/fail.** Every miss in the study's first round was a gap in the contract: a
-   function no example called, or a boundary the user stated in words but no example tried. A gate should reject a
-   cell version whose checks never exercise one of its declared actions.
-6. **Machinery catches about three quarters; the user's confirmed examples catch the rest.** The model may propose
-   checks, but self-graded checks pass by construction.
+   catches hangs and validation regressions that no example names.
+5. **Check coverage, not just pass/fail.** A check suite that never calls one of a tool's actions says nothing about
+   it. A gate should reject a cell version whose checks never exercise one of its declared actions.
+6. **The model never owns the contract.** Jiti's caller owns acceptance (its ADR 0008): the model may propose checks,
+   but self-graded checks pass by construction.
 
 ## Round 2: verification, enforced by types
 
-A second round implemented the transferable lessons, with [rauchg/gdp-ts](https://github.com/rauchg/gdp-ts)
+A second round implemented these ideas, with [rauchg/gdp-ts](https://github.com/rauchg/gdp-ts)
 (compile-time proofs) and [dmmulroy/anti-slop](https://github.com/dmmulroy/anti-slop) (Oxlint rules) added to a strict
-`tsc` setup. Details in [NOTES.md](NOTES.md#round-2-brief-a-with-gdp-ts-and-anti-slop).
+`tsc` setup. Details in [NOTES.md](NOTES.md#round-2-verification-with-gdp-ts-and-anti-slop).
 
 - **Two proofs guard the two doors.** Only `acceptVersion` writes a version into the catalog, and it demands
   `CellVerified<C>` about that exact candidate (fingerprinted, so a candidate edited after the gate is refused). Only
@@ -211,7 +209,7 @@ number. Details and the full transcript: [NOTES.md](NOTES.md#round-4-a-real-mode
 - ~~The migration runs on the real state before the catalog commit, in two databases.~~ Fixed in round 2 with a
   pending/marker/live protocol reconciled on boot.
 - The checks are written by the agent. The ratchet stops silent regressions, but nothing stops weak checks for new
-  behavior (see lessons 1 and 5).
+  behavior (see design ideas 1 and 5).
 - The QuickJS cold start is about 140 ms per call; a pooled sandbox per cell version would remove it.
 - `celld-sketch/` maps the cell model onto celld's Worker Loader and facets. It is **untested**: celld's installer and
   release downloads were blocked here.
