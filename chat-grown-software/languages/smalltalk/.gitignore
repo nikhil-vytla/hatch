@@ -1,0 +1,7 @@
+build/
+data/
+*.image
+*.changes
+*.sources
+pharo-local/
+PharoDebug.log

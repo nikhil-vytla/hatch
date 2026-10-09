@@ -1,0 +1,211 @@
+{
+ "turns": [
+  {
+   "intent": "add expenses",
+   "scope": [
+    "add_expense"
+   ],
+   "forms": [
+    "def add_expense (s : State) (amount : Int) (category : String) : Except String (Nat × State) :=\n  let s' := { s with expenses := s.expenses ++ [{ cents := amount, category }] }\n  .ok (s'.expenses.length, s')"
+   ],
+   "removes": [],
+   "laws": [
+    {
+     "name": "add_expense_count",
+     "check": "theorem add_expense_count (s : State) (a : Int) (c : String) (r : Nat) (s' : State)\n    (h : add_expense s a c = .ok (r, s')) : r = s.expenses.length + 1 ∧ s'.expenses.length = r := by\n  simp [add_expense] at h\n  obtain ⟨rfl, rfl⟩ := h\n  simp"
+    }
+   ]
+  },
+  {
+   "intent": "total",
+   "scope": [
+    "total"
+   ],
+   "forms": [
+    "def total (s : State) : Int := (s.expenses.map (·.cents)).sum"
+   ],
+   "removes": [],
+   "laws": []
+  },
+  {
+   "intent": "by category",
+   "scope": [
+    "by_category",
+    "add_to"
+   ],
+   "forms": [
+    "def add_to : List (String × Int) → String → Int → List (String × Int)\n  | [], k, v => [(k, v)]\n  | (k', v') :: rest, k, v => if k' = k then (k', v' + v) :: rest else (k', v') :: add_to rest k v",
+    "def by_category (s : State) : List (String × Int) :=\n  s.expenses.foldl (fun m e => add_to m e.category e.cents) []"
+   ],
+   "removes": [],
+   "laws": [
+    {
+     "name": "by_category_sums_to_total",
+     "check": "theorem sum_add_to (m : List (String × Int)) (k : String) (v : Int) :\n    ((add_to m k v).map (·.2)).sum = (m.map (·.2)).sum + v := by\n  induction m with\n  | nil => simp [add_to]\n  | cons p rest ih =>\n    obtain ⟨k', v'⟩ := p\n    by_cases h : k' = k\n    · simp [add_to, h]; omega\n    · simp [add_to, h, ih]; omega\n\ntheorem by_category_sums_to_total (s : State) :\n    ((by_category s).map (·.2)).sum = total s := by\n  have key : ∀ (es : List Expense) (m : List (String × Int)),\n      ((es.foldl (fun m e => add_to m e.category e.cents) m).map (·.2)).sum\n        = (m.map (·.2)).sum + (es.map (·.cents)).sum := by\n    intro es\n    induction es with\n    | nil => intro m; simp\n    | cons e rest ih =>\n      intro m\n      simp [List.foldl, ih, sum_add_to]\n      omega\n  have := key s.expenses []\n  simpa [by_category, total] using this"
+    }
+   ]
+  },
+  {
+   "intent": "exact cents",
+   "scope": [
+    "total",
+    "sum_cents"
+   ],
+   "forms": [
+    "def sum_cents (es : List Expense) : Int := (es.map (·.cents)).sum",
+    "def total (s : State) : Int := sum_cents s.expenses"
+   ],
+   "removes": [],
+   "laws": [
+    {
+     "name": "total_is_exact_sum",
+     "check": "theorem total_is_exact_sum (s : State) : total s = (s.expenses.map (·.cents)).sum := by\n  simp [total, sum_cents]"
+    },
+    {
+     "name": "by_category_sums_to_total",
+     "check": "theorem sum_add_to (m : List (String × Int)) (k : String) (v : Int) :\n    ((add_to m k v).map (·.2)).sum = (m.map (·.2)).sum + v := by\n  induction m with\n  | nil => simp [add_to]\n  | cons p rest ih =>\n    obtain ⟨k', v'⟩ := p\n    by_cases h : k' = k\n    · simp [add_to, h]; omega\n    · simp [add_to, h, ih]; omega\n\ntheorem by_category_sums_to_total (s : State) :\n    ((by_category s).map (·.2)).sum = total s := by\n  have key : ∀ (es : List Expense) (m : List (String × Int)),\n      ((es.foldl (fun m e => add_to m e.category e.cents) m).map (·.2)).sum\n        = (m.map (·.2)).sum + (es.map (·.cents)).sum := by\n    intro es\n    induction es with\n    | nil => intro m; simp\n    | cons e rest ih =>\n      intro m\n      simp [List.foldl, ih, sum_add_to]\n      omega\n  have := key s.expenses []\n  simpa [by_category, total, sum_cents] using this"
+    }
+   ]
+  },
+  {
+   "intent": "validate expenses",
+   "scope": [
+    "add_expense"
+   ],
+   "forms": [
+    "def add_expense (s : State) (amount : Int) (category : String) : Except String (Nat × State) :=\n  if amount ≤ 0 then .error \"amount must be positive\"\n  else if category = \"\" then .error \"category required\"\n  else\n    let s' := { s with expenses := s.expenses ++ [{ cents := amount, category }] }\n    .ok (s'.expenses.length, s')"
+   ],
+   "removes": [],
+   "laws": [
+    {
+     "name": "add_expense_count",
+     "check": "theorem add_expense_count (s : State) (a : Int) (c : String) (r : Nat) (s' : State)\n    (h : add_expense s a c = .ok (r, s')) : r = s.expenses.length + 1 ∧ s'.expenses.length = r := by\n  unfold add_expense at h\n  by_cases h1 : a ≤ 0\n  · simp [h1] at h\n  by_cases h2 : c = \"\"\n  · simp [h1, h2] at h\n  simp [h1, h2] at h\n  obtain ⟨rfl, rfl⟩ := h\n  simp"
+    },
+    {
+     "name": "add_expense_adds_exactly_the_amount",
+     "check": "theorem add_expense_adds_exactly_the_amount (s : State) (a : Int) (c : String) (r : Nat) (s' : State)\n    (h : add_expense s a c = .ok (r, s')) : total s' = total s + a := by\n  unfold add_expense at h\n  by_cases h1 : a ≤ 0\n  · simp [h1] at h\n  by_cases h2 : c = \"\"\n  · simp [h1, h2] at h\n  simp [h1, h2] at h\n  obtain ⟨_, rfl⟩ := h\n  simp [total, sum_cents]"
+    },
+    {
+     "name": "add_expense_keeps_state_well_formed",
+     "check": "theorem add_expense_keeps_state_well_formed (s : State) (a : Int) (c : String) (r : Nat) (s' : State)\n    (h : add_expense s a c = .ok (r, s')) (hs : s.WellFormed) : s'.WellFormed := by\n  unfold add_expense at h\n  by_cases h1 : a ≤ 0\n  · simp [h1] at h\n  by_cases h2 : c = \"\"\n  · simp [h1, h2] at h\n  simp [h1, h2] at h\n  obtain ⟨_, rfl⟩ := h\n  refine ⟨?_, hs.2⟩\n  intro e he\n  simp at he\n  rcases he with he | rfl\n  · exact hs.1 e he\n  · exact ⟨by simp; omega, h2⟩"
+    }
+   ]
+  },
+  {
+   "intent": "budgets",
+   "scope": [
+    "set_budget",
+    "over_budget",
+    "put"
+   ],
+   "forms": [
+    "def put : List (String × Int) → String → Int → List (String × Int)\n  | [], k, v => [(k, v)]\n  | (k', v') :: rest, k, v => if k' = k then (k, v) :: rest else (k', v') :: put rest k v",
+    "def set_budget (s : State) (category : String) (amount : Int) : Except String (Int × State) :=\n  if amount < 0 then .error \"a budget cannot be negative\"\n  else .ok (amount, { s with budgets := put s.budgets category amount })",
+    "def over_budget (s : State) : List String :=\n  let spent := by_category s\n  ((s.budgets.filter fun p => ((spent.lookup p.1).getD 0) > p.2).map (·.1)).mergeSort (fun a b => decide (a ≤ b))"
+   ],
+   "removes": [],
+   "laws": [
+    {
+     "name": "over_budget_means_over",
+     "check": "theorem over_budget_means_over (s : State) (c : String) (h : c ∈ over_budget s) :\n    ∃ b, (c, b) ∈ s.budgets ∧ b < ((by_category s).lookup c).getD 0 := by\n  unfold over_budget at h\n  simp [List.mem_mergeSort] at h\n  obtain ⟨b, hb, hlt⟩ := h\n  exact ⟨b, hb, hlt⟩"
+    },
+    {
+     "name": "set_budget_keeps_state_well_formed",
+     "check": "theorem put_nonneg (m : List (String × Int)) (k : String) (v : Int) (hv : 0 ≤ v)\n    (hm : ∀ b ∈ m, 0 ≤ b.2) : ∀ b ∈ put m k v, 0 ≤ b.2 := by\n  induction m with\n  | nil => intro b hb; simp [put] at hb; subst hb; simpa using hv\n  | cons p rest ih =>\n    obtain ⟨k', v'⟩ := p\n    intro b hb\n    by_cases h : k' = k\n    · simp [put, h] at hb\n      rcases hb with rfl | hb\n      · simpa using hv\n      · exact hm b (by simp [hb])\n    · simp [put, h] at hb\n      rcases hb with rfl | hb\n      · exact hm _ (by simp)\n      · exact ih (fun b hb => hm b (by simp [hb])) b (by simpa using hb)\n\ntheorem set_budget_keeps_state_well_formed (s : State) (c : String) (a : Int) (r : Int) (s' : State)\n    (h : set_budget s c a = .ok (r, s')) (hs : s.WellFormed) : s'.WellFormed := by\n  unfold set_budget at h\n  by_cases h1 : a < 0\n  · simp [h1] at h\n  simp [h1] at h\n  obtain ⟨_, rfl⟩ := h\n  exact ⟨hs.1, put_nonneg _ _ _ (by omega) hs.2⟩"
+    }
+   ]
+  },
+  {
+   "intent": "top category",
+   "scope": [
+    "top_category",
+    "best_of"
+   ],
+   "forms": [
+    "def best_of : List (String × Int) → Option (String × Int)\n  | [] => none\n  | p :: rest =>\n    match best_of rest with\n    | none => some p\n    | some q => if q.2 > p.2 then some q else some p",
+    "def top_category (s : State) : Option String :=\n  (best_of ((by_category s).mergeSort (fun a b => decide (a.1 ≤ b.1)))).map (·.1)"
+   ],
+   "removes": [],
+   "laws": [
+    {
+     "name": "top_category_is_a_max",
+     "check": "theorem best_of_none (l : List (String × Int)) (h : best_of l = none) : l = [] := by\n  cases l with\n  | nil => rfl\n  | cons p rest =>\n    simp only [best_of] at h\n    split at h\n    · simp at h\n    · split at h <;> simp at h\n\ntheorem best_of_spec (l : List (String × Int)) :\n    ∀ r, best_of l = some r → r ∈ l ∧ ∀ p ∈ l, p.2 ≤ r.2 := by\n  induction l with\n  | nil => simp [best_of]\n  | cons p rest ih =>\n    intro r h\n    simp only [best_of] at h\n    split at h\n    · next hn =>\n      have := best_of_none rest hn\n      subst this\n      simp at h\n      subst h\n      simp\n    · next q hq =>\n      obtain ⟨hmem, hmax⟩ := ih q hq\n      split at h\n      · next hgt =>\n        simp at h; subst h\n        refine ⟨by simp [hmem], ?_⟩\n        intro x hx\n        simp at hx\n        rcases hx with rfl | hx\n        · omega\n        · exact hmax x hx\n      · next hle =>\n        simp at h; subst h\n        refine ⟨by simp, ?_⟩\n        intro x hx\n        simp at hx\n        rcases hx with rfl | hx\n        · omega\n        · have := hmax x hx; omega\n\ntheorem top_category_is_a_max (s : State) (t : String) (h : top_category s = some t) :\n    ∀ p ∈ by_category s, ∃ v, (t, v) ∈ by_category s ∧ p.2 ≤ v := by\n  unfold top_category at h\n  simp only [Option.map_eq_some_iff] at h\n  obtain ⟨⟨t', v⟩, hb, rfl⟩ := h\n  obtain ⟨hmem, hmax⟩ := best_of_spec _ _ hb\n  intro p hp\n  refine ⟨v, ?_, ?_⟩\n  · simpa [List.mem_mergeSort] using hmem\n  · exact hmax p (by simpa [List.mem_mergeSort] using hp)"
+    }
+   ]
+  },
+  {
+   "intent": "notes",
+   "scope": [
+    "add_expense"
+   ],
+   "forms": [
+    "def add_expense (s : State) (amount : Int) (category : String) (note : Option String := none) :\n    Except String (Nat × State) :=\n  if amount ≤ 0 then .error \"amount must be positive\"\n  else if category = \"\" then .error \"category required\"\n  else\n    let s' := { s with expenses := s.expenses ++ [{ cents := amount, category, note }] }\n    .ok (s'.expenses.length, s')"
+   ],
+   "removes": [],
+   "laws": [
+    {
+     "name": "add_expense_count",
+     "check": "theorem add_expense_count (s : State) (a : Int) (c : String) (n : Option String) (r : Nat) (s' : State)\n    (h : add_expense s a c n = .ok (r, s')) : r = s.expenses.length + 1 ∧ s'.expenses.length = r := by\n  unfold add_expense at h\n  by_cases h1 : a ≤ 0\n  · simp [h1] at h\n  by_cases h2 : c = \"\"\n  · simp [h1, h2] at h\n  simp [h1, h2] at h\n  obtain ⟨rfl, rfl⟩ := h\n  simp"
+    },
+    {
+     "name": "add_expense_adds_exactly_the_amount",
+     "check": "theorem add_expense_adds_exactly_the_amount (s : State) (a : Int) (c : String) (n : Option String) (r : Nat) (s' : State)\n    (h : add_expense s a c n = .ok (r, s')) : total s' = total s + a := by\n  unfold add_expense at h\n  by_cases h1 : a ≤ 0\n  · simp [h1] at h\n  by_cases h2 : c = \"\"\n  · simp [h1, h2] at h\n  simp [h1, h2] at h\n  obtain ⟨_, rfl⟩ := h\n  simp [total, sum_cents]"
+    },
+    {
+     "name": "add_expense_keeps_state_well_formed",
+     "check": "theorem add_expense_keeps_state_well_formed (s : State) (a : Int) (c : String) (n : Option String) (r : Nat) (s' : State)\n    (h : add_expense s a c n = .ok (r, s')) (hs : s.WellFormed) : s'.WellFormed := by\n  unfold add_expense at h\n  by_cases h1 : a ≤ 0\n  · simp [h1] at h\n  by_cases h2 : c = \"\"\n  · simp [h1, h2] at h\n  simp [h1, h2] at h\n  obtain ⟨_, rfl⟩ := h\n  refine ⟨?_, hs.2⟩\n  intro e he\n  simp at he\n  rcases he with he | rfl\n  · exact hs.1 e he\n  · exact ⟨by simp; omega, h2⟩"
+    }
+   ]
+  }
+ ],
+ "probes": {
+  "side_effect": {
+   "scope": [
+    "total"
+   ],
+   "forms": [
+    "instance : Add Int := ⟨fun _ _ => 0⟩"
+   ]
+  },
+  "breaks_ratchet": {
+   "scope": [
+    "total"
+   ],
+   "forms": [
+    "def total (s : State) : Int := 0"
+   ]
+  },
+  "breaks_invariant": {
+   "scope": [
+    "add_expense"
+   ],
+   "forms": [
+    "def add_expense (s : State) (amount : Int) (category : String) (note : Option String := none) :\n    Except String (Nat × State) :=\n  if amount ≤ 0 then .error \"amount must be positive\"\n  else if category = \"\" then .error \"category required\"\n  else\n    let s' := { s with expenses := s.expenses ++ [{ cents := -amount, category, note }] }\n    .ok (s'.expenses.length, s')"
+   ]
+  },
+  "loops": {
+   "scope": [
+    "total"
+   ],
+   "forms": [
+    "def total (s : State) : Int := total s"
+   ]
+  },
+  "calls_missing": {
+   "scope": [
+    "total"
+   ],
+   "forms": [
+    "def total (s : State) : Int := sum_everything s.expenses"
+   ]
+  },
+  "breaks_trace": {
+   "scope": [
+    "total"
+   ],
+   "forms": [
+    "def top_category (s : State) : Except String (Option String × State) :=\n  .error \"boom\""
+   ]
+  }
+ }
+}

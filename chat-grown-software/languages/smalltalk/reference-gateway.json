@@ -1,0 +1,60 @@
+{
+ "turns": [
+  {
+   "intent": "usage",
+   "scope": [
+    "record_usage",
+    "usage"
+   ],
+   "forms": [
+    "record_usage: key model: model tokens: tokens\n\t(state at: 'calls' ifAbsentPut: [ OrderedCollection new ]) add: { 'key' -> key. 'model' -> model. 'tokens' -> tokens } asDictionary.\n\t^ self usage: key",
+    "usage: key\n\t^ (state at: 'calls' ifAbsent: [ #() ]) inject: 0 into: [ :sum :c | (c at: 'key') = key ifTrue: [ sum + (c at: 'tokens') ] ifFalse: [ sum ] ]"
+   ],
+   "removes": []
+  },
+  {
+   "intent": "prices",
+   "scope": [
+    "set_price",
+    "cost"
+   ],
+   "forms": [
+    "set_price: model cents: cents\n\t(state at: 'prices' ifAbsentPut: [ Dictionary new ]) at: model put: cents.\n\t^ cents",
+    "cost: key\n\t| prices cents |\n\tprices := state at: 'prices' ifAbsent: [ Dictionary new ].\n\tcents := (state at: 'calls' ifAbsent: [ #() ]) inject: 0 into: [ :sum :c |\n\t\t(c at: 'key') = key\n\t\t\tifTrue: [ sum + ((c at: 'tokens') / 1000.0 * (prices at: (c at: 'model') ifAbsent: [ 0 ])) ]\n\t\t\tifFalse: [ sum ] ].\n\t^ cents rounded / 100.0"
+   ],
+   "removes": []
+  },
+  {
+   "intent": "quotas",
+   "scope": [
+    "set_quota",
+    "record_usage"
+   ],
+   "forms": [
+    "set_quota: key tokens: tokens\n\t(self usage: key) > tokens ifTrue: [ ^ self error: 'already over that quota' ].\n\t(state at: 'quotas' ifAbsentPut: [ Dictionary new ]) at: key put: tokens.\n\t^ tokens",
+    "record_usage: key model: model tokens: tokens\n\t| quota |\n\tquota := (state at: 'quotas' ifAbsent: [ Dictionary new ]) at: key ifAbsent: [ nil ].\n\t(quota notNil and: [ (self usage: key) + tokens > quota ]) ifTrue: [ ^ self error: 'over quota' ].\n\t(state at: 'calls' ifAbsentPut: [ OrderedCollection new ]) add: { 'key' -> key. 'model' -> model. 'tokens' -> tokens } asDictionary.\n\t^ self usage: key"
+   ],
+   "removes": []
+  },
+  {
+   "intent": "validation",
+   "scope": [
+    "record_usage"
+   ],
+   "forms": [
+    "record_usage: key model: model tokens: tokens\n\t| quota |\n\t(key isString and: [ key isEmpty not ]) ifFalse: [ ^ self error: 'key required' ].\n\t(model isString and: [ model isEmpty not ]) ifFalse: [ ^ self error: 'model required' ].\n\t(tokens isNumber and: [ tokens > 0 and: [ tokens fractionPart = 0 ] ]) ifFalse: [ ^ self error: 'tokens must be a positive whole number' ].\n\tquota := (state at: 'quotas' ifAbsent: [ Dictionary new ]) at: key ifAbsent: [ nil ].\n\t(quota notNil and: [ (self usage: key) + tokens > quota ]) ifTrue: [ ^ self error: 'over quota' ].\n\t(state at: 'calls' ifAbsentPut: [ OrderedCollection new ]) add: { 'key' -> key. 'model' -> model. 'tokens' -> tokens truncated } asDictionary.\n\t^ self usage: key"
+   ],
+   "removes": []
+  },
+  {
+   "intent": "top spender",
+   "scope": [
+    "top_spender"
+   ],
+   "forms": [
+    "top_spender\n\t| keys best |\n\tkeys := ((state at: 'calls' ifAbsent: [ #() ]) collect: [ :c | c at: 'key' ]) asSet asArray sorted.\n\tbest := nil.\n\tkeys do: [ :k | (best isNil or: [ (self cost: k) > (self cost: best) ]) ifTrue: [ best := k ] ].\n\t^ best"
+   ],
+   "removes": []
+  }
+ ]
+}

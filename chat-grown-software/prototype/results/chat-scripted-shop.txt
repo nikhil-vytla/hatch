@@ -1,0 +1,86 @@
+
+[0] user> I run a small shop. Let me add stock: an item name and how many.
+  model: I'll add stock.
+    kernel asks: addItem("apple", 10) on {}  (the model proposed this call)
+    kernel asks: addItem("apple", 5) on {"stock":{"apple":3}}  (the model proposed this call)
+    kernel asks: [addItem("apple", 10), addItem("apple", 10)] on {}  (the same call twice: does it set, or add to?)
+    kernel asks: [addItem("apple", 5), addItem("apple", 5)] on {"stock":{"apple":3}}  (the same call twice: does it set, or add to?)
+  develop [addItem] -> accepted (rev-0002)
+  execute addItem("apple", 12) => {"ok":true,"value":12}
+  execute addItem("pear", 4) => {"ok":true,"value":4}
+  execute addItem("fig", 7) => {"ok":true,"value":7}
+  model: Done (accepted).
+
+[7] user> Record a sale. Never let stock go below zero: refuse the sale instead.
+  model: I'll sales.
+    kernel asks: sell("apple", 3) on {"stock":{"apple":10,"pear":4,"fig":0}}  (the model proposed this call)
+    kernel asks: (() => { try { sell("apple", 11); return "accepted"; } catch (e) { return "rejected"; } })() on {"stock":{"apple":10,"pear":4,"fig":0}}  (the model proposed this call)
+    kernel asks: sell("apple", 0) on {"stock":{"apple":10,"pear":4,"fig":0}}  (you said "zero")
+    kernel asks: sell("apple", -1) on {"stock":{"apple":10,"pear":4,"fig":0}}  (you said "below")
+    kernel asks: (() => { try { sell("apple", 0); return "accepted"; } catch (e) { return "rejected"; } })() on {"stock":{"apple":10,"pear":4,"fig":0}}  (you said "zero")
+    kernel asks: (() => { try { sell("apple", -1); return "accepted"; } catch (e) { return "rejected"; } })() on {"stock":{"apple":10,"pear":4,"fig":0}}  (you said "below")
+    kernel asks: sell("apple", 3) on {"stock":{"apple":0,"pear":4,"fig":0}}  (you said "0": stock.apple = 0)
+    kernel asks: sell("apple", 3) on {"stock":{"apple":10,"pear":0,"fig":0}}  (you said "0": stock.pear = 0)
+    kernel asks: (() => { try { sell("apple", 11); return "accepted"; } catch (e) { return "rejected"; } })() on {"stock":{"apple":0,"pear":4,"fig":0}}  (you said "0": stock.apple = 0)
+    kernel asks: (() => { try { sell("apple", 11); return "accepted"; } catch (e) { return "rejected"; } })() on {"stock":{"apple":10,"pear":0,"fig":0}}  (you said "0": stock.pear = 0)
+    kernel asks: [sell("apple", 3), sell("apple", 3)] on {"stock":{"apple":10,"pear":4,"fig":0}}  (the same call twice: does it set, or add to?)
+  develop [sell] -> accepted (rev-0006)
+  execute sell("apple", 2) => {"ok":true,"value":10}
+  execute sell("fig", 7) => {"ok":true,"value":0}
+  model: Done (accepted).
+
+[13] user> What's running low? Anything with fewer than 5 left.
+  model: I'll low stock.
+    kernel asks: lowStock() on {"stock":{"apple":10,"pear":4,"fig":0}}  (the model proposed this call)
+    kernel asks: lowStock() on {}  (the model proposed this call)
+    kernel asks: lowStock() on {"stock":{"apple":5,"pear":4,"fig":0}}  (you said "5": stock.apple = 5)
+    kernel asks: lowStock() on {"stock":{"apple":10,"pear":5,"fig":0}}  (you said "5": stock.pear = 5)
+    kernel asks: lowStock() on {"stock":{"apple":10,"pear":4,"fig":5}}  (you said "5": stock.fig = 5)
+  develop [lowStock] -> accepted (rev-0009)
+  execute lowStock() => {"ok":true,"value":["fig","pear"]}
+  model: Done (accepted).
+
+[18] user> Let me set a price per item, and tell me what my stock is worth. Items without a price count as nothing.
+  model: I'll stock value.
+    kernel asks: stockValue() on {"stock":{"apple":10,"pear":4},"prices":{"apple":0.5}}  (the model proposed this call)
+    kernel asks: (setPrice("pear", 1.25), stockValue()) on {"stock":{"pear":4}}  (the model proposed this call)
+    kernel asks: (setPrice("", 1.25), stockValue()) on {"stock":{"pear":4}}  (you said "without")
+    kernel asks: (setPrice("pear", 0), stockValue()) on {"stock":{"pear":4}}  (you said "nothing")
+    kernel asks: stockValue() on {"stock":{"apple":0,"pear":4},"prices":{"apple":0.5}}  (you said "0": stock.apple = 0)
+    kernel asks: stockValue() on {"stock":{"apple":10,"pear":0},"prices":{"apple":0.5}}  (you said "0": stock.pear = 0)
+    kernel asks: stockValue() on {"stock":{"apple":10,"pear":4},"prices":{"apple":0}}  (you said "0": prices.apple = 0)
+    kernel asks: (setPrice("pear", 1.25), stockValue()) on {"stock":{"pear":0}}  (you said "0": stock.pear = 0)
+    kernel asks: setPrice("apple", 10) on {}  (no call you have confirmed exercises setPrice())
+    kernel asks: [(setPrice("pear", 1.25), stockValue()), (setPrice("pear", 1.25), stockValue())] on {"stock":{"pear":4}}  (the same call twice: does it set, or add to?)
+    kernel asks: [setPrice("apple", 10), setPrice("apple", 10)] on {}  (the same call twice: does it set, or add to?)
+  develop [setPrice, stockValue] -> accepted (rev-0010)
+  execute setPrice("apple", 0.4) => {"ok":true,"value":0.4}
+  execute setPrice("pear", 0.75) => {"ok":true,"value":0.75}
+  execute stockValue() => {"ok":true,"value":7}
+  model: Done (accepted).
+
+[25] user> Give me a restock list: everything that's low, with how many to order to get back to 10.
+  model: I'll restock.
+    kernel asks: restock() on {"stock":{"apple":10,"pear":4,"fig":0}}  (the model proposed this call)
+    kernel asks: restock() on {"stock":{"apple":10,"pear":10,"fig":0}}  (you said "10": stock.pear = 10)
+    kernel asks: restock() on {"stock":{"apple":10,"pear":4,"fig":10}}  (you said "10": stock.fig = 10)
+  develop [restock] -> accepted (rev-0013)
+  execute restock() => {"ok":true,"value":{"fig":10,"pear":6}}
+  model: Done (accepted).
+
+[30] user> Item names shouldn't care about capitals or spaces: 'Apple ' and 'apple' are the same item.
+  model: I'll normalize names.
+    kernel asks: (addItem("Apple ", 2), addItem("apple", 3)) on {}  (the model proposed this call)
+    kernel asks: sell("APPLE", 1) on {"stock":{"apple":3}}  (the model proposed this call)
+    kernel asks: key("apple") on {}  (no call you have confirmed exercises key())
+    kernel asks: setPrice("apple", 10) on {}  (no call you have confirmed exercises setPrice())
+    kernel asks: [(addItem("Apple ", 2), addItem("apple", 3)), (addItem("Apple ", 2), addItem("apple", 3))] on {}  (the same call twice: does it set, or add to?)
+    kernel asks: [sell("APPLE", 1), sell("APPLE", 1)] on {"stock":{"apple":3}}  (the same call twice: does it set, or add to?)
+    kernel asks: [setPrice("apple", 10), setPrice("apple", 10)] on {}  (the same call twice: does it set, or add to?)
+  develop [key, addItem, sell, setPrice] -> accepted (rev-0014)
+  execute addItem("Pear", 6) => {"ok":true,"value":10}
+  execute lowStock() => {"ok":true,"value":["fig"]}
+  model: Done (accepted).
+
+36 chat log entries; 41 confirmed examples in the contract; the simulated user corrected 0 answers
+why is addItem() the way it is? rev-0014 ("normalize names") was asked for by chat message 30: "Item names shouldn't care about capitals or spaces: 'Apple ' and 'apple' are the same item."

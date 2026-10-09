@@ -1,0 +1,14 @@
+{
+  "add_expense": "def add_expense (s : State) (a : Int) (c : String) : Except String (Nat × State) :=\n  if a ≤ 0 then .error \"amount must be positive\"\n  else if c = \"\" then .error \"category must not be empty\"\n  else .ok (s.expenses.length + 1, { s with expenses := s.expenses ++ [⟨a, c, none⟩] })",
+  "budget_of": "def budget_of (bs : List (String × Int)) (c : String) : Int :=\n  match bs with\n  | [] => 0\n  | (c0, v0) :: ps => if c0 = c then v0 else budget_of ps c",
+  "budget_set": "def budget_set (bs : List (String × Int)) (c : String) (a : Int) : List (String × Int) :=\n  match bs with\n  | [] => [(c, a)]\n  | (c0, v0) :: ps => if c0 = c then (c, a) :: ps else (c0, v0) :: budget_set ps c a",
+  "by_category": "def by_category (s : State) : List (String × Int) :=\n  s.expenses.foldl (fun acc (e : Expense) => cat_add acc e.category e.cents) []",
+  "cat_add": "def cat_add (acc : List (String × Int)) (cat : String) (a : Int) : List (String × Int) :=\n  match acc with\n  | [] => [(cat, a)]\n  | (c0, v0) :: ps => if c0 = cat then (c0, v0 + a) :: ps else (c0, v0) :: cat_add ps cat a",
+  "cat_spend": "def cat_spend (l : List (String × Int)) (c : String) : Int :=\n  match l with\n  | [] => 0\n  | (c0, v0) :: ps => if c0 = c then v0 else cat_spend ps c",
+  "insert_sorted": "def insert_sorted (x : String) (l : List String) : List String :=\n  match l with\n  | [] => [x]\n  | y :: ys => if x ≤ y then x :: y :: ys else y :: insert_sorted x ys",
+  "over_budget": "def over_budget (s : State) : List String :=\n  sort_names ((s.budgets.filter (fun p : String × Int =>\n    decide (budget_of s.budgets p.1 < cat_spend (by_category s) p.1))).map (fun p : String × Int => p.1))",
+  "set_budget": "def set_budget (s : State) (c : String) (a : Int) : Except String (Int × State) :=\n  if a < 0 then .error \"budget must not be negative\"\n  else .ok (a, { s with budgets := budget_set s.budgets c a })",
+  "sort_names": "def sort_names : List String → List String\n  | [] => []\n  | x :: xs => insert_sorted x (sort_names xs)",
+  "sum_snd": "def sum_snd (l : List (String × Int)) : Int := (l.map (·.2)).sum",
+  "total": "def total (s : State) : Int := (s.expenses.map (·.cents)).sum"
+}

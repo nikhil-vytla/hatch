@@ -1,0 +1,88 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>replay</title>
+<style>
+  :root { --bg:#0d1117; --pane:#161b22; --line:#30363d; --fg:#c9d1d9; --dim:#7d8590; --user:#79c0ff; --ok:#3fb950; --bad:#f85149; --ask:#d29922; --goal:#d2a8ff; --form:#8b949e; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:13px/1.35 "DejaVu Sans Mono", ui-monospace, monospace; width:1280px; height:720px; overflow:hidden; display:flex; flex-direction:column; }
+  header { padding:10px 16px 6px; display:flex; align-items:baseline; gap:16px; border-bottom:1px solid var(--line); }
+  header h1 { font:600 18px/1.2 "DejaVu Sans", sans-serif; margin:0; }
+  header .sub { color:var(--dim); font-size:12px; flex:1; }
+  header .clock { color:var(--dim); font-size:12px; }
+  main { flex:1; display:grid; gap:6px; padding:6px; min-height:0; }
+  .pane { background:var(--pane); border:1px solid var(--line); border-radius:6px; display:flex; flex-direction:column; min-height:0; }
+  .pane .title { padding:4px 8px; border-bottom:1px solid var(--line); display:flex; justify-content:space-between; font-weight:600; }
+  .pane .title .score { font-weight:400; color:var(--dim); }
+  .pane .log { flex:1; overflow:hidden; padding:4px 8px; display:flex; flex-direction:column; justify-content:flex-end; }
+  .l { white-space:pre-wrap; word-break:break-word; margin:1px 0; }
+  .user { color:var(--user); font-weight:600; margin-top:6px; }
+  .model { color:var(--fg); }
+  .form { color:var(--form); border-left:2px solid var(--line); padding-left:6px; font-size:11px; }
+  .ask { color:var(--ask); }
+  .develop.ok { color:var(--ok); } .develop.bad { color:var(--bad); }
+  .load, .error, .bad { color:var(--bad); }
+  .goal { color:var(--goal); }
+  .use, .execute, .note { color:var(--dim); }
+  .ok { color:var(--ok); }
+  .head { color:var(--user); font-weight:600; margin-top:6px; }
+  #end { position:absolute; inset:0; background:rgba(13,17,23,.96); display:none; padding:40px 60px; }
+  #end h2 { font:600 22px "DejaVu Sans", sans-serif; margin:0 0 16px; }
+  #end table { border-collapse:collapse; font-size:14px; }
+  #end td, #end th { padding:6px 14px; border-bottom:1px solid var(--line); text-align:left; }
+  #end th { color:var(--dim); font-weight:400; }
+  #end p { color:var(--dim); max-width:1100px; }
+</style></head>
+<body>
+<header><h1 id="title"></h1><span class="sub" id="sub"></span><span class="clock" id="clock"></span></header>
+<main id="main"></main>
+<div id="end"><h2 id="endTitle"></h2><div id="endBody"></div></div>
+<script src="data.js"></script>
+<script>
+// DATA = { title, sub, mode: "race"|"story", speed, panes: [{ title, events: [{t, kind, text}] }], end: {title, html} }
+const D = window.DATA;
+document.getElementById("title").textContent = D.title;
+document.getElementById("sub").textContent = D.sub;
+const main = document.getElementById("main");
+const cols = D.cols ?? Math.min(D.panes.length, 3);
+main.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+main.style.gridTemplateRows = `repeat(${Math.ceil(D.panes.length / cols)}, minmax(0, 1fr))`;
+const clip = (s, n) => (s.length > n ? s.slice(0, n) + "…" : s);
+const panes = D.panes.map((p) => {
+  const el = document.createElement("div"); el.className = "pane";
+  el.innerHTML = `<div class="title"><span></span><span class="score"></span></div><div class="log"></div>`;
+  el.querySelector(".title span").textContent = p.title;
+  main.appendChild(el);
+  return { ...p, el, log: el.querySelector(".log"), score: el.querySelector(".score"), i: 0 };
+});
+const maxChars = D.maxChars ?? (D.panes.length > 2 ? 220 : 600);
+function show(p, e) {
+  const d = document.createElement("div");
+  let cls = e.kind, text = e.text;
+  if (e.kind === "develop") cls += / -> accepted/.test(text) ? " ok" : " bad";
+  const prefix = { user: "user> ", model: "model: ", ask: "  ? ", develop: "  develop ", goal: "  goal ", use: "  use ", execute: "  execute ", load: "  load error: ", error: "  error: " }[e.kind] ?? "";
+  d.className = "l " + cls;
+  d.textContent = prefix + clip(text, e.kind === "form" ? Math.round(maxChars * 1.3) : maxChars);
+  p.log.appendChild(d);
+  while (p.log.children.length > 80) p.log.removeChild(p.log.firstChild);
+  if (e.score) p.score.textContent = e.score;
+}
+// story mode: paced by text length; race mode: recorded timestamps divided by speed
+for (const p of panes) {
+  let t = 0;
+  p.events.forEach((e) => {
+    if (D.mode === "story") { e.at = t; t += Math.min(2600, 350 + e.text.length * (e.kind === "form" ? 4 : 14)) / (D.speed ?? 1); }
+    else e.at = e.t / D.speed;
+  });
+}
+const total = Math.max(...panes.map((p) => (p.events.at(-1)?.at ?? 0))) + 1500;
+const start = performance.now();
+function tick() {
+  const now = performance.now() - start;
+  for (const p of panes) while (p.i < p.events.length && p.events[p.i].at <= now) show(p, p.events[p.i++]);
+  const recorded = D.mode === "race" ? (now * D.speed) / 1000 : null;
+  document.getElementById("clock").textContent = recorded === null ? "" : `recorded time ${Math.floor(recorded / 60)}:${String(Math.floor(recorded % 60)).padStart(2, "0")}  (×${D.speed})`;
+  if (now < total) requestAnimationFrame(tick);
+  else if (D.end) { document.getElementById("endTitle").textContent = D.end.title; document.getElementById("endBody").innerHTML = D.end.html; document.getElementById("end").style.display = "block"; setTimeout(() => (window.done = true), D.endMs ?? 5000); }
+  else window.done = true;
+}
+requestAnimationFrame(tick);
+</script></body></html>

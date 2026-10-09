@@ -1,0 +1,38 @@
+== 1. grow the gateway to turn 2 (usage accounting, prices)
+   deploy usage       -> accepted rev-0001  (Hatch.App 6f4a0d3d)
+   deploy prices      -> accepted rev-0002  (Hatch.App eb00656a)
+
+== 2. live traffic: 4 customers + 1 greedy key + readers, 5 concurrent clients
+   after 0.5 s: 71 call records, mallory has used 18900 tokens with no limit
+
+== 3. hot-deploy turn 3: quotas (set_quota, quota-checking record_usage)
+   deploy quotas -> accepted rev-0003 in 121.7 ms (Hatch.App ed0fb059, old version still loaded: true)
+   set_quota alice    3546 -> true
+   set_quota bob      3546 -> true
+   set_quota carol    3546 -> true
+   set_quota dave     3546 -> true
+   set_quota mallory  26400 -> true
+
+== 4. hot-deploy turn 4: validation (key/model non-empty, tokens a positive whole number)
+   deploy validation -> accepted rev-0004 in 170.6 ms (Hatch.App c276b9d3)
+   record_usage(alice, gpt, 0) now -> ok=false (tokens must be a positive whole number)
+
+== 5. hot-deploy with a state-shape MIGRATION: calls are aggregated per (key, model)
+   deploy migration -> accepted rev-0005 in 174.8 ms (Hatch.App c276b9d3 -> 5ab7a4a5)
+   call records 121 -> 9 (usage per key unchanged; gates ran on the migrated state)
+
+== 6. hot-deploy turn 5: top_spender
+   deploy top spender -> accepted rev-0006
+
+== 7. summary
+   requests served: 564 in 3.0 s by 5 clients; unexpected failures: 0
+   refused by the new quota rule (legitimate, mallory over its limit): 63
+   latency overall: p50 9.2 ms, p99 119.9 ms, max 152.4 ms
+   during the quotas     swap (121.7 ms): 12 requests in flight window, slowest 100.0 ms, failed 0
+   during the validation swap (170.6 ms): 12 requests in flight window, slowest 152.4 ms, failed 0
+   during the migration  swap (174.8 ms): 10 requests in flight window, slowest 119.9 ms, failed 0
+   invariants (calls-shape, prices-shape, quotas-shape, within-quota, known-keys) sampled live 73 times, 66 of them with quotas set: violations 0
+   within-quota at the end: alice 1951/3546, bob 1951/3546, carol 1951/3546, dave 1951/3546, mallory 25900/26400 -> keys over quota: 0
+   no acknowledged record_usage lost across the swaps: true
+   call records at the end: 9 (at most keys x models = 10); top_spender() = mallory
+   why(record_usage): rev-0005 "aggregate calls per key and model", asked: "keep the call log from growing without bound"

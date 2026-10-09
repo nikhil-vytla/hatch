@@ -1,0 +1,60 @@
+{
+ "turns": [
+  {
+   "intent": "usage",
+   "scope": [
+    "record_usage",
+    "usage"
+   ],
+   "forms": [
+    "(defn record_usage [key model tokens]\n  (swap-state! update \"calls\" (fnil conj []) {\"key\" key \"model\" model \"tokens\" tokens})\n  (usage key))",
+    "(defn usage [key]\n  (reduce + 0 (map (fn [c] (get c \"tokens\"))\n                   (filter (fn [c] (= (get c \"key\") key)) (get (state) \"calls\")))))"
+   ],
+   "removes": []
+  },
+  {
+   "intent": "prices",
+   "scope": [
+    "set_price",
+    "cost"
+   ],
+   "forms": [
+    "(defn set_price [model cents]\n  (swap-state! assoc-in [\"prices\" model] cents)\n  cents)",
+    "(defn cost [key]\n  (let [prices (get (state) \"prices\")\n        cents (reduce + 0 (map (fn [c] (* (/ (get c \"tokens\") 1000.0) (get prices (get c \"model\") 0)))\n                               (filter (fn [c] (= (get c \"key\") key)) (get (state) \"calls\"))))]\n    (/ (round cents) 100)))"
+   ],
+   "removes": []
+  },
+  {
+   "intent": "quotas",
+   "scope": [
+    "set_quota",
+    "record_usage"
+   ],
+   "forms": [
+    "(defn set_quota [key tokens]\n  (when (> (usage key) tokens) (throw (ex-info \"already over that quota\" {})))\n  (swap-state! assoc-in [\"quotas\" key] tokens)\n  tokens)",
+    "(defn record_usage [key model tokens]\n  (let [quota (get-in (state) [\"quotas\" key])]\n    (when (and quota (> (+ (usage key) tokens) quota)) (throw (ex-info \"over quota\" {}))))\n  (swap-state! update \"calls\" (fnil conj []) {\"key\" key \"model\" model \"tokens\" tokens})\n  (usage key))"
+   ],
+   "removes": []
+  },
+  {
+   "intent": "validation",
+   "scope": [
+    "record_usage"
+   ],
+   "forms": [
+    "(defn record_usage [key model tokens]\n  (when-not (and (string? key) (not= key \"\")) (throw (ex-info \"key required\" {})))\n  (when-not (and (string? model) (not= model \"\")) (throw (ex-info \"model required\" {})))\n  (when-not (and (integer? tokens) (pos? tokens)) (throw (ex-info \"tokens must be a positive whole number\" {})))\n  (let [quota (get-in (state) [\"quotas\" key])]\n    (when (and quota (> (+ (usage key) tokens) quota)) (throw (ex-info \"over quota\" {}))))\n  (swap-state! update \"calls\" (fnil conj []) {\"key\" key \"model\" model \"tokens\" tokens})\n  (usage key))"
+   ],
+   "removes": []
+  },
+  {
+   "intent": "top spender",
+   "scope": [
+    "top_spender"
+   ],
+   "forms": [
+    "(defn top_spender []\n  (reduce (fn [best k] (if (or (nil? best) (> (cost k) (cost best))) k best))\n          nil (sort (distinct (map (fn [c] (get c \"key\")) (get (state) \"calls\"))))))"
+   ],
+   "removes": []
+  }
+ ]
+}

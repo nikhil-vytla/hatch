@@ -1,0 +1,11 @@
+node_modules/
+**/_build/
+**/deps/
+**/.cpcache/
+**/.lake/
+**/build/
+**/compiled/
+**/data/
+*.image
+*.changes
+*.sources

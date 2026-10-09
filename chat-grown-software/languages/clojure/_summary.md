@@ -1,0 +1,5 @@
+Growing an expense tracker one chat turn at a time is the job of this Clojure kernel, which speaks the JSON-lines protocol and passes all 51 conformance checks with about 400 ms startup and roughly 80 ms per develop. Its language layer treats code as data: each form is read with `*read-eval*` off and walked against an allowlist of [clojure.core](https://clojure.org) symbols before anything runs, so `def`, `eval`, Java interop and unknown calls are refused statically. State is an immutable string-keyed map, which makes transactions and rollback a matter of keeping the old value and lets the kernel retain every historical state cheaply. Because Java 21 removed `Thread.stop`, the walker injects cooperative deadline checks into loops and function bodies, using [data.json](https://github.com/clojure/data.json) for the wire format.
+
+- Runaway loops are reported as a timeout at about 1.03 s and leave no CPU burning afterwards.
+- A history of 20,001 states fits in 7.7 MB through structural sharing, against 4.8 MB for a single deep copy of the final state.
+- Property laws run as Clojure expressions over 40 seeded generated states.

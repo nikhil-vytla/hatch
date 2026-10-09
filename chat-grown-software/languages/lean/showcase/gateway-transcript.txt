@@ -1,0 +1,77 @@
+LLM gateway, grown by chat, guarded by proofs
+A 1970s idea (Hoare/Dijkstra: prove the program, don't just test it) on a 2020s problem (rate-limiting LLM API keys).
+Kernel: Lean 4, elaborating each change in-process. Tokens, quotas, prices are exact integers; cost() is integer cents.
+
+== 1. Grow the gateway in five chat turns ==
+turn 1 usage        accepted in 174 ms; proved so far: 1  (+ record_usage_returns_new_total)
+turn 2 prices       accepted in 151 ms; proved so far: 2  (+ set_price_returns_the_price)
+turn 3 quotas       accepted in 505 ms; proved so far: 4  (+ record_usage_returns_new_total, no_key_exceeds_its_quota, set_quota_keeps_within_quota)
+turn 4 validation   accepted in 710 ms; proved so far: 5  (+ record_usage_returns_new_total, no_key_exceeds_its_quota, record_usage_keeps_calls_well_formed)
+turn 5 top spender  accepted in 695 ms; proved so far: 6  (+ top_spender_is_a_max)
+
+== 2. (a) The quota law, proved for ALL inputs ==
+Statement the model wrote (the proof is not shown; Lean checked it):
+    theorem no_key_exceeds_its_quota (s : State) (k m : String) (t r : Nat) (s' : State)
+        (h : record_usage s k m t = .ok (r, s')) (hs : s.WithinQuota) : s'.WithinQuota
+In words: for every state that is within quota, every key, model and token count, if record_usage accepts the call, the new state is within quota.
+Not 300 random cases: every case. Re-proved by the kernel on every later change; a change that breaks it is refused.
+Same guarantee for set_quota, and 'top_spender is null or a maximum'. Proved laws now in the live kernel:
+    record_usage_returns_new_total, set_price_returns_the_price, no_key_exceeds_its_quota, set_quota_keeps_within_quota, record_usage_keeps_calls_well_formed, top_spender_is_a_max
+
+== 3. (b) A plausible off-by-one that passes every test ==
+The model 'thinks in indexes': the last token is number tokens-1, so it writes  usage + tokens - 1 > q  instead of  usage + tokens > q.
+diff:  - if usage s key + tokens > q then ...
+       + if usage s key + tokens - 1 > q then ...
+tests : 19/19 user-confirmed examples pass, 300/300 random (state, call) pairs keep every key within quota
+proof : develop -> REJECTED (957 ms)
+        Lean says:
+          law no_key_exceeds_its_quota: 23:27: omega could not prove the goal:
+          a possible counterexample may satisfy the constraints
+            c ≥ 1
+            b ≥ 0
+            b + c ≥ 1
+          ...
+in words: a call that overshoots the quota by exactly one token is accepted, so `used <= quota` cannot be proved.
+
+== 3b. Another classic: quota 0 means 'unlimited' ==
+Common in rate-limit APIs, wrong here: set_quota(key, 0) is a block.
+diff:  - | some q => if usage s key + tokens > q then ...
+       + | some q => if q != 0 && usage s key + tokens > q then ...
+tests : 19/19 user-confirmed examples pass, 300/300 random (state, call) pairs keep every key within quota
+proof : develop -> REJECTED (999 ms)
+        Lean says:
+          law no_key_exceeds_its_quota: 23:27: omega could not prove the goal:
+          a possible counterexample may satisfy the constraints
+            c ≥ 1
+            b ≥ 0
+            b + c ≥ 1
+          ...
+in words: a key with quota 0 may record any number of tokens, so `used <= quota` cannot be proved.
+
+== 4. (c) Injected change: 'let the admin key bypass its quota' ==
+The request sounds reasonable. The model adds one branch for key "root".
+diff:  - match s.quotas.lookup key with
+       + match (if key = "root" then none else s.quotas.lookup key) with
+tests : 19/19 user-confirmed examples pass, 300/300 random (state, call) pairs keep every key within quota
+proof : develop -> REJECTED (1073 ms)
+        Lean says:
+          law no_key_exceeds_its_quota: 22:12: Tactic `rewrite` failed: Did not find an occurrence of the pattern
+            if k = "root" then none else List.lookup k s.quotas
+          in the target expression
+            List.lookup k s.quotas = some q
+          
+          ...
+in words: for key "root" the quota is never consulted, so the proof of `used <= quota` has no case it can close.
+Nothing here distinguishes a harmless feature from a hole except the law: it says NO key, and Lean cannot prove it with the exemption in.
+
+== 5. The honest version still goes through ==
+the reference record_usage -> ACCEPTED (728 ms), 6 laws re-proved
+
+== Summary ==
+change                          | examples | random tests | proof
+off-by-one (tokens - 1)         |    19/19 |      300/300 | rejected
+quota 0 = unlimited             |    19/19 |      300/300 | rejected
+quota exemption for "root"      |    19/19 |      300/300 | rejected
+
+Tests sample; a proof covers every state and every call. Examples and random tests agreed these three changes were fine.
+The kernel refused them anyway, with the unproved goal as the reason, and kept the live world untouched.

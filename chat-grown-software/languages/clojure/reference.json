@@ -1,0 +1,168 @@
+{
+ "turns": [
+  {
+   "intent": "add expenses",
+   "scope": [
+    "add_expense"
+   ],
+   "forms": [
+    "(defn add_expense [amount category]\n  (swap-state! update \"expenses\" (fnil conj []) {\"amount\" amount \"category\" category})\n  (count (get (state) \"expenses\")))"
+   ],
+   "removes": [],
+   "laws": []
+  },
+  {
+   "intent": "total",
+   "scope": [
+    "total"
+   ],
+   "forms": [
+    "(defn total []\n  (reduce + 0 (map (fn [e] (get e \"amount\")) (get (state) \"expenses\"))))"
+   ],
+   "removes": [],
+   "laws": []
+  },
+  {
+   "intent": "by category",
+   "scope": [
+    "by_category"
+   ],
+   "forms": [
+    "(defn by_category []\n  (reduce (fn [out e] (update out (get e \"category\") (fnil + 0) (get e \"amount\")))\n          {} (get (state) \"expenses\")))"
+   ],
+   "laws": [
+    {
+     "name": "categories-sum-to-total",
+     "check": "(< (abs (- (reduce + 0 (vals (by_category))) (total))) 0.005)"
+    }
+   ],
+   "removes": []
+  },
+  {
+   "intent": "round to cents",
+   "scope": [
+    "total",
+    "by_category",
+    "cents"
+   ],
+   "forms": [
+    "(defn cents [x]\n  (/ (round (* x 100)) 100))",
+    "(defn total []\n  (cents (reduce + 0 (map (fn [e] (get e \"amount\")) (get (state) \"expenses\")))))",
+    "(defn by_category []\n  (reduce (fn [out e] (update out (get e \"category\") (fn [v] (cents (+ (or v 0) (get e \"amount\"))))))\n          {} (get (state) \"expenses\")))"
+   ],
+   "laws": [
+    {
+     "name": "total-in-cents",
+     "check": "(== (/ (round (* (total) 100)) 100) (total))"
+    }
+   ],
+   "removes": []
+  },
+  {
+   "intent": "validate expenses",
+   "scope": [
+    "add_expense"
+   ],
+   "forms": [
+    "(defn add_expense [amount category]\n  (when-not (and (number? amount) (pos? amount)) (throw (ex-info \"amount must be positive\" {})))\n  (when-not (and (string? category) (not= \"\" category)) (throw (ex-info \"category required\" {})))\n  (swap-state! update \"expenses\" (fnil conj []) {\"amount\" amount \"category\" category})\n  (count (get (state) \"expenses\")))"
+   ],
+   "removes": [],
+   "laws": []
+  },
+  {
+   "intent": "budgets",
+   "scope": [
+    "set_budget",
+    "over_budget"
+   ],
+   "forms": [
+    "(defn set_budget [category amount]\n  (swap-state! assoc-in [\"budgets\" category] amount)\n  amount)",
+    "(defn over_budget []\n  (let [spent (by_category)]\n    (vec (sort (filter (fn [c] (> (get spent c 0) (get-in (state) [\"budgets\" c])))\n                       (keys (get (state) \"budgets\")))))))"
+   ],
+   "laws": [
+    {
+     "name": "over-budget-is-over",
+     "check": "(every? (fn [c] (> (get (by_category) c 0) (get-in (state) [\"budgets\" c]))) (over_budget))"
+    }
+   ],
+   "removes": []
+  },
+  {
+   "intent": "top category",
+   "scope": [
+    "top_category"
+   ],
+   "forms": [
+    "(defn top_category []\n  (let [spent (by_category)]\n    (reduce (fn [best c] (if (or (nil? best) (> (get spent c) (get spent best))) c best))\n            nil (sort (keys spent)))))"
+   ],
+   "laws": [
+    {
+     "name": "top-is-max",
+     "check": "(let [t (top_category)] (or (nil? t) (every? (fn [v] (<= v (get (by_category) t))) (vals (by_category)))))"
+    }
+   ],
+   "removes": []
+  },
+  {
+   "intent": "optional note",
+   "scope": [
+    "add_expense"
+   ],
+   "forms": [
+    "(defn add_expense\n  ([amount category] (add_expense amount category nil))\n  ([amount category note]\n   (when-not (and (number? amount) (pos? amount)) (throw (ex-info \"amount must be positive\" {})))\n   (when-not (and (string? category) (not= \"\" category)) (throw (ex-info \"category required\" {})))\n   (swap-state! update \"expenses\" (fnil conj [])\n                (cond-> {\"amount\" amount \"category\" category} note (assoc \"note\" note)))\n   (count (get (state) \"expenses\"))))"
+   ],
+   "removes": [],
+   "laws": []
+  }
+ ],
+ "probes": {
+  "side_effect": {
+   "scope": [
+    "total"
+   ],
+   "forms": [
+    "(defn total []\n  (alter-var-root (var +) (constantly -))\n  0)"
+   ]
+  },
+  "breaks_ratchet": {
+   "scope": [
+    "total"
+   ],
+   "forms": [
+    "(defn total [] 0)"
+   ]
+  },
+  "breaks_invariant": {
+   "scope": [
+    "add_expense"
+   ],
+   "forms": [
+    "(defn add_expense [amount category]\n  (swap-state! update \"expenses\" (fnil conj []) {\"amount\" (- amount) \"category\" category})\n  (count (get (state) \"expenses\")))"
+   ]
+  },
+  "loops": {
+   "scope": [
+    "total"
+   ],
+   "forms": [
+    "(defn total [] (loop [] (recur)))"
+   ]
+  },
+  "calls_missing": {
+   "scope": [
+    "total"
+   ],
+   "forms": [
+    "(defn total [] (+ 1 (no_such_fn)))"
+   ]
+  },
+  "breaks_trace": {
+   "scope": [
+    "total"
+   ],
+   "forms": [
+    "(defn top_category [] (throw (ex-info \"boom\" {})))"
+   ]
+  }
+ }
+}

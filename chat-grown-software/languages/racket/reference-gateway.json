@@ -1,0 +1,60 @@
+{
+ "turns": [
+  {
+   "intent": "usage",
+   "scope": [
+    "record_usage",
+    "usage"
+   ],
+   "forms": [
+    "(define (record_usage key model tokens)\n  (let* ([s (get-state)]\n         [cs (hash-ref s 'calls '())])\n    (set-state! (hash-set s 'calls (append cs (list (hasheq 'key key 'model model 'tokens tokens)))))\n    (usage key)))",
+    "(define (usage key)\n  (for/fold ([sum 0]) ([c (in-list (hash-ref (get-state) 'calls '()))])\n    (if (equal? (hash-ref c 'key) key) (+ sum (hash-ref c 'tokens)) sum)))"
+   ],
+   "removes": []
+  },
+  {
+   "intent": "prices",
+   "scope": [
+    "set_price",
+    "cost"
+   ],
+   "forms": [
+    "(define (set_price model cents)\n  (update-state! (lambda (s)\n                   (hash-set s 'prices (hash-set (hash-ref s 'prices (hasheq)) (string->symbol model) cents))))\n  cents)",
+    "(define (cost key)\n  (let* ([s (get-state)]\n         [prices (hash-ref s 'prices (hasheq))]\n         [cents (for/fold ([sum 0]) ([c (in-list (hash-ref s 'calls '()))]\n                                     #:when (equal? (hash-ref c 'key) key))\n                  (+ sum (* (/ (exact->inexact (hash-ref c 'tokens)) 1000)\n                            (hash-ref prices (string->symbol (hash-ref c 'model)) 0))))])\n    (/ (floor (+ cents 0.5)) 100)))"
+   ],
+   "removes": []
+  },
+  {
+   "intent": "quotas",
+   "scope": [
+    "set_quota",
+    "record_usage"
+   ],
+   "forms": [
+    "(define (set_quota key tokens)\n  (when (> (usage key) tokens) (error 'set_quota \"already over that quota\"))\n  (update-state! (lambda (s)\n                   (hash-set s 'quotas (hash-set (hash-ref s 'quotas (hasheq)) (string->symbol key) tokens))))\n  tokens)",
+    "(define (record_usage key model tokens)\n  (let* ([s (get-state)]\n         [quota (hash-ref (hash-ref s 'quotas (hasheq)) (string->symbol key) #f)]\n         [cs (hash-ref s 'calls '())])\n    (when (and quota (> (+ (usage key) tokens) quota)) (error 'record_usage \"over quota\"))\n    (set-state! (hash-set s 'calls (append cs (list (hasheq 'key key 'model model 'tokens tokens)))))\n    (usage key)))"
+   ],
+   "removes": []
+  },
+  {
+   "intent": "validation",
+   "scope": [
+    "record_usage"
+   ],
+   "forms": [
+    "(define (record_usage key model tokens)\n  (unless (and (string? key) (> (string-length key) 0)) (error 'record_usage \"key required\"))\n  (unless (and (string? model) (> (string-length model) 0)) (error 'record_usage \"model required\"))\n  (unless (and (real? tokens) (integer? tokens) (> tokens 0)) (error 'record_usage \"tokens must be a positive whole number\"))\n  (let* ([s (get-state)]\n         [quota (hash-ref (hash-ref s 'quotas (hasheq)) (string->symbol key) #f)]\n         [cs (hash-ref s 'calls '())])\n    (when (and quota (> (+ (usage key) tokens) quota)) (error 'record_usage \"over quota\"))\n    (set-state! (hash-set s 'calls (append cs (list (hasheq 'key key 'model model 'tokens tokens)))))\n    (usage key)))"
+   ],
+   "removes": []
+  },
+  {
+   "intent": "top spender",
+   "scope": [
+    "top_spender"
+   ],
+   "forms": [
+    "(define (top_spender)\n  (let ([keys (sort (remove-duplicates (map (lambda (c) (hash-ref c 'key)) (hash-ref (get-state) 'calls '()))) string<?)])\n    (for/fold ([best 'null]) ([k (in-list keys)])\n      (if (or (eq? best 'null) (> (cost k) (cost best))) k best))))"
+   ],
+   "removes": []
+  }
+ ]
+}

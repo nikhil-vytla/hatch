@@ -1,0 +1,100 @@
+
+[0] user> Let me record expenses: an amount and a category.
+  model: I'll add expenses.
+    kernel asks: addExpense(12.5, "food") on {}  (the model proposed this call)
+    kernel asks: addExpense(2, "fun") on {"expenses":[{"amount":12.5,"category":"food"},{"amount":40,  (the model proposed this call)
+    kernel asks: [addExpense(12.5, "food"), addExpense(12.5, "food")] on {}  (the same call twice: does it set, or add to?)
+    kernel asks: [addExpense(2, "fun"), addExpense(2, "fun")] on {"expenses":[{"amount":12.5,"category":"food"},{"amount":40,  (the same call twice: does it set, or add to?)
+  develop [addExpense] -> accepted (rev-0002)
+  execute addExpense(12.5, "food") => {"ok":true,"value":1}
+  execute addExpense(40, "transport") => {"ok":true,"value":2}
+  execute addExpense(7.25, "food") => {"ok":true,"value":3}
+  model: Done (accepted).
+
+[7] user> What's my total so far?
+  model: I'll total.
+    kernel asks: total() on {"expenses":[{"amount":12.5,"category":"food"},{"amount":40,  (the model proposed this call)
+    kernel asks: total() on {}  (the model proposed this call)
+  develop [total] -> accepted (rev-0006)
+  execute total() => {"ok":true,"value":59.75}
+  model: Done (accepted).
+
+[12] user> Break it down by category. The categories should always add up to the total.
+  model: I'll by category.
+    kernel asks: byCategory() on {"expenses":[{"amount":12.5,"category":"food"},{"amount":40,  (the model proposed this call)
+    kernel asks: byCategory() on {}  (the model proposed this call)
+  develop [byCategory] -> accepted (rev-0007)
+  execute byCategory() => {"ok":true,"value":{"food":19.75,"transport":40}}
+  execute addExpense(3.1, "fun") => {"ok":true,"value":4}
+  execute byCategory() => {"ok":true,"value":{"food":19.75,"transport":40,"fun":3.1}}
+  model: Done (accepted).
+
+[19] user> Money should be in cents. When I add 0.10 and 0.20 the total should say 0.3, not 0.30000000000000004.
+  model: I'll round to cents.
+    kernel asks: [total(), byCategory().a] on {"expenses":[{"amount":0.1,"category":"a"},{"amount":0.2,"ca  (the model proposed this call)
+    kernel asks: [total(), byCategory().a] on {"expenses":[{"amount":0.2,"category":"a"},{"amount":0.2,"ca  (you said "0.2": expenses.0.amount = 0.2)
+    kernel asks: [total(), byCategory().a] on {"expenses":[{"amount":0.3,"category":"a"},{"amount":0.2,"ca  (you said "0.3": expenses.0.amount = 0.3)
+    kernel asks: [total(), byCategory().a] on {"expenses":[{"amount":0.30000000000000004,"category":"a"},{  (you said "0.30000000000000004": expenses.0.amount = 0.30000000000000004)
+    kernel asks: [total(), byCategory().a] on {"expenses":[{"amount":0.1,"category":"a"},{"amount":0.1,"ca  (you said "0.1": expenses.1.amount = 0.1)
+    kernel asks: [total(), byCategory().a] on {"expenses":[{"amount":0.1,"category":"a"},{"amount":0.3,"ca  (you said "0.3": expenses.1.amount = 0.3)
+    kernel asks: [total(), byCategory().a] on {"expenses":[{"amount":0.1,"category":"a"},{"amount":0.30000  (you said "0.30000000000000004": expenses.1.amount = 0.30000000000000004)
+    kernel asks: cents("food") on {}  (no call you have confirmed exercises cents())
+  develop [total, byCategory, cents] -> accepted (rev-0009)
+  execute total() => {"ok":true,"value":62.85}
+  model: Done (accepted).
+
+[24] user> Don't let me add an expense of zero or less, or one without a category. Throw an error.
+  model: I'll validate expenses.
+    kernel asks: (() => { try { addExpense(-5, "food"); return "accepted"; } catch (e) { return "rejected"; } })() on {}  (the model proposed this call)
+    kernel asks: (() => { try { addExpense(5, ""); return "accepted"; } catch (e) { return "rejected"; } })() on {}  (the model proposed this call)
+    kernel asks: (() => { try { addExpense(5, "food"); return "accepted"; } catch (e) { return "rejected"; } })() on {}  (the model proposed this call)
+    kernel asks: (() => { try { addExpense(0, "food"); return "accepted"; } catch (e) { return "rejected"; } })() on {}  (you said "zero")
+    kernel asks: (() => { try { addExpense(-1, "food"); return "accepted"; } catch (e) { return "rejected"; } })() on {}  (you said "less")
+    kernel asks: (() => { try { addExpense(-5, ""); return "accepted"; } catch (e) { return "rejected"; } })() on {}  (you said "without")
+    kernel asks: (() => { try { addExpense(0, ""); return "accepted"; } catch (e) { return "rejected"; } })() on {}  (you said "zero")
+    kernel asks: (() => { try { addExpense(-1, ""); return "accepted"; } catch (e) { return "rejected"; } })() on {}  (you said "less")
+    kernel asks: addExpense(12.5, "food") on {}  (no call you have confirmed exercises addExpense())
+    kernel asks: [(() => { try { addExpense(5, "food"); return "accepted"; } catch (e) { return "rejected"; } })(), (() => { try { addExpense(5, "food"); return "accepted"; } catch (e) { return "rejected"; } })()] on {}  (the same call twice: does it set, or add to?)
+    kernel asks: [addExpense(12.5, "food"), addExpense(12.5, "food")] on {}  (the same call twice: does it set, or add to?)
+  develop [addExpense] -> accepted (rev-0010)
+  execute addExpense(9.99, "fun") => {"ok":true,"value":5}
+  model: Done (accepted).
+
+[29] user> Let me set a monthly budget per category and tell me which ones I'm over.
+  model: I'll budgets.
+    kernel asks: overBudget() on {"expenses":[{"amount":12.5,"category":"food"},{"amount":40,  (the model proposed this call)
+    kernel asks: overBudget() on {"expenses":[{"amount":12.5,"category":"food"},{"amount":40,  (the model proposed this call)
+    kernel asks: setBudget("food", 12.5) on {}  (no call you have confirmed exercises setBudget())
+    kernel asks: [setBudget("food", 12.5), setBudget("food", 12.5)] on {}  (the same call twice: does it set, or add to?)
+  develop [setBudget, overBudget] -> accepted (rev-0012)
+  execute setBudget("food", 15) => {"ok":true,"value":15}
+  execute overBudget() => {"ok":true,"value":["food"]}
+  execute setBudget("fun", 100) => {"ok":true,"value":100}
+  execute overBudget() => {"ok":true,"value":["food"]}
+  model: Done (accepted).
+
+[37] user> Which category do I spend the most on? If two tie, pick the alphabetically first.
+  model: I'll top category.
+    kernel asks: topCategory() on {"expenses":[{"amount":12.5,"category":"food"},{"amount":40,  (the model proposed this call)
+    kernel asks: topCategory() on {"expenses":[{"amount":5,"category":"b"},{"amount":5,"catego  (the model proposed this call)
+    kernel asks: topCategory() on {}  (the model proposed this call)
+  develop [topCategory] -> accepted (rev-0015)
+  execute topCategory() => {"ok":true,"value":"transport"}
+  model: Done (accepted).
+
+[42] user> Can expenses have an optional note? Like 'coffee with Sam'.
+  model: I'll notes.
+    kernel asks: (addExpense(4, "food", "coffee with Sam"), state.expenses[0].note) on {}  (the model proposed this call)
+    kernel asks: (addExpense(4, "food"), "note" in state.expenses[0]) on {}  (the model proposed this call)
+    kernel asks: addExpense(12.5, "food", "food") on {}  (no call you have confirmed exercises addExpense())
+    kernel asks: [(addExpense(4, "food", "coffee with Sam"), state.expenses[0].note), (addExpense(4, "food", "coffee with Sam"), state.expenses[0].note)] on {}  (the same call twice: does it set, or add to?)
+    kernel asks: [(addExpense(4, "food"), "note" in state.expenses[0]), (addExpense(4, "food"), "note" in state.expenses[0])] on {}  (the same call twice: does it set, or add to?)
+    kernel asks: [addExpense(12.5, "food", "food"), addExpense(12.5, "food", "food")] on {}  (the same call twice: does it set, or add to?)
+  develop [addExpense] -> accepted (rev-0016)
+  execute addExpense(4.5, "food", "coffee with Sam") => {"ok":true,"value":6}
+  execute topCategory() => {"ok":true,"value":"transport"}
+  execute total() => {"ok":true,"value":77.34}
+  model: Done (accepted).
+
+49 chat log entries; 40 confirmed examples in the contract; the simulated user corrected 0 answers
+why is topCategory() the way it is? rev-0015 ("top category") was asked for by chat message 37: "Which category do I spend the most on? If two tie, pick the alphabetically first."

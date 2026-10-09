@@ -1,0 +1,7 @@
+{
+  "call_error": "def call_error (key : String) (model : String) (tokens : Nat) : Option String :=\n  if key = \"\" then some \"key must be non-empty\"\n  else if model = \"\" then some \"model must be non-empty\"\n  else if tokens = 0 then some \"tokens must be positive\"\n  else none",
+  "cost": "def cost (s : State) (key : String) : Int :=\n  Int.ofNat ((2 * ((s.calls.filter (fun c => c.key = key)).foldl (fun acc c => acc + c.tokens * (s.prices.lookup c.model).getD 0) 0) + 1000) / 2000)",
+  "record_usage": "def record_usage (s : State) (key : String) (model : String) (tokens : Nat) : Except String (Nat × State) :=\n  match call_error key model tokens with\n  | some e => .error e\n  | none =>\n    let s' := { s with calls := s.calls ++ [{ key := key, model := model, tokens := tokens }] }\n    .ok (s'.used key, s')",
+  "set_price": "def set_price (s : State) (model : String) (cents : Nat) : Except String (Nat × State) :=\n  .ok (cents, { s with prices := (model, cents) :: s.prices.filter (·.1 != model) })",
+  "usage": "def usage (s : State) (key : String) : Nat := s.used key"
+}
