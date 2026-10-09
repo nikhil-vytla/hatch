@@ -69,6 +69,8 @@ Only the infinite loop was stopped (by the `timeout` option). All of these are o
 ## Files
 `run.sh`, `setup.sh`, `kernel.rkt`, `lang.rkt`, `reference.json` (8 turns, 6 probes), `prompt.md`, `NOTES.md`,
 `showcase/{run.sh,attacks.rkt,vm-attacks.mjs,transcript.txt,conformance-output.txt}`.
+The attack scripts are deliberately hostile and refuse to run unless `HATCH_RUN_ATTACKS=1`; use a throwaway
+container or VM (`vm-attacks.mjs` really reads `/etc/passwd` and runs `id`).
 
 ## Second scenario: LLM API gateway
 `SCENARIO=gateway` makes the kernel enforce the gateway's five invariants (calls/prices/quotas shapes, within-quota,

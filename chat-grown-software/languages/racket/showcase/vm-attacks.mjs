@@ -1,4 +1,11 @@
 // The same attacks against node:vm (what chat-grown-software's prototype uses), run from a host with a canary.
+// Deliberately hostile demo, and the attacks SUCCEED: it prints the first line of /etc/passwd, runs `id`, deletes a
+// canary in a temp dir it creates, pollutes Object.prototype in this process, and runs a 64 MB-capped heap bomb in a
+// child process. Refuses to run unless HATCH_RUN_ATTACKS=1. Use a throwaway container or VM.
+if (process.env.HATCH_RUN_ATTACKS !== "1") {
+  console.error("vm-attacks.mjs: deliberately hostile demo; set HATCH_RUN_ATTACKS=1 to run it (use a throwaway container or VM)");
+  process.exit(2);
+}
 import vm from "node:vm";
 import { spawnSync } from "node:child_process";
 import { writeFileSync, readFileSync, existsSync, mkdtempSync } from "node:fs";

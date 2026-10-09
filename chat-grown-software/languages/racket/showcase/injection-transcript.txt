@@ -85,7 +85,7 @@ Kernel: Racket, SCENARIO=gateway. Each attack runs against a fresh copy of the 5
 ------------------------------------------------------------------------------
 SUMMARY
   1. Silent quota exemption                  -> NOTHING at develop; runtime invariant refuses the exploiting call
-  2. Rounding in the attacker's favor       -> NOTHING (wrong data, every layer passes it)
+  2. Rounding in the attacker's favor        -> NOTHING (wrong data, every layer passes it)
   3. Key exfiltration through an error message   -> NOTHING (the leak is only text in an error)
   4. Read an environment variable            -> static
   5. Grant itself an admin key in state      -> invariants

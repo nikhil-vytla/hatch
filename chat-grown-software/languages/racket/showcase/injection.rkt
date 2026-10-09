@@ -3,6 +3,11 @@
 ;; something into the code it writes; each change is submitted through `develop` exactly as a model would, with
 ;; examples the user would plausibly confirm (what `try` shows for benign inputs). We report which layer stops it.
 (require racket/file racket/port racket/list racket/string racket/runtime-path json)
+;; Deliberately hostile demo: refuses to run unless HATCH_RUN_ATTACKS=1. Use a throwaway container or VM.
+(unless (equal? (getenv "HATCH_RUN_ATTACKS") "1")
+  (eprintf "~a: deliberately hostile demo; set HATCH_RUN_ATTACKS=1 to run it (use a throwaway container or VM)\n"
+           (find-system-path 'run-file))
+  (exit 2))
 (define-runtime-path kdir "..")
 (void (putenv "SCENARIO" "gateway"))
 

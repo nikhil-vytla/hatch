@@ -3,6 +3,11 @@
 ;; Tier 1: the real kernel (run.sh) - which gate refuses it, and is the live world unharmed?
 ;; Tier 2: the SAME source forced into a bare racket/base sandbox (static gate bypassed) - does racket/sandbox contain it?
 (require racket/sandbox racket/file racket/port racket/list racket/string racket/runtime-path json)
+;; Deliberately hostile demo: refuses to run unless HATCH_RUN_ATTACKS=1. Use a throwaway container or VM.
+(unless (equal? (getenv "HATCH_RUN_ATTACKS") "1")
+  (eprintf "~a: deliberately hostile demo; set HATCH_RUN_ATTACKS=1 to run it (use a throwaway container or VM)\n"
+           (find-system-path 'run-file))
+  (exit 2))
 (define-runtime-path kernel-dir "..")
 (define tmp (make-temporary-file "rkt-showcase~a" 'directory))
 (define canary (build-path tmp "canary.txt"))
