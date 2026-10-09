@@ -521,6 +521,12 @@ describe("Too long", () => {
 		assert.equal(n, 1);
 	});
 
+	test("a copied id+n| head is stripped from the model's line", async () => {
+		const complete = async (): Promise<string> => "18+1|tool: cell_propose coffee v3";
+
+		assert.equal(await new ModelSummarizer(complete).merge({ id: 0, end: 1, a: { id: 0, n: 1, text: "a" }, b: { id: 1, n: 1, text: "b" }, task: "T", view: () => "V" }), "tool: cell_propose coffee v3");
+	});
+
 	test("the cut keeps whole characters", () => {
 		const wide = "é".repeat(400); // 800 bytes
 		assert.ok(tooLong(wide).includes(`${"é".repeat(256)}| ← LIMIT`));

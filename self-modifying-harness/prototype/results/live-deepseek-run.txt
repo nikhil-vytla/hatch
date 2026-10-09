@@ -1,0 +1,218 @@
+limits: 100 model calls or $0.3, whichever first; model deepseek/deepseek-flash
+
+user 1> I want to log how many cups of coffee I drink and see the total. Just added 2.
+  call   cell_propose {"name":"coffee","description":"Log cups of coffee and report the running total. action=\"add\" logs n cups (d...
+agent> I'll build you a coffee-logging tool.
+  result ACCEPTED coffee@8c69fffd (passed 6 checks; replayed 0 real calls; fuzzed 20 of 40 generated inputs in 40 of a budget of 40 sandbox executions). The tool "coffee" is available from your next step.
+  call   coffee {"action":"add","n":2}
+  result {"added":2,"total":2}
+agent> Built you a `coffee` tool (version `coffee@8c69fffd`) and logged your 2 cups.
+
+**Your total: 2 cups.**
+
+Ways to use it:
+- `add` — log a cup (or `add n:3` for three at once)
+- `total` — just ask for the running total
+- `reset` — clear the log and start over
+
+The count is stored in the tool's own key-value store, so it persists across turns and restarts. Just tell me "add one" whenever you pour another and I'll keep the tally.
+  -> done
+
+user 2> Track decaf separately from regular, please. I had a decaf.
+  call   cell_source {"name":"coffee"}
+agent> I'll extend the coffee tool to track decaf and regular separately. Let me read the current source first.
+  result { "version": "coffee@8c69fffd", "description": "Log cups of coffee and report the running total. action=\"add\" logs n cups (default 1); action=\"total\" returns the current total; action=\"reset\" cl...
+  call   cell_propose {"name":"coffee","description":"Log cups of coffee, tracking regular and decaf separately. action=\"add\" logs...
+agent> I'll add a `kind` parameter (regular/decaf) keeping the existing state as regular.
+  result REJECTED coffee@13cea794: invariant(s) "total is a non-negative finite number" of earlier versions were dropped; invariants only ratchet up, so send them again and add any new ones. The live version i...
+  call   cell_propose {"changes":["*"],"checks":[{"args":{"action":"total"},"expect":{"regular":0,"decaf":0,"combined":0}},{"args":{...
+agent> I need to keep the earlier invariant. Let me resend it along with the new one.
+  result REJECTED coffee@56fef510: checks do not exercise every action: kind="regular" appear in none of this version's own checks. The live version is unchanged.
+  call   cell_propose {"changes":["*"],"checks":[{"args":{"action":"total"},"expect":{"combined":0,"decaf":0,"regular":0}},{"args":{...
+agent> Adding an explicit `kind: "regular"` check.
+  result REJECTED coffee@56fef510: group 0 check 0 {"action":"total"}: expected {"total":0}, got {"regular":0,"decaf":0,"combined":0}. The live version is unchanged.
+  call   cell_propose {"changes":["*"],"checks":[{"args":{"action":"total"},"expect":{"combined":0,"decaf":0,"regular":0}},{"args":{...
+agent> The old checks are still enforced. I need to file them as retired so the flat-total responses are replaced.
+  result REJECTED coffee@56fef510: group 0 check 7 {"action":"reset","kind":"all"}: expected {"combined":0,"decaf":0,"kinds":["regular","decaf"],"regular":0,"reset":true}, got {"reset":true,"kinds":["regular",...
+  call   cell_propose {"changes":["*"],"checks":[{"args":{"action":"total"},"expect":{"combined":0,"decaf":0,"regular":0}},{"args":{...
+agent> My check forgot `previousTotals`. Fixing the expectation.
+  result ACCEPTED coffee@56fef510 (passed 9 checks; replayed 1 real calls; fuzzed 22 of 40 generated inputs in 41 of a budget of 40 sandbox executions). The tool "coffee" is available from your next step. BEHA...
+  call   coffee {"action":"add","kind":"decaf"}
+agent> Now let me log your decaf.
+  result {"kind":"decaf","added":1,"total":1,"totals":{"regular":2,"decaf":1,"combined":3}}
+agent> Done — decaf is now tracked separately (`coffee@56fef510`).
+
+**Your totals: 2 regular, 1 decaf — 3 combined.**
+
+- Your earlier 2 cups were migrated into the regular count untouched, and your decaf is logged.
+- `coffee {action:"add", kind:"decaf"}` logs decaf; omit `kind` (or say `regular`) for regular.
+- `coffee {action:"total"}` now returns `{regular, decaf, combined}`.
+- `coffee {action:"reset", kind:"decaf"}` clears just decaf; `kind:"all"` clears both.
+
+One note: the `add` result now includes the per-kind breakdown alongside the running total, so the response shape changed from before.
+  -> done
+
+user 3> What's my breakdown?
+  call   coffee {"action":"total"}
+  result {"regular":2,"decaf":1,"combined":3}
+agent> Your breakdown: **2 regular, 1 decaf — 3 cups total.**
+  -> done
+
+user 4> Why does the coffee tool track decaf? Who asked for that?
+agent> The user asked, at message 7: "Track decaf separately from regular, please. I had a decaf."
+  -> done
+
+=== catalogue ===
+coffee: live coffee@56fef510
+  coffee@8c69fffd: asked for by message 0; 6 checks, 1 invariants; "Log cups of coffee and report the running total. action="add" logs n cups (default 1); action="total" returns the current total; action="reset" clears the log."
+  coffee@56fef510 (live): asked for by message 7; 9 checks, 2 invariants, migrates state; "Log cups of coffee, tracking regular and decaf separately. action="add" logs n cups (default 1) of kind (default "regular"); action="total" returns totals per kind and combined; action="reset" clears one kind, or both when kind="all"."
+log:
+  2026-10-09T05:21:19.341Z verified coffee@8c69fffd, pending
+  2026-10-09T05:21:19.514Z accepted coffee@8c69fffd
+  2026-10-09T05:21:35.713Z rejected coffee@13cea794: invariant(s) "total is a non-negative finite number" of earlier versions were dropped; invariants only ratchet up, so send them again and add any new ones
+  2026-10-09T05:21:40.184Z rejected coffee@56fef510: checks do not exercise every action: kind="regular" appear in none of this version's own checks
+  2026-10-09T05:21:44.836Z rejected coffee@56fef510: group 0 check 0 {"action":"total"}: expected {"total":0}, got {"regular":0,"decaf":0,"combined":0}
+  2026-10-09T05:21:50.988Z rejected coffee@56fef510: group 0 check 7 {"action":"reset","kind":"all"}: expected {"combined":0,"decaf":0,"kinds":["regular","decaf"],"regular":0,"reset":true}, got {"reset":true,"kinds":["regular","decaf"],"previousTotals":{"regular":3,"decaf":2,"combined":5},"regular":0,"decaf":0,"combined":0}
+  2026-10-09T05:22:01.148Z verified coffee@56fef510, pending its migration
+  2026-10-09T05:22:01.306Z accepted coffee@56fef510, retiring 6 check(s)
+
+=== OptChat view (36 messages in 36 lines, 6910 bytes) ===
+<chat>
+0+1|user: I want to log how many cups of coffee I drink and see the total. Just added 2.
+1+1|agent: I'll build you a coffee-logging tool.
+2+1|tool: cell_propose name="coffee" — action="add" logs n cups (default 1, must be positive finite) by reading kv "total", adding, writing back, returns {added,total}; action="total" returns {total}; action="reset" returns {reset,previousTotal,total:0}; checks: total=0; add→1; add n=2→3; total→3; reset→prev 3,0; total→0; invariant: total non-negative finite number.
+3+1|echo: ACCEPTED coffee@8c69fffd (passed 6 checks; replayed 0 real calls; fuzzed 20 of 40 generated inputs in 40 of a budget of 40 sandbox executions). The tool "coffee" is available from your next step.
+4+1|tool: coffee {"action":"add","n":2}
+5+1|echo: {"added":2,"total":2}
+6+1|agent: Built you a `coffee` tool (version `coffee@8c69fffd`) and logged your 2 cups.  **Your total: 2 cups.**  Ways to use it: - `add` — log a cup (or `add n:3` for three at once) - `total` — just ask for the running total - `reset` — clear the log and start over  The count is stored in the tool's own key-value store, so it persists across turns and restarts. Just tell me "add one" whenever you pour another and I'll keep the tally.
+7+1|user: Track decaf separately from regular, please. I had a decaf.
+8+1|agent: I'll extend the coffee tool to track decaf and regular separately. Let me read the current source first.
+9+1|tool: cell_source {"name":"coffee"}
+10+1|echo: cell_source coffee@8c69fffd full spec: params {action enum add|total|reset (required), n number default 1}; source uses kv "total" — add: n=args.n??1, error "n must be a positive number" if not finite/≤0, returns {added,total}; total: {total:kv.get("total")||0}; reset: {reset:true,previousTotal,total:0}; else error "unknown action". 6 checks; invariant total non-negative finite; replay unsafe; why 0.
+11+1|agent: I'll add a `kind` parameter (regular/decaf) keeping the existing state as regular.
+12+1|tool: cell_propose "coffee" v2 — adds kind (regular default/decaf; "all" reset-only); add→{kind,added,total,totals}, total→{regular,decaf,combined}, reset one kind or all; errors "kind must be regular or decaf", "n must be a positive number"; migrate: kv "total"→"regular", decaf 0; 9 checks; invariant both non-negative finite; changes ["*"], expectLive coffee@8c69fffd.
+13+1|echo: REJECTED coffee@13cea794: invariant(s) "total is a non-negative finite number" of earlier versions were dropped; invariants only ratchet up, so send them again and add any new ones. The live version is unchanged.
+14+1|agent: I need to keep the earlier invariant. Let me resend it along with the new one.
+15+1|tool: resubmitted cell_propose coffee v2 with prior invariant "total is a non-negative finite number" restored plus new "counts are non-negative finite numbers"; adds kind (regular default/decaf, "all" reset-only); add→{kind,added,total,totals}, total→{regular,decaf,combined}, reset one kind or all; migrate kv "total"→"regular", decaf 0; 9 checks; expectLive coffee@8c69fffd; source: KINDS=[regular,decaf], readAll/add/kindOf helpers.
+16+1|echo: REJECTED coffee@56fef510: checks do not exercise every action: kind="regular" appear in none of this version's own checks. The live version is unchanged.
+17+1|agent: Adding an explicit `kind: "regular"` check.
+18+1|18+1|tool: cell_propose coffee v3, expectLive coffee@8c69fffd, changes ["*"]: keeps both invariants ("total is a non-negative finite number"), adds explicit kind="regular" check; 9 checks cover add/total/reset incl. default regular, kind=regular n=2, kind=decaf, reset decaf (previousTotal), reset kind=all; params action add|total|reset (required), kind regular|decaf|all (all reset-only, default regular), n default 1; errors "n must be a positive number", "kind must be regular or decaf"; migrate kv total→regular, decaf 0.
+19+1|echo: REJECTED coffee@56fef510: group 0 check 0 {"action":"total"}: expected {"total":0}, got {"regular":0,"decaf":0,"combined":0}. The live version is unchanged.
+20+1|agent: The old checks are still enforced. I need to file them as retired so the flat-total responses are replaced.
+21+1|tool: cell_propose coffee v3 resubmit — 9 checks cover every action incl. explicit kind="regular" (add default→regular, n=2→3, decaf variants, reset kind=all→kinds [regular,decaf]); retires old total-only checks; both prior invariants re-sent: "total is a non-negative finite number", "counts are non-negative finite numbers"; add n cups (default 1) of kind (default regular), total per kind + combined, reset one kind or all; expectLive coffee@8c69fffd; migrate kv "total"→"regular", decaf 0.
+22+1|echo: REJECTED coffee@56fef510: group 0 check 7 {"action":"reset","kind":"all"}: expected {"combined":0,"decaf":0,"kinds":["regular","decaf"],"regular":0,"reset":true}, got {"reset":true,"kinds":["regular","decaf"],"previousTotals":{"regular":3,"decaf":2,"combined":5},"regular":0,"decaf":0,"combined":0}. The live version is unchanged.
+23+1|agent: My check forgot `previousTotals`. Fixing the expectation.
+24+1|24|tool: cell_propose coffee v3 resubmit — expectLive coffee@8c69fffd, changes ["*"]; 9 checks cover total(0)/add default & kind=regular n=2/decaf add/reset decaf(previousTotal)/reset kind=all(previousTotals, kinds)/total 0; retires old flat-total 6 checks; params action add|total|reset (required), kind regular|decaf|all (all reset-only, default regular), n default 1; errors "n must be a positive number", "kind must be regular or decaf"; both invariants re-sent; migrate kv "total"→"regular", decaf 0.
+25+1|echo: ACCEPTED coffee@56fef510 (passed 9 checks; replayed 1 real calls; fuzzed 22 of 40 generated inputs in 41 of a budget of 40 sandbox executions). The tool "coffee" is available from your next step. BEHAVIOUR CHANGES you declared, which the user should hear about: {"action":"add","n":2}: result {"added":2,"total":2} became {"kind":"regular","added":2,"total":2,"totals":{"regular":2,"decaf":0,"combined":2}}
+26+1|agent: Now let me log your decaf.
+27+1|tool: coffee {"action":"add","kind":"decaf"}
+28+1|echo: {"kind":"decaf","added":1,"total":1,"totals":{"regular":2,"decaf":1,"combined":3}}
+29+1|agent: Done — decaf tracked separately, `coffee@56fef510`; totals 2 regular, 1 decaf, 3 combined; earlier 2 cups migrated to regular untouched; `add kind:"decaf"` (default regular); `total` returns {regular,decaf,combined}; `reset kind:"decaf"` or `"all"`; note: `add` result now includes per-kind breakdown, response shape changed.
+30+1|user: What's my breakdown?
+31+1|tool: coffee {"action":"total"}
+32+1|echo: {"regular":2,"decaf":1,"combined":3}
+33+1|agent: Your breakdown: **2 regular, 1 decaf — 3 cups total.**
+34+1|user: Why does the coffee tool track decaf? Who asked for that?
+35+1|agent: The user asked, at message 7: "Track decaf separately from regular, please. I had a decaf."
+</chat>
+
+=== usage per request (input = cache misses) ===
+  # msg kind         input cache-read  output  cache%      cost
+  1 1   turn           253       1792     619    87.6  $0.00083
+  2 1   turn          1962        896      53    31.4  $0.00066
+  3 1   compaction    1491          0     133       0  $0.00061
+  4 1   turn           243       2688     126    91.7  $0.00024
+  5 1   compaction     617        768     151    55.5  $0.00037
+  6 1   compaction     495        896     197    64.4  $0.00039
+  7 1   compaction     494       1280     182    72.2  $0.00037
+  8 1   compaction     476       1664     936    77.8  $0.00128
+  9 2   turn           627       1920      59    75.4  $0.00027
+ 10 2   compaction     671        896     200    57.2  $0.00045
+ 11 2   compaction     953       1152     150    54.7  $0.00047
+ 12 2   turn           763       2560    1308      77  $0.00181
+ 13 2   compaction     617       1152     153    65.1  $0.00038
+ 14 2   compaction    1492       1152     201    43.6  $0.00070
+ 15 2   compaction     453       2560     130      85  $0.00031
+ 16 2   compaction     648       1280     184    66.4  $0.00042
+ 17 2   turn           212       4480    1350    95.5  $0.00171
+ 18 2   compaction     516       1152    2000    69.1  $0.00256
+ 19 2   compaction     378       1920     174    83.6  $0.00033
+ 20 2   compaction    1344       1536     126    53.3  $0.00056
+ 21 2   compaction     476       2176     164    82.1  $0.00035
+ 22 2   compaction     528       1536     125    74.4  $0.00032
+ 23 2   compaction     508       1664     204    76.6  $0.00041
+ 24 2   turn           202       5888    1349    96.7  $0.00171
+ 25 2   compaction     511       2048     195      80  $0.00040
+ 26 2   compaction     134       1534     242      92  $0.00034
+ 27 2   compaction    1410       1664     304    54.1  $0.00080
+ 28 2   compaction     486       2432     164    83.3  $0.00036
+ 29 2   compaction     537       3072     233    85.1  $0.00046
+ 30 2   compaction     370       1664     379    81.8  $0.00058
+ 31 2   turn           203       7296    1516    97.3  $0.00192
+ 32 2   compaction     531       1664     482    75.8  $0.00075
+ 33 2   compaction     418       3584     181    89.6  $0.00036
+ 34 2   compaction    1519       1664     194    52.3  $0.00070
+ 35 2   compaction     499       3072     164      86  $0.00036
+ 36 2   compaction     418       3968    1151    90.5  $0.00153
+ 37 2   compaction     487       2176    1303    81.7  $0.00172
+ 38 2   compaction     457       3456     138    88.3  $0.00032
+ 39 2   turn           174       8960    1530    98.1  $0.00194
+ 40 2   compaction     379       4352     159      92  $0.00033
+ 41 2   compaction     428       2560     142    85.7  $0.00031
+ 42 2   compaction     477       1664     168    77.7  $0.00035
+ 43 2   compaction     717       1664     202    69.9  $0.00047
+ 44 2   compaction     367       2944     348    88.9  $0.00055
+ 45 2   compaction     540       1664     233    75.5  $0.00045
+ 46 2   compaction     469       2176     177    82.3  $0.00037
+ 47 2   compaction     448       2560     176    85.1  $0.00036
+ 48 2   turn          9967        896      61     8.2  $0.00307
+ 49 2   compaction    1789       1920     199    51.8  $0.00079
+ 50 2   compaction     419       2944     184    87.5  $0.00036
+ 51 2   turn           213      10752     166    98.1  $0.00033
+ 52 2   compaction     427       2048    2000    82.7  $0.00254
+ 53 2   compaction     380       3328     174    89.8  $0.00034
+ 54 2   compaction     538       3584     244    86.9  $0.00048
+ 55 2   compaction     435       2176     115    83.3  $0.00028
+ 56 2   compaction     458       2304    2000    83.4  $0.00255
+ 57 2   compaction     395       4096     164    91.2  $0.00034
+ 58 2   compaction     877       2176     266    71.3  $0.00060
+ 59 2   compaction     573       2944     242    83.7  $0.00048
+ 60 2   compaction     500       3456     232    87.4  $0.00045
+ 61 2   compaction     487       2176    1670    81.7  $0.00216
+ 62 2   compaction     539       3840     208    87.7  $0.00043
+ 63 2   compaction     400       4352     196    91.6  $0.00038
+ 64 2   compaction     566       2432     197    81.1  $0.00042
+ 65 2   compaction     454       2944     184    86.6  $0.00037
+ 66 2   compaction     448       3328     179    88.1  $0.00037
+ 67 3   turn          2244       1920      37    46.1  $0.00073
+ 68 3   turn           258       3968      17    93.9  $0.00012
+ 69 3   compaction     707       2560     504    78.4  $0.00083
+ 70 3   compaction     205       2176    1184    91.4  $0.00150
+ 71 3   compaction     515       3200     243    86.1  $0.00047
+ 72 3   compaction     424       2304     243    84.5  $0.00043
+ 73 3   compaction     447       3712     235    89.3  $0.00044
+ 74 3   compaction     462       1920     205    80.6  $0.00040
+ 75 3   compaction     470       4096     192    89.7  $0.00040
+ 76 3   compaction     476       2304     188    82.9  $0.00038
+ 77 3   compaction     471       4480     167    90.5  $0.00037
+ 78 3   compaction     457       2688     154    85.5  $0.00034
+ 79 3   compaction     423       3072     165    87.9  $0.00034
+ 80 3   compaction     389       3456     168    89.9  $0.00034
+ 81 3   compaction     598       2176     469    78.4  $0.00076
+ 82 3   compaction     525       2688     184    83.7  $0.00039
+ 83 3   compaction     376       3200    2000    89.5  $0.00253
+ 84 4   turn           144       4096      25    96.6  $0.00010
+ 85 4   compaction     214       2560     256    92.3  $0.00039
+ 86 4   compaction     525       2688     253    83.7  $0.00048
+ 87 4   compaction     438       3200     175      88  $0.00036
+ 88 4   compaction     402       3584     291    89.9  $0.00049
+ 89 4   compaction     357       3968     234    91.7  $0.00041
+ 90 4   compaction     573       2688    2000    82.4  $0.00259
+ 91 4   compaction     426       3200     374    88.3  $0.00060
+ 92 4   compaction     573       2688     740    82.4  $0.00108
+ 93 4   compaction     466       3200     209    87.3  $0.00041
+ 94 4   compaction     460       3584     183    88.6  $0.00038
+ 95 4   compaction     450       3968     188    89.8  $0.00038
+ 96 4   compaction     440       4352    1841    90.8  $0.00237
+
+spend: 96 of 100 calls, $0.0708 of $0.30 | turns 14 calls, 75577 prompt tokens (76.9% from cache), 8216 out, $0.0154 | compactions 82 calls, 253839 prompt tokens (82% from cache), 33644 out, $0.0553

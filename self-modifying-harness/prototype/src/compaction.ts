@@ -59,6 +59,14 @@ export function mergeTask(a: Line, b: Line, id: number, end: number): string {
 	return `Compaction: merge lines ${lineName(a)} and ${lineName(b)}, adjacent, into one line of at most\n${NODE} bytes (about 70 words), the length of this ruler:\n${RULER}\n<chat> may hold their messages, ${id} to ${end}, in more detail: take details\nof them from there too.\n<input>\n${asLine(a)}\n${asLine(b)}\n</input>`;
 }
 
+// The prompt says "output only the line, without an id+n| head", but a model still copies the head it sees in the view
+// (the live DeepSeek run did, twice in 82 compactions), and a stored head would show twice in every rendered line.
+const HEAD = /^\d+\+\d+\|\s*/;
+
+function withoutHead(reply: string): string {
+	return reply.trim().replace(HEAD, "");
+}
+
 /** The reply to a line that is over the limit, verbatim from spec section 4. */
 export function tooLong(reply: string): string {
 	return `Too long: your line is ${bytes(reply)} bytes, over the ${NODE}-byte limit. Write\nthe whole line again for the same <input>, cutting just enough of the\nleast valuable items to fit before this cut:\n${cut(reply, NODE)}| ← LIMIT`;
@@ -98,7 +106,7 @@ export class ModelSummarizer implements Summarizer {
 		let best = "";
 
 		for (let attempt = 1; attempt <= this.tries; attempt++) {
-			const reply = (await this.complete([...conversation])).trim();
+			const reply = withoutHead(await this.complete([...conversation]));
 
 			if (attempt === 1 || bytes(reply) < bytes(best)) best = reply;
 
