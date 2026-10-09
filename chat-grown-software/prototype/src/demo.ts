@@ -31,7 +31,7 @@ const show = (label: string, r: ReturnType<Kernel["develop"]>) => {
 	const failed = r.report?.verdicts.filter((v) => !v.ok).map((v) => `${v.layer}: ${v.detail}`) ?? [];
 	console.log(`  ${label} -> ${r.status}${r.revision ? ` (${r.revision})` : ""}`);
 	for (const f of failed) console.log(`     x ${f}`);
-	for (const s of r.report?.surfaced ?? []) console.log(`     ~ behaviour diff for you to confirm: ${s.expr}: ${JSON.stringify(s.before)} -> ${JSON.stringify(s.after)}`);
+	for (const s of r.report?.surfaced ?? []) console.log(`     ~ behavior diff for you to confirm: ${s.expr}: ${JSON.stringify(s.before)} -> ${JSON.stringify(s.after)}`);
 	for (const n of r.report?.uncovered ?? []) console.log(`     ? no example you confirmed calls ${n}(): give one?`);
 	const fresh = (r.report?.advisories ?? []).filter((a) => !a.includes("as the accepted version does"));
 	if (fresh.length) console.log(`     ! fuzzing found inputs that would corrupt state (the kernel undoes such calls): ${fresh.slice(0, 2).join("; ")}${fresh.length > 2 ? ` (+${fresh.length - 2} more)` : ""}`);

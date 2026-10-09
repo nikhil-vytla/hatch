@@ -3,7 +3,7 @@ misreadings: 21 (21 behave differently from the intended program on the probes)
 | turn | misreading | self-graded | as-written examples | kernel's questions (user corrected) |
 |---|---|---|---|---|
 | 1 | add-returns-expense: returns the recorded expense, not the count | MISSED | goals | goals (4) |
-| 1 | add-lowercases: normalises categories to lower case | MISSED | MISSED | MISSED (0) |
+| 1 | add-lowercases: normalizes categories to lower case | MISSED | MISSED | MISSED (0) |
 | 1 | add-newest-first: keeps the newest expense first | MISSED | MISSED | goals (2) |
 | 2 | total-formatted: the total as display text | MISSED | goals | goals (2) |
 | 2 | total-count: how many expenses so far | MISSED | goals | goals (1) |
@@ -20,11 +20,11 @@ misreadings: 21 (21 behave differently from the intended program on the probes)
 | 7 | top-tie-last: ties go to the alphabetically last | MISSED | goals | goals (1) |
 | 7 | top-by-count: "spend the most on" as "most often" | properties | properties+goals | properties+goals (1) |
 | 7 | top-tie-insertion: ties go to the category seen first | MISSED | goals | goals (1) |
-| 8 | note-empty-default: every expense gets a note, empty by default | missed; 5 behaviour diff(s) shown | goals | ratchet+goals (2) |
+| 8 | note-empty-default: every expense gets a note, empty by default | missed; 5 behavior diff(s) shown | goals | ratchet+goals (2) |
 | 8 | note-in-category: the note is folded into the category | MISSED | goals | goals (2) |
 | 8 | note-required-text: a note must be text, so a non-string note is dropped silently | MISSED | MISSED | MISSED (0) |
 
-| contract | caught (any layer) | by safety layers alone | by goals (this turn's examples) | missed, but a behaviour diff was shown | missed silently |
+| contract | caught (any layer) | by safety layers alone | by goals (this turn's examples) | missed, but a behavior diff was shown | missed silently |
 |---|---|---|---|---|---|
 | self | 6/21 (29%) | 6/21 (29%) | 0/21 (0%) | 1 | 14 |
 | written | 14/21 (67%) | 6/21 (29%) | 14/21 (67%) | 0 | 7 |

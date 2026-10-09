@@ -19,14 +19,14 @@
   400M-element `build-list` is killed at ~0.7 s with `out-of-memory`; `(expt 9 (expt 9 9))` raises "out of memory" in
   ~100 ms; `(let loop () (loop))` is killed at 1 s and the evaluator survives.
 - Racket specifics learned: `racket/list` in 8.10 has `takef`/`dropf`, not take-while. `null` in Racket is `'()`; JSON null
-  is the symbol `'null`. Exact rationals appear easily (`(/ 3 10)`), so output is normalised: exact non-integers -> float,
+  is the symbol `'null`. Exact rationals appear easily (`(/ 3 10)`), so output is normalized: exact non-integers -> float,
   void -> null. JSON object keys come in as symbols, so category names need `string->symbol` (stated in prompt.md).
 - Gates: static -> sandbox load -> ratchet -> invariants (live state, example results, post-trace states) -> traces
   -> laws (language layer: Racket expressions run on 25 generated states + {}, persisted and re-checked each develop).
   First failing layer is reported (short-circuit; keeps the `loops` refusal at ~1.1 s instead of several).
 - Finding (honest): gates only judge what is covered. In my first showcase run a `set_budget` that adds an `admin` key was
   ACCEPTED because no example or trace had ever called `set_budget`; once one trace existed, replay + invariants refused it.
-  The sandbox protects the host; the contract protects the data, and only where the user has pinned behaviour.
+  The sandbox protects the host; the contract protects the data, and only where the user has pinned behavior.
 - Sandbox limits found: `getenv` is not guarded by racket/sandbox (a bare racket/base evaluator returns `$HOME`); here the
   allow-list language has no `getenv`, and the static gate names it. Sandbox output ports are discarded (`sandbox-output #f`),
   so `displayln` cannot forge a protocol line; the kernel also repoints `current-output-port` to stderr.

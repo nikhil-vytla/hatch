@@ -28,4 +28,4 @@ Limits: develop runs inside the GenServer, so executes queue for ~100 ms while a
 ## Findings
 - The BEAM made isolation cheap: a fresh process per evaluation with `max_heap_size` and `Process.exit(pid, :kill)` is a few lines and handled both `loops` and memory blowups.
 - The static story is weaker than the runtime one: Elixir's metaprogramming means an allowlist has to reject every non-alias receiver (`m.cmd`), `apply`, macros and attributes, so forms look restricted to model authors (no `e.amount`).
-- Behaviour-preserving migration is where the existing gates shine: unchanged values on migrated traces are exactly the evidence that a representation change is safe.
+- Behavior-preserving migration is where the existing gates shine: unchanged values on migrated traces are exactly the evidence that a representation change is safe.

@@ -10,7 +10,7 @@
 //   properties  caller-owned laws (e.g. "categories sum to the total") over seeded generated states
 //   traces      replay of real use: (a) functions changed outside the request's declared scope must not change any
 //               recorded outcome; (b) any recorded outcome that changes must involve a function in scope. Outcomes
-//               that change inside scope are not failures: they are surfaced to the user as a behaviour diff.
+//               that change inside scope are not failures: they are surfaced to the user as a behavior diff.
 //   goals       the current request's own examples ("is it done?"); unmet goals block "done", not safety
 //
 // A timeout anywhere is a failure of the layer that ran the code.
@@ -240,7 +240,7 @@ export function verify(args: {
 		const removed = Object.keys(base.functions).filter((n) => !world.functions.has(n));
 		const scope = new Set(proposal.scope);
 		const undeclared = [...changed, ...removed].filter((n) => !scope.has(n) && base.functions[n] !== undefined);
-		// (a) Undeclared edits must be behaviour-preserving: the old world plus only those edits replays every trace.
+		// (a) Undeclared edits must be behavior-preserving: the old world plus only those edits replays every trace.
 		if (undeclared.length > 0) {
 			const hybrid = new World(base);
 			for (const n of undeclared) {

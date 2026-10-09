@@ -42,7 +42,7 @@ Contract coverage of the unmutated proposals:
   turn 3 (low stock): uncovered []; 15 fuzz advisories, e.g. []
   turn 4 (stock value): uncovered []; 32 fuzz advisories, e.g. ["setPrice(null, NaN) leaves prices-shape is false","setPrice(NaN, null) leaves prices-shape is false"]
   turn 5 (restock): uncovered []; 32 fuzz advisories, e.g. []
-  turn 6 (normalise names): uncovered ["setPrice"]; 32 fuzz advisories, e.g. []
+  turn 6 (normalize names): uncovered ["setPrice"]; 32 fuzz advisories, e.g. []
 
 Missed by every layer (real differences):
   turn 2 relational: sell: > -> >= @110

@@ -12,14 +12,14 @@
   are not exposed, so the remaining uninterruptible cases (one huge `reduce` over a finite seq) are bounded.
   Measured: runaway loop reports timeout at ~1.03 s, process CPU ~0 ms afterwards.
 - Namespaces: every candidate gets a fresh `kernel.appN` namespace holding ALL functions (vars interned first so
-  forward refs work), only allowlisted clojure.core vars are `refer`red (defence in depth behind the walker).
+  forward refs work), only allowlisted clojure.core vars are `refer`red (defense in depth behind the walker).
   Accepted candidate's ns becomes live; rejected ones are `remove-ns`ed.
 - Reader: `*read-eval*` false (kills `#=`), then exactly one form, shape `(defn ...)`. The walker is scope-aware
   (let/loop/fn/for/doseq/if-let/as->/destructuring), rewrites app-name spellings (snake/kebab), rejects qualified
   symbols (blocks `Math/..`, `clojure.core/..`, and reader-generated `clojure.core/deref`, syntax-quote), `.`, `new`, `def`.
 - Laws are implemented: checked as Clojure expressions on 40 generated states (seeded), only when cheaper gates pass.
 - Gotchas hit/anticipated: `(= 0 0.0)` false (use `==`); `(/ 30 100)` is a Ratio (so `round` returns a double);
-  keywords don't work on string-keyed state; `(sort [])` is `()` which serialises as `[]`.
+  keywords don't work on string-keyed state; `(sort [])` is `()` which serializes as `[]`.
 - JVM start: AOT jar + AppCDS (`-XX:+AutoCreateSharedArchive`, needs a jar not a dir on the classpath: a classes
   directory gave "Cannot have non-empty directory in paths") + SerialGC + C1 only. Observed start ~350-410 ms
   (observe round trip), restart with 8 turns of code ~870 ms (recompiles every function). Develop avg 70-120 ms.

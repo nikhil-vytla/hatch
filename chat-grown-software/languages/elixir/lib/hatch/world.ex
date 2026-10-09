@@ -1,7 +1,7 @@
 defmodule Hatch.World do
   @moduledoc """
   The live kernel: code (a hot-loaded module `Hatch.App`), state, revisions, examples, traces, exactly-once results.
-  All mutations are serialised through this GenServer; each execute is one transaction.
+  All mutations are serialized through this GenServer; each execute is one transaction.
   """
   use GenServer
   alias Hatch.{Cmp, Invariants, Sandbox}

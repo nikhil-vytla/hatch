@@ -122,7 +122,7 @@ for (const m of MISREADINGS) {
 // --- report ---
 const SAFETY: Layer[] = ["static", "invariants", "ratchet", "properties", "fuzz", "traces"];
 const caught = (r: Row) => LAYERS.some((l) => r.killed[l]);
-const mark = (r: Row) => (caught(r) ? LAYERS.filter((l) => r.killed[l]).join("+") : r.surfaced > 0 ? `missed; ${r.surfaced} behaviour diff(s) shown` : "MISSED");
+const mark = (r: Row) => (caught(r) ? LAYERS.filter((l) => r.killed[l]).join("+") : r.surfaced > 0 ? `missed; ${r.surfaced} behavior diff(s) shown` : "MISSED");
 const lines: string[] = [];
 const real = MISREADINGS.filter((m) => rows.find((r) => r.id === m.id)!.real);
 lines.push(`misreadings: ${MISREADINGS.length} (${real.length} behave differently from the intended program on the probes)`);
@@ -134,7 +134,7 @@ for (const m of MISREADINGS) {
 	lines.push(`| ${m.turn} | ${m.id}: ${m.reading}${rs("self").real ? "" : " (no observable difference)"} | ${mark(rs("self"))} | ${mark(rs("written"))} | ${mark(rs("chat"))} (${rs("chat").corrections}) |`);
 }
 lines.push("");
-lines.push("| contract | caught (any layer) | by safety layers alone | by goals (this turn's examples) | missed, but a behaviour diff was shown | missed silently |");
+lines.push("| contract | caught (any layer) | by safety layers alone | by goals (this turn's examples) | missed, but a behavior diff was shown | missed silently |");
 lines.push("|---|---|---|---|---|---|");
 const pct = (n: number, d: number) => `${n}/${d} (${Math.round((100 * n) / d)}%)`;
 for (const c of ["self", "written", "chat"]) {

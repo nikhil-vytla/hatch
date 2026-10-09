@@ -9,7 +9,7 @@ network, no subprocess), per-eval time limit, custodian memory limit, and killab
 `node --experimental-strip-types --no-warnings bench/conformance.ts racket` -> **51/51 pass**, start 310-410 ms,
 develop avg 112 ms (`showcase/conformance-output.txt`).
 
-## Layers of defence
+## Layers of defense
 1. **Form convention** (`prompt.md`): each form is one `(define (name params) body ...)`; state via `(get-state)`,
    `(set-state! s)`, `(update-state! f)`; JSON objects are hasheq with symbol keys, null is `'null`.
 2. **Language by omission** (`lang.rkt`): app code runs in a namespace containing only an allow-list. No `eval`,
@@ -40,7 +40,7 @@ on accept. A timeout leaves the evaluator usable; an out-of-memory kill discards
 | eval + fresh namespace | static | inner `delete-file` still denied by the guard |
 | `#reader` smuggling | static: `read` refuses `#reader` | same, reader disabled |
 | `(set! car cdr)` | static: cannot mutate module binding | same error |
-| `(define (car x) ...)` | static: redefines a builtin | would succeed in raw racket/base (gate-only defence) |
+| `(define (car x) ...)` | static: redefines a builtin | would succeed in raw racket/base (gate-only defense) |
 | top-level `set-state!` effect | static: not a single define | n/a |
 | leak a continuation (call/cc) | static: forbidden | would run, no host effect |
 | `getenv "HOME"` | static: forbidden | **returns `/root`**: racket/sandbox does not guard env vars |
@@ -59,7 +59,7 @@ Only the infinite loop was stopped (by the `timeout` option). All of these are o
 `this.constructor.constructor("return process")()`.
 
 ## Caveats
-- The gates only judge covered behaviour: before any example or trace exercised `set_budget`, a corrupting rewrite of it
+- The gates only judge covered behavior: before any example or trace exercised `set_budget`, a corrupting rewrite of it
   was accepted (found during the showcase). The sandbox protects the host, the contract protects the data.
 - racket/sandbox is in-process (threads, custodians, a security guard), not an OS boundary: it contains these attacks but
   a Racket runtime bug or an unguarded primitive (e.g. `getenv`) would not be stopped by it. This port stacks an

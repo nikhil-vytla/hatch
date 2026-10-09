@@ -56,7 +56,7 @@
  {
   "id": "add-lowercases",
   "turn": 1,
-  "reading": "normalises categories to lower case",
+  "reading": "normalizes categories to lower case",
   "real": true,
   "contract": "self",
   "killed": {
@@ -74,7 +74,7 @@
  {
   "id": "add-lowercases",
   "turn": 1,
-  "reading": "normalises categories to lower case",
+  "reading": "normalizes categories to lower case",
   "real": true,
   "contract": "written",
   "killed": {
@@ -92,7 +92,7 @@
  {
   "id": "add-lowercases",
   "turn": 1,
-  "reading": "normalises categories to lower case",
+  "reading": "normalizes categories to lower case",
   "real": true,
   "contract": "chat",
   "killed": {

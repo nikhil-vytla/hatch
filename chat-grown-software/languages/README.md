@@ -73,7 +73,7 @@ intended program; the model never sees them. *Final regression*: all turns' exam
 Where points were lost:
 - **Lean**: 6 turns (of 39) ended at the 10-step limit with no accepted change. The proof gate refuses drafts and
   DeepSeek spends its steps re-proving. It also needed far fewer user corrections: proofs force it to pin down
-  behaviour before the user sees it.
+  behavior before the user sees it.
 - **Racket** (one run): DeepSeek called `try` (preview) 10 times at the budgets turn, 54 forms, and never
   submitted; the user was never asked. A dithering failure, not a language one; a driver nudge would fix it.
 - **Clojure** (one run): `over_budget` wrong on one example of one turn.
@@ -107,7 +107,7 @@ quotas, validation, top spender. Each video replays a recorded transcript (sped 
 |---|---|
 | [Erlang/Elixir: hot-deploying an LLM gateway under live traffic](videos/elixir-gateway-hot-deploy.mp4) | Quotas, validation and a data migration (calls aggregated per key and model, ~114 records to 9) deployed into a running gateway while 5 clients call it: 564 requests in 3 s, 0 unexpected failures, p50 9.2 ms, max 152 ms (during a swap), the five invariants (`within-quota` included) never broken in 73 live samples. A bad migration was refused and the world untouched. 1986 runtime, 2026 traffic. |
 | [Clojure: auditing the gateway's billing code as data](videos/clojure-gateway-code-as-data.mp4) | Reads the live code as data: call graph, which functions can change state, which depend on prices, every throw site, structural diffs between revisions with the chat message that asked for each. Then time travel over every past state and "replay billing under a new price table" without touching live state (top spender flips from bob to alice). |
-| [Racket: prompt-injected code changes vs. the gates](videos/racket-prompt-injection.mp4) | Eight changes a prompt-injected model might write. Stopped before going live: env-var read and file write (static), self-granted admin key (invariants). Live but blocked at use: quota exemption and quota off-by-one (runtime invariant), a sleeper loop (sandbox kill). **Got through everything: round-in-the-attacker's-favour pricing, and API keys leaked in an error message.** |
+| [Racket: prompt-injected code changes vs. the gates](videos/racket-prompt-injection.mp4) | Eight changes a prompt-injected model might write. Stopped before going live: env-var read and file write (static), self-granted admin key (invariants). Live but blocked at use: quota exemption and quota off-by-one (runtime invariant), a sleeper loop (sandbox kill). **Got through everything: round-in-the-attacker's-favor pricing, and API keys leaked in an error message.** |
 | [Lean 4: an LLM rate limiter whose quota law is proved](videos/lean-gateway-proved-quota.mp4) | `no_key_exceeds_its_quota` proved for every state and call. An off-by-one (`usage + tokens - 1 > q`), "quota 0 means unlimited", and a one-key exemption each pass 19/19 examples and 300/300 random tests, and each is refused because the proof no longer goes through. A 1970s idea on a 2020s problem. |
 | [Pharo Smalltalk: the live image as an operations console](videos/smalltalk-gateway-live-image.mp4) | A bad "whole cents" revision ships; the operator inspects live objects and the change log, spots a scraper billed $0, hot-fixes one method with no restart, finds the revision and chat message that introduced the bug, rolls back that one method, then saves the image and restarts: code, data, history and exactly-once all return. |
 | [Same app, six kernels (benchmark race)](videos/benchmark-race-expenses.mp4) | Repetition 1 of the expense benchmark in all six kernels side by side at recorded speed (x8), with the end-of-run table. Lean is still proving long after the others finish. |
@@ -125,7 +125,7 @@ quotas, validation, top spender. Each video replays a recorded transcript (sped 
 - **Reads that write.** DeepSeek's `usage("nobody")` on an empty gateway left `{calls: []}` behind. No question
   covered an empty state, so the user never saw it; the hidden checks did. The question rules should add the empty
   fixture for every function in scope.
-- **Behaviour the examples don't exercise is unguarded in every language but Lean.** The Racket injection showcase
+- **Behavior the examples don't exercise is unguarded in every language but Lean.** The Racket injection showcase
   and the Lean showcase are two views of the same fact: gates built from examples and traces catch what was asked
   about; proofs catch what holds for all inputs; nothing here compares error *text*, so a leak through an error
   message passes everything.

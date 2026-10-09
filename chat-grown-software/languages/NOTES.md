@@ -74,7 +74,7 @@ benchmark them with DeepSeek, and record demos.
 
 ## Benchmark metric
 
-- "Turns accepted" undercounts good behaviour: in the Clojure expenses run, DeepSeek made no change at turn 5
+- "Turns accepted" undercounts good behavior: in the Clojure expenses run, DeepSeek made no change at turn 5
   ("reject zero or less") because its turn-1 `add_expense` already validated, and the hidden goal checks pass.
   Primary metric: hidden goal checks (per turn) and final regression; cost metrics: develops, load errors, user
   corrections, tokens, minutes. Three repetitions per language and scenario, since single runs are noisy.
@@ -88,7 +88,7 @@ benchmark them with DeepSeek, and record demos.
   racket 17/20, lean 14/20; gateway js 18/19, clojure 19/19, elixir 19/19, racket 19/19.
 - Racket expenses r2 ended 17/20: at turn 6 DeepSeek spent all 10 steps in `try` (54 forms previewed), never
   called `develop`, so the user was never asked and the turn ended with no budgets. Its `over_budget` sorted by
-  overage instead of by name; it kept previewing variants. A model behaviour failure (dithering), not a language
+  overage instead of by name; it kept previewing variants. A model behavior failure (dithering), not a language
   failure; the hidden goal check is what exposes it. A driver could nudge after N previews without a develop.
 
 ## Final (all 36 runs with the 32000 cap and the fixed simulated user)

@@ -52,12 +52,12 @@ conversation made it. So what can stand in for "the tests"?
 1. **The conversation itself.** When the user confirms an example in chat ("so 0.1 + 0.2 shows 0.3?" "yes"), that
    example is a requirement in their own words. Accumulate those as a ratchet: every later change must keep every
    earlier confirmed example.
-2. **Use.** The app is used as it grows, so every real call is an observation of accepted behaviour. Recording calls
+2. **Use.** The app is used as it grows, so every real call is an observation of accepted behavior. Recording calls
    with the state before and after gives a free regression corpus. The open question was how to tell an intended
    change from an unintended one. My answer: each request declares its **scope**, the functions it is about.
-   - Diffs in traces that involve scope functions are *surfaced* to the user as a behaviour diff, like a PR.
+   - Diffs in traces that involve scope functions are *surfaced* to the user as a behavior diff, like a PR.
    - Diffs that involve no scope function are rejected.
-   - Edits to functions outside scope must be behaviour-preserving, checked by replaying traces on old world plus
+   - Edits to functions outside scope must be behavior-preserving, checked by replaying traces on old world plus
      only those edits.
 3. **Caller-owned laws.** Invariants on state from the start, and properties agreed in chat ("categories always add
    up to the total"), checked on generated states.
@@ -108,7 +108,7 @@ rejected.
 | **all** | **96%** (89% without goals) | |
 
 - Each layer has unique catches. Invariants are the only thing that sees a stray `state.cache = {}` (10 of 11). Traces
-  are the best detector of drive-by edits (92% alone) because they cover behaviour nobody wrote an example for.
+  are the best detector of drive-by edits (92% alone) because they cover behavior nobody wrote an example for.
 - Every one of the 10 silent misses is one of two gaps:
   - **`setBudget` is never called by any check.** Examples set budgets through fixtures, and there are no traces yet
     because the function is new. Even a `while (true) {}` in it passes every layer. A function no check calls is
@@ -183,9 +183,9 @@ words, would have obtained:
   - every request should end with the model proposing concrete input → output examples (including the boundaries
     the user's words imply), which the user confirms or corrects;
   - the kernel should refuse to call a change "done" while a function in scope is uncovered.
-- **Scope declarations make use-replay usable.** Without a declared scope, any behaviour diff is ambiguous (intended
+- **Scope declarations make use-replay usable.** Without a declared scope, any behavior diff is ambiguous (intended
   or not). With it, out-of-scope diffs can be rejected automatically and in-scope diffs shown as a PR-like
-  "behaviour diff".
+  "behavior diff".
 
 ## Caveats
 
@@ -229,7 +229,7 @@ The question: can a proposal neuter the caller's checks? `src/tamper-check.ts`, 
 ### Items 2-4: store, kernel, questions (`store.ts`, `kernel.ts`, `ask.ts`)
 
 - Revisions now carry `codeId` (hash of functions + contract) and `dataId` (hash of state). `rollback(id, what)`
-  takes `"code"` (the new default: old code and contract, today's data), `"data"` or `"both"` (Jiti's behaviour).
+  takes `"code"` (the new default: old code and contract, today's data), `"data"` or `"both"` (Jiti's behavior).
   The combination must satisfy the invariants of the contract it lands under, or the rollback is refused and asks for
   a migration. Demo: rolling code back to before notes keeps the expense with a note (1 kept); `"both"` drops it, plus
   the expense added after the code rollback.
@@ -304,7 +304,7 @@ simulated user from the intended program).
 
   | contract | caught | by safety layers | by this turn's examples | silent misses |
   |---|---|---|---|---|
-  | self | 6/21 (29%) | 6/21 | 0/21 | 14 (+1 behaviour diff shown) |
+  | self | 6/21 (29%) | 6/21 | 0/21 | 14 (+1 behavior diff shown) |
   | written | 14/21 (67%) | 6/21 | 14/21 | 7 |
   | chat | 16/21 (76%) | 8/21 | 16/21 | 5 |
 
@@ -419,7 +419,7 @@ error: no real model run was possible.
   rejects, so the model sees the error. `npx tsc -p .` is clean; without a key it stops with "DEEPSEEK_API_KEY is
   not set"; the scripted chat output is unchanged.
 - A run with it would test a non-Claude model in the loop and should be reported as that.
-- The remote branch had been rewritten onto a reorganised repo (no common history with my local branch; the
+- The remote branch had been rewritten onto a reorganized repo (no common history with my local branch; the
   folder's content was identical). I re-applied this commit on top of it instead of force-pushing, and kept the old
   local commit on a local backup branch.
 - README: the adapter is listed under What's here and Limits. Ran the repo's `summarize` skill (new in AGENTS.md):
@@ -450,9 +450,9 @@ error: no real model run was possible.
     so it knows only the scripted names (`total`, `byCategory`, `overBudget`...). DeepSeek chose `getExpenses`,
     `totalExpenses`, `expensesByCategory`; every question about those "should throw" in the user's answers. The
     model then has to build functions that throw, against the user's words. The budget turn (17 rejections) is
-    where this piles up. So the simulated user tests agreement with the script's names as much as behaviour.
+    where this piles up. So the simulated user tests agreement with the script's names as much as behavior.
   - Not fixed here. Options: give the model the function names in the user's messages (changes the scenario), or
-    let the simulated user map unknown names onto intended functions by behaviour (hard to do honestly).
+    let the simulated user map unknown names onto intended functions by behavior (hard to do honestly).
 - `why topCategory()` prints undefined after the DeepSeek run because the model never defined a function by that
   name; the line is hard-coded to the scripted names.
 
@@ -463,7 +463,7 @@ error: no real model run was possible.
   (`readSync` on fd 0) because the `User` interface is synchronous. Smoke test piped one request plus empty lines
   (accept every answer) through DeepSeek: 7 questions, `addExpense` accepted at rev-0003, 13 confirmed examples.
   Scripted transcripts are unchanged.
-- In this mode the user's own judgement replaces the scripted program, so the naming problem from session 4 goes away.
+- In this mode the user's own judgment replaces the scripted program, so the naming problem from session 4 goes away.
 - First local run by the user failed with DeepSeek's "Authentication Fails (governor)": outside this container there
   is no proxy adding the key, and `DEEPSEEK_API_KEY` was unset. A 401 without a key now says so. Added
   `npm run play` for the interactive command (a typo'd `-- experimental-strip-types` made node look for a file).

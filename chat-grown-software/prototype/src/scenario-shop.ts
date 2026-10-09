@@ -109,7 +109,7 @@ export const TURNS: Turn[] = [
 	{
 		user: "Item names shouldn't care about capitals or spaces: 'Apple ' and 'apple' are the same item.",
 		proposal: {
-			intent: "normalise names",
+			intent: "normalize names",
 			scope: ["key", "addItem", "sell", "setPrice"],
 			forms: [
 				`function key(name) {

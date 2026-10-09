@@ -23,7 +23,7 @@
 `Int` cents in the app, JSON number <-> cents at the boundary with exact decimal arithmetic (`JsonNumber` mantissa/exponent,
 round half up = JS `Math.round`). Floats make proofs impossible; with cents `omega`/`simp` close goals. Cost: sub-cent inputs are
 quantised (0.001 -> 0 cents -> invariant violation); `Money` as an `abbrev` broke `omega` (it does not unfold it) so the type is plain `Int`.
-Consequence: the "round to cents" turn 4 needs no behavioural change; the reference only refactors `total` via `sum_cents` and
+Consequence: the "round to cents" turn 4 needs no behavioral change; the reference only refactors `total` via `sum_cents` and
 proves `total` is the exact integer sum. Turns 1-3 already behave as turn 4 asks.
 
 ## Things that failed / learned
@@ -35,7 +35,7 @@ proves `total` is the exact integer sum. Turns 1-3 already behave as turn 4 asks
 - Deliberate tightening: strict arity (extra args error), `set_budget` rejects negatives (JS wouldn't throw but the invariant forbids it), a rollback is refused when
   recorded traces call the newer arity (add_expense with a note) - allowed by the harness.
 - Execute also refuses a result that breaks an invariant.
-- Empty state keys: output omits empty `expenses`/`budgets` unless the input state had the key (matches JS `state.expenses ||= []` behaviour on the scenario).
+- Empty state keys: output omits empty `expenses`/`budgets` unless the input state had the key (matches JS `state.expenses ||= []` behavior on the scenario).
 - Proof repair is real: the turn-3 proof (`simpa [by_category, total]`) breaks when turn 4 refactors `total` into `sum_cents`; the kernel rejects until the law is restated (showcase part 2).
 
 ## Measured (4 cores, warm .lake)

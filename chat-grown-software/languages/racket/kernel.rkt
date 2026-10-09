@@ -138,7 +138,7 @@
       d)))
 
 ;; Expand an expression (never evaluate); returns (values free-ids bad-sets).
-(define (expand-analyse datum)
+(define (expand-analyze datum)
   (define stx (namespace-syntax-introduce (datum->syntax #f datum)))
   (define expanded
     (with-handlers ([exn:fail:resource? (λ (e) (static-fail "expansion took too long"))]
@@ -168,7 +168,7 @@
 
 ;; src -> (list name free-ids) or raises (cons 'static msg). Cached by source text.
 (define analysis-cache (make-hash))
-(define (analyse-form src)
+(define (analyze-form src)
   (hash-ref! analysis-cache src
     (λ ()
       (define d (read-one src "form"))
@@ -188,7 +188,7 @@
           (static-fail "parameter must be `x` or `[x default]`; got ~a" (short-datum p))))
       (define pnames (map (λ (p) (if (symbol? p) p (car p))) params))
       (unless (= (length pnames) (length (remove-duplicates pnames))) (static-fail "duplicate parameter names"))
-      (define-values (free sets) (expand-analyse `(lambda ,params ,@(cddr d))))
+      (define-values (free sets) (expand-analyze `(lambda ,params ,@(cddr d))))
       (unless (null? sets) (static-fail "~a: set! of non-local variable ~a is not allowed" name (car sets)))
       (list name free))))
 
@@ -211,7 +211,7 @@
       (define info
         (with-handlers ([(λ (e) (and (pair? e) (eq? (car e) 'static)))
                          (λ (e) (static-fail "~a: ~a" (car f) (cdr e)))])
-          (analyse-form (cdr f))))
+          (analyze-form (cdr f))))
       (unless (eq? (car info) (car f)) (static-fail "internal: name mismatch"))
       (define err (free-id-error (car f) (cadr info) allowed))
       (when err (static-fail "~a" err)))
@@ -221,7 +221,7 @@
 (define (check-expr-static src fns)
   (with-handlers ([(λ (e) (and (pair? e) (eq? (car e) 'static))) cdr])
     (define d (read-one src "law check"))
-    (define-values (free sets) (expand-analyse d))
+    (define-values (free sets) (expand-analyze d))
     (unless (null? sets) (static-fail "set! of non-local ~a" (car sets)))
     (define allowed (make-hasheq))
     (for ([(k _) (in-hash lang-exports)]) (hash-set! allowed k #t))
@@ -379,7 +379,7 @@
     (define kept (filter (λ (f) (not (memq (car f) rm))) base))
     (define added
       (for/list ([src forms])
-        (define info (analyse-form src))
+        (define info (analyze-form src))
         (cons (car info) src)))
     (let ([names (map car added)])
       (unless (= (length names) (length (remove-duplicates names)))

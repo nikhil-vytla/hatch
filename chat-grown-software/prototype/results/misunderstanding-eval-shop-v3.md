@@ -20,7 +20,7 @@ misreadings: 17 (16 behave differently from the intended program on the probes)
 | 6 | key-title-case: names are stored as 'Apple' | ratchet+goals | ratchet+goals | ratchet+goals (6) |
 | 6 | key-no-migration: new entries only; old names are left as they are (no observable difference) | MISSED | MISSED | MISSED (0) |
 
-| contract | caught (any layer) | by safety layers alone | by goals (this turn's examples) | missed, but a behaviour diff was shown | missed silently |
+| contract | caught (any layer) | by safety layers alone | by goals (this turn's examples) | missed, but a behavior diff was shown | missed silently |
 |---|---|---|---|---|---|
 | self | 4/16 (25%) | 4/16 (25%) | 1/16 (6%) | 0 | 12 |
 | written | 12/16 (75%) | 4/16 (25%) | 12/16 (75%) | 0 | 4 |

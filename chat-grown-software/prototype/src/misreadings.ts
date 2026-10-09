@@ -15,7 +15,7 @@ export const MISREADINGS: Misreading[] = [
   state.expenses.push(e);
   return e;
 }` } },
-	{ turn: 1, id: "add-lowercases", reading: "normalises categories to lower case", forms: { addExpense: `function addExpense(amount, category) {
+	{ turn: 1, id: "add-lowercases", reading: "normalizes categories to lower case", forms: { addExpense: `function addExpense(amount, category) {
   state.expenses = state.expenses || [];
   state.expenses.push({ amount, category: String(category).toLowerCase() });
   return state.expenses.length;

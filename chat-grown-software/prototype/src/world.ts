@@ -104,7 +104,7 @@ export function declaredFunctions(source: string): string[] {
 	return names;
 }
 
-/** The text of one top-level function declaration, so the catalogue keeps each function's own source. */
+/** The text of one top-level function declaration, so the catalog keeps each function's own source. */
 export function extractDeclaration(source: string, name: string): string {
 	const start = source.search(new RegExp(`function\\s+${name}\\s*\\(`));
 	if (start < 0) return source;

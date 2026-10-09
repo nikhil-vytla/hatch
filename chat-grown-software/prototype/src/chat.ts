@@ -59,7 +59,7 @@ export const TOOLS: ToolDef[] = [
 	{
 		name: "develop",
 		description:
-			"Propose a change: top-level function declarations only (no other statements). Declare `scope`, the functions this request is about; edits outside scope must not change behaviour. Propose example calls (no expected values): the kernel runs them and asks the user, and only the user's answers count. Pass the generation you last observed.",
+			"Propose a change: top-level function declarations only (no other statements). Declare `scope`, the functions this request is about; edits outside scope must not change behavior. Propose example calls (no expected values): the kernel runs them and asks the user, and only the user's answers count. Pass the generation you last observed.",
 		input_schema: {
 			type: "object",
 			properties: {
@@ -105,7 +105,7 @@ export const SYSTEM = `You grow a small application by talking with its user. Th
 
 Rules:
 - Change code only through \`develop\`. Each form is one complete top-level \`function\` declaration; any other top-level statement is refused. No eval, no imports.
-- Declare \`scope\` honestly: the functions the user's request is about. Edits to other functions must not change any recorded behaviour, or the change is rejected.
+- Declare \`scope\` honestly: the functions the user's request is about. Edits to other functions must not change any recorded behavior, or the change is rejected.
 - You propose example calls, never expected answers. The kernel shows the user what each call does and the user's answers become the contract. Later changes must keep every answer the user has confirmed.
 - A change is "done" only when the user's answers pass and every function in scope is exercised. If \`develop\` says accepted-incomplete or rejected, read why and fix it.
 - Use \`execute\` with a fresh request_id for each thing the user asks you to do with the app.
@@ -192,7 +192,7 @@ function handle(kernel: Kernel, user: User, name: string, input: Record<string, 
 				failed: r.report?.verdicts.filter((v) => !v.ok).map((v) => `${v.layer}: ${v.detail}`),
 				user_corrected: corrected,
 				uncovered: r.uncovered,
-				behaviour_diffs: r.report?.surfaced,
+				behavior_diffs: r.report?.surfaced,
 				fuzz_advisories: r.report?.advisories.filter((a) => !a.includes("as the accepted version")).slice(0, 5),
 			};
 		}

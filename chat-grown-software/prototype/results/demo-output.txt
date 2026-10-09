@@ -53,8 +53,8 @@ What the kernel refuses:
   overBudget that caches into state -> rejected
      x invariants: known-keys is false
      x fuzz: overBudget() now leaves known-keys is false (the accepted version did not)
-     ~ behaviour diff for you to confirm: overBudget(): ["food"] -> "[\"food\"], but the state after differs"
-     ~ behaviour diff for you to confirm: overBudget(): ["food"] -> "[\"food\"], but the state after differs"
+     ~ behavior diff for you to confirm: overBudget(): ["food"] -> "[\"food\"], but the state after differs"
+     ~ behavior diff for you to confirm: overBudget(): ["food"] -> "[\"food\"], but the state after differs"
      ? no example you confirmed calls overBudget(): give one?
   use state.expenses.push({amount: -3, category: "x"}) => {"ok":false,"error":"undone: expenses-shape is false"}
   addExpense with an accidental infinite loop -> rejected
@@ -63,7 +63,7 @@ What the kernel refuses:
      x fuzz: addExpense(1, true, undefined) hangs
      x traces: replaying addExpense(40, "transport") timed out
      x goals: (addExpense(4, "food", "coffee with Sam"), state.expenses[0].note) gave "error", asked for "coffee with Sam"
-     ~ behaviour diff for you to confirm: addExpense(12.5, "food"): 1 -> "error"
+     ~ behavior diff for you to confirm: addExpense(12.5, "food"): 1 -> "error"
      ? no example you confirmed calls addExpense(): give one?
 
 A fresh process:

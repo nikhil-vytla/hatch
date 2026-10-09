@@ -33,7 +33,7 @@ by the model**, plus machinery that needs nothing from anyone:
 | **invariants** | caller, from the start | stray writes into state, corrupt data |
 | **ratchet** | user, accumulated | regressions of anything confirmed in an earlier turn |
 | **properties** | user, agreed in chat | arithmetic and logic slips ("categories always add up to the total") |
-| **fuzz** | kernel | hangs; out-of-scope behaviour changes and validation regressions on boundary inputs nobody typed |
+| **fuzz** | kernel | hangs; out-of-scope behavior changes and validation regressions on boundary inputs nobody typed |
 | **traces** | kernel, from real use | drive-by edits to functions the request was not about |
 | **goals** | user, this turn | "did it do what I asked?" (the most unique catches) |
 
@@ -48,7 +48,7 @@ only the user's answer counts. The kernel adds its own questions:
 
 The kernel refuses "done" until the user's answers pass and every function in scope is covered.
 
-Results on mutants that change observable behaviour (no legitimate change was ever rejected):
+Results on mutants that change observable behavior (no legitimate change was ever rejected):
 
 | contract | expenses (238 mutants) | shop (224 mutants, held out until v3) |
 |---|---|---|
@@ -251,7 +251,7 @@ A sibling experiment built a durable agent harness that writes and hot-installs 
 4. **The chat is the change log** (OptChat keeps every message and ranks the user's own words highest).
    *Implemented:* revisions point at the chat message that asked for them, and `why()` follows the pointer.
 5. **Keep the prompt prefix stable as the app grows.** The chat loop's system prompt and tool list never change; the
-   function catalogue arrives through `observe` results, so a provider cache stays warm.
+   function catalog arrives through `observe` results, so a provider cache stays warm.
 
 ## Limits
 

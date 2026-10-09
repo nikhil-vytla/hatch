@@ -1,7 +1,7 @@
 # NOTES (Elixir/BEAM port)
 
 ## Design
-- mix project + Jason, built as an escript (`_build/hatch`, setup.sh) so `run.sh` is `exec escript`. Kernel is one GenServer (`Hatch.World`); every op is serialised through it, each execute is one transaction.
+- mix project + Jason, built as an escript (`_build/hatch`, setup.sh) so `run.sh` is `exec escript`. Kernel is one GenServer (`Hatch.World`); every op is serialized through it, each execute is one transaction.
 - Form convention: every function takes `state` (string-keyed map) first; reads return a plain value, writes return `{value, new_state}` (a 2-tuple is never a JSON value, so it is unambiguous). Throw = `raise`. Chosen over "everything returns {value, state}" so read functions and cross-calls (`by_category(state)` inside `over_budget`) stay plain.
 - Static gate: `Code.string_to_quoted`, each form = one `def`/`defp` (clauses of one name allowed), AST walked with an allowlist (Kernel Enum Map List String Float Integer Keyword MapSet Tuple Range :math). Rejected: other modules, atom/variable receivers (`m.cmd`), `apply spawn send receive self import @attr String.to_atom`, nested defs, names that shadow Kernel. Missing local functions are caught by the compiler (undefined function) = `calls_missing`.
 - Isolation: compile, every call-list, every migrate run in a fresh process (`spawn_opt`, `max_heap_size` 30M words with kill), 1 s timeout, `Process.exit(pid, :kill)`.

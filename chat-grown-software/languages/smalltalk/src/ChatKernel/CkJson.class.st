@@ -52,7 +52,7 @@ CkJson class >> toJson: x [
 
 { #category : #conversion }
 CkJson class >> asciiJson: x [
-	"Serialise to a pure-ASCII JSON line (non-ASCII as \uXXXX), so stdout never needs an encoding."
+	"Serialize to a pure-ASCII JSON line (non-ASCII as \uXXXX), so stdout never needs an encoding."
 
 	| s |
 	s := STONJSON toString: (self toJson: x).

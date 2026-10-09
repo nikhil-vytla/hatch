@@ -69,7 +69,7 @@
   model: Done (accepted).
 
 [30] user> Item names shouldn't care about capitals or spaces: 'Apple ' and 'apple' are the same item.
-  model: I'll normalise names.
+  model: I'll normalize names.
     kernel asks: (addItem("Apple ", 2), addItem("apple", 3)) on {}  (the model proposed this call)
     kernel asks: sell("APPLE", 1) on {"stock":{"apple":3}}  (the model proposed this call)
     kernel asks: key("apple") on {}  (no call you have confirmed exercises key())
@@ -83,4 +83,4 @@
   model: Done (accepted).
 
 36 chat log entries; 41 confirmed examples in the contract; the simulated user corrected 0 answers
-why is addItem() the way it is? rev-0014 ("normalise names") was asked for by chat message 30: "Item names shouldn't care about capitals or spaces: 'Apple ' and 'apple' are the same item."
+why is addItem() the way it is? rev-0014 ("normalize names") was asked for by chat message 30: "Item names shouldn't care about capitals or spaces: 'Apple ' and 'apple' are the same item."

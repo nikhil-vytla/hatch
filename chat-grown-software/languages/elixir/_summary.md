@@ -1,4 +1,4 @@
 An Elixir/BEAM port of a JSON-lines "live kernel" that grows an expense tracker through gated changes, built on a GenServer, [Jason](https://hex.pm/packages/jason) and Code.compile_string. Model-written forms are checked against an AST allowlist, evaluated in throwaway processes with heap limits and a 1 s kill, and hot-loaded as a new version of one module while the old version stays loaded. An optional `migrate` field acts as a `code_change`: live state, confirmed examples and recorded traces are carried through it and every gate runs on the migrated data. The port passes all 51 conformance checks with a ~290 ms start and ~55 ms average develop.
 
 - Showcase: switching amounts to integer cents under load from 4 clients gave 179 executes, 0 failures, and a bad migration was refused with the world untouched.
-- Rollback across a migration is refused because there is no down-migration; develop serialises through the GenServer, so executes queue about 100 ms during a swap.
+- Rollback across a migration is refused because there is no down-migration; develop serializes through the GenServer, so executes queue about 100 ms during a swap.
