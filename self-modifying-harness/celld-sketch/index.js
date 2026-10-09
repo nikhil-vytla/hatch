@@ -1,7 +1,8 @@
-// UNTESTED SKETCH of the prototype's cell model on celld itself. One Durable Object (a celld cell) is the kernel: it
-// holds the catalog in its own SQLite, which celld replicates (LTX) to the bucket, so the agent's self-written tools
-// survive the loss of a node, not just of a process. Each agent-written tool is loaded by the Worker Loader under its
-// immutable version id and runs as a facet whose SQLite is keyed by the tool's name, so state outlives code versions.
+// TESTED against celld 0.6.2 (see test.mjs and RESULTS.md). Sketch of the prototype's cell model on celld itself. One
+// Durable Object (a celld cell) is the kernel: it holds the catalog in its own SQLite, which celld replicates (LTX) to
+// the bucket, so the agent's self-written tools survive the loss of a node, not just of a process. Each agent-written
+// tool is loaded by the Worker Loader under its immutable version id and runs as a facet whose SQLite is keyed by the
+// tool's name, so state outlives code versions.
 //
 // What is left out: the agent loop itself. pi-durable's portable SQLite storage core is documented to run in a Durable
 // Object given an async SqliteDatabase facade over `ctx.storage.sql`; that harness would live in this same object.
@@ -62,9 +63,11 @@ export class Forge extends DurableObject {
       const got = await (await facet.fetch("http://cell/", { method: "POST", body: JSON.stringify({ args: c.args, callId: `check-${i}` }) })).json();
       if (JSON.stringify(got) !== JSON.stringify(c.expect)) return { ok: false, check: i, got };
     }
-    this.ctx.facets.delete?.(scratch); // whether facets can be deleted is an open question for celld
+    this.ctx.facets.delete(scratch); // celld deletes the facet and its scratch database
     this.ctx.storage.sql.exec("INSERT OR REPLACE INTO versions VALUES (?, ?, ?, ?)", version, name, source, JSON.stringify(checks));
     this.ctx.storage.sql.exec("INSERT INTO cells VALUES (?, ?) ON CONFLICT(name) DO UPDATE SET live = excluded.live", name, version);
+    // A running facet keeps the class it started with, so stop it to load the new code. `abort` keeps the database.
+    this.ctx.facets.abort(name, "cell version changed");
     return { ok: true };
   }
 }

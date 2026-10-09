@@ -1,5 +1,5 @@
-// UNTESTED SKETCH: celld's release binary could not be downloaded in the environment this was written in.
-// The shape follows celld's `facets` and `dynamic-worker-tails` examples (worker_loaders + a SQLite Durable Object).
+// TESTED against celld 0.6.2 by test.mjs. The shape follows celld's `facets` and `dynamic-worker-tails` examples
+// (worker_loaders + a SQLite Durable Object).
 {
   "name": "forge",
   "main": "index.js",

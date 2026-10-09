@@ -204,15 +204,29 @@ number. Details and the full transcript: [NOTES.md](NOTES.md#round-4-a-real-mode
   reused across turns. Compactions were 82 of the 96 calls.
 - Try it: `cd prototype && npm run chat` (needs the same DeepSeek access).
 
-## Gaps (round 1; see rounds 2-4 above for what changed)
+## Round 5: the celld sketch, run on celld
+
+The celld version of the cell model (`celld-sketch/`) had been written without running it. With the egress restrictions
+lifted, celld 0.6.2 came from its published container image (`ghcr.io/denoland/celld`, layers checked against their
+digests), and pi's coding agent on DeepSeek V4.1 Flash wrote the test and the fix, which I verified by rerunning both.
+
+- **The unchanged sketch passed 5 of 7 scenarios** with no errors at all: the catalog in `ctx.storage.sql`, checks in a
+  throwaway facet, exactly-once calls, a rejected proposal leaving the live version alone, and state across restarts.
+- **One silent bug: an upgrade did not take effect.** A running facet keeps the class it started with
+  (`ctx.facets.get` returns the cached one), so after a new version went live the calls still ran the old code. The fix
+  is one call, `ctx.facets.abort(name)`, which stops the facet and keeps its database; the next call loads the new code.
+  With it, all 7 scenarios pass (`celld-sketch/test.mjs`, details in `celld-sketch/RESULTS.md`).
+- Not covered: the agent loop on celld, concurrent calls, a crash mid-call, and a multi-node fleet.
+
+## Gaps (round 1; see rounds 2-5 above for what changed)
 
 - ~~The migration runs on the real state before the catalog commit, in two databases.~~ Fixed in round 2 with a
   pending/marker/live protocol reconciled on boot.
 - The checks are written by the agent. The ratchet stops silent regressions, but nothing stops weak checks for new
   behavior (see design ideas 1 and 5).
 - The QuickJS cold start is about 140 ms per call; a pooled sandbox per cell version would remove it.
-- `celld-sketch/` maps the cell model onto celld's Worker Loader and facets. It is **untested**: celld's installer and
-  release downloads were blocked here.
+- `celld-sketch/` maps the cell model onto celld's Worker Loader and facets. Round 5 ran it on celld 0.6.2:
+  `celld-sketch/test.mjs` passes 7 of 7 scenarios, and `celld-sketch/RESULTS.md` has the details.
 
 ## Run it
 

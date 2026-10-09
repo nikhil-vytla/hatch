@@ -1,0 +1,5 @@
+# celld local state
+.celld/
+
+# local logs
+*.log
