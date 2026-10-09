@@ -222,7 +222,7 @@ const NO_INVARIANTS: CallerInvariants = {};
 
 /**
  * Open (or reopen) the forge over `dataDir`: `session.sqlite` (pi-durable), `cells/` (code and state), `chat/` (OptChat).
- * Reopening the same directory resumes the same chat, reinstalls the tools from the catalogue and keeps the memory.
+ * Reopening the same directory resumes the same chat, reinstalls the tools from the catalog and keeps the memory.
  */
 export async function openLive(dataDir: string, options: LiveOptions = {}): Promise<Live> {
 	mkdirSync(dataDir, { recursive: true });
@@ -293,7 +293,7 @@ export async function openLive(dataDir: string, options: LiveOptions = {}): Prom
 	};
 }
 
-/** The catalogue in a few lines per cell: live version, history, the version each asked-for message, then the accept/reject log. */
+/** The catalog in a few lines per cell: live version, history, the version each asked-for message, then the accept/reject log. */
 export function describeCatalogue(catalogue: Catalogue): string {
 	const lines: string[] = [];
 

@@ -1,4 +1,4 @@
-// Crash-safe migration: a process dies after a migration committed to the cell's SQLite and before the catalogue says the
+// Crash-safe migration: a process dies after a migration committed to the cell's SQLite and before the catalog says the
 // new version is live. Booting must roll the version forward exactly once, with the state migrated exactly once.
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
@@ -47,7 +47,7 @@ function readCell(): CellState {
 	}
 }
 
-test("a crash between the migration and the catalogue commit rolls forward exactly once", async () => {
+test("a crash between the migration and the catalog commit rolls forward exactly once", async () => {
 	assert.equal(child("seed", {}), 0);
 	const seeded = readCell();
 	assert.equal(seeded.n, "2");
@@ -64,7 +64,7 @@ test("a crash between the migration and the catalogue commit rolls forward exact
 
 	try {
 		const before = (await catalogueOf(forge)).cells.counter;
-		assert.equal(before.live, seeded.marker, "the catalogue still says v1 is live");
+		assert.equal(before.live, seeded.marker, "the catalog still says v1 is live");
 		assert.equal(before.pending, crashed.marker, "with v2 pending");
 		assert.equal(before.history.length, 1);
 

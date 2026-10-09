@@ -1,9 +1,9 @@
-// The only code that changes what the catalogue says is live, and the only code that puts agent code into the registry.
+// The only code that changes what the catalog says is live, and the only code that puts agent code into the registry.
 //
 // Two sensitive operations, each behind a proof (src/proofs/):
-//   - writing a version into the catalogue document: `acceptVersion` demands `CellVerified<C>` about that candidate;
+//   - writing a version into the catalog document: `acceptVersion` demands `CellVerified<C>` about that candidate;
 //     moving `live` back to an earlier version: `rollbackVersion` demands `CellAccepted<C>`;
-//   - installing code into the registry: `installCells` demands `CatalogueCommitted<K>` about the catalogue it installs.
+//   - installing code into the registry: `installCells` demands `CatalogueCommitted<K>` about the catalog it installs.
 // `activatePending` and `dropPending` need no proof of their own: their only input is the `pending` slot that
 // `acceptVersion` filled, so they can promote or discard nothing that was not verified.
 //
@@ -116,7 +116,7 @@ export async function dropPending(tx: Tx, cell: string, version: string, reason:
 }
 
 /**
- * Make an earlier accepted version live again. It adds no version to the catalogue, so it needs no gate; the proof says the
+ * Make an earlier accepted version live again. It adds no version to the catalog, so it needs no gate; the proof says the
  * version was accepted before. The cell's state is not rolled back, and no migration runs.
  */
 export async function rollbackVersion<C>(tx: Tx, candidate: Named<C, CellVersion>, _accepted: CellAccepted<C>, expectLive: string | null): Promise<void> {
@@ -179,7 +179,7 @@ export async function commitVerified<C>(
 		return { ok: false, reason, stale: false };
 	}
 
-	// Crash injection for the demo and the tests: the migration has committed, the catalogue does not know yet.
+	// Crash injection for the demo and the tests: the migration has committed, the catalog does not know yet.
 	if (process.env.FORGE_CRASH_AFTER_MIGRATION === cell) process.exit(137);
 
 	try {
@@ -252,7 +252,7 @@ function cellsExtension(catalogue: Catalogue, runtime: CellRuntime, owned: Calle
 	return defineExtension({ name: "cells", tools });
 }
 
-/** Install the live versions of a committed catalogue as tools. The proof is about this catalogue, not another. */
+/** Install the live versions of a committed catalog as tools. The proof is about this catalog, not another. */
 export function installCells<K>(registry: Registry, catalogue: Named<K, Catalogue>, _committed: CatalogueCommitted<K>, runtime: CellRuntime, owned: CallerInvariants): void {
 	registry.install(cellsExtension(catalogue.value, runtime, owned));
 }
@@ -270,7 +270,7 @@ export async function refreshCells(session: Pick<Session, "snapshot" | "snapshot
 	await withCommittedCatalogue(session, context, (catalogue, committed) => installCells(registry, catalogue, committed, runtime, owned));
 }
 
-/** Boot: reconcile a crash between the accept steps, then install the committed catalogue. Returns it. */
+/** Boot: reconcile a crash between the accept steps, then install the committed catalog. Returns it. */
 export async function reinstallCells(session: Pick<Session, "commit" | "snapshot" | "snapshotAsOf">, registry: Registry, runtime: CellRuntime, context: Context, owned: CallerInvariants): Promise<Catalogue> {
 	await reconcile(session, context, runtime);
 

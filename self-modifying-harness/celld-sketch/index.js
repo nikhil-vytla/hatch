@@ -1,5 +1,5 @@
 // UNTESTED SKETCH of the prototype's cell model on celld itself. One Durable Object (a celld cell) is the kernel: it
-// holds the catalogue in its own SQLite, which celld replicates (LTX) to the bucket, so the agent's self-written tools
+// holds the catalog in its own SQLite, which celld replicates (LTX) to the bucket, so the agent's self-written tools
 // survive the loss of a node, not just of a process. Each agent-written tool is loaded by the Worker Loader under its
 // immutable version id and runs as a facet whose SQLite is keyed by the tool's name, so state outlives code versions.
 //

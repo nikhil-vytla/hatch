@@ -78,7 +78,7 @@ The system is called the "forge": the agent writes its own tools.
 
 - **Kernel vs. userland.** The kernel cannot be rewritten by the agent. It holds the gate (`cell_propose`),
   rollback, listing, source and `zoom`. Userland is the `cells` extension: one tool per live agent-written cell,
-  rebuilt from the catalogue document on every change and hot-installed with `registry.install`.
+  rebuilt from the catalog document on every change and hot-installed with `registry.install`.
 - **Cell = immutable code plus durable state**, after celld. The version id is `name@sha8(source, migrate)`. State is
   one SQLite file per cell name, so it is shared across that cell's versions. The code runs in QuickJS with only
   `args` and `kv` in scope. Each call is one SQLite transaction, so a script that throws leaves no partial writes.
@@ -91,7 +91,7 @@ The system is called the "forge": the agent writes its own tools.
 
   Each group of checks runs from an empty state, so expectations don't depend on live data. Checks can be
   *retired*, but only explicitly and on the record.
-- **Catalogue** is a pi-durable session document, committed atomically. It records every version, the live pointer,
+- **Catalog** is a pi-durable session document, committed atomically. It records every version, the live pointer,
   the history and a log of accept and reject events.
 - **Memory** is OptChat on pi-durable. A `beforeRequest` hook mirrors the transcript into the OptChat log and
   replaces everything before the current run with the rendered view. `onYield` logs final answers as they happen.
@@ -164,7 +164,7 @@ The system is called the "forge": the agent writes its own tools.
 
 ## Gaps and open questions
 
-- The migration runs against the real state *before* the catalogue commit, so a crash between them leaves migrated
+- The migration runs against the real state *before* the catalog commit, so a crash between them leaves migrated
   state under old code. On celld both would be in one Durable Object's SQLite and could share a transaction. Here
   they are two databases. A fix would record a "migrating to version X" intent in the cell's SQLite, inside the
   migration transaction, and finish or undo it on boot.
@@ -194,7 +194,7 @@ rejecting low-evidence TypeScript; its `install-anti-slop` skill was followed).
   standards. It lives in `tools/oxlint/anti-slop/` (from commit `c44ef22`, with Dillon Mulroy's MIT license and an
   `UPSTREAM.md` recording provenance and local changes). An earlier version fetched it with a script into a gitignored
   directory, on a too-broad reading of AGENTS.md's rule against committing code fetched for an investigation.
-- Baseline on the round-1 code: 24 type errors (one root: `Catalogue` did not fit pi-durable's `JsonObject`) and 228
+- Baseline on the round-1 code: 24 type errors (one root: `Catalog` did not fit pi-durable's `JsonObject`) and 228
   anti-slop findings (184 of them `require-readable-spacing`; the rest unknown params/returns, `typeof` narrowing,
   unjustified `as`). Now: 0 and 0.
 - **Finding about anti-slop:** `no-runtime-typeof` and `no-unknown-parameters` push parsing to the boundary, but with no
@@ -226,10 +226,10 @@ Three gdp-ts proofs guard the two places where unverified code could reach the l
 | proof | minted by | demanded by |
 |---|---|---|
 | `CatalogueCommitted<K>` | `withCommittedCatalogue`, which reads the session document itself | `installCells` (the only way agent code enters the registry) and `verifyCell` (so the ratchet lineage is the committed one) |
-| `CellVerified<C>` | `verifyCell`, only after the whole gate passes; carries a fingerprint of the candidate's JSON | `acceptVersion` (the only writer of a version into the catalogue) |
+| `CellVerified<C>` | `verifyCell`, only after the whole gate passes; carries a fingerprint of the candidate's JSON | `acceptVersion` (the only writer of a version into the catalog) |
 | `CellAccepted<C>` | `withAcceptedVersion`, only for a version in the cell's history | `rollbackVersion` |
 
-`src/mistakes.ts` holds 15 `@ts-expect-error` lines (installing a hand-made catalogue, accepting an unverified or
+`src/mistakes.ts` holds 15 `@ts-expect-error` lines (installing a hand-made catalog, accepting an unverified or
 different candidate, a raw `CellVersion`, a forged proof, proofs escaping their callbacks, ...). Removing the directives
 gives exactly 15 type errors, so each line guards a real mistake.
 
@@ -237,7 +237,7 @@ The gate, in order: compare-and-swap on `expectLive` (checked again inside every
 least one check; model-proposed invariants may be added but never dropped; every enum member of an action-like
 parameter must appear in the version's own checks; `changes` names real actions; migration on a scratch copy, the
 check ratchet and purity, all under both invariant lists; replay of up to 50 real calls of the live version (a diff in
-an action listed in `changes` is reported as a behaviour change the user should hear about, any other diff rejects);
+an action listed in `changes` is reported as a behavior change the user should hear about, any other diff rejects);
 fuzz on a budget of 40 sandbox executions (a hang blocks, an invariant violation the live version does not have blocks,
 the rest are advisories). A full gate costs about 4-5 s, dominated by the ~100 ms per sandbox execution.
 
@@ -271,7 +271,7 @@ isolation and the crash-recovery protocol.
   `migrateTo`, but nothing enforces it.
 - `verifyCell` takes the caller-owned invariants as a plain argument, so a caller passing `[]` still gets a proof. The
   proof is about the candidate, not the policy it was checked against.
-- Proofs describe the moment of the read: `installCells` can be handed an older, still-committed catalogue.
+- Proofs describe the moment of the read: `installCells` can be handed an older, still-committed catalog.
 - A rollback does not re-run the gate, so an old version can break an invariant added later; it is enforced at call
   time only.
 - The `CellsDoc` token is confined to the trusted modules by a `no-restricted-imports` lint rule, not by types.
@@ -384,7 +384,7 @@ A Sonnet agent wrote `src/live.ts`, `src/chat.ts` and `src/live-run.ts`; I verif
    each for a real reason: it dropped the earlier invariant (invariants only ratchet up); its checks never exercised
    `kind="regular"`; v1's ratcheted `total` check still expected the old shape (it then retired those checks, on the
    record); and its own expectation for `reset` was wrong. The fourth was accepted with a migration, and replay of the
-   one real call reported the behaviour change to pass on to the user. It declared `changes: ["*"]`, which makes
+   one real call reported the behavior change to pass on to the user. It declared `changes: ["*"]`, which makes
    scope-aware replay accept any change: the model took the widest declaration rather than naming the actions it
    changed, so that safeguard did not bite here.
 3. "What's my breakdown?" One tool call, correct (2 regular, 1 decaf).

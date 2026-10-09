@@ -50,7 +50,7 @@ export function version(cell: string, source: string, extra: Partial<CellVersion
 
 export type Proposed = { ok: true; report: GateReport } | { ok: false; reason: string; stale: boolean };
 
-/** What `cell_propose` does after parsing: read the catalogue, name the candidate, verify it, commit it in three steps. */
+/** What `cell_propose` does after parsing: read the catalog, name the candidate, verify it, commit it in three steps. */
 export async function propose(forge: Forge, candidate: CellVersion, intent: Intent): Promise<Proposed> {
 	return withCommittedCatalogue(forge.harness, context, (catalogue, committed) =>
 		name(candidate, async (named): Promise<Proposed> => {
@@ -117,7 +117,7 @@ export function successor(parent: CellVersion, source: string, extra: Partial<Ce
 	return version("counter", source, { parameters: COUNTER_PARAMS, checks: COUNTER_CHECKS, parent: parent.version, ...extra });
 }
 
-/** Verify without committing: what `verifyCell` says about `candidate` against the catalogue as committed now. */
+/** Verify without committing: what `verifyCell` says about `candidate` against the catalog as committed now. */
 export async function verifyOnly(forge: Forge, candidate: CellVersion, intent: Intent): Promise<Proposed> {
 	return withCommittedCatalogue(forge.harness, context, (catalogue, committed) =>
 		name(candidate, async (named): Promise<Proposed> => {

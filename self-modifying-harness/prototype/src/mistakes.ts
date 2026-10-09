@@ -32,12 +32,12 @@ export async function mistakes(): Promise<void> {
 	await withCommittedCatalogue(reader, context, async (catalogue, committed) => {
 		await installCells(registry, catalogue, committed, runtime, {}); // the honest call: read from the document, proved
 
-		// 1. Installing a catalogue that was not read from the document.
-		// @ts-expect-error a raw catalogue is not a Named one, so no proof is about it
+		// 1. Installing a catalog that was not read from the document.
+		// @ts-expect-error a raw catalog is not a Named one, so no proof is about it
 		installCells(registry, handMade, committed, runtime, {});
 
 		await name(handMade, async (mine) => {
-			// @ts-expect-error the proof is about the committed catalogue, not this one
+			// @ts-expect-error the proof is about the committed catalog, not this one
 			installCells(registry, mine, committed, runtime, {});
 		});
 

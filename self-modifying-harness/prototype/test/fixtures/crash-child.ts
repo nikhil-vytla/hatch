@@ -1,7 +1,7 @@
 // Child process of test/crash-migration.test.ts: proposes cell versions against the data directory in argv[2].
 //   seed     accepts counter v1 and adds 2 to its state;
 //   upgrade  proposes counter v2, whose migration multiplies the count by ten. With FORGE_CRASH_AFTER_MIGRATION=counter in
-//            the environment this process dies (exit 137) after the migration committed and before the catalogue did.
+//            the environment this process dies (exit 137) after the migration committed and before the catalog did.
 import { catalogueOf, type Forge, openForge, propose, version } from "../support.ts";
 
 const dir = process.argv[2];

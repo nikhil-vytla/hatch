@@ -41,7 +41,7 @@ describe("replay of real calls", () => {
 		assert.match(wrong.ok ? "" : wrong.reason, /declared changes \["add"\]/);
 	});
 
-	test("a declared change is accepted and reported as a behaviour diff for the user", async () => {
+	test("a declared change is accepted and reported as a behavior diff for the user", async () => {
 		const outcome = await verifyOnly(forge, successor(v1, CAPPED_GET), { expectLive: v1.version, owned: [], changes: ["get"] });
 		assert.ok(outcome.ok, outcome.ok ? "" : outcome.reason);
 		assert.equal(outcome.report.replayed, 2);

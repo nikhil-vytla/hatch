@@ -2,7 +2,7 @@
 //
 // `verifyCell` runs the whole gate (gate.ts) against the committed lineage and, only if every part holds, returns a proof
 // together with the gate's report. A rejection carries its reason. `acceptVersion` is the only function that writes a
-// version into the catalogue, and it demands this proof about the very candidate it writes.
+// version into the catalog, and it demands this proof about the very candidate it writes.
 import { createHash } from "node:crypto";
 import { defineProof, type Named, type Proof } from "@gdp-ts/core";
 import { type Catalogue, cellName, entryOf } from "../catalogue-doc.ts";
@@ -35,7 +35,7 @@ export function fingerprintOf(candidate: CellVersion): string {
 
 /**
  * Run the whole gate on `candidate` against the lineage in `catalogue`. The lineage must be the committed one, which is
- * why the catalogue comes with its `CatalogueCommitted` proof: a ratchet taken from a catalogue the caller assembled would
+ * why the catalog comes with its `CatalogueCommitted` proof: a ratchet taken from a catalog the caller assembled would
  * owe nothing. `intent.expectLive` is compared with the lineage's live version first (cheap); the commit checks it again.
  */
 export async function verifyCell<C, K>(

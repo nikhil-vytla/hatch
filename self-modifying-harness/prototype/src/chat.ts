@@ -1,9 +1,9 @@
 // An interactive chat with the forge on DeepSeek. One directory is one chat: running it again over the same directory
-// resumes the same session, reinstalls the agent-written tools from the catalogue and keeps the OptChat memory.
+// resumes the same session, reinstalls the agent-written tools from the catalog and keeps the OptChat memory.
 //
 //   node --experimental-strip-types --no-warnings src/chat.ts [dataDir]      (default: data/live; `npm run chat`)
 //
-// Commands: /usage (spend so far), /cells (the catalogue), /view (the OptChat view the model is shown), /verbose
+// Commands: /usage (spend so far), /cells (the catalog), /view (the OptChat view the model is shown), /verbose
 // (toggle full tool text), /quit. Ctrl-C leaves cleanly. Environment: see the `chat` script in package.json.
 import { createInterface } from "node:readline/promises";
 import { join } from "node:path";

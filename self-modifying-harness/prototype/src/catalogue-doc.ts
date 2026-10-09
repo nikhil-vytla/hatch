@@ -1,6 +1,6 @@
-// The cell catalogue as a pi-durable session document: its type and its token, and nothing else.
+// The cell catalog as a pi-durable session document: its type and its token, and nothing else.
 //
-// Who may touch it is the point of this file's neighbours: `proofs/catalogue-committed.ts` is the only code that reads it
+// Who may touch it is the point of this file's neighbors: `proofs/catalogue-committed.ts` is the only code that reads it
 // to mint a proof, and `catalogue.ts` is the only code that writes it (`acceptVersion`, `activatePending`, `dropPending`,
 // `rollbackVersion`). The oxlint config restricts imports of `CellsDoc` to those files.
 import { defineDoc } from "@earendil-works/pi-durable";

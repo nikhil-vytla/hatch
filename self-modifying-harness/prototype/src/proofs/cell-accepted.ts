@@ -11,7 +11,7 @@ import type { CatalogueCommitted } from "./catalogue-committed.ts";
 
 const CellAccepted = defineProof("CellAccepted");
 
-/** The version named `C` is in its cell's history in the committed catalogue. */
+/** The version named `C` is in its cell's history in the committed catalog. */
 export interface CellAccepted<C> extends Proof<"CellAccepted", [C]> {}
 
 export type Acceptance<R> = { ok: true; value: R } | { ok: false; reason: string };

@@ -33,7 +33,7 @@ after(async () => {
 const v2 = () => successor(v1, `${COUNTER_SOURCE}\n// v2`, { migrate: "await kv.put('seen', 1);" });
 
 describe("withCommittedCatalogue", () => {
-	test("an empty document reads as the empty catalogue, with a proof", async () => {
+	test("an empty document reads as the empty catalog, with a proof", async () => {
 		const read = await withCommittedCatalogue(forge.harness, context, (catalogue, committed) => ({ value: catalogue.value, kind: committed.kind, frozen: Object.isFrozen(committed) }));
 		assert.deepEqual(read, { value: { cells: {}, log: [] }, kind: "CatalogueCommitted", frozen: true });
 	});

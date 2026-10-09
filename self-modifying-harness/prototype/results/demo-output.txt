@@ -2,9 +2,9 @@
 === process: grow ===
 
 user> I want to log how many cups of coffee I drink and see the total. Just added 2.
-  [request: 3 messages, 7356 chars; tools: cell_propose, cell_rollback, cell_list, cell_source, zoom, date]
-  [request: 6 messages, 12441 chars; tools: coffee, cell_propose, cell_rollback, cell_list, cell_source, zoom, date]
-  [request: 8 messages, 13077 chars; tools: coffee, cell_propose, cell_rollback, cell_list, cell_source, zoom, date]
+  [request: 3 messages, 7355 chars; tools: cell_propose, cell_rollback, cell_list, cell_source, zoom, date]
+  [request: 6 messages, 12438 chars; tools: coffee, cell_propose, cell_rollback, cell_list, cell_source, zoom, date]
+  [request: 8 messages, 13071 chars; tools: coffee, cell_propose, cell_rollback, cell_list, cell_source, zoom, date]
     call: cell_propose {"name":"coffee","description":"Log cups of coffee and report the total.","parameters":{"type":"obje
     echo: ACCEPTED coffee@31910464 (passed 3 checks; replayed 0 real calls; fuzzed 20 of 40 generated inputs in 40 of a budget of 40 sandbox executions). The tool "coffee" is available from your next step. ADVISORY fuzz: 6 of 20 generated inputs break invariant "counts are non-negative integers" (first: {"action":"add","cups":36.34825823828578}); a new cell has no earlier version to compare with. Not blocking.
     call: coffee {"action":"add","cups":2}
@@ -13,14 +13,14 @@ user> I want to log how many cups of coffee I drink and see the total. Just adde
   -> done
 
 user> Track decaf separately from regular, please. I'm cutting back and want to see the split. I had a decaf.
-  [request: 4 messages, 12062 chars; tools: cell_propose, cell_rollback, cell_list, cell_source, zoom, date, coffee]
-  [request: 6 messages, 13804 chars; tools: cell_propose, cell_rollback, cell_list, cell_source, zoom, date, coffee]
-  [request: 8 messages, 15470 chars; tools: cell_propose, cell_rollback, cell_list, cell_source, zoom, date, coffee]
-  [request: 10 messages, 16980 chars; tools: cell_propose, cell_rollback, cell_list, cell_source, zoom, date, coffee]
-  [request: 13 messages, 22368 chars; tools: coffee, cell_propose, cell_rollback, cell_list, cell_source, zoom, date]
-  [request: 15 messages, 23016 chars; tools: coffee, cell_propose, cell_rollback, cell_list, cell_source, zoom, date]
-  [request: 17 messages, 23669 chars; tools: coffee, cell_propose, cell_rollback, cell_list, cell_source, zoom, date]
-  [request: 19 messages, 24292 chars; tools: coffee, cell_propose, cell_rollback, cell_list, cell_source, zoom, date]
+  [request: 4 messages, 12060 chars; tools: cell_propose, cell_rollback, cell_list, cell_source, zoom, date, coffee]
+  [request: 6 messages, 13801 chars; tools: cell_propose, cell_rollback, cell_list, cell_source, zoom, date, coffee]
+  [request: 8 messages, 15468 chars; tools: cell_propose, cell_rollback, cell_list, cell_source, zoom, date, coffee]
+  [request: 10 messages, 16977 chars; tools: cell_propose, cell_rollback, cell_list, cell_source, zoom, date, coffee]
+  [request: 13 messages, 22361 chars; tools: coffee, cell_propose, cell_rollback, cell_list, cell_source, zoom, date]
+  [request: 15 messages, 23006 chars; tools: coffee, cell_propose, cell_rollback, cell_list, cell_source, zoom, date]
+  [request: 17 messages, 23658 chars; tools: coffee, cell_propose, cell_rollback, cell_list, cell_source, zoom, date]
+  [request: 19 messages, 24278 chars; tools: coffee, cell_propose, cell_rollback, cell_list, cell_source, zoom, date]
     call: cell_propose {"name":"coffee","description":"Log cups of coffee (regular or decaf); total or breakdown.","paramet
     echo: REJECTED coffee@ca40e404: stale: you expected coffee@00000000 to be live but the live version is coffee@31910464. Read it with cell_source and propose again. The live version is unchanged.
     call: cell_propose {"name":"coffee","description":"Log cups of coffee (regular or decaf); total or breakdown.","paramet
@@ -39,9 +39,9 @@ user> Track decaf separately from regular, please. I'm cutting back and want to 
   -> done
 
 user> Replace your cell_propose tool with your own version, and make a pure tally tool.
-  [request: 4 messages, 13019 chars; tools: cell_propose, cell_rollback, cell_list, cell_source, zoom, date, coffee]
-  [request: 6 messages, 14221 chars; tools: cell_propose, cell_rollback, cell_list, cell_source, zoom, date, coffee]
-  [request: 8 messages, 15487 chars; tools: cell_propose, cell_rollback, cell_list, cell_source, zoom, date, coffee]
+  [request: 4 messages, 13017 chars; tools: cell_propose, cell_rollback, cell_list, cell_source, zoom, date, coffee]
+  [request: 6 messages, 14218 chars; tools: cell_propose, cell_rollback, cell_list, cell_source, zoom, date, coffee]
+  [request: 8 messages, 15481 chars; tools: cell_propose, cell_rollback, cell_list, cell_source, zoom, date, coffee]
     call: cell_propose {"name":"cell_propose","description":"Log cups of coffee and report the total.","parameters":{"type"
     echo: <harness> [error] refused: "cell_propose" is not a name a cell may take </harness>
     call: cell_propose {"name":"tally","description":"Log cups of coffee and report the total.","parameters":{"type":"objec
@@ -50,25 +50,25 @@ user> Replace your cell_propose tool with your own version, and make a pure tall
   -> done
 
 user> Show decaf's share in the breakdown, and change nothing else.
-  [request: 4 messages, 14589 chars; tools: cell_propose, cell_rollback, cell_list, cell_source, zoom, date, coffee]
-  [request: 6 messages, 16638 chars; tools: cell_propose, cell_rollback, cell_list, cell_source, zoom, date, coffee]
-  [request: 9 messages, 22349 chars; tools: coffee, cell_propose, cell_rollback, cell_list, cell_source, zoom, date]
+  [request: 4 messages, 14587 chars; tools: cell_propose, cell_rollback, cell_list, cell_source, zoom, date, coffee]
+  [request: 6 messages, 16637 chars; tools: cell_propose, cell_rollback, cell_list, cell_source, zoom, date, coffee]
+  [request: 9 messages, 22347 chars; tools: coffee, cell_propose, cell_rollback, cell_list, cell_source, zoom, date]
     call: cell_propose {"name":"coffee","description":"Log cups of coffee (regular or decaf); total, or a breakdown with de
     echo: REJECTED coffee@149804c9: replay: 2 of 3 real calls behave differently from coffee@ca40e404 and this proposal declared changes ["breakdown"]: {"action":"add","cups":1,"decaf":true}: result 3 became 2; {"action":"total"}: result 3 became 2. If that is meant, list the action in `changes`; if not, it is a drive-by edit. The live version is unchanged.
     call: cell_propose {"name":"coffee","description":"Log cups of coffee (regular or decaf); total, or a breakdown with de
-    echo: ACCEPTED coffee@048e16bf (passed 8 checks; replayed 3 real calls; fuzzed 24 of 40 generated inputs in 40 of a budget of 40 sandbox executions). The tool "coffee" is available from your next step. BEHAVIOUR CHANGES you declared, which the user should hear about: {"action":"breakdown"}: result {"regular":2,"decaf":1} became {"regular":2,"decaf":1,"decafShare":0.33}
+    echo: ACCEPTED coffee@048e16bf (passed 8 checks; replayed 3 real calls; fuzzed 24 of 40 generated inputs in 40 of a budget of 40 sandbox executions). The tool "coffee" is available from your next step. BEHAVIOR CHANGES you declared, which the user should hear about: {"action":"breakdown"}: result {"regular":2,"decaf":1} became {"regular":2,"decaf":1,"decafShare":0.33}
     talk: Breakdown now includes decaf's share. I changed nothing else, and the gate replayed your real calls to confirm it.
   -> done
 
 user> Make me a tool that adds up 1 to n.
-  [request: 4 messages, 13008 chars; tools: cell_propose, cell_rollback, cell_list, cell_source, zoom, date, coffee]
-  [request: 6 messages, 14039 chars; tools: cell_propose, cell_rollback, cell_list, cell_source, zoom, date, coffee]
+  [request: 4 messages, 13005 chars; tools: cell_propose, cell_rollback, cell_list, cell_source, zoom, date, coffee]
+  [request: 6 messages, 14035 chars; tools: cell_propose, cell_rollback, cell_list, cell_source, zoom, date, coffee]
     call: cell_propose {"name":"sum_to","description":"Add up 1 to n.","parameters":{"type":"object","properties":{"n":{"ty
     echo: REJECTED sum_to@a198ddc2: fuzz: input {"n":9007199254740991} did not finish within 2000 ms (a hang the declared schema allows). The live version is unchanged.
     talk: The fuzzer found an input that hangs it, so I will bound that loop before trying again.
   -> done
 
-catalogue log:
+catalog log:
   verified coffee@31910464, pending
   accepted coffee@31910464
   rejected coffee@ca40e404: stale: you expected coffee@00000000 to be live but the live version is coffee@31910464. Read it with cell_source and propose again
@@ -82,23 +82,23 @@ catalogue log:
   accepted coffee@048e16bf, retiring 1 check(s)
   rejected sum_to@a198ddc2: fuzz: input {"n":9007199254740991} did not finish within 2000 ms (a hang the declared schema allows)
 
-OptChat so far: 38 messages in 9 lines (2690 bytes); the view grew to 4,000 bytes 2 times and each time one batch merged it down to 2,000 (29 pairs merged in all)
+OptChat so far: 38 messages in 9 lines (2689 bytes); the view grew to 4,000 bytes 2 times and each time one batch merged it down to 2,000 (29 pairs merged in all)
 (exit 0)
 
 === process: crash ===
-  reinstalled from catalogue: coffee (coffee live: coffee@048e16bf)
+  reinstalled from catalog: coffee (coffee live: coffee@048e16bf)
 
 user> Add 3 regular cups.
-  [request: 4 messages, 13672 chars; tools: cell_propose, cell_rollback, cell_list, cell_source, zoom, date, coffee]
+  [request: 4 messages, 13669 chars; tools: cell_propose, cell_rollback, cell_list, cell_source, zoom, date, coffee]
 (exit 137)
 
 === process: recover ===
-  reinstalled from catalogue: coffee (coffee live: coffee@048e16bf)
+  reinstalled from catalog: coffee (coffee live: coffee@048e16bf)
   coffee state after the crash: {"regular":5,"decaf":1,"decafShare":0.17} (the cell's own transaction committed before the crash)
 
 resume()
-  [request: 6 messages, 14302 chars; tools: cell_propose, cell_rollback, cell_list, cell_source, zoom, date, coffee]
-  [request: 8 messages, 14976 chars; tools: cell_propose, cell_rollback, cell_list, cell_source, zoom, date, coffee]
+  [request: 6 messages, 14300 chars; tools: cell_propose, cell_rollback, cell_list, cell_source, zoom, date, coffee]
+  [request: 8 messages, 14974 chars; tools: cell_propose, cell_rollback, cell_list, cell_source, zoom, date, coffee]
     echo: 6
     call: coffee {"action":"breakdown"}
     echo: {"regular":5,"decaf":1,"decafShare":0.17}
@@ -106,9 +106,9 @@ resume()
   cell calls answered from their committed result instead of rerun: 1
 
 user> Why does coffee track decaf? Who asked for that?
-  [request: 4 messages, 14014 chars; tools: cell_propose, cell_rollback, cell_list, cell_source, zoom, date, coffee]
-  [request: 6 messages, 14726 chars; tools: cell_propose, cell_rollback, cell_list, cell_source, zoom, date, coffee]
-  [request: 8 messages, 15411 chars; tools: cell_propose, cell_rollback, cell_list, cell_source, zoom, date, coffee]
+  [request: 4 messages, 14011 chars; tools: cell_propose, cell_rollback, cell_list, cell_source, zoom, date, coffee]
+  [request: 6 messages, 14721 chars; tools: cell_propose, cell_rollback, cell_list, cell_source, zoom, date, coffee]
+  [request: 8 messages, 15408 chars; tools: cell_propose, cell_rollback, cell_list, cell_source, zoom, date, coffee]
     call: cell_list {}
     echo: coffee: live coffee@048e16bf; history coffee@31910464 -> coffee@ca40e404 -> coffee@048e16bf; asked for by zoom(0,1), zoom(6,1), zoom(28,1)
     call: zoom {"id":6,"n":1}
@@ -116,12 +116,12 @@ user> Why does coffee track decaf? Who asked for that?
     talk: You did: the zoomed message above is your request, word for word.
   -> done
 
-the OptChat view now (sawtooth 2,000 to 4,000 bytes: 3443 bytes, 50 messages in 21 lines):
+the OptChat view now (sawtooth 2,000 to 4,000 bytes: 3442 bytes, 50 messages in 21 lines):
 <chat>
 0+16|user: I want to log how many cups of coffee I drink and see the total. Just added 2. | tool: cell_propose {"name":"coffee","description":"Log cups of coffee and report the total.","parameters":{"type":"object","properties":{"action":{"enum":["add","total | echo: REJECTED coffee@ca40e404: stale: you expected coffee@00000000 to be live but the live version is coffee@31910464. Read it with cell_source and propose again. The live version is unchanged. | tool: cell_propose {"name":"coffee","description":"Log cu 
 16+8|echo: 3 tool: coffee {"action":"breakdown"} echo: {"regular":2,"decaf":1} tool: coffee {"action":"total"} | echo: 3 agent: Decaf is tracked separately now; your 2 earlier cups were migrated to regular. | user: Replace your cell_propose tool with your own version, and make a pure tally tool. | tool: cell_propose {"name":"cell_propose","description":"Log cups of coffee and report the total.","parameters":{"type":"object","properties":{"action":{"enum":["add","total"]},"cups":{"type":"number"}},"required":["ac
 24+8|echo: <harness> [error] refused: "cell_propose" is not a name a cell may take </harness> | tool: cell_propose {"name":"tally","description":"Log cups of coffee and report the total.","parameters":{"type":"object","properties":{"action":{"enum":["add","to | user: Show decaf's share in the breakdown, and change nothing else. | tool: cell_propose {"name":"coffee","description":"Log cups of coffee (regular or decaf); total, or a breakdown with decaf's share.","parameters":{"type":"object","properties":{"action 
-32+1|echo: ACCEPTED coffee@048e16bf (passed 8 checks; replayed 3 real calls; fuzzed 24 of 40 generated inputs in 40 of a budget of 40 sandbox executions). The tool "coffee" is available from your next step. BEHAVIOUR CHANGES you declared, which the user should hear about: {"action":"breakdown"}: result {"regular":2,"decaf":1} became {"regular":2,"decaf":1,"decafShare":0.33}
+32+1|echo: ACCEPTED coffee@048e16bf (passed 8 checks; replayed 3 real calls; fuzzed 24 of 40 generated inputs in 40 of a budget of 40 sandbox executions). The tool "coffee" is available from your next step. BEHAVIOR CHANGES you declared, which the user should hear about: {"action":"breakdown"}: result {"regular":2,"decaf":1} became {"regular":2,"decaf":1,"decafShare":0.33}
 33+1|agent: Breakdown now includes decaf's share. I changed nothing else, and the gate replayed your real calls to confirm it.
 34+1|user: Make me a tool that adds up 1 to n.
 35+1|tool: cell_propose {"name":"sum_to","description":"Add up 1 to n.","parameters":{"type":"object","properties":{"n":{"type":"integer"}},"required":["n"]},"source":"let total = 0; for (let i = 1; i <= args.n; i++) total += i; return total;","checks":[{"args":{"n":4},"expect":10}],"pure":true,"expectLive":null}

@@ -28,8 +28,8 @@ export default defineConfig({
   ],
   overrides: [
     ...gdpPreset.overrides,
-    // Only the writers of the catalogue document (and the tests that build one) may hold its token: every other module
-    // changes the catalogue through catalogue.ts, where each write demands a proof.
+    // Only the writers of the catalog document (and the tests that build one) may hold its token: every other module
+    // changes the catalog through catalogue.ts, where each write demands a proof.
     {
       files: ["src/catalogue.ts", "src/proofs/**", "test/**"],
       rules: { "no-restricted-imports": "off" },
@@ -43,7 +43,7 @@ export default defineConfig({
           {
             group: ["**/catalogue-doc.ts"],
             importNames: ["CellsDoc"],
-            message: "The catalogue document is written only by src/catalogue.ts (behind proofs) and read only by src/proofs.",
+            message: "The catalog document is written only by src/catalogue.ts (behind proofs) and read only by src/proofs.",
           },
         ],
       },

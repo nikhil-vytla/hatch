@@ -28,7 +28,7 @@ export const FUZZ_EXECUTION_BUDGET = 40;
 export type Intent = {
 	expectLive: string | null; // the live version the proposer saw; null: it expects the cell not to exist
 	owned: Invariant[]; // caller-owned invariants for this cell: the model cannot change them
-	changes: string[]; // enum values of the action property whose behaviour this version intends to change, or ["*"]
+	changes: string[]; // enum values of the action property whose behavior this version intends to change, or ["*"]
 };
 
 export type BehaviourDiff = { args: JsonValue; action: string | null; summary: string; intended: boolean };

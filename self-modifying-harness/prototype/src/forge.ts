@@ -1,9 +1,9 @@
 // The forge: a pi-durable harness whose agent can write, verify, hot-install and roll back its own tools.
 //
 // Three pieces, one per source:
-//   - pi-durable: the cell catalogue is a Session document, committed in the same atomic line as the transcript;
+//   - pi-durable: the cell catalog is a Session document, committed in the same atomic line as the transcript;
 //     `registry.install()` swaps the "cells" extension in place, so the next request offers the new tools while a running
-//     call finishes on the code it started with. After a crash the catalogue is reinstalled from the document.
+//     call finishes on the code it started with. After a crash the catalog is reinstalled from the document.
 //   - celld: each tool is a cell (cells.ts): immutable versioned code plus state that outlives code versions.
 //   - OptChat: each turn starts fresh from a view of the whole chat (optchat.ts, wired in by memory-extension.ts), and
 //     every cell version records the log index of the user words that asked for it, so "why does this tool exist?" is always one zoom away.
@@ -13,7 +13,7 @@
 // same name wins), and the gate also refuses such names outright.
 //
 // The two places where unverified code could reach the live system are behind gdp-ts proofs (src/proofs/): a version
-// enters the catalogue only through `acceptVersion` (needs `CellVerified`), and code enters the registry only through
+// enters the catalog only through `acceptVersion` (needs `CellVerified`), and code enters the registry only through
 // `installCells` (needs `CatalogueCommitted`). The kernel tools below are the callers; they cannot skip either.
 import type { Context } from "@earendil-works/chord";
 import { Type } from "@earendil-works/pi-ai";
@@ -61,7 +61,7 @@ function acceptedText(version: string, cell: string, report: GateReport): string
 	];
 
 	if (report.behaviourDiffs.length > 0) {
-		lines.push(`BEHAVIOUR CHANGES you declared, which the user should hear about: ${report.behaviourDiffs.map((d) => `${JSON.stringify(d.args)}: ${d.summary}`).join("; ")}`);
+		lines.push(`BEHAVIOR CHANGES you declared, which the user should hear about: ${report.behaviourDiffs.map((d) => `${JSON.stringify(d.args)}: ${d.summary}`).join("; ")}`);
 	}
 
 	for (const advisory of report.advisories) lines.push(`ADVISORY ${advisory}`);
@@ -115,7 +115,7 @@ export function kernelExtension(options: KernelOptions) {
 			"({args, expect}) run in order from an empty state; between them they must pass every value of every enum parameter. Every " +
 			"check of the tool's earlier accepted versions must still pass unless listed in `retire`. `invariants` ({name, source}) are " +
 			"function bodies over a read-only `kv` that must return true after every call; once proposed they can never be dropped, so " +
-			"send every earlier one again. `changes` lists the values of the action (enum) parameter whose behaviour this version " +
+			"send every earlier one again. `changes` lists the values of the action (enum) parameter whose behavior this version " +
 			"intends to change (or [\"*\"]): your recent real calls are replayed, and a differing one outside `changes` is rejected. " +
 			"`migrate` (optional) runs once against the tool's existing state when the version is accepted.",
 		parameters: ProposeParameters,

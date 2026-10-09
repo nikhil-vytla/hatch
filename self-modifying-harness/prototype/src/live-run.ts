@@ -59,7 +59,7 @@ for (const [k, text] of SCRIPT.entries()) {
 
 await live.memory.idle();
 
-out(`\n=== catalogue ===\n${describeCatalogue(await live.catalogue())}`);
+out(`\n=== catalog ===\n${describeCatalogue(await live.catalogue())}`);
 
 out(`\n=== OptChat view (${live.memory.length} messages in ${live.memory.view.length} lines, ${live.memory.viewBytes()} bytes) ===\n${live.memory.render()}`);
 

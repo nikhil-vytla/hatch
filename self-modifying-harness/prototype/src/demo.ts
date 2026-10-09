@@ -1,16 +1,16 @@
 // End to end, in three processes over one SQLite session and one OptChat log:
 //   1. grow:   the agent writes a `coffee` tool, uses it in the same run, then upgrades it. Along the way the gate refuses
-//              a stale proposal, checks that skip an action, a regression of an earlier check, a drive-by behaviour change
+//              a stale proposal, checks that skip an action, a regression of an earlier check, a drive-by behavior change
 //              (caught by replaying real calls), a kernel name, a false purity claim, and a hang (caught by schema fuzz);
 //              a migration carries the state across; a caller-owned invariant guards the state throughout;
 //   2. crash:  the process dies inside a call to the agent-written tool, after its effect committed;
-//   3. recover: a fresh process reinstalls the tools from the catalogue, finishes the interrupted run without applying
+//   3. recover: a fresh process reinstalls the tools from the catalog, finishes the interrupted run without applying
 //              the effect twice, and answers "why does coffee track decaf?" by zooming into the user's own words.
 //
 // The model is pi-ai's faux provider: scripted replies, but every request goes through the real harness, hooks, tools
 // and storage. Each scripted step asserts what the real model would see (e.g. that a just-written tool is on offer).
 //
-// The crash between a migration and the catalogue commit (FORGE_CRASH_AFTER_MIGRATION=<cell>) is exercised by
+// The crash between a migration and the catalog commit (FORGE_CRASH_AFTER_MIGRATION=<cell>) is exercised by
 // test/crash-migration.test.ts, which spawns a child process that dies there.
 //
 //   node --experimental-strip-types --no-warnings src/demo.ts
@@ -82,7 +82,7 @@ const registry = createRegistry();
 
 registry.install(memoryExtension(memory, memState));
 
-reserveCellsSlot(registry); // keeps "cells" before "kernel" in the install order; the real tools come from the catalogue below
+reserveCellsSlot(registry); // keeps "cells" before "kernel" in the install order; the real tools come from the catalog below
 
 let harness!: Harness;
 
@@ -267,7 +267,7 @@ if (phase === "grow") {
 		// turn 4: a declared change (breakdown) plus a drive-by one (total) that replaying real calls catches
 		step(() => undefined, async () => call("cell_propose", { ...V3, source: V3_BAD, expectLive: await liveOf("coffee") })),
 		step(sawResult("REJECTED", "replay: "), async () => call("cell_propose", { ...V3, expectLive: await liveOf("coffee") })),
-		step(sawResult("ACCEPTED", "BEHAVIOUR CHANGES"), () => say("Breakdown now includes decaf's share. I changed nothing else, and the gate replayed your real calls to confirm it.")),
+		step(sawResult("ACCEPTED", "BEHAVIOR CHANGES"), () => say("Breakdown now includes decaf's share. I changed nothing else, and the gate replayed your real calls to confirm it.")),
 		// turn 5: a loop whose bound the schema leaves open
 		step(() => undefined, () => call("cell_propose", SUM_TO)),
 		step(sawResult("REJECTED", "did not finish"), () => say("The fuzzer found an input that hangs it, so I will bound that loop before trying again.")),
@@ -278,20 +278,20 @@ if (phase === "grow") {
 	await ask("Show decaf's share in the breakdown, and change nothing else.");
 	await ask("Make me a tool that adds up 1 to n.");
 	const final = await withCommittedCatalogue(harness, context, (read) => read.value);
-	console.log(`\ncatalogue log:\n  ${final.log.map((l) => l.event).join("\n  ")}`);
+	console.log(`\ncatalog log:\n  ${final.log.map((l) => l.event).join("\n  ")}`);
 	await memory.idle();
 	console.log(`\nOptChat so far: ${memory.length} messages in ${memory.view.length} lines (${memory.viewBytes()} bytes); the view grew to 4,000 bytes ${memory.stats.batches} times and each time one batch merged it down to 2,000 (${memory.stats.merges} pairs merged in all)`);
 	await harness.close(context);
 }
 
 if (phase === "crash") {
-	console.log(`  reinstalled from catalogue: ${Object.keys(catalogue.cells).join(", ")} (coffee live: ${catalogue.cells.coffee?.live})`);
+	console.log(`  reinstalled from catalog: ${Object.keys(catalogue.cells).join(", ")} (coffee live: ${catalogue.cells.coffee?.live})`);
 	faux.setResponses([step(() => undefined, () => call("coffee", { action: "add", cups: 3 }))]);
 	await ask("Add 3 regular cups."); // never returns: the process exits inside the tool
 }
 
 if (phase === "recover") {
-	console.log(`  reinstalled from catalogue: ${Object.keys(catalogue.cells).join(", ")} (coffee live: ${catalogue.cells.coffee?.live})`);
+	console.log(`  reinstalled from catalog: ${Object.keys(catalogue.cells).join(", ")} (coffee live: ${catalogue.cells.coffee?.live})`);
 	const coffee = catalogue.cells.coffee;
 	console.log(`  coffee state after the crash: ${JSON.stringify(await runtime.call(coffee.versions[coffee.live ?? ""], "coffee", { action: "breakdown" }))} (the cell's own transaction committed before the crash)`);
 	let lastSeen = "";

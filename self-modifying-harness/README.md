@@ -35,7 +35,7 @@ user> Replace your cell_propose tool with your own version, and make a pure tall
     echo: refused: "cell_propose" is not a name a cell may take
     echo: REJECTED tally@...: declared pure (replay-safe) but check 1 wrote state
 === process: crash ===    (exit 137 inside the agent-written `coffee` tool, after its write committed)
-=== process: recover === (tools reinstalled from the catalogue document; the interrupted run resumes)
+=== process: recover === (tools reinstalled from the catalog document; the interrupted run resumes)
     echo: 6                                           <- the rerun found its own committed result: applied once
 user> Why does coffee track decaf? Who asked for that?
     echo: coffee: ... history coffee@31910464 -> coffee@4c77f4d1; asked for by zoom(0,1), zoom(6,1)
@@ -51,10 +51,10 @@ that the tool it just wrote is on offer.
 ```
 pi-durable Harness (SQLite session)
 ├── extension "memory"   beforeRequest: mirror transcript -> OptChat log; send [system head, VIEW, tool delta, current run]
-├── extension "cells"    one tool per live cell, rebuilt from the catalogue and hot-swapped with registry.install()
+├── extension "cells"    one tool per live cell, rebuilt from the catalog and hot-swapped with registry.install()
 └── extension "kernel"   cell_propose (the gate), cell_rollback, cell_list, cell_source, zoom   <- installed LAST
          │
-         ├── catalogue: a pi-durable session document (versions, live pointer, history, accept/reject log)
+         ├── catalog: a pi-durable session document (versions, live pointer, history, accept/reject log)
          └── CellRuntime: QuickJS sandbox per call (pi-codemode) + data/cells/state/<name>.sqlite per cell
                           one SQLite transaction per call, including the pi-durable call id (exactly-once)
 ```
@@ -74,7 +74,7 @@ Checks can be retired, but only explicitly, and the retirement is logged.
 1. **pi-durable's reload semantics are what make self-modification safe to attempt.** Code is stored as *names*
    and resolved against the registry at every phase. A running call keeps the code it started with, and the next
    request sees the new tool. After a restart, conversations rebind to whatever the new process installs, so
-   "reinstall cells from the catalogue document on boot" is the entire recovery story for the agent's code.
+   "reinstall cells from the catalog document on boot" is the entire recovery story for the agent's code.
 2. **Exactly-once comes from storing the call id with the effect.** The first version crashed after the cell's
    SQLite commit but before pi-durable stored the result. pi-durable correctly reported
    `Tool coffee was interrupted and may have partially run`, and the agent was left to guess
@@ -84,7 +84,7 @@ Checks can be retired, but only explicitly, and the retirement is logged.
 3. **Install order is a security boundary.** pi-durable resolves same-name tools so that the later extension wins,
    and a reinstall keeps its position. With the order `cells -> kernel`, the kernel's `cell_list` survives a hot
    reload of the agent's tools. With `kernel -> cells`, the agent's version replaces it (`results/shadow-check.txt`).
-   The gate also refuses kernel names, as a second line of defence.
+   The gate also refuses kernel names, as a second line of defense.
 4. **OptChat on pi-durable has to fold tool announcements, not drop them.** pi-durable announces tools and prompt
    sections as positional system messages. My first `beforeRequest` replaced everything before the current run with
    the OptChat view and silently removed every tool. The fix that also keeps the cache warm:
@@ -144,7 +144,7 @@ A second round implemented the transferable lessons, with [rauchg/gdp-ts](https:
 (compile-time proofs) and [dmmulroy/anti-slop](https://github.com/dmmulroy/anti-slop) (Oxlint rules) added to a strict
 `tsc` setup. Details in [NOTES.md](NOTES.md#round-2-brief-a-with-gdp-ts-and-anti-slop).
 
-- **Two proofs guard the two doors.** Only `acceptVersion` writes a version into the catalogue, and it demands
+- **Two proofs guard the two doors.** Only `acceptVersion` writes a version into the catalog, and it demands
   `CellVerified<C>` about that exact candidate (fingerprinted, so a candidate edited after the gate is refused). Only
   `installCells` puts agent code into the registry, and it demands `CatalogueCommitted<K>`, which only a read of the
   session document can mint. `src/mistakes.ts` type-checks 15 mistakes this rules out.
@@ -208,10 +208,10 @@ number. Details and the full transcript: [NOTES.md](NOTES.md#round-4-a-real-mode
 
 ## Gaps (round 1; see rounds 2-4 above for what changed)
 
-- ~~The migration runs on the real state before the catalogue commit, in two databases.~~ Fixed in round 2 with a
+- ~~The migration runs on the real state before the catalog commit, in two databases.~~ Fixed in round 2 with a
   pending/marker/live protocol reconciled on boot.
 - The checks are written by the agent. The ratchet stops silent regressions, but nothing stops weak checks for new
-  behaviour (see lessons 1 and 5).
+  behavior (see lessons 1 and 5).
 - The QuickJS cold start is about 140 ms per call; a pooled sandbox per cell version would remove it.
 - `celld-sketch/` maps the cell model onto celld's Worker Loader and facets. It is **untested**: celld's installer and
   release downloads were blocked here.
@@ -226,12 +226,12 @@ npm run chat                         # talk to it (DeepSeek; see round 4)
 node --experimental-strip-types --no-warnings src/demo.ts           # three processes: grow, crash, recover
 node --experimental-strip-types --no-warnings src/bench-view.ts 20000
 node --experimental-strip-types --no-warnings src/shadow-check.ts
-FORGE_EXACTLY_ONCE=0 node --experimental-strip-types --no-warnings src/demo.ts   # the "interrupted" behaviour
+FORGE_EXACTLY_ONCE=0 node --experimental-strip-types --no-warnings src/demo.ts   # the "interrupted" behavior
 ```
 
 Files in `prototype/src/`:
 - cell runtime: `cells.ts` (sandbox, per-cell SQLite, exactly-once calls, invariants, traces) and `schema-fuzz.ts`;
-- the gate and the catalogue: `gate.ts`, `proofs/` (the only modules that mint gdp-ts proofs), `catalogue.ts` (the
+- the gate and the catalog: `gate.ts`, `proofs/` (the only modules that mint gdp-ts proofs), `catalogue.ts` (the
   only writer and installer, migrations, boot reconcile), `catalogue-doc.ts`, `proposal.ts`, and `mistakes.ts`
   (type-checked mistakes, never run);
 - memory: `optchat.ts` (log, tree, view, compactor), `compaction.ts` (tasks, ruler, retry), `optchat-prompt.ts`, and
