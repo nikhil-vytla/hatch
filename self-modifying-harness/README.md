@@ -190,7 +190,23 @@ Victor Taelin revised the OptChat gist on 2026-10-07 (now "UniiChat"). The memor
   summarizer is still the default.
 - **Bug found in round-1 code** (finding 4 above): the system prompt never actually led the request. Fixed.
 
-## Gaps (round 1; see rounds 2 and 3 above for what changed)
+## Round 4: on a real model
+
+With DeepSeek V4.1 Flash (the key injected by this environment's proxy), one scripted, untuned run grew a `coffee`
+tool, upgraded it to track decaf and answered "who asked for that?" with the user's exact words and the right message
+number. Details and the full transcript: [NOTES.md](NOTES.md#round-4-a-real-model-deepseek-v41-flash),
+`prototype/results/live-deepseek-run.txt`.
+
+- **The gate did real work.** The model needed four tries for the upgrade; each rejection was a genuine mistake (a
+  dropped invariant, an untested action, a stale ratcheted check, a wrong expectation of its own), and each message
+  told it what to fix.
+- **One safeguard was sidestepped:** the model declared that its upgrade may change every action (`changes: ["*"]`),
+  so replay of past calls could only report the change, not reject it.
+- **96 calls cost $0.071**, 81% of input read from cache: DeepSeek caches prefixes automatically, so the memory view is
+  reused across turns. Compactions were 82 of the 96 calls.
+- Try it: `cd prototype && npm run chat` (needs the same DeepSeek access).
+
+## Gaps (round 1; see rounds 2-4 above for what changed)
 
 - ~~The migration runs on the real state before the catalogue commit, in two databases.~~ Fixed in round 2 with a
   pending/marker/live protocol reconciled on boot.
@@ -205,7 +221,8 @@ Victor Taelin revised the OptChat gist on 2026-10-07 (now "UniiChat"). The memor
 ```sh
 cd prototype && npm install          # pi-durable, pi-ai, chord, pi-codemode 1.0.3, @gdp-ts/core; tsc, oxlint
 npm run check                        # tsc + oxlint (anti-slop + gdp-ts)
-npm test                             # 93 tests, about a minute
+npm test                             # 100 tests, about a minute
+npm run chat                         # talk to it (DeepSeek; see round 4)
 node --experimental-strip-types --no-warnings src/demo.ts           # three processes: grow, crash, recover
 node --experimental-strip-types --no-warnings src/bench-view.ts 20000
 node --experimental-strip-types --no-warnings src/shadow-check.ts

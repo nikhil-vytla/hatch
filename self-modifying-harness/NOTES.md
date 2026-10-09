@@ -362,3 +362,50 @@ Here the view is one text block that is never last, so across turns the cache sh
 tools, and every turn would rewrite the view; within a turn (tool steps) the end mark still works. This is inferred
 from the adapter's code, not measured: there is no API key here. The 98.8% in the table is the spec's scheme,
 modeled; getting it for real needs explicit breakpoints in pi-ai or a direct Messages API call.
+
+## Round 4: a real model (DeepSeek V4.1 Flash)
+
+The environment gained DeepSeek access. The key is not in the container: the egress proxy attaches it to requests to
+`api.deepseek.com`, so the code sets `DEEPSEEK_API_KEY` to a placeholder that pi-ai's provider requires and the proxy
+replaces. Node's `fetch` needed `NODE_USE_ENV_PROXY=1` to go through the proxy (the CA bundle was already configured).
+A Sonnet agent wrote `src/live.ts`, `src/chat.ts` and `src/live-run.ts`; I verified the run against its raw output.
+
+- `live.ts` opens the forge with `deepseek-flash` for turns and a `ModelSummarizer` (same model, low reasoning, the
+  OptChat system prompt) for compactions, behind a spend meter that refuses requests past a cap (default 60 calls or
+  $0.25 per run). pi-durable's retries and its own compaction are off (OptChat is the memory).
+- `chat.ts` is an interactive, resumable chat; `live-run.ts` is one scripted run. pi-ai reports DeepSeek's
+  `prompt_cache_hit_tokens` as `usage.cacheRead`, with `usage.input` the misses only.
+
+**The run** (`results/live-deepseek-run.txt`, run once, prompts untuned):
+
+1. "Log my coffee, just added 2." The model wrote `coffee` (add/total/reset, 6 checks, an invariant), accepted on the
+   first try, and used it in the same run.
+2. "Track decaf separately. I had a decaf." It read the source, then needed four proposals. The gate rejected three,
+   each for a real reason: it dropped the earlier invariant (invariants only ratchet up); its checks never exercised
+   `kind="regular"`; v1's ratcheted `total` check still expected the old shape (it then retired those checks, on the
+   record); and its own expectation for `reset` was wrong. The fourth was accepted with a migration, and replay of the
+   one real call reported the behaviour change to pass on to the user. It declared `changes: ["*"]`, which makes
+   scope-aware replay accept any change: the model took the widest declaration rather than naming the actions it
+   changed, so that safeguard did not bite here.
+3. "What's my breakdown?" One tool call, correct (2 regular, 1 decaf).
+4. "Why does the coffee tool track decaf? Who asked?" "The user asked, at message 7: 'Track decaf separately from
+   regular, please. I had a decaf.'" Message 7 is the right log index. It answered from the OptChat view without
+   calling `cell_list` or `zoom`: with 36 messages the view still held that line verbatim.
+
+**Cost and cache** (checked by summing the per-request rows and recomputing from tokens × prices; both give $0.0708):
+
+| | calls | input read from cache | cost |
+|---|---|---|---|
+| turns | 14 | 76.9% | $0.0154 |
+| compactions | 82 | 82.0% | $0.0553 |
+| total | 96 | 80.8% | $0.0708 |
+
+- This is a real-provider answer to round 3's caching question, for DeepSeek: it caches prefixes automatically (no
+  markers), so the view is reused across turns without the explicit breakpoints Anthropic needs. Turn requests read
+  75-98% from cache, except the first request after a tool was accepted (31% and 8%): a changed tool set changes the
+  prompt early. The first request of each run reads less (46-75%) because the view was re-rendered.
+- Compactions were 82 of 96 calls for 36 messages: building the summary tree eagerly costs about two calls per message,
+  as the spec says. Five compaction replies ended at the 2,000-token output cap (low-effort reasoning still spends
+  tokens), and two came back with a copied `18+1|` head despite the prompt; `ModelSummarizer` now strips such heads.
+- The fuzz report said "41 of a budget of 40 executions": the budget is checked before each input, and one input can
+  cost more than one execution. A soft cap, working as written.
