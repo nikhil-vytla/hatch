@@ -36,7 +36,7 @@ import {
 	rollbackVersion,
 	StaleError,
 } from "./catalogue.ts";
-import { type Catalogue, entryOf, staleReason } from "./catalogue-doc.ts";
+import { type Catalogue, entryOf, fullVersion, staleReason } from "./catalogue-doc.ts";
 import type { CellRuntime, CellVersion } from "./cells.ts";
 import type { GateReport } from "./gate.ts";
 import type { Memory } from "./optchat.ts";
@@ -77,7 +77,7 @@ function acceptedText(version: string, cell: string, report: GateReport): string
  */
 export function sourceOf(catalogue: Catalogue, cell: string, version: string | undefined): { ok: true; text: string } | { ok: false; reason: string } {
 	const entry = entryOf(catalogue, cell);
-	const wanted = version === undefined ? (entry?.live ?? undefined) : version.includes("@") ? version : `${cell}@${version}`;
+	const wanted = version === undefined ? (entry?.live ?? undefined) : fullVersion(cell, version);
 	const found = wanted === undefined ? undefined : entry?.versions[wanted];
 
 	if (found !== undefined) return { ok: true, text: JSON.stringify(found, null, 2) };
@@ -95,14 +95,15 @@ export function sourceOf(catalogue: Catalogue, cell: string, version: string | u
 export const MAX_REJECTIONS_PER_TURN = 6;
 
 /**
- * Everything that decides a proposal's verdict, hashed. The version id covers only the code (cell, source, migration),
- * so the same code with corrected checks is a new attempt; the same code with the same checks is not, and in a live
- * run a model resent one rejected proposal until the call cap stopped it.
+ * Everything that decides a proposal's verdict, hashed, including the live version it builds on. The version id covers
+ * only the code (cell, source, migration), so the same code with corrected checks, or on a newer live version, is a new
+ * attempt; the same code with the same checks is not, and in a live run a model resent one rejected proposal until the
+ * call cap stopped it.
  */
 export function proposalFingerprint(proposal: Proposal): string {
-	const { cell, parameters, source, checks, retire, migrate, pure, invariants, changes } = proposal;
+	const { cell, parameters, source, checks, retire, migrate, pure, invariants, changes, expectLive } = proposal;
 
-	return createHash("sha256").update(JSON.stringify([cell, parameters, source, checks, retire, migrate ?? null, pure, invariants, changes])).digest("hex");
+	return createHash("sha256").update(JSON.stringify([cell, parameters, source, checks, retire, migrate ?? null, pure, invariants, changes, expectLive])).digest("hex");
 }
 
 /** Remembers rejected proposals and counts rejections per user turn, for one process. */
@@ -127,8 +128,10 @@ export class RejectionMemory {
 		return undefined;
 	}
 
+	/** A rejection counts toward the turn's limit; a stale one is not remembered, since it says nothing about the code. */
 	note(fingerprint: string, turn: number, reason: string): void {
-		this.seen.set(fingerprint, { times: (this.seen.get(fingerprint)?.times ?? 0) + 1, reason });
+		if (!reason.startsWith("stale:")) this.seen.set(fingerprint, { times: (this.seen.get(fingerprint)?.times ?? 0) + 1, reason });
+
 		this.perTurn.set(turn, (this.perTurn.get(turn) ?? 0) + 1);
 	}
 }
@@ -208,14 +211,17 @@ export function kernelExtension(options: KernelOptions) {
 		parameters: Type.Object({ name: Type.String(), version: Type.String(), expectLive: ExpectLive }),
 		executionMode: "sequential",
 		execute: async (args, api, context) => {
+			const expectLive = args.expectLive === null ? null : fullVersion(args.name, args.expectLive);
+			const version = fullVersion(args.name, args.version);
+
 			const outcome = await withCommittedCatalogue(api, context, async (catalogue, committed) => {
-				const stale = staleReason(entryOf(catalogue.value, args.name), args.expectLive);
+				const stale = staleReason(entryOf(catalogue.value, args.name), expectLive);
 
 				if (stale !== undefined) return stale;
 
-				const accepted = await withAcceptedVersion(catalogue, committed, args.name, args.version, async (target, proof) => {
+				const accepted = await withAcceptedVersion(catalogue, committed, args.name, version, async (target, proof) => {
 					try {
-						await api.commit((tx) => rollbackVersion(tx, target, proof, args.expectLive), context);
+						await api.commit((tx) => rollbackVersion(tx, target, proof, expectLive), context);
 
 						return undefined;
 					} catch (error) {
@@ -232,7 +238,7 @@ export function kernelExtension(options: KernelOptions) {
 
 			await refreshCells(api, context, registry, runtime, options.invariants);
 
-			return text(`${args.name} is now ${args.version}`);
+			return text(`${args.name} is now ${version}`);
 		},
 	});
 
@@ -289,7 +295,7 @@ export function kernelExtension(options: KernelOptions) {
 		name: "kernel",
 		tools: [propose, rollback, list, source, zoom, date],
 		sections: [
-			section("preamble", () => "You are an agent that grows its own tools. When the user needs something you cannot do, write a tool for it with cell_propose, with checks. Say in your reply what you learned that will matter later.", { tag: false }),
+			section("preamble", () => "You are an agent that grows its own tools. When the user needs something you cannot do, write a tool for it with cell_propose, with checks. Anything random or that must be exactly right (dice, arithmetic, dates, running totals) belongs in a tool, not in your head: make randomness injectable so checks can pin it. Say in your reply what you learned that will matter later.", { tag: false }),
 		],
 	});
 }

@@ -60,3 +60,18 @@ test("a turn that makes too many tool calls is aborted and says so", async () =>
 		rmSync(dir, { recursive: true, force: true });
 	}
 });
+
+test("a short version id in expectLive means the full one", () => {
+	assert.equal(parseProposal({ ...args, expectLive: "c8ddda6d" }).expectLive, "dice@c8ddda6d");
+	assert.equal(parseProposal({ ...args, expectLive: "dice@c8ddda6d" }).expectLive, "dice@c8ddda6d");
+	assert.equal(parseProposal(args).expectLive, null);
+});
+
+test("a stale rejection is not remembered: the same code on the right live version may be sent again", () => {
+	const memory = new RejectionMemory();
+	const fp = proposalFingerprint(parseProposal(args));
+
+	memory.note(fp, 1, "stale: you expected nothing to be live");
+	assert.equal(memory.refusal(fp, 1), undefined);
+	assert.notEqual(proposalFingerprint(parseProposal({ ...args, expectLive: "dice@c8ddda6d" })), fp);
+});

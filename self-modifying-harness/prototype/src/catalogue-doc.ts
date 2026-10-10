@@ -35,6 +35,13 @@ export function cellName(version: string): string {
 }
 
 /** Why a proposal made against `expectLive` is stale, or undefined when the live version is what the caller expected. */
+/**
+ * A version id in full. Models often name a version by its hash alone ("c8ddda6d" for "party@c8ddda6d"); in a live run
+ * that made three proposals in one turn fail as stale against the very version they meant. Arguments are normalized
+ * where they come in, so everything inside compares full ids.
+ */
+export const fullVersion = (cell: string, id: string): string => (id.includes("@") ? id : `${cell}@${id}`);
+
 export function staleReason(entry: CatalogueEntry | undefined, expectLive: string | null): string | undefined {
 	const actual = entry?.live ?? null;
 

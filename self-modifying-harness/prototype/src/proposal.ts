@@ -4,7 +4,7 @@ import { type Static, Type } from "@earendil-works/pi-ai";
 import type { JsonValue } from "@earendil-works/chord";
 import type { JsonObject } from "@earendil-works/pi-durable";
 import type { Catalogue } from "./catalogue-doc.ts";
-import { entryOf } from "./catalogue-doc.ts";
+import { entryOf, fullVersion } from "./catalogue-doc.ts";
 import { type CellVersion, type Check, type Invariant, versionId } from "./cells.ts";
 import { KERNEL_TOOLS, NAME } from "./gate.ts";
 
@@ -71,7 +71,7 @@ export function parseProposal(raw: RawProposal): Proposal {
 		pure: raw.pure === true,
 		invariants,
 		changes: raw.changes ?? [],
-		expectLive: raw.expectLive,
+		expectLive: raw.expectLive === null ? null : fullVersion(raw.name, raw.expectLive),
 	};
 }
 
