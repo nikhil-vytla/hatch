@@ -1,0 +1,18 @@
+#!/bin/sh
+# Keep claude.ai session links out of commit messages: this repository is public, and the link
+# would publish the session's ID.
+#   - A "Claude-Session: <link>" trailer line is removed, and the commit goes ahead.
+#   - A session link anywhere else in the message stops the commit.
+# Enable once per clone: git config core.hooksPath .githooks
+msg="$1"
+link='claude\.ai/code/session_'
+
+tmp="$msg.tmp.$$"
+grep -v -E "^Claude-Session:[[:space:]]*https?://(www\.)?$link" "$msg" > "$tmp"
+mv "$tmp" "$msg"
+
+if grep -q -E "$link" "$msg"; then
+	echo "commit-msg: the message contains a claude.ai session link; remove it and commit again:" >&2
+	grep -n -E "$link" "$msg" >&2
+	exit 1
+fi

@@ -1,0 +1,148 @@
+{
+ "turns": [
+  {
+   "intent": "add expenses",
+   "scope": [
+    "add_expense"
+   ],
+   "forms": [
+    "def add_expense(state, amount, category) do\n  expenses = Map.get(state, \"expenses\", [])\n  {length(expenses) + 1, Map.put(state, \"expenses\", expenses ++ [%{\"amount\" => amount, \"category\" => category}])}\nend"
+   ],
+   "removes": [],
+   "laws": []
+  },
+  {
+   "intent": "total",
+   "scope": [
+    "total"
+   ],
+   "forms": [
+    "def total(state) do\n  state |> Map.get(\"expenses\", []) |> Enum.reduce(0, fn e, sum -> sum + e[\"amount\"] end)\nend"
+   ],
+   "removes": [],
+   "laws": []
+  },
+  {
+   "intent": "by category",
+   "scope": [
+    "by_category"
+   ],
+   "forms": [
+    "def by_category(state) do\n  state\n  |> Map.get(\"expenses\", [])\n  |> Enum.reduce(%{}, fn e, acc -> Map.update(acc, e[\"category\"], e[\"amount\"], fn s -> s + e[\"amount\"] end) end)\nend"
+   ],
+   "removes": [],
+   "laws": []
+  },
+  {
+   "intent": "round to cents",
+   "scope": [
+    "total",
+    "by_category",
+    "cents"
+   ],
+   "forms": [
+    "defp cents(x), do: Float.round(x * 1.0, 2)",
+    "def total(state) do\n  cents(state |> Map.get(\"expenses\", []) |> Enum.reduce(0, fn e, sum -> sum + e[\"amount\"] end))\nend",
+    "def by_category(state) do\n  state\n  |> Map.get(\"expenses\", [])\n  |> Enum.reduce(%{}, fn e, acc ->\n    Map.update(acc, e[\"category\"], cents(e[\"amount\"]), fn s -> cents(s + e[\"amount\"]) end)\n  end)\nend"
+   ],
+   "removes": [],
+   "laws": []
+  },
+  {
+   "intent": "validate expenses",
+   "scope": [
+    "add_expense"
+   ],
+   "forms": [
+    "def add_expense(state, amount, category) do\n  if not (is_number(amount) and amount > 0), do: raise(\"amount must be positive\")\n  if not (is_binary(category) and category != \"\"), do: raise(\"category required\")\n  expenses = Map.get(state, \"expenses\", [])\n  {length(expenses) + 1, Map.put(state, \"expenses\", expenses ++ [%{\"amount\" => amount, \"category\" => category}])}\nend"
+   ],
+   "removes": [],
+   "laws": []
+  },
+  {
+   "intent": "budgets",
+   "scope": [
+    "set_budget",
+    "over_budget"
+   ],
+   "forms": [
+    "def set_budget(state, category, amount) do\n  budgets = Map.put(Map.get(state, \"budgets\", %{}), category, amount)\n  {amount, Map.put(state, \"budgets\", budgets)}\nend",
+    "def over_budget(state) do\n  spent = by_category(state)\n\n  state\n  |> Map.get(\"budgets\", %{})\n  |> Enum.filter(fn {c, limit} -> Map.get(spent, c, 0) > limit end)\n  |> Enum.map(fn {c, _} -> c end)\n  |> Enum.sort()\nend"
+   ],
+   "removes": [],
+   "laws": []
+  },
+  {
+   "intent": "top category",
+   "scope": [
+    "top_category"
+   ],
+   "forms": [
+    "def top_category(state) do\n  spent = by_category(state)\n\n  spent\n  |> Map.keys()\n  |> Enum.sort()\n  |> Enum.reduce(nil, fn c, best -> if best == nil or spent[c] > spent[best], do: c, else: best end)\nend"
+   ],
+   "removes": [],
+   "laws": []
+  },
+  {
+   "intent": "optional note",
+   "scope": [
+    "add_expense"
+   ],
+   "forms": [
+    "def add_expense(state, amount, category, note \\\\ nil) do\n  if not (is_number(amount) and amount > 0), do: raise(\"amount must be positive\")\n  if not (is_binary(category) and category != \"\"), do: raise(\"category required\")\n  expense = %{\"amount\" => amount, \"category\" => category}\n  expense = if is_binary(note), do: Map.put(expense, \"note\", note), else: expense\n  expenses = Map.get(state, \"expenses\", [])\n  {length(expenses) + 1, Map.put(state, \"expenses\", expenses ++ [expense])}\nend"
+   ],
+   "removes": [],
+   "laws": []
+  }
+ ],
+ "probes": {
+  "side_effect": {
+   "scope": [
+    "total"
+   ],
+   "forms": [
+    "def total(state), do: 0\nSystem.put_env(\"PWNED\", \"1\")"
+   ]
+  },
+  "breaks_ratchet": {
+   "scope": [
+    "total"
+   ],
+   "forms": [
+    "def total(_state), do: 0"
+   ]
+  },
+  "breaks_invariant": {
+   "scope": [
+    "add_expense"
+   ],
+   "forms": [
+    "def add_expense(state, amount, category, note \\\\ nil) do\n  expense = %{\"amount\" => -amount, \"category\" => category}\n  expense = if is_binary(note), do: Map.put(expense, \"note\", note), else: expense\n  expenses = Map.get(state, \"expenses\", [])\n  {length(expenses) + 1, Map.put(state, \"expenses\", expenses ++ [expense])}\nend"
+   ]
+  },
+  "loops": {
+   "scope": [
+    "total"
+   ],
+   "forms": [
+    "def total(state), do: total(state)"
+   ]
+  },
+  "calls_missing": {
+   "scope": [
+    "total"
+   ],
+   "forms": [
+    "def total(state), do: cents_of_everything(state)"
+   ]
+  },
+  "breaks_trace": {
+   "scope": [
+    "total"
+   ],
+   "forms": [
+    "def top_category(_state), do: raise(\"boom\")"
+   ]
+  }
+ }
+}

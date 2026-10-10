@@ -1,0 +1,242 @@
+[
+  {
+    "scenario": "expenses",
+    "lang": "js",
+    "n": 3,
+    "goal": "60/60",
+    "goal_pct": 100,
+    "final": "60/60",
+    "final_pct": 100,
+    "develops": 11.333333333333334,
+    "load_errors": 1,
+    "corrections": 10.666666666666666,
+    "out_tokens": 22277.333333333332,
+    "minutes": 1.9266666666666667,
+    "cap_hits": 0,
+    "per_run_goal": [
+      "20/20",
+      "20/20",
+      "20/20"
+    ]
+  },
+  {
+    "scenario": "expenses",
+    "lang": "clojure",
+    "n": 3,
+    "goal": "59/60",
+    "goal_pct": 98,
+    "final": "59/60",
+    "final_pct": 98,
+    "develops": 11.333333333333334,
+    "load_errors": 1,
+    "corrections": 7,
+    "out_tokens": 34652,
+    "minutes": 3.0466666666666664,
+    "cap_hits": 0,
+    "per_run_goal": [
+      "20/20",
+      "20/20",
+      "19/20"
+    ]
+  },
+  {
+    "scenario": "expenses",
+    "lang": "elixir",
+    "n": 3,
+    "goal": "60/60",
+    "goal_pct": 100,
+    "final": "60/60",
+    "final_pct": 100,
+    "develops": 13,
+    "load_errors": 0,
+    "corrections": 11.333333333333334,
+    "out_tokens": 39443.666666666664,
+    "minutes": 3.3200000000000003,
+    "cap_hits": 0,
+    "per_run_goal": [
+      "20/20",
+      "20/20",
+      "20/20"
+    ]
+  },
+  {
+    "scenario": "expenses",
+    "lang": "smalltalk",
+    "n": 3,
+    "goal": "60/60",
+    "goal_pct": 100,
+    "final": "60/60",
+    "final_pct": 100,
+    "develops": 11.333333333333334,
+    "load_errors": 0,
+    "corrections": 6.666666666666667,
+    "out_tokens": 27878,
+    "minutes": 2.5166666666666666,
+    "cap_hits": 0,
+    "per_run_goal": [
+      "20/20",
+      "20/20",
+      "20/20"
+    ]
+  },
+  {
+    "scenario": "expenses",
+    "lang": "racket",
+    "n": 3,
+    "goal": "57/60",
+    "goal_pct": 95,
+    "final": "57/60",
+    "final_pct": 95,
+    "develops": 13.333333333333334,
+    "load_errors": 0,
+    "corrections": 9.666666666666666,
+    "out_tokens": 41049.333333333336,
+    "minutes": 3.6033333333333335,
+    "cap_hits": 0,
+    "per_run_goal": [
+      "20/20",
+      "17/20",
+      "20/20"
+    ]
+  },
+  {
+    "scenario": "expenses",
+    "lang": "lean",
+    "n": 3,
+    "goal": "50/60",
+    "goal_pct": 83,
+    "final": "50/60",
+    "final_pct": 83,
+    "develops": 11.333333333333334,
+    "load_errors": 2,
+    "corrections": 4.333333333333333,
+    "out_tokens": 132140.33333333334,
+    "minutes": 9.916666666666666,
+    "cap_hits": 1,
+    "per_run_goal": [
+      "14/20",
+      "16/20",
+      "20/20"
+    ]
+  },
+  {
+    "scenario": "gateway",
+    "lang": "js",
+    "n": 3,
+    "goal": "57/57",
+    "goal_pct": 100,
+    "final": "57/57",
+    "final_pct": 100,
+    "develops": 7.333333333333333,
+    "load_errors": 0,
+    "corrections": 10.333333333333334,
+    "out_tokens": 15193.666666666666,
+    "minutes": 1.2300000000000002,
+    "cap_hits": 0,
+    "per_run_goal": [
+      "19/19",
+      "19/19",
+      "19/19"
+    ]
+  },
+  {
+    "scenario": "gateway",
+    "lang": "clojure",
+    "n": 3,
+    "goal": "57/57",
+    "goal_pct": 100,
+    "final": "57/57",
+    "final_pct": 100,
+    "develops": 7.666666666666667,
+    "load_errors": 0,
+    "corrections": 8.666666666666666,
+    "out_tokens": 19762,
+    "minutes": 1.68,
+    "cap_hits": 0,
+    "per_run_goal": [
+      "19/19",
+      "19/19",
+      "19/19"
+    ]
+  },
+  {
+    "scenario": "gateway",
+    "lang": "elixir",
+    "n": 3,
+    "goal": "57/57",
+    "goal_pct": 100,
+    "final": "57/57",
+    "final_pct": 100,
+    "develops": 7,
+    "load_errors": 0,
+    "corrections": 6,
+    "out_tokens": 13113,
+    "minutes": 1.1433333333333333,
+    "cap_hits": 0,
+    "per_run_goal": [
+      "19/19",
+      "19/19",
+      "19/19"
+    ]
+  },
+  {
+    "scenario": "gateway",
+    "lang": "smalltalk",
+    "n": 3,
+    "goal": "57/57",
+    "goal_pct": 100,
+    "final": "57/57",
+    "final_pct": 100,
+    "develops": 7.666666666666667,
+    "load_errors": 0,
+    "corrections": 6,
+    "out_tokens": 17561.333333333332,
+    "minutes": 1.5066666666666666,
+    "cap_hits": 0,
+    "per_run_goal": [
+      "19/19",
+      "19/19",
+      "19/19"
+    ]
+  },
+  {
+    "scenario": "gateway",
+    "lang": "racket",
+    "n": 3,
+    "goal": "57/57",
+    "goal_pct": 100,
+    "final": "57/57",
+    "final_pct": 100,
+    "develops": 6.666666666666667,
+    "load_errors": 0,
+    "corrections": 3.6666666666666665,
+    "out_tokens": 25359.666666666668,
+    "minutes": 2.06,
+    "cap_hits": 0,
+    "per_run_goal": [
+      "19/19",
+      "19/19",
+      "19/19"
+    ]
+  },
+  {
+    "scenario": "gateway",
+    "lang": "lean",
+    "n": 3,
+    "goal": "48/57",
+    "goal_pct": 84,
+    "final": "52/57",
+    "final_pct": 91,
+    "develops": 8,
+    "load_errors": 0,
+    "corrections": 4,
+    "out_tokens": 163320,
+    "minutes": 11.15,
+    "cap_hits": 0,
+    "per_run_goal": [
+      "15/19",
+      "19/19",
+      "14/19"
+    ]
+  }
+]

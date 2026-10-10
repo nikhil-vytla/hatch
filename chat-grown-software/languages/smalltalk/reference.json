@@ -1,0 +1,141 @@
+{
+ "turns": [
+  {
+   "intent": "add expenses",
+   "scope": [
+    "add_expense"
+   ],
+   "forms": [
+    "add_expense: amount category: category\n\t| list |\n\tlist := state at: 'expenses' ifAbsentPut: [ OrderedCollection new ].\n\tlist add: { 'amount' -> amount. 'category' -> category } asDictionary.\n\t^ list size"
+   ],
+   "removes": []
+  },
+  {
+   "intent": "total",
+   "scope": [
+    "total"
+   ],
+   "forms": [
+    "total\n\t^ (state at: 'expenses' ifAbsent: [ #() ]) inject: 0 into: [ :sum :e | sum + (e at: 'amount') ]"
+   ],
+   "removes": []
+  },
+  {
+   "intent": "by category",
+   "scope": [
+    "by_category"
+   ],
+   "forms": [
+    "by_category\n\t| out |\n\tout := Dictionary new.\n\t(state at: 'expenses' ifAbsent: [ #() ]) do: [ :e |\n\t\tout at: (e at: 'category') put: (out at: (e at: 'category') ifAbsent: [ 0 ]) + (e at: 'amount') ].\n\t^ out"
+   ],
+   "removes": []
+  },
+  {
+   "intent": "round to cents",
+   "scope": [
+    "total",
+    "by_category",
+    "cents"
+   ],
+   "forms": [
+    "cents: x\n\t^ (x * 100) rounded / 100.0",
+    "total\n\t^ self cents: ((state at: 'expenses' ifAbsent: [ #() ]) inject: 0 into: [ :sum :e | sum + (e at: 'amount') ])",
+    "by_category\n\t| out |\n\tout := Dictionary new.\n\t(state at: 'expenses' ifAbsent: [ #() ]) do: [ :e |\n\t\tout at: (e at: 'category') put: (self cents: (out at: (e at: 'category') ifAbsent: [ 0 ]) + (e at: 'amount')) ].\n\t^ out"
+   ],
+   "removes": []
+  },
+  {
+   "intent": "validate expenses",
+   "scope": [
+    "add_expense"
+   ],
+   "forms": [
+    "add_expense: amount category: category\n\t| list |\n\t(amount isNumber and: [ amount > 0 ]) ifFalse: [ ^ self error: 'amount must be positive' ].\n\t(category isString and: [ category isEmpty not ]) ifFalse: [ ^ self error: 'category required' ].\n\tlist := state at: 'expenses' ifAbsentPut: [ OrderedCollection new ].\n\tlist add: { 'amount' -> amount. 'category' -> category } asDictionary.\n\t^ list size"
+   ],
+   "removes": []
+  },
+  {
+   "intent": "budgets",
+   "scope": [
+    "set_budget",
+    "over_budget"
+   ],
+   "forms": [
+    "set_budget: category amount: amount\n\t(state at: 'budgets' ifAbsentPut: [ Dictionary new ]) at: category put: amount.\n\t^ amount",
+    "over_budget\n\t| spent budgets |\n\tspent := self by_category.\n\tbudgets := state at: 'budgets' ifAbsent: [ Dictionary new ].\n\t^ (budgets keys select: [ :c | (spent at: c ifAbsent: [ 0 ]) > (budgets at: c) ]) sorted"
+   ],
+   "removes": []
+  },
+  {
+   "intent": "top category",
+   "scope": [
+    "top_category"
+   ],
+   "forms": [
+    "top_category\n\t| spent best |\n\tspent := self by_category.\n\tbest := nil.\n\tspent keys sorted do: [ :c | (best isNil or: [ (spent at: c) > (spent at: best) ]) ifTrue: [ best := c ] ].\n\t^ best"
+   ],
+   "removes": []
+  },
+  {
+   "intent": "optional note",
+   "scope": [
+    "add_expense"
+   ],
+   "forms": [
+    "add_expense: amount category: category note: note\n\t| list entry |\n\t(amount isNumber and: [ amount > 0 ]) ifFalse: [ ^ self error: 'amount must be positive' ].\n\t(category isString and: [ category isEmpty not ]) ifFalse: [ ^ self error: 'category required' ].\n\tlist := state at: 'expenses' ifAbsentPut: [ OrderedCollection new ].\n\tentry := { 'amount' -> amount. 'category' -> category } asDictionary.\n\tnote isNil ifFalse: [ entry at: 'note' put: note ].\n\tlist add: entry.\n\t^ list size",
+    "add_expense: amount category: category\n\t^ self add_expense: amount category: category note: nil"
+   ],
+   "removes": []
+  }
+ ],
+ "probes": {
+  "side_effect": {
+   "scope": [
+    "total"
+   ],
+   "forms": [
+    "total\n\tSmalltalk at: #Hacked put: 1.\n\t^ 0"
+   ]
+  },
+  "breaks_ratchet": {
+   "scope": [
+    "total"
+   ],
+   "forms": [
+    "total\n\t^ 0"
+   ]
+  },
+  "breaks_invariant": {
+   "scope": [
+    "add_expense"
+   ],
+   "forms": [
+    "add_expense: amount category: category\n\t| list |\n\tlist := state at: 'expenses' ifAbsentPut: [ OrderedCollection new ].\n\tlist add: { 'amount' -> amount negated. 'category' -> category } asDictionary.\n\t^ list size"
+   ]
+  },
+  "loops": {
+   "scope": [
+    "total"
+   ],
+   "forms": [
+    "total\n\t[ true ] whileTrue: [ 1 + 1 ].\n\t^ 0"
+   ]
+  },
+  "calls_missing": {
+   "scope": [
+    "total"
+   ],
+   "forms": [
+    "total\n\t^ self grand_total"
+   ]
+  },
+  "breaks_trace": {
+   "scope": [
+    "total"
+   ],
+   "forms": [
+    "top_category\n\t^ self error: 'boom'"
+   ]
+  }
+ }
+}

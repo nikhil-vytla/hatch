@@ -1,0 +1,498 @@
+{
+ "name": "gateway",
+ "about": "An LLM API gateway grown in 5 turns: usage accounting, prices, quotas (rate limits), validation, top spender. Expected answers come from scenario/gateway.reference.js.",
+ "reference": "gateway.reference.js",
+ "functions": [
+  "record_usage",
+  "usage",
+  "set_price",
+  "cost",
+  "set_quota",
+  "top_spender"
+ ],
+ "invariants": [
+  {
+   "name": "calls-shape",
+   "rule": "every call record is exactly {key, model, tokens}: key and model non-empty strings, tokens a positive whole number"
+  },
+  {
+   "name": "prices-shape",
+   "rule": "every price (cents per 1000 tokens) is a number >= 0"
+  },
+  {
+   "name": "quotas-shape",
+   "rule": "every quota is a whole number >= 0"
+  },
+  {
+   "name": "within-quota",
+   "rule": "for every key with a quota, the sum of its call tokens is <= its quota"
+  },
+  {
+   "name": "known-keys",
+   "rule": "the state's top-level keys are only calls, prices and quotas (any may be absent)"
+  }
+ ],
+ "fixtures": {
+  "traffic": {
+   "calls": [
+    {
+     "key": "alice",
+     "model": "gpt",
+     "tokens": 1200
+    },
+    {
+     "key": "bob",
+     "model": "claude",
+     "tokens": 500
+    },
+    {
+     "key": "alice",
+     "model": "claude",
+     "tokens": 300
+    }
+   ]
+  },
+  "traffic+prices": {
+   "calls": [
+    {
+     "key": "alice",
+     "model": "gpt",
+     "tokens": 1200
+    },
+    {
+     "key": "bob",
+     "model": "claude",
+     "tokens": 500
+    },
+    {
+     "key": "alice",
+     "model": "claude",
+     "tokens": 300
+    }
+   ],
+   "prices": {
+    "gpt": 50,
+    "claude": 300
+   }
+  },
+  "traffic+quota": {
+   "calls": [
+    {
+     "key": "alice",
+     "model": "gpt",
+     "tokens": 1200
+    },
+    {
+     "key": "bob",
+     "model": "claude",
+     "tokens": 500
+    },
+    {
+     "key": "alice",
+     "model": "claude",
+     "tokens": 300
+    }
+   ],
+   "quotas": {
+    "alice": 2000
+   }
+  },
+  "traffic+pricey": {
+   "calls": [
+    {
+     "key": "alice",
+     "model": "gpt",
+     "tokens": 1200
+    },
+    {
+     "key": "bob",
+     "model": "claude",
+     "tokens": 500
+    },
+    {
+     "key": "alice",
+     "model": "claude",
+     "tokens": 300
+    }
+   ],
+   "prices": {
+    "gpt": 50,
+    "claude": 1000
+   }
+  }
+ },
+ "turns": [
+  {
+   "user": "I run an LLM API gateway. Record usage per API key: record_usage(key, model, tokens) stores the call and returns that key's total tokens so far; usage(key) returns the total (0 for a key never seen).",
+   "scope": [
+    "record_usage",
+    "usage"
+   ],
+   "examples": [
+    {
+     "fixture": {},
+     "calls": [
+      {
+       "fn": "record_usage",
+       "args": [
+        "alice",
+        "gpt",
+        1000
+       ]
+      }
+     ]
+    },
+    {
+     "fixture": "traffic",
+     "calls": [
+      {
+       "fn": "usage",
+       "args": [
+        "alice"
+       ]
+      }
+     ]
+    },
+    {
+     "fixture": {},
+     "calls": [
+      {
+       "fn": "usage",
+       "args": [
+        "nobody"
+       ]
+      }
+     ]
+    }
+   ],
+   "use": [
+    {
+     "fn": "record_usage",
+     "args": [
+      "acme",
+      "gpt",
+      800
+     ]
+    },
+    {
+     "fn": "record_usage",
+     "args": [
+      "acme",
+      "claude",
+      400
+     ]
+    },
+    {
+     "fn": "record_usage",
+     "args": [
+      "zeta",
+      "gpt",
+      2500
+     ]
+    },
+    {
+     "fn": "usage",
+     "args": [
+      "acme"
+     ]
+    }
+   ]
+  },
+  {
+   "user": "Now prices: set_price(model, cents_per_1k_tokens) sets a model's price and returns it. cost(key) is what that key has spent in dollars, rounded to cents. A model without a price costs nothing.",
+   "scope": [
+    "set_price",
+    "cost"
+   ],
+   "examples": [
+    {
+     "fixture": "traffic+prices",
+     "calls": [
+      {
+       "fn": "cost",
+       "args": [
+        "alice"
+       ]
+      }
+     ]
+    },
+    {
+     "fixture": "traffic+prices",
+     "calls": [
+      {
+       "fn": "cost",
+       "args": [
+        "bob"
+       ]
+      }
+     ]
+    },
+    {
+     "fixture": "traffic",
+     "calls": [
+      {
+       "fn": "cost",
+       "args": [
+        "alice"
+       ]
+      }
+     ]
+    },
+    {
+     "fixture": {},
+     "calls": [
+      {
+       "fn": "set_price",
+       "args": [
+        "gpt",
+        50
+       ]
+      }
+     ]
+    }
+   ],
+   "use": [
+    {
+     "fn": "set_price",
+     "args": [
+      "gpt",
+      50
+     ]
+    },
+    {
+     "fn": "set_price",
+     "args": [
+      "claude",
+      300
+     ]
+    },
+    {
+     "fn": "cost",
+     "args": [
+      "acme"
+     ]
+    },
+    {
+     "fn": "cost",
+     "args": [
+      "zeta"
+     ]
+    }
+   ]
+  },
+  {
+   "user": "Rate limits: set_quota(key, tokens) caps a key's total tokens and returns the quota; it throws if the key has already used more. record_usage must throw if the call would take the key over its quota. Keys without a quota are unlimited.",
+   "scope": [
+    "set_quota",
+    "record_usage"
+   ],
+   "examples": [
+    {
+     "fixture": "traffic+quota",
+     "calls": [
+      {
+       "fn": "record_usage",
+       "args": [
+        "alice",
+        "gpt",
+        600
+       ]
+      }
+     ]
+    },
+    {
+     "fixture": "traffic+quota",
+     "calls": [
+      {
+       "fn": "record_usage",
+       "args": [
+        "alice",
+        "gpt",
+        500
+       ]
+      }
+     ]
+    },
+    {
+     "fixture": {},
+     "calls": [
+      {
+       "fn": "set_quota",
+       "args": [
+        "bob",
+        100
+       ]
+      }
+     ]
+    },
+    {
+     "fixture": "traffic",
+     "calls": [
+      {
+       "fn": "set_quota",
+       "args": [
+        "alice",
+        1000
+       ]
+      }
+     ]
+    }
+   ],
+   "law": "no key's usage ever exceeds its quota",
+   "use": [
+    {
+     "fn": "set_quota",
+     "args": [
+      "acme",
+      1500
+     ]
+    },
+    {
+     "fn": "record_usage",
+     "args": [
+      "acme",
+      "gpt",
+      300
+     ]
+    },
+    {
+     "fn": "usage",
+     "args": [
+      "acme"
+     ]
+    }
+   ]
+  },
+  {
+   "user": "Reject bad input: tokens must be a positive whole number, and key and model non-empty strings. Throw an error.",
+   "scope": [
+    "record_usage"
+   ],
+   "examples": [
+    {
+     "fixture": {},
+     "calls": [
+      {
+       "fn": "record_usage",
+       "args": [
+        "alice",
+        "gpt",
+        0
+       ]
+      }
+     ]
+    },
+    {
+     "fixture": {},
+     "calls": [
+      {
+       "fn": "record_usage",
+       "args": [
+        "alice",
+        "gpt",
+        1.5
+       ]
+      }
+     ]
+    },
+    {
+     "fixture": {},
+     "calls": [
+      {
+       "fn": "record_usage",
+       "args": [
+        "",
+        "gpt",
+        10
+       ]
+      }
+     ]
+    },
+    {
+     "fixture": {},
+     "calls": [
+      {
+       "fn": "record_usage",
+       "args": [
+        "alice",
+        "",
+        10
+       ]
+      }
+     ]
+    },
+    {
+     "fixture": {},
+     "calls": [
+      {
+       "fn": "record_usage",
+       "args": [
+        "alice",
+        "gpt",
+        10
+       ]
+      }
+     ]
+    }
+   ],
+   "use": [
+    {
+     "fn": "record_usage",
+     "args": [
+      "zeta",
+      "claude",
+      100
+     ]
+    }
+   ]
+  },
+  {
+   "user": "Who spends the most? top_spender() returns the key with the highest cost; ties go to the alphabetically first key; null when nothing is recorded.",
+   "scope": [
+    "top_spender"
+   ],
+   "examples": [
+    {
+     "fixture": "traffic+prices",
+     "calls": [
+      {
+       "fn": "top_spender",
+       "args": []
+      }
+     ]
+    },
+    {
+     "fixture": "traffic+pricey",
+     "calls": [
+      {
+       "fn": "top_spender",
+       "args": []
+      }
+     ]
+    },
+    {
+     "fixture": {},
+     "calls": [
+      {
+       "fn": "top_spender",
+       "args": []
+      }
+     ]
+    }
+   ],
+   "law": "top_spender() is null or no key has a higher cost",
+   "use": [
+    {
+     "fn": "top_spender",
+     "args": []
+    },
+    {
+     "fn": "cost",
+     "args": [
+      "zeta"
+     ]
+    }
+   ]
+  }
+ ]
+}

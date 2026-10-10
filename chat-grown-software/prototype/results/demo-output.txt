@@ -1,0 +1,85 @@
+
+turn 1  user> Let me record expenses: an amount and a category.
+  develop [addExpense] -> accepted (rev-0002)
+     ! fuzzing found inputs that would corrupt state (the kernel undoes such calls): addExpense(-1, null) leaves expenses-shape is false; addExpense(0.1, undefined) leaves expenses-shape is false (+22 more)
+  use addExpense(12.5, "food") => {"ok":true,"value":1}
+  use addExpense(40, "transport") => {"ok":true,"value":2}
+  use addExpense(7.25, "food") => {"ok":true,"value":3}
+
+turn 2  user> What's my total so far?
+  develop [total] -> accepted (rev-0006)
+  use total() => {"ok":true,"value":59.75}
+
+turn 3  user> Break it down by category. The categories should always add up to the total.
+  develop [byCategory] -> accepted (rev-0007)
+  use byCategory() => {"ok":true,"value":{"food":19.75,"transport":40}}
+  use addExpense(3.1, "fun") => {"ok":true,"value":4}
+  use byCategory() => {"ok":true,"value":{"food":19.75,"transport":40,"fun":3.1}}
+
+turn 4  user> Money should be in cents. When I add 0.10 and 0.20 the total should say 0.3, not 0.30000000000000004.
+  develop [total, byCategory, cents] -> accepted (rev-0009)
+  use total() => {"ok":true,"value":62.85}
+
+turn 5  user> Don't let me add an expense of zero or less, or one without a category. Throw an error.
+  develop [addExpense] -> accepted (rev-0010)
+  use addExpense(9.99, "fun") => {"ok":true,"value":5}
+
+turn 6  user> Let me set a monthly budget per category and tell me which ones I'm over.
+  develop [setBudget, overBudget] -> accepted-incomplete (rev-0012)
+     ? no example you confirmed calls setBudget(): give one?
+     ! fuzzing found inputs that would corrupt state (the kernel undoes such calls): setBudget(NaN, true) leaves budgets-shape is false; setBudget("food", NaN) leaves budgets-shape is false (+15 more)
+  use setBudget("food", 15) => {"ok":true,"value":15}
+  use overBudget() => {"ok":true,"value":["food"]}
+  use setBudget("fun", 100) => {"ok":true,"value":100}
+  use overBudget() => {"ok":true,"value":["food"]}
+
+turn 7  user> Which category do I spend the most on? If two tie, pick the alphabetically first.
+  develop [topCategory] -> accepted (rev-0015)
+  use topCategory() => {"ok":true,"value":"transport"}
+
+turn 8  user> Can expenses have an optional note? Like 'coffee with Sam'.
+  develop [addExpense] -> accepted (rev-0016)
+  use addExpense(4.5, "food", "coffee with Sam") => {"ok":true,"value":6}
+  use topCategory() => {"ok":true,"value":"transport"}
+  use total() => {"ok":true,"value":77.34}
+
+What the kernel refuses:
+  stale proposal (saw generation 0) -> stale
+  CSV export + drive-by edit to total() -> rejected
+     x ratchet: turn 2: total() gave 59, confirmed 59.75
+     x properties: categories-sum-to-total fails on {"expenses":[{"amount":67.93,"category":"fun"},{"amount":38.35,"category":"transport"},{"amount":83.1,"category":"food"},{"amount":5.35,"category":"transport"},
+     x fuzz: total is outside the request but total() changed: {"value":118.3} -> {"value":118}
+     x traces: undeclared change to total alters total()
+  overBudget that caches into state -> rejected
+     x invariants: known-keys is false
+     x fuzz: overBudget() now leaves known-keys is false (the accepted version did not)
+     ~ behavior diff for you to confirm: overBudget(): ["food"] -> "[\"food\"], but the state after differs"
+     ~ behavior diff for you to confirm: overBudget(): ["food"] -> "[\"food\"], but the state after differs"
+     ? no example you confirmed calls overBudget(): give one?
+  use state.expenses.push({amount: -3, category: "x"}) => {"ok":false,"error":"undone: expenses-shape is false"}
+  addExpense with an accidental infinite loop -> rejected
+     x invariants: timed out running addExpense(2, "fun")
+     x ratchet: turn 1: addExpense(12.5, "food") gave "error", confirmed 1
+     x fuzz: addExpense(1, true, undefined) hangs
+     x traces: replaying addExpense(40, "transport") timed out
+     x goals: (addExpense(4, "food", "coffee with Sam"), state.expenses[0].note) gave "error", asked for "coffee with Sam"
+     ~ behavior diff for you to confirm: addExpense(12.5, "food"): 1 -> "error"
+     ? no example you confirmed calls addExpense(): give one?
+
+A fresh process:
+fresh process recovered rev-0017 ("data: addExpense(4.5, "food", "coffee with Sam")"): functions addExpense, total, byCategory, cents, setBudget, overBudget, topCategory
+  total() = {"ok":true,"value":77.34}, overBudget() = {"ok":true,"value":["food"]}
+  contract carried over: 17 confirmed examples, 4 properties, 3 invariants
+
+Why is topCategory the way it is?
+  rev-0015 ("top category"), asked for in chat message 6: "Which category do I spend the most on? If two tie, pick the alphabetically first."
+
+Rollback of code to before notes existed (data stays):
+  published rev-0018: its code id equals rev-0015's; its data id equals the data before the rollback; expenses with a note kept: 1
+  addExpense(1, "food", "x") => {"ok":true,"value":{"amount":1,"category":"food"}} (the note is ignored again)
+  Jiti-style rollback of code and data (rev-0020) instead: expenses with a note kept: 0, and the expense just added is gone too
+
+Exactly-once execute: a client sends addExpense(2, "fun") with request id req-retry-1; the kernel dies after the commit, before replying:
+  the process exited with 86; recovered rev-0021 ("data: addExpense(2, "fun")"), 6 expenses (was 5)
+  the client retries the same id => {"ok":true,"value":6,"replayed":true}; expenses: 6
+  a new id applies again => {"ok":true,"value":7}

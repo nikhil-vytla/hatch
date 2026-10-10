@@ -1,0 +1,17 @@
+{
+  "positive_whole_number": "(defn positive_whole_number [x] (and (number? x) (pos? x) (== x (floor x))))",
+  "call_cost_dollars": "(defn call_cost_dollars [c] (/ (* (get c \"tokens\") (model_price_cents (get c \"model\"))) 100000))",
+  "usage": "(defn usage [key] (usage_total_for_key key))",
+  "top_spender": "(defn top_spender [] (let [ks (vec (sort (distinct (map (fn [c] (get c \"key\")) (get (state) \"calls\" [])))))] (if (empty? ks) nil (reduce (fn [best k] (if (> (cost k) (cost best)) k best)) ks))))",
+  "over_quota": "(defn over_quota [key extra] (let [q (quota_for_key key)] (and (some? q) (> (+ (usage_total_for_key key) extra) q))))",
+  "model_price_cents": "(defn model_price_cents [model] (let [p (get-in (state) [\"prices\" model])] (if (number? p) p 0)))",
+  "cost": "(defn cost [key] (/ (round (* 100 (reduce + 0 (map call_cost_dollars (key_calls key))))) 100))",
+  "non_empty_string": "(defn non_empty_string [x] (and (string? x) (not (blank? x))))",
+  "usage_record": "(defn usage_record [key model tokens] {\"key\" key \"model\" model \"tokens\" tokens})",
+  "set_price": "(defn set_price [model cents_per_1k_tokens] (when-not (non_empty_string model) (throw (ex-info \"model must be a non-empty string\" {}))) (when-not (and (number? cents_per_1k_tokens) (not (< cents_per_1k_tokens 0))) (throw (ex-info \"price must be a non-negative number\" {}))) (swap-state! assoc-in [\"prices\" model] cents_per_1k_tokens) cents_per_1k_tokens)",
+  "quota_for_key": "(defn quota_for_key [key] (let [q (get-in (state) [\"quotas\" key])] (if (number? q) q nil)))",
+  "usage_total_for_key": "(defn usage_total_for_key [key] (reduce + 0 (map (fn [c] (get c \"tokens\")) (key_calls key))))",
+  "record_usage": "(defn record_usage [key model tokens] (when-not (non_empty_string key) (throw (ex-info \"key must be a non-empty string\" {}))) (when-not (non_empty_string model) (throw (ex-info \"model must be a non-empty string\" {}))) (when-not (positive_whole_number tokens) (throw (ex-info \"tokens must be a positive whole number\" {}))) (when (over_quota key tokens) (throw (ex-info \"call exceeds quota for key\" {}))) (swap-state! update \"calls\" (fnil conj []) (usage_record key model tokens)) (usage_total_for_key key))",
+  "set_quota": "(defn set_quota [key tokens] (when-not (non_empty_string key) (throw (ex-info \"key must be a non-empty string\" {}))) (when-not (positive_whole_number tokens) (throw (ex-info \"quota must be a positive whole number\" {}))) (when (> (usage_total_for_key key) tokens) (throw (ex-info \"quota below tokens already used\" {}))) (swap-state! assoc-in [\"quotas\" key] tokens) tokens)",
+  "key_calls": "(defn key_calls [key] (filter (fn [c] (= (get c \"key\") key)) (get (state) \"calls\" [])))"
+}

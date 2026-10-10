@@ -1,0 +1,920 @@
+[
+ {
+  "id": "add-sets-count",
+  "turn": 1,
+  "reading": "how many = the count on the shelf, not how many arrived",
+  "real": true,
+  "contract": "self",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": false
+  },
+  "surfaced": 0,
+  "corrections": 0
+ },
+ {
+  "id": "add-sets-count",
+  "turn": 1,
+  "reading": "how many = the count on the shelf, not how many arrived",
+  "real": true,
+  "contract": "written",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 0,
+  "corrections": 0
+ },
+ {
+  "id": "add-sets-count",
+  "turn": 1,
+  "reading": "how many = the count on the shelf, not how many arrived",
+  "real": true,
+  "contract": "chat",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 0,
+  "corrections": 3
+ },
+ {
+  "id": "add-returns-kinds",
+  "turn": 1,
+  "reading": "returns how many different items there are",
+  "real": true,
+  "contract": "self",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": false
+  },
+  "surfaced": 0,
+  "corrections": 0
+ },
+ {
+  "id": "add-returns-kinds",
+  "turn": 1,
+  "reading": "returns how many different items there are",
+  "real": true,
+  "contract": "written",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 0,
+  "corrections": 0
+ },
+ {
+  "id": "add-returns-kinds",
+  "turn": 1,
+  "reading": "returns how many different items there are",
+  "real": true,
+  "contract": "chat",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 0,
+  "corrections": 4
+ },
+ {
+  "id": "sell-clamps",
+  "turn": 2,
+  "reading": "\"never below zero\" as \"stop at zero\"",
+  "real": true,
+  "contract": "self",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": false
+  },
+  "surfaced": 0,
+  "corrections": 0
+ },
+ {
+  "id": "sell-clamps",
+  "turn": 2,
+  "reading": "\"never below zero\" as \"stop at zero\"",
+  "real": true,
+  "contract": "written",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 0,
+  "corrections": 0
+ },
+ {
+  "id": "sell-clamps",
+  "turn": 2,
+  "reading": "\"never below zero\" as \"stop at zero\"",
+  "real": true,
+  "contract": "chat",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 0,
+  "corrections": 5
+ },
+ {
+  "id": "sell-keeps-one",
+  "turn": 2,
+  "reading": "refuses a sale that would empty the shelf",
+  "real": true,
+  "contract": "self",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": false
+  },
+  "surfaced": 0,
+  "corrections": 0
+ },
+ {
+  "id": "sell-keeps-one",
+  "turn": 2,
+  "reading": "refuses a sale that would empty the shelf",
+  "real": true,
+  "contract": "written",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": false
+  },
+  "surfaced": 0,
+  "corrections": 0
+ },
+ {
+  "id": "sell-keeps-one",
+  "turn": 2,
+  "reading": "refuses a sale that would empty the shelf",
+  "real": true,
+  "contract": "chat",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": false
+  },
+  "surfaced": 0,
+  "corrections": 0
+ },
+ {
+  "id": "sell-returns-sold",
+  "turn": 2,
+  "reading": "returns how many were sold",
+  "real": true,
+  "contract": "self",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": false
+  },
+  "surfaced": 0,
+  "corrections": 0
+ },
+ {
+  "id": "sell-returns-sold",
+  "turn": 2,
+  "reading": "returns how many were sold",
+  "real": true,
+  "contract": "written",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 0,
+  "corrections": 0
+ },
+ {
+  "id": "sell-returns-sold",
+  "turn": 2,
+  "reading": "returns how many were sold",
+  "real": true,
+  "contract": "chat",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 0,
+  "corrections": 3
+ },
+ {
+  "id": "low-inclusive",
+  "turn": 3,
+  "reading": "\"fewer than 5\" as \"5 or fewer\"",
+  "real": true,
+  "contract": "self",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": false
+  },
+  "surfaced": 0,
+  "corrections": 0
+ },
+ {
+  "id": "low-inclusive",
+  "turn": 3,
+  "reading": "\"fewer than 5\" as \"5 or fewer\"",
+  "real": true,
+  "contract": "written",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": false
+  },
+  "surfaced": 0,
+  "corrections": 0
+ },
+ {
+  "id": "low-inclusive",
+  "turn": 3,
+  "reading": "\"fewer than 5\" as \"5 or fewer\"",
+  "real": true,
+  "contract": "chat",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 0,
+  "corrections": 3
+ },
+ {
+  "id": "low-not-out",
+  "turn": 3,
+  "reading": "out of stock is not 'low'",
+  "real": true,
+  "contract": "self",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": false
+  },
+  "surfaced": 0,
+  "corrections": 0
+ },
+ {
+  "id": "low-not-out",
+  "turn": 3,
+  "reading": "out of stock is not 'low'",
+  "real": true,
+  "contract": "written",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 0,
+  "corrections": 0
+ },
+ {
+  "id": "low-not-out",
+  "turn": 3,
+  "reading": "out of stock is not 'low'",
+  "real": true,
+  "contract": "chat",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 0,
+  "corrections": 3
+ },
+ {
+  "id": "low-with-counts",
+  "turn": 3,
+  "reading": "the low items with how many are left",
+  "real": true,
+  "contract": "self",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": false
+  },
+  "surfaced": 0,
+  "corrections": 0
+ },
+ {
+  "id": "low-with-counts",
+  "turn": 3,
+  "reading": "the low items with how many are left",
+  "real": true,
+  "contract": "written",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 0,
+  "corrections": 0
+ },
+ {
+  "id": "low-with-counts",
+  "turn": 3,
+  "reading": "the low items with how many are left",
+  "real": true,
+  "contract": "chat",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 0,
+  "corrections": 5
+ },
+ {
+  "id": "value-formatted",
+  "turn": 4,
+  "reading": "the worth as display text",
+  "real": true,
+  "contract": "self",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": true,
+   "fuzz": false,
+   "traces": false,
+   "goals": false
+  },
+  "surfaced": 0,
+  "corrections": 0
+ },
+ {
+  "id": "value-formatted",
+  "turn": 4,
+  "reading": "the worth as display text",
+  "real": true,
+  "contract": "written",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": true,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 0,
+  "corrections": 0
+ },
+ {
+  "id": "value-formatted",
+  "turn": 4,
+  "reading": "the worth as display text",
+  "real": true,
+  "contract": "chat",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": true,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 0,
+  "corrections": 9
+ },
+ {
+  "id": "value-unrounded",
+  "turn": 4,
+  "reading": "no rounding to cents",
+  "real": true,
+  "contract": "self",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": false
+  },
+  "surfaced": 0,
+  "corrections": 0
+ },
+ {
+  "id": "value-unrounded",
+  "turn": 4,
+  "reading": "no rounding to cents",
+  "real": true,
+  "contract": "written",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": false
+  },
+  "surfaced": 0,
+  "corrections": 0
+ },
+ {
+  "id": "value-unrounded",
+  "turn": 4,
+  "reading": "no rounding to cents",
+  "real": true,
+  "contract": "chat",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": false
+  },
+  "surfaced": 0,
+  "corrections": 0
+ },
+ {
+  "id": "value-prices-only",
+  "turn": 4,
+  "reading": "worth = the sum of the prices on the shelf labels",
+  "real": true,
+  "contract": "self",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": false
+  },
+  "surfaced": 0,
+  "corrections": 0
+ },
+ {
+  "id": "value-prices-only",
+  "turn": 4,
+  "reading": "worth = the sum of the prices on the shelf labels",
+  "real": true,
+  "contract": "written",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 0,
+  "corrections": 0
+ },
+ {
+  "id": "value-prices-only",
+  "turn": 4,
+  "reading": "worth = the sum of the prices on the shelf labels",
+  "real": true,
+  "contract": "chat",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 0,
+  "corrections": 4
+ },
+ {
+  "id": "restock-to-5",
+  "turn": 5,
+  "reading": "order back up to the low line (5)",
+  "real": true,
+  "contract": "self",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": true,
+   "fuzz": false,
+   "traces": false,
+   "goals": false
+  },
+  "surfaced": 0,
+  "corrections": 0
+ },
+ {
+  "id": "restock-to-5",
+  "turn": 5,
+  "reading": "order back up to the low line (5)",
+  "real": true,
+  "contract": "written",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": true,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 0,
+  "corrections": 0
+ },
+ {
+  "id": "restock-to-5",
+  "turn": 5,
+  "reading": "order back up to the low line (5)",
+  "real": true,
+  "contract": "chat",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": true,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 0,
+  "corrections": 3
+ },
+ {
+  "id": "restock-under-10",
+  "turn": 5,
+  "reading": "everything under 10, not just the low items",
+  "real": true,
+  "contract": "self",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": false
+  },
+  "surfaced": 0,
+  "corrections": 0
+ },
+ {
+  "id": "restock-under-10",
+  "turn": 5,
+  "reading": "everything under 10, not just the low items",
+  "real": true,
+  "contract": "written",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": false
+  },
+  "surfaced": 0,
+  "corrections": 0
+ },
+ {
+  "id": "restock-under-10",
+  "turn": 5,
+  "reading": "everything under 10, not just the low items",
+  "real": true,
+  "contract": "chat",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": false
+  },
+  "surfaced": 0,
+  "corrections": 0
+ },
+ {
+  "id": "restock-names",
+  "turn": 5,
+  "reading": "just the names to reorder",
+  "real": true,
+  "contract": "self",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": true,
+   "fuzz": false,
+   "traces": false,
+   "goals": false
+  },
+  "surfaced": 0,
+  "corrections": 0
+ },
+ {
+  "id": "restock-names",
+  "turn": 5,
+  "reading": "just the names to reorder",
+  "real": true,
+  "contract": "written",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": true,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 0,
+  "corrections": 0
+ },
+ {
+  "id": "restock-names",
+  "turn": 5,
+  "reading": "just the names to reorder",
+  "real": true,
+  "contract": "chat",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": true,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 0,
+  "corrections": 3
+ },
+ {
+  "id": "key-no-trim",
+  "turn": 6,
+  "reading": "capitals only; spaces still matter",
+  "real": true,
+  "contract": "self",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": false
+  },
+  "surfaced": 0,
+  "corrections": 0
+ },
+ {
+  "id": "key-no-trim",
+  "turn": 6,
+  "reading": "capitals only; spaces still matter",
+  "real": true,
+  "contract": "written",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 0,
+  "corrections": 0
+ },
+ {
+  "id": "key-no-trim",
+  "turn": 6,
+  "reading": "capitals only; spaces still matter",
+  "real": true,
+  "contract": "chat",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 0,
+  "corrections": 2
+ },
+ {
+  "id": "key-title-case",
+  "turn": 6,
+  "reading": "names are stored as 'Apple'",
+  "real": true,
+  "contract": "self",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 7,
+  "corrections": 0
+ },
+ {
+  "id": "key-title-case",
+  "turn": 6,
+  "reading": "names are stored as 'Apple'",
+  "real": true,
+  "contract": "written",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 7,
+  "corrections": 0
+ },
+ {
+  "id": "key-title-case",
+  "turn": 6,
+  "reading": "names are stored as 'Apple'",
+  "real": true,
+  "contract": "chat",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": true,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": true
+  },
+  "surfaced": 7,
+  "corrections": 6
+ },
+ {
+  "id": "key-no-migration",
+  "turn": 6,
+  "reading": "new entries only; old names are left as they are",
+  "real": false,
+  "contract": "self",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": false
+  },
+  "surfaced": 0,
+  "corrections": 0
+ },
+ {
+  "id": "key-no-migration",
+  "turn": 6,
+  "reading": "new entries only; old names are left as they are",
+  "real": false,
+  "contract": "written",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": false
+  },
+  "surfaced": 0,
+  "corrections": 0
+ },
+ {
+  "id": "key-no-migration",
+  "turn": 6,
+  "reading": "new entries only; old names are left as they are",
+  "real": false,
+  "contract": "chat",
+  "killed": {
+   "static": false,
+   "invariants": false,
+   "ratchet": false,
+   "properties": false,
+   "fuzz": false,
+   "traces": false,
+   "goals": false
+  },
+  "surfaced": 0,
+  "corrections": 0
+ }
+]

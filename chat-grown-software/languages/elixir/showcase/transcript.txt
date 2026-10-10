@@ -1,0 +1,31 @@
+== 1. grow the app with the 8 reference turns (dollar floats in state)
+   develop add expenses     -> accepted rev-0001
+   develop total            -> accepted rev-0002
+   develop by category      -> accepted rev-0003
+   develop round to cents   -> accepted rev-0004
+   develop validate expenses -> accepted rev-0005
+   develop budgets          -> accepted rev-0006
+   develop top category     -> accepted rev-0007
+   develop optional note    -> accepted rev-0008
+   state shape now: {"amount":12.5,"category":"food"}  (amount in dollars)
+   module Hatch.App version 89a10ee3  generation 8
+
+== 2. start 4 clients hammering execute (add_expense / total / by_category / over_budget)
+
+== 3. a BAD migration (truncates dollars, so 0.50 becomes 0) arrives while the clients run
+   -> rejected in 99.6 ms; failed: [%{"detail" => "live state: expenses-shape: amount must be a number > 0, got 0", "layer" => "invariants"}, %{"detail" => "replay of {\"args\":[],\"fn\":\"over_budget\"} changed [\"food\"] -> [] outside scope", "layer" => "traces"}]
+   world unchanged: generation 8, module 89a10ee3, first expense {"amount":12.5,"category":"food"}
+
+== 4. the GOOD migration (round(amount * 100)) is applied to the running world
+   -> accepted rev-0009 generation 9 in 114.3 ms
+   Hatch.App code version 89a10ee3 -> b1743007; old version still loaded beside it: true
+   first expense now {"amount":1250,"category":"food"}  (amount in integer cents)
+
+== 5. results
+   execute requests served: 179, failed: 0, total() regressions seen by any client: 0
+   slowest single execute (the one that waited for the swap): 109.1 ms
+   cents in state 9920 = seed 6025 + acknowledged adds 3895: true
+   invariants on the migrated state: :ok
+   total() = 99.2, top_category() = transport
+   why(total): "no more float drift: keep money as integer cents"
+   rollback across the migration: false -- rollback refused: trace {"args":[],"fn":"total"} gives a different value under rev-0008

@@ -1,0 +1,7 @@
+{
+  "add_expense": "def add_expense (s : State) (amount : Int) (category : String) (note : Option String := none) : Except String (Nat × State) :=\n  if amount ≤ 0 then .error \"amount must be positive\"\n  else if category = \"\" then .error \"category must not be empty\"\n  else .ok (s.expenses.length + 1, { s with expenses := s.expenses ++ [{ cents := amount, category := category, note := note }] })",
+  "by_category": "def by_category (s : State) : List (String × Int) :=\n  s.expenses.foldl cat_add []",
+  "cat_add": "def cat_add (acc : List (String × Int)) (e : Expense) : List (String × Int) :=\n  match acc with\n  | [] => [(e.category, e.cents)]\n  | p :: t => if p.1 = e.category then (p.1, p.2 + e.cents) :: t else p :: cat_add t e",
+  "sum_cents": "def sum_cents (es : List Expense) : Int :=\n  (es.map (·.cents)).sum",
+  "total": "def total (s : State) : Int :=\n  sum_cents s.expenses"
+}

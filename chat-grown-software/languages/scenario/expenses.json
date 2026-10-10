@@ -1,0 +1,72 @@
+{
+  "name": "expenses",
+  "about": "The expense tracker from chat-grown-software, in 8 turns, in language-neutral form. Expected answers are not stored here: the simulated user computes them by running the JS reference program (bench/reference.ts) on each question.",
+  "functions": ["add_expense", "total", "by_category", "set_budget", "over_budget", "top_category"],
+  "invariants": [
+    {"name": "expenses-shape", "rule": "every expense has amount: finite number > 0, category: non-empty string, and optionally note: string; no other keys"},
+    {"name": "budgets-shape", "rule": "every budget value is a number >= 0"},
+    {"name": "known-keys", "rule": "the state's top-level keys are only expenses and budgets (either may be absent)"}
+  ],
+  "turns": [
+    {"user": "Let me record expenses: an amount and a category. Call it add_expense(amount, category).",
+     "scope": ["add_expense"],
+     "examples": [
+       {"fixture": {}, "calls": [{"fn": "add_expense", "args": [12.5, "food"]}]},
+       {"fixture": "three", "calls": [{"fn": "add_expense", "args": [2, "fun"]}]}],
+     "use": [{"fn": "add_expense", "args": [12.5, "food"]}, {"fn": "add_expense", "args": [40, "transport"]}, {"fn": "add_expense", "args": [7.25, "food"]}]},
+    {"user": "What's my total so far? Call it total().",
+     "scope": ["total"],
+     "examples": [
+       {"fixture": "three", "calls": [{"fn": "total", "args": []}]},
+       {"fixture": {}, "calls": [{"fn": "total", "args": []}]}],
+     "use": [{"fn": "total", "args": []}]},
+    {"user": "Break it down by category: by_category() gives a map from category to amount. The categories should always add up to the total.",
+     "scope": ["by_category"],
+     "examples": [
+       {"fixture": "three", "calls": [{"fn": "by_category", "args": []}]},
+       {"fixture": {}, "calls": [{"fn": "by_category", "args": []}]}],
+     "law": "for any state, the values of by_category() sum to total() (within half a cent)",
+     "use": [{"fn": "by_category", "args": []}, {"fn": "add_expense", "args": [3.1, "fun"]}, {"fn": "by_category", "args": []}]},
+    {"user": "Money should be in cents. When I add 0.10 and 0.20 the total should say 0.3, not 0.30000000000000004. Same for by_category.",
+     "scope": ["total", "by_category"],
+     "examples": [
+       {"fixture": {"expenses": [{"amount": 0.1, "category": "a"}, {"amount": 0.2, "category": "a"}]}, "calls": [{"fn": "total", "args": []}]},
+       {"fixture": {"expenses": [{"amount": 0.1, "category": "a"}, {"amount": 0.2, "category": "a"}]}, "calls": [{"fn": "by_category", "args": []}]}],
+     "law": "total() is always a whole number of cents",
+     "use": [{"fn": "total", "args": []}]},
+    {"user": "Don't let me add an expense of zero or less, or one without a category. Throw an error.",
+     "scope": ["add_expense"],
+     "examples": [
+       {"fixture": {}, "calls": [{"fn": "add_expense", "args": [-5, "food"]}]},
+       {"fixture": {}, "calls": [{"fn": "add_expense", "args": [0, "food"]}]},
+       {"fixture": {}, "calls": [{"fn": "add_expense", "args": [5, ""]}]},
+       {"fixture": {}, "calls": [{"fn": "add_expense", "args": [5, "food"]}]}],
+     "use": [{"fn": "add_expense", "args": [9.99, "fun"]}]},
+    {"user": "Let me set a monthly budget per category with set_budget(category, amount), and over_budget() tells me which ones I'm over, sorted.",
+     "scope": ["set_budget", "over_budget"],
+     "examples": [
+       {"fixture": "three+budgets", "calls": [{"fn": "over_budget", "args": []}]},
+       {"fixture": "three", "calls": [{"fn": "over_budget", "args": []}]},
+       {"fixture": {}, "calls": [{"fn": "set_budget", "args": ["food", 20]}, {"fn": "set_budget", "args": ["rent", 900]}]}],
+     "law": "every category in over_budget() has spent more than its budget",
+     "use": [{"fn": "set_budget", "args": ["food", 15]}, {"fn": "over_budget", "args": []}, {"fn": "set_budget", "args": ["fun", 100]}, {"fn": "over_budget", "args": []}]},
+    {"user": "Which category do I spend the most on? Call it top_category(). If two tie, pick the alphabetically first; with no expenses, null.",
+     "scope": ["top_category"],
+     "examples": [
+       {"fixture": "three", "calls": [{"fn": "top_category", "args": []}]},
+       {"fixture": {"expenses": [{"amount": 5, "category": "b"}, {"amount": 5, "category": "a"}]}, "calls": [{"fn": "top_category", "args": []}]},
+       {"fixture": {}, "calls": [{"fn": "top_category", "args": []}]}],
+     "law": "top_category() is null or no category has spent more",
+     "use": [{"fn": "top_category", "args": []}]},
+    {"user": "Can expenses have an optional note, like 'coffee with Sam'? add_expense(amount, category, note).",
+     "scope": ["add_expense"],
+     "examples": [
+       {"fixture": {}, "calls": [{"fn": "add_expense", "args": [4, "food", "coffee with Sam"]}]},
+       {"fixture": {}, "calls": [{"fn": "add_expense", "args": [4, "food"]}]}],
+     "use": [{"fn": "add_expense", "args": [4.5, "food", "coffee with Sam"]}, {"fn": "top_category", "args": []}, {"fn": "total", "args": []}]}
+  ],
+  "fixtures": {
+    "three": {"expenses": [{"amount": 12.5, "category": "food"}, {"amount": 40, "category": "transport"}, {"amount": 7.25, "category": "food"}]},
+    "three+budgets": {"expenses": [{"amount": 12.5, "category": "food"}, {"amount": 40, "category": "transport"}, {"amount": 7.25, "category": "food"}], "budgets": {"food": 15, "transport": 50}}
+  }
+}

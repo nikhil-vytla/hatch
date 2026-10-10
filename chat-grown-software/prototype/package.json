@@ -1,0 +1,16 @@
+{
+  "name": "chat-grown-software-prototype",
+  "private": true,
+  "type": "module",
+  "description": "The kernel, gates and evals need no dependencies. The SDK is only loaded by src/model-claude.ts (MODEL=claude).",
+  "scripts": {
+    "play": "INTERACTIVE=1 MODEL=deepseek node --experimental-strip-types --no-warnings src/chat.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.131.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.0",
+    "@types/node": "^22.0.0"
+  }
+}

@@ -1,0 +1,5 @@
+The Racket port of the live kernel for chat-grown software runs model-written forms inside [racket/sandbox](https://docs.racket-lang.org/reference/Sandboxed_Evaluation.html) evaluators whose language is an explicit allow-list, with forms read as data and macro-expanded (not run) by a static gate, answering the claim that `node:vm` is only cooperative isolation. It passes all 51 conformance checks with about 0.35 s startup and 112 ms average develop time. A 16-attack showcase (filesystem, network, subprocess, eval, reader tricks, builtin mutation, memory bombs, infinite loops) is refused statically or contained by the sandbox's security guard and memory/time limits, while the same class of attacks fully succeeds against `node:vm`.
+
+- Evaluator creation costs 150-250 ms, so evaluators are stateless and reused across live use, try and develop.
+- Contract gates only judge covered behavior: a corrupting rewrite was accepted until a trace exercised that function.
+- `racket/sandbox` does not guard `getenv`; the allow-list language and static gate cover it.

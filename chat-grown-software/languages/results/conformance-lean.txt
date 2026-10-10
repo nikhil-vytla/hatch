@@ -1,0 +1,59 @@
+PASS  starts empty  (685 ms)
+PASS  turn 1 try: reference forms do what the user intends
+PASS  turn 1 develop accepted  (42 ms)
+PASS  turn 1 execute add_expense
+PASS  turn 1 execute add_expense
+PASS  turn 1 execute add_expense
+PASS  turn 2 try: reference forms do what the user intends
+PASS  turn 2 develop accepted  (39 ms)
+PASS  turn 2 execute total
+PASS  turn 3 try: reference forms do what the user intends
+PASS  turn 3 develop accepted  (296 ms)
+PASS  turn 3 execute by_category
+PASS  turn 3 execute add_expense
+PASS  turn 3 execute by_category
+PASS  turn 4 try: reference forms do what the user intends
+PASS  turn 4 develop accepted  (256 ms)
+PASS  turn 4 execute total
+PASS  turn 5 try: reference forms do what the user intends
+PASS  turn 5 develop accepted  (369 ms)
+PASS  turn 5 execute add_expense
+PASS  turn 6 try: reference forms do what the user intends
+PASS  turn 6 develop accepted  (499 ms)
+PASS  turn 6 execute set_budget
+PASS  turn 6 execute over_budget
+PASS  turn 6 execute set_budget
+PASS  turn 6 execute over_budget
+PASS  turn 7 try: reference forms do what the user intends
+PASS  turn 7 develop accepted  (580 ms)
+PASS  turn 7 execute top_category
+PASS  turn 8 try: reference forms do what the user intends
+PASS  turn 8 develop accepted  (839 ms)
+PASS  turn 8 execute add_expense
+PASS  turn 8 execute top_category
+PASS  turn 8 execute total
+PASS  live state matches the reference program's
+PASS  observe lists the public functions by snake_case name
+PASS  probe side_effect refused  (1 ms)
+      layers: static
+PASS  probe breaks_ratchet refused  (796 ms)
+      layers: ratchet, ratchet, proof, proof, proof
+PASS  probe breaks_invariant refused  (749 ms)
+      layers: ratchet, ratchet, ratchet, ratchet, ratchet, invariants, invariants, invariants, invariants, invariants, invariants, invariants, invariants, invariants, invariants, invariants, proof, proof
+PASS  probe loops refused  (176 ms)
+      layers: termination
+PASS  probe calls_missing refused  (165 ms)
+      layers: static
+PASS  probe breaks_trace refused  (477 ms)
+      layers: ratchet, ratchet, ratchet, traces, traces, proof
+PASS  stale generation refused
+PASS  execute is exactly-once by request_id
+PASS  a throwing execute reports the error and changes nothing
+PASS  why(over_budget) names the turn that asked for it
+PASS  rollback is code-only and clean (refused: old code fails the recorded {"args":[4.5,"food","coffee with Sam"],"fn":"add_exp)
+PASS  why() after rollback still answers
+PASS  restart resumes the same world  (534 ms)
+PASS  exactly-once survives a restart
+PASS  unknown op answers with an error and keeps running
+
+lean: 51/51 checks pass; develop avg 365 ms; start 685 ms

@@ -1,0 +1,13 @@
+{
+  "total": "(defn total []\n  (money_of (round (* 100 (reduce + 0 (map (fn [e] (get e \"amount\")) (get (state) \"expenses\")))))))",
+  "spent_cents": "(defn spent_cents [category]\n  (reduce + 0 (map (fn [e] (cents_of (get e \"amount\")))\n                   (filter (fn [e] (= (get e \"category\") category)) (get (state) \"expenses\")))))",
+  "top_category": "(defn top_category []\n  (let [spent (reduce-kv (fn [m c es]\n                           (assoc m c (reduce + 0 (map (fn [e] (cents_of (get e \"amount\"))) es))))\n                         {}\n                         (group-by (fn [e] (get e \"category\")) (get (state) \"expenses\")))]\n    (when (pos? (count spent))\n      (first (first (sort-by (fn [e] [(- (second e)) (first e)]) (vec spent)))))))",
+  "over_budget": "(defn over_budget []\n  (vec (sort (reduce-kv (fn [acc c b]\n                          (if (> (spent_cents c) (cents_of b)) (conj acc c) acc))\n                        []\n                        (get (state) \"budgets\")))))",
+  "set_budget": "(defn set_budget [category amount]\n  (let [m (money_of (cents_of amount))]\n    (swap-state! assoc-in [\"budgets\" category] m)\n    m))",
+  "by_category": "(defn by_category []\n  (reduce-kv (fn [m c es]\n               (assoc m c (money_of (reduce + 0 (map (fn [e] (cents_of (get e \"amount\"))) es)))))\n             {}\n             (group-by (fn [e] (get e \"category\")) (get (state) \"expenses\"))))",
+  "record_expense": "(defn record_expense [amount category note has_note]\n  (when-not (and (number? amount) (pos? amount))\n    (throw (ex-info \"amount must be positive\" {})))\n  (when-not (and (string? category) (pos? (count category)))\n    (throw (ex-info \"category is required\" {})))\n  (when has_note\n    (when-not (string? note)\n      (throw (ex-info (if (nil? note) \"breaks expenses-shape\" \"note must be text\") {}))))\n  (swap-state! update \"expenses\" (fnil conj [])\n                (if has_note\n                  {\"amount\" amount \"category\" category \"note\" note}\n                  {\"amount\" amount \"category\" category}))\n  (count (get (state) \"expenses\")))",
+  "money_of": "(defn money_of [c]\n  (if (zero? (rem c 100)) (quot c 100) (/ c 100.0)))",
+  "cents_of": "(defn cents_of [amount] (round (* 100 amount)))",
+  "round_money": "(defn round_money [x]\n  (let [r (/ (round (* 1000000000 x)) 1000000000.0)]\n    (if (== r 0) 0 r)))",
+  "add_expense": "(defn add_expense\n  ([amount category] (record_expense amount category nil false))\n  ([amount category note] (record_expense amount category note true)))"
+}

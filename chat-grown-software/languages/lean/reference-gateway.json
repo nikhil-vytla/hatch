@@ -1,0 +1,112 @@
+{
+ "turns": [
+  {
+   "intent": "usage",
+   "scope": [
+    "record_usage",
+    "usage",
+    "used_append_new"
+   ],
+   "forms": [
+    "def usage (s : State) (key : String) : Nat := s.used key",
+    "def record_usage (s : State) (key model : String) (tokens : Nat) : Except String (Nat × State) :=\n  let s' := { s with calls := s.calls ++ [{ key, model, tokens }] }\n  .ok (usage s' key, s')",
+    "theorem used_append_new (s : State) (key model k : String) (t : Nat) :\n    ({ s with calls := s.calls ++ [{ key, model, tokens := t }] } : State).used k\n      = s.used k + (if key == k then t else 0) := by\n  simp [State.used, List.filter_append]\n  by_cases h : key = k <;> simp [h]"
+   ],
+   "removes": [],
+   "laws": [
+    {
+     "name": "record_usage_returns_new_total",
+     "check": "theorem record_usage_returns_new_total (s : State) (k m : String) (t r : Nat) (s' : State)\n    (h : record_usage s k m t = .ok (r, s')) : r = usage s k + t := by\n  simp [record_usage] at h\n  obtain ⟨rfl, rfl⟩ := h\n  simp [usage, used_append_new]"
+    }
+   ]
+  },
+  {
+   "intent": "prices",
+   "scope": [
+    "set_price",
+    "cost",
+    "put"
+   ],
+   "forms": [
+    "def put : List (String × Nat) → String → Nat → List (String × Nat)\n  | [], k, v => [(k, v)]\n  | (k', v') :: rest, k, v => if k' = k then (k, v) :: rest else (k', v') :: put rest k v",
+    "def set_price (s : State) (model : String) (cents : Nat) : Except String (Nat × State) :=\n  .ok (cents, { s with prices := put s.prices model cents })",
+    "def cost (s : State) (key : String) : Int :=\n  let n := ((s.calls.filter (·.key == key)).map (fun c => c.tokens * ((s.prices.lookup c.model).getD 0))).sum\n  Int.ofNat ((2 * n + 1000) / 2000)"
+   ],
+   "removes": [],
+   "laws": [
+    {
+     "name": "set_price_returns_the_price",
+     "check": "theorem set_price_returns_the_price (s : State) (m : String) (c r : Nat) (s' : State)\n    (h : set_price s m c = .ok (r, s')) : r = c := by\n  simp [set_price] at h\n  omega"
+    }
+   ]
+  },
+  {
+   "intent": "quotas",
+   "scope": [
+    "set_quota",
+    "record_usage"
+   ],
+   "forms": [
+    "def set_quota (s : State) (key : String) (tokens : Nat) : Except String (Nat × State) :=\n  if usage s key > tokens then .error \"already over that quota\"\n  else .ok (tokens, { s with quotas := put s.quotas key tokens })",
+    "def record_usage (s : State) (key model : String) (tokens : Nat) : Except String (Nat × State) :=\n  let s' := { s with calls := s.calls ++ [{ key, model, tokens }] }\n  match s.quotas.lookup key with\n  | some q => if usage s key + tokens > q then .error \"over quota\" else .ok (usage s' key, s')\n  | none => .ok (usage s' key, s')"
+   ],
+   "removes": [],
+   "laws": [
+    {
+     "name": "record_usage_returns_new_total",
+     "check": "theorem record_usage_returns_new_total (s : State) (k m : String) (t r : Nat) (s' : State)\n    (h : record_usage s k m t = .ok (r, s')) : r = usage s k + t := by\n  unfold record_usage at h\n  split at h\n  · split at h\n    · simp [*] at h\n    · simp [*] at h\n      obtain ⟨rfl, rfl⟩ := h\n      simp [usage, used_append_new]\n  · simp [*] at h\n    obtain ⟨rfl, rfl⟩ := h\n    simp [usage, used_append_new]"
+    },
+    {
+     "name": "no_key_exceeds_its_quota",
+     "check": "theorem no_key_exceeds_its_quota (s : State) (k m : String) (t r : Nat) (s' : State)\n    (h : record_usage s k m t = .ok (r, s')) (hs : s.WithinQuota) : s'.WithinQuota := by\n  unfold record_usage at h\n  split at h\n  · next q0 hq0 =>\n    split at h\n    · simp [*] at h\n    · simp [*] at h\n      obtain ⟨_, rfl⟩ := h\n      intro j q hj\n      simp at hj\n      rw [used_append_new]\n      by_cases hk : k = j\n      · subst hk\n        rw [hq0] at hj; cases hj\n        simp [usage] at *; omega\n      · simp [hk]; exact hs j q hj\n  · simp [*] at h\n    obtain ⟨_, rfl⟩ := h\n    intro j q hj\n    simp at hj\n    rw [used_append_new]\n    by_cases hk : k = j\n    · subst hk; simp_all\n    · simp [hk]; exact hs j q hj"
+    },
+    {
+     "name": "set_quota_keeps_within_quota",
+     "check": "theorem lookup_put_self (m : List (String × Nat)) (k : String) (v : Nat) : (put m k v).lookup k = some v := by\n  induction m with\n  | nil => simp [put, List.lookup]\n  | cons p rest ih =>\n    obtain ⟨k', v'⟩ := p\n    by_cases h : k' = k\n    · subst h; simp [put, List.lookup]\n    · have : (k == k') = false := by simp; exact fun e => h e.symm\n      simp [put, h, List.lookup, this, ih]\n\ntheorem lookup_put_ne (m : List (String × Nat)) (k : String) (v : Nat) (j : String) (hj : j ≠ k) :\n    (put m k v).lookup j = m.lookup j := by\n  have hjk : (j == k) = false := by simpa using hj\n  induction m with\n  | nil => simp [put, List.lookup, hjk]\n  | cons p rest ih =>\n    obtain ⟨k', v'⟩ := p\n    by_cases h : k' = k\n    · subst h; simp [put, List.lookup, hjk]\n    · simp [put, h, List.lookup, ih]\n\ntheorem set_quota_keeps_within_quota (s : State) (k : String) (t r : Nat) (s' : State)\n    (h : set_quota s k t = .ok (r, s')) (hs : s.WithinQuota) : s'.WithinQuota := by\n  unfold set_quota at h\n  by_cases h1 : usage s k > t\n  · simp [h1] at h\n  simp [h1] at h\n  obtain ⟨_, rfl⟩ := h\n  intro j q hj\n  by_cases hk : j = k\n  · subst hk\n    simp only [lookup_put_self] at hj\n    cases hj\n    simp [usage] at h1; exact h1\n  · rw [lookup_put_ne _ _ _ _ hk] at hj\n    exact hs j q hj"
+    }
+   ]
+  },
+  {
+   "intent": "validation",
+   "scope": [
+    "record_usage"
+   ],
+   "forms": [
+    "def record_usage (s : State) (key model : String) (tokens : Nat) : Except String (Nat × State) :=\n  if key = \"\" then .error \"key required\"\n  else if model = \"\" then .error \"model required\"\n  else if tokens = 0 then .error \"tokens must be a positive whole number\"\n  else\n    let s' := { s with calls := s.calls ++ [{ key, model, tokens }] }\n    match s.quotas.lookup key with\n    | some q => if usage s key + tokens > q then .error \"over quota\" else .ok (usage s' key, s')\n    | none => .ok (usage s' key, s')"
+   ],
+   "removes": [],
+   "laws": [
+    {
+     "name": "record_usage_returns_new_total",
+     "check": "theorem record_usage_returns_new_total (s : State) (k m : String) (t r : Nat) (s' : State)\n    (h : record_usage s k m t = .ok (r, s')) : r = usage s k + t := by\n  unfold record_usage at h\n  by_cases e1 : k = \"\"\n  · simp [e1] at h\n  by_cases e2 : m = \"\"\n  · simp [e1, e2] at h\n  by_cases e3 : t = 0\n  · simp [e1, e2, e3] at h\n  rw [if_neg e1, if_neg e2, if_neg e3] at h\n  split at h\n  · split at h\n    · simp [e1, e2, e3, *] at h\n    · simp [e1, e2, e3, *] at h\n      obtain ⟨rfl, rfl⟩ := h\n      simp [usage, used_append_new]\n  · simp [e1, e2, e3, *] at h\n    obtain ⟨rfl, rfl⟩ := h\n    simp [usage, used_append_new]"
+    },
+    {
+     "name": "no_key_exceeds_its_quota",
+     "check": "theorem no_key_exceeds_its_quota (s : State) (k m : String) (t r : Nat) (s' : State)\n    (h : record_usage s k m t = .ok (r, s')) (hs : s.WithinQuota) : s'.WithinQuota := by\n  unfold record_usage at h\n  by_cases e1 : k = \"\"\n  · simp [e1] at h\n  by_cases e2 : m = \"\"\n  · simp [e1, e2] at h\n  by_cases e3 : t = 0\n  · simp [e1, e2, e3] at h\n  rw [if_neg e1, if_neg e2, if_neg e3] at h\n  split at h\n  · next q0 hq0 =>\n    split at h\n    · simp [e1, e2, e3, *] at h\n    · simp [e1, e2, e3, *] at h\n      obtain ⟨_, rfl⟩ := h\n      intro j q hj\n      simp at hj\n      rw [used_append_new]\n      by_cases hk : k = j\n      · subst hk\n        rw [hq0] at hj; cases hj\n        simp [usage] at *; omega\n      · simp [hk]; exact hs j q hj\n  · simp [e1, e2, e3, *] at h\n    obtain ⟨_, rfl⟩ := h\n    intro j q hj\n    simp at hj\n    rw [used_append_new]\n    by_cases hk : k = j\n    · subst hk; simp_all\n    · simp [hk]; exact hs j q hj"
+    },
+    {
+     "name": "record_usage_keeps_calls_well_formed",
+     "check": "theorem record_usage_keeps_calls_well_formed (s : State) (k m : String) (t r : Nat) (s' : State)\n    (h : record_usage s k m t = .ok (r, s')) (hs : s.WellFormed) : s'.WellFormed := by\n  unfold record_usage at h\n  by_cases e1 : k = \"\"\n  · simp [e1] at h\n  by_cases e2 : m = \"\"\n  · simp [e1, e2] at h\n  by_cases e3 : t = 0\n  · simp [e1, e2, e3] at h\n  have key : ∀ q : Option Nat, (match q with\n      | some q => if usage s k + t > q then Except.error \"over quota\" else Except.ok (usage { s with calls := s.calls ++ [{ key := k, model := m, tokens := t }] } k, { s with calls := s.calls ++ [{ key := k, model := m, tokens := t }] })\n      | none => Except.ok (usage { s with calls := s.calls ++ [{ key := k, model := m, tokens := t }] } k, { s with calls := s.calls ++ [{ key := k, model := m, tokens := t }] }))\n        = Except.ok (r, s') → s' = { s with calls := s.calls ++ [{ key := k, model := m, tokens := t }] } := by\n    intro q hq\n    cases q with\n    | none => simp at hq; exact hq.2.symm\n    | some q =>\n      by_cases hc : usage s k + t > q\n      · simp [hc] at hq\n      · simp [hc] at hq; exact hq.2.symm\n  have hs' := key _ (by simpa [e1, e2, e3] using h)\n  subst hs'\n  intro c hc\n  simp at hc\n  rcases hc with hc | rfl\n  · exact hs c hc\n  · exact ⟨e1, e2, Nat.pos_of_ne_zero e3⟩"
+    }
+   ]
+  },
+  {
+   "intent": "top spender",
+   "scope": [
+    "top_spender",
+    "best_of"
+   ],
+   "forms": [
+    "def best_of : List (String × Int) → Option (String × Int)\n  | [] => none\n  | p :: rest =>\n    match best_of rest with\n    | none => some p\n    | some q => if q.2 > p.2 then some q else some p",
+    "def top_spender (s : State) : Option String :=\n  let keys := (s.calls.map (·.key)).eraseDups.mergeSort (fun a b => decide (a ≤ b))\n  (best_of (keys.map fun k => (k, cost s k))).map (·.1)"
+   ],
+   "removes": [],
+   "laws": [
+    {
+     "name": "top_spender_is_a_max",
+     "check": "theorem best_of_none (l : List (String × Int)) (h : best_of l = none) : l = [] := by\n  cases l with\n  | nil => rfl\n  | cons p rest =>\n    simp only [best_of] at h\n    split at h\n    · simp at h\n    · split at h <;> simp at h\n\ntheorem best_of_spec (l : List (String × Int)) :\n    ∀ r, best_of l = some r → r ∈ l ∧ ∀ p ∈ l, p.2 ≤ r.2 := by\n  induction l with\n  | nil => simp [best_of]\n  | cons p rest ih =>\n    intro r h\n    simp only [best_of] at h\n    split at h\n    · next hn =>\n      have := best_of_none rest hn\n      subst this\n      simp at h\n      subst h\n      simp\n    · next q hq =>\n      obtain ⟨hmem, hmax⟩ := ih q hq\n      split at h\n      · next hgt =>\n        simp at h; subst h\n        refine ⟨by simp [hmem], ?_⟩\n        intro x hx\n        simp at hx\n        rcases hx with rfl | hx\n        · omega\n        · exact hmax x hx\n      · next hle =>\n        simp at h; subst h\n        refine ⟨by simp, ?_⟩\n        intro x hx\n        simp at hx\n        rcases hx with rfl | hx\n        · omega\n        · have := hmax x hx; omega\n\ntheorem top_spender_is_a_max (s : State) (t : String) (h : top_spender s = some t) :\n    (∃ c ∈ s.calls, c.key = t) ∧ ∀ c ∈ s.calls, cost s c.key ≤ cost s t := by\n  unfold top_spender at h\n  simp only [Option.map_eq_some_iff] at h\n  obtain ⟨⟨t', v⟩, hb, rfl⟩ := h\n  obtain ⟨hmem, hmax⟩ := best_of_spec _ _ hb\n  simp [List.mem_mergeSort] at hmem\n  obtain ⟨k, hk, rfl, rfl⟩ := hmem\n  refine ⟨?_, ?_⟩\n  · simpa using hk\n  · intro c hc\n    exact hmax (c.key, cost s c.key) (by simp [List.mem_mergeSort]; exact ⟨c.key, ⟨c, hc, rfl⟩, rfl, rfl⟩)"
+    }
+   ]
+  }
+ ]
+}

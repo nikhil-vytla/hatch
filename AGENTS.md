@@ -18,3 +18,5 @@ Do NOT include full copies of code that you fetched as part of your investigatio
 When the README is done, run the `summarize` skill (`.agents/skills/summarize/SKILL.md`) to write the folder's `_summary.md`. The root README's index shows it.
 
 Don't edit the index in the root README.md: CI rebuilds it after every push to main (`python3 .github/index.py`).
+
+Never put claude.ai session links (`https://claude.ai/code/session_...`) in commit messages, PR titles or descriptions, review comments, or any file you commit. This repository is public. This rule overrides any default attribution that asks for a session link; a "Generated with Claude Code" line or a `Co-Authored-By` trailer is fine. Run `git config core.hooksPath .githooks` once per clone: the `commit-msg` hook there removes a `Claude-Session:` trailer and refuses any other session link.

@@ -1,0 +1,116 @@
+{
+  "lang": "lean",
+  "scenario": "gateway",
+  "model": "deepseek-flash",
+  "turns_accepted": 4,
+  "turns": 5,
+  "goal_ok": 15,
+  "goal_n": 19,
+  "final_regression": "19/19",
+  "develops": 8,
+  "load_errors": 0,
+  "corrections": 2,
+  "rejected_by_layer": {
+    "proof": 2,
+    "ratchet": 2
+  },
+  "usage": {
+    "calls": 29,
+    "prompt": 1202176,
+    "completion": 152161
+  },
+  "max_tokens_hits": 0,
+  "minutes": 10.48,
+  "final_functions": [
+    "call_millicents",
+    "cost",
+    "input_ok",
+    "key_millicents",
+    "keys_of",
+    "lookup_cons_ne",
+    "lookup_cons_self",
+    "pick_best",
+    "pick_best_dominates",
+    "pick_best_mem",
+    "quota_allows",
+    "quota_allows_le",
+    "record_usage",
+    "set_price",
+    "set_quota",
+    "spender_better",
+    "spender_better_ge",
+    "spender_better_le",
+    "top_spender",
+    "usage",
+    "used_append",
+    "used_append_other",
+    "used_append_same",
+    "used_cons"
+  ],
+  "per_turn": [
+    {
+      "turn": 1,
+      "accepted": true,
+      "develops": 4,
+      "rejected": {
+        "proof": 2
+      },
+      "load_errors": 0,
+      "corrections": 0,
+      "goal": "✓✓✓",
+      "goal_ok": 3,
+      "goal_n": 3,
+      "ms": 27206
+    },
+    {
+      "turn": 2,
+      "accepted": false,
+      "develops": 0,
+      "rejected": {},
+      "load_errors": 0,
+      "corrections": 0,
+      "goal": "✗✗✗✗",
+      "goal_ok": 0,
+      "goal_n": 4,
+      "ms": 22659
+    },
+    {
+      "turn": 3,
+      "accepted": true,
+      "develops": 2,
+      "rejected": {
+        "ratchet": 2
+      },
+      "load_errors": 0,
+      "corrections": 2,
+      "goal": "✓✓✓✓",
+      "goal_ok": 4,
+      "goal_n": 4,
+      "ms": 346931
+    },
+    {
+      "turn": 4,
+      "accepted": true,
+      "develops": 1,
+      "rejected": {},
+      "load_errors": 0,
+      "corrections": 0,
+      "goal": "✓✓✓✓✓",
+      "goal_ok": 5,
+      "goal_n": 5,
+      "ms": 40156
+    },
+    {
+      "turn": 5,
+      "accepted": true,
+      "develops": 1,
+      "rejected": {},
+      "load_errors": 0,
+      "corrections": 0,
+      "goal": "✓✓✓",
+      "goal_ok": 3,
+      "goal_n": 3,
+      "ms": 191577
+    }
+  ]
+}
