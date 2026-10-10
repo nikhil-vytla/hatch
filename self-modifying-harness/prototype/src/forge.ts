@@ -69,6 +69,27 @@ function acceptedText(version: string, cell: string, report: GateReport): string
 	return lines.join(" ");
 }
 
+/**
+ * One version of a cell for `cell_source`, or why there is none. Models name versions either way ("party@9cbc43ec" or
+ * "9cbc43ec"); the catalog keys them in full. Rejected versions are not kept, so asking for one returns its rejection
+ * reasons instead of a bare "no such cell", which in a live run sent the model round three identical retries.
+ */
+export function sourceOf(catalogue: Catalogue, cell: string, version: string | undefined): { ok: true; text: string } | { ok: false; reason: string } {
+	const entry = entryOf(catalogue, cell);
+	const wanted = version === undefined ? (entry?.live ?? undefined) : version.includes("@") ? version : `${cell}@${version}`;
+	const found = wanted === undefined ? undefined : entry?.versions[wanted];
+
+	if (found !== undefined) return { ok: true, text: JSON.stringify(found, null, 2) };
+
+	const rejections = wanted === undefined ? [] : catalogue.log.filter((line) => line.event.startsWith(`rejected ${wanted}:`));
+
+	if (rejections.length > 0) return { ok: true, text: `${wanted} was rejected, and rejected versions are not kept. Fix your own copy and propose again. Rejections:\n${rejections.map((line) => line.event).join("\n")}` };
+
+	if (entry === undefined) return { ok: false, reason: `no cell named ${cell}` };
+
+	return { ok: false, reason: `no version ${wanted ?? "(none live)"} of ${cell}; known: ${Object.keys(entry.versions).join(", ")}` };
+}
+
 export function kernelExtension(options: KernelOptions) {
 	const { registry, runtime, memory } = options;
 
@@ -192,13 +213,11 @@ export function kernelExtension(options: KernelOptions) {
 		replay: "safe",
 		execute: async (args, api, context) => {
 			const catalogue = await withCommittedCatalogue(api, context, (read) => read.value);
-			const entry = entryOf(catalogue, args.name);
-			const wanted = args.version ?? entry?.live ?? undefined;
-			const cell = wanted === undefined ? undefined : entry?.versions[wanted];
+			const found = sourceOf(catalogue, args.name, args.version);
 
-			if (cell === undefined) throw new Error("no such cell");
+			if (found.ok) return text(found.text);
 
-			return text(JSON.stringify(cell, null, 2));
+			throw new Error(found.reason);
 		},
 	});
 

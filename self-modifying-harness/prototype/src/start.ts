@@ -15,9 +15,11 @@ import { backendOf, runTui } from "./tui.ts";
 
 /**
  * An interactive session's cap: wider than the library default (60 calls, $0.25), which a scripted run fits in but a chat
- * on a mid-priced model outgrows in a few turns, since most calls are OptChat compactions. Still a hard stop, not a hint.
+ * outgrows in a few turns. Calls grow much faster than dollars (each message and tool result is compacted, about two
+ * cheap calls each; one hard turn took over 100), so the call cap only catches runaway loops and the dollar cap is
+ * the real stop.
  */
-const CHAT_LIMITS: Limits = { maxCalls: 300, maxCostUsd: 1 };
+const CHAT_LIMITS: Limits = { maxCalls: 1000, maxCostUsd: 1 };
 
 const HELP = `usage: ./forge [flags]
 
