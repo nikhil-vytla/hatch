@@ -7,7 +7,11 @@ For these experiments, all I hope is that I get to learn something new! I have a
 ## Experiments
 
 <!-- index:start -->
-7 experiments, newest first.
+8 experiments, newest first.
+
+### [A self-modifying agent harness: pi-durable + OptChat + celld](self-modifying-harness/) (2026-10-09)
+
+An agent that writes, verifies and hot-installs its own tools was built by combining three recent systems: - [pi-durable](https://github.com/earendil-works/pi/tree/main/packages/durable) contributes crash-safe commits and in-place extension reload; - [OptChat](https://gist.github.com/VictorTaelin/91837951a5ce5b38f341ec1ba1df6449) contributes an endless chat, held as a binary tree of summaries with zoom; - [celld](https://github.com/denoland/celld) contributes the cell model, in which code is loaded by version id and state is keyed by name, so state outlives code.
 
 ### [Growing software by talking to it, and how to verify it](chat-grown-software/) (2026-10-08)
 
