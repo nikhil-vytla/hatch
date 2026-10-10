@@ -210,7 +210,13 @@ function eventsOf(message: Message): TurnEvent[] {
 
 // --- opening the forge ---
 
-export type LiveOptions = { limits?: Partial<Limits>; turn: ServedModel; summary: ServedModel };
+export type LiveOptions = { limits?: Partial<Limits>; turn: ServedModel; summary: ServedModel; maxToolCallsPerTurn?: number };
+
+/**
+ * A turn that makes this many tool calls is aborted. The kernel already refuses repeated and excessive rejected
+ * proposals, but a model can loop on anything, and one live turn spent 1,000 calls before the spending cap stopped it.
+ */
+export const DEFAULT_MAX_TOOL_CALLS_PER_TURN = 40;
 
 const modelLabel = (turn: ServedModel, summary: ServedModel): string => {
 	const turnName = describeModel(turn);
@@ -278,7 +284,15 @@ export async function openLive(dataDir: string, options: LiveOptions): Promise<L
 		async ask(text, onEvent) {
 			const before = (await entries()).length;
 			const events: TurnEvent[] = [];
+			const maxCalls = options.maxToolCallsPerTurn ?? DEFAULT_MAX_TOOL_CALLS_PER_TURN;
 			let seen = before;
+			let calls = 0;
+			let stopped = false;
+
+			const report = (event: TurnEvent): void => {
+				events.push(event);
+				onEvent?.(event);
+			};
 
 			// Entries are committed as the turn runs, so read them on a short poll and report each one once: a caller sees
 			// a tool call while the turn is still going, not only when it ends.
@@ -292,9 +306,16 @@ export async function openLive(dataDir: string, options: LiveOptions): Promise<L
 					if (message === undefined) continue;
 
 					for (const event of eventsOf(message)) {
-						events.push(event);
-						onEvent?.(event);
+						report(event);
+
+						if (event.kind === "call") calls++;
 					}
+				}
+
+				if (calls >= maxCalls && !stopped) {
+					stopped = true;
+					report({ kind: "reply", text: `(stopped: this turn made ${calls} tool calls, the limit is ${maxCalls}. Say how to continue.)` });
+					await root.abort(BACKGROUND_CONTEXT);
 				}
 			};
 

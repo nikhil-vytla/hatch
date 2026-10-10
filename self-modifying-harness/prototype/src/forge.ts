@@ -15,6 +15,7 @@
 // The two places where unverified code could reach the live system are behind gdp-ts proofs (src/proofs/): a version
 // enters the catalog only through `acceptVersion` (needs `CellVerified`), and code enters the registry only through
 // `installCells` (needs `CatalogueCommitted`). The kernel tools below are the callers; they cannot skip either.
+import { createHash } from "node:crypto";
 import type { Context } from "@earendil-works/chord";
 import { Type } from "@earendil-works/pi-ai";
 import {
@@ -90,8 +91,51 @@ export function sourceOf(catalogue: Catalogue, cell: string, version: string | u
 	return { ok: false, reason: `no version ${wanted ?? "(none live)"} of ${cell}; known: ${Object.keys(entry.versions).join(", ")}` };
 }
 
+/** Rejected proposals one user turn may make before the kernel refuses more and asks the model to report back. */
+export const MAX_REJECTIONS_PER_TURN = 6;
+
+/**
+ * Everything that decides a proposal's verdict, hashed. The version id covers only the code (cell, source, migration),
+ * so the same code with corrected checks is a new attempt; the same code with the same checks is not, and in a live
+ * run a model resent one rejected proposal until the call cap stopped it.
+ */
+export function proposalFingerprint(proposal: Proposal): string {
+	const { cell, parameters, source, checks, retire, migrate, pure, invariants, changes } = proposal;
+
+	return createHash("sha256").update(JSON.stringify([cell, parameters, source, checks, retire, migrate ?? null, pure, invariants, changes])).digest("hex");
+}
+
+/** Remembers rejected proposals and counts rejections per user turn, for one process. */
+export class RejectionMemory {
+	private readonly seen = new Map<string, { times: number; reason: string }>();
+	private readonly perTurn = new Map<number, number>();
+
+	/** Why this proposal should not reach the gate again, or undefined to let it through. */
+	refusal(fingerprint: string, turn: number): string | undefined {
+		const prior = this.seen.get(fingerprint);
+
+		if ((this.perTurn.get(turn) ?? 0) >= MAX_REJECTIONS_PER_TURN) {
+			return `REFUSED: ${MAX_REJECTIONS_PER_TURN} proposals were rejected in this turn. Stop proposing, and tell the user what is blocking you and what you would try next.`;
+		}
+
+		if (prior !== undefined) {
+			this.note(fingerprint, turn, prior.reason);
+
+			return `REJECTED: you sent this exact proposal before and it was rejected (${prior.times} time${prior.times === 1 ? "" : "s"}): ${prior.reason}. Sending it again cannot pass; change the source or the checks, or tell the user what is blocking you.`;
+		}
+
+		return undefined;
+	}
+
+	note(fingerprint: string, turn: number, reason: string): void {
+		this.seen.set(fingerprint, { times: (this.seen.get(fingerprint)?.times ?? 0) + 1, reason });
+		this.perTurn.set(turn, (this.perTurn.get(turn) ?? 0) + 1);
+	}
+}
+
 export function kernelExtension(options: KernelOptions) {
 	const { registry, runtime, memory } = options;
+	const rejections = new RejectionMemory();
 
 	// Everything that follows a parsed proposal and its named candidate: gate, then the three-step commit, then install.
 	const decide = async <C, K>(
@@ -112,6 +156,7 @@ export function kernelExtension(options: KernelOptions) {
 
 		const reject = async (reason: string) => {
 			await api.commit((tx) => recordRejection(tx, version, reason), context);
+			rejections.note(proposalFingerprint(proposal), options.currentRequest() ?? -1, reason);
 
 			return `REJECTED ${version}: ${reason}. The live version is unchanged.`;
 		};
@@ -143,6 +188,9 @@ export function kernelExtension(options: KernelOptions) {
 		executionMode: "sequential",
 		execute: async (args, api, context) => {
 			const proposal = parseProposal(args);
+			const refused = rejections.refusal(proposalFingerprint(proposal), options.currentRequest() ?? -1);
+
+			if (refused !== undefined) return text(refused);
 
 			const reply = await withCommittedCatalogue(api, context, (catalogue, committed) =>
 				name(candidateOf(proposal, catalogue.value, options.currentRequest()), (candidate) => decide(candidate, catalogue, committed, proposal, api, context)),
