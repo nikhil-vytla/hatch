@@ -1,0 +1,321 @@
+# A self-modifying agent harness: pi-durable + OptChat + celld
+
+Software that rewrites itself has to answer three questions at once:
+
+1. what happens when it crashes halfway through changing itself?
+2. how does it remember why each piece is the way it is?
+3. where does new code run, and what happens to the data the old code left behind?
+
+Three recent projects each answer one of them:
+
+| question | project | the idea taken from it |
+|---|---|---|
+| crash mid-change | [pi-durable](https://github.com/earendil-works/pi/tree/main/packages/durable) | every step is an atomic commit; `registry.install()` hot-swaps an extension while a running call finishes on its old code |
+| remembering why | [OptChat](https://gist.github.com/VictorTaelin/91837951a5ce5b38f341ec1ba1df6449) | one endless chat; a binary tree of summaries; a constant-size view; `zoom` back to any verbatim message |
+| new code, old data | [celld](https://github.com/denoland/celld) | a *cell*: code loaded by version id (Worker Loader) plus SQLite keyed by name (facets), so state outlives code versions |
+
+This folder combines them into a **forge**: an agent, running on the real pi-durable harness, that writes its own
+tools. A protected kernel verifies each tool before hot-installing it. Each tool is a cell with its own durable state.
+Every version of every tool points back into an OptChat log at the user's words that asked for it.
+
+## What it does (`prototype/results/demo-output.txt`)
+
+Three processes share one SQLite session and one OptChat log:
+
+```
+user> I want to log how many cups of coffee I drink and see the total. Just added 2.
+    call: cell_propose {"name":"coffee", ... checks: [...]}
+    echo: ACCEPTED coffee@31910464 (passed 3 checks). The tool "coffee" is available from your next step.
+    call: coffee {"action":"add","cups":2}           <- the tool it just wrote, offered in the same run
+user> Track decaf separately from regular, please. ...
+    echo: REJECTED coffee@1449e22d: group 0 check 0 {"action":"total"}: expected 0, got {"regular":0,"decaf":0}
+          (v1's own check, ratcheted: v2 changed what `total` returns)
+    echo: ACCEPTED coffee@4c77f4d1 (passed 5 checks)  <- with a migration: the 2 old cups become {regular: 2}
+user> Replace your cell_propose tool with your own version, and make a pure tally tool.
+    echo: refused: "cell_propose" is not a name a cell may take
+    echo: REJECTED tally@...: declared pure (replay-safe) but check 1 wrote state
+=== process: crash ===    (exit 137 inside the agent-written `coffee` tool, after its write committed)
+=== process: recover === (tools reinstalled from the catalog document; the interrupted run resumes)
+    echo: 6                                           <- the rerun found its own committed result: applied once
+user> Why does coffee track decaf? Who asked for that?
+    echo: coffee: ... history coffee@31910464 -> coffee@4c77f4d1; asked for by zoom(0,1), zoom(6,1)
+    echo: 6+0|user: Track decaf separately from regular, please. I'm cutting back and want to see the split.
+```
+
+The model is pi-ai's faux provider, because no API key was available. Every request still goes through the real
+harness, hooks, tools and storage. Each scripted reply first asserts what a real model would be shown, for example
+that the tool it just wrote is on offer.
+
+## How it fits together
+
+```
+pi-durable Harness (SQLite session)
+├── extension "memory"   beforeRequest: mirror transcript -> OptChat log; send [system head, VIEW, tool delta, current run]
+├── extension "cells"    one tool per live cell, rebuilt from the catalog and hot-swapped with registry.install()
+└── extension "kernel"   cell_propose (the gate), cell_rollback, cell_list, cell_source, zoom   <- installed LAST
+         │
+         ├── catalog: a pi-durable session document (versions, live pointer, history, accept/reject log)
+         └── CellRuntime: QuickJS sandbox per call (pi-codemode) + data/cells/state/<name>.sqlite per cell
+                          one SQLite transaction per call, including the pi-durable call id (exactly-once)
+```
+
+**The gate** (`cell_propose`) accepts a candidate only if all of these hold:
+
+- the name is legal and not a kernel name;
+- it has at least one check;
+- its migration runs on a scratch copy of the live state;
+- every check of every ancestor version still passes (a ratchet), each group from an empty state, along with its own;
+- if it claims to be pure, it writes no state.
+
+Checks can be retired, but only explicitly, and the retirement is logged.
+
+## Findings
+
+1. **pi-durable's reload semantics are what make self-modification safe to attempt.** Code is stored as *names*
+   and resolved against the registry at every phase. A running call keeps the code it started with, and the next
+   request sees the new tool. After a restart, conversations rebind to whatever the new process installs, so
+   "reinstall cells from the catalog document on boot" is the entire recovery story for the agent's code.
+2. **Exactly-once comes from storing the call id with the effect.** The first version crashed after the cell's
+   SQLite commit but before pi-durable stored the result. pi-durable correctly reported
+   `Tool coffee was interrupted and may have partially run`, and the agent was left to guess
+   (`results/demo-output-before-exactly-once.txt`). Recording pi-durable's `taskId:callId` in the cell's own
+   transaction made every cell safely `replay: "safe"`: the rerun returned the original result instead of adding 3
+   cups twice. The same pattern carries over to celld, where the call id would live in the facet's SQLite.
+3. **Install order is a security boundary.** pi-durable resolves same-name tools so that the later extension wins,
+   and a reinstall keeps its position. With the order `cells -> kernel`, the kernel's `cell_list` survives a hot
+   reload of the agent's tools. With `kernel -> cells`, the agent's version replaces it (`results/shadow-check.txt`).
+   The gate also refuses kernel names, as a second line of defense.
+4. **OptChat on pi-durable has to fold tool announcements, not drop them.** pi-durable announces tools and prompt
+   sections as positional system messages. My first `beforeRequest` replaced everything before the current run with
+   the OptChat view and silently removed every tool. The fix that also keeps the cache warm:
+   - keep the leading system message first (round 3 found this never worked: pi-durable puts the first system
+     message *after* the first user message, so the check at index 0 always failed and the prompt and tools were
+     folded after the view on every request; it now finds the system prompt wherever it is and moves it first);
+   - put the view next;
+   - fold all later tool and section changes into one delta placed *after* the view;
+   - keep the current run verbatim.
+5. *(Superseded in round 3: this measured the old merge rule. See "Round 3" below.)* **OptChat's view is cacheable,
+   and gets more so as the chat grows** (`src/bench-view.ts`, 128 KB budget, seeded synthetic agent log, truncating
+   summarizer):
+
+   | messages | avg shared prefix between consecutive turns | median | prompt-cache read at 50k/80k/100k marks |
+   |---|---|---|---|
+   | 4,000 | 39,574 chars | 34,353 | 19,938 |
+   | 20,000 | 57,927 | 59,550 | 39,709 |
+   | 100,000 | 73,242 | 75,844 | 57,617 |
+
+   A sliding window of recent messages has a median shared prefix of about 3 chars, but a bimodal mean of about 40k.
+   It actually gets *more* mark-based cache reads than OptChat at 4,000 messages (about 33k). OptChat's case is
+   coverage of the whole history at constant size, with cacheability that improves with age. The spec reports 73k
+   shared at 20k messages; my lower 58k is consistent with lines nearly twice as long from the placeholder
+   summarizer.
+6. **Provenance is cheap when every version stores where it came from.** Each cell version records the log index of
+   the user message that started its run. However coarse the view gets (the demo uses a 4 KB budget), `zoom(id, 1)`
+   returns the user's words verbatim.
+
+## Design ideas from Jiti
+
+Geoffrey Huntley's [Jiti](https://github.com/ghuntley/jiti) grows an application by chat in a live Lisp image, and
+its design records (ADRs) address the same problem as the gate: accepting model-written changes into a running system.
+What applies to the forge:
+
+1. **Separate goals from safety.** Jiti distinguishes caller-owned *goals* ("is it done?", which may stay unmet
+   during intermediate progress) from *invariants* ("must never break", which reject). The forge had only examples.
+   It should also take caller-owned invariants over each cell's state, for example a schema, which also catch stray
+   writes that no example looks for.
+2. **Use generations or compare-and-swap.** Jiti tags every proposal with the observation generation it was made
+   from and refuses stale ones. `cell_propose` should take the live version it expects to replace, so that two
+   subagents, or a model working from an old view, cannot silently overwrite each other.
+3. **The exactly-once `calls` table is already a regression oracle.** Real calls, with their arguments and results,
+   are stored per cell. Replaying them against a candidate, and rejecting diffs the change didn't declare, catches
+   "drive-by" edits that no example covers.
+4. **Fuzz from the schema.** Each cell declares a JSON Schema for its arguments. Generating boundary inputs from it
+   catches hangs and validation regressions that no example names.
+5. **Check coverage, not just pass/fail.** A check suite that never calls one of a tool's actions says nothing about
+   it. A gate should reject a cell version whose checks never exercise one of its declared actions.
+6. **The model never owns the contract.** Jiti's caller owns acceptance (its ADR 0008): the model may propose checks,
+   but self-graded checks pass by construction.
+
+## Round 2: verification, enforced by types
+
+A second round implemented these ideas, with [rauchg/gdp-ts](https://github.com/rauchg/gdp-ts)
+(compile-time proofs) and [dmmulroy/anti-slop](https://github.com/dmmulroy/anti-slop) (Oxlint rules) added to a strict
+`tsc` setup. Details in [NOTES.md](NOTES.md#round-2-verification-with-gdp-ts-and-anti-slop).
+
+- **Two proofs guard the two doors.** Only `acceptVersion` writes a version into the catalog, and it demands
+  `CellVerified<C>` about that exact candidate (fingerprinted, so a candidate edited after the gate is refused). Only
+  `installCells` puts agent code into the registry, and it demands `CatalogueCommitted<K>`, which only a read of the
+  session document can mint. `src/mistakes.ts` type-checks 15 mistakes this rules out.
+- **The gate grew** compare-and-swap on the live version, caller-owned and ratcheted invariants (enforced at call time
+  inside the call's transaction), coverage of every action, replay of real calls against the actions a proposal
+  declares it changes, and boundary fuzzing from each tool's JSON Schema. The demo now shows a stale proposal, an
+  untested action, a drive-by edit and a hang each rejected.
+- **Migrations are crash-safe**: pending, then migration plus marker in one cell transaction, then live; boot
+  reconciles. A test crashes between the steps and recovers with the state migrated exactly once.
+- **Found in review:** invariants sharing one VM let a model-proposed invariant tamper with built-ins so a later
+  caller-owned invariant passed. They now run in separate executions.
+- **Found about anti-slop:** without a schema library, `(line): T => JSON.parse(line)` satisfies every rule and checks
+  nothing, because `JSON.parse` returns `any`.
+- **Not improved:** sandbox cost. pi-codemode starts a worker per execution (~75 ms warm), so a full gate costs 4-5 s.
+- The remaining ways unverified code could get through (the public `registry.install`, raw code accepted by the
+  runtime, caller-owned invariants passed as a plain argument) are listed in NOTES as accepted limits.
+
+## Round 3: OptChat to the revised spec
+
+Victor Taelin revised the OptChat gist on 2026-10-07 (now "UniiChat"). The memory now follows it; details in
+[NOTES.md](NOTES.md#round-3-optchat-to-the-revised-uniichat-spec).
+
+- **Which lines merge.** The priority is now `due = (T - last) / 2^l`, measured from a pair's last message. Held at
+  the length of Taelin's rollback `push` list, it reproduces `push` exactly at all 20,001 steps; the old rule,
+  measured from the first message, matches at 481. Both numbers are the spec's, and both reproduce against a `push`
+  written independently of the implementation.
+- **When they merge.** Appending only adds a line; once the view passes 128 KB, one batch merges it down to 64 KB. The
+  view is saved to `view.json` and never rebuilt from the log.
+- **What it buys** (`results/bench-view-v2-*.json`, a call after every message):
+
+  | messages | policy | lines written per message | view read from cache |
+  |---|---|---|---|
+  | 20,000 | sawtooth (new) | 1.6 | 98.8% |
+  | 20,000 | merge every message, first-message rule (round 1) | 52.7 | 31.2% |
+  | 20,000 | sliding window | 17.7 | 73.4% |
+
+  The spec reports 98.6% cache reads; this gets 98.8% (94% when a call happens only at user turns). Its "about 2
+  lines per message" for the batched view and "53 of 192" for a fixed one reproduce (1.77 and 57.9); its separate
+  "21 vs 80" figure does not, and is inconsistent with those.
+- **Compactions** are async: queues, never tree scans, up to 8 at once, a turn waits until everything before it is
+  summarized. Each gets its own 16-32 KB view ending at its node and the spec's verbatim task with the 512-dash ruler
+  and "Too long" retry. `ModelSummarizer` takes any `complete()` function; with no API key here, the deterministic
+  summarizer is still the default.
+- **Bug found in round-1 code** (finding 4 above): the system prompt never actually led the request. Fixed.
+
+## Round 4: on a real model
+
+With DeepSeek V4.1 Flash (the key injected by this environment's proxy), one scripted, untuned run grew a `coffee`
+tool, upgraded it to track decaf and answered "who asked for that?" with the user's exact words and the right message
+number. Details and the full transcript: [NOTES.md](NOTES.md#round-4-a-real-model-deepseek-v41-flash),
+`prototype/results/live-deepseek-run.txt`.
+
+- **The gate did real work.** The model needed four tries for the upgrade; each rejection was a genuine mistake (a
+  dropped invariant, an untested action, a stale ratcheted check, a wrong expectation of its own), and each message
+  told it what to fix.
+- **One safeguard was sidestepped:** the model declared that its upgrade may change every action (`changes: ["*"]`),
+  so replay of past calls could only report the change, not reject it.
+- **96 calls cost $0.071**, 81% of input read from cache: DeepSeek caches prefixes automatically, so the memory view is
+  reused across turns. Compactions were 82 of the 96 calls.
+- Try it: `cd prototype && ./forge --model deepseek/deepseek-flash` (any other model works too; see round 6).
+
+## Round 5: the celld sketch, run on celld
+
+The celld version of the cell model (`celld-sketch/`) had been written without running it. With the egress restrictions
+lifted, celld 0.6.2 came from its published container image (`ghcr.io/denoland/celld`, layers checked against their
+digests), and pi's coding agent on DeepSeek V4.1 Flash wrote the test and the fix, which I verified by rerunning both.
+
+- **The unchanged sketch passed 5 of 7 scenarios** with no errors at all: the catalog in `ctx.storage.sql`, checks in a
+  throwaway facet, exactly-once calls, a rejected proposal leaving the live version alone, and state across restarts.
+- **One silent bug: an upgrade did not take effect.** A running facet keeps the class it started with
+  (`ctx.facets.get` returns the cached one), so after a new version went live the calls still ran the old code. The fix
+  is one call, `ctx.facets.abort(name)`, which stops the facet and keeps its database; the next call loads the new code.
+  With it, all 7 scenarios pass (`celld-sketch/test.mjs`, details in `celld-sketch/RESULTS.md`).
+- Not covered: the agent loop on celld, concurrent calls, a crash mid-call, and a multi-node fleet.
+
+## Round 6: one command, any model
+
+`./forge` (or `npm start`) in `prototype/` is the whole setup: it checks Node, installs on first run, picks a model and
+starts the chat. pi's coding agent on DeepSeek V4.1 Flash wrote it from a brief; I fixed two bugs it left and verified
+each path below by running it.
+
+- **No key: the demo.** With no credential it runs the scripted offline demo on pi-ai's faux provider and says which
+  variables to set. Without a model the harness has nothing to show, so the first run shows the demo instead of an error.
+- **Any pi-ai model.** `--model provider/modelId` or `FORGE_MODEL` (`--list-models` shows what your keys unlock). With
+  neither, it takes the first of Anthropic, OpenAI, Google, OpenRouter, DeepSeek, Groq and xAI that has a key.
+  `--base-url` points it at any OpenAI-compatible server (Ollama, llama.cpp, vLLM, LM Studio). Prices come from pi-ai's
+  catalog, so the spend cap means the same thing on every model.
+- **A separate summary model.** OptChat compactions are most of the calls (82 of 96 in round 4), so `--summary-model`
+  lets a cheap model keep the memory while a stronger one does the work.
+- **State persists.** A chat lives in `~/.forge/default` (or `--data`, `$FORGE_HOME`); running again resumes it with
+  its tools. `--fresh` starts over. The first line printed is the models, the data directory and the spend cap
+  (300 calls or $1 by default).
+- Checked by running it here: the no-key demo; a refused model whose provider has no key; a real DeepSeek chat that
+  grew a `books` tool (one rejection, then accepted, 26 calls, $0.019); a second run that resumed it and used the tool;
+  and the `--base-url` path against DeepSeek's OpenAI-compatible endpoint. That last one reports $0 and no cache reads,
+  because a custom endpoint has no catalog price and its usage is parsed generically.
+
+## Round 7: a terminal UI
+
+In a terminal, `./forge` now opens a full-screen app built on pi's own [pi-tui](https://github.com/earendil-works/pi)
+(1.0.3, the same release line as the other pi packages): the transcript, a side panel with each agent-written tool, its
+live version and the catalog's accept/reject log, an editor, and a footer with the turn's status, the model, calls and
+spend. Tool calls and gate verdicts show up while the turn runs (accepted in green, rejected in red), not only at its end.
+`--plain`, or piped input, keeps the line-based chat. pi on DeepSeek V4.1 Flash wrote it; I drove it in a real
+pseudo-terminal against DeepSeek and fixed what the screens showed (a spinner that pushed the footer off its row, the
+transcript running into the panel, user lines clipped instead of wrapped, events arriving only after the turn, the
+status hidden behind a long path).
+
+## Round 8: a D&D one-shot, on video
+
+[`video/forge-dnd.mp4`](video/forge-dnd.mp4) (2 minutes; time while the model works runs 6× fast) is one untuned
+run of `./forge` on DeepSeek V4.1 Flash. A Dungeon Master sends five messages to an agent that starts with no tools:
+track the party, roll initiative, apply damage and a healing potion, track a poison until the end of round 3, then
+"who asked you to track conditions, and when?". The full transcript is `video/recording/transcript.txt`.
+
+- **The gate shaped the tools.** The `party` tool was rejected three times (an untested action, two wrong
+  expectations) before it went live with 14 checks. Its upgrade for rounds and timed conditions was rejected four times
+  for the model's own off-by-one errors, then once by replay of real calls because the stored state changed shape; the
+  model declared the change, added a migration, and v2 went live with 43 checks and Mira's 5/14 HP carried over.
+- **A dice tool never passed.** Asked to keep dice in tools with injectable randomness, the model seeded its own
+  random generator but could not predict the generator's output when writing exact-value checks, so six attempts
+  failed and the per-turn limit stopped it. Exact-value checks fit deterministic tools; a random one needs property
+  checks ("between 1 and 20"), which the gate does not have yet.
+- **It answered provenance correctly**, quoting the user's spider message word for word.
+- **Not all good:** after the dice tool failed, the model gave initiative rolls it called "real d20s I actually
+  rolled", which it cannot have done; one message later it refused to invent a potion roll.
+- **Getting this run took three attempts, and each one found a real bug** (fixed and tested):
+  - the 300-call cap stopped a chat in its second message, because memory compactions make calls grow much faster
+    than dollars; the cap is now 1,000, and $1 stays the real stop;
+  - the model resent one rejected proposal until the cap stopped it at 1,000 calls; the kernel now refuses an
+    identical resubmission, refuses all proposals after 6 rejections in a turn, and `Live.ask` aborts a turn after
+    40 tool calls;
+  - the model wrote version ids without the cell name (`c8ddda6d` for `party@c8ddda6d`), so three proposals failed
+    as stale against the very version they meant; short ids are now expanded where arguments come in, and the same
+    run showed why exact facts need tools (it healed "2+4+2 = 10"), so the kernel's preamble now says so.
+- **How it was made.** A small Python driver ran `./forge` in a pseudo-terminal, typed the five messages and saved
+  the byte stream as an asciinema cast (`video/recording/`). The video is an [fframes](https://github.com/dmtrKovalenko/fframes)
+  project (`video/forge-video/`): it replays the cast through the `vt100` crate, draws each screen as SVG text, and
+  adds the title, chapter and closing cards. It renders on fframes' CPU backend (this machine has no GPU) in about a
+  minute.
+
+## Gaps (round 1; see rounds 2-8 above for what changed)
+
+- ~~The migration runs on the real state before the catalog commit, in two databases.~~ Fixed in round 2 with a
+  pending/marker/live protocol reconciled on boot.
+- The checks are written by the agent. The ratchet stops silent regressions, but nothing stops weak checks for new
+  behavior (see design ideas 1 and 5).
+- The QuickJS cold start is about 140 ms per call; a pooled sandbox per cell version would remove it.
+- `celld-sketch/` maps the cell model onto celld's Worker Loader and facets. Round 5 ran it on celld 0.6.2:
+  `celld-sketch/test.mjs` passes 7 of 7 scenarios, and `celld-sketch/RESULTS.md` has the details.
+
+## Run it
+
+```sh
+cd prototype && ./forge              # installs on first run; demo with no key, full-screen chat with one (rounds 6-7)
+./forge --help                       # --model, --summary-model, --base-url, --data, --fresh, caps, --list-models, --plain
+npm run check                        # tsc + oxlint (anti-slop + gdp-ts)
+npm test                             # 140 tests, about a minute
+node --experimental-strip-types --no-warnings src/demo.ts           # three processes: grow, crash, recover
+node --experimental-strip-types --no-warnings src/bench-view.ts 20000
+node --experimental-strip-types --no-warnings src/shadow-check.ts
+FORGE_EXACTLY_ONCE=0 node --experimental-strip-types --no-warnings src/demo.ts   # the "interrupted" behavior
+```
+
+Files in `prototype/src/`:
+- cell runtime: `cells.ts` (sandbox, per-cell SQLite, exactly-once calls, invariants, traces) and `schema-fuzz.ts`;
+- the gate and the catalog: `gate.ts`, `proofs/` (the only modules that mint gdp-ts proofs), `catalogue.ts` (the
+  only writer and installer, migrations, boot reconcile), `catalogue-doc.ts`, `proposal.ts`, and `mistakes.ts`
+  (type-checked mistakes, never run);
+- memory: `optchat.ts` (log, tree, view, compactor), `compaction.ts` (tasks, ruler, retry), `optchat-prompt.ts`, and
+  `memory-extension.ts` (the pi-durable glue);
+- running it: `start.ts` (`./forge`), `tui.ts` (the full-screen chat), `model-config.ts` (choosing models and keys), `live.ts` (the forge on a real
+  model, with the spend meter), `chat-loop.ts`, `chat.ts`, `live-run.ts`;
+- `forge.ts` (the kernel's tools) and the scripts `demo.ts`, `bench-view.ts`, `bench-cells.ts`, `shadow-check.ts`.
+
+The working log is in [NOTES.md](NOTES.md).

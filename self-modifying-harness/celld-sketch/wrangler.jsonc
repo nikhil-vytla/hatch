@@ -1,0 +1,10 @@
+// TESTED against celld 0.6.2 by test.mjs. The shape follows celld's `facets` and `dynamic-worker-tails` examples
+// (worker_loaders + a SQLite Durable Object).
+{
+  "name": "forge",
+  "main": "index.js",
+  "compatibility_date": "2026-01-01",
+  "worker_loaders": [{ "binding": "LOADER" }],
+  "durable_objects": { "bindings": [{ "name": "FORGE", "class_name": "Forge" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Forge"] }]
+}

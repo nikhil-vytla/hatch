@@ -1,0 +1,301 @@
+// The forge: a pi-durable harness whose agent can write, verify, hot-install and roll back its own tools.
+//
+// Three pieces, one per source:
+//   - pi-durable: the cell catalog is a Session document, committed in the same atomic line as the transcript;
+//     `registry.install()` swaps the "cells" extension in place, so the next request offers the new tools while a running
+//     call finishes on the code it started with. After a crash the catalog is reinstalled from the document.
+//   - celld: each tool is a cell (cells.ts): immutable versioned code plus state that outlives code versions.
+//   - OptChat: each turn starts fresh from a view of the whole chat (optchat.ts, wired in by memory-extension.ts), and
+//     every cell version records the log index of the user words that asked for it, so "why does this tool exist?" is always one zoom away.
+//
+// The kernel (this file's `kernel` extension) is the part the agent cannot rewrite. It is installed after the cells
+// extension so that a cell named like a kernel tool can never replace it (pi-durable: a later extension's tool with the
+// same name wins), and the gate also refuses such names outright.
+//
+// The two places where unverified code could reach the live system are behind gdp-ts proofs (src/proofs/): a version
+// enters the catalog only through `acceptVersion` (needs `CellVerified`), and code enters the registry only through
+// `installCells` (needs `CatalogueCommitted`). The kernel tools below are the callers; they cannot skip either.
+import { createHash } from "node:crypto";
+import type { Context } from "@earendil-works/chord";
+import { Type } from "@earendil-works/pi-ai";
+import {
+	defineExtension,
+	defineTool,
+	type Harness,
+	type Registry,
+	section,
+	type ToolExecutionApi,
+} from "@earendil-works/pi-durable";
+import { name, type Named } from "@gdp-ts/core";
+import {
+	type CallerInvariants,
+	commitVerified,
+	ownedInvariants,
+	recordRejection,
+	refreshCells,
+	rollbackVersion,
+	StaleError,
+} from "./catalogue.ts";
+import { type Catalogue, entryOf, fullVersion, staleReason } from "./catalogue-doc.ts";
+import type { CellRuntime, CellVersion } from "./cells.ts";
+import type { GateReport } from "./gate.ts";
+import type { Memory } from "./optchat.ts";
+import { type CatalogueCommitted, withCommittedCatalogue } from "./proofs/catalogue-committed.ts";
+import { withAcceptedVersion } from "./proofs/cell-accepted.ts";
+import { verifyCell } from "./proofs/cell-verified.ts";
+import { candidateOf, ExpectLive, type Proposal, parseProposal, ProposeParameters } from "./proposal.ts";
+
+export type KernelOptions = {
+	harness: () => Harness;
+	registry: Registry;
+	runtime: CellRuntime;
+	memory: Memory;
+	currentRequest: () => number | undefined;
+	invariants: CallerInvariants; // caller-owned invariants by cell name: the model cannot propose, change or drop them
+};
+
+const text = (value: string) => ({ content: [{ type: "text" as const, text: value }] });
+
+function acceptedText(version: string, cell: string, report: GateReport): string {
+	const lines = [
+		`ACCEPTED ${version} (passed ${report.checks} checks; replayed ${report.replayed} real calls${report.replaySkipped > 0 ? `, ${report.replaySkipped} skipped through the migration` : ""}; fuzzed ${report.fuzz.ran} of ${report.fuzz.generated} generated inputs in ${report.fuzz.executions} of a budget of ${report.fuzz.budget} sandbox executions). The tool "${cell}" is available from your next step.`,
+	];
+
+	if (report.behaviourDiffs.length > 0) {
+		lines.push(`BEHAVIOR CHANGES you declared, which the user should hear about: ${report.behaviourDiffs.map((d) => `${JSON.stringify(d.args)}: ${d.summary}`).join("; ")}`);
+	}
+
+	for (const advisory of report.advisories) lines.push(`ADVISORY ${advisory}`);
+
+	return lines.join(" ");
+}
+
+/**
+ * One version of a cell for `cell_source`, or why there is none. Models name versions either way ("party@9cbc43ec" or
+ * "9cbc43ec"); the catalog keys them in full. Rejected versions are not kept, so asking for one returns its rejection
+ * reasons instead of a bare "no such cell", which in a live run sent the model round three identical retries.
+ */
+export function sourceOf(catalogue: Catalogue, cell: string, version: string | undefined): { ok: true; text: string } | { ok: false; reason: string } {
+	const entry = entryOf(catalogue, cell);
+	const wanted = version === undefined ? (entry?.live ?? undefined) : fullVersion(cell, version);
+	const found = wanted === undefined ? undefined : entry?.versions[wanted];
+
+	if (found !== undefined) return { ok: true, text: JSON.stringify(found, null, 2) };
+
+	const rejections = wanted === undefined ? [] : catalogue.log.filter((line) => line.event.startsWith(`rejected ${wanted}:`));
+
+	if (rejections.length > 0) return { ok: true, text: `${wanted} was rejected, and rejected versions are not kept. Fix your own copy and propose again. Rejections:\n${rejections.map((line) => line.event).join("\n")}` };
+
+	if (entry === undefined) return { ok: false, reason: `no cell named ${cell}` };
+
+	return { ok: false, reason: `no version ${wanted ?? "(none live)"} of ${cell}; known: ${Object.keys(entry.versions).join(", ")}` };
+}
+
+/** Rejected proposals one user turn may make before the kernel refuses more and asks the model to report back. */
+export const MAX_REJECTIONS_PER_TURN = 6;
+
+/**
+ * Everything that decides a proposal's verdict, hashed, including the live version it builds on. The version id covers
+ * only the code (cell, source, migration), so the same code with corrected checks, or on a newer live version, is a new
+ * attempt; the same code with the same checks is not, and in a live run a model resent one rejected proposal until the
+ * call cap stopped it.
+ */
+export function proposalFingerprint(proposal: Proposal): string {
+	const { cell, parameters, source, checks, retire, migrate, pure, invariants, changes, expectLive } = proposal;
+
+	return createHash("sha256").update(JSON.stringify([cell, parameters, source, checks, retire, migrate ?? null, pure, invariants, changes, expectLive])).digest("hex");
+}
+
+/** Remembers rejected proposals and counts rejections per user turn, for one process. */
+export class RejectionMemory {
+	private readonly seen = new Map<string, { times: number; reason: string }>();
+	private readonly perTurn = new Map<number, number>();
+
+	/** Why this proposal should not reach the gate again, or undefined to let it through. */
+	refusal(fingerprint: string, turn: number): string | undefined {
+		const prior = this.seen.get(fingerprint);
+
+		if ((this.perTurn.get(turn) ?? 0) >= MAX_REJECTIONS_PER_TURN) {
+			return `REFUSED: ${MAX_REJECTIONS_PER_TURN} proposals were rejected in this turn. Stop proposing, and tell the user what is blocking you and what you would try next.`;
+		}
+
+		if (prior !== undefined) {
+			this.note(fingerprint, turn, prior.reason);
+
+			return `REJECTED: you sent this exact proposal before and it was rejected (${prior.times} time${prior.times === 1 ? "" : "s"}): ${prior.reason}. Sending it again cannot pass; change the source or the checks, or tell the user what is blocking you.`;
+		}
+
+		return undefined;
+	}
+
+	/** A rejection counts toward the turn's limit; a stale one is not remembered, since it says nothing about the code. */
+	note(fingerprint: string, turn: number, reason: string): void {
+		if (!reason.startsWith("stale:")) this.seen.set(fingerprint, { times: (this.seen.get(fingerprint)?.times ?? 0) + 1, reason });
+
+		this.perTurn.set(turn, (this.perTurn.get(turn) ?? 0) + 1);
+	}
+}
+
+export function kernelExtension(options: KernelOptions) {
+	const { registry, runtime, memory } = options;
+	const rejections = new RejectionMemory();
+
+	// Everything that follows a parsed proposal and its named candidate: gate, then the three-step commit, then install.
+	const decide = async <C, K>(
+		candidate: Named<C, CellVersion>,
+		catalogue: Named<K, Catalogue>,
+		committed: CatalogueCommitted<K>,
+		proposal: Proposal,
+		api: ToolExecutionApi,
+		context: Context,
+	): Promise<string> => {
+		const version = candidate.value.version;
+		const live = entryOf(catalogue.value, proposal.cell)?.live ?? null;
+
+		if (live === version && proposal.expectLive === live) return `unchanged: ${version} is already live`;
+
+		const owned = ownedInvariants(options.invariants, proposal.cell);
+		const verdict = await verifyCell(candidate, catalogue, committed, runtime, { expectLive: proposal.expectLive, owned, changes: proposal.changes });
+
+		const reject = async (reason: string) => {
+			await api.commit((tx) => recordRejection(tx, version, reason), context);
+			rejections.note(proposalFingerprint(proposal), options.currentRequest() ?? -1, reason);
+
+			return `REJECTED ${version}: ${reason}. The live version is unchanged.`;
+		};
+
+		if (!verdict.ok) return reject(verdict.reason);
+
+		const done = await commitVerified(api, context, runtime, candidate, verdict.proof, proposal.expectLive, owned);
+
+		if (!done.ok) return reject(done.reason);
+
+		await refreshCells(api, context, registry, runtime, options.invariants);
+
+		return acceptedText(version, proposal.cell, verdict.report);
+	};
+
+	const propose = defineTool({
+		name: "cell_propose",
+		description:
+			"Create or replace one of your own tools. `source` is the body of an async JS function with `args` and a `kv` store " +
+			"(kv.get/put/delete/keys) in scope; return the result. `expectLive` is REQUIRED: the live version id you read (cell_list or " +
+			"cell_source) and are replacing, or null if you expect the tool not to exist; a stale value is rejected. `checks` are examples " +
+			"({args, expect}) run in order from an empty state; between them they must pass every value of every enum parameter. Every " +
+			"check of the tool's earlier accepted versions must still pass unless listed in `retire`. `invariants` ({name, source}) are " +
+			"function bodies over a read-only `kv` that must return true after every call; once proposed they can never be dropped, so " +
+			"send every earlier one again. `changes` lists the values of the action (enum) parameter whose behavior this version " +
+			"intends to change (or [\"*\"]): your recent real calls are replayed, and a differing one outside `changes` is rejected. " +
+			"`migrate` (optional) runs once against the tool's existing state when the version is accepted.",
+		parameters: ProposeParameters,
+		executionMode: "sequential",
+		execute: async (args, api, context) => {
+			const proposal = parseProposal(args);
+			const refused = rejections.refusal(proposalFingerprint(proposal), options.currentRequest() ?? -1);
+
+			if (refused !== undefined) return text(refused);
+
+			const reply = await withCommittedCatalogue(api, context, (catalogue, committed) =>
+				name(candidateOf(proposal, catalogue.value, options.currentRequest()), (candidate) => decide(candidate, catalogue, committed, proposal, api, context)),
+			);
+
+			return text(reply);
+		},
+	});
+
+	const rollback = defineTool({
+		name: "cell_rollback",
+		description:
+			"Make an earlier accepted version of a tool live again. Its state is not rolled back. `expectLive` is REQUIRED: the live " +
+			"version id you read and are replacing; a stale value is rejected.",
+		parameters: Type.Object({ name: Type.String(), version: Type.String(), expectLive: ExpectLive }),
+		executionMode: "sequential",
+		execute: async (args, api, context) => {
+			const expectLive = args.expectLive === null ? null : fullVersion(args.name, args.expectLive);
+			const version = fullVersion(args.name, args.version);
+
+			const outcome = await withCommittedCatalogue(api, context, async (catalogue, committed) => {
+				const stale = staleReason(entryOf(catalogue.value, args.name), expectLive);
+
+				if (stale !== undefined) return stale;
+
+				const accepted = await withAcceptedVersion(catalogue, committed, args.name, version, async (target, proof) => {
+					try {
+						await api.commit((tx) => rollbackVersion(tx, target, proof, expectLive), context);
+
+						return undefined;
+					} catch (error) {
+						if (error instanceof StaleError) return error.message;
+
+						throw error;
+					}
+				});
+
+				return accepted.ok ? accepted.value : accepted.reason;
+			});
+
+			if (outcome !== undefined) return text(`REFUSED: ${outcome}`);
+
+			await refreshCells(api, context, registry, runtime, options.invariants);
+
+			return text(`${args.name} is now ${version}`);
+		},
+	});
+
+	const list = defineTool({
+		name: "cell_list",
+		description: "List your tools, their versions, and the chat message that asked for each version.",
+		parameters: Type.Object({}),
+		replay: "safe",
+		execute: async (_args, api, context) => {
+			const catalogue = await withCommittedCatalogue(api, context, (read) => read.value);
+
+			const rows = Object.entries(catalogue.cells).map(([cell, e]) => {
+				const asked = e.history.map((v) => `zoom(${e.versions[v].why},1)`).join(", ");
+
+				return `${cell}: live ${e.live ?? "none"}${e.pending === null ? "" : `; pending ${e.pending}`}; history ${e.history.join(" -> ")}; asked for by ${asked}`;
+			});
+
+			return text(rows.join("\n") || "(no cells)");
+		},
+	});
+
+	const source = defineTool({
+		name: "cell_source",
+		description: "Read the source, checks and invariants of one version of a tool (default: live).",
+		parameters: Type.Object({ name: Type.String(), version: Type.Optional(Type.String()) }),
+		replay: "safe",
+		execute: async (args, api, context) => {
+			const catalogue = await withCommittedCatalogue(api, context, (read) => read.value);
+			const found = sourceOf(catalogue, args.name, args.version);
+
+			if (found.ok) return text(found.text);
+
+			throw new Error(found.reason);
+		},
+	});
+
+	const zoom = defineTool({
+		name: "zoom",
+		description: "Open the line id+n of the view into the two lines of n/2 under it; n = 1 gives the message whole.",
+		parameters: Type.Object({ id: Type.Number(), n: Type.Number() }),
+		replay: "safe",
+		execute: async (args) => text(memory.zoom(args.id, args.n)),
+	});
+
+	const date = defineTool({
+		name: "date",
+		description: "The date and time of message id.",
+		parameters: Type.Object({ id: Type.Number() }),
+		replay: "safe",
+		execute: async (args) => text(memory.date(args.id)),
+	});
+
+	return defineExtension({
+		name: "kernel",
+		tools: [propose, rollback, list, source, zoom, date],
+		sections: [
+			section("preamble", () => "You are an agent that grows its own tools. When the user needs something you cannot do, write a tool for it with cell_propose, with checks. Anything random or that must be exactly right (dice, arithmetic, dates, running totals) belongs in a tool, not in your head: make randomness injectable so checks can pin it. Say in your reply what you learned that will matter later.", { tag: false }),
+		],
+	});
+}

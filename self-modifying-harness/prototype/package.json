@@ -1,0 +1,32 @@
+{
+  "name": "self-modifying-harness",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@earendil-works/chord": "1.0.3",
+    "@earendil-works/pi-ai": "1.0.3",
+    "@earendil-works/pi-codemode": "1.0.3",
+    "@earendil-works/pi-durable": "1.0.3",
+    "@earendil-works/pi-tui": "1.0.3",
+    "@gdp-ts/core": "0.1.0"
+  },
+  "devDependencies": {
+    "@oxlint/plugins": "1.87.0",
+    "@types/node": "22.20.5",
+    "oxlint": "1.87.0",
+    "typescript": "7.0.2"
+  },
+  "scripts": {
+    "typecheck": "tsc -p .",
+    "lint": "oxlint -c oxlint.config.ts src test",
+    "test": "node --test --experimental-strip-types --no-warnings test/*.test.ts",
+    "bench:cells": "node --experimental-strip-types --no-warnings src/bench-cells.ts",
+    "check": "npm run typecheck && npm run lint",
+    "start": "./forge",
+    "chat": "NODE_USE_ENV_PROXY=1 node --experimental-strip-types --no-warnings src/chat.ts",
+    "live-run": "NODE_USE_ENV_PROXY=1 node --experimental-strip-types --no-warnings src/live-run.ts"
+  },
+  "engines": {
+    "node": ">=22.6"
+  }
+}

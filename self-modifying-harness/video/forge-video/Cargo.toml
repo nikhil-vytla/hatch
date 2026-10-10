@@ -1,0 +1,31 @@
+[package]
+name = "forge-video"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+fframes = { version = "=1.2.0", features = ["compile-time-svgtree", "cli"] }
+serde_json = "1.0.151"
+vt100 = "0.16.2"
+
+[target.'cfg(not(windows))'.dependencies]
+fframes = { version = "=1.2.0", features = [] }
+
+[lib]
+name = "forge_video"
+path = "src/lib.rs"
+doctest = false
+
+[[bin]]
+name = "forge-video"
+path = "src/main.rs"
+
+[workspace]
+
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 3
+

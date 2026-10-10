@@ -1,0 +1,112 @@
+{
+	"messages": 20000,
+	"warmupMessages": 500,
+	"budgets": {
+		"sawtooth": {
+			"low": 64000,
+			"high": 128000
+		},
+		"oldPolicyBytes": 96000,
+		"slidingWindowBytes": 96000
+	},
+	"cacheModel": "blocks of 4 lines, one mark on the last whole block, a call reads the longest marked prefix of the previous call still identical",
+	"sawtooth": {
+		"perMessage": {
+			"calls": 19500,
+			"avgViewBytes": 96076,
+			"avgViewLines": 233.9,
+			"avgSharedPrefixBytes": 95468,
+			"lineInputsPerCall": 1.601,
+			"lineInputsPerMessage": 1.601,
+			"cacheReadFraction": 0.9882,
+			"cacheReadFractionMeanOfCalls": 0.9862
+		},
+		"perTurn": {
+			"calls": 2466,
+			"avgViewBytes": 96318,
+			"avgViewLines": 234.2,
+			"avgSharedPrefixBytes": 91570,
+			"lineInputsPerCall": 12.478,
+			"lineInputsPerMessage": 1.578,
+			"cacheReadFraction": 0.9418,
+			"cacheReadFractionMeanOfCalls": 0.9286,
+			"turns": 2466
+		},
+		"batches": 99,
+		"merges": 19700,
+		"msTotal": 7824
+	},
+	"oldPolicy": {
+		"perMessage": {
+			"calls": 19500,
+			"avgViewBytes": 96070,
+			"avgViewLines": 205.4,
+			"avgSharedPrefixBytes": 75673,
+			"lineInputsPerCall": 52.725,
+			"lineInputsPerMessage": 52.725,
+			"cacheReadFraction": 0.3119,
+			"cacheReadFractionMeanOfCalls": 0.3115
+		},
+		"perTurn": {
+			"calls": 2466,
+			"avgViewBytes": 96182,
+			"avgViewLines": 205.2,
+			"avgSharedPrefixBytes": 45171,
+			"lineInputsPerCall": 118.433,
+			"lineInputsPerMessage": 14.977,
+			"cacheReadFraction": 0.0048,
+			"cacheReadFractionMeanOfCalls": 0.0048,
+			"turns": 2466
+		},
+		"batches": 13528,
+		"merges": 19799,
+		"msTotal": 20099
+	},
+	"slidingWindow": {
+		"perMessage": {
+			"calls": 19500,
+			"avgViewBytes": 90497,
+			"avgViewLines": 70.2,
+			"avgSharedPrefixBytes": 67655,
+			"lineInputsPerCall": 17.658,
+			"lineInputsPerMessage": 17.658,
+			"cacheReadFraction": 0.7336,
+			"cacheReadFractionMeanOfCalls": 0.7402
+		},
+		"perTurn": {
+			"calls": 2466,
+			"avgViewBytes": 90468,
+			"avgViewLines": 69.6,
+			"avgSharedPrefixBytes": 29109,
+			"lineInputsPerCall": 47.269,
+			"lineInputsPerMessage": 5.978,
+			"cacheReadFraction": 0.3137,
+			"cacheReadFractionMeanOfCalls": 0.3164,
+			"turns": 2466
+		},
+		"msTotal": 508
+	},
+	"lineSimulation": [
+		{
+			"low": 192,
+			"high": 192,
+			"age": "last",
+			"messages": 30000,
+			"lineInputsPerMessage": 57.86
+		},
+		{
+			"low": 192,
+			"high": 192,
+			"age": "first",
+			"messages": 30000,
+			"lineInputsPerMessage": 58.5
+		},
+		{
+			"low": 96,
+			"high": 192,
+			"age": "last",
+			"messages": 30000,
+			"lineInputsPerMessage": 1.77
+		}
+	]
+}

@@ -1,0 +1,918 @@
+{
+	"model": "deepseek-flash",
+	"limits": {
+		"maxCalls": 100,
+		"maxCostUsd": 0.3
+	},
+	"totals": {
+		"calls": 96,
+		"input": 63178,
+		"cacheRead": 266238,
+		"output": 41860,
+		"costUsd": 0.07078282800000002
+	},
+	"turns": {
+		"calls": 14,
+		"input": 17465,
+		"cacheRead": 58112,
+		"output": 8216,
+		"costUsd": 0.015447372
+	},
+	"compactions": {
+		"calls": 82,
+		"input": 45713,
+		"cacheRead": 208126,
+		"output": 33644,
+		"costUsd": 0.055335456000000005
+	},
+	"perMessage": [
+		{
+			"n": 1,
+			"message": "I want to log how many cups of coffee I drink and see the total. Just added 2.",
+			"rows": [
+				{
+					"n": 1,
+					"kind": "turn",
+					"input": 253,
+					"cacheRead": 1792,
+					"output": 619,
+					"costUsd": 0.0008294519999999999,
+					"stop": "toolUse"
+				},
+				{
+					"n": 2,
+					"kind": "turn",
+					"input": 1962,
+					"cacheRead": 896,
+					"output": 53,
+					"costUsd": 0.000657576,
+					"stop": "toolUse"
+				},
+				{
+					"n": 3,
+					"kind": "compaction",
+					"input": 1491,
+					"cacheRead": 0,
+					"output": 133,
+					"costUsd": 0.0006069,
+					"stop": "stop"
+				},
+				{
+					"n": 4,
+					"kind": "turn",
+					"input": 243,
+					"cacheRead": 2688,
+					"output": 126,
+					"costUsd": 0.00024022799999999996,
+					"stop": "stop"
+				},
+				{
+					"n": 5,
+					"kind": "compaction",
+					"input": 617,
+					"cacheRead": 768,
+					"output": 151,
+					"costUsd": 0.000370908,
+					"stop": "stop"
+				},
+				{
+					"n": 6,
+					"kind": "compaction",
+					"input": 495,
+					"cacheRead": 896,
+					"output": 197,
+					"costUsd": 0.000390276,
+					"stop": "stop"
+				},
+				{
+					"n": 7,
+					"kind": "compaction",
+					"input": 494,
+					"cacheRead": 1280,
+					"output": 182,
+					"costUsd": 0.00037428,
+					"stop": "stop"
+				},
+				{
+					"n": 8,
+					"kind": "compaction",
+					"input": 476,
+					"cacheRead": 1664,
+					"output": 936,
+					"costUsd": 0.001275984,
+					"stop": "stop"
+				}
+			]
+		},
+		{
+			"n": 2,
+			"message": "Track decaf separately from regular, please. I had a decaf.",
+			"rows": [
+				{
+					"n": 9,
+					"kind": "turn",
+					"input": 627,
+					"cacheRead": 1920,
+					"output": 59,
+					"costUsd": 0.00027042,
+					"stop": "toolUse"
+				},
+				{
+					"n": 10,
+					"kind": "compaction",
+					"input": 671,
+					"cacheRead": 896,
+					"output": 200,
+					"costUsd": 0.00044667599999999996,
+					"stop": "stop"
+				},
+				{
+					"n": 11,
+					"kind": "compaction",
+					"input": 953,
+					"cacheRead": 1152,
+					"output": 150,
+					"costUsd": 0.00047281199999999997,
+					"stop": "stop"
+				},
+				{
+					"n": 12,
+					"kind": "turn",
+					"input": 763,
+					"cacheRead": 2560,
+					"output": 1308,
+					"costUsd": 0.00181386,
+					"stop": "toolUse"
+				},
+				{
+					"n": 13,
+					"kind": "compaction",
+					"input": 617,
+					"cacheRead": 1152,
+					"output": 153,
+					"costUsd": 0.000375612,
+					"stop": "stop"
+				},
+				{
+					"n": 14,
+					"kind": "compaction",
+					"input": 1492,
+					"cacheRead": 1152,
+					"output": 201,
+					"costUsd": 0.0006957119999999999,
+					"stop": "stop"
+				},
+				{
+					"n": 15,
+					"kind": "compaction",
+					"input": 453,
+					"cacheRead": 2560,
+					"output": 130,
+					"costUsd": 0.00030726,
+					"stop": "stop"
+				},
+				{
+					"n": 16,
+					"kind": "compaction",
+					"input": 648,
+					"cacheRead": 1280,
+					"output": 184,
+					"costUsd": 0.00042288,
+					"stop": "stop"
+				},
+				{
+					"n": 17,
+					"kind": "turn",
+					"input": 212,
+					"cacheRead": 4480,
+					"output": 1350,
+					"costUsd": 0.00171048,
+					"stop": "toolUse"
+				},
+				{
+					"n": 18,
+					"kind": "compaction",
+					"input": 516,
+					"cacheRead": 1152,
+					"output": 2000,
+					"costUsd": 0.002561712,
+					"stop": "length"
+				},
+				{
+					"n": 19,
+					"kind": "compaction",
+					"input": 378,
+					"cacheRead": 1920,
+					"output": 174,
+					"costUsd": 0.00033371999999999997,
+					"stop": "stop"
+				},
+				{
+					"n": 20,
+					"kind": "compaction",
+					"input": 1344,
+					"cacheRead": 1536,
+					"output": 126,
+					"costUsd": 0.0005636160000000001,
+					"stop": "stop"
+				},
+				{
+					"n": 21,
+					"kind": "compaction",
+					"input": 476,
+					"cacheRead": 2176,
+					"output": 164,
+					"costUsd": 0.000352656,
+					"stop": "stop"
+				},
+				{
+					"n": 22,
+					"kind": "compaction",
+					"input": 528,
+					"cacheRead": 1536,
+					"output": 125,
+					"costUsd": 0.000317616,
+					"stop": "stop"
+				},
+				{
+					"n": 23,
+					"kind": "compaction",
+					"input": 508,
+					"cacheRead": 1664,
+					"output": 204,
+					"costUsd": 0.000407184,
+					"stop": "stop"
+				},
+				{
+					"n": 24,
+					"kind": "turn",
+					"input": 202,
+					"cacheRead": 5888,
+					"output": 1349,
+					"costUsd": 0.001714728,
+					"stop": "toolUse"
+				},
+				{
+					"n": 25,
+					"kind": "compaction",
+					"input": 511,
+					"cacheRead": 2048,
+					"output": 195,
+					"costUsd": 0.000399588,
+					"stop": "stop"
+				},
+				{
+					"n": 26,
+					"kind": "compaction",
+					"input": 134,
+					"cacheRead": 1534,
+					"output": 242,
+					"costUsd": 0.00033980400000000003,
+					"stop": "stop"
+				},
+				{
+					"n": 27,
+					"kind": "compaction",
+					"input": 1410,
+					"cacheRead": 1664,
+					"output": 304,
+					"costUsd": 0.000797784,
+					"stop": "stop"
+				},
+				{
+					"n": 28,
+					"kind": "compaction",
+					"input": 486,
+					"cacheRead": 2432,
+					"output": 164,
+					"costUsd": 0.000357192,
+					"stop": "stop"
+				},
+				{
+					"n": 29,
+					"kind": "compaction",
+					"input": 537,
+					"cacheRead": 3072,
+					"output": 233,
+					"costUsd": 0.0004591319999999999,
+					"stop": "stop"
+				},
+				{
+					"n": 30,
+					"kind": "compaction",
+					"input": 370,
+					"cacheRead": 1664,
+					"output": 379,
+					"costUsd": 0.000575784,
+					"stop": "stop"
+				},
+				{
+					"n": 31,
+					"kind": "turn",
+					"input": 203,
+					"cacheRead": 7296,
+					"output": 1516,
+					"costUsd": 0.001923876,
+					"stop": "toolUse"
+				},
+				{
+					"n": 32,
+					"kind": "compaction",
+					"input": 531,
+					"cacheRead": 1664,
+					"output": 482,
+					"costUsd": 0.000747684,
+					"stop": "stop"
+				},
+				{
+					"n": 33,
+					"kind": "compaction",
+					"input": 418,
+					"cacheRead": 3584,
+					"output": 181,
+					"costUsd": 0.00036410399999999997,
+					"stop": "stop"
+				},
+				{
+					"n": 34,
+					"kind": "compaction",
+					"input": 1519,
+					"cacheRead": 1664,
+					"output": 194,
+					"costUsd": 0.000698484,
+					"stop": "stop"
+				},
+				{
+					"n": 35,
+					"kind": "compaction",
+					"input": 499,
+					"cacheRead": 3072,
+					"output": 164,
+					"costUsd": 0.000364932,
+					"stop": "stop"
+				},
+				{
+					"n": 36,
+					"kind": "compaction",
+					"input": 418,
+					"cacheRead": 3968,
+					"output": 1151,
+					"costUsd": 0.0015304079999999998,
+					"stop": "stop"
+				},
+				{
+					"n": 37,
+					"kind": "compaction",
+					"input": 487,
+					"cacheRead": 2176,
+					"output": 1303,
+					"costUsd": 0.0017227559999999998,
+					"stop": "stop"
+				},
+				{
+					"n": 38,
+					"kind": "compaction",
+					"input": 457,
+					"cacheRead": 3456,
+					"output": 138,
+					"costUsd": 0.00032343599999999997,
+					"stop": "stop"
+				},
+				{
+					"n": 39,
+					"kind": "turn",
+					"input": 174,
+					"cacheRead": 8960,
+					"output": 1530,
+					"costUsd": 0.00194196,
+					"stop": "toolUse"
+				},
+				{
+					"n": 40,
+					"kind": "compaction",
+					"input": 379,
+					"cacheRead": 4352,
+					"output": 159,
+					"costUsd": 0.000330612,
+					"stop": "stop"
+				},
+				{
+					"n": 41,
+					"kind": "compaction",
+					"input": 428,
+					"cacheRead": 2560,
+					"output": 142,
+					"costUsd": 0.00031416,
+					"stop": "stop"
+				},
+				{
+					"n": 42,
+					"kind": "compaction",
+					"input": 477,
+					"cacheRead": 1664,
+					"output": 168,
+					"costUsd": 0.00035468399999999997,
+					"stop": "stop"
+				},
+				{
+					"n": 43,
+					"kind": "compaction",
+					"input": 717,
+					"cacheRead": 1664,
+					"output": 202,
+					"costUsd": 0.000467484,
+					"stop": "stop"
+				},
+				{
+					"n": 44,
+					"kind": "compaction",
+					"input": 367,
+					"cacheRead": 2944,
+					"output": 348,
+					"costUsd": 0.000545364,
+					"stop": "stop"
+				},
+				{
+					"n": 45,
+					"kind": "compaction",
+					"input": 540,
+					"cacheRead": 1664,
+					"output": 233,
+					"costUsd": 0.00045158399999999994,
+					"stop": "stop"
+				},
+				{
+					"n": 46,
+					"kind": "compaction",
+					"input": 469,
+					"cacheRead": 2176,
+					"output": 177,
+					"costUsd": 0.00036615599999999997,
+					"stop": "stop"
+				},
+				{
+					"n": 47,
+					"kind": "compaction",
+					"input": 448,
+					"cacheRead": 2560,
+					"output": 176,
+					"costUsd": 0.00036095999999999996,
+					"stop": "stop"
+				},
+				{
+					"n": 48,
+					"kind": "turn",
+					"input": 9967,
+					"cacheRead": 896,
+					"output": 61,
+					"costUsd": 0.0030686759999999998,
+					"stop": "toolUse"
+				},
+				{
+					"n": 49,
+					"kind": "compaction",
+					"input": 1789,
+					"cacheRead": 1920,
+					"output": 199,
+					"costUsd": 0.0007870199999999999,
+					"stop": "stop"
+				},
+				{
+					"n": 50,
+					"kind": "compaction",
+					"input": 419,
+					"cacheRead": 2944,
+					"output": 184,
+					"costUsd": 0.00036416400000000005,
+					"stop": "stop"
+				},
+				{
+					"n": 51,
+					"kind": "turn",
+					"input": 213,
+					"cacheRead": 10752,
+					"output": 166,
+					"costUsd": 0.000327612,
+					"stop": "stop"
+				},
+				{
+					"n": 52,
+					"kind": "compaction",
+					"input": 427,
+					"cacheRead": 2048,
+					"output": 2000,
+					"costUsd": 0.0025403879999999998,
+					"stop": "length"
+				},
+				{
+					"n": 53,
+					"kind": "compaction",
+					"input": 380,
+					"cacheRead": 3328,
+					"output": 174,
+					"costUsd": 0.00034276799999999997,
+					"stop": "stop"
+				},
+				{
+					"n": 54,
+					"kind": "compaction",
+					"input": 538,
+					"cacheRead": 3584,
+					"output": 244,
+					"costUsd": 0.00047570399999999997,
+					"stop": "stop"
+				},
+				{
+					"n": 55,
+					"kind": "compaction",
+					"input": 435,
+					"cacheRead": 2176,
+					"output": 115,
+					"costUsd": 0.00028155599999999997,
+					"stop": "stop"
+				},
+				{
+					"n": 56,
+					"kind": "compaction",
+					"input": 458,
+					"cacheRead": 2304,
+					"output": 2000,
+					"costUsd": 0.002551224,
+					"stop": "length"
+				},
+				{
+					"n": 57,
+					"kind": "compaction",
+					"input": 395,
+					"cacheRead": 4096,
+					"output": 164,
+					"costUsd": 0.00033987599999999997,
+					"stop": "stop"
+				},
+				{
+					"n": 58,
+					"kind": "compaction",
+					"input": 877,
+					"cacheRead": 2176,
+					"output": 266,
+					"costUsd": 0.000595356,
+					"stop": "stop"
+				},
+				{
+					"n": 59,
+					"kind": "compaction",
+					"input": 573,
+					"cacheRead": 2944,
+					"output": 242,
+					"costUsd": 0.00047996400000000004,
+					"stop": "stop"
+				},
+				{
+					"n": 60,
+					"kind": "compaction",
+					"input": 500,
+					"cacheRead": 3456,
+					"output": 232,
+					"costUsd": 0.000449136,
+					"stop": "stop"
+				},
+				{
+					"n": 61,
+					"kind": "compaction",
+					"input": 487,
+					"cacheRead": 2176,
+					"output": 1670,
+					"costUsd": 0.002163156,
+					"stop": "stop"
+				},
+				{
+					"n": 62,
+					"kind": "compaction",
+					"input": 539,
+					"cacheRead": 3840,
+					"output": 208,
+					"costUsd": 0.00043433999999999996,
+					"stop": "stop"
+				},
+				{
+					"n": 63,
+					"kind": "compaction",
+					"input": 400,
+					"cacheRead": 4352,
+					"output": 196,
+					"costUsd": 0.00038131199999999997,
+					"stop": "stop"
+				},
+				{
+					"n": 64,
+					"kind": "compaction",
+					"input": 566,
+					"cacheRead": 2432,
+					"output": 197,
+					"costUsd": 0.000420792,
+					"stop": "stop"
+				},
+				{
+					"n": 65,
+					"kind": "compaction",
+					"input": 454,
+					"cacheRead": 2944,
+					"output": 184,
+					"costUsd": 0.00037466400000000003,
+					"stop": "stop"
+				},
+				{
+					"n": 66,
+					"kind": "compaction",
+					"input": 448,
+					"cacheRead": 3328,
+					"output": 179,
+					"costUsd": 0.00036916799999999996,
+					"stop": "stop"
+				}
+			]
+		},
+		{
+			"n": 3,
+			"message": "What's my breakdown?",
+			"rows": [
+				{
+					"n": 67,
+					"kind": "turn",
+					"input": 2244,
+					"cacheRead": 1920,
+					"output": 37,
+					"costUsd": 0.00072912,
+					"stop": "toolUse"
+				},
+				{
+					"n": 68,
+					"kind": "turn",
+					"input": 258,
+					"cacheRead": 3968,
+					"output": 17,
+					"costUsd": 0.00012160799999999999,
+					"stop": "stop"
+				},
+				{
+					"n": 69,
+					"kind": "compaction",
+					"input": 707,
+					"cacheRead": 2560,
+					"output": 504,
+					"costUsd": 0.0008322599999999999,
+					"stop": "stop"
+				},
+				{
+					"n": 70,
+					"kind": "compaction",
+					"input": 205,
+					"cacheRead": 2176,
+					"output": 1184,
+					"costUsd": 0.0014953559999999998,
+					"stop": "stop"
+				},
+				{
+					"n": 71,
+					"kind": "compaction",
+					"input": 515,
+					"cacheRead": 3200,
+					"output": 243,
+					"costUsd": 0.0004652999999999999,
+					"stop": "stop"
+				},
+				{
+					"n": 72,
+					"kind": "compaction",
+					"input": 424,
+					"cacheRead": 2304,
+					"output": 243,
+					"costUsd": 0.000432624,
+					"stop": "stop"
+				},
+				{
+					"n": 73,
+					"kind": "compaction",
+					"input": 447,
+					"cacheRead": 3712,
+					"output": 235,
+					"costUsd": 0.00043837199999999997,
+					"stop": "stop"
+				},
+				{
+					"n": 74,
+					"kind": "compaction",
+					"input": 462,
+					"cacheRead": 1920,
+					"output": 205,
+					"costUsd": 0.0003961199999999999,
+					"stop": "stop"
+				},
+				{
+					"n": 75,
+					"kind": "compaction",
+					"input": 470,
+					"cacheRead": 4096,
+					"output": 192,
+					"costUsd": 0.000395976,
+					"stop": "stop"
+				},
+				{
+					"n": 76,
+					"kind": "compaction",
+					"input": 476,
+					"cacheRead": 2304,
+					"output": 188,
+					"costUsd": 0.00038222399999999996,
+					"stop": "stop"
+				},
+				{
+					"n": 77,
+					"kind": "compaction",
+					"input": 471,
+					"cacheRead": 4480,
+					"output": 167,
+					"costUsd": 0.00036858,
+					"stop": "stop"
+				},
+				{
+					"n": 78,
+					"kind": "compaction",
+					"input": 457,
+					"cacheRead": 2688,
+					"output": 154,
+					"costUsd": 0.000338028,
+					"stop": "stop"
+				},
+				{
+					"n": 79,
+					"kind": "compaction",
+					"input": 423,
+					"cacheRead": 3072,
+					"output": 165,
+					"costUsd": 0.00034333199999999996,
+					"stop": "stop"
+				},
+				{
+					"n": 80,
+					"kind": "compaction",
+					"input": 389,
+					"cacheRead": 3456,
+					"output": 168,
+					"costUsd": 0.00033903599999999997,
+					"stop": "stop"
+				},
+				{
+					"n": 81,
+					"kind": "compaction",
+					"input": 598,
+					"cacheRead": 2176,
+					"output": 469,
+					"costUsd": 0.000755256,
+					"stop": "stop"
+				},
+				{
+					"n": 82,
+					"kind": "compaction",
+					"input": 525,
+					"cacheRead": 2688,
+					"output": 184,
+					"costUsd": 0.000394428,
+					"stop": "stop"
+				},
+				{
+					"n": 83,
+					"kind": "compaction",
+					"input": 376,
+					"cacheRead": 3200,
+					"output": 2000,
+					"costUsd": 0.002532,
+					"stop": "length"
+				}
+			]
+		},
+		{
+			"n": 4,
+			"message": "Why does the coffee tool track decaf? Who asked for that?",
+			"rows": [
+				{
+					"n": 84,
+					"kind": "turn",
+					"input": 144,
+					"cacheRead": 4096,
+					"output": 25,
+					"costUsd": 0.000097776,
+					"stop": "stop"
+				},
+				{
+					"n": 85,
+					"kind": "compaction",
+					"input": 214,
+					"cacheRead": 2560,
+					"output": 256,
+					"costUsd": 0.00038676,
+					"stop": "stop"
+				},
+				{
+					"n": 86,
+					"kind": "compaction",
+					"input": 525,
+					"cacheRead": 2688,
+					"output": 253,
+					"costUsd": 0.000477228,
+					"stop": "stop"
+				},
+				{
+					"n": 87,
+					"kind": "compaction",
+					"input": 438,
+					"cacheRead": 3200,
+					"output": 175,
+					"costUsd": 0.00036059999999999993,
+					"stop": "stop"
+				},
+				{
+					"n": 88,
+					"kind": "compaction",
+					"input": 402,
+					"cacheRead": 3584,
+					"output": 291,
+					"costUsd": 0.000491304,
+					"stop": "stop"
+				},
+				{
+					"n": 89,
+					"kind": "compaction",
+					"input": 357,
+					"cacheRead": 3968,
+					"output": 234,
+					"costUsd": 0.000411708,
+					"stop": "stop"
+				},
+				{
+					"n": 90,
+					"kind": "compaction",
+					"input": 573,
+					"cacheRead": 2688,
+					"output": 2000,
+					"costUsd": 0.0025880279999999996,
+					"stop": "length"
+				},
+				{
+					"n": 91,
+					"kind": "compaction",
+					"input": 426,
+					"cacheRead": 3200,
+					"output": 374,
+					"costUsd": 0.0005958,
+					"stop": "stop"
+				},
+				{
+					"n": 92,
+					"kind": "compaction",
+					"input": 573,
+					"cacheRead": 2688,
+					"output": 740,
+					"costUsd": 0.001076028,
+					"stop": "stop"
+				},
+				{
+					"n": 93,
+					"kind": "compaction",
+					"input": 466,
+					"cacheRead": 3200,
+					"output": 209,
+					"costUsd": 0.00040979999999999993,
+					"stop": "stop"
+				},
+				{
+					"n": 94,
+					"kind": "compaction",
+					"input": 460,
+					"cacheRead": 3584,
+					"output": 183,
+					"costUsd": 0.000379104,
+					"stop": "stop"
+				},
+				{
+					"n": 95,
+					"kind": "compaction",
+					"input": 450,
+					"cacheRead": 3968,
+					"output": 188,
+					"costUsd": 0.000384408,
+					"stop": "stop"
+				},
+				{
+					"n": 96,
+					"kind": "compaction",
+					"input": 440,
+					"cacheRead": 4352,
+					"output": 1841,
+					"costUsd": 0.002367312,
+					"stop": "stop"
+				}
+			]
+		}
+	]
+}

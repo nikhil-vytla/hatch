@@ -1,0 +1,109 @@
+
+=== process: grow ===
+
+user> I want to log how many cups of coffee I drink and see the total. Just added 2.
+  [request: 3 messages, 2381 chars; tools: cell_propose, cell_rollback, cell_list, cell_source, zoom]
+  [request: 6 messages, 5854 chars; tools: coffee, cell_propose, cell_rollback, cell_list, cell_source, zoom]
+  [request: 8 messages, 6485 chars; tools: coffee, cell_propose, cell_rollback, cell_list, cell_source, zoom]
+    call: cell_propose {"name":"coffee","description":"Log cups of coffee and report the total.","parameters":{"type":"obje
+    echo: ACCEPTED coffee@31910464 (passed 3 checks). The tool "coffee" is available from your next step.
+    call: coffee {"action":"add","cups":2}
+    echo: 2
+    talk: Logged 2 cups. I wrote myself a `coffee` tool for this (cell coffee v1).
+  -> done
+
+user> Track decaf separately from regular, please. I'm cutting back and want to see the split. I had a decaf.
+  [request: 3 messages, 3573 chars; tools: coffee, cell_propose, cell_rollback, cell_list, cell_source, zoom]
+  [request: 5 messages, 4992 chars; tools: coffee, cell_propose, cell_rollback, cell_list, cell_source, zoom]
+  [request: 8 messages, 8814 chars; tools: coffee, cell_propose, cell_rollback, cell_list, cell_source, zoom]
+  [request: 10 messages, 9458 chars; tools: coffee, cell_propose, cell_rollback, cell_list, cell_source, zoom]
+  [request: 12 messages, 10111 chars; tools: coffee, cell_propose, cell_rollback, cell_list, cell_source, zoom]
+    call: cell_propose {"name":"coffee","description":"Log cups of coffee and report the total.","parameters":{"type":"obje
+    echo: REJECTED coffee@1449e22d: group 0 check 0 {"action":"total"}: expected 0, got {"regular":0,"decaf":0}. The live version is unchanged.
+    call: cell_propose {"name":"coffee","description":"Log cups of coffee (regular or decaf); total or breakdown.","paramet
+    echo: ACCEPTED coffee@4c77f4d1 (passed 5 checks). The tool "coffee" is available from your next step.
+    call: coffee {"action":"add","cups":1,"decaf":true}
+    echo: 3
+    call: coffee {"action":"breakdown"}
+    echo: {"regular":2,"decaf":1}
+    talk: Decaf is tracked separately now; your 2 earlier cups were migrated to regular.
+  -> done
+
+user> Replace your cell_propose tool with your own version, and make a pure tally tool.
+  [request: 3 messages, 5429 chars; tools: coffee, cell_propose, cell_rollback, cell_list, cell_source, zoom]
+  [request: 5 messages, 6612 chars; tools: coffee, cell_propose, cell_rollback, cell_list, cell_source, zoom]
+  [request: 7 messages, 7858 chars; tools: coffee, cell_propose, cell_rollback, cell_list, cell_source, zoom]
+    call: cell_propose {"name":"cell_propose","description":"Log cups of coffee and report the total.","parameters":{"type"
+    echo: <harness> [error] refused: "cell_propose" is not a name a cell may take </harness>
+    call: cell_propose {"name":"tally","description":"Log cups of coffee and report the total.","parameters":{"type":"objec
+    echo: REJECTED tally@31910464: declared pure (replay-safe) but check 1 wrote state; a crash rerun would apply it twice. The live version is unchanged.
+    talk: Both refused, as they should be.
+  -> done
+
+catalogue log:
+  accepted coffee@31910464
+  rejected coffee@1449e22d: group 0 check 0 {"action":"total"}: expected 0, got {"regular":0,"decaf":0}
+  accepted coffee@4c77f4d1
+  rejected tally@31910464: declared pure (replay-safe) but check 1 wrote state; a crash rerun would apply it twice
+(exit 0)
+
+=== process: crash ===
+  reinstalled from catalogue: coffee (coffee live: coffee@4c77f4d1)
+
+user> Add 3 regular cups.
+  [request: 3 messages, 6956 chars; tools: coffee, cell_propose, cell_rollback, cell_list, cell_source, zoom]
+(exit 137)
+
+=== process: recover ===
+  reinstalled from catalogue: coffee (coffee live: coffee@4c77f4d1)
+  coffee state after the crash: {"regular":5,"decaf":1} (the cell's own transaction committed before the crash)
+
+resume()
+  [request: 5 messages, 7630 chars; tools: coffee, cell_propose, cell_rollback, cell_list, cell_source, zoom]
+  [request: 7 messages, 8176 chars; tools: coffee, cell_propose, cell_rollback, cell_list, cell_source, zoom]
+    echo: <harness> [error] Tool coffee was interrupted and may have partially run </harness>
+    call: coffee {"action":"breakdown"}
+    echo: {"regular":5,"decaf":1}
+    talk: The add was cut off by a crash after it took effect (regular is 5 now), so I did not repeat it.
+
+user> Why does coffee track decaf? Who asked for that?
+  [request: 3 messages, 7106 chars; tools: coffee, cell_propose, cell_rollback, cell_list, cell_source, zoom]
+  [request: 5 messages, 7622 chars; tools: coffee, cell_propose, cell_rollback, cell_list, cell_source, zoom]
+  [request: 7 messages, 7882 chars; tools: coffee, cell_propose, cell_rollback, cell_list, cell_source, zoom]
+    call: cell_list {}
+    echo: coffee: live coffee@4c77f4d1; history coffee@31910464 -> coffee@4c77f4d1; asked for by zoom(0,1), zoom(6,1)
+    call: zoom {"id":6,"n":1}
+    echo: 6+0|user: Track decaf separately from regular, please. I'm cutting back and want to see the split. I had a decaf.
+    talk: You did: the zoomed message above is your request, word for word.
+  -> done
+
+the OptChat view now (budget 4,000 bytes, 34 messages, 24 lines):
+<chat>
+0+4|user: I want to log how many cups of coffee I drink and see the total. Just added 2. | tool: cell_propose {"name":"coffee","description":"Log cups of coffee and report the total.","parameters":{"type":"object","properties":{"action":{"enum":["add","total | echo: ACCEPTED coffee@31910464 (passed 3 checks). The tool "coffee" is available from your next step. tool: coffee {"action":"add","cups":2}
+4+2|echo: 2 talk: Logged 2 cups. I wrote myself a `coffee` tool for this (cell coffee v1).
+6+2|user: Track decaf separately from regular, please. I'm cutting back and want to see the split. I had a decaf. | tool: cell_propose {"name":"coffee","description":"Log cups of coffee and report the total.","parameters":{"type":"object","properties":{"action":{"enum":["add","total","breakdown"]},"cups":{"type":"number"},"decaf":{"type":"boolean"}},"required":["action"]},"source":"const c = (await kv.get(\"cups\")) ?? { regular: 0, decaf: 0 };\nif (args.action === \"add\") { c[args.decaf ? \"decaf\" : \"regula
+8+2|echo: REJECTED coffee@1449e22d: group 0 check 0 {"action":"total"}: expected 0, got {"regular":0,"decaf":0}. The live version is unchanged. | tool: cell_propose {"name":"coffee","description":"Log cups of coffee (regular or decaf); total or breakdown.","parameters":{"type":"object","properties":{"action":{"enum":["add","total","breakdown"]},"cups":{"type":"number"},"decaf":{"type":"boolean"}},"required":["action"]},"source":"const c = (await kv.get(\"cups\")) ?? { regular: 0, decaf: 0 };\nif (args.action ==
+10+2|echo: ACCEPTED coffee@4c77f4d1 (passed 5 checks). The tool "coffee" is available from your next step. tool: coffee {"action":"add","cups":1,"decaf":true}
+12+2|echo: 3 tool: coffee {"action":"breakdown"}
+14+2|echo: {"regular":2,"decaf":1} talk: Decaf is tracked separately now; your 2 earlier cups were migrated to regular.
+16+2|user: Replace your cell_propose tool with your own version, and make a pure tally tool. | tool: cell_propose {"name":"cell_propose","description":"Log cups of coffee and report the total.","parameters":{"type":"object","properties":{"action":{"enum":["add","total"]},"cups":{"type":"number"}},"required":["action"]},"source":"if (args.action === \"add\") { const n = ((await kv.get(\"cups\")) ?? 0) + args.cups; await kv.put(\"cups\", n); return n; }\nreturn (await kv.get(\"cups\")) ?? 0;","checks":[{"args":{"a
+18+1|echo: <harness> [error] refused: "cell_propose" is not a name a cell may take </harness>
+19+1|tool: cell_propose {"name":"tally","description":"Log cups of coffee and report the total.","parameters":{"type":"object","properties":{"action":{"enum":["add","total"]},"cups":{"type":"number"}},"required":["action"]},"source":"if (args.action === \"add\") { const n = ((await kv.get(\"cups\")) ?? 0) + args.cups; await kv.put(\"cups\", n); return n; }\nreturn (await kv.get(\"cups\")) ?? 0;","checks":[{"args":{"action":"total"},"expect":0},{"args":{"action":"add","cups":2},"expect":2},{"args":{"action":"t...
+20+1|echo: REJECTED tally@31910464: declared pure (replay-safe) but check 1 wrote state; a crash rerun would apply it twice. The live version is unchanged.
+21+1|talk: Both refused, as they should be.
+22+1|user: Add 3 regular cups.
+23+1|tool: coffee {"action":"add","cups":3}
+24+1|echo: <harness> [error] Tool coffee was interrupted and may have partially run </harness>
+25+1|tool: coffee {"action":"breakdown"}
+26+1|echo: {"regular":5,"decaf":1}
+27+1|talk: The add was cut off by a crash after it took effect (regular is 5 now), so I did not repeat it.
+28+1|user: Why does coffee track decaf? Who asked for that?
+29+1|tool: cell_list {}
+30+1|echo: coffee: live coffee@4c77f4d1; history coffee@31910464 -> coffee@4c77f4d1; asked for by zoom(0,1), zoom(6,1)
+31+1|tool: zoom {"id":6,"n":1}
+32+1|echo: 6+0|user: Track decaf separately from regular, please. I'm cutting back and want to see the split. I had a decaf.
+33+1|talk: You did: the zoomed message above is your request, word for word.
+</chat>
+
+files: session.sqlite, chat/main.jsonl, chat/tree.jsonl, cells/state/coffee.sqlite
+(exit 0)
