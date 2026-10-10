@@ -251,7 +251,40 @@ pseudo-terminal against DeepSeek and fixed what the screens showed (a spinner th
 transcript running into the panel, user lines clipped instead of wrapped, events arriving only after the turn, the
 status hidden behind a long path).
 
-## Gaps (round 1; see rounds 2-7 above for what changed)
+## Round 8: a D&D one-shot, on video
+
+[`video/forge-dnd.mp4`](video/forge-dnd.mp4) (2 minutes; time while the model works runs 6× fast) is one untuned
+run of `./forge` on DeepSeek V4.1 Flash. A Dungeon Master sends five messages to an agent that starts with no tools:
+track the party, roll initiative, apply damage and a healing potion, track a poison until the end of round 3, then
+"who asked you to track conditions, and when?". The full transcript is `video/recording/transcript.txt`.
+
+- **The gate shaped the tools.** The `party` tool was rejected three times (an untested action, two wrong
+  expectations) before it went live with 14 checks. Its upgrade for rounds and timed conditions was rejected four times
+  for the model's own off-by-one errors, then once by replay of real calls because the stored state changed shape; the
+  model declared the change, added a migration, and v2 went live with 43 checks and Mira's 5/14 HP carried over.
+- **A dice tool never passed.** Asked to keep dice in tools with injectable randomness, the model seeded its own
+  random generator but could not predict the generator's output when writing exact-value checks, so six attempts
+  failed and the per-turn limit stopped it. Exact-value checks fit deterministic tools; a random one needs property
+  checks ("between 1 and 20"), which the gate does not have yet.
+- **It answered provenance correctly**, quoting the user's spider message word for word.
+- **Not all good:** after the dice tool failed, the model gave initiative rolls it called "real d20s I actually
+  rolled", which it cannot have done; one message later it refused to invent a potion roll.
+- **Getting this run took three attempts, and each one found a real bug** (fixed and tested):
+  - the 300-call cap stopped a chat in its second message, because memory compactions make calls grow much faster
+    than dollars; the cap is now 1,000, and $1 stays the real stop;
+  - the model resent one rejected proposal until the cap stopped it at 1,000 calls; the kernel now refuses an
+    identical resubmission, refuses all proposals after 6 rejections in a turn, and `Live.ask` aborts a turn after
+    40 tool calls;
+  - the model wrote version ids without the cell name (`c8ddda6d` for `party@c8ddda6d`), so three proposals failed
+    as stale against the very version they meant; short ids are now expanded where arguments come in, and the same
+    run showed why exact facts need tools (it healed "2+4+2 = 10"), so the kernel's preamble now says so.
+- **How it was made.** A small Python driver ran `./forge` in a pseudo-terminal, typed the five messages and saved
+  the byte stream as an asciinema cast (`video/recording/`). The video is an [fframes](https://github.com/dmtrKovalenko/fframes)
+  project (`video/forge-video/`): it replays the cast through the `vt100` crate, draws each screen as SVG text, and
+  adds the title, chapter and closing cards. It renders on fframes' CPU backend (this machine has no GPU) in about a
+  minute.
+
+## Gaps (round 1; see rounds 2-8 above for what changed)
 
 - ~~The migration runs on the real state before the catalog commit, in two databases.~~ Fixed in round 2 with a
   pending/marker/live protocol reconciled on boot.
@@ -267,7 +300,7 @@ status hidden behind a long path).
 cd prototype && ./forge              # installs on first run; demo with no key, full-screen chat with one (rounds 6-7)
 ./forge --help                       # --model, --summary-model, --base-url, --data, --fresh, caps, --list-models, --plain
 npm run check                        # tsc + oxlint (anti-slop + gdp-ts)
-npm test                             # 130 tests, about a minute
+npm test                             # 140 tests, about a minute
 node --experimental-strip-types --no-warnings src/demo.ts           # three processes: grow, crash, recover
 node --experimental-strip-types --no-warnings src/bench-view.ts 20000
 node --experimental-strip-types --no-warnings src/shadow-check.ts

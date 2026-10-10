@@ -113,7 +113,9 @@ export function sidePanelLines(catalogue: Catalogue | undefined, width: number):
 			const pending = entry.pending === null ? "" : `, pending ${shortVersion(entry.pending)}`;
 
 			lines.push(` ${name}  ${live}`);
-			lines.push(dim(`   ${Object.keys(entry.versions).length} versions${pending}`));
+			const count = Object.keys(entry.versions).length;
+
+			lines.push(dim(`   ${count} ${count === 1 ? "version" : "versions"}${pending}`));
 		}
 	}
 

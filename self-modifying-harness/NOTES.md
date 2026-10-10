@@ -479,3 +479,35 @@ A Sonnet agent wrote `src/live.ts`, `src/chat.ts` and `src/live-run.ts`; I verif
     committed entries every 300 ms and reports each once, so a `cell_propose` and its verdict appear as they happen;
     an assistant message's words now come before its tool calls;
   - the status was at the end of the footer and a long data path hid it; it now leads.
+
+## Round 8: the video
+
+- **Ask.** Record `./forge` doing something real and fun, and render it with fframes.
+- **Recording.** A Python pty driver (`video/recording/drive.py`) runs the TUI at 132×34, types each message, waits for
+  `ready |` in the footer and saves an asciinema cast. Two driver lessons: write the cast as you go, because the first
+  stuck run could not be inspected until it ended; and `pkill -f` matched my own shell again (the pattern was in its
+  command line). Stop processes by PID.
+- **Three runs, three bugs (all fixed with tests, all in the README's round 8):**
+  1. The run sat idle with no request in flight: it had hit the 300-call cap in message 2. A two-message rerun used
+     126 calls, mostly memory compactions (each message and tool result costs about two cheap calls). Cap: 1,000 calls.
+  2. The next run spent 1,000 calls in message 2: the model resent the same rejected `dice` proposal over and over.
+     The version id hashes only cell, source and migration, so the fingerprint for "the same proposal" covers source,
+     checks, invariants, retire, changes and `expectLive`; stale rejections are not remembered, since they say nothing
+     about the code (the demo resends identical code with a corrected `expectLive`, and my first version broke it,
+     which a diff of `src/demo.ts`'s output caught). Brakes: identical resubmission refused, 6 rejections per turn,
+     40 tool calls per turn (then `Conversation.abort()`).
+  3. The next run failed three proposals as stale because `expectLive` was `c8ddda6d`, not `party@c8ddda6d`. Short ids
+     are expanded at the boundary (`cell_propose`, `cell_rollback`, `cell_source`). The same run did dice and
+     arithmetic in its head and healed "2+4+2 = 10", so the preamble now says random or exact facts belong in tools.
+- **The filmed run** (4 min 45 s real, 293 calls, $0.32): the gate rejected 16 proposals; `party` went v1 (14 checks)
+  to v2 (43 checks, rounds and timed conditions, state migrated); the dice tool failed 6 times because exact-value
+  checks cannot pin a random generator's output the model cannot predict. The gate needs property checks for that
+  (an `expect` that is a predicate). The model also claimed hand-made rolls were "real d20s I actually rolled".
+- **fframes on a machine without a GPU.** The template uses Skia on Vulkan and a preview window (ALSA). Neither
+  exists here; fframes' own CPU renderer is the default when no backend is set, so I removed both. Its prebuilt ffmpeg
+  links libx264 ABI 163 and Ubuntu's `libx264-dev` is 164, so the binary encodes with ffmpeg's built-in `mpeg4` and
+  the system ffmpeg makes the H.264 copies. Rendering 3,586 frames of 1080p took 53 s.
+- **Terminal to SVG.** `vt100` replays the cast; each distinct screen becomes a keyframe. One `<text>` per run of
+  same-styled cells, positioned by column, keeps the grid aligned. DejaVu Sans Mono has no Braille (the spinner), and a
+  `<text>` with one missing glyph fell back whole to a proportional font, so Braille cells get runs of their own.
+- **Not done:** property checks in the gate; a second model on the same five messages.
