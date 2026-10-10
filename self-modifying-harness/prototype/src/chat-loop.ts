@@ -1,13 +1,17 @@
 // The interactive chat loop, split out of src/chat.ts so both the thin `npm run chat` entry and src/start.ts (the
 // `./forge` command) drive an already-open forge the same way: one line in, one turn out, with /usage, /cells, /view,
-// /verbose and /quit. Opening the forge (models, data directory, limits) is the caller's job.
+// /verbose and /quit. Opening the forge (models, data directory, limits) is the caller's job. `usageRow` is exported
+// because the TUI's `/usage` and footer reuse the same one-row-per-request format.
 import { createInterface } from "node:readline/promises";
-import { cachePercent, describeCatalogue, type Live, show } from "./live.ts";
+import { cachePercent, describeCatalogue, type Live, type UsageRow, show } from "./live.ts";
+
+/** One meter row, the same line both the plain loop and the TUI's `/usage` append. */
+export function usageRow(r: UsageRow): string {
+	return `  #${r.n} ${r.kind.padEnd(10)} input ${r.input} cache-read ${r.cacheRead} (${cachePercent(r)}%) output ${r.output} $${r.costUsd.toFixed(5)}`;
+}
 
 function usage(live: Live): string {
-	const rows = live.meter.rows.map((r) => `  #${r.n} ${r.kind.padEnd(10)} input ${r.input} cache-read ${r.cacheRead} (${cachePercent(r)}%) output ${r.output} $${r.costUsd.toFixed(5)}`);
-
-	return [...rows, live.meter.summary()].join("\n");
+	return [...live.meter.rows.map(usageRow), live.meter.summary()].join("\n");
 }
 
 /** Read lines from stdin until /quit, Ctrl-C or end of input, then close the forge and print the spend. */

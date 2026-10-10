@@ -1,7 +1,8 @@
 // One command to start the forge: `./forge [flags]` (or `npm start`). It resolves the turn and summary models from the
 // flags/environment via src/model-config.ts, runs the scripted offline demo when no model is configured (or --demo is
-// given), and otherwise opens the forge and hands it to the chat loop. The status line it prints before chatting names
-// the models, the data directory and the spend cap, so the first thing a run shows is what it is going to spend.
+// given), and otherwise opens the forge and hands it to the chat UI. On a terminal the full-screen TUI owns the screen
+// and repeats the model/data/cap facts in its footer; --plain forces the line-based loop, which is also the only option
+// when stdin or stdout is not a TTY (piped input), and it keeps the status line printed before the first prompt.
 import { spawnSync } from "node:child_process";
 import { rmSync } from "node:fs";
 import { homedir } from "node:os";
@@ -10,6 +11,7 @@ import { parseArgs } from "node:util";
 import { runChat } from "./chat-loop.ts";
 import { type Limits, openLive } from "./live.ts";
 import { chooseModels, configuredModels, describeModel, type Env } from "./model-config.ts";
+import { backendOf, runTui } from "./tui.ts";
 
 /**
  * An interactive session's cap: wider than the library default (60 calls, $0.25), which a scripted run fits in but a chat
@@ -30,6 +32,7 @@ const HELP = `usage: ./forge [flags]
   --max-cost USD             stop after this many dollars (default ${CHAT_LIMITS.maxCostUsd})
   --list-models              list providers with a configured credential and their chat models
   --demo                     run the scripted offline demo instead of chatting
+  --plain                    line-based chat instead of the full-screen TUI (automatic without a TTY)
   --help                     this text
 
 Environment: FORGE_MODEL, FORGE_SUMMARY_MODEL, FORGE_BASE_URL, FORGE_HOME, FORGE_API_KEY (local endpoints), and each
@@ -70,6 +73,7 @@ async function main(argv: readonly string[], env: Env): Promise<number> {
 			"max-cost": { type: "string" },
 			"list-models": { type: "boolean" },
 			demo: { type: "boolean" },
+			plain: { type: "boolean" },
 			help: { type: "boolean" },
 		},
 		strict: true,
@@ -121,10 +125,14 @@ async function main(argv: readonly string[], env: Env): Promise<number> {
 
 	const limits = { maxCalls: numberFlag(values["max-calls"], CHAT_LIMITS.maxCalls), maxCostUsd: numberFlag(values["max-cost"], CHAT_LIMITS.maxCostUsd) };
 	const live = await openLive(dataDir, { limits, turn: choice.turn, summary: choice.summary });
+	const model = describeModel(choice.turn);
 
-	console.log(`turn ${describeModel(choice.turn)} | summary ${describeModel(choice.summary)} | data ${dataDir} | cap ${limits.maxCalls} calls or $${limits.maxCostUsd.toFixed(2)}`);
-
-	await runChat(live);
+	if (values.plain || !process.stdin.isTTY || !process.stdout.isTTY) {
+		console.log(`turn ${model} | summary ${describeModel(choice.summary)} | data ${dataDir} | cap ${limits.maxCalls} calls or $${limits.maxCostUsd.toFixed(2)}`);
+		await runChat(live);
+	} else {
+		await runTui(backendOf(live), { model, dataDir });
+	}
 
 	return 0;
 }

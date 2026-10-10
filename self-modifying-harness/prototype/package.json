@@ -7,6 +7,7 @@
     "@earendil-works/pi-ai": "1.0.3",
     "@earendil-works/pi-codemode": "1.0.3",
     "@earendil-works/pi-durable": "1.0.3",
+    "@earendil-works/pi-tui": "1.0.3",
     "@gdp-ts/core": "0.1.0"
   },
   "devDependencies": {

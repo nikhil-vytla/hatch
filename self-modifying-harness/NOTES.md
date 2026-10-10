@@ -459,3 +459,23 @@ A Sonnet agent wrote `src/live.ts`, `src/chat.ts` and `src/live-run.ts`; I verif
   on the command line; the code no longer sets it itself.
 - Not done: the TUI; a per-model smoke comparison (the round 4 script on several models); a check that a model supports
   tool calls (pi-ai's catalog has no such flag).
+
+## Round 7: the terminal UI
+
+- **Why TypeScript, not Rust.** Every part of the harness is TypeScript, and a turn waits seconds on the model; a Rust
+  front end would add a second process and a wire protocol for no speed a person would notice. pi ships its own TUI
+  library, `@earendil-works/pi-tui`. I pinned 1.0.3 (same release line as pi-durable and pi-ai) rather than 1.1.0, which
+  was two days old; 1.0.3 already has `TuiAltScreen`, `HStack`/`VStack` and `ScrollView`.
+- **Who did what.** pi on `deepseek-flash` wrote `src/tui.ts` (behind a `ChatBackend` seam so a fake backend and a fake
+  `Terminal` can test it), `test/tui.test.ts` (9 tests) and the `--plain`/TTY switch in `start.ts`. Check and tests
+  passed on my rerun.
+- **What the tests could not see.** I ran `./forge` in a real pseudo-terminal (a small Python pty driver) against
+  DeepSeek and rendered the screens with `@xterm/headless`. That showed five problems, all fixed:
+  - pi-tui's `Loader` renders a blank line above its spinner, so in the footer's row it pushed the footer text down to
+    a single "."; the spinner is now a frame in the footer's status, with the elapsed seconds;
+  - the transcript ran straight into the side panel; the panel now draws a `│` rule;
+  - user messages were clipped to one line; they now wrap (`Text`);
+  - events arrived only when the turn ended, because `Live.ask` read the session after `wait()`; it now polls the
+    committed entries every 300 ms and reports each once, so a `cell_propose` and its verdict appear as they happen;
+    an assistant message's words now come before its tool calls;
+  - the status was at the end of the footer and a long data path hid it; it now leads.

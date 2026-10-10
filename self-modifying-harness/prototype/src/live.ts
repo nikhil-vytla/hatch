@@ -187,6 +187,27 @@ function compactionCall(meter: Meter, summary: ServedModel): Complete {
 	};
 }
 
+/** What one committed message did: a tool result, or an assistant message's tool calls, words and failure. */
+function eventsOf(message: Message): TurnEvent[] {
+	if (message.role === "toolResult") return [{ kind: "result", name: message.toolName, text: message.content.flatMap((p) => (p.type === "text" ? [p.text] : [])).join(""), isError: message.isError }];
+
+	if (message.role !== "assistant") return [];
+
+	const events: TurnEvent[] = [];
+	const said = textOf(message);
+
+	// The words come before the calls, in the order the model wrote them.
+	if (said !== "") events.push({ kind: "reply", text: said });
+
+	for (const part of message.content) {
+		if (part.type === "toolCall") events.push({ kind: "call", name: part.name, args: JSON.stringify(part.arguments) });
+	}
+
+	if (message.stopReason === "error" && message.errorMessage !== undefined) events.push({ kind: "reply", text: `(model request failed: ${message.errorMessage})` });
+
+	return events;
+}
+
 // --- opening the forge ---
 
 export type LiveOptions = { limits?: Partial<Limits>; turn: ServedModel; summary: ServedModel };
@@ -256,30 +277,41 @@ export async function openLive(dataDir: string, options: LiveOptions): Promise<L
 		catalogue: () => withCommittedCatalogue(harness, BACKGROUND_CONTEXT, (read) => read.value),
 		async ask(text, onEvent) {
 			const before = (await entries()).length;
-			const settled = await (await root.submit({ type: "input", content: text }, BACKGROUND_CONTEXT)).wait(BACKGROUND_CONTEXT);
 			const events: TurnEvent[] = [];
+			let seen = before;
 
-			for (const entry of (await entries()).slice(before)) {
-				const message = entry.model?.[0];
+			// Entries are committed as the turn runs, so read them on a short poll and report each one once: a caller sees
+			// a tool call while the turn is still going, not only when it ends.
+			const drain = async (): Promise<void> => {
+				const fresh = (await entries()).slice(seen);
+				seen += fresh.length;
 
-				if (message === undefined) continue;
+				for (const entry of fresh) {
+					const message = entry.model?.[0];
 
-				if (message.role === "toolResult") events.push({ kind: "result", name: message.toolName, text: message.content.flatMap((p) => (p.type === "text" ? [p.text] : [])).join(""), isError: message.isError });
+					if (message === undefined) continue;
 
-				if (message.role === "assistant") {
-					const said = textOf(message);
-
-					for (const part of message.content) {
-						if (part.type === "toolCall") events.push({ kind: "call", name: part.name, args: JSON.stringify(part.arguments) });
+					for (const event of eventsOf(message)) {
+						events.push(event);
+						onEvent?.(event);
 					}
-
-					if (said !== "") events.push({ kind: "reply", text: said });
-
-					if (message.stopReason === "error" && message.errorMessage !== undefined) events.push({ kind: "reply", text: `(model request failed: ${message.errorMessage})` });
 				}
+			};
+
+			const handle = await root.submit({ type: "input", content: text }, BACKGROUND_CONTEXT);
+			let settledYet = false;
+
+			const settling = handle.wait(BACKGROUND_CONTEXT).finally(() => {
+				settledYet = true;
+			});
+
+			while (!settledYet) {
+				await Promise.race([settling, new Promise((resolve) => setTimeout(resolve, 300))]);
+				await drain();
 			}
 
-			for (const event of events) onEvent?.(event);
+			const settled = await settling;
+			await drain();
 
 			return { status: settled.status, reason: settled.status === "done" ? "" : JSON.stringify(settled.reason ?? ""), events, capped: meter.tripped };
 		},

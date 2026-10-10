@@ -240,7 +240,18 @@ each path below by running it.
   and the `--base-url` path against DeepSeek's OpenAI-compatible endpoint. That last one reports $0 and no cache reads,
   because a custom endpoint has no catalog price and its usage is parsed generically.
 
-## Gaps (round 1; see rounds 2-6 above for what changed)
+## Round 7: a terminal UI
+
+In a terminal, `./forge` now opens a full-screen app built on pi's own [pi-tui](https://github.com/earendil-works/pi)
+(1.0.3, the same release line as the other pi packages): the transcript, a side panel with each agent-written tool, its
+live version and the catalog's accept/reject log, an editor, and a footer with the turn's status, the model, calls and
+spend. Tool calls and gate verdicts show up while the turn runs (accepted in green, rejected in red), not only at its end.
+`--plain`, or piped input, keeps the line-based chat. pi on DeepSeek V4.1 Flash wrote it; I drove it in a real
+pseudo-terminal against DeepSeek and fixed what the screens showed (a spinner that pushed the footer off its row, the
+transcript running into the panel, user lines clipped instead of wrapped, events arriving only after the turn, the
+status hidden behind a long path).
+
+## Gaps (round 1; see rounds 2-7 above for what changed)
 
 - ~~The migration runs on the real state before the catalog commit, in two databases.~~ Fixed in round 2 with a
   pending/marker/live protocol reconciled on boot.
@@ -253,10 +264,10 @@ each path below by running it.
 ## Run it
 
 ```sh
-cd prototype && ./forge              # installs on first run; demo with no key, chat with one (round 6)
-./forge --help                       # --model, --summary-model, --base-url, --data, --fresh, caps, --list-models
+cd prototype && ./forge              # installs on first run; demo with no key, full-screen chat with one (rounds 6-7)
+./forge --help                       # --model, --summary-model, --base-url, --data, --fresh, caps, --list-models, --plain
 npm run check                        # tsc + oxlint (anti-slop + gdp-ts)
-npm test                             # 121 tests, about a minute
+npm test                             # 130 tests, about a minute
 node --experimental-strip-types --no-warnings src/demo.ts           # three processes: grow, crash, recover
 node --experimental-strip-types --no-warnings src/bench-view.ts 20000
 node --experimental-strip-types --no-warnings src/shadow-check.ts
@@ -270,7 +281,7 @@ Files in `prototype/src/`:
   (type-checked mistakes, never run);
 - memory: `optchat.ts` (log, tree, view, compactor), `compaction.ts` (tasks, ruler, retry), `optchat-prompt.ts`, and
   `memory-extension.ts` (the pi-durable glue);
-- running it: `start.ts` (`./forge`), `model-config.ts` (choosing models and keys), `live.ts` (the forge on a real
+- running it: `start.ts` (`./forge`), `tui.ts` (the full-screen chat), `model-config.ts` (choosing models and keys), `live.ts` (the forge on a real
   model, with the spend meter), `chat-loop.ts`, `chat.ts`, `live-run.ts`;
 - `forge.ts` (the kernel's tools) and the scripts `demo.ts`, `bench-view.ts`, `bench-cells.ts`, `shadow-check.ts`.
 
