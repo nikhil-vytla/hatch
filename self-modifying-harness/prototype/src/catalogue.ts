@@ -238,8 +238,9 @@ function cellsExtension(catalogue: Catalogue, runtime: CellRuntime, owned: Calle
 				execute: async (args, api) => {
 					const invariants = { owned: ownedInvariants(owned, cell), proposed: live.invariants };
 					// The call id is the seed either way, so a random tool draws fresh numbers when calls are not exactly-once.
+					// Without exactly-once there is no `call_clock` row, so that mode reads the live clock instead.
 					const callId = `${api.taskId}:${api.callId}`;
-					const value = await runtime.call(live, cell, args, exactlyOnce ? callId : undefined, invariants, callId);
+					const value = await runtime.call(live, cell, args, exactlyOnce ? callId : undefined, invariants, callId, exactlyOnce ? undefined : Date.now());
 
 					// Demo only: die after the cell's own SQLite transaction committed but before pi-durable stored the result,
 					// the window in which a rerun would apply the effect twice.

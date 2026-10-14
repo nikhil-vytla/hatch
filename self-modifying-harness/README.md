@@ -302,6 +302,10 @@ property checks ratchet and count for action coverage like exact ones.
   160 calls, $0.18.
 - **What the tools fixed and what they did not.** `party` reported Mira at 13/14 after the potion; the model's own
   sentence then said she "topped out at 14". The numbers in tools were right; the prose around them still was not.
+- **`Date` is pinned too** (from [tardigrade](https://github.com/clavia-labs/tardigrade)'s ambient clock): a call's
+  first run records the host time next to its call id, and reruns and replays reuse it. Gate checks and fuzzing start
+  from an empty state at a fixed `2026-01-01`, so date-based expectations hold for every version on every day.
+  Invariants see the instant of what they check, and migrations see the real time, since they run on today's state.
 - **Can a rule cheat?** Tests try a rule that empties the harness's list of results, reaches for it on `globalThis`,
   and redefines `Array.prototype.length`; all three still fail the off-by-one d20, because pi-codemode runs each
   script inside a function the rule's `new Function` body cannot see.
@@ -322,7 +326,7 @@ property checks ratchet and count for action coverage like exact ones.
 cd prototype && ./forge              # installs on first run; demo with no key, full-screen chat with one (rounds 6-7)
 ./forge --help                       # --model, --summary-model, --base-url, --data, --fresh, caps, --list-models, --plain
 npm run check                        # tsc + oxlint (anti-slop + gdp-ts)
-npm test                             # 160 tests, about a minute
+npm test                             # 169 tests, about a minute
 node --experimental-strip-types --no-warnings src/demo.ts           # three processes: grow, crash, recover
 node --experimental-strip-types --no-warnings src/bench-view.ts 20000
 node --experimental-strip-types --no-warnings src/shadow-check.ts

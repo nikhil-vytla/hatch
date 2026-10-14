@@ -61,6 +61,7 @@ export type Trace = {
 	after: JsonObject; // the whole kv after the call
 	result: JsonValue;
 	version: string | null; // the cell version that ran it
+	at: number; // the instant the original call saw through `Date` (its `call_clock` row)
 };
 
 export type ReplayOutcome = { result: JsonValue; after: JsonObject } | { error: string } | { migrationError: string };
@@ -199,6 +200,9 @@ function openState(stateFile: string): DatabaseSync {
 	// Exactly-once: the harness's call id is recorded in the same transaction as the call's effects, so a rerun
 	// after a crash finds its own result instead of applying the effects again. The other columns are the call's trace.
 	db.exec("CREATE TABLE IF NOT EXISTS calls (id TEXT PRIMARY KEY, result TEXT NOT NULL)");
+	// The instant a call id's scripts see through `Date`, recorded on the call's first run and kept (it is tiny) so a
+	// crash rerun and the gate's replay of the trace draw the same time. Its own transaction, before the call's.
+	db.exec("CREATE TABLE IF NOT EXISTS call_clock (id TEXT PRIMARY KEY, at INTEGER NOT NULL)");
 	// Crash-safe migration: `migrated_to` is written in the same transaction as the migration it records.
 	db.exec("CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT NOT NULL)");
 	const have = new Set(db.prepare("PRAGMA table_info(calls)").all().map((column) => String(column.name)));
@@ -239,10 +243,19 @@ function seedNumber(seed: string): number {
 	return hash >>> 0;
 }
 
+/**
+ * The instant the gate's checks, property-check repeats and fuzzing (which all start from an empty state) see through
+ * `Date`, so a date-based expectation is the same for every version and on every day the gate runs. `Date.UTC(2026, 0, 1)`,
+ * in milliseconds since the epoch.
+ */
+export const GATE_EPOCH = Date.UTC(2026, 0, 1);
+
 // Prepended to every script (tool, invariant, rule): mulberry32 behind `Math.random`, with a `rand()` alias on the same
-// stream. A fresh VM per execution, so the override never leaks between calls; the block keeps the state out of the
-// model's scope, so only a deliberate `Math.random` or `rand()` sees it.
-function randomPrelude(seed: string): string {
+// stream, and a `Date` whose no-argument forms answer from `at`. A fresh VM per execution, so the overrides never leak
+// between calls; the block keeps the state out of the model's scope, so only a deliberate `Math.random`/`rand()`/`Date`
+// sees it. `new Date(x)` with arguments, the static methods and every instance method keep working: the wrapper returns
+// real Date instances and inherits the real constructor's statics.
+function ambientPrelude(seed: string, at: number): string {
 	return `{
 	let state = ${seedNumber(seed)} >>> 0;
 	const next = () => {
@@ -254,6 +267,16 @@ function randomPrelude(seed: string): string {
 	};
 	Math.random = next;
 	globalThis.rand = next;
+	const RealDate = Date;
+	const fixed = ${at};
+	const ClockDate = function Date(...args) {
+		if (!new.target) return new RealDate(fixed).toString();
+		return args.length === 0 ? new RealDate(fixed) : new RealDate(...args);
+	};
+	Object.setPrototypeOf(ClockDate, RealDate);
+	ClockDate.prototype = RealDate.prototype;
+	ClockDate.now = () => fixed;
+	globalThis.Date = ClockDate;
 }`;
 }
 
@@ -346,7 +369,7 @@ export class CellRuntime {
 		return next;
 	}
 
-	private async execute(db: DatabaseSync, code: string, readOnly: boolean, seed: string): Promise<JsonValue> {
+	private async execute(db: DatabaseSync, code: string, readOnly: boolean, seed: string, at: number = GATE_EPOCH): Promise<JsonValue> {
 		this.executions++;
 		this.active = {
 			get: db.prepare("SELECT v FROM kv WHERE k = ?"),
@@ -357,7 +380,7 @@ export class CellRuntime {
 		};
 
 		try {
-			const result = await this.sandbox.execute(`${randomPrelude(seed)}\n${code}`);
+			const result = await this.sandbox.execute(`${ambientPrelude(seed, at)}\n${code}`);
 
 			if (!result.ok) throw new Error(`${result.error.kind}: ${result.error.message}`);
 
@@ -369,15 +392,17 @@ export class CellRuntime {
 
 	// Evaluated against the call's own uncommitted state, so a failure can still roll the call back. One execution per
 	// non-empty list, so lists of different origin never share a VM.
-	private async checkInvariants(db: DatabaseSync, invariants: Invariant[] | InvariantSets): Promise<void> {
-		for (const group of groupsOf(invariants)) await this.checkGroup(db, group);
+	// Invariants see the same instant as the execution they check, so "nothing is dated in the future" holds for a
+	// real call made today as well as for a gate check at the gate epoch.
+	private async checkInvariants(db: DatabaseSync, invariants: Invariant[] | InvariantSets, at: number): Promise<void> {
+		for (const group of groupsOf(invariants)) await this.checkGroup(db, group, at);
 	}
 
-	private async checkGroup(db: DatabaseSync, invariants: Invariant[]): Promise<void> {
+	private async checkGroup(db: DatabaseSync, invariants: Invariant[], at: number): Promise<void> {
 		let verdicts: (string | null)[] | undefined;
 
 		try {
-			verdicts = parseVerdicts(await this.execute(db, invariantProgram(invariants), true, "invariant"), invariants.length);
+			verdicts = parseVerdicts(await this.execute(db, invariantProgram(invariants), true, "invariant", at), invariants.length);
 		} catch (error) {
 			const names = invariants.map((i) => i.name).join(", ");
 			throw new Error(`invariants [${names}] could not be evaluated: ${error instanceof Error ? error.message : String(error)}`);
@@ -390,7 +415,22 @@ export class CellRuntime {
 		}
 	}
 
-	private async runLocked(source: string, args: JsonValue, stateFile: string, callId: string | undefined, invariants: Invariant[] | InvariantSets, version: string | undefined, seed: string | undefined, marker?: string): Promise<JsonValue> {
+	// The instant a script sees through `Date`. A call id records the host clock on its first run and every later run
+	// of that id (a crash rerun) reads the same instant back; the recording commits in its own transaction before the
+	// call's own transaction opens, and the row is kept because it is tiny. A replayed call passes the original trace's
+	// instant and migrations pass the host clock (they run on today's state). Gate checks and fuzzing get the gate epoch.
+	private callClock(db: DatabaseSync, callId: string | undefined, at: number | undefined): number {
+		if (callId === undefined) return at ?? GATE_EPOCH;
+
+		db.exec("BEGIN");
+		db.prepare("INSERT OR IGNORE INTO call_clock (id, at) VALUES (?, ?)").run(callId, Date.now());
+		db.exec("COMMIT");
+		const row = db.prepare("SELECT at FROM call_clock WHERE id = ?").get(callId);
+
+		return Number(row?.at);
+	}
+
+	private async runLocked(source: string, args: JsonValue, stateFile: string, callId: string | undefined, invariants: Invariant[] | InvariantSets, version: string | undefined, seed: string | undefined, at?: number, marker?: string): Promise<JsonValue> {
 		this.lastWrites = 0;
 		const db = openState(stateFile);
 		// A real call seeds from its call id: a crash rerun and the gate's replay of the recorded trace draw the same
@@ -408,6 +448,8 @@ export class CellRuntime {
 				}
 			}
 
+			const clockAt = this.callClock(db, callId, at);
+
 			// One transaction per call: a script that throws, or breaks an invariant, leaves the state as it was.
 			db.exec("BEGIN");
 
@@ -420,8 +462,8 @@ export class CellRuntime {
 				}
 
 				const before = callId === undefined ? null : snapshot(db, SNAPSHOT_LIMIT_BYTES);
-				const value = await this.execute(db, `const args = ${JSON.stringify(args ?? {})};\n${source}`, false, seedString);
-				await this.checkInvariants(db, invariants);
+				const value = await this.execute(db, `const args = ${JSON.stringify(args ?? {})};\n${source}`, false, seedString, clockAt);
+				await this.checkInvariants(db, invariants, clockAt);
 
 				if (callId !== undefined) {
 					const after = snapshot(db, SNAPSHOT_LIMIT_BYTES);
@@ -456,13 +498,13 @@ export class CellRuntime {
 	 * before commit, `invariants` are checked against the same transaction; a violation rolls the call back and throws
 	 * an `InvariantError`.
 	 */
-	run(source: string, args: JsonValue, stateFile: string, callId?: string, invariants: Invariant[] | InvariantSets = [], version?: string, seed?: string): Promise<JsonValue> {
-		return this.serialized(() => this.runLocked(source, args, stateFile, callId, invariants, version, seed));
+	run(source: string, args: JsonValue, stateFile: string, callId?: string, invariants: Invariant[] | InvariantSets = [], version?: string, seed?: string, at?: number): Promise<JsonValue> {
+		return this.serialized(() => this.runLocked(source, args, stateFile, callId, invariants, version, seed, at));
 	}
 
 	/** Run a live cell's code against its real state. */
-	call(cell: CellVersion, name: string, args: JsonValue, callId?: string, invariants: Invariant[] | InvariantSets = [], seed?: string): Promise<JsonValue> {
-		return this.run(cell.source, args, this.statePath(name), callId, invariants, cell.version, seed);
+	call(cell: CellVersion, name: string, args: JsonValue, callId?: string, invariants: Invariant[] | InvariantSets = [], seed?: string, at?: number): Promise<JsonValue> {
+		return this.run(cell.source, args, this.statePath(name), callId, invariants, cell.version, seed, at);
 	}
 
 	/** The most recent `limit` exactly-once calls of a cell that have complete snapshots, oldest first. */
@@ -474,7 +516,7 @@ export class CellRuntime {
 
 			try {
 				const rows = db
-					.prepare("SELECT id, args, kv_before, kv_after, result, version FROM calls WHERE args IS NOT NULL AND kv_before IS NOT NULL AND kv_after IS NOT NULL ORDER BY rowid DESC LIMIT ?")
+					.prepare("SELECT c.id, c.args, c.kv_before, c.kv_after, c.result, c.version, k.at FROM calls c LEFT JOIN call_clock k ON k.id = c.id WHERE c.args IS NOT NULL AND c.kv_before IS NOT NULL AND c.kv_after IS NOT NULL ORDER BY c.rowid DESC LIMIT ?")
 					.all(limit);
 
 				const traces = rows.map((row): Trace => ({
@@ -484,6 +526,8 @@ export class CellRuntime {
 					after: JSON.parse(String(row.kv_after)),
 					result: JSON.parse(String(row.result)),
 					version: row.version === null ? null : String(row.version),
+					// A call recorded before `call_clock` existed has no row; the fixed gate epoch keeps its replay deterministic.
+					at: row.at === null ? GATE_EPOCH : Number(row.at),
 				}));
 
 				return traces.reverse();
@@ -517,15 +561,16 @@ export class CellRuntime {
 
 				if (candidate.migrate) {
 					try {
-						await this.runLocked(candidate.migrate, {}, scratch, undefined, [], undefined, `${trace.id}|migrate`);
+						await this.runLocked(candidate.migrate, {}, scratch, undefined, [], undefined, `${trace.id}|migrate`, trace.at);
 					} catch (error) {
 						return { migrationError: error instanceof Error ? error.message : String(error) };
 					}
 				}
 
 				try {
-					// The trace's id is the original call id, so the replayed call draws the same random stream.
-					const result = await this.runLocked(candidate.source, trace.args, scratch, undefined, invariants, undefined, trace.id);
+					// The trace's id is the original call id, so the replayed call draws the same random stream; its recorded
+					// instant makes `Date` match too. A migration replayed onto the trace's state sees that instant as well.
+					const result = await this.runLocked(candidate.source, trace.args, scratch, undefined, invariants, undefined, trace.id, trace.at);
 					const db = openState(scratch);
 
 					try {
@@ -560,7 +605,8 @@ export class CellRuntime {
 				if (existsSync(this.statePath(name))) copyFileSync(this.statePath(name), scratch);
 
 				try {
-					await this.run(candidate.migrate, {}, scratch, undefined, invariants, undefined, `${candidate.version}|migrate`);
+					// The trial migration runs on a copy of today's live state, so it sees today's time, as the real one will.
+					await this.run(candidate.migrate, {}, scratch, undefined, invariants, undefined, `${candidate.version}|migrate`, Date.now());
 				} catch (error) {
 					return { ok: false, reason: `migration failed on a copy of the live state: ${error instanceof Error ? error.message : String(error)}` };
 				}
@@ -697,7 +743,7 @@ export class CellRuntime {
 	 */
 	migrateTo(name: string, cell: CellVersion, invariants: Invariant[] | InvariantSets = []): Promise<void> {
 		return this.serialized(async () => {
-			await this.runLocked(cell.migrate ?? "", {}, this.statePath(name), undefined, invariants, cell.version, `${cell.version}|migrate`, cell.version);
+			await this.runLocked(cell.migrate ?? "", {}, this.statePath(name), undefined, invariants, cell.version, `${cell.version}|migrate`, Date.now(), cell.version);
 		});
 	}
 

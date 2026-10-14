@@ -536,3 +536,10 @@ A Sonnet agent wrote `src/live.ts`, `src/chat.ts` and `src/live-run.ts`; I verif
   the TUI was busy (it said so).
 - Not done: shrinking (rules apply to fixed args; shrinking needs generated inputs, which would combine with the schema
   fuzzer), and rules over all results at once ("every face of a d20 appears").
+- **Pinned `Date`** (idea from tardigrade, whose code mode records `{at, seed}` once per run). pi wrote it: a
+  `call_clock (id, at)` table written in its own transaction before a call's first run, `trace.at` for replay, a
+  `Date` wrapper whose no-argument forms answer from `at`, and `GATE_EPOCH = 2026-01-01` for the gate. Its first version
+  gave invariants and migrations the gate epoch too, so an invariant like "nothing is dated in the future" would have
+  failed every real call after January 1, and a migration of today's data would have failed it as well. Fixed:
+  invariants take the instant of the execution they check, migrations take the host clock (a replayed migration takes
+  the trace's instant). Two tests cover it, and both fail with the first version.
