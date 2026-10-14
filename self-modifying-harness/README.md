@@ -284,7 +284,29 @@ track the party, roll initiative, apply damage and a healing potion, track a poi
   adds the title, chapter and closing cards. It renders on fframes' CPU backend (this machine has no GPU) in about a
   minute.
 
-## Gaps (round 1; see rounds 2-8 above for what changed)
+## Round 9: property checks
+
+A check can now say what must always hold instead of naming one exact result: `{ args, holds, runs }`, where `holds`
+is an expression over the result `r` and `args` (or a function body), run against `runs` repeats of the call.
+`Math.random` is seeded per execution from the call id (gate runs from the version, check and repeat), so a crash
+rerun and the gate's replay of a recorded call draw the same numbers. The rule runs in the sandbox with a read-only
+`kv`; a rule that accepts every decoy result (`null`, `-1`, `1e9`, `""`, ...) is refused as checking nothing; and
+property checks ratchet and count for action coverage like exact ones.
+
+- **The D&D rerun, before and after.** Round 8's dice tool failed six times. With property checks, the first rerun
+  was worse: 25 rejections, no tools at all. The model wrote every rule as an expression
+  (`r.members.length === 3 && ...`), the gate expected a function body with `return`, so each correct result was judged
+  `undefined`, and the message did not say so. After accepting both forms and naming what the rule returned, the next
+  rerun built `dice` in three proposals (passed 4 checks, fuzzed 40 inputs), rolled initiative and the potion with it
+  (2d4+2 = [3, 3] + 2 = 8), and upgraded `party` with rounds and timed conditions through a migration (33 checks).
+  160 calls, $0.18.
+- **What the tools fixed and what they did not.** `party` reported Mira at 13/14 after the potion; the model's own
+  sentence then said she "topped out at 14". The numbers in tools were right; the prose around them still was not.
+- **Can a rule cheat?** Tests try a rule that empties the harness's list of results, reaches for it on `globalThis`,
+  and redefines `Array.prototype.length`; all three still fail the off-by-one d20, because pi-codemode runs each
+  script inside a function the rule's `new Function` body cannot see.
+
+## Gaps (round 1; see rounds 2-9 above for what changed)
 
 - ~~The migration runs on the real state before the catalog commit, in two databases.~~ Fixed in round 2 with a
   pending/marker/live protocol reconciled on boot.
@@ -300,7 +322,7 @@ track the party, roll initiative, apply damage and a healing potion, track a poi
 cd prototype && ./forge              # installs on first run; demo with no key, full-screen chat with one (rounds 6-7)
 ./forge --help                       # --model, --summary-model, --base-url, --data, --fresh, caps, --list-models, --plain
 npm run check                        # tsc + oxlint (anti-slop + gdp-ts)
-npm test                             # 140 tests, about a minute
+npm test                             # 160 tests, about a minute
 node --experimental-strip-types --no-warnings src/demo.ts           # three processes: grow, crash, recover
 node --experimental-strip-types --no-warnings src/bench-view.ts 20000
 node --experimental-strip-types --no-warnings src/shadow-check.ts

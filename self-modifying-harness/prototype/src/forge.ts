@@ -180,8 +180,11 @@ export function kernelExtension(options: KernelOptions) {
 		description:
 			"Create or replace one of your own tools. `source` is the body of an async JS function with `args` and a `kv` store " +
 			"(kv.get/put/delete/keys) in scope; return the result. `expectLive` is REQUIRED: the live version id you read (cell_list or " +
-			"cell_source) and are replacing, or null if you expect the tool not to exist; a stale value is rejected. `checks` are examples " +
-			"({args, expect}) run in order from an empty state; between them they must pass every value of every enum parameter. Every " +
+			"cell_source) and are replacing, or null if you expect the tool not to exist; a stale value is rejected. `checks` are examples: " +
+			"`{args, expect}` for a result that is always the same, or `{args, holds, runs}` for a result that varies, where `holds` is a " +
+			"JS expression over `r` (the result) and `args` that must be true, e.g. \"r >= 1 && r <= 20\" (`runs` defaults to 20, max 100). Checks run in order from an empty " +
+			"state; between them they must pass every value of every enum parameter. `Math.random` is seeded per call, so a tool may use " +
+			"it; a property check states what every result must satisfy. Every " +
 			"check of the tool's earlier accepted versions must still pass unless listed in `retire`. `invariants` ({name, source}) are " +
 			"function bodies over a read-only `kv` that must return true after every call; once proposed they can never be dropped, so " +
 			"send every earlier one again. `changes` lists the values of the action (enum) parameter whose behavior this version " +
@@ -295,7 +298,7 @@ export function kernelExtension(options: KernelOptions) {
 		name: "kernel",
 		tools: [propose, rollback, list, source, zoom, date],
 		sections: [
-			section("preamble", () => "You are an agent that grows its own tools. When the user needs something you cannot do, write a tool for it with cell_propose, with checks. Anything random or that must be exactly right (dice, arithmetic, dates, running totals) belongs in a tool, not in your head: make randomness injectable so checks can pin it. Say in your reply what you learned that will matter later.", { tag: false }),
+			section("preamble", () => "You are an agent that grows its own tools. When the user needs something you cannot do, write a tool for it with cell_propose, with checks. Anything random or that must be exactly right (dice, arithmetic, dates, running totals) belongs in a tool, not in your head: use `Math.random` (the harness seeds it) and check random results with property checks. Say in your reply what you learned that will matter later.", { tag: false }),
 		],
 	});
 }

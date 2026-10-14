@@ -214,14 +214,14 @@ async function fuzz(runtime: CellRuntime, name: string, candidate: CellVersion, 
 	let ran = 0;
 
 	try {
-		for (const args of generateArgs(candidate.parameters, FUZZ_INPUTS, seed)) {
+		for (const [index, args] of generateArgs(candidate.parameters, FUZZ_INPUTS, seed).entries()) {
 			if (spent() >= FUZZ_EXECUTION_BUDGET) break;
 
 			rmSync(scratch, { force: true });
 			ran++;
 
 			try {
-				await runtime.run(candidate.source, args, scratch, undefined, sets);
+				await runtime.run(candidate.source, args, scratch, undefined, sets, undefined, `${candidate.version}|fuzz|${index}`);
 			} catch (error) {
 				const message = error instanceof Error ? error.message : String(error);
 
@@ -231,7 +231,7 @@ async function fuzz(runtime: CellRuntime, name: string, candidate: CellVersion, 
 
 				if (!(error instanceof InvariantError)) continue; // the script refused the input: that is validation, not a defect
 
-				if (live !== undefined && !(await violates(runtime, live, args, liveScratch, sets, error.invariant))) {
+				if (live !== undefined && !(await violates(runtime, live, args, liveScratch, sets, error.invariant, index))) {
 					return { blocking: `fuzz: input ${JSON.stringify(args)} breaks invariant "${error.invariant}", which the live version ${live.version} does not on that input: a regression`, advisories: [], ran, executions: spent() };
 				}
 
@@ -251,11 +251,11 @@ async function fuzz(runtime: CellRuntime, name: string, candidate: CellVersion, 
 	return { advisories, ran, executions: spent() };
 }
 
-async function violates(runtime: CellRuntime, live: CellVersion, args: JsonObject, scratch: string, sets: InvariantSets, invariant: string): Promise<boolean> {
+async function violates(runtime: CellRuntime, live: CellVersion, args: JsonObject, scratch: string, sets: InvariantSets, invariant: string, index: number): Promise<boolean> {
 	rmSync(scratch, { force: true });
 
 	try {
-		await runtime.run(live.source, args, scratch, undefined, sets);
+		await runtime.run(live.source, args, scratch, undefined, sets, undefined, `${live.version}|fuzz|${index}`);
 
 		return false;
 	} catch (error) {

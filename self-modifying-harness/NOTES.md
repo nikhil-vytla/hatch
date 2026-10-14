@@ -511,3 +511,28 @@ A Sonnet agent wrote `src/live.ts`, `src/chat.ts` and `src/live-run.ts`; I verif
   same-styled cells, positioned by column, keeps the grid aligned. DejaVu Sans Mono has no Braille (the spinner), and a
   `<text>` with one missing glyph fell back whole to a proportional font, so Braille cells get runs of their own.
 - **Not done:** property checks in the gate; a second model on the same five messages.
+
+## Round 9: property checks
+
+- **Design.** `Check = { args, expect } | { args, holds, runs? }` (`runs` 1..100, default 20). Each repeat starts from
+  the state just before the check; the last repeat's state carries on. All results are judged in one extra read-only
+  sandbox execution, along with eight decoys; a rule that accepts every decoy is refused. `Math.random` and `rand()` are
+  a seeded mulberry32 stream, seeded from the call id (real calls, crash reruns, replay) or from
+  `version|g|c|r` (gate checks, fuzzing, migrations). Exact checks of a random tool now see a fixed stream too, but a
+  model cannot predict it, so the prompt steers random results to property checks.
+- **Who did what.** pi on `deepseek-flash` wrote it (14 tests). It also created a `prototype/property-checks/` folder of
+  docs, which I removed. I added three tests that try to cheat the rule (all fail as they should) and three for
+  expression rules.
+- **The bug the tests missed.** The first real run had 25 rejections and no tools: DeepSeek wrote every `holds` as an
+  expression, the runtime wrapped it as a function body, and a body with no `return` returns `undefined`. My brief said
+  "function body", so every test used `return`. The failure message said "rule failed" without the value, so the
+  model could not tell. Now the rule is tried as an expression first and as a body if that does not parse, and the
+  message says `rule returned undefined (not true)`. Lesson, again: test the feature with the model, not only with
+  tests written from the spec.
+- **The second run.** `dice` accepted on the third proposal (two rejections for checks that expected an error); the
+  rolls in the transcript match the tool's results. The `party` upgrade went through four rejections: a rule that
+  returned false, replay of 4 real calls, and a migration that broke an invariant on the real state, then passed with
+  33 checks. Message 5 never ran: message 4 took 10 minutes, the recording driver's limit, so its text arrived while
+  the TUI was busy (it said so).
+- Not done: shrinking (rules apply to fixed args; shrinking needs generated inputs, which would combine with the schema
+  fuzzer), and rules over all results at once ("every face of a d20 appears").

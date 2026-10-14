@@ -16,8 +16,25 @@ import { DatabaseSync, type StatementSync } from "node:sqlite";
 import type { JsonValue } from "@earendil-works/chord";
 import { CodemodeSandbox, loadQuickJSWasm } from "@earendil-works/pi-codemode";
 import type { JsonObject } from "@earendil-works/pi-durable";
+import { isObject } from "./schema-fuzz.ts";
 
-export type Check = { args: JsonValue; expect: JsonValue };
+export type ExactCheck = { args: JsonValue; expect: JsonValue };
+
+/** A property check: `holds` is an expression over `r` and `args`, or a function body, that must be `true` for every run. */
+export type PropertyCheck = { args: JsonValue; holds: string; runs?: number };
+
+export type Check = ExactCheck | PropertyCheck;
+
+/** Property checks run the tool this many times unless `runs` says otherwise. */
+export const DEFAULT_RUNS = 20;
+
+export const MIN_RUNS = 1;
+
+export const MAX_RUNS = 100;
+
+export function isPropertyCheck(check: Check): check is PropertyCheck {
+	return "holds" in check;
+}
 
 export type CellVersion = {
 	version: string; // "<name>@<sha8>"
@@ -107,6 +124,65 @@ function parseVerdicts(value: JsonValue | undefined, expected: number): (string 
 	return value.map((verdict) => (verdict === null ? null : String(verdict)));
 }
 
+// The rule is model-written, so it runs in the sandbox: `r` and `args` in scope, a frozen read-only `kv`, and a
+// fixed decoy list. It returns the first result the rule rejected (or threw on) and whether it accepted every decoy,
+// because a rule that accepts null, -1, 1e9, "" ... checks nothing.
+function ruleProgram(check: PropertyCheck, results: JsonValue[]): string {
+	return `const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
+const readOnly = Object.freeze({ get: kv.get, keys: kv.keys });
+const body = ${JSON.stringify(check.holds)};
+const args = ${JSON.stringify(check.args ?? {})};
+const results = ${JSON.stringify(results)};
+const decoys = [null, -1, 1e9, "", "x", [], {}, true];
+// Models write rules both ways: an expression ("r >= 1 && r <= 20") or a function body ("return r >= 1;"). Try the
+// expression form first; a body does not parse as one, so it falls back.
+let rule;
+try { rule = new AsyncFunction("r", "args", "kv", "return (" + body + "\\n);"); } catch (error) { rule = null; }
+if (rule === null) rule = new AsyncFunction("r", "args", "kv", body);
+async function evaluate(value) {
+	try {
+		const got = await rule(value, args, readOnly);
+		return got === true ? null : "returned " + JSON.stringify(got);
+	} catch (error) {
+		return "threw " + (error && error.message);
+	}
+}
+let accepted = 0;
+for (const decoy of decoys) { if ((await evaluate(decoy)) === null) accepted++; }
+let failedIndex = null;
+let failure = null;
+for (let i = 0; i < results.length; i++) {
+	const verdict = await evaluate(results[i]);
+	if (verdict !== null) { failedIndex = i; failure = verdict; break; }
+}
+return { decoysAllAccepted: accepted === decoys.length, failedIndex: failedIndex, failure: failure };`;
+}
+
+type RuleOutcome = { kind: "passed" } | { kind: "never-fails" } | { kind: "failed"; index: number; threw: boolean; message: string };
+
+function parseRuleOutcome(value: JsonValue): RuleOutcome | undefined {
+	if (!isObject(value)) return undefined;
+
+	if (value.decoysAllAccepted === true) return { kind: "never-fails" };
+
+	if (value.decoysAllAccepted !== false) return undefined;
+
+	const index = value.failedIndex;
+
+	if (index === null) return { kind: "passed" };
+
+	if (!Number.isInteger(index)) return undefined;
+
+	const failure = value.failure;
+
+	if (failure === null || failure.constructor !== String) return undefined;
+
+	const text = String(failure);
+	const threw = text.startsWith("threw ");
+
+	return { kind: "failed", index: Number(index), threw, message: threw ? text.slice("threw ".length) : text };
+}
+
 function snapshot(db: DatabaseSync, limitBytes: number): JsonObject | null {
 	const size = db.prepare("SELECT COALESCE(SUM(LENGTH(CAST(k AS BLOB)) + LENGTH(CAST(v AS BLOB))), 0) AS bytes FROM kv").get();
 
@@ -151,6 +227,34 @@ function migratedMarker(db: DatabaseSync): string | null {
 
 function keyOf(argv: JsonValue[]): string {
 	return String(argv[0]);
+}
+
+// A 32-bit FNV-1a hash of the seed string: the same call id (or gate seed string) always seeds the same stream, so a
+// crash rerun and the gate's replay draw the numbers the original call drew.
+function seedNumber(seed: string): number {
+	let hash = 0x811c9dc5;
+
+	for (let i = 0; i < seed.length; i++) hash = Math.imul(hash ^ seed.charCodeAt(i), 0x01000193);
+
+	return hash >>> 0;
+}
+
+// Prepended to every script (tool, invariant, rule): mulberry32 behind `Math.random`, with a `rand()` alias on the same
+// stream. A fresh VM per execution, so the override never leaks between calls; the block keeps the state out of the
+// model's scope, so only a deliberate `Math.random` or `rand()` sees it.
+function randomPrelude(seed: string): string {
+	return `{
+	let state = ${seedNumber(seed)} >>> 0;
+	const next = () => {
+		state = (state + 0x6d2b79f5) >>> 0;
+		let t = state;
+		t = Math.imul(t ^ (t >>> 15), t | 1);
+		t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+		return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+	};
+	Math.random = next;
+	globalThis.rand = next;
+}`;
 }
 
 export class CellRuntime {
@@ -242,7 +346,7 @@ export class CellRuntime {
 		return next;
 	}
 
-	private async execute(db: DatabaseSync, code: string, readOnly: boolean): Promise<JsonValue> {
+	private async execute(db: DatabaseSync, code: string, readOnly: boolean, seed: string): Promise<JsonValue> {
 		this.executions++;
 		this.active = {
 			get: db.prepare("SELECT v FROM kv WHERE k = ?"),
@@ -253,7 +357,7 @@ export class CellRuntime {
 		};
 
 		try {
-			const result = await this.sandbox.execute(code);
+			const result = await this.sandbox.execute(`${randomPrelude(seed)}\n${code}`);
 
 			if (!result.ok) throw new Error(`${result.error.kind}: ${result.error.message}`);
 
@@ -273,7 +377,7 @@ export class CellRuntime {
 		let verdicts: (string | null)[] | undefined;
 
 		try {
-			verdicts = parseVerdicts(await this.execute(db, invariantProgram(invariants), true), invariants.length);
+			verdicts = parseVerdicts(await this.execute(db, invariantProgram(invariants), true, "invariant"), invariants.length);
 		} catch (error) {
 			const names = invariants.map((i) => i.name).join(", ");
 			throw new Error(`invariants [${names}] could not be evaluated: ${error instanceof Error ? error.message : String(error)}`);
@@ -286,9 +390,12 @@ export class CellRuntime {
 		}
 	}
 
-	private async runLocked(source: string, args: JsonValue, stateFile: string, callId: string | undefined, invariants: Invariant[] | InvariantSets, version: string | undefined, marker?: string): Promise<JsonValue> {
+	private async runLocked(source: string, args: JsonValue, stateFile: string, callId: string | undefined, invariants: Invariant[] | InvariantSets, version: string | undefined, seed: string | undefined, marker?: string): Promise<JsonValue> {
 		this.lastWrites = 0;
 		const db = openState(stateFile);
+		// A real call seeds from its call id: a crash rerun and the gate's replay of the recorded trace draw the same
+		// numbers. Calls without one (gate checks, fuzzing, migrations) seed from the string the caller passes.
+		const seedString = callId ?? seed ?? "";
 
 		try {
 			if (callId !== undefined) {
@@ -313,7 +420,7 @@ export class CellRuntime {
 				}
 
 				const before = callId === undefined ? null : snapshot(db, SNAPSHOT_LIMIT_BYTES);
-				const value = await this.execute(db, `const args = ${JSON.stringify(args ?? {})};\n${source}`, false);
+				const value = await this.execute(db, `const args = ${JSON.stringify(args ?? {})};\n${source}`, false, seedString);
 				await this.checkInvariants(db, invariants);
 
 				if (callId !== undefined) {
@@ -349,13 +456,13 @@ export class CellRuntime {
 	 * before commit, `invariants` are checked against the same transaction; a violation rolls the call back and throws
 	 * an `InvariantError`.
 	 */
-	run(source: string, args: JsonValue, stateFile: string, callId?: string, invariants: Invariant[] | InvariantSets = [], version?: string): Promise<JsonValue> {
-		return this.serialized(() => this.runLocked(source, args, stateFile, callId, invariants, version));
+	run(source: string, args: JsonValue, stateFile: string, callId?: string, invariants: Invariant[] | InvariantSets = [], version?: string, seed?: string): Promise<JsonValue> {
+		return this.serialized(() => this.runLocked(source, args, stateFile, callId, invariants, version, seed));
 	}
 
 	/** Run a live cell's code against its real state. */
-	call(cell: CellVersion, name: string, args: JsonValue, callId?: string, invariants: Invariant[] | InvariantSets = []): Promise<JsonValue> {
-		return this.run(cell.source, args, this.statePath(name), callId, invariants, cell.version);
+	call(cell: CellVersion, name: string, args: JsonValue, callId?: string, invariants: Invariant[] | InvariantSets = [], seed?: string): Promise<JsonValue> {
+		return this.run(cell.source, args, this.statePath(name), callId, invariants, cell.version, seed);
 	}
 
 	/** The most recent `limit` exactly-once calls of a cell that have complete snapshots, oldest first. */
@@ -410,14 +517,15 @@ export class CellRuntime {
 
 				if (candidate.migrate) {
 					try {
-						await this.runLocked(candidate.migrate, {}, scratch, undefined, [], undefined);
+						await this.runLocked(candidate.migrate, {}, scratch, undefined, [], undefined, `${trace.id}|migrate`);
 					} catch (error) {
 						return { migrationError: error instanceof Error ? error.message : String(error) };
 					}
 				}
 
 				try {
-					const result = await this.runLocked(candidate.source, trace.args, scratch, undefined, invariants, undefined);
+					// The trace's id is the original call id, so the replayed call draws the same random stream.
+					const result = await this.runLocked(candidate.source, trace.args, scratch, undefined, invariants, undefined, trace.id);
 					const db = openState(scratch);
 
 					try {
@@ -452,7 +560,7 @@ export class CellRuntime {
 				if (existsSync(this.statePath(name))) copyFileSync(this.statePath(name), scratch);
 
 				try {
-					await this.run(candidate.migrate, {}, scratch, undefined, invariants);
+					await this.run(candidate.migrate, {}, scratch, undefined, invariants, undefined, `${candidate.version}|migrate`);
 				} catch (error) {
 					return { ok: false, reason: `migration failed on a copy of the live state: ${error instanceof Error ? error.message : String(error)}` };
 				}
@@ -462,24 +570,13 @@ export class CellRuntime {
 				rmSync(scratch, { force: true });
 
 				for (const [i, check] of group.entries()) {
-					let actual: JsonValue;
+					const seed = `${candidate.version}|g${g}|c${i}`;
 
-					try {
-						actual = await this.run(candidate.source, check.args, scratch, undefined, invariants);
-					} catch (error) {
-						const message = error instanceof Error ? error.message : String(error);
-						const verb = error instanceof InvariantError ? "broke" : "threw";
+					const verdict = isPropertyCheck(check)
+						? await this.verifyProperty(g, i, check, candidate, scratch, invariants, seed)
+						: await this.verifyExact(g, i, check, candidate, scratch, invariants, seed);
 
-						return { ok: false, reason: `group ${g} check ${i} ${JSON.stringify(check.args)} ${verb} ${message}` };
-					}
-
-					if (candidate.replay === "safe" && this.lastWrites > 0) {
-						return { ok: false, reason: `declared pure (replay-safe) but check ${i} wrote state; a crash rerun would apply it twice` };
-					}
-
-					if (!deepEqual(actual, check.expect)) {
-						return { ok: false, reason: `group ${g} check ${i} ${JSON.stringify(check.args)}: expected ${JSON.stringify(check.expect)}, got ${JSON.stringify(actual)}` };
-					}
+					if (!verdict.ok) return verdict;
 				}
 			}
 
@@ -489,6 +586,110 @@ export class CellRuntime {
 		}
 	}
 
+	// An exact check: one run, one expected value. The seed string is fixed by the gate, so a failure is reproducible.
+	private async verifyExact(g: number, i: number, check: ExactCheck, candidate: CellVersion, scratch: string, invariants: Invariant[] | InvariantSets, seed: string): Promise<Verdict> {
+		let actual: JsonValue;
+
+		try {
+			actual = await this.run(candidate.source, check.args, scratch, undefined, invariants, candidate.version, seed);
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			const verb = error instanceof InvariantError ? "broke" : "threw";
+
+			return { ok: false, reason: `group ${g} check ${i} ${JSON.stringify(check.args)} ${verb} ${message}` };
+		}
+
+		if (candidate.replay === "safe" && this.lastWrites > 0) {
+			return { ok: false, reason: `declared pure (replay-safe) but check ${i} wrote state; a crash rerun would apply it twice` };
+		}
+
+		if (!deepEqual(actual, check.expect)) {
+			return { ok: false, reason: `group ${g} check ${i} ${JSON.stringify(check.args)}: expected ${JSON.stringify(check.expect)}, got ${JSON.stringify(actual)}` };
+		}
+
+		return { ok: true };
+	}
+
+	// A property check: run the tool `runs` times, each from the state just before the check, then judge every result in
+	// one read-only execution. The last repeat's state is what the group continues with.
+	private async verifyProperty(g: number, i: number, check: PropertyCheck, candidate: CellVersion, scratch: string, invariants: Invariant[] | InvariantSets, seed: string): Promise<Verdict> {
+		const runs = check.runs ?? DEFAULT_RUNS;
+		const backup = `${scratch}.check-${g}-${i}`;
+		const hadState = existsSync(scratch);
+
+		if (hadState) copyFileSync(scratch, backup);
+
+		const results: JsonValue[] = [];
+
+		try {
+			for (let r = 0; r < runs; r++) {
+				if (r > 0) {
+					rmSync(scratch, { force: true });
+
+					if (hadState) copyFileSync(backup, scratch);
+				}
+
+				try {
+					results.push(await this.run(candidate.source, check.args, scratch, undefined, invariants, candidate.version, `${seed}|r${r}`));
+				} catch (error) {
+					const message = error instanceof Error ? error.message : String(error);
+					const verb = error instanceof InvariantError ? "broke" : "threw";
+
+					return { ok: false, reason: `group ${g} check ${i} ${JSON.stringify(check.args)} ${verb} ${message}` };
+				}
+
+				if (candidate.replay === "safe" && this.lastWrites > 0) {
+					return { ok: false, reason: `declared pure (replay-safe) but check ${i} wrote state; a crash rerun would apply it twice` };
+				}
+			}
+
+			return await this.verifyRule(g, i, check, scratch, results, seed);
+		} finally {
+			rmSync(backup, { force: true });
+		}
+	}
+
+	// The rule runs in its own read-only execution, off the host and off the model's state. Serialized like a run so it
+	// never shares the sandbox's active database with a concurrent call.
+	private verifyRule(g: number, i: number, check: PropertyCheck, scratch: string, results: JsonValue[], seed: string): Promise<Verdict> {
+		return this.serialized(async () => {
+			let value: JsonValue;
+
+			try {
+				const db = openState(scratch);
+
+				try {
+					value = await this.execute(db, ruleProgram(check, results), true, `${seed}|rule`);
+				} finally {
+					db.close();
+				}
+			} catch (error) {
+				return { ok: false, reason: `group ${g} check ${i} ${JSON.stringify(check.args)}: rule could not be evaluated: ${error instanceof Error ? error.message : String(error)}` };
+			}
+
+			const outcome = parseRuleOutcome(value);
+
+			if (outcome === undefined) return { ok: false, reason: `group ${g} check ${i} ${JSON.stringify(check.args)}: rule could not be evaluated: the sandbox returned a malformed verdict` };
+
+			if (outcome.kind === "never-fails") {
+				return { ok: false, reason: `group ${g} check ${i} ${JSON.stringify(check.args)}: rule never fails: it accepts null, -1, 1e9, "" ... as results, so it checks nothing` };
+			}
+
+			if (outcome.kind === "failed") {
+				const where = `run ${outcome.index} of ${results.length} (seed ${seed}|r${outcome.index})`;
+
+				return {
+					ok: false,
+					reason: outcome.threw
+						? `group ${g} check ${i} ${JSON.stringify(check.args)}: rule threw on ${where}: ${outcome.message}`
+						: `group ${g} check ${i} ${JSON.stringify(check.args)}: rule ${outcome.message} (not true) on ${where}: r = ${JSON.stringify(results[outcome.index])}`,
+				};
+			}
+
+			return { ok: true };
+		});
+	}
+
 	/**
 	 * Step 2 of the crash-safe accept: run the version's migration (if any) against the real state and record
 	 * `migrated_to = <version>` in the same SQLite transaction, so the marker is there exactly when the migration is. A
@@ -496,7 +697,7 @@ export class CellRuntime {
 	 */
 	migrateTo(name: string, cell: CellVersion, invariants: Invariant[] | InvariantSets = []): Promise<void> {
 		return this.serialized(async () => {
-			await this.runLocked(cell.migrate ?? "", {}, this.statePath(name), undefined, invariants, cell.version, cell.version);
+			await this.runLocked(cell.migrate ?? "", {}, this.statePath(name), undefined, invariants, cell.version, `${cell.version}|migrate`, cell.version);
 		});
 	}
 
