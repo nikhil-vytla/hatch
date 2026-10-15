@@ -543,3 +543,20 @@ A Sonnet agent wrote `src/live.ts`, `src/chat.ts` and `src/live-run.ts`; I verif
   failed every real call after January 1, and a migration of today's data would have failed it as well. Fixed:
   invariants take the instant of the execution they check, migrations take the host clock (a replayed migration takes
   the trace's instant). Two tests cover it, and both fail with the first version.
+
+## Round 10: spilling large tool results
+
+- **Design** (from tardigrade's `packages/code/src/storage/store.ts`): pi-durable's `hook(ToolTask, { afterTool })`
+  replaces a result before it is stored, so the session, the OptChat log and later requests all see only the pointer.
+  The full text goes to `results.sqlite` under a ref derived from the task and call id (`INSERT OR IGNORE`, so a crash
+  rerun writes the same row). `result_read`, `result_grep` and `result_query` are reserved names in the gate.
+- **First version, measured live and found wanting:** same cost as no spilling, and less accurate (5 of 7 blacksmiths).
+  Line-based grep on one-line JSON, slices read back into context, and `zoom` results spilled into pointer chains.
+- **Second version:** `result_query` (an expression over the parsed value, run in the sandbox against an empty
+  throwaway state file, answer capped at 8000 characters), grep by substring with a 120-character window, previews by
+  shape, and `zoom`/`date` never spilled. Live rerun: 8 of 8 blacksmiths via one query, #150 right, $0.066 vs $0.088.
+  The no-spill run listed all 11 of its blacksmiths but its heading said "10"; it re-ran the generator for #150.
+- **Lesson:** pointer-and-preview alone mostly moves the cost (the model reads the value back); what saves it is a way
+  to compute over the stored value without reading it.
+- pi on `deepseek-flash` wrote both versions; I ran the comparisons and checked every answer against the tool's own
+  output in `results.sqlite` or the chat log.

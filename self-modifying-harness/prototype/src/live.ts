@@ -27,6 +27,7 @@ import { describeModel, type ServedModel } from "./model-config.ts";
 import { Memory } from "./optchat.ts";
 import { SYSTEM_PROMPT } from "./optchat-prompt.ts";
 import { withCommittedCatalogue } from "./proofs/catalogue-committed.ts";
+import { DEFAULT_SPILL_POLICY, spillExtension, type SpillPolicy } from "./spill.ts";
 
 export type Limits = { maxCalls: number; maxCostUsd: number };
 
@@ -210,7 +211,7 @@ function eventsOf(message: Message): TurnEvent[] {
 
 // --- opening the forge ---
 
-export type LiveOptions = { limits?: Partial<Limits>; turn: ServedModel; summary: ServedModel; maxToolCallsPerTurn?: number };
+export type LiveOptions = { limits?: Partial<Limits>; turn: ServedModel; summary: ServedModel; maxToolCallsPerTurn?: number; spill?: Partial<SpillPolicy> };
 
 /**
  * A turn that makes this many tool calls is aborted. The kernel already refuses repeated and excessive rejected
@@ -266,6 +267,9 @@ export async function openLive(dataDir: string, options: LiveOptions): Promise<L
 
 	let harness!: Harness;
 	registry.install(kernelExtension({ harness: () => harness, registry, runtime, memory, currentRequest: () => memState.runStartLog, invariants: NO_INVARIANTS }));
+	// Installed last, so its `afterTool` hook sees every tool result, kernel tools and agent-written cells alike.
+	const spill = spillExtension(dataDir, runtime, { ...DEFAULT_SPILL_POLICY, ...options.spill });
+	registry.install(spill);
 
 	// No durable retries and no SDK retries: a failed request is reported, not repeated. pi-durable's own compaction is off
 	// (OptChat is the memory, and the context window is 1M tokens).
@@ -340,6 +344,7 @@ export async function openLive(dataDir: string, options: LiveOptions): Promise<L
 			await memory.idle();
 			await runtime.close();
 			await harness.close(BACKGROUND_CONTEXT);
+			spill.close();
 		},
 	};
 }

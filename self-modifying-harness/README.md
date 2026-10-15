@@ -310,7 +310,25 @@ property checks ratchet and count for action coverage like exact ones.
   and redefines `Array.prototype.length`; all three still fail the off-by-one d20, because pi-codemode runs each
   script inside a function the rule's `new Function` body cannot see.
 
-## Gaps (round 1; see rounds 2-9 above for what changed)
+## Round 10: large tool results, spilled to storage
+
+A tool result over 8 KB (`--spill-bytes`, `0` turns it off) now goes to `results.sqlite`, a file no agent-written tool
+can reach, and the model sees a pointer: the ref, the size, and a preview that shows the shape (the first 3 items of a
+list and its length). Three read-only tools open it: `result_query({ref, expr})` runs an expression over the parsed
+value in the sandbox (`r.roster.filter(p => p.job === "blacksmith")`) and returns only the answer; `result_grep`
+finds a substring anywhere and returns a window around each match; `result_read` pages through it. The idea is
+[tardigrade](https://github.com/clavia-labs/tardigrade)'s spill-with-pointer; the query tool is ours.
+
+- **The first version made things worse.** In a live comparison (build a generator of 300 townsfolk, list the
+  blacksmiths, look up #150), spilling cost the same ($0.106 vs $0.103) and missed 2 of 7 blacksmiths. The roster was
+  JSON on one 27 KB line, so the line-based grep returned that line every time; the model read all four 8 KB slices
+  back into context; and `zoom` over those messages was spilled in turn, so it searched pointers to pointers.
+- **With the query tool,** the same session found the blacksmiths with one `result_query` and listed exactly the 8 in
+  its roster, answered #150 correctly, and cost $0.066 against $0.088 without spilling (-25%). Prompt tokens fell 23%
+  for turns and 37% for memory compactions. One run each, so a direction, not a benchmark.
+- Memory tools (`zoom`, `date`) and the readers themselves are never spilled.
+
+## Gaps (round 1; see rounds 2-10 above for what changed)
 
 - ~~The migration runs on the real state before the catalog commit, in two databases.~~ Fixed in round 2 with a
   pending/marker/live protocol reconciled on boot.
@@ -324,9 +342,9 @@ property checks ratchet and count for action coverage like exact ones.
 
 ```sh
 cd prototype && ./forge              # installs on first run; demo with no key, full-screen chat with one (rounds 6-7)
-./forge --help                       # --model, --summary-model, --base-url, --data, --fresh, caps, --list-models, --plain
+./forge --help                       # --model, --summary-model, --base-url, --data, --fresh, caps, --spill-bytes, --list-models, --plain
 npm run check                        # tsc + oxlint (anti-slop + gdp-ts)
-npm test                             # 169 tests, about a minute
+npm test                             # 191 tests, about two minutes
 node --experimental-strip-types --no-warnings src/demo.ts           # three processes: grow, crash, recover
 node --experimental-strip-types --no-warnings src/bench-view.ts 20000
 node --experimental-strip-types --no-warnings src/shadow-check.ts
