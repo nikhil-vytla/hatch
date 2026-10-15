@@ -14,8 +14,8 @@ Asked to "analyse like a data scientist", models often switch to data-science wo
 
 ## The five depth moves
 
-1. **Use the profession's instruments.** Install them if needed. Ask which tool a top practitioner would open first.
-2. **Set an unreasonable target and present it as reachable.** "Get load time to 200 ms. It can be done if you keep going" draws more effort than "improve it from 5 s". Specific, hard goals beat "do your best", as decades of goal-setting research show (see [self-efficacy.md](self-efficacy.md)).
+1. **Use the profession's instruments.** Install them if needed. Ask which tool a top practitioner *in this task's field* would open first. The table below is a sample from three fields, not a toolkit to reuse.
+2. **Set an unreasonable target and present it as reachable.** "Get load time from 5 s to under 1 s. It can be done if you keep going" draws more effort than "improve it". Anchor the stretch to a measured baseline and to what the field's best teams achieve. A target nobody in the field would call achievable reads as noise, not ambition. Specific, hard goals beat "do your best", as decades of goal-setting research show (see [self-efficacy.md](self-efficacy.md)).
 3. **Test the premise.** Before building on what everyone "knows" ("churn is an onboarding problem"), check it against the raw data. Often the premise is the finding.
 4. **Produce new knowledge.** Ask for something nobody has yet: a leading indicator, a simulated population, a counterfactual. Then check it against data held out from its discovery.
 5. **Use an outside judge.** The model doesn't grade its own work. Find a judge outside both the model and the user, such as tests, a holdout set, a benchmark, a profiler, a compiler, a market or a human expert. Ideally make the judge a tool the model can call in a loop, so feedback arrives in seconds.

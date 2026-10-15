@@ -5,6 +5,7 @@
 ## Altitude
 **Outcome:** {{the concrete, checkable outcome above rung 0, or "n/a: <why>"}}
 - **Prompt:** {{ready-to-paste}}
+- **Who runs it:** {{model here / model with access / a person, per step}}
 - **Outside judge:** {{what verifies it}}
 - **Access:** {{data, machines, connectors}}
 - **Cost to you:** {{time / workflow change / risk}}

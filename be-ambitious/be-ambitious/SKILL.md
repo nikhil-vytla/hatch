@@ -1,5 +1,5 @@
 ---
-name: ambition
+name: be-ambitious
 description: Raises the ambition of a task given to an AI model along three axes (altitude, depth and range), then rewrites the request as a ladder of more ambitious prompts. Each rung names its verifier and the access it needs. Use when the user asks to think bigger or be more ambitious, wants to get more out of a model, asks to upgrade a prompt or plan, or asks what else AI could do for a piece of work.
 metadata:
   source: "https://felixrieseberg.com/how-to-be-more-ambitious-a-tutorial-for-humans-with-models/"
@@ -7,7 +7,7 @@ metadata:
   version: "1.0"
 ---
 
-# Ambition
+# Be ambitious
 
 Models now do more than most people ask of them. The gap between what's possible and what gets asked is usually a failure of **ambition**, not of capability. This skill closes that gap in a set order. Doing the same task faster (**speed**) is the default, so it isn't covered here. The work is in three other axes:
 
@@ -43,11 +43,11 @@ Techniques and examples: [references/altitude.md](references/altitude.md).
 Answer these four questions for the task:
 1. What would a top professional do here that the user hasn't asked for?
 2. What is the rawest material they'd start from?
-3. Which specific methods, instruments and tools would they use? Name real ones (a database and a survival model, not "a thorough analysis").
+3. Which specific methods, instruments and tools would they use? Name real ones **native to the user's field**: what its practitioners actually open (an email platform's holdout groups for a launch email, a profiler for a slow page, a structured-interview scorecard for hiring). Tools named in this skill's examples belong to those examples' fields.
 4. What outside the model and the user would judge whether the result is right? Examples: a test suite, a holdout set, a benchmark, a profiler, a domain expert, the market.
 
 Then apply the depth moves:
-- **Set an unreasonable target and frame it as reachable.** Example: 200 ms where 5 s was asked.
+- **Set an unreasonable target and frame it as reachable.** Write the baseline beside it, and pick a stretch a top practitioner would still call achievable. Example: 5 s → under 1 s for a page whose bottleneck is known.
 - **Test the premise** against raw data before building on it.
 - **Produce new knowledge**: a signal, a simulation or a finding the user doesn't have yet, validated on data the model hasn't seen.
 
@@ -68,7 +68,9 @@ Every axis depends on the model having a real working environment. List what's m
 - Access to the data, through connectors, exports or credentials the user grants.
 - The outside judge from step 3, ideally as a tool the model can call for fast feedback.
 
-**Done when:** every rung has a verifier and its access needs are stated as concrete asks to the user.
+For each rung, say who carries out each step: the model in this conversation, the model with the listed access, or a person. When a number depends on data or computation the model doesn't have (a pooled effect size, a model fit, a load-test result), the rung asks for the code or protocol and leaves the number to the run.
+
+**Done when:** every rung has a verifier, an executor for each step, and its access needs are stated as concrete asks to the user.
 
 ### 6. Deliver the ambition ladder
 
@@ -78,8 +80,8 @@ Use the format in [assets/ambition-ladder-template.md](assets/ambition-ladder-te
 - the access it needs;
 - what it costs the user (time, workflow change, risk).
 
-If an axis doesn't apply, give it one line saying why. Recommend one rung, and pick the highest one the user can supply prerequisites for today.
+If an axis doesn't apply, give it one line saying why. Recommend the highest rung that runs on what the user already has or can paste in a few minutes. Present the rungs above it as upgrades, each with the first thing that unlocks it.
 
 If the user hesitates over a goal that sounds out of reach, or you do, read [references/self-efficacy.md](references/self-efficacy.md) before lowering it.
 
-A fully worked example (Acme quarterly review and churn analysis on every axis) is in [references/worked-example.md](references/worked-example.md). Attribution and the line between the source article and this skill's additions are in [references/source.md](references/source.md).
+Worked examples showing the shape of each rung are in [references/worked-example.md](references/worked-example.md): a SaaS quarterly review, plus a launch email for contrast. Their tools are specific to those fields. Attribution and the line between the source article and this skill's additions are in [references/source.md](references/source.md).

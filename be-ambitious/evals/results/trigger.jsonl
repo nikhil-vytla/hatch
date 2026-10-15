@@ -1,0 +1,60 @@
+{"qi": 0, "sample": 0, "query": "I'm going to ask Claude to summarize our churn data. How could I be way more ambitious with that?", "expected": true, "chose": "be-ambitious", "fired": true}
+{"qi": 1, "sample": 0, "query": "Think bigger: what else could an AI do for our quarterly planning beyond drafting the doc?", "expected": true, "chose": "be-ambitious", "fired": true}
+{"qi": 0, "sample": 2, "query": "I'm going to ask Claude to summarize our churn data. How could I be way more ambitious with that?", "expected": true, "chose": "be-ambitious", "fired": true}
+{"qi": 0, "sample": 1, "query": "I'm going to ask Claude to summarize our churn data. How could I be way more ambitious with that?", "expected": true, "chose": "be-ambitious", "fired": true}
+{"qi": 1, "sample": 2, "query": "Think bigger: what else could an AI do for our quarterly planning beyond drafting the doc?", "expected": true, "chose": "be-ambitious", "fired": true}
+{"qi": 1, "sample": 1, "query": "Think bigger: what else could an AI do for our quarterly planning beyond drafting the doc?", "expected": true, "chose": "be-ambitious", "fired": true}
+{"qi": 2, "sample": 0, "query": "Here's my prompt for refactoring our auth module. Can you upgrade it so I get much more out of the model?", "expected": true, "chose": "be-ambitious", "fired": true}
+{"qi": 2, "sample": 1, "query": "Here's my prompt for refactoring our auth module. Can you upgrade it so I get much more out of the model?", "expected": true, "chose": "be-ambitious", "fired": true}
+{"qi": 2, "sample": 2, "query": "Here's my prompt for refactoring our auth module. Can you upgrade it so I get much more out of the model?", "expected": true, "chose": "be-ambitious", "fired": true}
+{"qi": 3, "sample": 0, "query": "I feel like I'm only using AI for tiny tasks. What should I be asking it to do for my marketing work?", "expected": true, "chose": "be-ambitious", "fired": true}
+{"qi": 3, "sample": 1, "query": "I feel like I'm only using AI for tiny tasks. What should I be asking it to do for my marketing work?", "expected": true, "chose": "be-ambitious", "fired": true}
+{"qi": 3, "sample": 2, "query": "I feel like I'm only using AI for tiny tasks. What should I be asking it to do for my marketing work?", "expected": true, "chose": "be-ambitious", "fired": true}
+{"qi": 4, "sample": 1, "query": "Push this plan further. I want the model doing work an expert would actually learn from.", "expected": true, "chose": "be-ambitious", "fired": true}
+{"qi": 4, "sample": 2, "query": "Push this plan further. I want the model doing work an expert would actually learn from.", "expected": true, "chose": "be-ambitious", "fired": true}
+{"qi": 4, "sample": 0, "query": "Push this plan further. I want the model doing work an expert would actually learn from.", "expected": true, "chose": "be-ambitious", "fired": true}
+{"qi": 5, "sample": 0, "query": "We're asking an agent to fix crashes one at a time. Is there a higher-level way to frame this?", "expected": true, "chose": "be-ambitious", "fired": true}
+{"qi": 5, "sample": 1, "query": "We're asking an agent to fix crashes one at a time. Is there a higher-level way to frame this?", "expected": true, "chose": "be-ambitious", "fired": true}
+{"qi": 5, "sample": 2, "query": "We're asking an agent to fix crashes one at a time. Is there a higher-level way to frame this?", "expected": true, "chose": "be-ambitious", "fired": true}
+{"qi": 6, "sample": 1, "query": "What's the most ambitious version of 'write unit tests for billing.py' I could hand an agent?", "expected": true, "chose": "be-ambitious", "fired": true}
+{"qi": 6, "sample": 2, "query": "What's the most ambitious version of 'write unit tests for billing.py' I could hand an agent?", "expected": true, "chose": "be-ambitious", "fired": true}
+{"qi": 7, "sample": 0, "query": "Upgrade this request so an AI attacks it like a top data scientist would: 'make a chart of signups by month'.", "expected": true, "chose": "be-ambitious", "fired": true}
+{"qi": 6, "sample": 0, "query": "What's the most ambitious version of 'write unit tests for billing.py' I could hand an agent?", "expected": true, "chose": "be-ambitious", "fired": true}
+{"qi": 7, "sample": 2, "query": "Upgrade this request so an AI attacks it like a top data scientist would: 'make a chart of signups by month'.", "expected": true, "chose": "be-ambitious", "fired": true}
+{"qi": 8, "sample": 1, "query": "I want to stop micro-prompting. How do I give the model the outcome instead of the task?", "expected": true, "chose": "be-ambitious", "fired": true}
+{"qi": 8, "sample": 0, "query": "I want to stop micro-prompting. How do I give the model the outcome instead of the task?", "expected": true, "chose": "none", "fired": false}
+{"qi": 9, "sample": 0, "query": "My team uses Copilot for autocomplete only. What bolder things could we delegate?", "expected": true, "chose": "be-ambitious", "fired": true}
+{"qi": 8, "sample": 2, "query": "I want to stop micro-prompting. How do I give the model the outcome instead of the task?", "expected": true, "chose": "be-ambitious", "fired": true}
+{"qi": 9, "sample": 2, "query": "My team uses Copilot for autocomplete only. What bolder things could we delegate?", "expected": true, "chose": "be-ambitious", "fired": true}
+{"qi": 7, "sample": 1, "query": "Upgrade this request so an AI attacks it like a top data scientist would: 'make a chart of signups by month'.", "expected": true, "chose": "be-ambitious", "fired": true}
+{"qi": 10, "sample": 0, "query": "Fix the null pointer exception in OrderService.java line 88.", "expected": false, "chose": "none", "fired": false}
+{"qi": 10, "sample": 2, "query": "Fix the null pointer exception in OrderService.java line 88.", "expected": false, "chose": "none", "fired": false}
+{"qi": 11, "sample": 0, "query": "Summarize this PDF report into five bullet points.", "expected": false, "chose": "pdf", "fired": false}
+{"qi": 11, "sample": 1, "query": "Summarize this PDF report into five bullet points.", "expected": false, "chose": "pdf", "fired": false}
+{"qi": 11, "sample": 2, "query": "Summarize this PDF report into five bullet points.", "expected": false, "chose": "pdf", "fired": false}
+{"qi": 12, "sample": 0, "query": "Review my branch against main for style issues.", "expected": false, "chose": "code-review", "fired": false}
+{"qi": 12, "sample": 1, "query": "Review my branch against main for style issues.", "expected": false, "chose": "code-review", "fired": false}
+{"qi": 12, "sample": 2, "query": "Review my branch against main for style issues.", "expected": false, "chose": "code-review", "fired": false}
+{"qi": 13, "sample": 0, "query": "Fix the typos and grammar in this prompt but keep the meaning exactly the same.", "expected": false, "chose": "prompt-polish", "fired": false}
+{"qi": 13, "sample": 1, "query": "Fix the typos and grammar in this prompt but keep the meaning exactly the same.", "expected": false, "chose": "prompt-polish", "fired": false}
+{"qi": 13, "sample": 2, "query": "Fix the typos and grammar in this prompt but keep the meaning exactly the same.", "expected": false, "chose": "prompt-polish", "fired": false}
+{"qi": 14, "sample": 0, "query": "Write a failing test first for the new discount rule, then implement it.", "expected": false, "chose": "tdd", "fired": false}
+{"qi": 14, "sample": 1, "query": "Write a failing test first for the new discount rule, then implement it.", "expected": false, "chose": "tdd", "fired": false}
+{"qi": 14, "sample": 2, "query": "Write a failing test first for the new discount rule, then implement it.", "expected": false, "chose": "tdd", "fired": false}
+{"qi": 10, "sample": 1, "query": "Fix the null pointer exception in OrderService.java line 88.", "expected": false, "chose": "tdd", "fired": false}
+{"qi": 15, "sample": 0, "query": "What does the Python walrus operator do?", "expected": false, "chose": "none", "fired": false}
+{"qi": 15, "sample": 1, "query": "What does the Python walrus operator do?", "expected": false, "chose": "none", "fired": false}
+{"qi": 15, "sample": 2, "query": "What does the Python walrus operator do?", "expected": false, "chose": "none", "fired": false}
+{"qi": 16, "sample": 0, "query": "Research the history of the four-minute mile and write it up with sources.", "expected": false, "chose": "research", "fired": false}
+{"qi": 16, "sample": 1, "query": "Research the history of the four-minute mile and write it up with sources.", "expected": false, "chose": "research", "fired": false}
+{"qi": 16, "sample": 2, "query": "Research the history of the four-minute mile and write it up with sources.", "expected": false, "chose": "research", "fired": false}
+{"qi": 17, "sample": 2, "query": "Make this paragraph sound less like ChatGPT wrote it.", "expected": false, "chose": "unslop", "fired": false}
+{"qi": 17, "sample": 1, "query": "Make this paragraph sound less like ChatGPT wrote it.", "expected": false, "chose": "unslop", "fired": false}
+{"qi": 9, "sample": 1, "query": "My team uses Copilot for autocomplete only. What bolder things could we delegate?", "expected": true, "chose": "be-ambitious", "fired": true}
+{"qi": 17, "sample": 0, "query": "Make this paragraph sound less like ChatGPT wrote it.", "expected": false, "chose": "unslop", "fired": false}
+{"qi": 18, "sample": 0, "query": "Convert this CSV of signups into a bar chart by month.", "expected": false, "chose": "none", "fired": false}
+{"qi": 18, "sample": 2, "query": "Convert this CSV of signups into a bar chart by month.", "expected": false, "chose": "none", "fired": false}
+{"qi": 19, "sample": 0, "query": "I'm feeling unmotivated about my running goals; any tips?", "expected": false, "chose": "none", "fired": false}
+{"qi": 19, "sample": 1, "query": "I'm feeling unmotivated about my running goals; any tips?", "expected": false, "chose": "none", "fired": false}
+{"qi": 19, "sample": 2, "query": "I'm feeling unmotivated about my running goals; any tips?", "expected": false, "chose": "none", "fired": false}
+{"qi": 18, "sample": 1, "query": "Convert this CSV of signups into a bar chart by month.", "expected": false, "chose": "none", "fired": false}

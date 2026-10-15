@@ -1,14 +1,18 @@
-# Worked example: Acme Inc.
+# Worked examples
+
+These show the *shape* of each rung. The tools are specific to each example's field. For a new task, choose the instruments its own practitioners use.
+
+## Acme Inc. quarterly review (SaaS analytics)
 
 This example uses the fictional company from the source article. Acme is a mid-sized SaaS business. A user asks: **"Make me the slide deck for our quarterly business review."**
 
-## Rung 0: baseline (speed)
+### Rung 0: baseline (speed)
 
 > Build a QBR deck from these summary metrics.
 
 Faster than doing it by hand, but no more ambitious.
 
-## Altitude
+### Altitude
 
 Climbing: the deck exists so leadership spots problems → so they decide what to do → so problems get caught before the quarter is lost.
 
@@ -19,7 +23,7 @@ Climbing: the deck exists so leadership spots problems → so they decide what t
 - **Access:** raw exports or connectors for all four systems, plus somewhere to run a scheduled job.
 - **Cost to user:** they have to give up control of the deck format and commit to a one-quarter parallel run.
 
-## Depth
+### Depth
 
 The deck shows churn is up. The user assumes the cause is onboarding.
 
@@ -30,7 +34,7 @@ The deck shows churn is up. The user assumes the cause is onboarding.
 - **Produce new knowledge:** find early-warning behaviours nobody tracks today. Validate them on a held-out quarter the model never saw while searching.
 - **Outside judge:** the holdout quarter's predictive performance.
 
-## Range
+### Range
 
 Nouns → verbs: the QBR becomes *get busy people to believe a cause-and-effect story and decide under uncertainty in 30 minutes*.
 
@@ -43,8 +47,17 @@ Nouns → verbs: the QBR becomes *get busy people to believe a cause-and-effect 
 | **Short seller** (adversary) | Builds the strongest case that the story is wrong | A list of flattering metrics and how much they move the conclusion |
 | **Forensic accountant** (adversary) | Ties every number back to the ledger | A reconciliation table |
 
-## Combined rung (recommended)
+### Combined rung (recommended)
 
 > Using raw exports from billing, product events, support and CRM: (1) test whether rising churn is really an onboarding problem, with a cohort hazard model in DuckDB, and look for leading signals that a held-out quarter confirms; (2) name the three decisions leadership must make, with for/against cases, and red-team them as a short seller and a forensic accountant would; (3) propose a standing early-warning process, back-tested on the last eight quarters, to run alongside next quarter's QBR. Deliver the 10-slide deck as a by-product.
 
 **Prerequisites:** a machine with Python and DuckDB, read access to the four systems, and the user agreeing to a one-quarter parallel run.
+
+## Contrast: launch email (lifecycle marketing)
+
+Rung 0: "Write the launch email announcing team sharing to our 40k free-tier users."
+
+- **Altitude:** the outcome is free-tier teams that actually start sharing, and ideally upgrade. The email is one touch in that sequence. Durable version: a triggered sequence keyed to product events (invited a teammate, hit the share limit) instead of a one-off blast.
+- **Depth:** the field's instruments are the email platform's randomised holdout group (did the email cause any activation?), subject-line tests on a small sample before the full send, seed-list deliverability checks, and segmenting by product usage pulled from raw events. Premise to test: whether free-tier users who would benefit can be identified from usage (solo accounts with frequent exports, say). Stretch target: lift in 14-day sharing activation versus the holdout, against last launch's baseline.
+- **Range:** verbs are *get a stranger to try a new behaviour this week*. That brings in behavioural design (a single clear next action), editing (one idea per email), and an adversary: a deliverability and spam reviewer who tries to get the email filtered or unsubscribed.
+- **Executor and judge:** the model drafts variants and the segment queries. The email platform runs the holdout and the tests. The activation metric is the judge, read 14 days after the send.
