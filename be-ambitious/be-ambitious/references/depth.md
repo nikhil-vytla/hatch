@@ -9,7 +9,7 @@ Push for work an expert in the field would learn from. You want a deeper task, n
 - **Produce new knowledge.** Find what nobody has yet, and validate it on data the model didn't see while searching.
 - **Use an outside judge,** ideally a tool the model can call for fast feedback.
 
-**Rewrite prompt:**
+**Rewrite prompt** (the opening line is the article's; the rest is a paraphrase. For the exact wording, see the Depth section of the [source article](https://felixrieseberg.com/how-to-be-more-ambitious-a-tutorial-for-humans-with-models/)):
 
 ```text
 I want a deeper version of this task, not a bigger one. First answer:
