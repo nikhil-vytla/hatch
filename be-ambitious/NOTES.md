@@ -127,3 +127,4 @@ references.
 - I also dropped the article's own "200 ms" number from the depth move, because the eval showed it leaking.
 - The result is SKILL.md at 24 lines (16 of body) and references at 16, 21 and 11 lines, for 72 in total (v1 had about 370). The assets and the worked-example, self-efficacy and source references are gone.
 - v3 is not evaluated. The harness now discovers conditions from the data, so a `skill_full_v3` run slots in next to the v1 rows.
+- The user supplied the exact wording of the article's depth rewrite prompt, and `references/depth.md` now uses it, credited to the article. Everything else is still paraphrased.
