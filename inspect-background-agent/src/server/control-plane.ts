@@ -1,0 +1,1643 @@
+import { Hono } from "hono";
+import { serve } from "@hono/node-server";
+import { createNodeWebSocket } from "@hono/node-ws";
+import { randomBytes } from "node:crypto";
+import path from "node:path";
+import { access } from "node:fs/promises";
+import { GitSandboxManager, type GitAuthor } from "../sandbox/git-sandbox.js";
+import { OpenCodeBridge } from "../agent/opencode-bridge.js";
+import { listModels, resolveModel } from "../agent/models.js";
+import { createMemoryEventBus } from "../control/event-bus.js";
+import { SessionQueues } from "../control/session-queues.js";
+import { ResourceLifecycle } from "../control/resource-lifecycle.js";
+import { Automations } from "../control/automations.js";
+import { SessionIndex } from "../control/session-index.js";
+import { openPullRequest, parseGitHubRemote } from "../scm/github.js";
+import {
+  assertBindAllowed,
+  authMiddleware,
+  COOKIE_NAME,
+  LoginLimiter,
+  passwordsMatch,
+  SessionTokens,
+  setSessionCookie,
+} from "./security.js";
+import { getCookie } from "hono/cookie";
+import { spawn } from "node:child_process";
+import type { SessionEventEnvelope } from "../session/index.js";
+import { brandNumber, brandString } from "../kernel/index.js";
+
+export type SessionRow = {
+  id: string;
+  title: string;
+  sandboxId: string;
+  repoDir: string;
+  branch: string;
+  remoteUrl: string | null;
+  opencodeSessionId: string | null;
+  /** Session opener. Individual prompts may carry their own author (multiplayer). */
+  author: GitAuthor;
+  /** Everyone who has prompted this session, opener first. */
+  participants: GitAuthor[];
+  /** Author of the most recent prompt; used for commit attribution. */
+  lastPromptAuthor: GitAuthor;
+  /** Completed agent turns; turns after the first continue the OpenCode session. */
+  turns: number;
+  createdAt: number;
+  lastActiveAt: number;
+  status: "idle" | "running" | "error";
+  lastError?: string;
+  /** Soft archive: hidden from default list, disk kept, prompts rejected until restore. */
+  archivedAt: number | null;
+  /** Set when created via POST .../fork. */
+  parentSessionId: string | null;
+};
+
+export type ControlPlaneOptions = {
+  readonly rootDir?: string;
+  readonly port?: number;
+  readonly host?: string;
+  readonly modelProvider?: string;
+  readonly modelId?: string;
+  readonly sessionTtlMs?: number;
+  /** Shared secret for POST /api/hooks (external triggers: Slack workflows, Sentry, CI). */
+  readonly hookToken?: string;
+  /** GitHub token for opening PRs as the prompting user. */
+  readonly githubToken?: string;
+  /** Web/API password. Required (fail-closed) when binding non-loopback. */
+  readonly password?: string;
+  readonly cookieSecure?: boolean;
+};
+
+function addParticipant(row: SessionRow, author: GitAuthor): void {
+  if (!row.participants.some((p) => p.email === author.email)) {
+    row.participants.push(author);
+  }
+  row.lastPromptAuthor = author;
+}
+
+function id(prefix: string): string {
+  return `${prefix}_${randomBytes(5).toString("hex")}`;
+}
+
+export async function startControlPlane(opts: ControlPlaneOptions = {}) {
+  const rootDir = opts.rootDir ?? path.join("/tmp", "hatch-inspect");
+  // Fail-closed like hermes-workspace: loopback by default; non-loopback needs a password.
+  const host = opts.host ?? process.env.HOST ?? "127.0.0.1";
+  const password = opts.password ?? process.env.INSPECT_PASSWORD;
+  assertBindAllowed(host, password);
+  const cookieSecure = opts.cookieSecure ?? process.env.COOKIE_SECURE === "1";
+  const tokens = new SessionTokens();
+  const limiter = new LoginLimiter();
+
+  const sandboxes = new GitSandboxManager(path.join(rootDir, "sandboxes"));
+  await sandboxes.ensureBase();
+
+  const model = resolveModel(opts.modelId ?? process.env.OPENCODE_MODEL, opts.modelProvider ?? process.env.OPENCODE_PROVIDER);
+  const bridge = new OpenCodeBridge({ model });
+  await bridge.start();
+
+  const index = new SessionIndex(path.join(rootDir, "sessions.sqlite"));
+  const sessions = new Map<string, SessionRow>(
+    index.load().map((row) => [row.id, row]),
+  );
+  const persist = (row: SessionRow) => index.upsert(row);
+  const bus = createMemoryEventBus();
+  const queues = new SessionQueues();
+  // Abort handle for the currently running turn of each session.
+  const running = new Map<string, AbortController>();
+  const lifecycle = new ResourceLifecycle(sandboxes, {
+    ttlMs: opts.sessionTtlMs ?? 30 * 60_000,
+  });
+  const reapTimer = setInterval(() => {
+    void (async () => {
+      for (const id of await lifecycle.reap(sessions)) index.delete(id);
+    })();
+  }, 60_000);
+  reapTimer.unref?.();
+
+  const hookToken = opts.hookToken ?? process.env.HOOK_TOKEN;
+  const githubToken = opts.githubToken ?? process.env.GITHUB_TOKEN;
+
+  // Recurring prompts that spawn sessions unattended (cron-style automations).
+  const automations = new Automations(async (a) => {
+    const r = await app.request("/api/sessions", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${internalToken}`,
+      },
+      body: JSON.stringify({
+        prompt: a.prompt,
+        title: a.title ?? `auto: ${a.name}`,
+        authorName: `Automation ${a.name}`,
+        authorEmail: `automation+${a.id}@localhost`,
+      }),
+    });
+    if (!r.ok) throw new Error(`automation session failed: ${r.status}`);
+    const j = (await r.json()) as { id: string };
+    return j.id;
+  });
+  automations.start();
+
+  let seq = 0;
+
+  function emit(
+    sessionId: string,
+    origin: SessionEventEnvelope["origin"],
+    event: SessionEventEnvelope["event"],
+  ) {
+    seq += 1;
+    const envelope: SessionEventEnvelope = {
+      seq: brandNumber<"EventSeq">(seq),
+      at: brandNumber<"Timestamp">(Date.now()),
+      origin,
+      event,
+    };
+    bus.publish(brandString<"SessionId">(sessionId), envelope);
+    return envelope;
+  }
+
+  const app = new Hono();
+  const { injectWebSocket, upgradeWebSocket } = createNodeWebSocket({ app });
+
+  app.use("*", authMiddleware({ password, tokens, cookieSecure, exempt: ["/api/hooks"] }));
+
+  // Internal bearer for server-initiated requests (automations, hook forwarding).
+  const internalToken = tokens.issue();
+
+  app.get("/api/health", (c) =>
+    c.json({
+      ok: true,
+      sessions: sessions.size,
+      service: "@hatch/inspect",
+      model,
+      authRequired: Boolean(password),
+    }),
+  );
+
+  app.post("/api/login", async (c) => {
+    if (!password) return c.json({ ok: true, authRequired: false });
+    const who = c.req.header("x-forwarded-for")?.split(",")[0]?.trim() ?? "local";
+    if (!limiter.allow(who)) return c.json({ error: "too many attempts" }, 429);
+    const body = (await c.req.json().catch(() => ({}))) as { password?: string };
+    if (!body.password || !passwordsMatch(body.password, password)) {
+      return c.json({ error: "wrong password" }, 401);
+    }
+    const token = tokens.issue();
+    setSessionCookie(c, token, cookieSecure);
+    return c.json({ ok: true, token });
+  });
+
+  app.post("/api/logout", (c) => {
+    tokens.revoke(getCookie(c, COOKIE_NAME));
+    return c.json({ ok: true });
+  });
+
+  app.get("/api/models", (c) => c.json({ models: listModels(), selected: model }));
+
+  app.get("/api/sessions", (c) => {
+    const includeArchived = c.req.query("include") === "archived";
+    const rows = [...sessions.values()].filter((s) => includeArchived || !s.archivedAt);
+    rows.sort((a, b) => b.lastActiveAt - a.lastActiveAt);
+    return c.json({
+      sessions: rows.map((s) => ({
+        id: s.id,
+        title: s.title,
+        branch: s.branch,
+        status: s.status,
+        createdAt: s.createdAt,
+        lastActiveAt: s.lastActiveAt,
+        archivedAt: s.archivedAt,
+        parentSessionId: s.parentSessionId,
+        lastError: s.lastError ?? null,
+      })),
+    });
+  });
+
+  app.post("/api/sessions", async (c) => {
+    const body = (await c.req.json().catch(() => ({}))) as {
+      title?: string;
+      cloneUrl?: string;
+      authorName?: string;
+      authorEmail?: string;
+      prompt?: string;
+    };
+    const author: GitAuthor = {
+      name: body.authorName ?? "Inspect User",
+      email: body.authorEmail ?? "user@localhost",
+    };
+    const sandbox = await sandboxes.create({
+      ...(body.cloneUrl ? { cloneUrl: body.cloneUrl } : {}),
+      ...(!body.cloneUrl
+        ? {
+            seedFiles: {
+              "README.md": "# Hatch Inspect sandbox\n\nTell the agent what to build.\n",
+              "src/index.ts":
+                'export function greet(name: string) {\n  return `hello ${name}`;\n}\n',
+            },
+          }
+        : {}),
+    });
+    await sandboxes.setAuthor(sandbox.repoDir, author);
+    const ocSession = await bridge.createSession(sandbox.repoDir);
+    const row: SessionRow = {
+      id: id("ses"),
+      title: body.title ?? body.prompt?.slice(0, 72) ?? "Untitled session",
+      sandboxId: sandbox.id,
+      repoDir: sandbox.repoDir,
+      branch: sandbox.branch,
+      remoteUrl: body.cloneUrl ?? null,
+      opencodeSessionId: ocSession,
+      author,
+      participants: [author],
+      lastPromptAuthor: author,
+      turns: 0,
+      createdAt: Date.now(),
+      lastActiveAt: Date.now(),
+      status: "idle",
+      archivedAt: null,
+      parentSessionId: null,
+    };
+    sessions.set(row.id, row);
+    persist(row);
+    emit(row.id, "system", {
+      kind: "session.started",
+      repo: { owner: "local", name: sandbox.id },
+      by: {
+        id: brandString<"ActorId">(author.email),
+        display: author.name,
+        github: null,
+      },
+    });
+
+    if (body.prompt) {
+      void queues.enqueue(row.id, () => runPrompt(row.id, body.prompt!, author));
+    }
+    return c.json({
+      id: row.id,
+      branch: row.branch,
+      repoDir: row.repoDir,
+      status: row.status,
+    });
+  });
+
+  // External trigger ingress: Slack workflows, Sentry alerts, CI hooks.
+  // POST /api/hooks { prompt, title?, cloneUrl?, authorName?, authorEmail? }
+  // Requires X-Hook-Token to match HOOK_TOKEN when one is configured.
+  app.post("/api/hooks", async (c) => {
+    if (hookToken && c.req.header("x-hook-token") !== hookToken) {
+      return c.json({ error: "bad hook token" }, 401);
+    }
+    const body = (await c.req.json().catch(() => ({}))) as {
+      prompt?: string;
+      title?: string;
+      cloneUrl?: string;
+      authorName?: string;
+      authorEmail?: string;
+    };
+    if (!body.prompt?.trim()) return c.json({ error: "prompt required" }, 400);
+    const r = await app.request("/api/sessions", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${internalToken}`,
+      },
+      body: JSON.stringify({
+        prompt: body.prompt,
+        title: body.title ?? `hook: ${body.prompt.slice(0, 60)}`,
+        cloneUrl: body.cloneUrl,
+        authorName: body.authorName ?? "Webhook",
+        authorEmail: body.authorEmail ?? "hook@localhost",
+      }),
+    });
+    return new Response(r.body, {
+      status: r.status,
+      headers: { "content-type": "application/json" },
+    });
+  });
+
+  app.delete("/api/sessions/:id", async (c) => {
+    const row = sessions.get(c.req.param("id") ?? "");
+    if (!row) return c.json({ error: "not found" }, 404);
+    running.get(row.id)?.abort();
+    await queues.drain(row.id);
+    const sandboxId = row.sandboxId;
+    await lifecycle.destroy(row, sessions);
+    index.delete(row.id);
+    let gone = false;
+    try {
+      await access(path.join(rootDir, "sandboxes", sandboxId));
+    } catch {
+      gone = true;
+    }
+    return c.json({ ok: true, destroyed: sandboxId, diskGone: gone });
+  });
+
+  app.post("/api/sessions/:id/archive", async (c) => {
+    const row = sessions.get(c.req.param("id") ?? "");
+    if (!row) return c.json({ error: "not found" }, 404);
+    if (row.status === "running") return c.json({ error: "session running" }, 409);
+    row.archivedAt = Date.now();
+    lifecycle.touch(row);
+    persist(row);
+    emit(row.id, "system", { kind: "session.closed", reason: "archived" });
+    return c.json({ ok: true, id: row.id, archivedAt: row.archivedAt });
+  });
+
+  app.post("/api/sessions/:id/restore", async (c) => {
+    const row = sessions.get(c.req.param("id") ?? "");
+    if (!row) return c.json({ error: "not found" }, 404);
+    row.archivedAt = null;
+    lifecycle.touch(row);
+    persist(row);
+    return c.json({ ok: true, id: row.id, archivedAt: null });
+  });
+
+  // Interrupt the currently running turn. Queued prompts still run afterwards.
+  app.post("/api/sessions/:id/stop", (c) => {
+    const row = sessions.get(c.req.param("id") ?? "");
+    if (!row) return c.json({ error: "not found" }, 404);
+    const controller = running.get(row.id);
+    if (!controller) return c.json({ ok: false, note: "no running turn" });
+    controller.abort();
+    return c.json({ ok: true, stopping: true });
+  });
+
+  app.post("/api/sessions/:id/fork", async (c) => {
+    const parent = sessions.get(c.req.param("id") ?? "");
+    if (!parent) return c.json({ error: "not found" }, 404);
+    if (parent.archivedAt) return c.json({ error: "archived; restore first" }, 409);
+    const body = (await c.req.json().catch(() => ({}))) as {
+      title?: string;
+      prompt?: string;
+      commitDirty?: boolean;
+    };
+    if (body.commitDirty !== false) {
+      const dirty = await sandboxes.status(parent.repoDir);
+      if (dirty) {
+        await sandboxes.commitAll(
+          parent.repoDir,
+          "inspect: snapshot before fork",
+          parent.author,
+        );
+      }
+    }
+    const sandbox = await sandboxes.forkFrom({ sourceRepoDir: parent.repoDir });
+    await sandboxes.setAuthor(sandbox.repoDir, parent.author);
+    const ocSession = await bridge.createSession(sandbox.repoDir);
+    const row: SessionRow = {
+      id: id("ses"),
+      title: body.title ?? `Fork of ${parent.title}`.slice(0, 72),
+      sandboxId: sandbox.id,
+      repoDir: sandbox.repoDir,
+      branch: sandbox.branch,
+      remoteUrl: parent.remoteUrl,
+      opencodeSessionId: ocSession,
+      author: parent.author,
+      participants: [parent.author],
+      lastPromptAuthor: parent.author,
+      turns: 0,
+      createdAt: Date.now(),
+      lastActiveAt: Date.now(),
+      status: "idle",
+      archivedAt: null,
+      parentSessionId: parent.id,
+    };
+    sessions.set(row.id, row);
+    persist(row);
+    emit(row.id, "system", {
+      kind: "session.started",
+      repo: { owner: "local", name: sandbox.id },
+      by: {
+        id: brandString<"ActorId">(parent.author.email),
+        display: parent.author.name,
+        github: null,
+      },
+    });
+    if (body.prompt) {
+      void queues.enqueue(row.id, () => runPrompt(row.id, body.prompt!));
+    }
+    return c.json({
+      id: row.id,
+      branch: row.branch,
+      repoDir: row.repoDir,
+      status: row.status,
+      parentSessionId: parent.id,
+    });
+  });
+
+  app.get("/api/sessions/:id", async (c) => {
+    const row = sessions.get(c.req.param("id"));
+    if (!row) return c.json({ error: "not found" }, 404);
+    const status = await sandboxes.status(row.repoDir);
+    const artifacts = await sandboxes.artifacts(row.repoDir);
+    return c.json({
+      ...row,
+      gitStatus: status,
+      diff: artifacts.diff,
+      files: artifacts.files,
+    });
+  });
+
+  app.get("/api/sessions/:id/artifacts", async (c) => {
+    const row = sessions.get(c.req.param("id"));
+    if (!row) return c.json({ error: "not found" }, 404);
+    const artifacts = await sandboxes.artifacts(row.repoDir);
+    return c.json({
+      sessionId: row.id,
+      branch: row.branch,
+      ...artifacts,
+      screenshots: [] as const,
+      screenshotsNote:
+        "Screenshots need in-sandbox VNC/Chromium sidecars (Modal execution plane). Not wired in the local hatch yet.",
+    });
+  });
+
+  app.post("/api/sessions/:id/prompt", async (c) => {
+    const row = sessions.get(c.req.param("id"));
+    if (!row) return c.json({ error: "not found" }, 404);
+    if (row.archivedAt) return c.json({ error: "archived; restore first" }, 409);
+    const body = (await c.req.json()) as {
+      text?: string;
+      authorName?: string;
+      authorEmail?: string;
+    };
+    if (!body.text?.trim()) return c.json({ error: "text required" }, 400);
+    // Multiplayer: any client may prompt with its own identity; commits attribute to them.
+    const author: GitAuthor =
+      body.authorName || body.authorEmail
+        ? {
+            name: body.authorName ?? body.authorEmail!,
+            email: body.authorEmail ?? `${body.authorName}@localhost`,
+          }
+        : row.lastPromptAuthor;
+    void queues.enqueue(row.id, () => runPrompt(row.id, body.text!.trim(), author));
+    return c.json({ ok: true, status: "queued", author });
+  });
+
+  app.post("/api/sessions/:id/commit", async (c) => {
+    const row = sessions.get(c.req.param("id"));
+    if (!row) return c.json({ error: "not found" }, 404);
+    const body = (await c.req.json().catch(() => ({}))) as { message?: string };
+    const sha = await sandboxes.commitAll(
+      row.repoDir,
+      body.message ?? `inspect: ${row.title}`,
+      row.lastPromptAuthor,
+    );
+    emit(row.id, "sandbox", {
+      kind: "git.pushed",
+      branch: brandString<"BranchName">(row.branch),
+      head: brandString<"CommitSha">(sha),
+    });
+    return c.json({ sha, branch: row.branch, author: row.lastPromptAuthor });
+  });
+
+  // Push branch to origin; open a GitHub PR as the prompting user when a token exists.
+  app.post("/api/sessions/:id/pr", async (c) => {
+    const row = sessions.get(c.req.param("id"));
+    if (!row) return c.json({ error: "not found" }, 404);
+    if (!row.remoteUrl) {
+      return c.json({ error: "session has no cloneUrl remote; nothing to push to" }, 400);
+    }
+    const body = (await c.req.json().catch(() => ({}))) as {
+      title?: string;
+      body?: string;
+      base?: string;
+      token?: string;
+    };
+    const sha = await sandboxes.commitAll(
+      row.repoDir,
+      `inspect: ${row.title}`,
+      row.lastPromptAuthor,
+    );
+    const token = body.token ?? githubToken;
+    const gh = parseGitHubRemote(row.remoteUrl);
+    await sandboxes.push(row.repoDir, row.branch, gh ? token : undefined);
+    emit(row.id, "sandbox", {
+      kind: "git.pushed",
+      branch: brandString<"BranchName">(row.branch),
+      head: brandString<"CommitSha">(sha),
+    });
+    if (!gh || !token) {
+      return c.json({
+        pushed: true,
+        branch: row.branch,
+        sha,
+        pr: null,
+        note: gh
+          ? "no GitHub token (set GITHUB_TOKEN or pass token) — branch pushed, PR not opened"
+          : "remote is not GitHub — branch pushed, PR not opened",
+      });
+    }
+    const pr = await openPullRequest({
+      repo: gh,
+      head: row.branch,
+      ...(body.base ? { base: body.base } : {}),
+      title: body.title ?? row.title,
+      body:
+        body.body ??
+        `Session ${row.id} by ${row.participants.map((p) => p.name).join(", ")}.`,
+      token,
+    });
+    emit(row.id, "webhook", {
+      kind: "pr.opened",
+      number: pr.number,
+      url: pr.url,
+      by: brandString<"ActorId">(row.lastPromptAuthor.email),
+    });
+    return c.json({ pushed: true, branch: row.branch, sha, pr });
+  });
+
+  app.get("/api/automations", (c) => c.json({ automations: automations.list() }));
+
+  app.post("/api/automations", async (c) => {
+    const body = (await c.req.json().catch(() => ({}))) as {
+      name?: string;
+      prompt?: string;
+      everyMs?: number;
+      title?: string;
+    };
+    if (!body.name?.trim() || !body.prompt?.trim()) {
+      return c.json({ error: "name and prompt required" }, 400);
+    }
+    const automation = automations.add({
+      id: id("auto"),
+      name: body.name.trim(),
+      prompt: body.prompt.trim(),
+      everyMs: Math.max(10_000, body.everyMs ?? 3_600_000),
+      ...(body.title ? { title: body.title } : {}),
+    });
+    return c.json(automation);
+  });
+
+  app.delete("/api/automations/:id", (c) => {
+    const ok = automations.remove(c.req.param("id"));
+    return ok ? c.json({ ok: true }) : c.json({ error: "not found" }, 404);
+  });
+
+  app.get(
+    "/api/sessions/:id/events",
+    upgradeWebSocket((c) => {
+      const sessionId = c.req.param("id") ?? "";
+      return {
+        onOpen(_evt, ws) {
+          const unsub = bus.subscribe(brandString<"SessionId">(sessionId), (envelope) => {
+            ws.send(JSON.stringify(envelope));
+          });
+          (ws as unknown as { __unsub?: () => void }).__unsub = unsub;
+          ws.send(JSON.stringify({ type: "hello", sessionId }));
+        },
+        onClose(_evt, ws) {
+          const u = (ws as unknown as { __unsub?: () => void }).__unsub;
+          u?.();
+        },
+      };
+    }),
+  );
+
+  // Terminal into a session's sandbox (workspace-grade frontend feature).
+  app.get(
+    "/api/sessions/:id/terminal",
+    upgradeWebSocket((c) => {
+      const row = sessions.get(c.req.param("id") ?? "");
+      let shell: ReturnType<typeof spawn> | null = null;
+      return {
+        onOpen(_evt, ws) {
+          if (!row) {
+            ws.send("no such session\r\n");
+            ws.close();
+            return;
+          }
+          // Non-interactive bash in its own process group: `bash -i` would grab the
+          // server's controlling TTY and SIGTTOU-stop the whole process group.
+          shell = spawn("bash", ["--noprofile", "--norc"], {
+            cwd: row.repoDir,
+            env: { ...process.env, TERM: "dumb" },
+            stdio: ["pipe", "pipe", "pipe"],
+            detached: true,
+          });
+          shell.stdout?.on("data", (d: Buffer) => ws.send(d.toString()));
+          shell.stderr?.on("data", (d: Buffer) => ws.send(d.toString()));
+          shell.on("close", () => ws.close());
+          ws.send(`connected: bash in sandbox ${row.sandboxId} (piped, line-based)\r\n`);
+        },
+        onMessage(evt) {
+          shell?.stdin?.write(String(evt.data));
+        },
+        onClose() {
+          if (shell?.pid) {
+            try {
+              process.kill(-shell.pid, "SIGKILL");
+            } catch {
+              shell.kill("SIGKILL");
+            }
+          }
+          shell = null;
+        },
+      };
+    }),
+  );
+
+  // Static web UI
+  app.get("/", (c) => c.html(webUiHtml()));
+  app.get("/ui", (c) => c.html(webUiHtml()));
+
+  async function runPrompt(sessionId: string, text: string, author?: GitAuthor) {
+    const row = sessions.get(sessionId);
+    if (!row || !row.opencodeSessionId || row.archivedAt) return;
+    const by = author ?? row.lastPromptAuthor;
+    addParticipant(row, by);
+    row.status = "running";
+    lifecycle.touch(row);
+    persist(row);
+    const controller = new AbortController();
+    running.set(row.id, controller);
+    const turnId = brandString<"TurnId">(id("trn"));
+    emit(sessionId, "user", {
+      kind: "turn.queued",
+      turn: {
+        id: turnId,
+        author: {
+          id: brandString<"ActorId">(by.email),
+          display: by.name,
+          github: null,
+        },
+        text,
+        state: { kind: "queued" },
+      },
+    });
+    emit(sessionId, "system", { kind: "turn.started", turnId });
+
+    try {
+      let summary = "";
+      let stopped = false;
+      for await (const delta of bridge.runPrompt({
+        sessionId: row.opencodeSessionId,
+        directory: row.repoDir,
+        text,
+        continueSession: row.turns > 0,
+        signal: controller.signal,
+      })) {
+        if (delta.kind === "text") {
+          summary += delta.text;
+          emit(sessionId, "agent", {
+            kind: "agent.delta",
+            turnId,
+            text: delta.text,
+          });
+        } else if (delta.kind === "tool") {
+          emit(sessionId, "agent", {
+            kind: "agent.delta",
+            turnId,
+            text: `\n[tool:${delta.name} ${delta.status}]\n`,
+          });
+        } else if (delta.kind === "stopped") {
+          stopped = true;
+          break;
+        } else if (delta.kind === "error") {
+          row.status = "error";
+          row.lastError = delta.message;
+          lifecycle.touch(row);
+          persist(row);
+          emit(sessionId, "system", {
+            kind: "turn.finished",
+            turnId,
+            summary: `error: ${delta.message}`,
+          });
+          return;
+        } else if (delta.kind === "idle") {
+          break;
+        }
+      }
+      row.status = "idle";
+      row.turns += 1;
+      lifecycle.touch(row);
+      persist(row);
+      if (stopped) {
+        emit(sessionId, "system", {
+          kind: "turn.stopped",
+          turnId,
+          by: brandString<"ActorId">(by.email),
+        });
+        return;
+      }
+      const gitStatus = await sandboxes.status(row.repoDir);
+      emit(sessionId, "agent", {
+        kind: "turn.finished",
+        turnId,
+        summary: summary.slice(0, 500) || (gitStatus ? "done (dirty tree)" : "done"),
+      });
+    } catch (e) {
+      row.status = "error";
+      row.lastError = e instanceof Error ? e.message : String(e);
+      lifecycle.touch(row);
+      persist(row);
+      emit(sessionId, "system", {
+        kind: "turn.finished",
+        turnId,
+        summary: `error: ${row.lastError}`,
+      });
+    } finally {
+      running.delete(row.id);
+    }
+  }
+
+  const port = opts.port ?? 8787;
+  const server = serve({ fetch: app.fetch, port, hostname: host });
+  injectWebSocket(server);
+  let closed = false;
+
+  return {
+    app,
+    server,
+    port,
+    host,
+    sessions,
+    sandboxes,
+    bridge,
+    bus,
+    automations,
+    async close() {
+      if (closed) return;
+      closed = true;
+      automations.stop();
+      clearInterval(reapTimer);
+      // Sessions survive restarts: drain running turns, keep sandboxes + index.
+      for (const session of [...sessions.values()]) {
+        running.get(session.id)?.abort();
+        await queues.drain(session.id);
+        persist(session);
+      }
+      index.close();
+      await bridge.close();
+      server.close();
+    },
+  };
+}
+
+export function webUiHtml(): string {
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Hatch Inspect</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg0: #0f1410;
+      --bg1: #1a221c;
+      --ink: #e8f0e9;
+      --muted: #9bb09e;
+      --accent: #c4f542;
+      --line: #2c3a30;
+      --danger: #ff6b6b;
+      --agent: #121814;
+      --code: #080b09;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh;
+      font-family: "IBM Plex Sans", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(1200px 600px at 10% -10%, #243528 0%, transparent 55%),
+        radial-gradient(900px 500px at 100% 0%, #1e2a40 0%, transparent 50%),
+        var(--bg0);
+    }
+    header {
+      padding: 28px 32px 12px;
+      border-bottom: 1px solid var(--line);
+    }
+    header h1 {
+      margin: 0;
+      font-size: 28px;
+      letter-spacing: -0.02em;
+    }
+    header p { margin: 8px 0 0; color: var(--muted); max-width: 60ch; }
+    main {
+      display: grid;
+      grid-template-columns: 340px 1fr;
+      gap: 0;
+      min-height: calc(100vh - 110px);
+    }
+    aside, section.workspace { padding: 20px 24px; }
+    aside { border-right: 1px solid var(--line); background: color-mix(in oklab, var(--bg1) 80%, transparent); }
+    section.workspace {
+      display: grid;
+      grid-template-rows: minmax(220px, 42vh) 1fr;
+      gap: 14px;
+      min-width: 0;
+    }
+    label { display:block; font-size: 12px; color: var(--muted); margin: 12px 0 6px; text-transform: uppercase; letter-spacing: 0.06em; }
+    textarea, input, button {
+      width: 100%;
+      font: inherit;
+      border-radius: 10px;
+      border: 1px solid var(--line);
+      background: var(--bg0);
+      color: var(--ink);
+      padding: 10px 12px;
+    }
+    textarea { min-height: 120px; resize: vertical; font-family: "IBM Plex Mono", monospace; font-size: 13px; }
+    button {
+      margin-top: 14px;
+      background: var(--accent);
+      color: #111;
+      font-weight: 600;
+      border: none;
+      cursor: pointer;
+    }
+    button.secondary { background: transparent; color: var(--ink); border: 1px solid var(--line); }
+    button:disabled { opacity: 0.5; cursor: wait; }
+    .meta { font-family: "IBM Plex Mono", monospace; font-size: 12px; color: var(--muted); margin-top: 14px; white-space: pre-wrap; }
+    #log {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      background: #0b0f0c;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 14px;
+      height: 100%;
+      min-height: 180px;
+      overflow: auto;
+    }
+    #log:empty::before { content: "Waiting…"; color: var(--muted); font-family: "IBM Plex Mono", monospace; font-size: 12.5px; }
+    .artifacts {
+      background: #0b0f0c;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .artifacts-tabs {
+      display: flex;
+      gap: 0;
+      border-bottom: 1px solid var(--line);
+      flex: 0 0 auto;
+    }
+    .artifacts-tabs button {
+      width: auto;
+      margin: 0;
+      border: none;
+      border-radius: 0;
+      background: transparent;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      padding: 10px 14px;
+      border-bottom: 2px solid transparent;
+    }
+    .artifacts-tabs button.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+    }
+    .artifacts-body {
+      flex: 1;
+      overflow: auto;
+      padding: 12px 14px;
+      min-height: 0;
+    }
+    .file-list { list-style: none; margin: 0 0 12px; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+    .file-list button {
+      width: auto;
+      margin: 0;
+      padding: 4px 8px;
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 11.5px;
+      font-weight: 500;
+      background: var(--bg1);
+      color: var(--ink);
+      border: 1px solid var(--line);
+    }
+    .file-list button.active {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+    .diff-view, .file-view {
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 12px;
+      line-height: 1.45;
+      white-space: pre;
+      overflow-x: auto;
+      margin: 0;
+    }
+    .diff-view .add { color: #9be39b; }
+    .diff-view .del { color: #ff8f8f; }
+    .diff-view .hunk { color: #7aa2ff; }
+    .empty-art { color: var(--muted); font-size: 13px; line-height: 1.45; max-width: 48ch; }
+    .shot-note {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+      max-width: 52ch;
+      border: 1px dashed var(--line);
+      border-radius: 8px;
+      padding: 12px 14px;
+    }
+    .entry-sys {
+      color: var(--muted);
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 12px;
+      line-height: 1.4;
+    }
+    .entry-turn {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 11px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      margin-top: 4px;
+    }
+    .entry-turn .dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: var(--line);
+      flex: 0 0 auto;
+    }
+    .entry-turn.running .dot { background: var(--accent); box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent) 25%, transparent); }
+    .entry-turn.done .dot { background: #5a8f66; }
+    .entry-turn.err { color: var(--danger); }
+    .entry-turn.err .dot { background: var(--danger); }
+    .entry-agent {
+      background: var(--agent);
+      border-left: 3px solid var(--accent);
+      padding: 12px 14px;
+      border-radius: 0 10px 10px 0;
+      font-size: 13.5px;
+      line-height: 1.5;
+    }
+    .entry-agent .md-text { white-space: pre-wrap; word-break: break-word; }
+    .entry-agent code {
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 12.5px;
+      background: color-mix(in oklab, var(--code) 80%, #1a2a1c);
+      padding: 1px 5px;
+      border-radius: 4px;
+    }
+    .entry-agent pre {
+      margin: 10px 0 0;
+      padding: 12px 14px;
+      background: var(--code);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow-x: auto;
+    }
+    .entry-agent pre code {
+      background: none;
+      padding: 0;
+      font-size: 12.5px;
+      line-height: 1.45;
+      color: #d7e6d9;
+      white-space: pre;
+    }
+    .entry-agent .lang {
+      display: block;
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 10px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 6px;
+    }
+    .entry-tool {
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 12px;
+      color: #b7c9a0;
+      border: 1px dashed var(--line);
+      border-radius: 8px;
+      padding: 8px 10px;
+      background: color-mix(in oklab, var(--bg1) 70%, transparent);
+    }
+    .pill {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      font-size: 11px;
+      color: var(--muted);
+      margin-right: 6px;
+    }
+    .pill.live { border-color: var(--accent); color: var(--accent); }
+    #login {
+      position: fixed; inset: 0; background: rgba(8,10,9,.93);
+      display: none; align-items: center; justify-content: center; z-index: 50;
+    }
+    #login.open { display: flex; }
+    #login form {
+      background: var(--bg1); border: 1px solid var(--line); border-radius: 14px;
+      padding: 26px; width: 320px; display: flex; flex-direction: column; gap: 12px;
+    }
+    #login input {
+      font: inherit; background: var(--bg0); border: 1px solid var(--line);
+      color: var(--ink); border-radius: 8px; padding: 10px 12px;
+    }
+    #login .lerr { color: var(--danger); font-size: 12px; min-height: 14px; }
+    .term-wrap { display: flex; flex-direction: column; gap: 8px; height: 100%; }
+    #termOut {
+      flex: 1; min-height: 120px; overflow: auto;
+      background: var(--code); border: 1px solid var(--line); border-radius: 8px;
+      padding: 10px 12px; font-family: "IBM Plex Mono", monospace; font-size: 12px;
+      white-space: pre-wrap; word-break: break-all; margin: 0;
+    }
+    #termIn {
+      font-family: "IBM Plex Mono", monospace; font-size: 12.5px;
+      background: var(--bg0); color: var(--ink);
+      border: 1px solid var(--line); border-radius: 8px; padding: 9px 11px; width: 100%;
+    }
+    .session-list {
+      list-style: none; margin: 14px 0 0; padding: 0;
+      max-height: 220px; overflow: auto;
+      border: 1px solid var(--line); border-radius: 10px;
+    }
+    .session-list li {
+      display: grid;
+      grid-template-columns: 8px 1fr auto;
+      gap: 8px;
+      align-items: start;
+      padding: 8px 10px;
+      border-bottom: 1px solid var(--line);
+      cursor: pointer;
+      font-size: 12.5px;
+    }
+    .session-list li:last-child { border-bottom: none; }
+    .session-list li:hover { background: color-mix(in oklab, var(--bg0) 55%, transparent); }
+    .session-list li.active { background: color-mix(in oklab, var(--accent) 12%, transparent); }
+    .session-list li.archived { opacity: 0.55; }
+    .session-list .st {
+      width: 8px; height: 8px; border-radius: 50%; margin-top: 5px;
+      background: var(--line);
+    }
+    .session-list .st.idle { background: #5a8f66; }
+    .session-list .st.running { background: var(--accent); }
+    .session-list .st.error { background: var(--danger); }
+    .session-list .title {
+      font-weight: 600; line-height: 1.3;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .session-list .sub {
+      color: var(--muted); font-family: "IBM Plex Mono", monospace; font-size: 10.5px;
+      margin-top: 2px;
+    }
+    .session-list .badge {
+      font-size: 10px; color: var(--muted); text-transform: uppercase;
+      letter-spacing: 0.04em; margin-top: 4px;
+    }
+    .row-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .row-actions button { margin-top: 8px; }
+    .show-archived {
+      display: flex; align-items: center; gap: 8px;
+      margin-top: 8px; color: var(--muted); font-size: 12px;
+    }
+    .show-archived input { width: auto; }
+    @media (max-width: 820px) {
+      main { grid-template-columns: 1fr; }
+      aside { border-right: none; border-bottom: 1px solid var(--line); }
+      section.workspace { grid-template-rows: 40vh 45vh; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Hatch Inspect</h1>
+    <p>Local background coding agent. Real git sandbox + OpenCode free models. Inspired by Ramp Inspect / Open-Inspect, not a clone.</p>
+  </header>
+  <main>
+    <aside>
+      <div><span class="pill" id="health">…</span><span class="pill" id="sesspill">no session</span></div>
+      <label>Sessions</label>
+      <ul class="session-list" id="sessionList"></ul>
+      <label class="show-archived"><input type="checkbox" id="showArchived" /> Show archived</label>
+      <label>Prompt</label>
+      <textarea id="prompt">Add a function called add in src/math.ts that returns the sum of two numbers, and export it. Keep it TypeScript.</textarea>
+      <button id="start">Start session + run</button>
+      <button class="secondary" id="follow" disabled>Send follow-up</button>
+      <button class="secondary" id="commit" disabled>Commit changes</button>
+      <div class="row-actions">
+        <button class="secondary" id="stop" disabled>Stop turn</button>
+        <button class="secondary" id="fork" disabled>Fork</button>
+        <button class="secondary" id="archive" disabled>Archive</button>
+        <button class="secondary" id="restore" disabled>Restore</button>
+        <button class="secondary" id="destroy" disabled>Delete</button>
+      </div>
+      <div class="meta" id="meta"></div>
+    </aside>
+    <section class="workspace">
+      <div id="log"></div>
+      <div class="artifacts">
+        <div class="artifacts-tabs">
+          <button type="button" class="active" data-tab="files">Files</button>
+          <button type="button" data-tab="diff">Diff</button>
+          <button type="button" data-tab="term">Terminal</button>
+          <button type="button" data-tab="shots">Screenshots</button>
+        </div>
+        <div class="artifacts-body" id="artifactsBody">
+          <p class="empty-art">Artifacts appear here after the agent writes files: source, unified diff, and (later) screenshots.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+  <div id="login"><form id="loginForm">
+    <strong>Inspect locked</strong>
+    <span class="empty-art">This deployment sets INSPECT_PASSWORD. Enter it to continue.</span>
+    <input type="password" id="pw" placeholder="password" autofocus />
+    <div class="lerr" id="loginErr"></div>
+    <button type="submit">Unlock</button>
+  </form></div>
+  <script>
+    const logEl = document.getElementById('log');
+    const meta = document.getElementById('meta');
+    const health = document.getElementById('health');
+    const sesspill = document.getElementById('sesspill');
+    const sessionList = document.getElementById('sessionList');
+    const showArchived = document.getElementById('showArchived');
+    const artifactsBody = document.getElementById('artifactsBody');
+    let sessionId = null;
+    let sessionMeta = null;
+    let ws = null;
+    let agentBuf = '';
+    let agentEl = null;
+    let artTab = 'files';
+    let artData = null;
+    let selectedFile = null;
+    let termWs = null;
+    let termBuf = '';
+
+    async function api(url, opts) {
+      const r = await fetch(url, opts);
+      if (r.status === 401) {
+        document.getElementById('login').classList.add('open');
+        throw new Error('unauthorized');
+      }
+      return r;
+    }
+
+    document.getElementById('loginForm').onsubmit = async (e) => {
+      e.preventDefault();
+      const r = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ password: document.getElementById('pw').value }),
+      });
+      if (r.ok) {
+        document.getElementById('login').classList.remove('open');
+        refreshSessions();
+      } else {
+        document.getElementById('loginErr').textContent = (await r.json()).error || 'login failed';
+      }
+    };
+
+    document.querySelectorAll('.artifacts-tabs button').forEach((btn) => {
+      btn.onclick = () => {
+        document.querySelectorAll('.artifacts-tabs button').forEach((b) => b.classList.remove('active'));
+        btn.classList.add('active');
+        artTab = btn.getAttribute('data-tab');
+        renderArtifacts();
+      };
+    });
+
+    function connectTerm() {
+      if (!sessionId) return;
+      if (termWs && termWs.readyState === WebSocket.OPEN && termWs.__session === sessionId) return;
+      if (termWs) termWs.close();
+      termBuf = '';
+      const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+      termWs = new WebSocket(proto + '://' + location.host + '/api/sessions/' + sessionId + '/terminal');
+      termWs.__session = sessionId;
+      termWs.onmessage = (ev) => {
+        termBuf += ev.data;
+        const out = document.getElementById('termOut');
+        if (out) { out.textContent = termBuf; out.scrollTop = out.scrollHeight; }
+      };
+      termWs.onclose = () => {
+        termBuf += '\\n[disconnected]\\n';
+        const out = document.getElementById('termOut');
+        if (out) out.textContent = termBuf;
+      };
+    }
+
+    function renderTerminal() {
+      artifactsBody.innerHTML =
+        '<div class="term-wrap"><pre id="termOut"></pre>' +
+        '<input id="termIn" placeholder="command in the session sandbox — Enter to run" /></div>';
+      const out = document.getElementById('termOut');
+      out.textContent = termBuf || (sessionId ? 'connecting…' : 'select or start a session first');
+      if (sessionId) connectTerm();
+      const input = document.getElementById('termIn');
+      input.onkeydown = (e) => {
+        if (e.key === 'Enter' && termWs && termWs.readyState === WebSocket.OPEN) {
+          termWs.send(input.value + '\\n');
+          input.value = '';
+        }
+      };
+      input.focus();
+    }
+
+    function escapeHtml(s) {
+      return String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+    }
+
+    function renderDiffHtml(diff) {
+      if (!diff) return '<p class="empty-art">No diff yet.</p>';
+      const lines = diff.split('\\n').map((line) => {
+        const e = escapeHtml(line);
+        if (line.startsWith('+') && !line.startsWith('+++')) return '<span class="add">' + e + '</span>';
+        if (line.startsWith('-') && !line.startsWith('---')) return '<span class="del">' + e + '</span>';
+        if (line.startsWith('@@')) return '<span class="hunk">' + e + '</span>';
+        return e;
+      });
+      return '<pre class="diff-view">' + lines.join('\\n') + '</pre>';
+    }
+
+    function renderArtifacts() {
+      if (artTab === 'term') {
+        renderTerminal();
+        return;
+      }
+      if (!artData) {
+        artifactsBody.innerHTML = '<p class="empty-art">Artifacts appear here after the agent writes files: source, unified diff, and (later) screenshots.</p>';
+        return;
+      }
+      if (artTab === 'shots') {
+        artifactsBody.innerHTML = '<div class="shot-note">' + escapeHtml(artData.screenshotsNote || 'Screenshots are not available in the local hatch. They need VNC/Chromium sidecars on the Modal execution plane.') + '</div>';
+        return;
+      }
+      if (artTab === 'diff') {
+        artifactsBody.innerHTML = renderDiffHtml(artData.diff || '');
+        return;
+      }
+      const files = artData.files || [];
+      if (!files.length) {
+        artifactsBody.innerHTML = '<p class="empty-art">No changed files yet.</p>';
+        return;
+      }
+      if (!selectedFile || !files.find((f) => f.path === selectedFile)) {
+        selectedFile = files[0].path;
+      }
+      const current = files.find((f) => f.path === selectedFile) || files[0];
+      let html = '<ul class="file-list">';
+      for (const f of files) {
+        html += '<li style="display:contents"><button type="button" data-path="' + escapeHtml(f.path) + '"'
+          + (f.path === selectedFile ? ' class="active"' : '') + '>'
+          + escapeHtml(f.status + ' ' + f.path) + '</button></li>';
+      }
+      html += '</ul>';
+      if (current.binary) {
+        html += '<p class="empty-art">Binary file (not shown).</p>';
+      } else if (current.content == null) {
+        html += '<p class="empty-art">File missing or deleted.</p>';
+      } else {
+        html += '<pre class="file-view">' + escapeHtml(current.content)
+          + (current.truncated ? '\\n\\n… truncated …' : '') + '</pre>';
+      }
+      artifactsBody.innerHTML = html;
+      artifactsBody.querySelectorAll('button[data-path]').forEach((b) => {
+        b.onclick = () => {
+          selectedFile = b.getAttribute('data-path');
+          renderArtifacts();
+        };
+      });
+    }
+
+    async function refreshArtifacts() {
+      if (!sessionId) return;
+      try {
+        const r = await api('/api/sessions/' + sessionId + '/artifacts');
+        if (!r.ok) return;
+        artData = await r.json();
+        renderArtifacts();
+      } catch {
+        /* ignore */
+      }
+    }
+
+    function setActionsEnabled(on) {
+      document.getElementById('follow').disabled = !on;
+      document.getElementById('commit').disabled = !on;
+      document.getElementById('stop').disabled = !on;
+      document.getElementById('fork').disabled = !on;
+      document.getElementById('archive').disabled = !on;
+      document.getElementById('restore').disabled = !on;
+      document.getElementById('destroy').disabled = !on;
+      if (on && sessionMeta && sessionMeta.archivedAt) {
+        document.getElementById('follow').disabled = true;
+        document.getElementById('commit').disabled = true;
+        document.getElementById('stop').disabled = true;
+        document.getElementById('fork').disabled = true;
+        document.getElementById('archive').disabled = true;
+        document.getElementById('restore').disabled = false;
+      } else if (on) {
+        document.getElementById('restore').disabled = true;
+      }
+    }
+
+    function scrollLog() {
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    function clearLog() {
+      logEl.replaceChildren();
+      agentBuf = '';
+      agentEl = null;
+    }
+
+    function note(text) {
+      const d = document.createElement('div');
+      d.className = 'entry-sys';
+      d.textContent = text;
+      logEl.appendChild(d);
+      scrollLog();
+    }
+
+    function turnMarker(label, state) {
+      const d = document.createElement('div');
+      d.className = 'entry-turn' + (state ? ' ' + state : '');
+      const dot = document.createElement('span');
+      dot.className = 'dot';
+      d.appendChild(dot);
+      d.appendChild(document.createTextNode(label));
+      logEl.appendChild(d);
+      scrollLog();
+    }
+
+    function renderInline(text) {
+      const wrap = document.createElement('span');
+      wrap.className = 'md-text';
+      const parts = text.split(/\`([^\`]+)\`/);
+      for (let i = 0; i < parts.length; i++) {
+        if (i % 2 === 1) {
+          const c = document.createElement('code');
+          c.textContent = parts[i];
+          wrap.appendChild(c);
+        } else if (parts[i]) {
+          wrap.appendChild(document.createTextNode(parts[i]));
+        }
+      }
+      return wrap;
+    }
+
+    function renderRich(text) {
+      const root = document.createDocumentFragment();
+      const fence = /\`\`\`(\\w*)\\n?([\\s\\S]*?)\`\`\`/g;
+      let last = 0;
+      let m;
+      while ((m = fence.exec(text))) {
+        if (m.index > last) root.appendChild(renderInline(text.slice(last, m.index)));
+        const pre = document.createElement('pre');
+        if (m[1]) {
+          const lang = document.createElement('span');
+          lang.className = 'lang';
+          lang.textContent = m[1];
+          pre.appendChild(lang);
+        }
+        const code = document.createElement('code');
+        code.textContent = m[2].replace(/\\n$/, '');
+        pre.appendChild(code);
+        root.appendChild(pre);
+        last = m.index + m[0].length;
+      }
+      if (last < text.length) root.appendChild(renderInline(text.slice(last)));
+      return root;
+    }
+
+    function flushAgent() {
+      agentEl = null;
+      agentBuf = '';
+    }
+
+    function onAgentDelta(text) {
+      const tool = text.trim().match(/^\\[tool:([^\\]\\s]+)(?:\\s+([^\\]]+))?\\]$/);
+      if (tool) {
+        flushAgent();
+        const d = document.createElement('div');
+        d.className = 'entry-tool';
+        d.textContent = 'tool · ' + tool[1] + (tool[2] ? ' · ' + tool[2] : '');
+        logEl.appendChild(d);
+        scrollLog();
+        return;
+      }
+      if (!agentEl) {
+        agentEl = document.createElement('div');
+        agentEl.className = 'entry-agent';
+        logEl.appendChild(agentEl);
+        agentBuf = '';
+      }
+      agentBuf += text;
+      agentEl.replaceChildren(renderRich(agentBuf));
+      scrollLog();
+    }
+
+    function handleEnvelope(msg) {
+      const e = msg.event || msg;
+      if (e.kind === 'agent.delta') {
+        onAgentDelta(e.text || '');
+        return;
+      }
+      flushAgent();
+      if (e.kind === 'session.started') note('Session started');
+      else if (e.kind === 'turn.queued') note('Prompt queued');
+      else if (e.kind === 'turn.started') turnMarker('Turn started', 'running');
+      else if (e.kind === 'turn.finished') {
+        const err = typeof e.summary === 'string' && e.summary.startsWith('error:');
+        turnMarker(err ? e.summary : 'Turn finished', err ? 'err' : 'done');
+        refreshSessions();
+        refreshArtifacts();
+      }
+      else if (e.kind === 'turn.stopped') { turnMarker('Turn stopped by user', 'err'); refreshSessions(); }
+      else if (e.kind === 'git.pushed') note('Committed ' + e.head + ' on ' + e.branch);
+      else if (e.kind === 'session.closed') note('Session closed' + (e.reason ? ': ' + e.reason : ''));
+      else note('[' + (msg.origin || '?') + '] ' + e.kind);
+    }
+
+    async function refreshHealth() {
+      try {
+        const r = await fetch('/api/health');
+        const j = await r.json();
+        health.textContent = 'ok · ' + j.sessions + ' sessions';
+        health.classList.add('live');
+      } catch {
+        health.textContent = 'down';
+      }
+    }
+
+    async function refreshSessions() {
+      const q = showArchived.checked ? '?include=archived' : '';
+      const r = await api('/api/sessions' + q);
+      const j = await r.json();
+      sessionList.replaceChildren();
+      for (const s of j.sessions || []) {
+        const li = document.createElement('li');
+        if (s.id === sessionId) li.classList.add('active');
+        if (s.archivedAt) li.classList.add('archived');
+        const st = document.createElement('span');
+        st.className = 'st ' + (s.status || 'idle');
+        const mid = document.createElement('div');
+        const title = document.createElement('div');
+        title.className = 'title';
+        title.textContent = s.title || s.id;
+        const sub = document.createElement('div');
+        sub.className = 'sub';
+        sub.textContent = s.status + (s.parentSessionId ? ' · fork' : '');
+        mid.appendChild(title);
+        mid.appendChild(sub);
+        const badge = document.createElement('div');
+        badge.className = 'badge';
+        badge.textContent = s.archivedAt ? 'archived' : s.status;
+        li.appendChild(st);
+        li.appendChild(mid);
+        li.appendChild(badge);
+        li.onclick = () => selectSession(s.id, { clear: true });
+        sessionList.appendChild(li);
+      }
+      refreshHealth();
+    }
+
+    async function selectSession(id, opts) {
+      sessionId = id;
+      const r = await api('/api/sessions/' + id);
+      const j = await r.json();
+      sessionMeta = j;
+      sesspill.textContent = id;
+      sesspill.classList.add('live');
+      meta.textContent = 'branch: ' + j.branch + '\\nrepo: ' + j.repoDir
+        + (j.parentSessionId ? '\\nparent: ' + j.parentSessionId : '')
+        + (j.archivedAt ? '\\narchived' : '');
+      setActionsEnabled(true);
+      if (opts && opts.clear) {
+        clearLog();
+        note('Switched to ' + id + (j.archivedAt ? ' (archived)' : ''));
+      }
+      connectEvents(id);
+      refreshSessions();
+      await refreshArtifacts();
+    }
+
+    function connectEvents(id) {
+      if (ws) ws.close();
+      const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+      ws = new WebSocket(proto + '://' + location.host + '/api/sessions/' + id + '/events');
+      ws.onmessage = (ev) => {
+        try {
+          const msg = JSON.parse(ev.data);
+          if (msg.type === 'hello') return;
+          handleEnvelope(msg);
+        } catch {
+          note(String(ev.data));
+        }
+      };
+    }
+
+    showArchived.onchange = () => refreshSessions();
+    refreshHealth();
+    refreshSessions();
+    setInterval(refreshSessions, 2500);
+
+    document.getElementById('start').onclick = async () => {
+      const text = document.getElementById('prompt').value.trim();
+      document.getElementById('start').disabled = true;
+      clearLog();
+      note('Creating session…');
+      const r = await api('/api/sessions', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ prompt: text, title: text.slice(0, 72) }),
+      });
+      const j = await r.json();
+      document.getElementById('start').disabled = false;
+      await selectSession(j.id, { clear: false });
+      note('Session ' + j.id);
+    };
+
+    document.getElementById('follow').onclick = async () => {
+      if (!sessionId) return;
+      const text = document.getElementById('prompt').value.trim();
+      await api('/api/sessions/' + sessionId + '/prompt', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ text }),
+      });
+      note('Follow-up queued…');
+      refreshSessions();
+    };
+
+    document.getElementById('commit').onclick = async () => {
+      if (!sessionId) return;
+      const r = await api('/api/sessions/' + sessionId + '/commit', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: '{}',
+      });
+      const j = await r.json();
+      note('Committed ' + j.sha + ' on ' + j.branch);
+      refreshArtifacts();
+    };
+
+    document.getElementById('fork').onclick = async () => {
+      if (!sessionId) return;
+      note('Forking…');
+      const r = await api('/api/sessions/' + sessionId + '/fork', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ title: 'Fork of ' + (sessionMeta && sessionMeta.title ? sessionMeta.title : sessionId) }),
+      });
+      const j = await r.json();
+      if (!r.ok) { note('Fork failed: ' + (j.error || r.status)); return; }
+      await selectSession(j.id, { clear: true });
+      note('Forked from ' + j.parentSessionId);
+    };
+
+    document.getElementById('archive').onclick = async () => {
+      if (!sessionId) return;
+      await api('/api/sessions/' + sessionId + '/archive', { method: 'POST' });
+      note('Archived ' + sessionId);
+      sessionId = null;
+      sessionMeta = null;
+      sesspill.textContent = 'no session';
+      setActionsEnabled(false);
+      clearLog();
+      refreshSessions();
+    };
+
+    document.getElementById('restore').onclick = async () => {
+      if (!sessionId) return;
+      await api('/api/sessions/' + sessionId + '/restore', { method: 'POST' });
+      await selectSession(sessionId, { clear: false });
+      note('Restored ' + sessionId);
+    };
+
+    document.getElementById('stop').onclick = async () => {
+      if (!sessionId) return;
+      const r = await api('/api/sessions/' + sessionId + '/stop', { method: 'POST' });
+      const j = await r.json();
+      note(j.stopping ? 'Stopping current turn…' : 'No running turn.');
+    };
+
+    document.getElementById('destroy').onclick = async () => {
+      if (!sessionId) return;
+      if (!confirm('Delete session and destroy sandbox disk?')) return;
+      const id = sessionId;
+      const r = await api('/api/sessions/' + id, { method: 'DELETE' });
+      const j = await r.json();
+      note('Deleted ' + id + (j.diskGone ? ' (disk gone)' : ''));
+      sessionId = null;
+      sessionMeta = null;
+      sesspill.textContent = 'no session';
+      setActionsEnabled(false);
+      refreshSessions();
+    };
+  </script>
+</body>
+</html>`;
+}
