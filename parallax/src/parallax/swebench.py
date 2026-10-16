@@ -17,10 +17,11 @@ from pydantic import (
 
 from .canonical import canonical_digest
 from .evolving_intent import Arm, Chat, Message
+from .hud_wire import WireFormatError, parse_wire, wire_tuple
 from .types import (
-    ConstructionSeed,
     DigestText,
     NonEmptyText,
+    PositiveInt,
     SourceId,
     StrictModel,
 )
@@ -83,23 +84,9 @@ PUBLISHED_INSTANCE_IDS = (
     "sympy__sympy-15599",
 )
 
-INITIAL_SCREENING_IDS = (
-    "astropy__astropy-13236",
-    "django__django-10914",
-    "django__django-13089",
-    "matplotlib__matplotlib-20676",
-    "psf__requests-5414",
-    "pydata__xarray-6461",
-    "pylint-dev__pylint-6903",
-    "pytest-dev__pytest-6202",
-    "sphinx-doc__sphinx-9230",
-    "sympy__sympy-13091",
-)
-
 InstanceId = NewType("InstanceId", NonEmptyText)
 ImageDigest = NewType("ImageDigest", DigestText)
 CommitSha = Annotated[str, StringConstraints(pattern=r"^[0-9a-f]{40}$")]
-PositiveInt = Annotated[int, Field(gt=0)]
 ArgumentCategory: TypeAlias = Literal[
     "symptom",
     "context",
@@ -171,6 +158,12 @@ class _DatasetRow(StrictModel):
     @field_validator("FAIL_TO_PASS", "PASS_TO_PASS", mode="before")
     @classmethod
     def parse_test_list(cls, value: object) -> object:
+        """Accept the dataset's string-encoded arrays and plain arrays alike.
+
+        The rows service returns these columns as JSON text, but a plain array
+        is the shape everything else on this wire uses, and attaching this
+        validator would otherwise reject it: see `wire_tuple`.
+        """
         if isinstance(value, str):
             try:
                 parsed = json.loads(value)
@@ -179,7 +172,7 @@ class _DatasetRow(StrictModel):
             if not isinstance(parsed, list):
                 raise ValueError("test list must decode to an array")
             return tuple(parsed)
-        return value
+        return wire_tuple(value)
 
 
 class _FilteredRow(StrictModel):
@@ -415,14 +408,10 @@ def construct_swe_intent(
         ),
     )
     output = chat(messages, max_output_tokens)
-    payload = output
-    if output.startswith("```json\n") and output.endswith("\n```"):
-        payload = output[8:-4]
     try:
-        construction = SweConstruction.model_validate_json(payload)
-    except ValidationError as error:
-        detail = error.errors(include_url=False)[0]["msg"]
-        raise SweBenchError(f"SWE intent construction is invalid: {detail}") from error
+        construction = parse_wire(SweConstruction, output)
+    except WireFormatError as error:
+        raise SweBenchError(f"SWE intent construction is invalid: {error}") from error
     return SweConstructionEvidence(
         model=model,
         output=output,
@@ -485,7 +474,6 @@ class SweOverlayReceipt(StrictModel):
 
 
 class SweScriptFamily(StrictModel):
-    construction_seed: ConstructionSeed
     construction: SweConstruction
     static: SweScript
     matched: SweScript
@@ -561,7 +549,6 @@ def build_swe_script_family(
     problem: SweBenchProblem,
     construction: SweConstruction,
     *,
-    seed: int,
     total_agent_steps: int,
     max_output_tokens: int,
 ) -> SweScriptFamily:
@@ -649,7 +636,6 @@ def build_swe_script_family(
         ),
     )
     return SweScriptFamily(
-        construction_seed=ConstructionSeed(seed),
         construction=construction,
         static=static,
         matched=matched,

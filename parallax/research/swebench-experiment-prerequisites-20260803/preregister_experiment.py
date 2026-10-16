@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 from parallax.canonical import atomic_write, canonical_bytes, canonical_digest
+from parallax.metering import pricing_for
 
 ROOT = Path(__file__).parent
 EVIDENCE = ROOT / "evidence"
@@ -15,6 +16,8 @@ SOURCES = (
 TRIAL_SEEDS = (2026080401, 2026080402, 2026080403)
 PRIOR_STATIC_METERED_USD = 0.908775
 EVOLVED_COST_MULTIPLIER = 2.0
+MODEL = "claude-opus-4-8"
+PRICING = pricing_for(MODEL)
 
 
 def main() -> None:
@@ -47,12 +50,12 @@ def main() -> None:
             "estimated_static_usd": PRIOR_STATIC_METERED_USD,
             "estimated_total_usd": PRIOR_STATIC_METERED_USD + evolved_estimate,
             "evolved_multiplier": EVOLVED_COST_MULTIPLIER,
-            "pricing_input_usd_per_million": 5.0,
-            "pricing_output_usd_per_million": 25.0,
+            "pricing_input_usd_per_million": PRICING.input_usd_per_million,
+            "pricing_output_usd_per_million": PRICING.output_usd_per_million,
         },
-        "expected_response_model": "claude-opus-4-8",
+        "expected_response_model": MODEL,
         "kind": "single_vs_evolved_manifest",
-        "model": "claude-opus-4-8",
+        "model": MODEL,
         "schema_version": 1,
         "trial_seeds": TRIAL_SEEDS,
         "units": [

@@ -1,0 +1,20 @@
+{
+  "choices": [
+    {
+      "finish_reason": "stop",
+      "index": 0,
+      "message": {
+        "content": "the answer is 42",
+        "role": "assistant",
+        "tool_calls": null
+      }
+    }
+  ],
+  "id": "chatcmpl-parallax-fixture",
+  "model": "claude-opus-4-8",
+  "usage": {
+    "completion_tokens": 96,
+    "prompt_tokens": 731,
+    "total_tokens": 827
+  }
+}

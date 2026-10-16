@@ -9,6 +9,7 @@ from run_remaining_medium import INSTANCE_DIGESTS, PINNED_PARQUET
 
 from parallax.canonical import atomic_write, canonical_bytes
 from parallax.hud_screening import HudExecutor
+from parallax.metering import total
 from parallax.screening import (
     ScreeningCost,
     ScreeningPlan,
@@ -79,7 +80,6 @@ def main() -> None:
         str(problem.record_id): build_swe_script_family(
             problem,
             constructions[str(problem.record_id)],
-            seed=20260803,
             total_agent_steps=12,
             max_output_tokens=4096,
         )
@@ -108,7 +108,7 @@ def main() -> None:
         )
     summary = summarize_screening(plan, runs)
     atomic_write(SUMMARY, canonical_bytes(summary) + b"\n")
-    extension_cost = sum(run.estimated_cost_usd for run in runs)
+    extension_cost = total(run.usage for run in runs).cost_usd
     print(
         json.dumps(
             {

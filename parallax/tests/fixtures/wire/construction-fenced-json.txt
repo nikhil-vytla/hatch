@@ -1,0 +1,31 @@
+```json
+{
+  "predecessors": [
+    {
+      "arguments": [
+        {
+          "category": "context",
+          "identifier": "target_module",
+          "value": "astropy.units.format"
+        }
+      ],
+      "function": "parse_unit_string"
+    }
+  ],
+  "source": {
+    "arguments": [
+      {
+        "category": "symptom",
+        "identifier": "current_symptom",
+        "value": "a malformed unit parses without error"
+      },
+      {
+        "category": "context",
+        "identifier": "target_module",
+        "value": "astropy.units.format"
+      }
+    ],
+    "function": "reject_invalid_unit_string"
+  }
+}
+```

@@ -7,7 +7,8 @@ from pathlib import Path
 from pydantic import Field
 
 from parallax.canonical import atomic_write, canonical_bytes
-from parallax.hud_screening import CLAUDE_HAIKU_PRICING, HudExecutor
+from parallax.hud_screening import HudExecutor
+from parallax.metering import meter, total
 from parallax.provider import HudGatewayProvider
 from parallax.screening import (
     ScreeningCost,
@@ -17,6 +18,7 @@ from parallax.screening import (
     initialize_screening_manifest,
     read_screening_jsonl,
     run_screening,
+    single_writer,
     summarize_screening,
 )
 from parallax.swebench import (
@@ -39,7 +41,6 @@ SUMMARY = EVIDENCE / "screening-summary.json"
 SPEND_CAP_USD = 5.0
 CONSTRUCTION_MODEL = "claude-haiku-4-5"
 BOUNDARY_MODEL = "claude-opus-4-8"
-CONSTRUCTION_SEED = 20260802
 TRIAL_SEEDS = (2026080201, 2026080202)
 PREREGISTERED_EPISODE_UPPER_USD: float | None = None
 FETCH_BATCH_SIZE: int | None = None
@@ -75,6 +76,7 @@ class ConstructionReceipt(StrictModel):
 
 
 def _append(path: Path, value: object) -> None:
+    """Append one receipt. Callers hold `single_writer(path)` around the phase."""
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("ab") as output:
         output.write(canonical_bytes(value) + b"\n")
@@ -97,6 +99,17 @@ def _read_constructions() -> dict[str, ConstructionReceipt]:
 
 
 def _construct(problems) -> tuple[dict[str, SweConstruction], float]:
+    with single_writer(CONSTRUCTIONS):
+        return _construct_locked(problems)
+
+
+def _construct_locked(problems) -> tuple[dict[str, SweConstruction], float]:
+    """Pay for the missing constructions. The evidence lock is already held.
+
+    Skipping an already-receipted source is a read of the file this appends to,
+    so two sessions racing here would each see the other's work as absent and
+    pay for it twice. `run_screening` takes the same lock over the episodes.
+    """
     receipts = _read_constructions()
     provider = HudGatewayProvider(CONSTRUCTION_MODEL)
     for problem in problems:
@@ -120,16 +133,18 @@ def _construct(problems) -> tuple[dict[str, SweConstruction], float]:
             raise RuntimeError("construction response omitted usage")
         response = responses[0]
         usage = response.usage
-        cost = (
-            usage.prompt_tokens * CLAUDE_HAIKU_PRICING.input_usd_per_million
-            + usage.completion_tokens * CLAUDE_HAIKU_PRICING.output_usd_per_million
-        ) / 1_000_000
+        metered = meter(
+            CONSTRUCTION_MODEL,
+            prompt_tokens=usage.prompt_tokens,
+            completion_tokens=usage.completion_tokens,
+        )
+        cost = metered.cost_usd
         receipt = ConstructionReceipt(
             source_id=problem.record_id,
             requested_model=CONSTRUCTION_MODEL,
             reported_model=response.model,
-            prompt_tokens=usage.prompt_tokens,
-            completion_tokens=usage.completion_tokens,
+            prompt_tokens=metered.prompt_tokens,
+            completion_tokens=metered.completion_tokens,
             estimated_cost_usd=cost,
             construction=evidence.construction,
         )
@@ -195,7 +210,6 @@ def main() -> None:
         str(problem.record_id): build_swe_script_family(
             problem,
             constructions[str(problem.record_id)],
-            seed=CONSTRUCTION_SEED,
             total_agent_steps=12,
             max_output_tokens=4096,
         )
@@ -244,7 +258,7 @@ def main() -> None:
         json.dumps(
             {
                 "construction_cost_usd": construction_cost,
-                "screening_cost_usd": sum(run.estimated_cost_usd for run in runs),
+                "screening_cost_usd": total(run.usage for run in runs).cost_usd,
                 "summary": summary.model_dump(mode="json"),
             },
             sort_keys=True,
