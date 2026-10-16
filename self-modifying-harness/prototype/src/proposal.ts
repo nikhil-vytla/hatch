@@ -5,12 +5,16 @@ import type { JsonValue } from "@earendil-works/chord";
 import type { JsonObject } from "@earendil-works/pi-durable";
 import type { Catalogue } from "./catalogue-doc.ts";
 import { entryOf, fullVersion } from "./catalogue-doc.ts";
-import { type CellVersion, type Check, type Invariant, versionId } from "./cells.ts";
+import { type CellVersion, type Check, DEFAULT_RUNS, type Invariant, MAX_RUNS, MIN_RUNS, versionId } from "./cells.ts";
 import { KERNEL_TOOLS, NAME } from "./gate.ts";
 
 const Json = Type.Unsafe<JsonValue>({});
 
-const CheckSchema = Type.Object({ args: Json, expect: Json });
+const ExactCheckSchema = Type.Object({ args: Json, expect: Json });
+
+const PropertyCheckSchema = Type.Object({ args: Json, holds: Type.String(), runs: Type.Optional(Type.Integer({ minimum: MIN_RUNS, maximum: MAX_RUNS })) });
+
+const CheckSchema = Type.Union([ExactCheckSchema, PropertyCheckSchema]);
 
 const InvariantSchema = Type.Object({ name: Type.String(), source: Type.String() });
 
@@ -32,6 +36,23 @@ export const ProposeParameters = Type.Object({
 });
 
 export type RawProposal = Static<typeof ProposeParameters>;
+
+type RawCheck = Static<typeof CheckSchema>;
+
+/** Decode one check: exact (`expect`) or property (`holds`, `runs`). Malformed shapes are refused here, with why. */
+function parseCheck(check: RawCheck): Check {
+	if ("holds" in check) {
+		const runs = check.runs ?? DEFAULT_RUNS;
+
+		if (!Number.isInteger(runs) || runs < MIN_RUNS || runs > MAX_RUNS) throw new Error(`refused: runs must be an integer from ${MIN_RUNS} to ${MAX_RUNS}, got ${JSON.stringify(runs)}`);
+
+		return { args: check.args, holds: check.holds, runs };
+	}
+
+	if ("expect" in check) return { args: check.args, expect: check.expect };
+
+	throw new Error("refused: a check is { args, expect } or { args, holds, runs }");
+}
 
 export type Proposal = {
 	cell: string;
@@ -65,8 +86,8 @@ export function parseProposal(raw: RawProposal): Proposal {
 		description: raw.description,
 		parameters: raw.parameters,
 		source: raw.source,
-		checks: raw.checks,
-		retire: raw.retire ?? [],
+		checks: raw.checks.map(parseCheck),
+		retire: (raw.retire ?? []).map(parseCheck),
 		migrate: raw.migrate,
 		pure: raw.pure === true,
 		invariants,

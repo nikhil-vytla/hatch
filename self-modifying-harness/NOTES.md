@@ -511,3 +511,52 @@ A Sonnet agent wrote `src/live.ts`, `src/chat.ts` and `src/live-run.ts`; I verif
   same-styled cells, positioned by column, keeps the grid aligned. DejaVu Sans Mono has no Braille (the spinner), and a
   `<text>` with one missing glyph fell back whole to a proportional font, so Braille cells get runs of their own.
 - **Not done:** property checks in the gate; a second model on the same five messages.
+
+## Round 9: property checks
+
+- **Design.** `Check = { args, expect } | { args, holds, runs? }` (`runs` 1..100, default 20). Each repeat starts from
+  the state just before the check; the last repeat's state carries on. All results are judged in one extra read-only
+  sandbox execution, along with eight decoys; a rule that accepts every decoy is refused. `Math.random` and `rand()` are
+  a seeded mulberry32 stream, seeded from the call id (real calls, crash reruns, replay) or from
+  `version|g|c|r` (gate checks, fuzzing, migrations). Exact checks of a random tool now see a fixed stream too, but a
+  model cannot predict it, so the prompt steers random results to property checks.
+- **Who did what.** pi on `deepseek-flash` wrote it (14 tests). It also created a `prototype/property-checks/` folder of
+  docs, which I removed. I added three tests that try to cheat the rule (all fail as they should) and three for
+  expression rules.
+- **The bug the tests missed.** The first real run had 25 rejections and no tools: DeepSeek wrote every `holds` as an
+  expression, the runtime wrapped it as a function body, and a body with no `return` returns `undefined`. My brief said
+  "function body", so every test used `return`. The failure message said "rule failed" without the value, so the
+  model could not tell. Now the rule is tried as an expression first and as a body if that does not parse, and the
+  message says `rule returned undefined (not true)`. Lesson, again: test the feature with the model, not only with
+  tests written from the spec.
+- **The second run.** `dice` accepted on the third proposal (two rejections for checks that expected an error); the
+  rolls in the transcript match the tool's results. The `party` upgrade went through four rejections: a rule that
+  returned false, replay of 4 real calls, and a migration that broke an invariant on the real state, then passed with
+  33 checks. Message 5 never ran: message 4 took 10 minutes, the recording driver's limit, so its text arrived while
+  the TUI was busy (it said so).
+- Not done: shrinking (rules apply to fixed args; shrinking needs generated inputs, which would combine with the schema
+  fuzzer), and rules over all results at once ("every face of a d20 appears").
+- **Pinned `Date`** (idea from tardigrade, whose code mode records `{at, seed}` once per run). pi wrote it: a
+  `call_clock (id, at)` table written in its own transaction before a call's first run, `trace.at` for replay, a
+  `Date` wrapper whose no-argument forms answer from `at`, and `GATE_EPOCH = 2026-01-01` for the gate. Its first version
+  gave invariants and migrations the gate epoch too, so an invariant like "nothing is dated in the future" would have
+  failed every real call after January 1, and a migration of today's data would have failed it as well. Fixed:
+  invariants take the instant of the execution they check, migrations take the host clock (a replayed migration takes
+  the trace's instant). Two tests cover it, and both fail with the first version.
+
+## Round 10: spilling large tool results
+
+- **Design** (from tardigrade's `packages/code/src/storage/store.ts`): pi-durable's `hook(ToolTask, { afterTool })`
+  replaces a result before it is stored, so the session, the OptChat log and later requests all see only the pointer.
+  The full text goes to `results.sqlite` under a ref derived from the task and call id (`INSERT OR IGNORE`, so a crash
+  rerun writes the same row). `result_read`, `result_grep` and `result_query` are reserved names in the gate.
+- **First version, measured live and found wanting:** same cost as no spilling, and less accurate (5 of 7 blacksmiths).
+  Line-based grep on one-line JSON, slices read back into context, and `zoom` results spilled into pointer chains.
+- **Second version:** `result_query` (an expression over the parsed value, run in the sandbox against an empty
+  throwaway state file, answer capped at 8000 characters), grep by substring with a 120-character window, previews by
+  shape, and `zoom`/`date` never spilled. Live rerun: 8 of 8 blacksmiths via one query, #150 right, $0.066 vs $0.088.
+  The no-spill run listed all 11 of its blacksmiths but its heading said "10"; it re-ran the generator for #150.
+- **Lesson:** pointer-and-preview alone mostly moves the cost (the model reads the value back); what saves it is a way
+  to compute over the stored value without reading it.
+- pi on `deepseek-flash` wrote both versions; I ran the comparisons and checked every answer against the tool's own
+  output in `results.sqlite` or the chat log.

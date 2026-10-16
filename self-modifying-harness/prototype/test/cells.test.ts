@@ -184,7 +184,9 @@ describe("exactly-once and traces", () => {
 		await rt.call(COUNTER, "t", { by: 100 });
 		const traces = await rt.traces("t", 10);
 		assert.deepEqual(traces.map((t) => t.id), ["task:a", "task:b"], "newest last; calls without an id are not traced");
-		assert.deepEqual(traces[0], { id: "task:a", args: { by: 4 }, before: {}, after: { n: 4 }, result: 4, version: "counter@test" });
+		const { at, ...rest } = traces[0];
+		assert.ok(Number.isInteger(at), "the trace carries the call's clock instant");
+		assert.deepEqual(rest, { id: "task:a", args: { by: 4 }, before: {}, after: { n: 4 }, result: 4, version: "counter@test" });
 		assert.deepEqual(traces[1].before, { n: 4 });
 		assert.deepEqual(traces[1].after, { n: 5 });
 		assert.deepEqual((await rt.traces("t", 1)).map((t) => t.id), ["task:b"]);

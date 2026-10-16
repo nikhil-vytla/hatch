@@ -11,6 +11,7 @@ import { parseArgs } from "node:util";
 import { runChat } from "./chat-loop.ts";
 import { type Limits, openLive } from "./live.ts";
 import { chooseModels, configuredModels, describeModel, type Env } from "./model-config.ts";
+import { DEFAULT_SPILL_POLICY } from "./spill.ts";
 import { backendOf, runTui } from "./tui.ts";
 
 /**
@@ -32,6 +33,8 @@ const HELP = `usage: ./forge [flags]
   --fresh                    delete the session directory before opening it
   --max-calls N              stop after N model calls (default ${CHAT_LIMITS.maxCalls})
   --max-cost USD             stop after this many dollars (default ${CHAT_LIMITS.maxCostUsd})
+  --spill-bytes N            spill tool results over N bytes to results.sqlite (default ${DEFAULT_SPILL_POLICY.spillBytes}; 0 disables)
+  --preview-chars N          characters of each spilled result kept in the pointer (default ${DEFAULT_SPILL_POLICY.previewChars})
   --list-models              list providers with a configured credential and their chat models
   --demo                     run the scripted offline demo instead of chatting
   --plain                    line-based chat instead of the full-screen TUI (automatic without a TTY)
@@ -47,6 +50,15 @@ function numberFlag(raw: string | undefined, fallback: number): number {
 	const value = Number(raw);
 
 	if (!Number.isFinite(value) || value < 0) throw new Error(`expected a non-negative number, got "${raw}"`);
+
+	return value;
+}
+
+/** A whole-number flag, rejecting anything that is not a non-negative integer. */
+function integerFlag(raw: string | undefined, fallback: number): number {
+	const value = numberFlag(raw, fallback);
+
+	if (!Number.isInteger(value)) throw new Error(`expected a non-negative integer, got "${raw}"`);
 
 	return value;
 }
@@ -73,6 +85,8 @@ async function main(argv: readonly string[], env: Env): Promise<number> {
 			fresh: { type: "boolean" },
 			"max-calls": { type: "string" },
 			"max-cost": { type: "string" },
+			"spill-bytes": { type: "string" },
+			"preview-chars": { type: "string" },
 			"list-models": { type: "boolean" },
 			demo: { type: "boolean" },
 			plain: { type: "boolean" },
@@ -126,7 +140,8 @@ async function main(argv: readonly string[], env: Env): Promise<number> {
 	}
 
 	const limits = { maxCalls: numberFlag(values["max-calls"], CHAT_LIMITS.maxCalls), maxCostUsd: numberFlag(values["max-cost"], CHAT_LIMITS.maxCostUsd) };
-	const live = await openLive(dataDir, { limits, turn: choice.turn, summary: choice.summary });
+	const spill = { spillBytes: integerFlag(values["spill-bytes"], DEFAULT_SPILL_POLICY.spillBytes), previewChars: integerFlag(values["preview-chars"], DEFAULT_SPILL_POLICY.previewChars) };
+	const live = await openLive(dataDir, { limits, turn: choice.turn, summary: choice.summary, spill });
 	const model = describeModel(choice.turn);
 
 	if (values.plain || !process.stdin.isTTY || !process.stdout.isTTY) {

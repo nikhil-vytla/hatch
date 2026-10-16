@@ -284,7 +284,51 @@ track the party, roll initiative, apply damage and a healing potion, track a poi
   adds the title, chapter and closing cards. It renders on fframes' CPU backend (this machine has no GPU) in about a
   minute.
 
-## Gaps (round 1; see rounds 2-8 above for what changed)
+## Round 9: property checks
+
+A check can now say what must always hold instead of naming one exact result: `{ args, holds, runs }`, where `holds`
+is an expression over the result `r` and `args` (or a function body), run against `runs` repeats of the call.
+`Math.random` is seeded per execution from the call id (gate runs from the version, check and repeat), so a crash
+rerun and the gate's replay of a recorded call draw the same numbers. The rule runs in the sandbox with a read-only
+`kv`; a rule that accepts every decoy result (`null`, `-1`, `1e9`, `""`, ...) is refused as checking nothing; and
+property checks ratchet and count for action coverage like exact ones.
+
+- **The D&D rerun, before and after.** Round 8's dice tool failed six times. With property checks, the first rerun
+  was worse: 25 rejections, no tools at all. The model wrote every rule as an expression
+  (`r.members.length === 3 && ...`), the gate expected a function body with `return`, so each correct result was judged
+  `undefined`, and the message did not say so. After accepting both forms and naming what the rule returned, the next
+  rerun built `dice` in three proposals (passed 4 checks, fuzzed 40 inputs), rolled initiative and the potion with it
+  (2d4+2 = [3, 3] + 2 = 8), and upgraded `party` with rounds and timed conditions through a migration (33 checks).
+  160 calls, $0.18.
+- **What the tools fixed and what they did not.** `party` reported Mira at 13/14 after the potion; the model's own
+  sentence then said she "topped out at 14". The numbers in tools were right; the prose around them still was not.
+- **`Date` is pinned too** (from [tardigrade](https://github.com/clavia-labs/tardigrade)'s ambient clock): a call's
+  first run records the host time next to its call id, and reruns and replays reuse it. Gate checks and fuzzing start
+  from an empty state at a fixed `2026-01-01`, so date-based expectations hold for every version on every day.
+  Invariants see the instant of what they check, and migrations see the real time, since they run on today's state.
+- **Can a rule cheat?** Tests try a rule that empties the harness's list of results, reaches for it on `globalThis`,
+  and redefines `Array.prototype.length`; all three still fail the off-by-one d20, because pi-codemode runs each
+  script inside a function the rule's `new Function` body cannot see.
+
+## Round 10: large tool results, spilled to storage
+
+A tool result over 8 KB (`--spill-bytes`, `0` turns it off) now goes to `results.sqlite`, a file no agent-written tool
+can reach, and the model sees a pointer: the ref, the size, and a preview that shows the shape (the first 3 items of a
+list and its length). Three read-only tools open it: `result_query({ref, expr})` runs an expression over the parsed
+value in the sandbox (`r.roster.filter(p => p.job === "blacksmith")`) and returns only the answer; `result_grep`
+finds a substring anywhere and returns a window around each match; `result_read` pages through it. The idea is
+[tardigrade](https://github.com/clavia-labs/tardigrade)'s spill-with-pointer; the query tool is ours.
+
+- **The first version made things worse.** In a live comparison (build a generator of 300 townsfolk, list the
+  blacksmiths, look up #150), spilling cost the same ($0.106 vs $0.103) and missed 2 of 7 blacksmiths. The roster was
+  JSON on one 27 KB line, so the line-based grep returned that line every time; the model read all four 8 KB slices
+  back into context; and `zoom` over those messages was spilled in turn, so it searched pointers to pointers.
+- **With the query tool,** the same session found the blacksmiths with one `result_query` and listed exactly the 8 in
+  its roster, answered #150 correctly, and cost $0.066 against $0.088 without spilling (-25%). Prompt tokens fell 23%
+  for turns and 37% for memory compactions. One run each, so a direction, not a benchmark.
+- Memory tools (`zoom`, `date`) and the readers themselves are never spilled.
+
+## Gaps (round 1; see rounds 2-10 above for what changed)
 
 - ~~The migration runs on the real state before the catalog commit, in two databases.~~ Fixed in round 2 with a
   pending/marker/live protocol reconciled on boot.
@@ -298,9 +342,9 @@ track the party, roll initiative, apply damage and a healing potion, track a poi
 
 ```sh
 cd prototype && ./forge              # installs on first run; demo with no key, full-screen chat with one (rounds 6-7)
-./forge --help                       # --model, --summary-model, --base-url, --data, --fresh, caps, --list-models, --plain
+./forge --help                       # --model, --summary-model, --base-url, --data, --fresh, caps, --spill-bytes, --list-models, --plain
 npm run check                        # tsc + oxlint (anti-slop + gdp-ts)
-npm test                             # 140 tests, about a minute
+npm test                             # 191 tests, about two minutes
 node --experimental-strip-types --no-warnings src/demo.ts           # three processes: grow, crash, recover
 node --experimental-strip-types --no-warnings src/bench-view.ts 20000
 node --experimental-strip-types --no-warnings src/shadow-check.ts
