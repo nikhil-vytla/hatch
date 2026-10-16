@@ -27,7 +27,7 @@ def boot_ci(xs, n=2000, seed=0):
 def main():
     out = []
     gens, rub, pw, trig = load("gen.jsonl"), load("rubric.jsonl"), load("pairwise.jsonl"), load("trigger.jsonl")
-    conds = [c for c in ["baseline", "baseline_long", "skill_body", "skill_full", "skill_body_v2", "skill_full_v2"] if any(g["cond"] == c for g in gens)]
+    conds = list(dict.fromkeys(g["cond"] for g in gens))
 
     out.append("# be-ambitious eval results\n")
     out.append(f"Model (generator and judge): `opencode/deepseek-v4.1-flash-free`. "

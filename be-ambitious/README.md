@@ -1,64 +1,53 @@
 # be-ambitious: an Agent Skill distilled from "How to be more ambitious"
 
-Felix Rieseberg's essay [How to be more ambitious: A tutorial for humans with models](https://felixrieseberg.com/how-to-be-more-ambitious-a-tutorial-for-humans-with-models/) argues that most people ask far less of models than the models can deliver. It sorts the missing ambition into four types: **speed, altitude, depth and range**. This folder turns that essay into a reusable skill in the [agentskills.io](https://agentskills.io/specification) format. An agent can load the skill to turn a plain request into a ladder of more ambitious, verifiable prompts.
+Felix Rieseberg's essay [How to be more ambitious: A tutorial for humans with models](https://felixrieseberg.com/how-to-be-more-ambitious-a-tutorial-for-humans-with-models/) argues that most people ask far less of models than the models can deliver. It sorts the missing ambition into four types: **speed, altitude, depth and range**. This folder distills the essay into a short skill in the [agentskills.io](https://agentskills.io/specification) format. The skill is a principle with guardrails, not a procedure. The format follows Lauren Tan's [pstack](https://cursor.com/lp-team/lauren) principle skills.
 
 ## What's here
 
 ```
 be-ambitious/
-├── NOTES.md                       working notes and design decisions
-├── README.md                      this report
-└── be-ambitious/                  the skill (drop this folder into any skills directory)
-    ├── SKILL.md                   6-step procedure, ~85 lines
-    ├── references/
-    │   ├── altitude.md            climbing to the outcome; durable workflows; analyse→decide→redesign ladder
-    │   ├── depth.md               instruments over vocabulary; five depth moves; four-question rewrite
-    │   ├── range.md               nouns→verbs; assembling a crew with adversaries; activities not personas
-    │   ├── self-efficacy.md       evidence and triage for when a goal feels out of reach
-    │   ├── worked-example.md      Acme Inc. QBR and churn analysis on every axis
-    │   └── source.md              attribution, and what is the article vs. what this skill adds
-    └── assets/
-        ├── depth-rewrite-prompt.md     ready-to-paste "deeper, not bigger" prompt
-        └── ambition-ladder-template.md the output format
-evals/                             harness, raw results and summary (see Evals below)
+├── NOTES.md                 working notes and design decisions
+├── README.md                this report
+├── be-ambitious/            the skill (drop this folder into any skills directory)
+│   ├── SKILL.md             principle, why, three axes, guardrails (24 lines)
+│   └── references/
+│       ├── altitude.md      the outcome question, signals, the QBR climb, durable workflows (16 lines)
+│       ├── depth.md         five depth moves and the "deeper, not bigger" prompt (21 lines)
+│       └── range.md         nouns→verbs, the crew, activities not personas (11 lines)
+└── evals/                   harness, raw results and summary (see Evals)
 ```
 
 ## Distilling the essay
 
-| Essay idea | Where it lives in the skill |
+| Essay idea | Where it lives |
 |---|---|
-| Speed is the uncreative default | Named in the intro, then skipped |
-| **Altitude**: ask for the outcome; "what should happen next?" | Step 2 + `altitude.md` |
-| Meetings as a signal; open-ended goals still don't work | Step 2 signals; "stop one level before abstract" |
-| Durable workflows need access and workflow changes | Step 2 + step 5 prerequisites; "cost to you" on each rung |
-| **Depth**: work like top professionals, until experts could learn from it | Step 3 + `depth.md` |
-| Instruments, unreasonable-but-reachable goals, test the premise, new knowledge, outside judge | The five depth moves |
-| "Deeper, not bigger" four-question rewrite | Step 3 + `assets/depth-rewrite-prompt.md` |
-| **Range**: many fields via subagents | Step 4 + `range.md` |
-| Nouns→verbs; crew with a short seller and a forensic accountant | Step 4 crew with at least one adversary |
-| Role play makes transcripts weird | Stated positively: "assign activities, not personas" |
-| Needs a usable computer and data connectors | Step 5 |
-| "We have been here before": self-efficacy | `self-efficacy.md`, loaded only when a goal is about to be lowered |
+| Capabilities are uneven and move faster than our sense of them | SKILL.md **Why** |
+| Speed is the uncreative default | One clause in **Pattern** |
+| **Altitude**: "what do you want to happen next?"; meetings as a signal; the QBR climb; durable workflows; open goals don't work yet | SKILL.md + `altitude.md` |
+| **Depth**: deeper not bigger; instruments over vocabulary; unreasonable targets; challenge assumptions; new knowledge; outside judge; the four-question rewrite | SKILL.md + `depth.md` |
+| **Range**: nouns→verbs; crew with a short seller and a forensic accountant; activities not personas; seeing tools used in other fields | SKILL.md + `range.md` |
+| Needs a usable computer and data access | Guardrail |
+| Self-efficacy ("we have been here before") | One line in **Why**: specific, hard goals beat "do your best" |
 
-## Design choices
+## Design: two versions
 
-- **A procedure, not an essay.** The skill body is six ordered steps, each with a "Done when" criterion: baseline, altitude, depth, range, prerequisites, deliver the ladder. The essay's narrative and examples sit in references that load on demand.
-- **The output is an *ambition ladder*.** Each rung includes a ready-to-paste prompt, its **outside judge**, the access it needs and what it costs the user. The essay's strongest practical warning is "don't let the model grade its own work", so a rung without a verifier counts as unfinished.
-- **Two modes.** *Advise* returns the ladder to the user. *Self-apply* is for an agent raising its own ambition before a task. It proposes the higher rungs and then carries out only the rung the user picked, so that ambition doesn't turn into scope creep.
-- **Disclosure by branch.** Every run needs the six steps, so they stay inline. The self-efficacy material is needed only when someone wants to lower a goal, so it sits behind a conditional pointer.
-- **Attribution and copyright.** Everything is paraphrased, and quotes are kept to a few words. `references/source.md` separates the article's ideas from this skill's additions: the step order, the ladder format, the specific tools in the worked example and the capability-vs-belief triage.
+**v1 (commit `404b412`, the version evaluated below)** was a 6-step procedure (85 lines) with completion criteria and two modes. Its output was an "ambition ladder" template with a judge, access needs and a cost for each rung. It had six references and two assets, about 370 lines in total. A worked Acme example used specific tools.
 
-## Validation
+**v3 (current)** is the article's best ideas in the pstack principle shape: a one-line rule, **Why**, **Pattern** and **Guardrails**. Each reference is 11–21 lines. I questioned every addition I had made beyond the article:
 
-The skill passes the reference validator:
+| Added in v1 | v3 | Reason |
+|---|---|---|
+| Step order, "Done when" criteria, advise/self-apply modes | Cut | They box the model in. The model already knows how to structure an answer. |
+| Ladder template (judge / access / cost per rung) | Cut | It made every answer template-shaped. The judge and access needs survive as guardrails. |
+| Worked Acme example with named tools | Cut | It directly caused the example anchoring the evals found (DuckDB in 11 of 30 answers). |
+| Self-efficacy reference | One line in **Why** | Motivation, not instruction |
+| `source.md` attribution file | Frontmatter `metadata` | Attribution without a file |
+| v2 patches (domain-native tools, executor per step, baseline beside every target) | Cut | They fixed problems that v1's own additions caused. Remove the cause instead. |
+| "The user chooses how far to go" | **Kept** as a guardrail | Without it, ambition turns into scope creep. |
 
-```bash
-uvx --from skills-ref agentskills validate be-ambitious
-```
+I also cut the article's own numbers ("5 s → 200 ms") from the depth move. The evals showed literal numbers in the skill leaking into unrelated answers.
 
-Result: `Valid skill: be-ambitious`. `SKILL.md` is 85 lines and about 1k words, inside the spec's 500-line and ~5k-token guidance. The description is under the 1024-character limit. Every relative link resolves.
-
-Note: the spec's docs say to run `skills-ref validate`, but the PyPI package installs its executable as `agentskills`.
+The validator passes: `uvx --from skills-ref agentskills validate be-ambitious` reports `Valid skill: be-ambitious`. The spec docs name the CLI `skills-ref`, but the PyPI package installs it as `agentskills`.
 
 ## Evals
 
@@ -106,14 +95,7 @@ Trigger: precision **1.00** and recall **0.97** over 60 calls. The one miss was 
 1. **Example anchoring.** With the references loaded, the model copied the worked example's toolkit into unrelated fields. DuckDB appeared in 11 of 30 skill_full answers, including launch emails and hiring JDs, against 0 in every other condition. "Back-test" appeared in 13 of 30.
 2. **Overreach.** The baseline won when the skill proposed things the user or model couldn't execute. Examples: cross-system pipelines for a QBR, a model "running" a meta-analysis (which invites fabricated effect sizes), and a p95 LCP ≤ 200 ms target, echoing the "200 ms" example in the skill.
 
-**v2 changes (in this folder, not yet evaluated).**
-- Instruments must be *native to the user's field*, and example tools are labelled as belonging to their examples.
-- Stretch targets sit next to a baseline and must be something a top practitioner would call achievable.
-- Every step names an executor. Numbers the model can't compute become code or a protocol.
-- The recommended rung is the highest one runnable on what the user already has.
-- The worked examples file gains a non-analytics contrast (a launch email).
-
-I started the v2 re-run, but the free endpoint stopped responding: every call timed out, including a one-word ping. **The v2 edits are motivated by the evidence but unverified.** The v1 that was evaluated is commit `404b412`.
+**After v1.** I wrote v2 patches aimed at those failures, but the free endpoint stopped responding before they could be measured. v2 was then replaced by the minimal v3 described above, which removes the causes (the worked example, the literal numbers, the template) instead of patching around them. **v3 is not evaluated yet.** The v1 numbers describe a different, longer skill. Note that the v1 ladder template probably earned some of its rubric points (ready-to-paste prompt, access needs). Expect v3 to score lower on those items, and judge it mainly on the pairwise comparisons.
 
 Reproduce:
 
@@ -123,7 +105,17 @@ cd be-ambitious/evals && python3 run.py all --samples 3 --workers 6 && python3 a
 
 ## Gaps and next steps
 
-- **Re-run v2.** Run `gen --conds skill_body_v2,skill_full_v2`, then `rubric`, `rubric_extra` (post-hoc R13 executable / R14 domain-native, graded on all conditions) and `pairwise --vs skill_full_v2`. Do one stage at a time: the free endpoint handles about 6–10 concurrent calls.
-- **Use a different-family judge** to remove self-preference, and a human spot-check on a sample.
+- **Evaluate v3** against the same baselines, one stage at a time (the free endpoint handles about 6–10 concurrent calls):
+
+  ```bash
+  cd be-ambitious/evals
+  python3 run.py gen --conds skill_body_v3,skill_full_v3 --workers 6
+  python3 run.py rubric --workers 6
+  python3 run.py pairwise --base baseline --vs skill_full_v3 --workers 6
+  python3 run.py pairwise --base skill_full --vs skill_full_v3 --workers 6
+  python3 analyze.py && python3 leakage.py
+  ```
+
+  The last pairwise run compares v3 directly against v1. That comparison is the real test of "shorter is better".
+- **Use a judge from a different model family** to remove self-preference, and have a human spot-check a sample.
 - **Harder trigger set.** The current positives all use explicit "ambitious / bigger / upgrade" wording.
-- **Self-apply mode is untested.** Nothing enforces "carry out only the approved rung". A harness could make that a required confirmation.

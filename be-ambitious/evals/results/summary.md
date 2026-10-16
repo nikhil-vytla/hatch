@@ -7,42 +7,42 @@ Model (generator and judge): `opencode/deepseek-v4.1-flash-free`. Generations: 1
 | Condition | mean | min | max |
 |---|---|---|---|
 | baseline | 341 | 250 | 482 |
-| baseline_long | 772 | 704 | 856 |
 | skill_body | 792 | 87 | 1133 |
 | skill_full | 858 | 639 | 1044 |
+| baseline_long | 772 | 704 | 856 |
 
 ## Rubric (fraction of responses meeting each criterion)
 
-| Criterion | baseline | baseline_long | skill_body | skill_full |
+| Criterion | baseline | skill_body | skill_full | baseline_long |
 |---|---|---|---|---|
 | R1_outcome | 0.93 | 1.00 | 1.00 | 1.00 |
-| R2_durable | 0.07 | 0.30 | 0.90 | 0.90 |
-| R3_instruments | 0.47 | 0.90 | 0.97 | 1.00 |
-| R4_raw | 0.27 | 0.47 | 0.90 | 1.00 |
-| R5_premise | 0.30 | 0.43 | 0.80 | 1.00 |
-| R6_judge | 0.60 | 0.67 | 0.97 | 1.00 |
-| R7_target | 0.17 | 0.20 | 0.73 | 0.90 |
-| R8_fields | 0.00 | 0.20 | 0.97 | 1.00 |
-| R9_adversary | 0.40 | 0.60 | 0.97 | 1.00 |
-| R10_access | 0.40 | 0.57 | 0.97 | 1.00 |
-| R11_prompt | 1.00 | 0.97 | 0.97 | 1.00 |
+| R2_durable | 0.07 | 0.90 | 0.90 | 0.30 |
+| R3_instruments | 0.47 | 0.97 | 1.00 | 0.90 |
+| R4_raw | 0.27 | 0.90 | 1.00 | 0.47 |
+| R5_premise | 0.30 | 0.80 | 1.00 | 0.43 |
+| R6_judge | 0.60 | 0.97 | 1.00 | 0.67 |
+| R7_target | 0.17 | 0.73 | 0.90 | 0.20 |
+| R8_fields | 0.00 | 0.97 | 1.00 | 0.20 |
+| R9_adversary | 0.40 | 0.97 | 1.00 | 0.60 |
+| R10_access | 0.40 | 0.97 | 1.00 | 0.57 |
+| R11_prompt | 1.00 | 0.97 | 1.00 | 0.97 |
 | R12_grounded | 1.00 | 1.00 | 1.00 | 1.00 |
-| **overall (95% bootstrap CI)** | 0.47 [0.42, 0.51] | 0.61 [0.56, 0.66] | 0.93 [0.86, 0.97] | 0.98 [0.97, 0.99] |
+| **overall (95% bootstrap CI)** | 0.47 [0.42, 0.51] | 0.93 [0.86, 0.97] | 0.98 [0.97, 0.99] | 0.61 [0.56, 0.66] |
 
 ### Overall rubric score per task
 
-| Task | baseline | baseline_long | skill_body | skill_full |
+| Task | baseline | skill_body | skill_full | baseline_long |
 |---|---|---|---|---|
-| crash-fix | 0.31 | 0.58 | 0.94 | 1.00 |
-| qbr-deck | 0.53 | 0.53 | 0.97 | 1.00 |
-| survey-summary | 0.53 | 0.64 | 0.64 | 0.97 |
-| unit-tests | 0.58 | 0.64 | 1.00 | 1.00 |
-| launch-email | 0.44 | 0.64 | 0.97 | 0.97 |
-| slow-page | 0.67 | 0.83 | 1.00 | 1.00 |
-| interview-prep | 0.39 | 0.64 | 0.86 | 0.94 |
-| legacy-refactor | 0.47 | 0.56 | 0.97 | 1.00 |
-| lit-review | 0.33 | 0.42 | 0.92 | 0.94 |
-| hiring-jd | 0.42 | 0.61 | 1.00 | 1.00 |
+| crash-fix | 0.31 | 0.94 | 1.00 | 0.58 |
+| qbr-deck | 0.53 | 0.97 | 1.00 | 0.53 |
+| survey-summary | 0.53 | 0.64 | 0.97 | 0.64 |
+| unit-tests | 0.58 | 1.00 | 1.00 | 0.64 |
+| launch-email | 0.44 | 0.97 | 0.97 | 0.64 |
+| slow-page | 0.67 | 1.00 | 1.00 | 0.83 |
+| interview-prep | 0.39 | 0.86 | 0.94 | 0.64 |
+| legacy-refactor | 0.47 | 0.97 | 1.00 | 0.56 |
+| lit-review | 0.33 | 0.92 | 0.94 | 0.42 |
+| hiring-jd | 0.42 | 1.00 | 1.00 | 0.61 |
 
 ## Pairwise preference (blind, both presentation orders)
 

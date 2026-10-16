@@ -10,7 +10,7 @@ MARKERS = {
     "eight quarters / back-test": r"eight quarters|back-?test",
 }
 rows = [json.loads(l) for l in open(Path(__file__).parent / "results/gen.jsonl")]
-conds = ["baseline", "baseline_long", "skill_body", "skill_full", "skill_body_v2", "skill_full_v2"]
+conds = list(dict.fromkeys(g["cond"] for g in rows))
 hits = defaultdict(lambda: defaultdict(int)); n = defaultdict(int)
 for g in rows:
     n[g["cond"]] += 1

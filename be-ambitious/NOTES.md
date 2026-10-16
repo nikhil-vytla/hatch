@@ -118,3 +118,12 @@ references.
 - Lesson: the free OpenCode endpoint copes with about 6–10 concurrent calls. Run stages one after another, never several pools in parallel.
 - Of the extra pairwise runs, skill_body vs baseline finished 43 of 60 and skill_full vs baseline_long finished 33 of 60. The rest timed out. The results report n alongside each rate.
 - I deleted the raw `.log` files because their error messages echoed full prompts. The JSONL rows hold everything needed to rerun the analysis.
+
+## v3: minimal, pstack-style rewrite
+
+- The user asked for a much shorter skill: 10–20 lines per file, focused on the article's best ideas, and without boxing the model in. They pointed to the style of pstack principles. Those are Lauren Tan's principle skills, which I read through the Go7hic/ystack port, e.g. `principle-prove-it-works`. Each one has a one-line rule, **Why:**, a pattern and **Guardrails:**, and no procedure.
+- I went through every "added by this skill" item and cut almost all of them. The table is in the README. The key argument: the v2 patches were fixing problems that v1's own additions caused (worked-example tools, literal numbers, the template). Deleting the causes beats patching them.
+- One addition stays: "the user chooses how far to go". It's the only guard against ambition turning into scope creep.
+- I also dropped the article's own "200 ms" number from the depth move, because the eval showed it leaking.
+- The result is SKILL.md at 24 lines (16 of body) and references at 16, 21 and 11 lines, for 72 in total (v1 had about 370). The assets and the worked-example, self-efficacy and source references are gone.
+- v3 is not evaluated. The harness now discovers conditions from the data, so a `skill_full_v3` run slots in next to the v1 rows.

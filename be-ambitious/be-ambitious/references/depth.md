@@ -1,39 +1,21 @@
 # Depth
 
-Depth means pushing the model to work the way the best people in a field work: with their instruments, their raw material and their standards of proof. The bar is a result an expert could learn something from. A bigger version of the same shallow work doesn't count.
+Push for work an expert in the field would learn from. You want a deeper task, not a bigger one.
 
-## The tell: vocabulary without method
+**Moves:**
+- **Use the field's real instruments.** Models often change their vocabulary without changing their methods. Insist on the tools the best practitioners actually use.
+- **Set a target that sounds unreasonable, and treat it as reachable.** Say it can be solved if the model keeps going.
+- **Challenge what you know.** Test the premise against raw data before building on it.
+- **Produce new knowledge.** Find what nobody has yet, and validate it on data the model didn't see while searching.
+- **Use an outside judge,** ideally a tool the model can call for fast feedback.
 
-Asked to "analyse like a data scientist", models often switch to data-science words while still making a markdown table by hand. Look at the **methods** in the plan, not the words. A deep plan names real instruments, for example:
+**Rewrite prompt:**
 
-| Shallow | Deep |
-|---|---|
-| "Look at the churn numbers" | Load raw events into a database (DuckDB, Postgres). Fit a survival or hazard model and report confidence intervals. |
-| "Speed up the page" | Profile with a real tracer, set a budget per stage, and check results against a load-test harness. |
-| "Review the contract" | Compare clause by clause against a precedent library, then score the deviations against a risk rubric. |
-
-## The five depth moves
-
-1. **Use the profession's instruments.** Install them if needed. Ask which tool a top practitioner *in this task's field* would open first. The table below is a sample from three fields, not a toolkit to reuse.
-2. **Set an unreasonable target and present it as reachable.** "Get load time from 5 s to under 1 s. It can be done if you keep going" draws more effort than "improve it". Anchor the stretch to a measured baseline and to what the field's best teams achieve. A target nobody in the field would call achievable reads as noise, not ambition. Specific, hard goals beat "do your best", as decades of goal-setting research show (see [self-efficacy.md](self-efficacy.md)).
-3. **Test the premise.** Before building on what everyone "knows" ("churn is an onboarding problem"), check it against the raw data. Often the premise is the finding.
-4. **Produce new knowledge.** Ask for something nobody has yet: a leading indicator, a simulated population, a counterfactual. Then check it against data held out from its discovery.
-5. **Use an outside judge.** The model doesn't grade its own work. Find a judge outside both the model and the user, such as tests, a holdout set, a benchmark, a profiler, a compiler, a market or a human expert. Ideally make the judge a tool the model can call in a loop, so feedback arrives in seconds.
-
-## The four questions (rewrite pattern)
-
-Before you rewrite a request, answer:
-
-1. What would a top professional do here that wasn't asked for?
-2. What is the rawest material they'd start from?
+```text
+I want a deeper version of this task, not a bigger one. First answer:
+1. What would a top professional do here that I haven't asked for?
+2. What is the rawest material they would start from?
 3. Which specific methods and tools would they use?
-4. What, other than the model or the user, would verify the result?
-
-Then rewrite the prompt so it asks for exactly that. The ready-to-paste version is in [../assets/depth-rewrite-prompt.md](../assets/depth-rewrite-prompt.md).
-
-## Completion check
-
-- Every method in the plan is a real, named technique or tool.
-- The input is raw data, not a summary of it.
-- Each conclusion has an outside judge attached.
-- At least one premise has been tested, not assumed.
+4. What, besides you or me, would verify the result?
+Then rewrite my request to ask for exactly that.
+```

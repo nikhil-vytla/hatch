@@ -81,8 +81,8 @@ def run_pool(jobs, fn, workers):
 # ---------- stages ----------
 
 CONDS = ["baseline", "skill_body", "skill_full"]
-# *_v2 conditions use the same code path; they exist so v2 generations of the
-# (edited) skill are stored separately from the v1 rows already on disk.
+# Suffixed conditions (skill_full_v3, ...) use the same code path; the label only
+# keeps a later skill version's rows separate from earlier ones on disk.
 
 
 def stage_gen(samples, workers, conds=CONDS):
