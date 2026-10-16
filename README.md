@@ -7,7 +7,11 @@ For these experiments, all I hope is that I get to learn something new! I have a
 ## Experiments
 
 <!-- index:start -->
-8 experiments, newest first.
+9 experiments, newest first.
+
+### [be-ambitious: an Agent Skill distilled from "How to be more ambitious"](be-ambitious/) (2026-10-16)
+
+Felix Rieseberg's essay [How to be more ambitious: A tutorial for humans with models](https://felixrieseberg.com/how-to-be-more-ambitious-a-tutorial-for-humans-with-models/) is distilled here into `be-ambitious`, a 72-line Agent Skill in the [agentskills.io](https://agentskills.io/specification) format. It uses the principle-plus-guardrails shape of [pstack](https://cursor.com/lp-team/lauren). The skill pushes a task along three axes:
 
 ### [A self-modifying agent harness: pi-durable + OptChat + celld](self-modifying-harness/) (2026-10-09)
 
