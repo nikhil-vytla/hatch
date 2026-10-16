@@ -1,0 +1,4 @@
+Map|Tonight's one-shot is a dungeon crawl. Build me a map tool: a 28x14 dungeon generated from a seed, rendered as ASCII (# walls, . floor, @ the party, and a space for unexplored fog). Show seed 42 with the party at the entrance and only the squares they can see.
+Explore|The party moves 6 squares east and 3 south. Reveal what they can see within radius 3, keep everything revealed before, and show the map.
+Traps|Add traps to the map: a discovered trap shows as ^. The rogue searches and finds one 2 squares north of the party. Show the map, keeping everything we've explored.
+Recap|Recap for the table: how many squares have we explored so far, where is the trap, and what seed is this dungeon?

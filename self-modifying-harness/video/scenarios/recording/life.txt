@@ -1,0 +1,4 @@
+Life|Build me a Conway's Game of Life tool: a wrapping grid, step N generations, rendered as ASCII with # for alive and . for dead. Start a 20x10 grid with a glider in the top-left corner and show generation 0 and generation 4.
+Patterns|Add a pattern library you can place at x,y: glider, blinker, beacon and the R-pentomino. Put a blinker at (14,2) on an empty 20x10 grid and show generations 0, 1 and 2.
+Chaos|Teach the tool to return the population at every generation of a run, and to draw that history as a sparkline with ▁▂▃▄▅▆▇█. Then run the R-pentomino in the middle of an empty 40x20 grid for 40 generations and show the final grid and the sparkline.
+Recap|What pattern did I ask you to start with first, and what was the population at generation 40?

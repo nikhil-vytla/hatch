@@ -1,0 +1,4 @@
+Spending|Help me track my spending this month. Build a tool to log expenses by category and show an ASCII bar chart of total spending per category. Log: groceries 82.40, rent 1450, coffee 4.50, coffee 5.25, transit 38, groceries 61.10, dining 47.80.
+Budgets|Add a monthly budget per category and draw each category's bar against its budget, marking over-budget categories with !. Budgets: groceries 200, coffee 15, dining 100, transit 60, rent 1450.
+Sparkline|Log: dining 72.30, coffee 6.00, coffee 4.75, groceries 55.20. Show the chart again, and a sparkline of daily spending for the week using the characters ▁▂▃▄▅▆▇█ with these daily totals: 12, 0, 88, 45, 6, 140, 30.
+Recap|Where am I over budget and by how much, and what was the biggest single expense this month?
