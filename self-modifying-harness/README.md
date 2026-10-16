@@ -328,7 +328,38 @@ finds a substring anywhere and returns a window around each match; `result_read`
   for turns and 37% for memory compactions. One run each, so a direction, not a benchmark.
 - Memory tools (`zoom`, `date`) and the readers themselves are never spilled.
 
-## Gaps (round 1; see rounds 2-10 above for what changed)
+## Round 11: memory strategies, compared from one fork
+
+Memory is now pluggable: `--memory optchat|rolling|window|pi` with one shared `--memory-budget KB`. `optchat` is the
+summary tree with `zoom` (the default); `rolling` keeps one rolling summary plus a verbatim tail (tardigrade's style,
+`--rolling-trigger`/`--rolling-retain`); `window` keeps the newest turns that fit and drops the rest; `pi` is
+pi-durable's own compaction. `--fork-from DIR` copies a stopped forge, so every strategy can continue from the same point.
+
+**The experiment** (`prototype/results/memory-strategies/`): DeepSeek V4.1 Flash ran D&D messages 1-3 once (a party
+tracker, a dice tool, initiative, damage and a potion). That forge was forked four times, and each fork ran messages 4-5
+with a 24 KB budget. Message 5 asked for facts that only messages 1-3 contain: the starting HP, the potion's dice, and the
+initiative order. Neither of the last two was stored in any tool.
+
+| strategy | starting HP | potion (4, 1 -> 7) | turn order | cost (msgs 4-5) | calls (summaries) |
+|---|---|---|---|---|---|
+| optchat | yes | yes | yes | $0.061 | 64 (56) |
+| rolling | yes | yes | yes | $0.067 | 21 (2) |
+| pi | yes | yes | yes | $0.034 | 15 (2) |
+| window | "not on record" (gave max HP) | yes | "not on record" | $0.010 | 9 (0) |
+
+- **Every summarizing strategy kept the facts; the window lost them and said so** rather than inventing them.
+- **OptChat paid the most for it at this budget:** the tree was built at 128 KB and had to merge down to 24 KB, which took
+  56 summary calls. Its first attempt hit the run's 100-call cap before answering (87 summaries), so calls vary a lot
+  between runs. Its `zoom` was never needed here; the facts survived in the summaries.
+- **pi-durable's compaction needed two fixes to run at all.** The first version lowered the model's context window to
+  make pi-durable compact at the budget, which also shrank the room for the answer: a tool call was cut off mid-turn and
+  the reply stopped after "Here". Now the forge asks for a compaction between turns and relabels its calls in the meter.
+  Then pi-durable 1.0.3's compaction dropped `"type": "object"` from an agent-written tool's schema, and DeepSeek refused
+  the request; the pi strategy now puts it back (a pi-durable bug to report).
+- One run per strategy and one session: a direction, not a benchmark. `pi` also slipped once in prose (it said Mira's
+  heal was capped; 5 + 7 = 12 is not a cap).
+
+## Gaps (round 1; see rounds 2-11 above for what changed)
 
 - ~~The migration runs on the real state before the catalog commit, in two databases.~~ Fixed in round 2 with a
   pending/marker/live protocol reconciled on boot.
@@ -342,9 +373,9 @@ finds a substring anywhere and returns a window around each match; `result_read`
 
 ```sh
 cd prototype && ./forge              # installs on first run; demo with no key, full-screen chat with one (rounds 6-7)
-./forge --help                       # --model, --summary-model, --base-url, --data, --fresh, caps, --spill-bytes, --list-models, --plain
+./forge --help                       # --model, --summary-model, --base-url, --data, --fresh, --fork-from, --memory, caps, --spill-bytes, --plain
 npm run check                        # tsc + oxlint (anti-slop + gdp-ts)
-npm test                             # 191 tests, about two minutes
+npm test                             # 204 tests, about two minutes
 node --experimental-strip-types --no-warnings src/demo.ts           # three processes: grow, crash, recover
 node --experimental-strip-types --no-warnings src/bench-view.ts 20000
 node --experimental-strip-types --no-warnings src/shadow-check.ts

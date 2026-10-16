@@ -560,3 +560,30 @@ A Sonnet agent wrote `src/live.ts`, `src/chat.ts` and `src/live-run.ts`; I verif
   to compute over the stored value without reading it.
 - pi on `deepseek-flash` wrote both versions; I ran the comparisons and checked every answer against the tool's own
   output in `results.sqlite` or the chat log.
+
+## Round 11: memory strategies
+
+- **Ask.** Make memory configurable (OptChat, a rolling summary, other strategies) and compare them. Overeasy
+  (modal-labs) suggested forking a whole forge at a point; the forge's state is one folder, so `--fork-from` copies it
+  (SQLite files through the backup API, the rest as is) instead of using a FUSE filesystem.
+- **Built by pi on `deepseek-flash`:** `src/memory/` (`optchat`, `rolling`, `window`, `pi` behind one interface),
+  `src/fork.ts`, the flags, and `live-run --script/--memory/--fork-from`. The kernel's `zoom`/`date` tools exist only
+  with OptChat.
+- **Message 5 had to change.** As first written it asked about message 4, which every strategy keeps verbatim. It now
+  asks for facts only messages 1-3 hold, two of which no tool stores (the potion's dice, the initiative order).
+- **Live findings, not caught by the unit tests:**
+  - `pi` v1 lowered the turn model's context window so pi-durable would compact at the budget; that also shrank the
+    room for the answer (a `cell_propose` was truncated, so "history ends before this call completed", and the final
+    reply stopped at "Here"). Now `Live.ask` checks the context size between turns, calls `compact()`, waits for it, and
+    relabels the requests it made as compactions (they go through the turn provider). A faux end-to-end test covers it.
+  - `pi` v2 then failed on the next request: pi-durable's compaction head re-announced the `party` tool without
+    `"type": "object"` in its schema. Our hook only reorders messages, so this is in pi-durable 1.0.3. The `pi` strategy
+    repairs a schema that has `properties` but no `type`; to report upstream.
+  - `optchat` at 24 KB, continuing a tree built at 128 KB, spends dozens of summary calls merging down (56 on the
+    completed run, 87 on a first run that hit the 100-call cap). Turn behavior also varies run to run (the first run
+    repeated its first step).
+  - `live-run` writes into `prototype/results/`, so each experiment run overwrote the committed round 4 files; I restored
+    them every time. The experiment's own logs are in `results/memory-strategies/`, scratch paths replaced.
+- **Result:** optchat, rolling and pi all recalled the three facts; window recalled the potion (still in its window) and
+  said the other two were not on record instead of guessing. Costs for messages 4-5: window $0.010 < pi $0.034 <
+  optchat $0.061 ~ rolling $0.067.

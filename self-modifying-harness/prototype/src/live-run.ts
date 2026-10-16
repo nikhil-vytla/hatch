@@ -1,16 +1,20 @@
-// The "try it for real" experiment: a fresh forge on any chosen model, a fixed script of four user messages about growing
-// a tool, upgrading it, using it and asking where it came from. Nothing is tuned to make it pass: whatever the model does
+// The "try it for real" experiment: a fresh forge on any chosen model and a script of user messages about growing a
+// tool, upgrading it, using it and asking where it came from. Nothing is tuned to make it pass: whatever the model does
 // with the harness (rejected proposals, malformed arguments, refusals) is printed as it happened.
 //
-//   node --experimental-strip-types --no-warnings src/live-run.ts [--model provider/modelId] [--data DIR]   (`npm run live-run`)
+//   node --experimental-strip-types --no-warnings src/live-run.ts [--model provider/modelId] [--data DIR]
+//     [--script FILE] [--memory optchat|rolling|window|pi] [--memory-budget KB] [--fork-from DIR] [--fresh]
 //
-// Writes results/live-<provider>-run.txt (everything printed) and results/live-<provider>-usage.json (one row per model
-// request: kind, input, cache-read and output tokens, cost). The models come from src/model-config.ts, so the flags,
-// environment and auto-pick are the same as `./forge`; a run with no configured credential exits instead of pretending
-// to be a demo. The run has its own spending limits (LIVE_MAX_CALLS, LIVE_MAX_COST_USD).
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+// Writes results/live-<provider>[-<strategy>]-run.txt (everything printed) and results/live-<provider>[-<strategy>]-usage.json
+// (one row per model request: kind, input, cache-read and output tokens, cost). The models come from src/model-config.ts,
+// so the flags, environment and auto-pick are the same as `./forge`; a run with no configured credential exits instead of
+// pretending to be a demo. The run has its own spending limits (LIVE_MAX_CALLS, LIVE_MAX_COST_USD).
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { forkDataDir } from "./fork.ts";
 import { cachePercent, describeCatalogue, openLive, show, type UsageRow } from "./live.ts";
+import { memoryFlags } from "./memory/flags.ts";
+import { memoryLabel, resolveMemory } from "./memory/strategy.ts";
 import { chooseModels, describeModel, flagValue } from "./model-config.ts";
 
 const root = join(import.meta.dirname, "..");
@@ -31,12 +35,41 @@ if (choice.kind === "demo") {
 
 const dataDir = flagValue(argv, "--data") ?? join(root, "data", "live-run");
 
-const SCRIPT = [
+const DEFAULT_SCRIPT = [
 	"I want to log how many cups of coffee I drink and see the total. Just added 2.",
 	"Track decaf separately from regular, please. I had a decaf.",
 	"What's my breakdown?",
 	"Why does the coffee tool track decaf? Who asked for that?",
 ];
+
+/** One user message per non-empty line of the file. */
+function scriptFrom(path: string): string[] {
+	return readFileSync(path, "utf8")
+		.split("\n")
+		.map((line) => line.trim())
+		.filter((line) => line !== "");
+}
+
+const scriptPath = flagValue(argv, "--script");
+
+const memory = memoryFlags(argv);
+
+const resolved = resolveMemory(memory);
+
+const forkFrom = flagValue(argv, "--fork-from");
+
+const fresh = argv.includes("--fresh");
+
+if (forkFrom !== undefined) {
+	if (forkFrom === dataDir) {
+		console.error(`refusing to fork ${dataDir} onto itself`);
+		process.exit(1);
+	}
+
+	await forkDataDir(forkFrom, dataDir, fresh);
+} else {
+	rmSync(dataDir, { recursive: true, force: true });
+}
 
 const printed: string[] = [];
 
@@ -51,13 +84,13 @@ const limit = (name: string, fallback: number): number => {
 	return raw === undefined ? fallback : Number(raw);
 };
 
-rmSync(dataDir, { recursive: true, force: true });
+const live = await openLive(dataDir, { limits: { maxCalls: limit("LIVE_MAX_CALLS", 100), maxCostUsd: limit("LIVE_MAX_COST_USD", 0.3) }, turn: choice.turn, summary: choice.summary, memory });
 
-const live = await openLive(dataDir, { limits: { maxCalls: limit("LIVE_MAX_CALLS", 100), maxCostUsd: limit("LIVE_MAX_COST_USD", 0.3) }, turn: choice.turn, summary: choice.summary });
-
-out(`limits: ${live.meter.limits.maxCalls} model calls or $${live.meter.limits.maxCostUsd}, whichever first; turn ${describeModel(choice.turn)}, summary ${describeModel(choice.summary)}`);
+out(`limits: ${live.meter.limits.maxCalls} model calls or $${live.meter.limits.maxCostUsd}, whichever first; turn ${describeModel(choice.turn)}, summary ${describeModel(choice.summary)}, memory ${memoryLabel(resolved)}`);
 
 const perMessage: { message: string; rows: UsageRow[] }[] = [];
+
+const SCRIPT = scriptPath === undefined ? DEFAULT_SCRIPT : scriptFrom(scriptPath);
 
 for (const [k, text] of SCRIPT.entries()) {
 	out(`\nuser ${k + 1}> ${text}`);
@@ -77,7 +110,10 @@ await live.memory.idle();
 
 out(`\n=== catalog ===\n${describeCatalogue(await live.catalogue())}`);
 
-out(`\n=== OptChat view (${live.memory.length} messages in ${live.memory.view.length} lines, ${live.memory.viewBytes()} bytes) ===\n${live.memory.render()}`);
+const recall = live.memory.recall;
+
+if (recall !== undefined) out(`\n=== OptChat view (${recall.length} messages in ${recall.view.length} lines, ${recall.viewBytes()} bytes) ===\n${recall.render()}`);
+else out(`\n=== memory (${live.memory.name}) ===\n${live.memory.view()}`);
 
 out("\n=== usage per request (input = cache misses) ===");
 
@@ -95,10 +131,12 @@ await live.close();
 
 const providerId = choice.turn.model.provider;
 
+const suffix = resolved.strategy === "optchat" ? "" : `-${resolved.strategy}`;
+
 mkdirSync(join(root, "results"), { recursive: true });
 
-writeFileSync(join(root, "results", `live-${providerId}-run.txt`), `${printed.join("\n")}\n`);
+writeFileSync(join(root, "results", `live-${providerId}${suffix}-run.txt`), `${printed.join("\n")}\n`);
 
-const usage = { model: describeModel(choice.turn), summaryModel: describeModel(choice.summary), limits: live.meter.limits, totals: live.meter.totals(), turns: live.meter.totals("turn"), compactions: live.meter.totals("compaction"), perMessage: perMessage.map((m, k) => ({ n: k + 1, message: m.message, rows: m.rows })) };
+const usage = { model: describeModel(choice.turn), summaryModel: describeModel(choice.summary), memory: { strategy: resolved.strategy, budgetBytes: resolved.budgetBytes }, limits: live.meter.limits, totals: live.meter.totals(), turns: live.meter.totals("turn"), compactions: live.meter.totals("compaction"), perMessage: perMessage.map((m, k) => ({ n: k + 1, message: m.message, rows: m.rows })) };
 
-writeFileSync(join(root, "results", `live-${providerId}-usage.json`), `${JSON.stringify(usage, null, "\t")}\n`);
+writeFileSync(join(root, "results", `live-${providerId}${suffix}-usage.json`), `${JSON.stringify(usage, null, "\t")}\n`);
