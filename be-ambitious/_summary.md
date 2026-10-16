@@ -1,5 +1,10 @@
-Felix Rieseberg's essay [How to be more ambitious: A tutorial for humans with models](https://felixrieseberg.com/how-to-be-more-ambitious-a-tutorial-for-humans-with-models/) is distilled here into `be-ambitious`, a 72-line Agent Skill in the [agentskills.io](https://agentskills.io/specification) format. It is written in the principle-plus-guardrails shape of [pstack](https://cursor.com/lp-team/lauren). It pushes a task along three axes: altitude (aim at the outcome), depth (deeper not bigger, with the field's real instruments) and range (nouns as verbs, plus a crew that includes adversaries). Every claim needs an outside judge. An earlier, procedural 370-line version was evaluated on the free OpenCode-hosted DeepSeek V4.1 Flash, as both generator and judge. It won 87% of blind pairwise comparisons against a plain baseline and 79% against a length-matched one. Its worked example leaked into unrelated answers, which motivated cutting it to the minimal form.
+Felix Rieseberg's essay [How to be more ambitious: A tutorial for humans with models](https://felixrieseberg.com/how-to-be-more-ambitious-a-tutorial-for-humans-with-models/) is distilled here into `be-ambitious`, a 72-line Agent Skill in the [agentskills.io](https://agentskills.io/specification) format. It uses the principle-plus-guardrails shape of [pstack](https://cursor.com/lp-team/lauren). The skill pushes a task along three axes:
 
-- Trigger precision was 1.00 and recall 0.97 over 60 calls, on an easy query set.
-- Example anchoring: DuckDB from the v1 worked example appeared in 11 of 30 answers, against 0 in every other condition.
-- The current minimal version is not yet evaluated. A direct v3-vs-v1 pairwise run is the next step.
+- altitude: aim at the outcome;
+- depth: a deeper task rather than a bigger one, using the field's real instruments;
+- range: restate nouns as verbs and bring in a crew that includes adversaries.
+
+Every claim needs an outside judge, and the user chooses how far to go. An earlier version was a 370-line procedure with a worked example and an output template. It was cut back after an early eval showed the example's tools leaking into unrelated answers.
+
+- The skill passes the reference validator (`uvx --from skills-ref agentskills validate`). The PyPI executable is `agentskills`, not `skills-ref`.
+- The current version has not been evaluated yet.
