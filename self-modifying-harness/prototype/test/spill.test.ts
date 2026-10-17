@@ -348,7 +348,7 @@ test("a big cell result is the pointer in the memory log, with the full text in 
 	try {
 		const answer = await live.ask("run big");
 		assert.equal(answer.status, "done");
-		const echo = live.memory.root.find((message) => message.kind === "echo");
+		const echo = live.memory.recall?.root.find((message) => message.kind === "echo");
 
 		if (echo === undefined) throw new Error("no tool result was logged");
 		const pointer = pointerOf(echo.text);

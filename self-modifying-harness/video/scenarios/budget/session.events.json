@@ -1,0 +1,342 @@
+[
+ {
+  "t": 47.538,
+  "kind": "propose",
+  "cell": "expenses"
+ },
+ {
+  "t": 47.54,
+  "kind": "verdict",
+  "ok": false,
+  "cell": "expenses",
+  "version": "74a2dd99",
+  "stage": "checks",
+  "detail": "group 0 check 10 {\"action\":\"add\",\"category\":\"x\",\"amount\":-5} threw script: add needs amount > 0"
+ },
+ {
+  "t": 85.959,
+  "kind": "propose",
+  "cell": "expenses"
+ },
+ {
+  "t": 85.961,
+  "kind": "verdict",
+  "ok": false,
+  "cell": "expenses",
+  "version": "0fd6db7e",
+  "stage": "properties",
+  "detail": "group 0 check 12 {\"action\":\"add\",\"category\":\"a\",\"amount\":10}: rule never fails: it accepts null, -1, 1e9, \"\" ... as results, so it checks nothing"
+ },
+ {
+  "t": 131.948,
+  "kind": "propose",
+  "cell": "expenses"
+ },
+ {
+  "t": 131.95,
+  "kind": "verdict",
+  "ok": false,
+  "cell": "expenses",
+  "version": "0fd6db7e",
+  "stage": "properties",
+  "detail": "group 0 check 15 {\"action\":\"report\",\"width\":10}: rule returned false (not true) on run 0 of 20 (seed expenses@0fd6db7e|g0|c15|r0): r = {\"chart\":\"Spend"
+ },
+ {
+  "t": 194.668,
+  "kind": "propose",
+  "cell": "expenses"
+ },
+ {
+  "t": 194.67,
+  "kind": "verdict",
+  "ok": true,
+  "cell": "expenses",
+  "version": "0fd6db7e",
+  "stage": "accepted",
+  "detail": "19 checks"
+ },
+ {
+  "t": 200.285,
+  "kind": "art",
+  "tool": "expenses",
+  "lines": [
+   "Spending by category",
+   "--------------------",
+   "rent       ########################################  1450.00",
+   "groceries  ###=                                       143.50",
+   "dining     #                                           47.80",
+   "transit    #                                           38.00",
+   "coffee     .                                            9.75",
+   "",
+   "TOTAL: 1689.05"
+  ]
+ },
+ {
+  "t": 281.281,
+  "kind": "propose",
+  "cell": "expenses"
+ },
+ {
+  "t": 281.286,
+  "kind": "verdict",
+  "ok": false,
+  "cell": "expenses",
+  "version": "9051bb1e",
+  "stage": "properties",
+  "detail": "group 0 check 15 {\"action\":\"report\",\"width\":10}: rule returned false (not true) on run 0 of 20 (seed expenses@9051bb1e|g0|c15|r0): r = {\"chart\":\"Spend"
+ },
+ {
+  "t": 337.139,
+  "kind": "propose",
+  "cell": "log is array of positive amounts"
+ },
+ {
+  "t": 337.14,
+  "kind": "verdict",
+  "ok": false,
+  "cell": "expenses",
+  "version": "9cc73e23",
+  "stage": "properties",
+  "detail": "group 0 check 15 {\"action\":\"report\",\"width\":10}: rule returned false (not true) on run 0 of 20 (seed expenses@9cc73e23|g0|c15|r0): r = {\"chart\":\"Spend"
+ },
+ {
+  "t": 393.113,
+  "kind": "propose",
+  "cell": "log is array of positive amounts"
+ },
+ {
+  "t": 393.117,
+  "kind": "verdict",
+  "ok": false,
+  "cell": "expenses",
+  "version": "9cc73e23",
+  "stage": "properties",
+  "detail": "group 0 check 15 {\"action\":\"report\",\"width\":10}: rule returned false (not true) on run 0 of 20 (seed expenses@9cc73e23|g0|c15|r0): r = {\"chart\":\"Spend"
+ },
+ {
+  "t": 472.964,
+  "kind": "propose",
+  "cell": "log is array of positive amounts"
+ },
+ {
+  "t": 473.044,
+  "kind": "verdict",
+  "ok": false,
+  "cell": "expenses",
+  "version": "9cc73e23",
+  "stage": "properties",
+  "detail": "group 0 check 15 {\"action\":\"report\",\"width\":10}: rule returned false (not true) on run 0 of 20 (seed expenses@9cc73e23|g0|c15|r0): r = {\"chart\":\"Spend"
+ },
+ {
+  "t": 528.764,
+  "kind": "propose",
+  "cell": "log is array of positive amounts"
+ },
+ {
+  "t": 528.765,
+  "kind": "verdict",
+  "ok": false,
+  "cell": "expenses",
+  "version": "9cc73e23",
+  "stage": "properties",
+  "detail": "group 0 check 15 {\"action\":\"report\",\"width\":10}: rule returned false (not true) on run 0 of 20 (seed expenses@9cc73e23|g0|c15|r0): r = {\"chart\":\"Spend"
+ },
+ {
+  "t": 532.644,
+  "kind": "propose",
+  "cell": "chartprobe"
+ },
+ {
+  "t": 532.652,
+  "kind": "verdict",
+  "ok": false,
+  "cell": "chartprobe",
+  "version": "b06dcd46",
+  "stage": "checks",
+  "detail": "group 0 check 0 {\"action\":\"clear\"}: expected {\"cleared\":0}, got {\"chart\":\"Spending by category\\n--------------------\\n b  . 30.00\\n a  . 10.00\\n c  . "
+ },
+ {
+  "t": 536.971,
+  "kind": "propose",
+  "cell": "chartprobe"
+ },
+ {
+  "t": 536.972,
+  "kind": "verdict",
+  "ok": false,
+  "cell": "?",
+  "version": "",
+  "stage": "repeat",
+  "detail": "REFUSED: 6 proposals were rejected in this turn. Stop proposing, and tell the user what is blocking you and what you would try next."
+ },
+ {
+  "t": 578.575,
+  "kind": "propose",
+  "cell": "expenses"
+ },
+ {
+  "t": 578.577,
+  "kind": "propose",
+  "cell": "sparkline"
+ },
+ {
+  "t": 578.578,
+  "kind": "verdict",
+  "ok": false,
+  "cell": "expenses",
+  "version": "12171ff6",
+  "stage": "checks",
+  "detail": "changes names \"clearBudgets\", which is not one of the action values [\"add\",\"report\",\"list\",\"clear\",\"setbudget\",\"budgets\"]"
+ },
+ {
+  "t": 578.581,
+  "kind": "verdict",
+  "ok": false,
+  "cell": "sparkline",
+  "version": "b38bff9c",
+  "stage": "checks",
+  "detail": "group 0 check 0 {\"values\":[0,1,2,3,4,5,6,7]}: expected {\"sparkline\":\"\u2581\u2582\u2583\u2584\u2585\u2586\u2587\u2588\",\"min\":0,\"max\":7,\"total\":28,\"peak\":7}, got {\"sparkline\":\"\u2581\u2582\u2583\u2584\u2585\u2586\u2587\u2588\",\"valu"
+ },
+ {
+  "t": 611.476,
+  "kind": "propose",
+  "cell": "log is array of positive amounts"
+ },
+ {
+  "t": 611.478,
+  "kind": "propose",
+  "cell": "sparkline"
+ },
+ {
+  "t": 611.479,
+  "kind": "verdict",
+  "ok": false,
+  "cell": "expenses",
+  "version": "e83b1871",
+  "stage": "properties",
+  "detail": "group 0 check 3 {\"action\":\"report\"}: rule returned false (not true) on run 0 of 20 (seed expenses@e83b1871|g0|c3|r0): r = {\"chart\":\"Spending by catego"
+ },
+ {
+  "t": 611.481,
+  "kind": "verdict",
+  "ok": true,
+  "cell": "sparkline",
+  "version": "b38bff9c",
+  "stage": "accepted",
+  "detail": "5 checks"
+ },
+ {
+  "t": 737.393,
+  "kind": "propose",
+  "cell": "log is array of positive amounts"
+ },
+ {
+  "t": 737.405,
+  "kind": "verdict",
+  "ok": false,
+  "cell": "expenses",
+  "version": "d4ef467a",
+  "stage": "checks",
+  "detail": "group 1 check 20 {\"action\":\"setbudget\",\"category\":\"Coffee\",\"budget\":20}: expected {\"set\":{\"Coffee\":20},\"budgets\":{\"Coffee\":20}}, got {\"set\":{\"Coffee\":"
+ },
+ {
+  "t": 902.371,
+  "kind": "propose",
+  "cell": "log is array of positive amounts"
+ },
+ {
+  "t": 902.393,
+  "kind": "verdict",
+  "ok": false,
+  "cell": "expenses",
+  "version": "b83c30e6",
+  "stage": "checks",
+  "detail": "group 1 check 23 {\"action\":\"report\"} threw script: cannot read property 'toFixed' of undefined"
+ },
+ {
+  "t": 1048.733,
+  "kind": "propose",
+  "cell": "log is array of positive amounts"
+ },
+ {
+  "t": 1048.735,
+  "kind": "verdict",
+  "ok": false,
+  "cell": "expenses",
+  "version": "2d24ebe0",
+  "stage": "checks",
+  "detail": "group 1 check 23 {\"action\":\"report\"} threw script: cannot read property 'toFixed' of null"
+ },
+ {
+  "t": 1067.895,
+  "kind": "propose",
+  "cell": "log is array of positive amounts"
+ },
+ {
+  "t": 1067.898,
+  "kind": "verdict",
+  "ok": false,
+  "cell": "?",
+  "version": "",
+  "stage": "repeat",
+  "detail": "REFUSED: 6 proposals were rejected in this turn. Stop proposing, and tell the user what is blocking you and what you would try next."
+ },
+ {
+  "t": 1073.876,
+  "kind": "art",
+  "tool": "expenses",
+  "lines": [
+   "Spending by category",
+   "--------------------",
+   "rent       ########################################  1450.00",
+   "groceries  #####                                      198.70",
+   "dining     ###                                        120.10",
+   "transit    #                                           38.00",
+   "coffee     =                                           20.50",
+   "",
+   "TOTAL: 1827.30"
+  ]
+ },
+ {
+  "t": 1106.44,
+  "kind": "propose",
+  "cell": "budget_check"
+ },
+ {
+  "t": 1106.441,
+  "kind": "verdict",
+  "ok": false,
+  "cell": "budget_check",
+  "version": "3c30e928",
+  "stage": "checks",
+  "detail": "group 0 check 1 {\"action\":\"check\",\"entries\":[{\"category\":\"COFFEE\",\"amount\":6},{\"category\":\"coffee\",\"amount\":4.75},{\"category\":\"COFFEE\",\"amount\":9.25}]"
+ },
+ {
+  "t": 1117.229,
+  "kind": "propose",
+  "cell": "totals are finite numbers"
+ },
+ {
+  "t": 1117.231,
+  "kind": "verdict",
+  "ok": false,
+  "cell": "budget_check",
+  "version": "3c30e928",
+  "stage": "checks",
+  "detail": "group 0 check 2 {\"action\":\"check\",\"budgets\":{\"rent\":1450},\"entries\":[]}: expected {\"categories\":[{\"budget\":1450,\"category\":\"rent\",\"count\":0,\"over\":fal"
+ },
+ {
+  "t": 1129.875,
+  "kind": "propose",
+  "cell": "budget_math"
+ },
+ {
+  "t": 1129.877,
+  "kind": "verdict",
+  "ok": true,
+  "cell": "budget_math",
+  "version": "c1a0180c",
+  "stage": "accepted",
+  "detail": "1 checks"
+ }
+]

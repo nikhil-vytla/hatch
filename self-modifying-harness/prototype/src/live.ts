@@ -22,9 +22,11 @@ import { type Catalogue } from "./catalogue-doc.ts";
 import { type Complete, ModelSummarizer, type Turn } from "./compaction.ts";
 import { CellRuntime } from "./cells.ts";
 import { kernelExtension } from "./forge.ts";
-import { loadMirror, memoryExtension } from "./memory-extension.ts";
+import { buildMemoryStrategy } from "./memory/build.ts";
+import { piCompaction, piShouldCompact } from "./memory/pi.ts";
+import { ROLLING_SYSTEM_PROMPT, type RollSummarizer } from "./memory/rolling.ts";
+import { contentText, type MemorySpec, type MemoryStrategy } from "./memory/strategy.ts";
 import { describeModel, type ServedModel } from "./model-config.ts";
-import { Memory } from "./optchat.ts";
 import { SYSTEM_PROMPT } from "./optchat-prompt.ts";
 import { withCommittedCatalogue } from "./proofs/catalogue-committed.ts";
 import { DEFAULT_SPILL_POLICY, spillExtension, type SpillPolicy } from "./spill.ts";
@@ -87,6 +89,11 @@ export class Meter {
 		this.rows.push(row);
 
 		return row;
+	}
+
+	/** Mark the rows from `from` on as `kind`: pi-durable's compaction requests go through the turn provider. */
+	relabel(from: number, kind: RequestKind): void {
+		for (let k = from; k < this.rows.length; k++) this.rows[k] = { ...this.rows[k], kind };
 	}
 
 	get costUsd(): number {
@@ -188,6 +195,55 @@ function compactionCall(meter: Meter, summary: ServedModel): Complete {
 	};
 }
 
+const ROLL_CLIP = 4_000;
+
+function clipMiddle(text: string, max: number): string {
+	if (text.length <= max) return text;
+	const half = Math.floor(max / 2);
+
+	return `${text.slice(0, half)}\n[... ${text.length - max} characters cut ...]\n${text.slice(text.length - half)}`;
+}
+
+function rollingLine(message: Message): string {
+	if (message.role === "assistant") {
+		const parts = message.content.flatMap((part) => (part.type === "text" ? [part.text] : part.type === "toolCall" ? [`${part.name} ${JSON.stringify(part.arguments)}`] : []));
+
+		return `assistant: ${parts.join(" ")}`;
+	}
+
+	if (message.role === "toolResult") return `toolResult ${message.toolName}: ${clipMiddle(contentText(message.content), ROLL_CLIP)}`;
+
+	if (message.role === "system") return `system: ${contentText(message.content)}`;
+
+	return `user: ${contentText(message.content)}`;
+}
+
+function rollingPrompt(previous: string, cut: readonly Message[]): string {
+	const lines: string[] = [];
+
+	if (previous !== "") lines.push(`Summary so far:\n${previous}\n`);
+	lines.push("Conversation to fold into the summary:");
+
+	for (const message of cut) lines.push(rollingLine(message));
+
+	return lines.join("\n");
+}
+
+/** The rolling strategy's summary call, metered as a compaction like OptChat's compactor. */
+function rollingCall(meter: Meter, summary: ServedModel): RollSummarizer {
+	const models = createModels();
+	models.setProvider(meteredProvider(summary.provider, meter, "compaction"));
+
+	return async (previous, cut) => {
+		const messages: Message[] = [{ role: "user", content: [{ type: "text", text: rollingPrompt(previous, cut) }], timestamp: Date.now() }];
+		const reply = await models.completeSimple(summary.model, { systemPrompt: ROLLING_SYSTEM_PROMPT, messages }, { reasoning: "low", maxTokens: 2_000, maxRetries: 0 });
+
+		if (reply.stopReason === "error" || reply.stopReason === "aborted") throw new Error(reply.errorMessage ?? `rolling summary request ${reply.stopReason}`);
+
+		return textOf(reply);
+	};
+}
+
 /** What one committed message did: a tool result, or an assistant message's tool calls, words and failure. */
 function eventsOf(message: Message): TurnEvent[] {
 	if (message.role === "toolResult") return [{ kind: "result", name: message.toolName, text: message.content.flatMap((p) => (p.type === "text" ? [p.text] : [])).join(""), isError: message.isError }];
@@ -211,7 +267,7 @@ function eventsOf(message: Message): TurnEvent[] {
 
 // --- opening the forge ---
 
-export type LiveOptions = { limits?: Partial<Limits>; turn: ServedModel; summary: ServedModel; maxToolCallsPerTurn?: number; spill?: Partial<SpillPolicy> };
+export type LiveOptions = { limits?: Partial<Limits>; turn: ServedModel; summary: ServedModel; maxToolCallsPerTurn?: number; spill?: Partial<SpillPolicy>; memory?: MemorySpec };
 
 /**
  * A turn that makes this many tool calls is aborted. The kernel already refuses repeated and excessive rejected
@@ -235,7 +291,7 @@ export type TurnEvent =
 export type Turned = { status: string; reason: string; events: TurnEvent[]; capped: CapExceeded | undefined };
 
 export type Live = {
-	memory: Memory;
+	memory: MemoryStrategy;
 	meter: Meter;
 	runtime: CellRuntime;
 	ask(text: string, onEvent?: (event: TurnEvent) => void): Promise<Turned>;
@@ -255,25 +311,27 @@ export async function openLive(dataDir: string, options: LiveOptions): Promise<L
 	const meter = new Meter(options.limits, modelLabel(options.turn, options.summary));
 	const runtime = new CellRuntime(join(dataDir, "cells"));
 	const summarizer = new ModelSummarizer(compactionCall(meter, options.summary));
-
-	// Real budgets: the OptChat defaults (view 64k to 128k bytes, compaction view 16k to 32k).
-	const memory = new Memory(join(dataDir, "chat"), { summarizer });
-	const memState = loadMirror(memory);
+	const rollingSummarizer = rollingCall(meter, options.summary);
+	const memory = buildMemoryStrategy(options.memory, { dataDir, summarizer, rollingSummarizer });
 	const models = createModels();
-	models.setProvider(meteredProvider(options.turn.provider, meter, "turn"));
+	const turnProvider = meteredProvider(options.turn.provider, meter, "turn");
+
+	models.setProvider(turnProvider);
 	const registry = createRegistry();
-	registry.install(memoryExtension(memory, memState));
+
+	for (const extension of memory.strategy.extensions()) registry.install(extension);
 	reserveCellsSlot(registry);
 
 	let harness!: Harness;
-	registry.install(kernelExtension({ harness: () => harness, registry, runtime, memory, currentRequest: () => memState.runStartLog, invariants: NO_INVARIANTS }));
+	registry.install(kernelExtension({ harness: () => harness, registry, runtime, memory: memory.strategy.recall, currentRequest: memory.currentRequest, invariants: NO_INVARIANTS }));
 	// Installed last, so its `afterTool` hook sees every tool result, kernel tools and agent-written cells alike.
 	const spill = spillExtension(dataDir, runtime, { ...DEFAULT_SPILL_POLICY, ...options.spill });
 	registry.install(spill);
 
-	// No durable retries and no SDK retries: a failed request is reported, not repeated. pi-durable's own compaction is off
-	// (OptChat is the memory, and the context window is 1M tokens).
-	const settings = { retry: { enabled: false }, stream: { maxRetries: 0, timeoutMs: 180_000 }, compaction: { enabled: false } };
+	// No durable retries and no SDK retries: a failed request is reported, not repeated. pi-durable's automatic
+	// compaction stays off for every strategy; the pi strategy's policy only sets what a compaction keeps, and `ask`
+	// triggers it between turns (its requests are relabelled as compactions there).
+	const settings = { retry: { enabled: false }, stream: { maxRetries: 0, timeoutMs: 180_000 }, compaction: memory.strategy.name === "pi" ? piCompaction(memory.resolved.budgetBytes) : { enabled: false } };
 	harness = await Harness.open(await openNodeSqliteStorage(join(dataDir, "session.sqlite")), { models, registry, settings }, BACKGROUND_CONTEXT);
 	await reinstallCells(harness, registry, runtime, BACKGROUND_CONTEXT, NO_INVARIANTS);
 	const root = await harness.root(BACKGROUND_CONTEXT, { agent: { model: { provider: options.turn.model.provider, modelId: options.turn.model.id } } });
@@ -281,11 +339,19 @@ export async function openLive(dataDir: string, options: LiveOptions): Promise<L
 	const entries = async () => [...(await root.entries({}, 1000, undefined, BACKGROUND_CONTEXT)).items].sort((a, b) => (a.id < b.id ? -1 : 1));
 
 	return {
-		memory,
+		memory: memory.strategy,
 		meter,
 		runtime,
 		catalogue: () => withCommittedCatalogue(harness, BACKGROUND_CONTEXT, (read) => read.value),
 		async ask(text, onEvent) {
+			// The pi strategy compacts between turns, never inside one: when the context passes the budget, ask pi-durable
+			// for a compaction and wait for it. The requests it makes go through the turn provider, so they are relabelled.
+			if (memory.strategy.name === "pi" && piShouldCompact((await root.context(BACKGROUND_CONTEXT)).messages, memory.resolved.budgetBytes)) {
+				const from = meter.rows.length;
+				await harness.waitForTask(await root.compact(undefined, BACKGROUND_CONTEXT), BACKGROUND_CONTEXT);
+				meter.relabel(from, "compaction");
+			}
+
 			const before = (await entries()).length;
 			const events: TurnEvent[] = [];
 			const maxCalls = options.maxToolCallsPerTurn ?? DEFAULT_MAX_TOOL_CALLS_PER_TURN;
@@ -341,7 +407,7 @@ export async function openLive(dataDir: string, options: LiveOptions): Promise<L
 			return { status: settled.status, reason: settled.status === "done" ? "" : JSON.stringify(settled.reason ?? ""), events, capped: meter.tripped };
 		},
 		async close() {
-			await memory.idle();
+			await memory.strategy.idle();
 			await runtime.close();
 			await harness.close(BACKGROUND_CONTEXT);
 			spill.close();

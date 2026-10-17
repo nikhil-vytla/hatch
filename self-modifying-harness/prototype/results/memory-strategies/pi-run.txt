@@ -1,0 +1,220 @@
+limits: 600 model calls or $1.5, whichever first; turn deepseek/deepseek-flash, summary deepseek/deepseek-flash, memory pi 24KB
+
+user 1> A giant spider bites Pip: poisoned until the end of round 3, and we're in round 1. Track conditions and the round from now on, then advance two rounds and tell me who's still poisoned.
+  call   party {"action":"condition_add","name":"Pip","condition":"poisoned"}
+  call   cell_list {}
+  result party: live party@f54aaef4; history party@f54aaef4; asked for by zoom(0,1) dice: live dice@137b8e8d; history dice@137b8e8d; asked for by zoom(7,1)
+  result {"name":"Pip","hp":18,"maxHp":18,"conditions":["poisoned"]}
+  call   cell_source {"name":"party"}
+  result { "version": "party@f54aaef4", "description": "Track D&D party members: HP, max HP, conditions. Actions: init (seed the party), list, damage, heal, set, condition_add, condition_remove.", "parameters"...
+  call   cell_propose {"name":"party","description":"Track D&D party members: HP, max HP, conditions, and the combat round counter. ...
+  result REJECTED party@c929c22d: group 0 check 0 {"action":"init","members":[{"name":"Mira","hp":14,"maxHp":14},{"name":"Thorn","hp":28,"maxHp":28},{"name":"Pip","hp":18,"maxHp":18}]}: expected [{"name":"Mira...
+  call   cell_propose {"changes":["init","list"],"checks":[{"args":{"action":"init","members":[{"hp":14,"maxHp":14,"name":"Mira"},{"...
+  result REJECTED party@c0cb4974: checks do not exercise every action: action="round_get" appear in none of this version's own checks. The live version is unchanged.
+  call   cell_propose {"changes":["init","list"],"checks":[{"args":{"action":"init","members":[{"hp":14,"maxHp":14,"name":"Mira"},{"...
+  result REJECTED party@c0cb4974: group 1 check 10 {"action":"round_get"}: expected {"round":2}, got {"round":1}. The live version is unchanged.
+  call   cell_propose {"changes":["init","list"],"checks":[{"args":{"action":"init","members":[{"hp":14,"maxHp":14,"name":"Mira"},{"...
+  result ACCEPTED party@c0cb4974 (passed 29 checks; replayed 5 real calls; fuzzed 29 of 40 generated inputs in 41 of a budget of 40 sandbox executions). The tool "party" is available from your next step. ADVIS...
+  call   party {"action":"round_set","round":1}
+  call   party {"action":"condition_add","condition":"poisoned","duration":3,"name":"Pip"}
+  result {"round":1,"expired":[]}
+  result {"name":"Pip","hp":18,"maxHp":18,"conditions":["poisoned"],"untilRound":3}
+  call   party {"action":"round_next"}
+  result {"round":2,"expired":[]}
+  call   party {"action":"round_next"}
+  result {"round":3,"expired":[]}
+  call   party {"action":"list"}
+  call   party {"action":"round_get"}
+  result [{"name":"Mira","hp":12,"maxHp":14,"conditions":[]},{"name":"Thorn","hp":21,"maxHp":28,"conditions":[]},{"name":"Pip","hp":18,"maxHp":18,"conditions":["poisoned"],"untilRound":3}]
+  result {"round":3}
+agent> **Round 3, and Pip is the only one poisoned — it ends here.**
+
+I set the round counter to 1 and gave Pip's poison a duration of 3, then advanced twice:
+
+- Round 1 → 2: nothing expired.
+- Round 2 → 3: nothing expired (poison was still live through round 3).
+
+Pip's `poisoned` condition is tagged `untilRound: 3`, meaning it clears at the end of round 3 — i.e. it's still on him right now, during round 3, and the next `round_next` will strip it automatically.
+
+**Where everyone is as of round 3:**
+
+| Member | HP | Conditions |
+|--------|----|------------|
+| Mira | 12/14 | — |
+| Thorn | 21/28 | — |
+| Pip | 18/18 | **poisoned** (clears at end of round 3) |
+
+The `party` tool now carries a persistent round counter alongside HP, and timed conditions auto-expire on `round_next` — no more arithmetic in my head. What that means going forward: when you tell me something like "poisoned for 3 rounds" or "stunned until the end of next round" (that's `duration: 2`), I'll attach a duration and the round advance handles the bookkeeping, reporting exactly what fell off.
+
+Two things worth knowing for later: a timed condition is one condition per member (a new timed condition replaces the expiry of the old one), so if you ever give one PC two different timed conditions, tell me the durations separately and I'll flag it. And I still don't track the goblins/spider — want me to add the enemies to the tracker now that the spider has shown up? Just need names and max HP.
+  -> done
+
+user 2> Quick recap for the table: everyone's current HP and conditions. Also, from earlier tonight: what were the party's starting HP values, what exactly did Mira's potion roll (the dice and the total), and what was the turn order from the initiative roll?
+  call   party {"action":"list"}
+  call   party {"action":"round_get"}
+  result [{"name":"Mira","hp":12,"maxHp":14,"conditions":[]},{"name":"Thorn","hp":21,"maxHp":28,"conditions":[]},{"name":"Pip","hp":18,"maxHp":18,"conditions":["poisoned"],"untilRound":3}]
+  result {"round":3}
+agent> **Recap — round 3**
+
+| Member | HP | Conditions |
+|--------|----|------------|
+| Mira | 12/14 | — |
+| Thorn | 21/28 | — |
+| Pip | 18/18 | poisoned (clears at end of round 3) |
+
+Nobody's unconscious, nobody's bloodied below half except nobody — Mira's at 12/14, Thorn 21/28, Pip 18/18.
+
+**From earlier tonight:**
+
+- **Starting HP:** Mira 14/14, Thorn 28/28, Pip 18/18.
+- **Mira's potion:** 2d4+2 → rolled 4+1, +2 = **7**. Mira was at 5/14, healed 7 → capped at 12/14 (she lost 2 to the cap).
+- **Initiative order:** Mira 22 (nat 20 + 2) → Goblin 2, 21 (19+2) → Goblin 3, 16 (14+2) → Pip, 12 (8+4) → Thorn, 5 (4+1) → Goblin 1, 3 (1+2).
+
+Damage so far: Thorn took 7 (28→21), Mira took 9 (14→5, then potion to 12).
+
+One caveat on that initiative list: it's the **opening** order for the fight. At the end of round 3 Pip's poison drops off — I'll handle that on the next `round_next`, and if you want a fresh initiative roll for the next encounter just say so and I'll reroll all six.
+  -> done
+
+=== catalog ===
+party: live party@c0cb4974
+  party@f54aaef4: asked for by message 0; 9 checks, 2 invariants; "Track D&D party members: HP, max HP, conditions. Actions: init (seed the party), list, damage, heal, set, condition_add, condition_remove."
+  party@c0cb4974 (live): asked for by message ?; 20 checks, 2 invariants, migrates state; "Track D&D party members: HP, max HP, conditions, and the combat round counter. Actions: init (seed the party), list, damage, heal, set, condition_add, condition_remove, round_set, round_next, round_get. Conditions can be given a duration in rounds (`duration`): round_next auto-expires them. `list` returns the member array; `round_get` returns {round}."
+dice: live dice@137b8e8d
+  dice@137b8e8d (live): asked for by message 7; 8 checks, 0 invariants; "Roll dice for D&D: `roll` rolls N dice of S sides (default 1d20) and returns {rolls, sum, mod, total, notation}; `initiative` takes a list of {name, mod} and rolls 1d20 each, returning entries sorted high-to-low by total (d20+mod), ties broken by higher mod then name. Bad input returns {error: "..."} instead of throwing."
+log:
+  2026-10-16T08:30:33.991Z verified party@f54aaef4, pending
+  2026-10-16T08:30:34.258Z accepted party@f54aaef4
+  2026-10-16T08:31:06.440Z rejected dice@3af4e87a: group 0 check 3 {"action":"roll","n":0} threw script: n must be an integer 1..100
+  2026-10-16T08:31:22.734Z rejected dice@3af4e87a: group 0 check 3 {"action":"roll","n":0} threw script: n must be an integer 1..100
+  2026-10-16T08:31:38.014Z rejected dice@3af4e87a: group 0 check 3 {"action":"roll","n":1,"sides":1} threw script: sides must be an integer 2..1000
+  2026-10-16T08:32:11.319Z verified dice@137b8e8d, pending
+  2026-10-16T08:32:11.467Z accepted dice@137b8e8d
+  2026-10-16T08:44:55.212Z rejected party@c929c22d: group 0 check 0 {"action":"init","members":[{"name":"Mira","hp":14,"maxHp":14},{"name":"Thorn","hp":28,"maxHp":28},{"name":"Pip","hp":18,"maxHp":18}]}: expected [{"name":"Mira","hp":14,"maxHp":14,"conditions":[]},{"name":"Thorn","hp":28,"maxHp":28,"conditions":[]},{"name":"Pip","hp":18,"maxHp":18,"conditions":[]}], got {"round":1,"members":[{"name":"Mira","hp":14,"maxHp":14,"conditions":[]},{"name":"Thorn","hp":28,"maxHp":28,"conditions":[]},{"name":"Pip","hp":18,"maxHp":18,"conditions":[]}]}
+  2026-10-16T08:45:04.518Z rejected party@c0cb4974: checks do not exercise every action: action="round_get" appear in none of this version's own checks
+  2026-10-16T08:45:19.417Z rejected party@c0cb4974: group 1 check 10 {"action":"round_get"}: expected {"round":2}, got {"round":1}
+  2026-10-16T08:45:43.892Z verified party@c0cb4974, pending its migration
+  2026-10-16T08:45:44.170Z accepted party@c0cb4974
+
+=== memory (pi) ===
+user: The conversation history before this point was compacted into the following summary:
+
+<summary>
+## Goal
+- Act as table assistant for a D&D one-shot: track party (Mira the wizard, Thorn the fighter, Pip the rogue) HP/conditions, roll initiative/turn order, roll dice, track combat round, and manage round-based condition durations.
+
+## Constraints & Preferences
+- Track party members' HP, max HP, and conditions.
+- Interact naturally (e.g., "Mira takes 6", "Pip heals 5", "Thorn is prone", "how's everyone doing?").
+- Damage floors at 0 and auto-applies `unconscious`; at 0 HP healing fails until stabilised/revived.
+- max HP changes should be settable on request.
+- Dice rolls (especially initiative) must be "exactly right" — user wants reliable output.
+- User asked to "track conditions and the round from now on" and to advance rounds on command.
+
+## Progress
+### Done
+- [x] Created and accepted `party` tool — live version `party@f54aaef4` (HP/conditions only; no round tracking).
+- [x] Seeded party via `init`: Mira 14/14, Thorn 28/28, Pip 18/18, no conditions.
+- [x] Created and ACCEPTED `dice` tool — live version `dice@137b8e8d` (passed 8 checks). Actions: `roll` (N dice of S sides, default 1d20, returns {rolls, sum, mod, total, notation}); `initiative` (list of {name, mod}, rolls 1d20 each, sorts high-to-low by total, ties broken by higher mod then name). Bad input returns `{error: "..."}` instead of throwing.
+- [x] Ran initiative: Mira 22 (nat 20+2), Goblin 2 21 (19+2), Goblin 3 16 (14+2), Pip 12 (8+4), Thorn 5 (4+1), Goblin 1 3 (1+2). Order: Mira → Goblin 2 → Goblin 3 → Pip → Thorn → Goblin 1.
+- [x] Applied damage: Thorn 7 (28→21), Mira 9 (14→5).
+- [x] Rolled potion 2d4+2 = 4+1+2 = 7; healed Mira 5→12/14.
+- [x] Added `poisoned` condition to Pip (currently still via old `party@f54aaef4` which has no duration support).
+
+### In Progress
+- [ ] Upgrading `party` tool to support combat round tracking + round-based condition durations (`untilRound` auto-expiry). New actions: `round_set`, `round_next`, `round_get`; `condition_add` gains `duration` param.
+
+### Blocked
+- [ ] `party` tool upgrade proposal repeatedly REJECTED (live version unchanged, still `party@f54aaef4`). Three attempts this session:
+  - Attempt A (`party@c929c22d`): check 0 `init` expected a bare member array but source returned `{round:1, members:[...]}`.
+  - Attempt B (`party@c0cb4974`): REJECTED "checks do not exercise every action: action=\"round_get\" appear in none of this version's own checks."
+  - Attempt C: REJECTED "group 1 check 10 {\"action\":\"round_get\"}: expected {\"round\":2}, got {\"round\":1}." — because the check sequence didn't actually advance the round before querying (round_get ran at round 1).
+- Root cause pattern: check sequences must be ordered so state transitions line up; `expect` values must match exact shapes returned by source; every declared action must appear in checks.
+
+## Key Decisions
+- **`party` tool (live `@f54aaef4`) actions**: `init`, `list`, `damage`, `heal`, `set`, `condition_add`, `condition_remove`; case-insensitive lookup; errors on missing/ambiguous names.
+- **`party` upgrade design (proposed, not yet accepted)**: add `round` kv key (default via `migrate` sets `members` conditions arrays + `round=1`); `view(p)` returns member with optional `untilRound`; `expire(m, round)` drops conditions whose `untilRound < round`.
+  - `init` returns `{round, members}` OR bare array (needs to pick ONE consistently — caused rejection A).
+  - `list` returns bare member array.
+  - `round_get` returns `{round}`.
+  - `round_set` returns `{round, expired:[]}`, requires integer >= 1.
+  - `round_next` returns `{round, expired}`.
+  - `condition_add` with `duration` sets `p.untilRound = cur + duration - 1`, `p.untilCondition = condition`.
+- **`dice` tool design (live `@137b8e8d`)**: as above; uses `function d(sides){ return 1 + Math.floor(Math.random()*sides); }`; returns `{error}` objects (not throws) on bad input.
+- Party state persisted via kv key `"members"`; round via kv key `"round"`.
+
+## Next Steps
+1. Re-propose `party` upgrade with corrections:
+   - Make `init` return shape consistent with its check `expect`.
+   - Ensure every action (`round_get` included) appears in checks.
+   - Order checks so state matches `expect` (e.g., advance round with `round_next` before asserting `round_get`/`list` round values).
+2. Once `party` upgrade is ACCEPTED, run `migrate` to set `round=1` and normalize conditions arrays.
+3. Set up round state: user said poison lasts "until end of round 3" and we are in round 1 — need round=1 current.
+4. Advance two rounds (round 1 → 2 → 3) via `round_next`; at end of round 3 the poison should auto-expire.
+5. Report who is still poisoned (expected: nobody, poison expired at end of round 3).
+
+## Critical Context
+- Party state: Mira 12/14, Thorn 21/28, Pip 18/18; Pip has condition `["poisoned"]`.
+- Round state: currently 1 (poison applied during round 1, should expire at end of round 3).
+- Poison intent: "poisoned until the end of round 3, and we're in round 1" → with `duration=3` from round 1, `untilRound = 1 + 3 - 1 = 3`, expires when round advances past 3.
+- `dice@137b8e8d` behavior confirmed live: initiative handled 6 combatants correctly.
+- Initiative mods: Mira +2, Thorn +1, Pip +4, Goblin 1/2/3 +2 each.
+- Error messages to preserve exactly: `n must be an integer 1..100`, `sides must be an integer 2..1000`, `combatants required`, `unknown action: `, `party is empty; call init first`, `no such party member: `, `ambiguous name: `.
+- cell_list result (before dice was added): `party: live party@f54aaef4; history party@f54aaef4`; `dice: live dice@137b8e8d; history dice@137b8e8d`.
+- Goblin HP not tracked (user offered to add — no answer yet); goblins' AC/max HP unknown.
+</summary>
+assistant: cell_propose {"changes":["init","list"],"checks":[{"args":{"action":"init","members":[{"hp":14,"maxHp":14,"name":"Mira"},{"hp":28,"maxHp":28,"name":"Thorn"},{"hp":18,"maxHp":18,"name":"Pip"}]},"expect":[{"conditions":[],"hp":14,"maxHp":14,"name":"Mira"},{"conditions":[],"hp":28,"maxHp":28,"name":"Thorn"},{"conditions":[],"hp":18,"maxHp":18,"name":"Pip"}]},{"args":{"action":"list"},"expect":[{"conditions":[],"hp":14,"maxHp":14,"name":"Mira"},{"conditions":[],"hp":28,"maxHp":28,"name":"Thorn"},{"conditions":[],"hp":18,"maxHp":18,"name":"Pip"}]},{"args":{"action":"damage","amount":6,"name":"mira"},"expect":{"conditions":[],"hp":8,"maxHp":14,"name":"Mira"}},{"args":{"action":"heal","amount":100,"name":"Mira"},"expect":{"conditions":[],"hp":14,"maxHp":14,"name":"Mira"}},{"args":{"action":"damage","amount":999,"name":"Thorn"},"expect":{"conditions":["unconscious"],"hp":0,"maxHp":28,"name":"Thorn"}},{"args":{"action":"condition_add","condition":"poisoned","name":"Pip"},"expect":{"conditions":["poisoned"],"hp":18,"maxHp":18,"name":"Pip"}},{"args":{"action":"condition_remove","condition":"poisoned","name":"Pip"},"expect":{"conditions":[],"hp":18,"maxHp":18,"name":"Pip"}},{"args":{"action":"set","hp":12,"name":"Thorn"},"expect":{"conditions":[],"hp":12,"maxHp":28,"name":"Thorn"}},{"args":{"action":"damage","amount":5,"name":"Mira"},"holds":"r.hp === 9 && r.conditions.length === 0","runs":1},{"args":{"action":"round_get"},"expect":{"round":1},"runs":1},{"args":{"action":"condition_add","condition":"poisoned","duration":3,"name":"Pip"},"expect":{"conditions":["poisoned"],"hp":18,"maxHp":18,"name":"Pip","untilRound":3}},{"args":{"action":"round_next"},"expect":{"expired":[],"round":2}},{"args":{"action":"round_get"},"expect":{"round":2},"runs":1},{"args":{"action":"list"},"expect":[{"conditions":[],"hp":9,"maxHp":14,"name":"Mira"},{"conditions":[],"hp":12,"maxHp":28,"name":"Thorn"},{"conditions":["poisoned"],"hp":18,"maxHp":18,"name":"Pip","untilRound":3}]},{"args":{"action":"round_next"},"expect":{"expired":[],"round":3}},{"args":{"action":"round_next"},"expect":{"expired":[{"condition":"poisoned","expiredAtEndOfRound":3,"name":"Pip"}],"round":4},"runs":1},{"args":{"action":"list"},"expect":[{"conditions":[],"hp":9,"maxHp":14,"name":"Mira"},{"conditions":[],"hp":12,"maxHp":28,"name":"Thorn"},{"conditions":[],"hp":18,"maxHp":18,"name":"Pip"}]},{"args":{"action":"round_set","round":1},"expect":{"expired":[],"round":1}},{"args":{"action":"round_get"},"expect":{"round":1},"runs":1},{"args":{"action":"condition_remove","condition":"poisoned","name":"Pip"},"expect":{"conditions":[],"hp":18,"maxHp":18,"name":"Pip"}}],"description":"Track D&D party members: HP, max HP, conditions, and the combat round counter. Actions: init (seed the party), list, damage, heal, set, condition_add, condition_remove, round_set, round_next, round_get. Conditions can be given a duration in rounds (`duration`): round_next auto-expires them. `list` returns the member array; `round_get` returns {round}.","expectLive":"party@f54aaef4","invariants":[{"name":"hp in range","source":"const m = (await kv.get(\"members\")) || []; return m.every(p => p.hp >= 0 && p.hp <= p.maxHp);"},{"name":"conditions array","source":"const m = (await kv.get(\"members\")) || []; return m.every(p => Array.isArray(p.conditions));"}],"migrate":"const m = (await kv.get(\"members\")) || []; await kv.put(\"members\", m.map(p => Object.assign({}, p, { conditions: Array.isArray(p.conditions) ? p.conditions : [] }))); await kv.put(\"round\", 1);","name":"party","parameters":{"properties":{"action":{"enum":["init","list","damage","heal","set","condition_add","condition_remove","round_set","round_next","round_get"],"type":"string"},"amount":{"type":"number"},"condition":{"type":"string"},"duration":{"description":"for condition_add: number of rounds the condition lasts, counting the current round as round 1","type":"number"},"hp":{"type":"number"},"maxHp":{"type":"number"},"members":{"items":{"properties":{"hp":{"type":"number"},"maxHp":{"type":"number"},"name":{"type":"string"}},"type":"object"},"type":"array"},"name":{"type":"string"},"round":{"description":"for round_set: the round number to jump to","type":"number"}},"required":["action"]},"source":"const all = async () => (await kv.get(\"members\")) || [];\nconst save = async (m) => { await kv.put(\"members\", m); return m; };\nconst getRound = async () => { const r = await kv.get(\"round\"); return typeof r === \"number\" ? r : 0; };\nconst setRound = async (r) => { await kv.put(\"round\", r); return r; };\nconst find = (m, name) => {\n  const key = String(name || \"\").trim().toLowerCase();\n  const hit = m.filter(p => p.name.toLowerCase() === key);\n  if (hit.length === 0) throw new Error(\"no such party member: \" + name);\n  if (hit.length > 1) throw new Error(\"ambiguous name: \" + name);\n  return hit[0];\n};\nconst view = (p) => { const o = { name: p.name, hp: p.hp, maxHp: p.maxHp, conditions: p.conditions }; if (typeof p.untilRound === \"number\") o.untilRound = p.untilRound; return o; };\nconst expire = (m, round) => {\n  const dropped = [];\n  for (const p of m) {\n    if (typeof p.untilRound !== \"number\") continue;\n    if (p.untilRound < round) {\n      p.conditions = p.conditions.filter(c => c !== p.untilCondition);\n      dropped.push({ name: p.name, condition: p.untilCondition, expiredAtEndOfRound: p.untilRound });\n      delete p.untilRound; delete p.untilCondition;\n    }\n  }\n  return dropped;\n};\n\nif (args.action === \"init\") {\n  const seed = (args.members || []).map(p => ({ name: p.name, hp: p.hp, maxHp: p.maxHp, conditions: [] }));\n  if (seed.length === 0) throw new Error(\"init needs members\");\n  await save(seed);\n  await setRound(args.round != null ? args.round : 1);\n  return seed.map(view);\n}\n\nif (args.action === \"round_get\") {\n  return { round: await getRound() };\n}\n\nif (args.action === \"round_set\") {\n  if (!Number.isInteger(args.round) || args.round < 1) throw new Error(\"round_set needs an integer round >= 1\");\n  return { round: await setRound(args.round), expired: [] };\n}\n\nif (args.action === \"round_next\") {\n  const r = (await getRound()) + 1;\n  await setRound(r);\n  const m = await all();\n  const expired = expire(m, r);\n  if (expired.length) await save(m);\n  return { round: r, expired };\n}\n\nif (args.action === \"list\") {\n  const m = await all();\n  return m.map(view);\n}\n\nconst m = await all();\nif (m.length === 0) throw new Error(\"party is empty; call init first\");\nconst p = find(m, args.name);\n\nif (args.action === \"damage\") {\n  if (!(args.amount > 0)) throw new Error(\"damage needs a positive amount\");\n  p.hp = Math.max(0, p.hp - args.amount);\n  if (p.hp === 0 && !p.conditions.includes(\"unconscious\")) p.conditions.push(\"unconscious\");\n} else if (args.action === \"heal\") {\n  if (!(args.amount > 0)) throw new Error(\"heal needs a positive amount\");\n  if (p.hp === 0) throw new Error(p.name + \" is at 0 HP; needs stabilising or a revive, not healing\");\n  p.hp = Math.min(p.maxHp, p.hp + args.amount);\n} else if (args.action === \"set\") {\n  if (!(args.hp >= 0)) throw new Error(\"set needs hp >= 0\");\n  p.hp = args.hp;\n  if (args.maxHp != null) p.maxHp = args.maxHp;\n  if (p.hp === 0) { if (!p.conditions.includes(\"unconscious\")) p.conditions.push(\"unconscious\"); }\n  else p.conditions = p.conditions.filter(c => c !== \"unconscious\");\n} else if (args.action === \"condition_add\") {\n  if (!args.condition) throw new Error(\"condition_add needs a condition\");\n  if (!p.conditions.includes(args.condition)) p.conditions.push(args.condition);\n  if (args.duration != null) {\n    if (!Number.isInteger(args.duration) || args.duration < 1) throw new Error(\"condition_add needs an integer duration >= 1\");\n    const cur = await getRound();\n    p.untilRound = cur + args.duration - 1;\n    p.untilCondition = args.condition;\n  }\n} else if (args.action === \"condition_remove\") {\n  p.conditions = p.conditions.filter(c => c !== args.condition);\n  if (p.untilCondition === args.condition) { delete p.untilRound; delete p.untilCondition; }\n} else {\n  throw new Error(\"unknown action: \" + args.action);\n}\n\nawait save(m);\nreturn view(p);\n"}
+toolResult cell_propose: ACCEPTED party@c0cb4974 (passed 29 checks; replayed 5 real calls; fuzzed 29 of 40 generated inputs in 41 of a budget of 40 sandbox executions). The tool "party" is available from your next step. ADVISORY fuzz: 1 of 29 generated inputs break invariant "hp in range" (first: {"action":"init","condition":"tO","maxHp":1.5,"members":[{"hp":40.236902609467506,"maxHp":74.70363746397197},{"hp":33.22400511242449,"maxHp":-1e+308},{},{"hp":82.86040374077857}],"round":-43.95806575194001}); the live version party@f54aaef4 breaks it too. Not blocking.
+assistant: party {"action":"round_set","round":1} party {"action":"condition_add","condition":"poisoned","duration":3,"name":"Pip"}
+toolResult party: {"round":1,"expired":[]}
+toolResult party: {"name":"Pip","hp":18,"maxHp":18,"conditions":["poisoned"],"untilRound":3}
+assistant: party {"action":"round_next"}
+toolResult party: {"round":2,"expired":[]}
+assistant: party {"action":"round_next"}
+toolResult party: {"round":3,"expired":[]}
+assistant: party {"action":"list"} party {"action":"round_get"}
+toolResult party: [{"name":"Mira","hp":12,"maxHp":14,"conditions":[]},{"name":"Thorn","hp":21,"maxHp":28,"conditions":[]},{"name":"Pip","hp":18,"maxHp":18,"conditions":["poisoned"],"untilRound":3}]
+toolResult party: {"round":3}
+assistant: **Round 3, and Pip is the only one poisoned — it ends here.**
+
+I set the round counter to 1 and gave Pip's poison a duration of 3, then advanced twice:
+
+- Round 1 → 2: nothing expired.
+- Round 2 → 3: nothing expired (poison was still live through round 3).
+
+Pip's `poisoned` condition is tagged `untilRound: 3`, meaning it clears at the end of round 3 — i.e. it's still on him right now, during round 3, and the next `round_next` will strip it automatically.
+
+**Where everyone is as of round 3:**
+
+| Member | HP | Conditions |
+|--------|----|------------|
+| Mira | 12/14 | — |
+| Thorn | 21/28 | — |
+| Pip | 18/18 | **poisoned** (clears at end of round 3) |
+
+The `party` tool now carries a persistent round counter alongside HP, and timed conditions auto-expire on `round_next` — no more arithmetic in my head. What that means going forward: when you tell me something like "poisoned for 3 rounds" or "stunned until the end of next round" (that's `duration: 2`), I'll attach a duration and the round advance handles the bookkeeping, reporting exactly what fell off.
+
+Two things worth knowing for later: a timed condition is one condition per member (a new timed condition replaces the expiry of the old one), so if you ever give one PC two different timed conditions, tell me the durations separately and I'll flag it. And I still don't track the goblins/spider — want me to add the enemies to the tracker now that the spider has shown up? Just need names and max HP.
+user: Quick recap for the table: everyone's current HP and conditions. Also, from earlier tonight: what were the party's starting HP values, what exactly did Mira's potion roll (the dice and the total), and what was the turn order from the initiative roll?
+assistant: party {"action":"list"} party {"action":"round_get"}
+toolResult party: [{"name":"Mira","hp":12,"maxHp":14,"conditions":[]},{"name":"Thorn","hp":21,"maxHp":28,"conditions":[]},{"name":"Pip","hp":18,"maxHp":18,"conditions":["poisoned"],"untilRound":3}]
+toolResult party: {"round":3}
+
+=== usage per request (input = cache misses) ===
+  # msg kind         input cache-read  output  cache%      cost
+  1 1   compaction     216       6016     993    96.5  $0.00129
+  2 1   turn          4124       1920      84    31.8  $0.00135
+  3 1   turn           215       6016      37    96.5  $0.00014
+  4 1   turn          2229       6144    2900    73.4  $0.00419
+  5 1   turn           225      11264    2806      98  $0.00350
+  6 1   turn           137      14208    2858      99  $0.00356
+  7 1   turn           232      17024    2908    98.7  $0.00366
+  8 1   turn         20349        128     132     0.6  $0.00626
+  9 1   turn           186      20480      37    99.1  $0.00022
+ 10 1   turn           244      20480      37    98.8  $0.00024
+ 11 1   turn           174      20608      64    99.2  $0.00025
+ 12 1   turn           201      20736     380      99  $0.00064
+ 13 2   compaction   12691          0    1679       0  $0.00582
+ 14 2   turn          5785       2176      64    27.3  $0.00183
+ 15 2   turn           180       7936     350    97.8  $0.00052
+
+models deepseek/deepseek-flash | spend: 15 of 600 calls, $0.0335 of $1.50 | turns 13 calls, 183401 prompt tokens (81.3% from cache), 12657 out, $0.0264 | compactions 2 calls, 18923 prompt tokens (31.8% from cache), 2672 out, $0.0071

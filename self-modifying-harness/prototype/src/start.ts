@@ -9,7 +9,10 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { parseArgs } from "node:util";
 import { runChat } from "./chat-loop.ts";
+import { forkDataDir } from "./fork.ts";
 import { type Limits, openLive } from "./live.ts";
+import { memoryFlags } from "./memory/flags.ts";
+import { memoryLabel, resolveMemory } from "./memory/strategy.ts";
 import { chooseModels, configuredModels, describeModel, type Env } from "./model-config.ts";
 import { DEFAULT_SPILL_POLICY } from "./spill.ts";
 import { backendOf, runTui } from "./tui.ts";
@@ -35,6 +38,11 @@ const HELP = `usage: ./forge [flags]
   --max-cost USD             stop after this many dollars (default ${CHAT_LIMITS.maxCostUsd})
   --spill-bytes N            spill tool results over N bytes to results.sqlite (default ${DEFAULT_SPILL_POLICY.spillBytes}; 0 disables)
   --preview-chars N          characters of each spilled result kept in the pointer (default ${DEFAULT_SPILL_POLICY.previewChars})
+  --memory NAME              memory strategy: optchat (default), rolling, window, pi
+  --memory-budget KB         view budget in KB (default: optchat 128, others 64)
+  --rolling-trigger R        rolling: summarize once the earlier runs pass this share of the budget (default 0.8)
+  --rolling-retain R         rolling: keep at most this share of the budget verbatim (default 0.5)
+  --fork-from DIR            copy a stopped forge's data directory here before opening
   --list-models              list providers with a configured credential and their chat models
   --demo                     run the scripted offline demo instead of chatting
   --plain                    line-based chat instead of the full-screen TUI (automatic without a TTY)
@@ -87,6 +95,11 @@ async function main(argv: readonly string[], env: Env): Promise<number> {
 			"max-cost": { type: "string" },
 			"spill-bytes": { type: "string" },
 			"preview-chars": { type: "string" },
+			memory: { type: "string" },
+			"memory-budget": { type: "string" },
+			"rolling-trigger": { type: "string" },
+			"rolling-retain": { type: "string" },
+			"fork-from": { type: "string" },
 			"list-models": { type: "boolean" },
 			demo: { type: "boolean" },
 			plain: { type: "boolean" },
@@ -127,8 +140,23 @@ async function main(argv: readonly string[], env: Env): Promise<number> {
 	}
 
 	const dataDir = values.data ?? env.FORGE_HOME ?? join(homedir(), ".forge", "default");
+	const forkFrom = values["fork-from"];
 
-	if (values.fresh) {
+	if (forkFrom !== undefined) {
+		if (forkFrom === dataDir) {
+			console.error(`refusing to fork ${dataDir} onto itself`);
+
+			return 1;
+		}
+
+		if (values.fresh && (dataDir === "/" || dataDir === homedir())) {
+			console.error(`refusing to delete ${dataDir}`);
+
+			return 1;
+		}
+
+		await forkDataDir(forkFrom, dataDir, values.fresh === true);
+	} else if (values.fresh) {
 		if (dataDir === "/" || dataDir === homedir()) {
 			console.error(`refusing to delete ${dataDir}`);
 
@@ -141,14 +169,16 @@ async function main(argv: readonly string[], env: Env): Promise<number> {
 
 	const limits = { maxCalls: numberFlag(values["max-calls"], CHAT_LIMITS.maxCalls), maxCostUsd: numberFlag(values["max-cost"], CHAT_LIMITS.maxCostUsd) };
 	const spill = { spillBytes: integerFlag(values["spill-bytes"], DEFAULT_SPILL_POLICY.spillBytes), previewChars: integerFlag(values["preview-chars"], DEFAULT_SPILL_POLICY.previewChars) };
-	const live = await openLive(dataDir, { limits, turn: choice.turn, summary: choice.summary, spill });
+	const memory = memoryFlags(argv);
+	const resolved = resolveMemory(memory);
+	const live = await openLive(dataDir, { limits, turn: choice.turn, summary: choice.summary, spill, memory });
 	const model = describeModel(choice.turn);
 
 	if (values.plain || !process.stdin.isTTY || !process.stdout.isTTY) {
-		console.log(`turn ${model} | summary ${describeModel(choice.summary)} | data ${dataDir} | cap ${limits.maxCalls} calls or $${limits.maxCostUsd.toFixed(2)}`);
+		console.log(`turn ${model} | summary ${describeModel(choice.summary)} | memory ${memoryLabel(resolved)} | data ${dataDir} | cap ${limits.maxCalls} calls or $${limits.maxCostUsd.toFixed(2)}`);
 		await runChat(live);
 	} else {
-		await runTui(backendOf(live), { model, dataDir });
+		await runTui(backendOf(live), { model: `${model} · memory ${memoryLabel(resolved)}`, dataDir });
 	}
 
 	return 0;

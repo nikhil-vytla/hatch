@@ -49,7 +49,7 @@ export type KernelOptions = {
 	harness: () => Harness;
 	registry: Registry;
 	runtime: CellRuntime;
-	memory: Memory;
+	memory?: Memory;
 	currentRequest: () => number | undefined;
 	invariants: CallerInvariants; // caller-owned invariants by cell name: the model cannot propose, change or drop them
 };
@@ -283,7 +283,7 @@ export function kernelExtension(options: KernelOptions) {
 		description: "Open the line id+n of the view into the two lines of n/2 under it; n = 1 gives the message whole.",
 		parameters: Type.Object({ id: Type.Number(), n: Type.Number() }),
 		replay: "safe",
-		execute: async (args) => text(memory.zoom(args.id, args.n)),
+		execute: async (args) => text(memory === undefined ? "No zoom without OptChat memory." : memory.zoom(args.id, args.n)),
 	});
 
 	const date = defineTool({
@@ -291,12 +291,12 @@ export function kernelExtension(options: KernelOptions) {
 		description: "The date and time of message id.",
 		parameters: Type.Object({ id: Type.Number() }),
 		replay: "safe",
-		execute: async (args) => text(memory.date(args.id)),
+		execute: async (args) => text(memory === undefined ? "No date without OptChat memory." : memory.date(args.id)),
 	});
 
 	return defineExtension({
 		name: "kernel",
-		tools: [propose, rollback, list, source, zoom, date],
+		tools: memory === undefined ? [propose, rollback, list, source] : [propose, rollback, list, source, zoom, date],
 		sections: [
 			section("preamble", () => "You are an agent that grows its own tools. When the user needs something you cannot do, write a tool for it with cell_propose, with checks. Anything random or that must be exactly right (dice, arithmetic, dates, running totals) belongs in a tool, not in your head: use `Math.random` (the harness seeds it) and check random results with property checks. Say in your reply what you learned that will matter later.", { tag: false }),
 		],
