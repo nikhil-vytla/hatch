@@ -1,0 +1,233 @@
+[
+ {
+  "t": 26.287,
+  "kind": "propose",
+  "cell": "life"
+ },
+ {
+  "t": 26.289,
+  "kind": "verdict",
+  "ok": false,
+  "cell": "life",
+  "version": "6b63b04a",
+  "stage": "checks",
+  "detail": "group 0 check 1 {\"action\":\"run\",\"width\":5,\"height\":5,\"pattern\":\"blinker\",\"steps\":1}: expected {\"width\":5,\"height\":5,\"pattern\":\"blinker\",\"generation\":1"
+ },
+ {
+  "t": 32.794,
+  "kind": "propose",
+  "cell": "life"
+ },
+ {
+  "t": 45.563,
+  "kind": "propose",
+  "cell": "life"
+ },
+ {
+  "t": 45.564,
+  "kind": "verdict",
+  "ok": false,
+  "cell": "life",
+  "version": "24839a21",
+  "stage": "checks",
+  "detail": "group 0 check 3 {\"action\":\"run\",\"width\":7,\"height\":5,\"pattern\":\"blinker\",\"steps\":1}: expected {\"width\":7,\"height\":5,\"pattern\":\"blinker\",\"generation\":1"
+ },
+ {
+  "t": 55.716,
+  "kind": "propose",
+  "cell": "life"
+ },
+ {
+  "t": 55.717,
+  "kind": "verdict",
+  "ok": false,
+  "cell": "life",
+  "version": "24839a21",
+  "stage": "checks",
+  "detail": "group 0 check 3 {\"action\":\"run\",\"width\":40,\"height\":40,\"pattern\":\"blinker\",\"steps\":1}: expected {\"width\":40,\"height\":40,\"pattern\":\"blinker\",\"generatio"
+ },
+ {
+  "t": 81.175,
+  "kind": "propose",
+  "cell": "life"
+ },
+ {
+  "t": 81.184,
+  "kind": "verdict",
+  "ok": false,
+  "cell": "life",
+  "version": "24839a21",
+  "stage": "fuzz",
+  "detail": "fuzz: input {\"action\":\"run\",\"width\":2,\"height\":2147483647,\"steps\":-1} did not finish within 2000 ms (a hang the declared schema allows)"
+ },
+ {
+  "t": 109.506,
+  "kind": "propose",
+  "cell": "life"
+ },
+ {
+  "t": 109.508,
+  "kind": "verdict",
+  "ok": false,
+  "cell": "life",
+  "version": "a77d2816",
+  "stage": "fuzz",
+  "detail": "fuzz: input {\"action\":\"run\",\"height\":313,\"steps\":100000} did not finish within 2000 ms (a hang the declared schema allows)"
+ },
+ {
+  "t": 147.267,
+  "kind": "propose",
+  "cell": "life"
+ },
+ {
+  "t": 147.281,
+  "kind": "verdict",
+  "ok": true,
+  "cell": "life",
+  "version": "f220434b",
+  "stage": "accepted",
+  "detail": "10 checks"
+ },
+ {
+  "t": 149.818,
+  "kind": "art",
+  "tool": "life",
+  "lines": [
+   ".#..................",
+   "..#.................",
+   "###.................",
+   "....................",
+   "....................",
+   "....................",
+   "....................",
+   "....................",
+   "....................",
+   "...................."
+  ]
+ },
+ {
+  "t": 203.055,
+  "kind": "propose",
+  "cell": "life"
+ },
+ {
+  "t": 203.056,
+  "kind": "verdict",
+  "ok": false,
+  "cell": "life",
+  "version": "3ad7880f",
+  "stage": "checks",
+  "detail": "group 0 check 2 {\"action\":\"run\",\"width\":4,\"height\":4,\"pattern\":\"block\",\"steps\":3}: expected {\"width\":4,\"height\":4,\"pattern\":\"block\",\"generation\":3,\"al"
+ },
+ {
+  "t": 223.292,
+  "kind": "propose",
+  "cell": "life"
+ },
+ {
+  "t": 223.297,
+  "kind": "verdict",
+  "ok": false,
+  "cell": "life",
+  "version": "3ad7880f",
+  "stage": "checks",
+  "detail": "group 0 check 2 {\"action\":\"run\",\"width\":4,\"height\":4,\"pattern\":\"block\",\"steps\":3}: expected {\"width\":4,\"height\":4,\"pattern\":\"block\",\"generation\":3,\"al"
+ },
+ {
+  "t": 236.869,
+  "kind": "propose",
+  "cell": "life"
+ },
+ {
+  "t": 236.881,
+  "kind": "verdict",
+  "ok": false,
+  "cell": "?",
+  "version": "",
+  "stage": "repeat",
+  "detail": "REJECTED: you sent this exact proposal before and it was rejected (1 time): group 0 check 2 {\"action\":\"run\",\"width\":4,\"height\":4,\"pattern\":\"block\",\"st"
+ },
+ {
+  "t": 304.893,
+  "kind": "propose",
+  "cell": "life"
+ },
+ {
+  "t": 304.907,
+  "kind": "verdict",
+  "ok": false,
+  "cell": "life",
+  "version": "27cde005",
+  "stage": "properties",
+  "detail": "group 1 check 12 {\"action\":\"run\",\"height\":10,\"pattern\":\"blinker\",\"steps\":1,\"width\":20,\"x\":7,\"y\":4}: rule returned false (not true) on run 0 of 20 (see"
+ },
+ {
+  "t": 370.228,
+  "kind": "propose",
+  "cell": "life"
+ },
+ {
+  "t": 370.237,
+  "kind": "verdict",
+  "ok": false,
+  "cell": "life",
+  "version": "27cde005",
+  "stage": "properties",
+  "detail": "group 1 check 15 {\"action\":\"run\",\"height\":30,\"pattern\":\"beacon\",\"steps\":1,\"width\":30,\"x\":5,\"y\":5}: rule returned false (not true) on run 0 of 20 (seed"
+ },
+ {
+  "t": 434.066,
+  "kind": "propose",
+  "cell": "life"
+ },
+ {
+  "t": 434.073,
+  "kind": "verdict",
+  "ok": false,
+  "cell": "life",
+  "version": "27cde005",
+  "stage": "properties",
+  "detail": "group 1 check 15 {\"action\":\"run\",\"height\":30,\"pattern\":\"beacon\",\"steps\":1,\"width\":30,\"x\":5,\"y\":5}: rule returned false (not true) on run 0 of 20 (seed"
+ },
+ {
+  "t": 448.435,
+  "kind": "propose",
+  "cell": "life"
+ },
+ {
+  "t": 448.44,
+  "kind": "verdict",
+  "ok": false,
+  "cell": "?",
+  "version": "",
+  "stage": "repeat",
+  "detail": "REFUSED: 6 proposals were rejected in this turn. Stop proposing, and tell the user what is blocking you and what you would try next."
+ },
+ {
+  "t": 482.612,
+  "kind": "art",
+  "tool": "life",
+  "lines": [
+   "........................................",
+   "........................................",
+   "........................................",
+   "........................................",
+   "........................................",
+   "........................................",
+   "........................................",
+   "........................................",
+   "........................................",
+   "........................................",
+   "........................................",
+   "........................................",
+   "........................................",
+   "........................................",
+   "........................................",
+   "........................................",
+   "........................................",
+   "........................................",
+   "........................................",
+   "........................................"
+  ]
+ }
+]

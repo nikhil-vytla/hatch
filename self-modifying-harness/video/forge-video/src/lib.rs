@@ -54,7 +54,7 @@ const AMBER: &str = "#e5c07b";
 const INTRO: f64 = 6.0;
 const OUTRO: f64 = 9.0;
 /// Model time runs this many times faster than real time.
-const THINK_SPEED: f64 = 6.0;
+const THINK_SPEED: f64 = 8.0;
 /// No single quiet gap lasts longer than this on screen.
 const MAX_GAP: f64 = 1.2;
 /// Pause after each turn ends, so its result can be read.
@@ -388,6 +388,11 @@ fn art_class(ch: char) -> &'static str {
     }
 }
 
+/// A tool name cut to fit its column in the lineage card.
+fn short(name: &str) -> String {
+    if name.chars().count() <= 12 { name.to_string() } else { name.chars().take(11).collect::<String>() + "…" }
+}
+
 /// A drawing without its empty margins (a fogged map is mostly blank), so what was drawn fills the spotlight.
 fn crop(lines: Vec<String>) -> Vec<String> {
     let drawn = |l: &String| !l.trim().is_empty();
@@ -398,7 +403,7 @@ fn crop(lines: Vec<String>) -> Vec<String> {
 }
 
 /// The drawings worth a spotlight, at their real times: each new picture once (not one already shown), at least
-/// `ART_GAP` real seconds after the last one, and at most `MAX_ARTS` in all.
+/// `ART_GAP` real seconds after the last one, at most `MAX_ARTS` in all, and never an empty canvas (all background).
 fn pick_arts(events: &[serde_json::Value]) -> Vec<Art> {
     let mut out: Vec<Art> = Vec::new();
 
@@ -406,7 +411,9 @@ fn pick_arts(events: &[serde_json::Value]) -> Vec<Art> {
         let at = e["t"].as_f64().unwrap_or(0.0);
         let lines = crop(e["lines"].as_array().map(|l| l.iter().filter_map(|s| s.as_str().map(str::to_string)).collect()).unwrap_or_default());
 
-        if out.len() >= MAX_ARTS || out.iter().any(|a| a.lines == lines) || out.last().is_some_and(|a| at - a.at < ART_GAP) {
+        let blank = lines.iter().flat_map(|l| l.chars()).all(|c| c == ' ' || art_class(c) == "dim");
+
+        if blank || out.len() >= MAX_ARTS || out.iter().any(|a| a.lines == lines) || out.last().is_some_and(|a| at - a.at < ART_GAP) {
             continue;
         }
 
@@ -725,9 +732,9 @@ impl<'a> ForgeVideoVideo<'a> {
                 let live = mine.iter().filter(|v| v.ok).count();
                 let label_color = if live > 0 { FG } else { MUTED };
                 let tag = if live > 0 { format!("v{live}") } else { "not yet".to_string() };
-                let dots_x = x0 + 190.0;
+                let dots_x = x0 + 222.0;
                 let gap = 15.0;
-                let fit = ((SIDE_W - 190.0 - 44.0) / gap) as usize;
+                let fit = ((SIDE_W - 222.0 - 44.0) / gap) as usize;
                 let dots = &mine[mine.len().saturating_sub(fit)..];
                 let lineage: Vec<f32> = dots.iter().enumerate().filter(|(_, v)| v.ok).map(|(i, _)| dots_x + i as f32 * gap).collect();
                 let line = match (lineage.first(), lineage.last()) {
@@ -760,8 +767,8 @@ impl<'a> ForgeVideoVideo<'a> {
 
                 fframes::svgr!(
                     <g opacity={enter} transform={format!("translate({},0)", (1.0 - enter) * 30.0)}>
-                        <text x={x0} y={y + 6.0} font-family={MONO} font-size={18} font-weight="bold" fill={label_color}>{cell.as_str()}</text>
-                        <text x={x0 + 150.0} y={y + 6.0} font-family={MONO} font-size={14} fill={if live > 0 { GREEN } else { DIM }} text-anchor="end">{tag}</text>
+                        <text x={x0} y={y + 6.0} font-family={MONO} font-size={17} font-weight="bold" fill={label_color}>{short(cell)}</text>
+                        <text x={x0 + 202.0} y={y + 6.0} font-family={MONO} font-size={14} fill={if live > 0 { GREEN } else { DIM }} text-anchor="end">{tag}</text>
                         {line}
                         {marks}
                     </g>

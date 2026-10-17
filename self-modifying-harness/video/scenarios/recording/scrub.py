@@ -14,7 +14,7 @@ out = [lines[0]]
 for l in lines[1:]:
     ev = json.loads(l)
     ev[2] = pattern.sub(neutral, ev[2])
-    out.append(json.dumps(ev, ensure_ascii=False))
+    out.append(json.dumps(ev, ensure_ascii=False, separators=(",", ":")))
 open(cast, "w").write("\n".join(out) + "\n")
 left = sum(1 for l in out if "/tmp/claude" in l or "/home/user" in l or "scratchpad" in l)
 print(cast, "scrubbed; lines still mentioning a local path:", left)

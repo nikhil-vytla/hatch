@@ -587,3 +587,38 @@ A Sonnet agent wrote `src/live.ts`, `src/chat.ts` and `src/live-run.ts`; I verif
 - **Result:** optchat, rolling and pi all recalled the three facts; window recalled the potion (still in its window) and
   said the other two were not on record instead of guessing. Costs for messages 4-5: window $0.010 < pi $0.034 <
   optchat $0.061 ~ rolling $0.067.
+
+## Round 12: three scenario videos with animations
+
+- Asked for better demo videos: three scenarios, SVG animations, interesting ASCII tools the agent built, fframes.
+- Scenarios (`video/scenarios/recording/*.txt`), four messages each, recorded in parallel with `drive.py` at 132×34 on
+  DeepSeek V4.1 Flash, `--fresh --max-cost 2`: dungeon map with fog and traps, expense ledger with bar chart, budgets
+  and sparkline, Game of Life with a pattern library.
+- `events.py`: the chat log's entries are dated, and the cast header has the start time, so verdicts and tool results
+  can be placed on the cast's clock. A `cell_propose` call and its verdict are logged at the same instant (when the
+  tool returns), so the gate animation runs from the verdict, not from the call.
+- Gate stages in `gate.ts` order: stale base, coverage, migration, checks (exact, property rules, invariants together
+  per group), replay, fuzz. The verdict text says which one failed; `stage_of` maps it.
+- Renderer v2 (`video/forge-video/src/lib.rs`): terminal at 9.3 px cells on the left, gate and tool-lineage cards on
+  the right, cost ticker and chapter bar. Easing and a damped "pop" written by hand instead of fframes timelines.
+  - Spotlight v1 required the model to still be thinking for the whole spotlight; with 6× fast-forward that never held,
+    so nothing showed. v2 pauses the replay at the drawing instead (like the after-turn hold), crops fog and empty
+    margins, skips repeats, all-background canvases and anything within 8 real seconds of the last one.
+  - Long tool names ran into the "not yet" tag: names cut at 12 characters, tag column moved.
+  - The 720p budget video was 2.7 MB at 6×; at 8× fast-forward and fps 10, crf 35 it is 1.99 MB. Casts are committed
+    gzipped (the budget one is 2.2 MB as text).
+  - `scrub.py` replaces local paths with `./data` padded to the same width, so screens are unchanged.
+- Results (counts from `session.events.json`; answers checked against the logs):
+  - dungeon: 14 rejected or refused before `dungeon` was accepted in turn 3 (25 checks); 9 rejections were property
+    rules asserting geometry that was not guaranteed. The trap answer was honest (nearest trap is 2 north and 2 west).
+  - budget: `expenses` accepted in turn 1; the budget upgrade was rejected 12 times (its own chart check, held by the
+    ratchet, and `.toFixed()` on a missing field), `sparkline` accepted in turn 3, a `budget_math` helper in the recap.
+    Over-budget answers correct (dining +20.10, coffee +5.50; groceries 82.40 + 61.10 + 55.20 = 198.70, inside).
+    Sparkline levels match floor(v / max × 8) capped at 7.
+  - life take 1: turn 3 issued 40 parallel `life` calls (one per generation) and hit `DEFAULT_MAX_TOOL_CALLS_PER_TURN`,
+    so the turn was aborted with no answer; the recap gave the right gen-40 population (33, from its tool) but the
+    wrong first pattern (R-pentomino, not glider).
+  - life take 2 (message 3 asks for a population-history action): `life` accepted in turn 1 after fuzz found two hangs;
+    turns 2 and 3 hit the brake on miscounted expectations (beacon gen 1 has 6 cells, not 8; column off by one). The
+    recap refused to make up a gen-40 population.
+- Not fixed (ideas): steer expectations toward probing the tool; count a parallel batch once in the tool-call brake.

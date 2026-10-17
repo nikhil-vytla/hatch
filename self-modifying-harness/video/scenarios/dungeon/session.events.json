@@ -1,0 +1,274 @@
+[
+ {
+  "t": 30.756,
+  "kind": "propose",
+  "cell": "dungeon"
+ },
+ {
+  "t": 30.758,
+  "kind": "verdict",
+  "ok": false,
+  "cell": "dungeon",
+  "version": "78456851",
+  "stage": "properties",
+  "detail": "group 0 check 0 {\"seed\":42}: rule returned false (not true) on run 0 of 20 (seed dungeon@78456851|g0|c0|r0): r = {\"seed\":42,\"width\":28,\"height\":14,\"as"
+ },
+ {
+  "t": 42.309,
+  "kind": "propose",
+  "cell": "dungeon"
+ },
+ {
+  "t": 42.31,
+  "kind": "verdict",
+  "ok": false,
+  "cell": "dungeon",
+  "version": "bed85aa9",
+  "stage": "properties",
+  "detail": "group 0 check 0 {\"seed\":42}: rule returned false (not true) on run 0 of 20 (seed dungeon@bed85aa9|g0|c0|r0): r = {\"seed\":42,\"width\":28,\"height\":14,\"as"
+ },
+ {
+  "t": 52.869,
+  "kind": "propose",
+  "cell": "dungeon"
+ },
+ {
+  "t": 52.871,
+  "kind": "verdict",
+  "ok": false,
+  "cell": "dungeon",
+  "version": "7781db8f",
+  "stage": "properties",
+  "detail": "group 0 check 0 {\"seed\":42}: rule returned false (not true) on run 0 of 20 (seed dungeon@7781db8f|g0|c0|r0): r = {\"seed\":42,\"width\":28,\"height\":14,\"as"
+ },
+ {
+  "t": 64.17,
+  "kind": "propose",
+  "cell": "dungeon"
+ },
+ {
+  "t": 64.172,
+  "kind": "verdict",
+  "ok": false,
+  "cell": "dungeon",
+  "version": "37cfaec7",
+  "stage": "properties",
+  "detail": "group 0 check 0 {\"seed\":42}: rule returned false (not true) on run 0 of 20 (seed dungeon@37cfaec7|g0|c0|r0): r = {\"seed\":42,\"width\":28,\"height\":14,\"as"
+ },
+ {
+  "t": 79.251,
+  "kind": "propose",
+  "cell": "dungeon"
+ },
+ {
+  "t": 79.252,
+  "kind": "verdict",
+  "ok": false,
+  "cell": "dungeon",
+  "version": "bc5efb54",
+  "stage": "properties",
+  "detail": "group 0 check 0 {\"seed\":42}: rule returned false (not true) on run 0 of 20 (seed dungeon@bc5efb54|g0|c0|r0): r = {\"seed\":42,\"width\":28,\"height\":14,\"as"
+ },
+ {
+  "t": 82.225,
+  "kind": "propose",
+  "cell": "probe"
+ },
+ {
+  "t": 82.226,
+  "kind": "verdict",
+  "ok": false,
+  "cell": "probe",
+  "version": "c3bc2236",
+  "stage": "checks",
+  "detail": "group 0 check 0 {\"seed\":42}: expected 1, got 42"
+ },
+ {
+  "t": 94.286,
+  "kind": "propose",
+  "cell": "dungeon"
+ },
+ {
+  "t": 94.287,
+  "kind": "verdict",
+  "ok": false,
+  "cell": "?",
+  "version": "",
+  "stage": "repeat",
+  "detail": "REFUSED: 6 proposals were rejected in this turn. Stop proposing, and tell the user what is blocking you and what you would try next."
+ },
+ {
+  "t": 147.513,
+  "kind": "propose",
+  "cell": "dungeon"
+ },
+ {
+  "t": 147.515,
+  "kind": "verdict",
+  "ok": false,
+  "cell": "dungeon",
+  "version": "a04449ee",
+  "stage": "checks",
+  "detail": "group 0 check 1 {\"seed\":42}: expected {\"entrance\":{\"x\":1,\"y\":1}}, got {\"seed\":42,\"width\":28,\"height\":14,\"ascii\":\"                            \\n       "
+ },
+ {
+  "t": 162.848,
+  "kind": "propose",
+  "cell": "dungeon"
+ },
+ {
+  "t": 162.85,
+  "kind": "verdict",
+  "ok": false,
+  "cell": "dungeon",
+  "version": "63c09c1f",
+  "stage": "checks",
+  "detail": "group 0 check 2 {\"seed\":42}: expected {\"rooms\":10}, got {\"seed\":42,\"width\":28,\"height\":14,\"ascii\":\"                            \\n                     "
+ },
+ {
+  "t": 183.783,
+  "kind": "propose",
+  "cell": "dungeon"
+ },
+ {
+  "t": 183.784,
+  "kind": "verdict",
+  "ok": false,
+  "cell": "dungeon",
+  "version": "63c09c1f",
+  "stage": "properties",
+  "detail": "group 0 check 5 {\"seed\":42,\"explore\":true,\"seen\":[\"0,0\"],\"party\":{\"x\":5,\"y\":5}}: rule returned false (not true) on run 0 of 20 (seed dungeon@63c09c1f|"
+ },
+ {
+  "t": 213.976,
+  "kind": "propose",
+  "cell": "dungeon"
+ },
+ {
+  "t": 213.977,
+  "kind": "verdict",
+  "ok": false,
+  "cell": "dungeon",
+  "version": "63c09c1f",
+  "stage": "properties",
+  "detail": "group 0 check 10 {\"seed\":42,\"radius\":3,\"seen\":[\"20,8\"]}: rule returned false (not true) on run 0 of 20 (seed dungeon@63c09c1f|g0|c10|r0): r = {\"seed\":"
+ },
+ {
+  "t": 245.53,
+  "kind": "propose",
+  "cell": "dungeon"
+ },
+ {
+  "t": 245.531,
+  "kind": "verdict",
+  "ok": false,
+  "cell": "dungeon",
+  "version": "63c09c1f",
+  "stage": "properties",
+  "detail": "group 0 check 10 {\"seed\":42,\"radius\":3,\"seen\":[\"9,9\"],\"party\":{\"x\":20,\"y\":8}}: rule returned false (not true) on run 0 of 20 (seed dungeon@63c09c1f|g0"
+ },
+ {
+  "t": 284.241,
+  "kind": "propose",
+  "cell": "dungeon"
+ },
+ {
+  "t": 284.243,
+  "kind": "verdict",
+  "ok": false,
+  "cell": "dungeon",
+  "version": "63c09c1f",
+  "stage": "properties",
+  "detail": "group 0 check 15 {\"seed\":7,\"radius\":30}: rule returned false (not true) on run 0 of 20 (seed dungeon@63c09c1f|g0|c15|r0): r = {\"seed\":7,\"width\":28,\"he"
+ },
+ {
+  "t": 295.329,
+  "kind": "propose",
+  "cell": "dungeon"
+ },
+ {
+  "t": 295.331,
+  "kind": "verdict",
+  "ok": false,
+  "cell": "?",
+  "version": "",
+  "stage": "repeat",
+  "detail": "REFUSED: 6 proposals were rejected in this turn. Stop proposing, and tell the user what is blocking you and what you would try next."
+ },
+ {
+  "t": 339.758,
+  "kind": "propose",
+  "cell": "dungeon"
+ },
+ {
+  "t": 426.879,
+  "kind": "propose",
+  "cell": "dungeon"
+ },
+ {
+  "t": 426.881,
+  "kind": "verdict",
+  "ok": true,
+  "cell": "dungeon",
+  "version": "490e1732",
+  "stage": "accepted",
+  "detail": "25 checks"
+ },
+ {
+  "t": 429.967,
+  "kind": "art",
+  "tool": "dungeon",
+  "lines": [
+   "",
+   "",
+   "",
+   "",
+   "                 ...####",
+   "                 ...####",
+   "                 #.#####",
+   "                 #.....#",
+   "                 ......#",
+   "                 #.....# .",
+   "                 .......@."
+  ]
+ },
+ {
+  "t": 432.388,
+  "kind": "art",
+  "tool": "dungeon",
+  "lines": [
+   "############################",
+   "############.......#####..##",
+   "##......#..#.......#####..##",
+   "##............#.#########.##",
+   "#########..##.#.#...#####.##",
+   "##########..........#####.##",
+   "#######...###...##.######.##",
+   "##..............##.....##.##",
+   "##.....................##.##",
+   "###########....###.....##.##",
+   "###########.............@.##",
+   "############################",
+   "############################",
+   "############################"
+  ]
+ },
+ {
+  "t": 442.668,
+  "kind": "art",
+  "tool": "dungeon",
+  "lines": [
+   "",
+   "",
+   "",
+   "",
+   "                 ...####",
+   "                 ...####",
+   "                 #.#####",
+   "                 #.....#",
+   "                 .....^#",
+   "                 #.....# .",
+   "                 .......@."
+  ]
+ }
+]

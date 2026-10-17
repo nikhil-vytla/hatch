@@ -359,7 +359,42 @@ initiative order. Neither of the last two was stored in any tool.
 - One run per strategy and one session: a direction, not a benchmark. `pi` also slipped once in prose (it said Mira's
   heal was capped; 5 + 7 = 12 is not a cap).
 
-## Gaps (round 1; see rounds 2-11 above for what changed)
+## Round 12: three scenarios, animated
+
+Three new videos ([dungeon](video/scenarios/forge-dungeon.mp4), [budget](video/scenarios/forge-budget.mp4),
+[life](video/scenarios/forge-life.mp4); details in [video/README.md](video/README.md)): a dungeon crawl, a household
+budget and the Game of Life, each a fresh forge on DeepSeek V4.1 Flash given four messages and no tools. The fframes
+renderer now animates the forge's own records around the replayed terminal: the gate lighting its stages up to the
+one that decided each proposal, a lineage row per tool, a spotlight for the ASCII drawings the agent's tools returned,
+and cost and chapter bars.
+
+| Scenario | Accepted | Rejected or refused | Cost |
+|---|---|---|---|
+| Dungeon crawl | 1 (turn 3 of 4) | 14 | $0.40 |
+| Household budget | 3 | 19 | $0.49 |
+| Game of Life (take 2) | 1 (turn 1 of 4) | 12 | $0.28 |
+
+- **The model's checks, not its code, were the bottleneck.** Most rejections quote output the agent itself then
+  agreed was right: hand-computed expectations off by one (a blinker's column, a glider's row), a beacon's population
+  miscounted, an exact `expect` used where a subset was meant, property rules asserting things the geometry does not
+  guarantee ("a wall is in sight"). The six-per-turn brake (round 8) then ended the turn, and every scenario hit it at
+  least twice. The agents reported this honestly each time instead of claiming success.
+- **The gate also caught real bugs:** fuzzing found two hangs in the Life tool (huge grids, huge step counts), fixed with
+  bounds; budget versions calling `.toFixed()` on a missing field; the ratchet held the accepted chart's own property
+  check against five budget versions.
+- **Answers were right where tools existed, and refused where they did not.** Budget: over budget on dining by 20.10 and
+  coffee by 5.50, the biggest expense rent at 1,450 (all checked against the log). Dungeon: the trap is at (22,8), and
+  the agent said plainly that none lies exactly 2 north, rather than moving one. Life take 2: it declined to give a
+  generation-40 population it had no tool to compute.
+- **Life take 1 (not used) failed two ways.** Asked for a population sparkline with no history action, the agent fired
+  40 parallel tool calls, one per generation, and hit the 40-calls-per-turn brake, so the turn ended with no answer.
+  The recap gave the generation-40 population its tool had returned (33) but named the R-pentomino as the first
+  pattern (it was the glider). Take 2 asked for a history action instead.
+- Things to try: tell the model (in `cell_propose`'s description) to derive exact expectations by running the tool on a
+  probe rather than by hand, and to prefer property checks for drawings; count a parallel batch as one step of the
+  tool-call brake.
+
+## Gaps (round 1; see rounds 2-12 above for what changed)
 
 - ~~The migration runs on the real state before the catalog commit, in two databases.~~ Fixed in round 2 with a
   pending/marker/live protocol reconciled on boot.
