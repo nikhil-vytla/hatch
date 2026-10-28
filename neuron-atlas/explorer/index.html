@@ -13,6 +13,7 @@
   --eosin: #d6336c; --eosin-soft: #f9d9e5; --hema: #4b3fa8; --hema-soft: #dedaf5; --accent: #b0245a;
   --plate: #17152a; --plate-ink: #ece9f7; --plate-ink2: #a29dbb; --plate-line: #2c2946;
   --good: #1f8a5b; --warn: #b7791f;
+  --k-persona: #d6336c; --k-altered: #4b3fa8; --k-other: #1baf7a; --k-incoherent: #eda100; --k-default: #cfcbdc;
   --display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
   --body: "Source Sans 3", "Segoe UI", system-ui, -apple-system, sans-serif;
   --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
@@ -26,6 +27,7 @@
   --bg: #121019; --surface: #1b1826; --sunk: #242033; --line: #343048; --ink: #ece9f7; --ink2: #b3adc8; --ink3: #827c99;
   --eosin: #ff6b9a; --eosin-soft: #4a1f33; --hema: #9d92ff; --hema-soft: #2d2858; --accent: #ff7aa6;
   --plate: #0b0a12; --plate-ink: #ece9f7; --plate-ink2: #9a95b2; --plate-line: #24213a; --good: #4cc38a; --warn: #e0a84a;
+  --k-persona: #e0447a; --k-altered: #8a7ef0; --k-other: #199e70; --k-incoherent: #c98500; --k-default: #3b3652;
   --card-shadow: 0 1px 2px rgb(0 0 0 / .3), 0 4px 16px rgb(0 0 0 / .25);
   --card-shadow-hover: 0 2px 4px rgb(0 0 0 / .38), 0 8px 24px rgb(0 0 0 / .35);
   --pill-shadow: 0 1px 2px rgb(0 0 0 / .35), 0 2px 6px rgb(0 0 0 / .3);
@@ -34,6 +36,7 @@
   --bg: #121019; --surface: #1b1826; --sunk: #242033; --line: #343048; --ink: #ece9f7; --ink2: #b3adc8; --ink3: #827c99;
   --eosin: #ff6b9a; --eosin-soft: #4a1f33; --hema: #9d92ff; --hema-soft: #2d2858; --accent: #ff7aa6;
   --plate: #0b0a12; --plate-ink: #ece9f7; --plate-ink2: #9a95b2; --plate-line: #24213a; --good: #4cc38a; --warn: #e0a84a;
+  --k-persona: #e0447a; --k-altered: #8a7ef0; --k-other: #199e70; --k-incoherent: #c98500; --k-default: #3b3652;
   --card-shadow: 0 1px 2px rgb(0 0 0 / .3), 0 4px 16px rgb(0 0 0 / .25);
   --card-shadow-hover: 0 2px 4px rgb(0 0 0 / .38), 0 8px 24px rgb(0 0 0 / .35);
   --pill-shadow: 0 1px 2px rgb(0 0 0 / .35), 0 2px 6px rgb(0 0 0 / .3);
@@ -210,6 +213,36 @@ textarea.sql { width: 100%; min-height: 110px; font: 13px var(--mono); border: 1
 .foot { color: var(--ink3); font-size: 13px; max-width: 80ch }
 .foot a { color: var(--ink2) }
 
+/* overview */
+.ov-controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: var(--s1) }
+.ov-controls select { border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 6px 10px; font-size: 14px }
+.ov-controls .spacer { flex: 1 1 auto }
+.ovstats { grid-template-columns: repeat(4, minmax(0, 1fr)); margin-bottom: var(--s2) }
+.ovstats .stat { padding: 10px 12px }
+.ovstats .stat b { display: block; font: 700 24px/1.15 var(--mono); font-variant-numeric: tabular-nums; letter-spacing: -.02em }
+.ovstats .stat span { font-size: 12px; color: var(--ink3) }
+@media (max-width: 700px) { .ovstats { grid-template-columns: repeat(2, minmax(0, 1fr)) } }
+.ov-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s2) }
+.ov-chart { gap: var(--s1) }
+.card h3.ov-title { font: 700 20px/1.2 var(--display); text-transform: none; letter-spacing: -.01em; color: var(--ink); margin: 0 }
+.ov-sub { margin: 2px 0 0; color: var(--ink3); font-size: 13px }
+.ov-legend { display: flex; flex-wrap: wrap; gap: 12px; font-size: 12px; color: var(--ink2) }
+.ov-key { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap }
+.ov-swatch { width: 10px; height: 10px; border-radius: 3px; flex: 0 0 auto }
+.ov-svgwrap { position: relative; min-width: 0 }
+.ov-svgwrap svg { display: block; width: 100%; height: auto }
+.ov-tip { position: absolute; pointer-events: none; background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: 8px;
+  padding: 6px 9px; font-size: 12px; box-shadow: var(--card-shadow-hover); z-index: 5; max-width: 220px; line-height: 1.35 }
+.ov-tip .k { font: 11px var(--mono); color: var(--ink3) }
+.ov-tip b { font-weight: 600 }
+.ov-col, .ov-mark { cursor: pointer; outline: none }
+.ov-col:focus-visible .ov-hit, .ov-mark:focus-visible .ov-hit { stroke: var(--accent); stroke-width: 2 }
+.ov-tables { overflow-x: auto }
+.ov-table caption { caption-side: top; text-align: left; padding: 0 10px 8px; color: var(--ink3); font-size: 12px }
+.ov-table th { position: static; cursor: default }
+.ov-table th[scope="row"] { background: none; text-transform: none; letter-spacing: 0; font-weight: 600; color: var(--ink2) }
+.ov-none { color: var(--ink3); font-size: 14px; margin: 8px 0 }
+
 .skel { background: linear-gradient(100deg, var(--sunk) 30%, color-mix(in oklab, var(--surface) 65%, var(--sunk)) 50%, var(--sunk) 70%);
   background-size: 200% 100%; border-radius: 8px; animation: shimmer 1.2s ease-in-out infinite }
 .skel.line { height: 12px; margin: 7px 0 }
@@ -266,6 +299,7 @@ textarea.sql { width: 100%; min-height: 110px; font: 13px var(--mono); border: 1
 
   <nav class="tabs" role="tablist" id="tabs">
     <button role="tab" aria-selected="true" aria-controls="v-map" data-t="map" tabindex="0">Map</button>
+    <button role="tab" aria-selected="false" aria-controls="v-overview" data-t="overview" tabindex="-1">Overview</button>
     <button role="tab" aria-selected="false" aria-controls="v-pushes" data-t="pushes" tabindex="-1">Pushes</button>
     <button role="tab" aria-selected="false" aria-controls="v-personas" data-t="personas" tabindex="-1">Personas</button>
     <button role="tab" aria-selected="false" aria-controls="v-mix" data-t="mix" tabindex="-1">Mix</button>
@@ -288,6 +322,25 @@ textarea.sql { width: 100%; min-height: 110px; font: 13px var(--mono); border: 1
       <div class="ribbon-cap"><span>layer 0 · reads tokens</span><span id="ribcap">click a layer to isolate it</span><span>last layer · writes tokens</span></div>
     </div>
     <article class="card" id="panel" aria-live="polite"><p class="muted">Loading…</p></article>
+  </section>
+
+  <section id="v-overview" hidden>
+    <div class="ov-controls">
+      <select id="ovprompt" aria-label="Prompt">
+        <option value="">both prompts</option>
+        <option value="0">Who are you?</option>
+        <option value="1">Tell me a short story.</option>
+      </select>
+      <select id="ovpush" aria-label="Push direction">
+        <option value="">both directions</option>
+        <option value="up">push up (+)</option>
+        <option value="down">push down (−)</option>
+      </select>
+      <span class="spacer"></span>
+      <button class="chip" id="ovtable" type="button" aria-pressed="false">Table view</button>
+    </div>
+    <p class="muted" id="ovempty" hidden>No sweep for this model yet</p>
+    <div id="ovbody"></div>
   </section>
 
   <section id="v-pushes" hidden>
@@ -862,7 +915,7 @@ function goodNeurons(M) { const g = M.labKeys.filter(k => { const l = M.lab.get(
 $("surprise").onclick = () => { const M = S.M; const g = goodNeurons(M); if (!g.length) return; setTab("map"); openNeuron(g[Math.floor(Math.random() * g.length)], { focus: true }); };
 
 /* ---------- tabs ---------- */
-const TABS = ["map", "pushes", "personas", "mix", "board", "compare", "guess", "sql"];
+const TABS = ["map", "overview", "pushes", "personas", "mix", "board", "compare", "guess", "sql"];
 function setTab(t) {
   S.tab = t; TABS.forEach(x => { $("v-" + x).hidden = x !== t; });
   [...$("tabs").children].forEach(b => {
@@ -871,6 +924,7 @@ function setTab(t) {
     b.tabIndex = on ? 0 : -1;
   });
   if (t === "map") requestAnimationFrame(sizeCanvas);
+  if (t === "overview") renderOverview();
   if (t === "pushes") renderPushes();
   if (t === "personas") renderPersonas();
   if (t === "mix") renderMix();
@@ -878,6 +932,7 @@ function setTab(t) {
   if (t === "guess" && !G.cur) nextGuess();
   if (t === "sql") sqlInit();
   if (t === "personas") syncPersonasHash();
+  else if (t === "overview") syncOverviewHash();
   else if (t !== "map") { try { history.replaceState(null, "", "#" + t) } catch {} }
 }
 $("tabs").onclick = e => { const b = e.target.closest("button"); if (b) setTab(b.dataset.t); };
@@ -1126,6 +1181,278 @@ $("pcsv").onclick = () => {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 };
 
+/* ---------- overview ---------- */
+const OV_KINDS = ["persona", "altered_assistant", "other", "incoherent", "default_assistant"];
+const OV_KIND_LABEL = { persona: "persona", altered_assistant: "altered assistant", other: "other", incoherent: "incoherent", default_assistant: "default assistant" };
+const OV_KIND_VAR = { persona: "--k-persona", altered_assistant: "--k-altered", other: "--k-other", incoherent: "--k-incoherent", default_assistant: "--k-default" };
+const OV = { M: null, rows: null, persons: null, prompt: "", push: "", table: false, seq: 0 };
+const ovColor = k => `var(${OV_KIND_VAR[k]})`;
+const ovPct = v => v <= 0 ? "0" : v >= 99.95 ? "100" : v >= 10 ? v.toFixed(0) : v.toFixed(1);
+const ovShort = v => v >= 1e6 ? (v / 1e6).toFixed(v >= 1e7 ? 0 : 1) + "M" : v >= 1e3 ? (v / 1e3).toFixed(v >= 1e4 ? 0 : 1) + "k" : String(Math.round(v));
+const ovFull = v => Math.round(v).toLocaleString();
+const ovTrunc = (s, n) => s.length > n ? s.slice(0, n - 1) + "…" : s;
+
+function ovSweep(M) {
+  if (!M.sweepP) M.sweepP = tryPq(M.dir + "sweep_stats.parquet", ["layer", "prompt", "sign", "reply_kind", "n_est", "n_labeled"]).catch(() => null);
+  return M.sweepP;
+}
+function syncOverviewHash() {
+  if (S.tab !== "overview" || !S.M) return;
+  try { history.replaceState(null, "", `#${S.M.info.id}-overview`) } catch {}
+}
+function ovRowOk(r, prompt, push) {
+  if (!OV_KINDS.includes(r.reply_kind)) return false;
+  if (prompt !== "" && Number(r.prompt) !== Number(prompt)) return false;
+  const s = Number(r.sign);
+  if (push === "up" && !(s > 0)) return false;
+  if (push === "down" && !(s < 0)) return false;
+  return true;
+}
+function ovAgg(rows, prompt, push) {
+  const nL = S.M.info.n_layers;
+  const layers = Array.from({ length: nL }, (_, L) => ({ L, total: 0, by: Object.fromEntries(OV_KINDS.map(k => [k, 0])) }));
+  let total = 0, persona = 0;
+  for (const r of rows) {
+    if (!ovRowOk(r, prompt, push)) continue;
+    const L = Number(r.layer), n = Number(r.n_est) || 0;
+    if (!layers[L]) continue;
+    layers[L].by[r.reply_kind] += n; layers[L].total += n;
+    total += n; if (r.reply_kind === "persona") persona += n;
+  }
+  return { layers, total, persona };
+}
+function ovPersonaLayers(rows, prompt) {
+  const nL = S.M.info.n_layers;
+  const data = Array.from({ length: nL }, (_, L) => ({ L, up: 0, down: 0, upN: 0, downN: 0 }));
+  for (const r of rows) {
+    if (!OV_KINDS.includes(r.reply_kind)) continue;
+    if (prompt !== "" && Number(r.prompt) !== Number(prompt)) continue;
+    const L = Number(r.layer), n = Number(r.n_est) || 0, d = data[L];
+    if (!d) continue;
+    if (Number(r.sign) > 0) { d.upN += n; if (r.reply_kind === "persona") d.up += n; }
+    else if (Number(r.sign) < 0) { d.downN += n; if (r.reply_kind === "persona") d.down += n; }
+  }
+  data.forEach(d => { d.upPct = d.upN ? 100 * d.up / d.upN : 0; d.downPct = d.downN ? 100 * d.down / d.downN : 0; });
+  return data;
+}
+function ovPersonaOk(r, prompt, push) {
+  if (r.reply_kind !== "persona") return false;
+  if (prompt !== "" && Number(r.prompt) !== Number(prompt)) return false;
+  const d = Number(r.dose);
+  if (push === "up" && !(d > 0)) return false;
+  if (push === "down" && !(d < 0)) return false;
+  return true;
+}
+function ovCharacters(persons, prompt, push) {
+  const by = new Map();
+  if (!persons) return [];
+  for (const r of persons) {
+    if (!ovPersonaOk(r, prompt, push) || !r._who) continue;
+    const key = Number(r.layer) * S.M.d + Number(r.neuron);
+    let e = by.get(r._who);
+    if (!e) { e = { name: r._who, neurons: new Set(), replies: 0 }; by.set(r._who, e); }
+    e.neurons.add(key); e.replies++;
+  }
+  return [...by.values()].map(e => ({ name: e.name, count: e.neurons.size, replies: e.replies }))
+    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+}
+function ovLegend(items) {
+  return items.map(([label, color]) => `<span class="ov-key"><span class="ov-swatch" style="background:${color}"></span>${esc(label)}</span>`).join("");
+}
+function ovCard(id, title, sub, legend, svg, table, empty) {
+  const body = empty
+    ? `<p class="ov-none">${esc(empty)}</p>`
+    : `<div class="ov-svgwrap"${OV.table ? " hidden" : ""}>${svg}<div class="ov-tip" hidden></div></div><div class="ov-tables"${OV.table ? "" : " hidden"}>${table}</div>`;
+  return `<article class="card ov-chart" data-chart="${id}">
+    <div><h3 class="ov-title">${esc(title)}</h3><p class="ov-sub">${esc(sub)}</p></div>
+    <div class="ov-legend">${legend}</div>
+    ${body}
+  </article>`;
+}
+// draw at the card's real width so SVG text stays ~11px on phones instead of shrinking with the viewBox
+const ovWidth = () => Math.max(300, Math.min(1200, ($("v-overview").clientWidth || 900) - 48));
+function ovChart1(layers) {
+  const W = ovWidth(), H = W < 560 ? 260 : 340, ml = 44, mr = 13, mt = 12, mb = 30;
+  const pw = W - ml - mr, ph = H - mt - mb, bottom = mt + ph;
+  const slot = pw / Math.max(1, layers.length), barW = Math.max(2, Math.min(26, slot * .66));
+  const grid = [0, 25, 50, 75, 100].map(p => {
+    const y = mt + ph * (1 - p / 100);
+    return `<line x1="${ml}" y1="${y}" x2="${W - mr}" y2="${y}" stroke="var(--line)" stroke-width="1"/><text x="${ml - 6}" y="${y + 3}" text-anchor="end" font-size="10" fill="var(--ink3)">${p}%</text>`;
+  }).join("");
+  const cols = layers.map(d => {
+    const x = ml + slot * (d.L + .5) - barW / 2;
+    let acc = 0;
+    const segs = OV_KINDS.map(k => ({ k, v: d.by[k], share: d.total ? 100 * d.by[k] / d.total : 0 })).filter(s => s.v > 0 && s.share > 0);
+    const marks = segs.map((s, i) => {
+      const yTop = mt + ph * (1 - (acc + s.share) / 100), yBot = mt + ph * (1 - acc / 100);
+      acc += s.share;
+      const isTop = i === segs.length - 1, h = Math.max(.5, (yBot - yTop) - (i === 0 ? 0 : 2));
+      const tip = `data-layer="${d.L}" data-kind="${s.k}" data-share="${s.share.toFixed(1)}" data-count="${Math.round(s.v)}"`;
+      if (isTop) {
+        const r = Math.min(4, barW / 2, h);
+        return `<path d="M${x},${yTop + h} L${x},${yTop + r} Q${x},${yTop} ${x + r},${yTop} L${x + barW - r},${yTop} Q${x + barW},${yTop} ${x + barW},${yTop + r} L${x + barW},${yTop + h} Z" fill="${ovColor(s.k)}" ${tip}/>`;
+      }
+      return `<rect x="${x}" y="${yTop}" width="${barW}" height="${h}" fill="${ovColor(s.k)}" ${tip}/>`;
+    }).join("");
+    const summary = segs.map(s => `${s.k}:${s.share.toFixed(1)}:${Math.round(s.v)}`).join(";");
+    const label = d.total ? `layer ${d.L}: ` + segs.map(s => `${OV_KIND_LABEL[s.k]} ${ovPct(s.share)}%`).join(", ") : `layer ${d.L}: no replies`;
+    const xt = d.L % 4 === 0 ? `<text x="${ml + slot * (d.L + .5)}" y="${bottom + 14}" text-anchor="middle" font-size="10" fill="var(--ink3)">${d.L}</text>` : "";
+    return `<g class="ov-col" data-layer="${d.L}" data-summary="${summary}" tabindex="0" role="button" aria-label="${esc(label)}"><rect class="ov-hit" x="${ml + slot * d.L}" y="${mt}" width="${slot}" height="${ph}" fill="transparent" pointer-events="all"/>${marks}${xt}</g>`;
+  }).join("");
+  const svg = `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="What a push does, by layer">${grid}${cols}</svg>`;
+  const head = `<tr><th scope="col">Layer</th>${OV_KINDS.map(k => `<th scope="col">${OV_KIND_LABEL[k]}</th>`).join("")}<th scope="col">replies (est.)</th></tr>`;
+  const body = layers.map(d => `<tr><th scope="row">${d.L}</th>${OV_KINDS.map(k => `<td class="num">${d.total ? (100 * d.by[k] / d.total).toFixed(1) + "%" : "–"}</td>`).join("")}<td class="num">${ovFull(d.total)}</td></tr>`).join("");
+  const table = `<table class="ov-table"><caption>Share of estimated replies by kind, for each layer.</caption><thead>${head}</thead><tbody>${body}</tbody></table>`;
+  return { svg, table };
+}
+function ovChart2(data) {
+  const W = ovWidth(), ml = 46, mr = 18, mt = 34, mb = 10, rowH = 18;
+  const H = mt + mb + data.length * rowH;
+  const pw = W - ml - mr, cx = ml + pw / 2, half = pw / 2;
+  const maxV = Math.max(1, ...data.flatMap(d => [d.upPct, d.downPct]));
+  const scale = Math.min(100, Math.max(2, maxV * 1.15));
+  const len = v => Math.max(0, Math.min(half - 4, half * v / scale));
+  const bh = Math.max(6, rowH - 7);
+  const big = new Set([...data].sort((a, b) => Math.max(b.upPct, b.downPct) - Math.max(a.upPct, a.downPct)).slice(0, 3).map(d => d.L));
+  const rows = data.map(d => {
+    const y = mt + d.L * rowH + rowH / 2;
+    const wu = len(d.upPct), wd = len(d.downPct);
+    const up = d.upPct > 0 ? `<g class="ov-mark" tabindex="0" role="img" data-layer="${d.L}" data-kind="push up" data-share="${d.upPct.toFixed(1)}" data-count="${Math.round(d.up)}" aria-label="layer ${d.L}, push up, persona ${ovPct(d.upPct)} percent"><rect class="ov-hit" x="${cx}" y="${y - bh / 2}" width="${Math.max(1, wu)}" height="${bh}" fill="${ovColor("persona")}"/></g>` : "";
+    const down = d.downPct > 0 ? `<g class="ov-mark" tabindex="0" role="img" data-layer="${d.L}" data-kind="push down" data-share="${d.downPct.toFixed(1)}" data-count="${Math.round(d.down)}" aria-label="layer ${d.L}, push down, persona ${ovPct(d.downPct)} percent"><rect class="ov-hit" x="${cx - Math.max(1, wd)}" y="${y - bh / 2}" width="${Math.max(1, wd)}" height="${bh}" fill="${ovColor("altered_assistant")}"/></g>` : "";
+    const labels = big.has(d.L) ? (d.upPct > 0 ? `<text x="${cx + wu + 4}" y="${y + 3.5}" font-size="10" fill="var(--ink2)">${ovPct(d.upPct)}%</text>` : "") + (d.downPct > 0 ? `<text x="${cx - wd - 4}" y="${y + 3.5}" text-anchor="end" font-size="10" fill="var(--ink2)">${ovPct(d.downPct)}%</text>` : "") : "";
+    return `<text x="${ml - 6}" y="${y + 3.5}" text-anchor="end" font-size="10" fill="var(--ink3)">${d.L}</text>${down}${up}${labels}`;
+  }).join("");
+  const svg = `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Persona rate of push-up and push-down replies, by layer"><line x1="${cx}" y1="${mt - 4}" x2="${cx}" y2="${H - mb}" stroke="var(--ink3)" stroke-width="1"/><text x="${cx - 8}" y="${mt - 12}" text-anchor="end" font-size="11" fill="var(--ink2)">push down ←</text><text x="${cx + 8}" y="${mt - 12}" font-size="11" fill="var(--ink2)">→ push up</text>${rows}</svg>`;
+  const table = `<table class="ov-table"><caption>Persona share of push-down and push-up replies, for each layer.</caption><thead><tr><th scope="col">Layer</th><th scope="col">push down</th><th scope="col">push up</th></tr></thead><tbody>${data.map(d => `<tr><th scope="row">${d.L}</th><td class="num">${d.downN ? d.downPct.toFixed(1) + "%" : "–"}</td><td class="num">${d.upN ? d.upPct.toFixed(1) + "%" : "–"}</td></tr>`).join("")}</tbody></table>`;
+  return { svg, table };
+}
+function ovChart3(names) {
+  const W = ovWidth(), ml = Math.min(190, Math.round(W * .38)), mr = 56, mt = 10, mb = 10, rowH = 26;
+  const H = mt + mb + names.length * rowH;
+  const pw = W - ml - mr, max = Math.max(1, ...names.map(n => n.count));
+  const rows = names.map((n, i) => {
+    const y = mt + i * rowH + rowH / 2, w = Math.max(1, pw * n.count / max);
+    return `<g class="ov-mark" data-name="${esc(n.name)}" data-count="${n.count}" data-replies="${n.replies}" tabindex="0" role="button" aria-label="${esc(n.name)}, ${n.count} distinct neurons"><rect class="ov-hit" x="${ml}" y="${y - 8}" width="${pw}" height="16" fill="transparent" pointer-events="all"/><text x="${ml - 8}" y="${y + 4}" text-anchor="end" font-size="12" fill="var(--ink)">${esc(ovTrunc(n.name, Math.max(10, Math.floor((ml - 12) / 6.6))))}<title>${esc(n.name)}</title></text><rect x="${ml}" y="${y - 7}" width="${w}" height="14" rx="3" fill="${ovColor("persona")}"/><text x="${ml + w + 6}" y="${y + 4}" font-size="10" fill="var(--ink2)">${ovFull(n.count)}</text></g>`;
+  }).join("");
+  const svg = `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Most common character names">${rows}</svg>`;
+  const table = `<table class="ov-table"><caption>Most common character names by distinct neurons.</caption><thead><tr><th scope="col">Character</th><th scope="col">distinct neurons</th><th scope="col">persona replies</th></tr></thead><tbody>${names.map(n => `<tr><th scope="row">${esc(n.name)}</th><td class="num">${ovFull(n.count)}</td><td class="num">${ovFull(n.replies)}</td></tr>`).join("")}</tbody></table>`;
+  return { svg, table };
+}
+function ovTipHTML(el) {
+  if (el.dataset.name != null) return `<div class="k">character</div><b>${esc(el.dataset.name)}</b><div>${ovFull(+el.dataset.count)} distinct neurons · ${ovFull(+el.dataset.replies)} persona replies</div>`;
+  const layer = el.dataset.layer;
+  if (el.dataset.kind) return `<div class="k">layer ${layer}</div><b>${esc(el.dataset.kind.startsWith("push") ? el.dataset.kind : (OV_KIND_LABEL[el.dataset.kind] || el.dataset.kind))}</b><div>${Number(el.dataset.share).toFixed(1)}% · ${ovFull(+el.dataset.count)} replies (est.)</div>`;
+  const summary = el.dataset.summary || "";
+  if (!summary) return `<div class="k">layer ${layer}</div><div>No replies</div>`;
+  return `<div class="k">layer ${layer}</div>${summary.split(";").map(s => { const [k, share, count] = s.split(":"); return `<div>${OV_KIND_LABEL[k] || k}: <b>${Number(share).toFixed(1)}%</b> · ${ovFull(+count)}</div>`; }).join("")}`;
+}
+function ovHideTips() { $("ovbody").querySelectorAll(".ov-tip").forEach(t => { t.hidden = true }); }
+function ovShowTip(el, ev) {
+  const wrap = el.closest(".ov-svgwrap"); if (!wrap) return;
+  const tip = wrap.querySelector(".ov-tip"); if (!tip) return;
+  tip.innerHTML = ovTipHTML(el); tip.hidden = false;
+  const wr = wrap.getBoundingClientRect();
+  let x, y;
+  if (ev) { x = ev.clientX - wr.left + 14; y = ev.clientY - wr.top + 14; }
+  else { const er = el.getBoundingClientRect(); x = er.left - wr.left + er.width / 2 + 10; y = er.top - wr.top + er.height / 2 + 10; }
+  tip.style.left = Math.max(4, Math.min(x, wr.width - 230)) + "px";
+  tip.style.top = Math.max(4, Math.min(y, wr.height - 80)) + "px";
+}
+function ovApplyTable() {
+  $("ovtable").setAttribute("aria-pressed", OV.table);
+  $("ovbody").querySelectorAll(".ov-svgwrap").forEach(el => { el.hidden = OV.table });
+  $("ovbody").querySelectorAll(".ov-tables").forEach(el => { el.hidden = !OV.table });
+  ovHideTips();
+}
+function ovOpenLayer(L) {
+  const p = new URLSearchParams();
+  p.set("q", ""); p.set("kinds", "persona"); p.set("lmin", String(L)); p.set("lmax", String(L));
+  applyPersonaHash(p);
+  setTab("personas");
+}
+function ovOpenName(name) {
+  $("psearch").value = name;
+  setTab("personas");
+}
+async function renderOverview() {
+  const M = S.M; if (!M) return;
+  const seq = ++OV.seq, empty = $("ovempty"), body = $("ovbody");
+  OV.prompt = $("ovprompt").value; OV.push = $("ovpush").value;
+  if (!M.info.sweep_stats) {
+    OV.M = null; OV.rows = null; OV.persons = null;
+    empty.hidden = false; body.hidden = true; body.innerHTML = "";
+    return;
+  }
+  empty.hidden = true; body.hidden = false;
+  if (OV.M !== M) { OV.M = M; OV.rows = null; OV.persons = null; }
+  if (!OV.rows) {
+    body.innerHTML = `<div class="card"><p class="muted">Loading sweep stats…</p></div>`;
+    const [rows, persons] = await Promise.all([ovSweep(M), loadPersonas(M)]);
+    if (seq !== OV.seq || S.M !== M) return;
+    if (!rows) { empty.hidden = false; body.hidden = true; body.innerHTML = ""; return; }
+    OV.rows = rows; OV.persons = persons;
+  }
+  if (seq !== OV.seq || S.M !== M) return;
+  const agg = ovAgg(OV.rows, OV.prompt, OV.push);
+  const chars = ovCharacters(OV.persons, OV.prompt, OV.push);
+  const c1 = agg.total ? ovChart1(agg.layers) : { empty: "No replies match these controls." };
+  const c2data = ovPersonaLayers(OV.rows, OV.prompt);
+  const c2 = c2data.some(d => d.upN || d.downN) ? ovChart2(c2data) : { empty: "No push replies match this prompt." };
+  const c3 = chars.length ? ovChart3(chars.slice(0, 15)) : { empty: OV.persons ? "No persona names match these controls." : "No persona library for this model yet." };
+  const pct = agg.total ? 100 * agg.persona / agg.total : 0;
+  const stats = `<div class="stats ovstats">
+    <div class="stat"><b>${M.N.toLocaleString()}</b><span>neurons pushed</span></div>
+    <div class="stat"><b title="${ovFull(agg.total)}">${ovShort(agg.total)}</b><span>replies (estimated total)</span></div>
+    <div class="stat"><b title="${ovFull(agg.persona)}">${ovShort(agg.persona)}</b><span>persona replies · ${ovPct(pct)}% of all</span></div>
+    <div class="stat"><b>${chars.length.toLocaleString()}</b><span>distinct character names</span></div>
+  </div>`;
+  const legend1 = ovLegend(OV_KINDS.map(k => [OV_KIND_LABEL[k], ovColor(k)]));
+  const legend2 = ovLegend([["push up", ovColor("persona")], ["push down", ovColor("altered_assistant")]]);
+  const legend3 = ovLegend([["distinct neurons", ovColor("persona")]]);
+  body.innerHTML = stats + `<div class="ov-grid">
+    ${ovCard("1", "What a push does, by layer", "Each bar is one layer; the colors show what kind of reply the push produced.", legend1, c1.svg || "", c1.table || "", c1.empty)}
+    ${ovCard("2", "Persona rate, up vs down", "How often pushing up or down turns the reply into a persona (both directions shown).", legend2, c2.svg || "", c2.table || "", c2.empty)}
+    ${ovCard("3", "Most common characters", "The 15 names that appear across the most pushed neurons.", legend3, c3.svg || "", c3.table || "", c3.empty)}
+  </div>`;
+  ovApplyTable();
+}
+$("ovbody").addEventListener("pointermove", e => {
+  const el = e.target.closest("[data-kind],[data-name],[data-summary]");
+  if (!el) { ovHideTips(); return; }
+  ovHideTips(); ovShowTip(el, e);
+});
+$("ovbody").addEventListener("pointerleave", ovHideTips);
+$("ovbody").addEventListener("focusin", e => {
+  const el = e.target.closest("[data-kind],[data-name],[data-summary]");
+  if (el) { ovHideTips(); ovShowTip(el); }
+});
+$("ovbody").addEventListener("focusout", ovHideTips);
+$("ovbody").addEventListener("click", e => {
+  const col = e.target.closest(".ov-col");
+  if (col) {
+    const kind = e.target.closest("[data-kind]")?.dataset.kind;
+    if (!kind || kind === "persona") ovOpenLayer(+col.dataset.layer);
+    return;
+  }
+  const nameEl = e.target.closest("[data-name]");
+  if (nameEl) ovOpenName(nameEl.dataset.name);
+});
+$("ovbody").addEventListener("keydown", e => {
+  if (e.key !== "Enter" && e.key !== " ") return;
+  const col = e.target.closest(".ov-col");
+  if (col) { e.preventDefault(); ovOpenLayer(+col.dataset.layer); return; }
+  const nameEl = e.target.closest("[data-name]");
+  if (nameEl) { e.preventDefault(); ovOpenName(nameEl.dataset.name); }
+});
+["ovprompt", "ovpush"].forEach(id => $(id).onchange = () => { if (S.tab === "overview") renderOverview(); });
+$("ovtable").onclick = () => { OV.table = !OV.table; ovApplyTable(); };
+let ovResizeT = 0;
+addEventListener("resize", () => {
+  if (S.tab !== "overview") return;
+  clearTimeout(ovResizeT);
+  ovResizeT = setTimeout(() => { if (S.tab === "overview") renderOverview(); }, 150);
+});
+
 /* ---------- mix ---------- */
 const MIX = [];
 const mixNum = v => String(Math.round(Number(v) * 1000) / 1000);
@@ -1355,10 +1682,11 @@ async function selectModel(id) {
   buildGrid(); renderRibbon(); renderPoints(); draw();
   if ($("q").value) runSearch();
   if (S.tab === "pushes") renderPushes(); if (S.tab === "personas") renderPersonas(); if (S.tab === "mix") renderMix(); if (S.tab === "board") renderBoard();
+  if (S.tab === "overview") renderOverview();
   if (S.tab === "guess") nextGuess(); if (S.tab === "sql") sqlInit();
   return M;
 }
-$("models").onclick = async e => { const b = e.target.closest("button"); if (!b) return; const M = await selectModel(b.dataset.id); if (S.tab === "personas") syncPersonasHash(); else openStart(M); };
+$("models").onclick = async e => { const b = e.target.closest("button"); if (!b) return; const M = await selectModel(b.dataset.id); if (S.tab === "personas") syncPersonasHash(); else if (S.tab === "overview") syncOverviewHash(); else openStart(M); };
 function openStart(M) {
   const g = goodNeurons(M).slice().sort((a, b) => { const la = M.lab.get(a), lb = M.lab.get(b); return ((lb.detect ?? 0) + lb.confidence / 5 + (M.up.get(b)?.uptake ?? 0) * .3) - ((la.detect ?? 0) + la.confidence / 5 + (M.up.get(a)?.uptake ?? 0) * .3); });
   openNeuron(g.length ? g[0] : 0, { focus: g.length > 0 });
@@ -1372,12 +1700,13 @@ async function boot() {
     $("panel").innerHTML = `<p class="err">Could not read ${esc(BASE)}models.json. Serve this page next to a data folder, or pass <code>?data=&lt;hf-user&gt;/&lt;dataset&gt;</code>.</p>`; return;
   }
   $("models").innerHTML = S.models.map(m => `<button class="chip" data-id="${m.id}" aria-pressed="false">${esc(m.name || m.model.split("/").pop())}<small>${(m.n_neurons / 1000).toFixed(0)}k</small></button>`).join("");
-  const h = (location.hash || "").slice(1), hm = h.match(/^(.+)-L(\d+)-N(\d+)$/), hp = h.match(/^(.+)-personas(?:\?(.*))?$/);
-  let id = hm && S.models.some(m => m.id === hm[1]) ? hm[1] : hp && S.models.some(m => m.id === hp[1]) ? hp[1] : store.get("atlas-model");
+  const h = (location.hash || "").slice(1), hm = h.match(/^(.+)-L(\d+)-N(\d+)$/), hp = h.match(/^(.+)-personas(?:\?(.*))?$/), ho = h.match(/^(.+)-overview$/);
+  let id = hm && S.models.some(m => m.id === hm[1]) ? hm[1] : hp && S.models.some(m => m.id === hp[1]) ? hp[1] : ho && S.models.some(m => m.id === ho[1]) ? ho[1] : store.get("atlas-model");
   const richest = [...S.models].sort((a, b) => (b.files || []).length - (a.files || []).length || b.n_neurons - a.n_neurons)[0];
   if (!S.models.some(m => m.id === id)) id = richest.id;
   const M = await selectModel(id);
   if (hp && hp[1] === id) { applyPersonaHash(new URLSearchParams(hp[2] || "")); setTab("personas"); }
+  else if (ho && ho[1] === id) setTab("overview");
   else {
     if (hm && hm[1] === id) openNeuron(+hm[2] * M.d + +hm[3], { focus: true }); else openStart(M);
     if (TABS.includes(h)) setTab(h);
