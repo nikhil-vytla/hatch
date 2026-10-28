@@ -28,38 +28,58 @@ def shard(d):
                     to '{d}/map.parquet' (format parquet, compression zstd)""")
         for (L,) in con.sql(f"select distinct layer from '{src}' order by 1").fetchall():
             con.sql(f"""copy (select * from '{src}' where layer = {L} order by neuron)
-                        to '{d}/neurons/L{L:02d}.parquet' (format parquet, compression zstd)""")
+                        to '{d}/neurons/L{L:02d}.parquet' (format parquet, compression zstd, ROW_GROUP_SIZE 1024)""")
     add_example_tokens(d)
 
 
 def add_example_tokens(d):
     """Add toks (an example window's token strings) and t0 (where that window starts in the document) to every
-    examples/Lxx.parquet that lacks them, so the explorer can draw a card without downloading tokens.parquet."""
+    examples/Lxx.parquet that lacks them, so the explorer can draw a card without downloading tokens.parquet.
+    Also regroup files whose row groups are too large, so the explorer can fetch one neuron's rows."""
     exdir = os.path.join(d, "examples")
     tok_path = os.path.join(d, "tokens.parquet")
     meta_path = os.path.join(d, "meta.json")
-    if not os.path.isdir(exdir) or not os.path.exists(tok_path) or not os.path.exists(meta_path):
+    if not os.path.isdir(exdir):
         return
     import pyarrow as pa, pyarrow.parquet as pq
-    todo = [f for f in sorted(glob.glob(os.path.join(exdir, "*.parquet"))) if "toks" not in pq.read_schema(f).names]
+    todo = []
+    for f in sorted(glob.glob(os.path.join(exdir, "*.parquet"))):
+        pf = pq.ParquetFile(f)
+        if "toks" not in pf.schema_arrow.names:
+            todo.append((f, True))
+        else:
+            md = pf.metadata
+            if any(md.row_group(i).num_rows > 4096 for i in range(md.num_row_groups)):
+                todo.append((f, False))
     if not todo:
         return
-    meta = json.load(open(meta_path))
-    before, after = int(meta["before"]), int(meta["after"])
-    t = pq.read_table(tok_path, columns=["doc", "toks"])
-    corpus = dict(zip(t.column("doc").to_pylist(), t.column("toks").to_pylist()))
-    for f in todo:  # one layer at a time, so memory stays bounded on big models
+    can_add = os.path.exists(tok_path) and os.path.exists(meta_path)
+    todo = [(f, add) for f, add in todo if not add or can_add]
+    if not todo:
+        return
+    meta = json.load(open(meta_path)) if can_add else None
+    before, after = (int(meta["before"]), int(meta["after"])) if meta else (0, 0)
+    corpus = None
+    for f, add in todo:  # one layer at a time, so memory stays bounded on big models
         tab = pq.read_table(f)
-        t0s, wins = [], []
-        for doc, pos in zip(tab.column("doc").to_pylist(), tab.column("pos").to_pylist()):
-            toks = corpus[doc]
-            start = max(0, pos - before)
-            t0s.append(start)
-            wins.append(toks[start:min(len(toks), pos + after + 1)])
-        tab = tab.append_column("t0", pa.array(t0s, type=pa.int32()))
-        tab = tab.append_column("toks", pa.array(wins, type=pa.list_(pa.string())))
+        if add:
+            if corpus is None:
+                t = pq.read_table(tok_path, columns=["doc", "toks"])
+                corpus = dict(zip(t.column("doc").to_pylist(), t.column("toks").to_pylist()))
+            t0s, wins = [], []
+            for doc, pos in zip(tab.column("doc").to_pylist(), tab.column("pos").to_pylist()):
+                toks = corpus[doc]
+                start = max(0, pos - before)
+                t0s.append(start)
+                wins.append(toks[start:min(len(toks), pos + after + 1)])
+            tab = tab.append_column("t0", pa.array(t0s, type=pa.int32()))
+            tab = tab.append_column("toks", pa.array(wins, type=pa.list_(pa.string())))
+        keys = [(k, o) for k, o in [("neuron", "ascending"), ("sign", "descending"), ("rank", "ascending")]
+                if k in tab.column_names]
+        if keys:
+            tab = tab.sort_by(keys)
         tmp = f + ".tmp"
-        pq.write_table(tab, tmp, compression="zstd", row_group_size=8192)
+        pq.write_table(tab, tmp, compression="zstd", row_group_size=2048)
         os.replace(tmp, f)
 
 
@@ -195,6 +215,7 @@ def push_hub(out, repo, private=False):
         api.upload_folder(repo_id=repo, repo_type="dataset", folder_path=os.path.join(out, m["slug"]),
                           path_in_repo=m["slug"], commit_message=f"atlas for {m['model']}",
                           ignore_patterns=["neurons.parquet", "calib*"], delete_patterns=["neurons.parquet"])
+    push_index(repo)  # models.json and the card list every model folder on the Hub, not only this machine's
     print(f"https://huggingface.co/datasets/{repo}")
 
 

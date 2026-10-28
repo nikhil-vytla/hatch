@@ -270,7 +270,7 @@ order by detect desc nulls last, confidence desc limit 25</textarea>
 </div>
 
 <script type="module">
-import { parquetReadObjects } from "https://cdn.jsdelivr.net/npm/hyparquet@1.31.2/+esm";
+import { parquetReadObjects, parquetMetadataAsync, asyncBufferFromUrl } from "https://cdn.jsdelivr.net/npm/hyparquet@1.31.2/+esm";
 import { compressors } from "https://cdn.jsdelivr.net/npm/hyparquet-compressors@1.1.1/+esm";
 
 const $ = id => document.getElementById(id);
@@ -309,6 +309,42 @@ async function readPq(url, columns) {
   return parquetReadObjects({ file, columns, compressors });
 }
 async function tryPq(url, columns) { try { return await readPq(url, columns) } catch { return null } }
+const PQ_SOURCES = new Map(); // url -> Promise<{ file: AsyncBuffer, metadata }>
+function pqSource(url) {
+  if (!PQ_SOURCES.has(url)) {
+    const p = asyncBufferFromUrl({ url }).then(async file => ({ file, metadata: await parquetMetadataAsync(file) }));
+    PQ_SOURCES.set(url, p);
+  }
+  return PQ_SOURCES.get(url);
+}
+async function readNeuronRows(url, neuron) {
+  if (!B64) {
+    try {
+      const { file, metadata } = await pqSource(url);
+      const ci = metadata.schema.filter(s => s.type).findIndex(s => s.name === "neuron");
+      if (ci >= 0) {
+        let start = 0, missing = false; const ranges = [];
+        for (const rg of metadata.row_groups) {
+          const st = rg.columns[ci]?.meta_data?.statistics;
+          const lo = st?.min_value ?? st?.min, hi = st?.max_value ?? st?.max;
+          if (lo == null || hi == null) missing = true;
+          else if (Number(lo) <= neuron && neuron <= Number(hi)) ranges.push([start, start + Number(rg.num_rows)]);
+          start += Number(rg.num_rows);
+        }
+        if (!missing) {
+          const out = [];
+          for (const [rowStart, rowEnd] of ranges) {
+            const rows = await parquetReadObjects({ file, metadata, rowStart, rowEnd, compressors });
+            rows.forEach(r => { if (Number(r.neuron) === neuron) out.push(r); });
+          }
+          return out;
+        }
+      }
+    } catch {}
+  }
+  const rows = await readPq(url);
+  return rows.filter(r => Number(r.neuron) === neuron);
+}
 
 /* ---------- state ---------- */
 const S = { models: [], M: null, cache: new Map(), tab: "map", qmode: "label", isolate: -1, colorby: "layer", sel: -1 };
@@ -324,7 +360,7 @@ async function loadModel(id) {
     tryPq(dir + "recipes.parquet")]);
   const N = info.n_neurons, d = info.d_mlp;
   const M = { info, dir, N, d, rows: new Array(N), layerP: new Map(), x: new Float32Array(N), y: new Float32Array(N), layer: new Int16Array(N), z: new Float32Array(N),
-    lab: new Map(), steer: new Map(), up: new Map(), base: [], ex: new Map(), toks: null, recipes: recipes || [] };
+    lab: new Map(), steer: new Map(), up: new Map(), base: [], ex: new Map(), exN: new Map(), toks: null, recipes: recipes || [] };
   rows.forEach(r => { const k = r.layer * d + r.neuron; M.x[k] = r.x; M.y[k] = r.y; M.layer[k] = r.layer; M.z[k] = r.zmax; if (!info.sharded) M.rows[k] = r; });
   if (!info.sharded) for (let L = 0; L < info.n_layers; L++) M.layerP.set(L, Promise.resolve());
   (labels || []).forEach(l => M.lab.set(l.layer * d + l.neuron, l));
@@ -355,6 +391,12 @@ async function layerExamples(M, L) {
     const by = new Map(); rows.forEach(r => { if (!by.has(r.neuron)) by.set(r.neuron, []); by.get(r.neuron).push(r) }); return by;
   });
   M.ex.set(L, p); return p;
+}
+async function neuronExamples(M, L, n) {
+  const key = `${L}:${n}`;
+  if (M.exN.has(key)) return M.exN.get(key);
+  const p = readNeuronRows(M.dir + `examples/L${String(L).padStart(2, "0")}.parquet`, n);
+  M.exN.set(key, p); return p;
 }
 async function tokens(M) {
   if (!M.toks) M.toks = readPq(M.dir + "tokens.parquet", ["doc", "toks", "skip"]).then(rows => { const t = []; rows.forEach(r => t[r.doc] = r.toks); return t; });
@@ -500,7 +542,16 @@ async function openNeuron(k, opts = {}) {
   const L = Math.floor(k / M.d), n = k - L * M.d, lb = M.lab.get(k);
   try { history.replaceState(null, "", `#${M.info.id}-L${L}-N${n}`) } catch {}
   const P = $("panel");
-  if (!M.rows[k]) { P.innerHTML = `<p class="muted">Loading layer ${L}…</p>`; await ensureLayer(M, L); if (S.sel !== k) return; }
+  if (!M.rows[k]) {
+    if (M.info.sharded) {
+      P.innerHTML = `<p class="muted">Loading neuron ${n}…</p>`;
+      const rs = await readNeuronRows(M.dir + `neurons/L${String(L).padStart(2, "0")}.parquet`, n);
+      rs.forEach(r => { M.rows[r.layer * M.d + r.neuron] = r; });
+      if (S.sel !== k) return;
+    } else {
+      P.innerHTML = `<p class="muted">Loading layer ${L}…</p>`; await ensureLayer(M, L); if (S.sel !== k) return;
+    }
+  }
   const row = M.rows[k];
   const st = M.steer.get(k) || [];
   const up = M.up.get(k);
@@ -557,9 +608,9 @@ async function openNeuron(k, opts = {}) {
     b.addEventListener("focus", load);
   });
   nbrs.onclick = e => { const b = e.target.closest("button"); if (b) openNeuron(+b.dataset.k, { focus: true }); };
-  const by = await layerExamples(M, L);
+  const by = await neuronExamples(M, L, n);
   if (S.sel !== k) return;
-  const ex = (by.get(n) || []).sort((a, b) => b.sign - a.sign || a.rank - b.rank);
+  const ex = by.sort((a, b) => b.sign - a.sign || a.rank - b.rank);
   const toks = ex.some(e => !e.toks) ? await tokens(M) : null;
   if (S.sel !== k) return;
   const pos = ex.filter(e => e.sign > 0), neg = ex.filter(e => e.sign < 0);
