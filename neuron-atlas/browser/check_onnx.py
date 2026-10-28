@@ -1,12 +1,15 @@
 """Parity checks for the browser ONNX exports against NeuronModel + our PyTorch steering hooks.
 
-    python browser/check_onnx.py [--build browser/build]
+    python browser/check_onnx.py [--build browser/build] [--kv]
 
-Checks last-position logits, then greedy 32-token replies (repetition penalty 1.1) for no push, one neuron and a
-two-neuron recipe. ORT fp32 must match the reference token for token; ORT int8 is reported and, if it drifts on the
-no-push prompts, a float16 model is exported and checked instead.
+Without --kv: checks last-position logits, then greedy 32-token replies (repetition penalty 1.1) for no push, one
+neuron and a two-neuron recipe. ORT fp32 must match the reference token for token; ORT int8 is reported and, if it
+drifts on the no-push prompts, a float16 model is exported and checked instead.
+
+With --kv: the same six-case greedy table for the KV-cache fp32/q8/q4 models, file sizes and one-thread CPU
+ms/token, and build/models.json for the browser's default-model pick.
 """
-import argparse, json, sys
+import argparse, json, sys, time
 from pathlib import Path
 
 import numpy as np
@@ -73,13 +76,197 @@ def match32(a, b):
     return sum((a[i] if i < len(a) else None) == (b[i] if i < len(b) else None) for i in range(MAX_NEW))
 
 
+def kv_past_shape(meta, sess):
+    n_kv, head_dim = meta.get("n_kv_heads"), meta.get("head_dim")
+    if n_kv is None or head_dim is None:
+        for inp in sess.get_inputs():
+            if inp.name == "past_key_values.0.key":
+                n_kv, head_dim = inp.shape[1], inp.shape[3]
+                break
+    return n_kv, head_dim
+
+
+def kv_feed(ids, steer, mask_len, past, n_layers):
+    feed = {"input_ids": np.asarray(ids, dtype=np.int64), "steer": steer,
+            "attention_mask": np.ones((1, mask_len), dtype=np.int64)}
+    for i in range(n_layers):
+        feed[f"past_key_values.{i}.key"] = past[2 * i]
+        feed[f"past_key_values.{i}.value"] = past[2 * i + 1]
+    return feed
+
+
+def empty_past(n_layers, n_kv, head_dim):
+    return [np.zeros((1, n_kv, 0, head_dim), dtype=np.float32) for _ in range(2 * n_layers)]
+
+
+def ort_generate_kv(sess, ids, steer, eos, n_layers, n_kv, head_dim):
+    prompt_len = int(ids.shape[1])
+    seq = ids.flatten().tolist()
+    past = empty_past(n_layers, n_kv, head_dim)
+    outs = sess.run(None, kv_feed(ids.numpy(), steer, prompt_len, past, n_layers))
+    logits = outs[0][0]
+    present = list(outs[1:])
+    for _ in range(MAX_NEW):
+        for t in set(seq):
+            if logits[t] > 0:
+                logits[t] /= PENALTY
+            else:
+                logits[t] *= PENALTY
+        nxt = int(logits.argmax())
+        seq.append(nxt)
+        if nxt in eos or len(seq) - prompt_len >= MAX_NEW:
+            break
+        feed = kv_feed(np.array([[nxt]], dtype=np.int64), steer, len(seq), present, n_layers)
+        outs = sess.run(None, feed)
+        logits = outs[0][0]
+        present = list(outs[1:])
+    return seq[prompt_len:]
+
+
+def time_kv(sess, ids, steer, n_layers, n_kv, head_dim, steps=MAX_NEW):
+    prompt_len = int(ids.shape[1])
+    past = empty_past(n_layers, n_kv, head_dim)
+    feed = kv_feed(ids.numpy(), steer, prompt_len, past, n_layers)
+    t0 = time.perf_counter()
+    outs = sess.run(None, feed)
+    prefill_ms = (time.perf_counter() - t0) * 1000
+    present = list(outs[1:])
+    token = int(np.argmax(outs[0][0]))
+    times = []
+    for k in range(steps):
+        feed = kv_feed(np.array([[token]], dtype=np.int64), steer, prompt_len + k + 1, present, n_layers)
+        t0 = time.perf_counter()
+        outs = sess.run(None, feed)
+        times.append(time.perf_counter() - t0)
+        present = list(outs[1:])
+        token = int(np.argmax(outs[0][0]))
+    return prefill_ms, 1000 * sum(times) / len(times)
+
+
 def text(tok, ids):
     return tok.decode(ids, skip_special_tokens=True).replace("\n", " ").strip()
+
+
+def run_kv_checks(build, meta, n_layers, d_mlp, resid, colnorm, eos, nm):
+    prompts = ["Who are you?", "Tell me a short story."]
+    conds = [("none", []), ("L10N100+0.8", [(10, 100, "add", 0.8)]),
+             ("recipe", parse_recipe(RECIPE))]
+    paths = {"fp32": build / "smollm2_steer_kv.onnx",
+             "fp16": build / "smollm2_steer_kv_fp16.onnx",
+             "q8": build / "smollm2_steer_kv_q8.onnx",
+             "q4": build / "smollm2_steer_kv_q4.onnx"}
+    names = {k: p.name for k, p in paths.items()}
+    sessions, dims = {}, {}
+    for key, path in paths.items():
+        if not path.exists():
+            print(f"missing {path}; skipping {key}")
+            continue
+        sess = session(path, threads=1)
+        sessions[key] = sess
+        dims[key] = kv_past_shape(meta, sess)
+    if "fp32" not in sessions:
+        raise SystemExit(f"missing {paths['fp32']}")
+
+    prompt = nm.chat_prompt("Who are you?")
+    ids = encode(nm.tok, prompt)
+    zero = np.zeros((n_layers, d_mlp), dtype=np.float32)
+    single = steer_for([(10, 100, "add", 0.8)], d_mlp, resid, colnorm)
+    n_kv, head_dim = dims["fp32"]
+    diffs = {}
+    for name, terms, steer in (("zero steer", [], zero),
+                               ("L10N100 +0.8", [(10, 100, "add", 0.8)], single)):
+        if terms:
+            nm.set_recipes([terms], resid)
+        else:
+            nm.clear_steer()
+        with torch.no_grad():
+            ref = nm.model(input_ids=ids, use_cache=False, return_dict=True).logits[:, -1, :].numpy()
+        past = empty_past(n_layers, n_kv, head_dim)
+        got = sessions["fp32"].run(None, kv_feed(ids.numpy(), steer, int(ids.shape[1]), past,
+                                                n_layers))[0][0]
+        diffs[name] = float(np.max(np.abs(ref[0] - got)))
+    nm.clear_steer()
+
+    print("\nlogits KV fp32 prefill (last position)")
+    print(f"  {'case':22s} {'max|diff|':>10s}  ok")
+    logit_ok = True
+    for name, d in diffs.items():
+        ok = d < 1e-3
+        logit_ok &= ok
+        print(f"  {name:22s} {d:10.2e}  {'yes' if ok else 'NO'}")
+
+    results = {k: [] for k in sessions}
+    rows = []
+    for p in prompts:
+        pid = encode(nm.tok, nm.chat_prompt(p))
+        for cname, terms in conds:
+            ref = ref_generate(nm, pid, terms, resid)
+            steer = steer_for(terms, d_mlp, resid, colnorm)
+            m = {}
+            for key, sess in sessions.items():
+                kv, hd = dims[key]
+                got = ort_generate_kv(sess, pid, steer, eos, n_layers, kv, hd)
+                m[key] = match32(ref, got)
+                results[key].append(m[key])
+            rows.append((p, cname, len(ref), m))
+            cols = "  ".join(f"{key} {m[key]:2d}/32" for key in sessions)
+            print(f"  {p[:22]:22s} {cname:14s} {len(ref):2d} tok -> {cols}", flush=True)
+    nm.clear_steer()
+
+    print("\ngreedy 32 tokens, repetition penalty 1.1 (KV cache)")
+    labels = {"fp32": "kv fp32", "fp16": "kv fp16", "q8": "q8", "q4": "q4"}
+    header = f"  {'prompt':22s} {'push':14s}" + "".join(f" {labels[k]:>8s}" for k in sessions)
+    print(header)
+    for p, cname, nref, m in rows:
+        vals = "".join(f" {m[k]:5d}/32" for k in sessions)
+        print(f"  {p[:22]:22s} {cname:14s}{vals}")
+
+    timing_id = encode(nm.tok, nm.chat_prompt("Who are you?"))
+    timing_steer = np.zeros((n_layers, d_mlp), dtype=np.float32)
+    print("\nfile sizes and CPU speed (onnxruntime, 1 thread; prefill once, then one token/step)")
+    print(f"  {'model':32s} {'MB':>8s} {'prefill ms':>11s} {'ms/token':>9s}")
+    for key, path in paths.items():
+        if key not in sessions:
+            continue
+        kv, hd = dims[key]
+        prefill_ms, per_token_ms = time_kv(sessions[key], timing_id, timing_steer, n_layers, kv, hd)
+        print(f"  {path.name:32s} {path.stat().st_size / 1e6:8.1f} {prefill_ms:11.1f} "
+              f"{per_token_ms:9.1f}", flush=True)
+
+    files = {}
+    for key, path in paths.items():
+        if path.exists():
+            files[names[key]] = {"bytes": path.stat().st_size,
+                                 "matches": int(sum(results.get(key, [0]))),
+                                 "per_case": [int(x) for x in results.get(key, [])]}
+
+    def good(key):
+        vals = results.get(key, [])
+        return len(vals) == len(prompts) * len(conds) and all(v >= 30 for v in vals)
+
+    # smallest file that still reproduces PyTorch greedy decoding
+    if good("fp16"):
+        default = names["fp16"]
+    elif good("q8"):
+        default = names["q8"]
+    elif good("q4"):
+        default = names["q4"]
+    else:
+        default = names["fp32"]
+    (build / "models.json").write_text(json.dumps({"default": default, "files": files}, indent=1) + "\n")
+    print(f"\nwrote {build / 'models.json'}  default={default}")
+
+    fp32_ok = all(m == 32 for m in results["fp32"])
+    ok = logit_ok and fp32_ok
+    print(f"\n{'PASS' if ok else 'FAIL'}: KV logits {'ok' if logit_ok else 'bad'}, "
+          f"kv fp32 greedy {'ok' if fp32_ok else 'mismatch'}")
+    return 0 if ok else 1
 
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--build", default=str(Path(__file__).with_name("build")))
+    ap.add_argument("--kv", action="store_true", help="check the KV-cache fp32/q8/q4 exports instead")
     a = ap.parse_args()
     build = Path(a.build)
     meta = json.load(open(build / "steer_meta.json"))
@@ -89,6 +276,9 @@ def main():
 
     nm = NeuronModel(meta["model"], device="cpu", dtype=torch.float32)
     nm.clear_steer()
+    if a.kv:
+        sys.exit(run_kv_checks(build, meta, n_layers, d_mlp, resid, colnorm, eos, nm))
+
     wrapper = ex.SteerWrapper(nm.model)  # wraps the same model in place; nm's hooks still apply
     wrapper._steer = None
 

@@ -385,14 +385,9 @@ const normalCount = $("normalCount");
 const pushedCount = $("pushedCount");
 
 const params = new URLSearchParams(location.search);
-let modelUrl;
-try {
-  modelUrl = new URL(params.get("model") || DEFAULT_MODEL, location.href);
-} catch {
-  modelUrl = new URL(DEFAULT_MODEL, location.href);
-}
-const modelDir = new URL(".", modelUrl);
 
+let modelUrl = null;
+let modelDir = null;
 let meta = null;
 let colnorm = null;
 let tokenizer = null;
@@ -403,6 +398,9 @@ let ready = false;
 let busy = false;
 let stopRequested = false;
 let currentAdds = [];
+let supportsKv = false;
+let useKv = false;
+let emptyPast = null;
 
 function errText(e) {
   return e && (e.message || String(e)) ? (e.message || String(e)) : String(e);
@@ -536,11 +534,44 @@ async function loadModelBytes(url, onProgress) {
   return bytes;
 }
 
+async function chooseModel() {
+  const explicit = params.get("model");
+  const fallback = new URL(DEFAULT_MODEL, location.href);
+  if (explicit) {
+    try {
+      return new URL(explicit, location.href);
+    } catch {
+      return fallback;
+    }
+  }
+
+  const dir = new URL(".", fallback);
+  try {
+    const res = await fetch(new URL("models.json", dir), { cache: "no-store" });
+    if (res.ok) {
+      const manifest = await res.json();
+      if (manifest && typeof manifest.default === "string" && manifest.default) {
+        return new URL(manifest.default, dir);
+      }
+    }
+  } catch {
+    /* models.json is optional; keep the old default as the fallback */
+  }
+  return fallback;
+}
+
 async function importOrt(useWebGPU) {
   const mod = await import(
     useWebGPU ? ORT_BASE + "ort.webgpu.min.mjs" : ORT_BASE + "ort.min.mjs"
   );
   mod.env.wasm.wasmPaths = ORT_BASE;
+  if (!useWebGPU) {
+    // run wasm inference in a worker so token generation never blocks the page
+    mod.env.wasm.proxy = true;
+    if (self.crossOriginIsolated) {
+      mod.env.wasm.numThreads = navigator.hardwareConcurrency || 1;
+    }
+  }
   return mod;
 }
 
@@ -698,16 +729,72 @@ async function encodePrompt(prompt) {
   return ids;
 }
 
+function outputTensor(output, name, index) {
+  if (Array.isArray(output)) return output[index];
+  return output[name] || output[Object.keys(output)[index]];
+}
+
+function emptyKvPast() {
+  const nKv = Number(meta.n_kv_heads) || 1;
+  const headDim = Number(meta.head_dim) || 1;
+  const past = [];
+  for (let i = 0; i < meta.n_layers; i++) {
+    past.push(new ort.Tensor("float32", new Float32Array(0), [1, nKv, 0, headDim]));
+    past.push(new ort.Tensor("float32", new Float32Array(0), [1, nKv, 0, headDim]));
+  }
+  return past;
+}
+
+function makeKvState() {
+  return { past: emptyKvPast(), seqLen: 0 };
+}
+
+// the wasm proxy worker takes ownership of input buffers, so a tensor reused across runs must be copied each time
+const fresh = (t) => new ort.Tensor(t.type, t.data.slice(), t.dims);
+
 async function infer(seq, steerTensor) {
   const ids = BigInt64Array.from(seq, (value) => BigInt(value));
-  const input = new ort.Tensor("int64", ids, [1, seq.length]);
-  const output = await session.run({ input_ids: input, steer: steerTensor });
-  const tensor = Array.isArray(output)
-    ? output[0]
-    : output[session.outputNames && session.outputNames[0]]
-      || output.logits
-      || output[Object.keys(output)[0]];
+  const feed = {
+    input_ids: new ort.Tensor("int64", ids, [1, seq.length]),
+    steer: fresh(steerTensor),
+  };
+  if (supportsKv) {
+    const mask = new BigInt64Array(seq.length).fill(1n);
+    feed.attention_mask = new ort.Tensor("int64", mask, [1, seq.length]);
+    if (!emptyPast) emptyPast = emptyKvPast();
+    for (let i = 0; i < meta.n_layers; i++) {
+      feed[`past_key_values.${i}.key`] = fresh(emptyPast[2 * i]);
+      feed[`past_key_values.${i}.value`] = fresh(emptyPast[2 * i + 1]);
+    }
+  }
+  const output = await session.run(feed);
+  const tensor = outputTensor(output, "logits", 0);
   return Float32Array.from(tensor.data);
+}
+
+async function inferKv(state, tokens, steerTensor) {
+  const length = tokens.length;
+  const maskLength = state.seqLen + length;
+  const ids = BigInt64Array.from(tokens, (value) => BigInt(value));
+  const mask = new BigInt64Array(maskLength).fill(1n);
+  const feed = {
+    input_ids: new ort.Tensor("int64", ids, [1, length]),
+    steer: fresh(steerTensor),
+    attention_mask: new ort.Tensor("int64", mask, [1, maskLength]),
+  };
+  for (let i = 0; i < meta.n_layers; i++) {
+    feed[`past_key_values.${i}.key`] = state.past[2 * i];
+    feed[`past_key_values.${i}.value`] = state.past[2 * i + 1];
+  }
+  const output = await session.run(feed);
+  const present = [];
+  for (let i = 0; i < meta.n_layers; i++) {
+    present.push(outputTensor(output, `present.${i}.key`, 1 + 2 * i));
+    present.push(outputTensor(output, `present.${i}.value`, 2 + 2 * i));
+  }
+  state.past = present;
+  state.seqLen = maskLength;
+  return Float32Array.from(outputTensor(output, "logits", 0).data);
 }
 
 function applyPenalty(logits, seq) {
@@ -736,9 +823,10 @@ function makeSource(promptIds, steerTensor, textEl, countEl) {
     ids: [],
     count: 0,
     done: false,
-    steer: steerTensor,
+    steer: fresh(steerTensor),
     textEl,
     countEl,
+    cache: useKv ? makeKvState() : null,
   };
 }
 
@@ -749,7 +837,17 @@ async function advance(source, maxTokensValue, eosSet) {
     return;
   }
 
-  const logits = await infer(source.seq, source.steer);
+  let logits;
+  if (source.cache) {
+    const tokens = source.seq.slice(source.cache.seqLen);
+    if (!tokens.length) {
+      source.done = true;
+      return;
+    }
+    logits = await inferKv(source.cache, tokens, source.steer);
+  } else {
+    logits = await infer(source.seq, source.steer);
+  }
   applyPenalty(logits, source.seq);
   const next = argmax(logits);
 
@@ -840,8 +938,14 @@ async function run() {
       if (!normal.done && !stopRequested) {
         await advance(normal, maxTokensValue, eosSet);
       }
+      if (backend === "webgpu" && !stopRequested) {
+        await new Promise((resolve) => setTimeout(resolve));
+      }
       if (!pushed.done && !stopRequested) {
         await advance(pushed, maxTokensValue, eosSet);
+      }
+      if (backend === "webgpu" && !stopRequested) {
+        await new Promise((resolve) => setTimeout(resolve));
       }
       const tokens = normal.count + pushed.count;
       const seconds = (performance.now() - started) / 1000;
@@ -866,12 +970,20 @@ async function run() {
 }
 
 async function boot() {
-  modelName.textContent = modelUrl.pathname.split("/").pop() || modelUrl.href;
-  modelName.title = modelUrl.href;
-
   recipeInput.value = readHashRecipe();
   updateDose();
   syncHash();
+
+  statusLine.textContent = "Loading model manifest…";
+  modelUrl = await chooseModel();
+  modelDir = new URL(".", modelUrl);
+  const fileName = modelUrl.pathname.split("/").pop() || "";
+  const kvParam = params.get("kv");
+  const kvRequested = kvParam === null
+    ? /_kv/i.test(fileName)
+    : !(kvParam === "0" || kvParam === "false");
+  modelName.textContent = fileName || modelUrl.href;
+  modelName.title = modelUrl.href;
 
   statusLine.textContent = "Loading metadata…";
   try {
@@ -934,10 +1046,26 @@ async function boot() {
     }
   }
 
+  const inputNames = session.inputNames || [];
+  supportsKv = inputNames.some((name) => name.startsWith("past_key_values."));
+  useKv = supportsKv && kvRequested;
+  if (kvRequested && !supportsKv) {
+    showNotice("This model has no KV-cache inputs; running without a cache.", "warn");
+  }
+  if (supportsKv && (!meta.n_kv_heads || !meta.head_dim)) {
+    const pastName = inputNames.find((name) => name === "past_key_values.0.key");
+    const md = pastName && session.inputMetadata && session.inputMetadata[pastName];
+    const dims = md && (md.dimensions || md.shape);
+    if (dims && dims.length === 4) {
+      meta.n_kv_heads = Number(dims[1]) || meta.n_kv_heads;
+      meta.head_dim = Number(dims[3]) || meta.head_dim;
+    }
+  }
+
   ready = true;
   progressWrap.hidden = true;
   backendPill.textContent = backendLabel();
-  statusLine.textContent = "Ready.";
+  statusLine.textContent = "Ready." + (useKv ? " · KV cache" : "");
   speedLine.textContent = "— · " + backendLabel();
   runBtn.disabled = false;
 }

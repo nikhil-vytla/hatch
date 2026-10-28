@@ -1,10 +1,14 @@
 """Export SmolLM2-135M-Instruct with add-on-input neuron steering to ONNX, fp32 and int8.
 
-    python browser/export_onnx.py [--model HuggingFaceTB/SmolLM2-135M-Instruct] [--out browser/build]
+    python browser/export_onnx.py [--model HuggingFaceTB/SmolLM2-135M-Instruct] [--out browser/build] [--kv]
 
 A neuron is one input channel of a layer's mlp.down_proj. The wrapper takes input_ids [1,T] and a steer tensor
 [n_layers,d_mlp], adds steer[L] to that layer's down_proj input at every position, and returns only the last
 position's logits [1,vocab]. No KV cache: each decoding step recomputes the sequence.
+
+With --kv it also writes a cache-aware wrapper (inputs input_ids [1,T_new], steer [n_layers,d_mlp], attention_mask
+[1,T_past+T_new] and past_key_values.{i}.key/value [1,n_kv_heads,T_past,head_dim]; outputs logits [1,vocab] for the
+last position and present.{i}.key/value), then two weight-only nbits copies (q8 and q4).
 """
 import argparse, json, sys
 from pathlib import Path
@@ -13,7 +17,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 from huggingface_hub import hf_hub_download
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoModelForCausalLM, AutoTokenizer, DynamicCache
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
@@ -33,8 +37,8 @@ class SteerDown(nn.Module):
         return self.down(x)
 
 
-class SteerWrapper(nn.Module):
-    """Causal LM with a steer input; returns the last position's logits only."""
+class SteerBase(nn.Module):
+    """Shared setup: find each dense MLP down projection and wrap it with a steer input hook."""
 
     def __init__(self, model):
         super().__init__()
@@ -60,11 +64,9 @@ class SteerWrapper(nn.Module):
         self.conv1d = type(found[0][2]).__name__ == "Conv1D"
         self.d_mlp, self.d_model = (w.shape[0], w.shape[1]) if self.conv1d else (w.shape[1], w.shape[0])
         self.layers = [L for L, _, _ in found]
-
-    def forward(self, input_ids, steer):
-        self._steer = steer
-        out = self.model(input_ids=input_ids, use_cache=False, return_dict=True)
-        return out.logits[:, -1, :].float()
+        cfg = model.config
+        self.n_kv_heads = getattr(cfg, "num_key_value_heads", None) or getattr(cfg, "num_attention_heads")
+        self.head_dim = getattr(cfg, "head_dim", None) or (cfg.hidden_size // cfg.num_attention_heads)
 
     def colnorm(self):
         out = []
@@ -73,6 +75,41 @@ class SteerWrapper(nn.Module):
             cols = (w if self.conv1d else w.T).float()
             out.append(cols.norm(dim=1).cpu().numpy())
         return np.stack(out).astype("<f4")
+
+
+class SteerWrapper(SteerBase):
+    """Causal LM with a steer input; returns the last position's logits only."""
+
+    def forward(self, input_ids, steer):
+        self._steer = steer
+        out = self.model(input_ids=input_ids, use_cache=False, return_dict=True)
+        return out.logits[:, -1, :].float()
+
+
+class KVCacheWrapper(nn.Module):
+    """Cache-aware view over an existing SteerWrapper: one forward is either a prefill or one decoding step."""
+
+    def __init__(self, base):
+        super().__init__()
+        object.__setattr__(self, "base", base)  # plain attr: base already owns the wrapped modules
+        self.model = base.model
+        self.n_layers = base.n_layers
+        self.n_kv_heads = base.n_kv_heads
+        self.head_dim = base.head_dim
+
+    def forward(self, input_ids, steer, attention_mask, *past):
+        self.base._steer = steer
+        pairs = [(past[2 * i], past[2 * i + 1]) for i in range(self.n_layers)]
+        cache = DynamicCache(ddp_cache_data=pairs)
+        t_past = past[0].shape[2]
+        position_ids = (torch.arange(input_ids.shape[1], device=input_ids.device) + t_past).unsqueeze(0)
+        out = self.model(input_ids=input_ids, attention_mask=attention_mask, position_ids=position_ids,
+                         past_key_values=cache, use_cache=True, return_dict=True)
+        presents = []
+        for i in range(self.n_layers):
+            presents.append(out.past_key_values.layers[i].keys)
+            presents.append(out.past_key_values.layers[i].values)
+        return (out.logits[:, -1, :].float(), *presents)
 
 
 def chat_prompt(tok, user):
@@ -107,6 +144,35 @@ def export_fp32(wrapper, tok, path):
                           dynamic_shapes={"input_ids": {0: Dim("batch"), 1: Dim("T", min=1)}, "steer": {}}, **kw)
 
 
+def export_kv(wrapper, tok, path):
+    """Export the cache-aware wrapper. Trace with T_past > 0 so the concat stays in the graph."""
+    ids = tok(chat_prompt(tok, "Who are you?"), return_tensors="pt", add_special_tokens=False)["input_ids"]
+    n_layers, n_kv, hd = wrapper.n_layers, wrapper.n_kv_heads, wrapper.head_dim
+    past_len = min(4, max(1, ids.shape[1] - 1))
+    new_ids = ids[:, past_len:]
+    past = []
+    for _ in range(n_layers):
+        past.append(torch.zeros(1, n_kv, past_len, hd, dtype=torch.float32))
+        past.append(torch.zeros(1, n_kv, past_len, hd, dtype=torch.float32))
+    steer = torch.zeros(n_layers, wrapper.base.d_mlp, dtype=torch.float32)
+    attention_mask = torch.ones(1, ids.shape[1], dtype=torch.int64)
+    args = (new_ids, steer, attention_mask, *past)
+
+    in_names = ["input_ids", "steer", "attention_mask"]
+    out_names = ["logits"]
+    dyn = {"input_ids": {0: "batch", 1: "T_new"}, "attention_mask": {0: "batch", 1: "T"},
+           "logits": {0: "batch"}}
+    for i in range(n_layers):
+        for kv in ("key", "value"):
+            in_names.append(f"past_key_values.{i}.{kv}")
+            out_names.append(f"present.{i}.{kv}")
+            dyn[f"past_key_values.{i}.{kv}"] = {0: "batch", 2: "T_past"}
+            dyn[f"present.{i}.{kv}"] = {0: "batch", 2: "T"}
+    torch.onnx.export(wrapper, args, str(path), input_names=in_names, output_names=out_names,
+                      opset_version=18, do_constant_folding=True, external_data=False,
+                      dynamo=False, dynamic_axes=dyn)
+
+
 def export_fp16(src, dst):
     from onnxruntime.transformers.float16 import convert_float_to_float16
     import onnx
@@ -115,10 +181,61 @@ def export_fp16(src, dst):
     onnx.save(model, str(dst), save_as_external_data=False)
 
 
+def tie_lm_head(path):
+    """torch.onnx stores the tied embedding twice (Gather table and a transposed MatMul copy for the LM head).
+    Point the LM head at the Gather table with Gemm(transB=1) and drop the copy: ~113 MB less for SmolLM2."""
+    import onnx
+    from onnx import helper, numpy_helper
+    import numpy as np
+    m = onnx.load(str(path))
+    g = m.graph
+    inits = {t.name: t for t in g.initializer}
+    gather = next(n for n in g.node if n.op_type == "Gather" and n.input[0] in inits)
+    emb = inits[gather.input[0]]
+    vocab, hidden = emb.dims
+    head = next(n for n in g.node if n.op_type == "MatMul" and n.input[1] in inits
+                and list(inits[n.input[1]].dims) == [hidden, vocab])
+    E = numpy_helper.to_array(emb)
+    W = numpy_helper.to_array(inits[head.input[1]])
+    if not np.array_equal(W, E.T):
+        print("lm head is not tied to the embedding; left as is")
+        return
+    a, out, dead = head.input[0], head.output[0], head.input[1]
+    k = lambda name: f"tie_{name}"
+    g.initializer.extend([numpy_helper.from_array(np.array([-1, hidden], np.int64), k("flat")),
+                          numpy_helper.from_array(np.array([vocab], np.int64), k("vocab")),
+                          numpy_helper.from_array(np.array([0], np.int64), k("zero")),
+                          numpy_helper.from_array(np.array([-1], np.int64), k("last"))])
+    new = [helper.make_node("Reshape", [a, k("flat")], [k("a2")]),
+           helper.make_node("Gemm", [k("a2"), emb.name], [k("y2")], transB=1),
+           helper.make_node("Shape", [a], [k("shape")]),
+           helper.make_node("Slice", [k("shape"), k("zero"), k("last")], [k("lead")]),
+           helper.make_node("Concat", [k("lead"), k("vocab")], [k("oshape")], axis=0),
+           helper.make_node("Reshape", [k("y2"), k("oshape")], [out])]
+    i = list(g.node).index(head)
+    g.node.remove(head)
+    for j, n in enumerate(new):
+        g.node.insert(i + j, n)
+    g.initializer.remove(inits[dead])
+    onnx.save(m, str(path), save_as_external_data=False)
+
+
+def quantize_nbits(src, dst, bits):
+    """Weight-only MatMul quantization; activations and the embedding Gather stay float32."""
+    import onnx
+    from onnxruntime.quantization.matmul_nbits_quantizer import MatMulNBitsQuantizer
+    model = onnx.load(str(src))
+    quantizer = MatMulNBitsQuantizer(model, bits=bits, block_size=32, is_symmetric=True,
+                                     op_types_to_quantize=("MatMul",))
+    quantizer.process()
+    quantizer.model.save_model_to_file(str(dst), use_external_data_format=False)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--model", default="HuggingFaceTB/SmolLM2-135M-Instruct")
     ap.add_argument("--out", default=str(Path(__file__).with_name("build")))
+    ap.add_argument("--kv", action="store_true", help="also export the KV-cache wrapper and its q8/q4 copies")
     a = ap.parse_args()
     out = Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
@@ -133,6 +250,23 @@ def main():
     int8 = out / "smollm2_steer_int8.onnx"
     quantize_dynamic(str(fp32), str(int8), weight_type=QuantType.QInt8, per_channel=True)
     print(f"int8   {int8}  {int8.stat().st_size / 1e6:.1f} MB")
+
+    if a.kv:
+        kv_wrapper = KVCacheWrapper(wrapper)
+        kv_fp32 = out / "smollm2_steer_kv.onnx"
+        export_kv(kv_wrapper, tok, kv_fp32)
+        tie_lm_head(kv_fp32)
+        print(f"kv fp32 {kv_fp32}  {kv_fp32.stat().st_size / 1e6:.1f} MB")
+        kv_fp16 = out / "smollm2_steer_kv_fp16.onnx"
+        export_fp16(kv_fp32, kv_fp16)
+        print(f"kv fp16 {kv_fp16}  {kv_fp16.stat().st_size / 1e6:.1f} MB")
+        for bits in (8, 4):
+            dst = out / f"smollm2_steer_kv_q{bits}.onnx"
+            try:
+                quantize_nbits(kv_fp32, dst, bits)
+                print(f"kv q{bits}  {dst}  {dst.stat().st_size / 1e6:.1f} MB")
+            except Exception as e:
+                print(f"kv q{bits} failed ({type(e).__name__}: {e}); skipped")
 
     slug = a.model.replace("/", "__")
     pub = hf_hub_download(repo_id="nikhilxvytla/neuron-atlas", repo_type="dataset",
@@ -152,6 +286,7 @@ def main():
     i = prompt.index("X")
     meta = {"model": a.model, "n_layers": wrapper.n_layers, "d_mlp": wrapper.d_mlp,
             "vocab": int(wrapper.model.get_output_embeddings().weight.shape[0]),
+            "n_kv_heads": wrapper.n_kv_heads, "head_dim": wrapper.head_dim,
             "resid_median": [float(x) for x in resid], "eos": sorted(eos),
             "chat_template_prefix": {"before": prompt[:i], "after": prompt[i + 1:]}}
     (out / "steer_meta.json").write_text(json.dumps(meta, indent=1) + "\n")
