@@ -9,7 +9,7 @@
    random corpus windows, and says which snippets the neuron fires on. Chance is 50% per snippet; the null runs the
    same snippets against another neuron's label.
 """
-import argparse, json, os, random, re, concurrent.futures as cf
+import argparse, json, os, random, re, time, concurrent.futures as cf
 import duckdb
 
 from . import neurons_src
@@ -269,15 +269,112 @@ def classify_pushes(atlas, group=20, workers=8):
     print(f"classified {sum(counts.values())} replies with {MODEL}: {counts}")
 
 
+def classify_sweep(sweep, layers=None, sample=0.05, group=40, workers=16, seed=0):
+    """Classify the identity replies and a sample of an all-neuron sweep, one labels/Lxx.parquet per layer."""
+    try:
+        prompts = json.load(open(f"{sweep}/meta.json"))["steer"]["prompts"]
+    except (OSError, KeyError, TypeError, ValueError):
+        prompts = ["Who are you?", "Tell me a short story."]
+    sdir = os.path.join(sweep, "steer")
+    ldir = os.path.join(sweep, "labels")
+    os.makedirs(ldir, exist_ok=True)
+    if layers is None:
+        names = os.listdir(sdir) if os.path.isdir(sdir) else []
+        layers = sorted(int(m.group(1)) for m in (re.fullmatch(r"L(\d+)\.parquet", n) for n in names) if m)
+    base = {}
+    if os.path.exists(os.path.join(sdir, "baseline.parquet")):
+        for r in pq.read_table(os.path.join(sdir, "baseline.parquet")).to_pylist():
+            if r["layer"] < 0:
+                base[r["prompt"]] = r["text"]
+    cl = None
+    for layer in layers:
+        path = os.path.join(ldir, f"L{layer:02d}.parquet")
+        if os.path.exists(path):
+            print(f"L{layer}: labels exist, skipped")
+            continue
+        rows = pq.read_table(os.path.join(sdir, f"L{layer:02d}.parquet")).to_pylist()
+        id_idx, rest = [], []
+        for i, r in enumerate(rows):
+            text = str(r.get("text") or "")
+            if r["prompt"] == 0 and (not text.strip() or not re.search(r"qwen|tongyi|alibaba", text, re.I)):
+                id_idx.append(i)
+            else:
+                rest.append(i)
+        rng = random.Random(f"{seed}:{layer}")
+        k = max(0, min(len(rest), int(sample * len(rest))))
+        picked = set(id_idx) | set(rng.sample(rest, k))
+        sel = sorted(picked)
+        id_set = set(id_idx)
+        keys, seen = [], set()
+        for i in sel:
+            text = str(rows[i].get("text") or "")
+            if text.strip() and (rows[i]["prompt"], text) not in seen:
+                seen.add((rows[i]["prompt"], text))
+                keys.append((rows[i]["prompt"], text))
+
+        def job(chunk):
+            lines = [f"normal reply to {prompts[p]!r}: {base.get(p, '')[:200]!r}" for p in sorted(base)]
+            lines += [f"[{i}] prompt {prompts[p]!r} -> {text[:240]!r}" for i, (p, text) in chunk]
+            r = chat(cl, CLASSIFY, "\n".join(lines)) or {}
+            return {int(it["i"]): it for it in r.get("items", []) if str(it.get("i", "")).lstrip("-").isdigit()}
+
+        t0 = time.time()
+        out, calls = {}, 0
+        if keys:
+            cl = cl or client()
+            indexed = list(enumerate(keys))
+            chunks = [indexed[i:i + group] for i in range(0, len(indexed), group)]
+            calls = len(chunks)
+            with cf.ThreadPoolExecutor(workers) as ex:
+                for res in ex.map(job, chunks):
+                    out.update(res)
+        got = {keys[i]: it for i, it in out.items() if 0 <= i < len(keys)}
+        out_rows, counts = [], {}
+        for i in sel:
+            r = rows[i]
+            text = str(r.get("text") or "")
+            if not text.strip():
+                it = {"kind": "incoherent", "who": "", "change": "empty reply"}
+            else:
+                it = got.get((r["prompt"], text)) or {}
+            kind = it.get("kind")
+            kind = kind if kind in KINDS else None
+            out_rows.append(dict(layer=int(r["layer"]), neuron=int(r["neuron"]), dose=float(r["dose"]),
+                                 prompt=int(r["prompt"]), picked="identity" if i in id_set else "sample",
+                                 reply_kind=kind, who=str(it.get("who", "") or "")[:80],
+                                 what_changed=str(it.get("change", "") or "")[:120], text=text))
+            counts[kind] = counts.get(kind, 0) + 1
+        schema = pa.schema([("layer", pa.int16()), ("neuron", pa.int32()), ("dose", pa.float32()),
+                            ("prompt", pa.int8()), ("picked", pa.string()), ("reply_kind", pa.string()),
+                            ("who", pa.string()), ("what_changed", pa.string()), ("text", pa.string())])
+        tmp = path + ".tmp"
+        pq.write_table(pa.Table.from_pylist(out_rows, schema=schema), tmp, compression="zstd")
+        os.replace(tmp, path)
+        n_id = sum(i in id_set for i in sel)
+        print(f"L{layer}: picked {n_id} identity / {len(sel) - n_id} sample, {len(keys)} distinct sent, "
+              f"{calls} calls, {counts} {time.time() - t0:.1f}s")
+
+
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("--atlas", required=True)
+    ap.add_argument("--atlas")
+    ap.add_argument("--sweep", help="all-neuron sweep folder; classify it and nothing else")
+    ap.add_argument("--layers", type=int, nargs="+", default=None)
+    ap.add_argument("--sample", type=float, default=0.05)
     ap.add_argument("--per-layer", type=int, default=40)
-    ap.add_argument("--group", type=int, default=8)
-    ap.add_argument("--workers", type=int, default=8)
+    ap.add_argument("--group", type=int, default=None)
+    ap.add_argument("--workers", type=int, default=None)
     ap.add_argument("--pushes-only", action="store_true", help="only classify steered replies")
     ap.add_argument("--judge", help="deepseek, openai:<base_url>:<model>, or opencode/<model>")
     a = ap.parse_args()
+    if not a.sweep and not a.atlas:
+        ap.error("--atlas is required unless --sweep is given")
+    if a.sweep:
+        classify_sweep(a.sweep, a.layers, a.sample, a.group if a.group is not None else 40,
+                       a.workers if a.workers is not None else 16)
+        raise SystemExit
+    workers = a.workers if a.workers is not None else 8
+    group = a.group if a.group is not None else 8
     from contextlib import nullcontext
     ctx = nullcontext(None)
     if a.judge:
@@ -289,7 +386,7 @@ if __name__ == "__main__":
         if a.judge:
             JUDGE = make_judge(a.judge, server)
         if os.path.exists(f"{a.atlas}/steer.parquet"):
-            classify_pushes(a.atlas, workers=a.workers)
+            classify_pushes(a.atlas, workers=workers)
         if not a.pushes_only:
-            run(a.atlas, a.per_layer, a.group, a.workers)
+            run(a.atlas, a.per_layer, group, workers)
 
