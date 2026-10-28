@@ -11,7 +11,23 @@ import argparse, glob, json, os, re, shutil
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 EXPLORER = os.path.join(HERE, "..", "explorer", "index.html")
-FILES = ["meta.json", "neurons.parquet", "labels.parquet", "steer.parquet", "tokens.parquet"]
+FILES = ["meta.json", "map.parquet", "labels.parquet", "steer.parquet", "tokens.parquet"]  # + neurons/, examples/
+
+
+def shard(d):
+    """Derive what the explorer loads from a model folder's neurons.parquet: map.parquet (one slim row per neuron:
+    layer, neuron, x, y, zmax) and neurons/Lxx.parquet (full rows, one file per layer, fetched on demand)."""
+    import duckdb
+    src = os.path.join(d, "neurons.parquet")
+    if not os.path.exists(src):
+        return
+    os.makedirs(os.path.join(d, "neurons"), exist_ok=True)
+    con = duckdb.connect()
+    con.sql(f"""copy (select layer, neuron, x, y, zmax from '{src}' order by layer, neuron)
+                to '{d}/map.parquet' (format parquet, compression zstd)""")
+    for (L,) in con.sql(f"select distinct layer from '{src}' order by 1").fetchall():
+        con.sql(f"""copy (select * from '{src}' where layer = {L} order by neuron)
+                    to '{d}/neurons/L{L:02d}.parquet' (format parquet, compression zstd)""")
 
 
 def model_id(name):
@@ -21,7 +37,9 @@ def model_id(name):
 def models_index(out):
     idx = []
     for meta_path in sorted(glob.glob(os.path.join(out, "*", "meta.json"))):
+        shard(os.path.dirname(meta_path))
         m = json.load(open(meta_path))
+        m["sharded"] = True
         m["id"] = model_id(m["model"])
         m["name"] = m["model"].split("/")[-1]
         m["files"] = [f for f in FILES if os.path.exists(os.path.join(os.path.dirname(meta_path), f))]
@@ -65,8 +83,10 @@ def build_site(out, site, b64=False):
         os.makedirs(os.path.join(dst, "examples"), exist_ok=True)
         for f in m["files"]:
             put(os.path.join(src, f), os.path.join(dst, f), m)
-        for f in glob.glob(os.path.join(src, "examples", "*.parquet")):
-            put(f, os.path.join(dst, "examples", os.path.basename(f)), m)
+        for sub in ["examples", "neurons"]:
+            os.makedirs(os.path.join(dst, sub), exist_ok=True)
+            for f in glob.glob(os.path.join(src, sub, "*.parquet")):
+                put(f, os.path.join(dst, sub, os.path.basename(f)), m)
         m["b64"] = b64
     json.dump(idx, open(os.path.join(site, "data", "models.json"), "w"), indent=1)
     open(os.path.join(site, "index.html"), "w").write(page())
@@ -78,9 +98,9 @@ def card(idx, repo):
                      f"{m['n_neurons']:,} | {m['n_tokens']:,} | {'yes' if 'steer.parquet' in m['files'] else 'no'} | "
                      f"{'yes' if 'labels.parquet' in m['files'] else 'no'} |" for m in idx)
     configs = "\n".join(
-        f"- config_name: {m['id']}-{t}\n  data_files: \"{m['slug']}/{t if t != 'examples' else 'examples/*'}{'' if t == 'examples' else '.parquet'}\""
+        f"- config_name: {m['id']}-{t}\n  data_files: \"{m['slug']}/{t + '/*' if t in ('examples', 'neurons') else t}.parquet\""
         for m in idx for t in ["neurons", "labels", "steer", "examples"]
-        if t == "examples" or f"{t}.parquet" in m["files"])
+        if t in ("examples", "neurons") or f"{t}.parquet" in m["files"])
     return f"""---
 license: odc-by
 tags: [interpretability, neurons, mechanistic-interpretability]
@@ -99,11 +119,12 @@ detection check. Built with `neuron-atlas` (https://github.com/nikhil-vytla/hatc
 
 ## Files per model (`<org>__<name>/`)
 
-- `neurons.parquet`: one row per neuron. `layer, neuron, mean, std, max, min, frac_pos, zmax, zmin, w_norm, x, y`
+- `neurons/Lxx.parquet`: one row per neuron, one file per layer. `layer, neuron, mean, std, max, min, frac_pos, zmax, zmin, w_norm, x, y`
   (2D UMAP of the down-projection column), `lens_up` / `lens_down` (logit lens top/bottom tokens), `peaks` (token at
   each top document's peak).
 - `examples/Lxx.parquet`: top documents per neuron (`sign` 1 = most positive, -1 = most negative), peak `act`, `doc`,
   `pos`, and the activation window `q` (int8, x `scale`/127) for tokens `pos-before .. pos+after` (see `meta.json`).
+- `map.parquet`: `layer, neuron, x, y, zmax` for every neuron (what the explorer loads first).
 - `tokens.parquet`: the corpus as token strings per `doc`.
 - `steer.parquet`: greedy replies with one neuron pushed by `dose` x median residual norm (`layer = -1` rows are the
   unsteered baselines), plus `change` (1 - word Jaccard to baseline) and `diversity` (distinct bigram ratio).
@@ -122,7 +143,7 @@ Open the explorer with `?data={repo}`; it reads these files directly from
 `https://huggingface.co/datasets/{repo}/resolve/main/`. DuckDB also works:
 
 ```sql
-select * from 'hf://datasets/{repo}/{idx[0]['slug'] if idx else '<slug>'}/neurons.parquet' order by zmax desc limit 10;
+select * from 'hf://datasets/{repo}/{idx[0]['slug'] if idx else '<slug>'}/neurons/*.parquet' order by zmax desc limit 10;
 ```
 """
 
@@ -139,7 +160,8 @@ def push_hub(out, repo, private=False):
     api.upload_folder(repo_id=repo, repo_type="dataset", folder_path=tmp, commit_message="index + card")
     for m in idx:
         api.upload_folder(repo_id=repo, repo_type="dataset", folder_path=os.path.join(out, m["slug"]),
-                          path_in_repo=m["slug"], commit_message=f"atlas for {m['model']}")
+                          path_in_repo=m["slug"], commit_message=f"atlas for {m['model']}",
+                          ignore_patterns=["neurons.parquet", "calib*"], delete_patterns=["neurons.parquet"])
     print(f"https://huggingface.co/datasets/{repo}")
 
 

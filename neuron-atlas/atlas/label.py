@@ -11,6 +11,8 @@
 """
 import argparse, json, os, random, re, concurrent.futures as cf
 import duckdb
+
+from . import neurons_src
 import pyarrow as pa
 import pyarrow.parquet as pq
 from openai import OpenAI
@@ -100,7 +102,7 @@ def run(atlas, per_layer=40, group=8, workers=8, seed=0):
     at = Atlas(atlas)
     con = at.con
     sel = con.sql(f"""select layer, neuron, lens_up, lens_down from (
-        select *, row_number() over (partition by layer order by zmax desc) r from '{atlas}/neurons.parquet')
+        select *, row_number() over (partition by layer order by zmax desc) r from {neurons_src(atlas)})
         where r <= {per_layer}""").fetchall()
     keys = {(L, n) for L, n, _, _ in sel}
     steer, base = {}, {}
@@ -114,7 +116,7 @@ def run(atlas, per_layer=40, group=8, workers=8, seed=0):
         extra = [k for k in steer if k not in keys]
         if extra:
             q = " or ".join(f"(layer={L} and neuron={n})" for L, n in extra)
-            sel += con.sql(f"select layer, neuron, lens_up, lens_down from '{atlas}/neurons.parquet' where {q}").fetchall()
+            sel += con.sql(f"select layer, neuron, lens_up, lens_down from {neurons_src(atlas)} where {q}").fetchall()
     print(f"labeling {len(sel)} neurons of {at.meta['model']} with {MODEL}")
     jobs = [sel[i:i + group] for i in range(0, len(sel), group)]
     cl = client()

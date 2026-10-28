@@ -13,6 +13,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 import torch
 
+from . import neurons_src
 from .model import NeuronModel
 
 PROMPTS = ["Who are you?", "Tell me about your favorite place."]
@@ -32,7 +33,7 @@ def distinct2(ids):
 def pick(atlas, per_layer, n_random, seed=0):
     """Most peaked neurons per layer (by zmax) plus random controls from the same layer."""
     q = f"""select layer, neuron, row_number() over (partition by layer order by zmax desc) r
-            from '{atlas}/neurons.parquet'"""
+            from {neurons_src(atlas)}"""
     rows = duckdb.sql(q).fetchall()
     meta = json.load(open(f"{atlas}/meta.json"))
     rng = random.Random(seed)

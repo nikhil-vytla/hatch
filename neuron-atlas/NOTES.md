@@ -159,3 +159,16 @@ derangement null, not "persona vs not".
 - Static Space `nikhilxvytla/neuron-atlas-explorer` serves the explorer with the dataset as default data source.
 - Gradio Space refused: `402 Payment Required` — "hosting Gradio and Docker Spaces on free cpu-basic requires a PRO
   subscription". Static Spaces remain free.
+
+## Per-layer neuron files (prep for 8B models)
+
+- The explorer used to download all of `neurons.parquet` at startup (16 MB for Qwen3-0.6B; an 8B model with 442k
+  neurons would be about 80 MB). `export.py` now derives `map.parquet` (layer, neuron, x, y, zmax: 0.9 MB for
+  Qwen3-0.6B) and `neurons/Lxx.parquet`, and publishes those instead of the single file (Hub: `delete_patterns`
+  removed the old ones). Local tools keep the single file; `atlas.neurons_src()` reads either layout.
+- Explorer: `ensureLayer` fetches a layer on demand (neuron card, neighbor list); token search and the cross-model
+  view fetch all layers once with a progress line; SQL builds `neurons` as `read_parquet([...layer files])` and
+  adds a `map` view. Tested in headless Chromium: neuron card, " Paris" token search, and the "peakiest neurons"
+  query over shards (25 rows, 1.0 s).
+- Bug found while testing: the "vs random" example query used `share` as an alias (reserved in DuckDB) and mixed
+  `group by all` with a window over aggregates. Fixed to explicit `group by kind, reply_kind` and alias `frac`.

@@ -84,8 +84,12 @@ One adapter (`atlas/model.py`) finds MLP down projections by name, so Llama, Qwe
 and Phi-style models work unchanged. MoE experts are skipped.
 
 Per model the output is `neurons.parquet`, `examples/Lxx.parquet`, `tokens.parquet`, `steer.parquet`,
-`labels.parquet` and `meta.json`, plus a root `models.json`. The dataset card that `export.py hub` writes documents
-every column.
+`labels.parquet` and `meta.json`, plus a root `models.json`. For publishing, `export.py` splits the neuron table
+into `neurons/Lxx.parquet` (one file per layer) and a slim `map.parquet` (`layer, neuron, x, y, zmax`). The explorer
+loads the map first and fetches a layer when it opens one of its neurons, which keeps its first download small
+(Qwen3-0.6B: 0.9 MB instead of 16 MB; an 8B model about 5 MB instead of about 80). A token search across all
+neurons fetches every layer once, with progress shown. The Python tools read either layout (`atlas.neurons_src`).
+The dataset card that `export.py hub` writes documents every column.
 
 ## Ways to explore
 
@@ -109,7 +113,7 @@ python -m atlas.export space --repo <you>/neuron-atlas --space <you>/neuron-atla
 ```
 
 The dataset gets a card with `configs` per model and table, so the Hub viewer and `hf://` DuckDB queries work
-(`select * from 'hf://datasets/nikhilxvytla/neuron-atlas/Qwen__Qwen3-0.6B/labels.parquet'`). The Space is a static
+(`select * from 'hf://datasets/nikhilxvytla/neuron-atlas/Qwen__Qwen3-0.6B/neurons/*.parquet'`). The Space is a static
 page that reads the dataset over HTTP (Hub `resolve` URLs send CORS headers). Both are published as linked above.
 The Gradio app can't go on a Space from a free account: Hugging Face now requires PRO for Gradio and Docker Spaces,
 even on cpu-basic, while static Spaces stay free. Run it locally with `python app.py --repo nikhilxvytla/neuron-atlas`.

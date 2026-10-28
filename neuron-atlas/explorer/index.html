@@ -301,14 +301,15 @@ async function loadModel(id) {
   if (S.cache.has(id)) return S.cache.get(id);
   const info = S.models.find(m => m.id === id);
   const dir = BASE + info.slug + "/";
+  // sharded: map.parquet has every neuron's position; full rows come per layer (neurons/Lxx.parquet) on demand
   const [rows, labels, steer] = await Promise.all([
-    readPq(dir + "neurons.parquet"),
+    readPq(dir + (info.sharded ? "map.parquet" : "neurons.parquet")),
     tryPq(dir + "labels.parquet"), tryPq(dir + "steer.parquet")]);
-  const N = rows.length, d = info.d_mlp;
-  const M = { info, dir, N, d, rows, x: new Float32Array(N), y: new Float32Array(N), layer: new Int16Array(N), z: new Float32Array(N),
+  const N = info.n_neurons, d = info.d_mlp;
+  const M = { info, dir, N, d, rows: new Array(N), layerP: new Map(), x: new Float32Array(N), y: new Float32Array(N), layer: new Int16Array(N), z: new Float32Array(N),
     lab: new Map(), steer: new Map(), base: [], ex: new Map(), toks: null };
-  rows.forEach((r, i) => { const k = r.layer * d + r.neuron; M.x[k] = r.x; M.y[k] = r.y; M.layer[k] = r.layer; M.z[k] = r.zmax; });
-  const sorted = new Array(N); rows.forEach(r => sorted[r.layer * d + r.neuron] = r); M.rows = sorted;
+  rows.forEach(r => { const k = r.layer * d + r.neuron; M.x[k] = r.x; M.y[k] = r.y; M.layer[k] = r.layer; M.z[k] = r.zmax; if (!info.sharded) M.rows[k] = r; });
+  if (!info.sharded) for (let L = 0; L < info.n_layers; L++) M.layerP.set(L, Promise.resolve());
   (labels || []).forEach(l => M.lab.set(l.layer * d + l.neuron, l));
   (steer || []).forEach(s => {
     if (s.layer < 0) { M.base[s.prompt] = s.text; return }
@@ -318,6 +319,18 @@ async function loadModel(id) {
   S.cache.set(id, M);
   return M;
 }
+function ensureLayer(M, L) {
+  if (!M.layerP.has(L)) M.layerP.set(L, readPq(M.dir + `neurons/L${String(L).padStart(2, "0")}.parquet`)
+    .then(rs => rs.forEach(r => { M.rows[r.layer * M.d + r.neuron] = r; }))
+    .catch(e => { M.layerP.delete(L); throw e; }));
+  return M.layerP.get(L);
+}
+async function ensureLayers(M, Ls, onProgress) {
+  let done = 0; const todo = [...new Set(Ls)];
+  await Promise.all(todo.map(L => ensureLayer(M, L).then(() => onProgress && onProgress(++done, todo.length))));
+}
+const allLayers = M => Array.from({ length: M.info.n_layers }, (_, L) => L);
+const allLoaded = M => M.layerP.size === M.info.n_layers && [...M.layerP.values()].length === M.info.n_layers;
 async function layerExamples(M, L) {
   if (M.ex.has(L)) return M.ex.get(L);
   const p = readPq(M.dir + `examples/L${String(L).padStart(2, "0")}.parquet`).then(rows => {
@@ -394,7 +407,7 @@ cv.addEventListener("pointermove", e => {
   const tip = $("tip");
   if (k < 0) { tip.hidden = true; return; }
   const M = S.M, L = M.layer[k], n = k - L * M.d, lb = M.lab.get(k), row = M.rows[k];
-  tip.innerHTML = `<div class="k">L${L} · N${n} · z ${fmt(M.z[k], 0)}</div>${lb ? `${esc(lb.emoji)} ${esc(lb.label)}` : `<span class="k">promotes</span> ${row.lens_up.slice(0, 4).map(showTok).join(" ")}`}`;
+  tip.innerHTML = `<div class="k">L${L} · N${n} · z ${fmt(M.z[k], 0)}</div>${lb ? `${esc(lb.emoji)} ${esc(lb.label)}` : row ? `<span class="k">promotes</span> ${row.lens_up.slice(0, 4).map(showTok).join(" ")}` : `<span class="k">click to open</span>`}`;
   tip.hidden = false;
   const x = e.clientX - rc.left + 14, y = e.clientY - rc.top + 14;
   tip.style.left = Math.min(x, rc.width - 290) + "px"; tip.style.top = y + "px";
@@ -449,9 +462,11 @@ function keyName(M, k) { const L = Math.floor(k / M.d); return `L${L} · N${k - 
 async function openNeuron(k, opts = {}) {
   const M = S.M; S.sel = k; draw();
   if (opts.focus) focusOn(k);
-  const L = Math.floor(k / M.d), n = k - L * M.d, row = M.rows[k], lb = M.lab.get(k);
+  const L = Math.floor(k / M.d), n = k - L * M.d, lb = M.lab.get(k);
   try { history.replaceState(null, "", `#${M.info.id}-L${L}-N${n}`) } catch {}
   const P = $("panel");
+  if (!M.rows[k]) { P.innerHTML = `<p class="muted">Loading layer ${L}…</p>`; await ensureLayer(M, L); if (S.sel !== k) return; }
+  const row = M.rows[k];
   const st = M.steer.get(k) || [];
   const prompts = M.info.steer?.prompts || [];
   let steerHTML = "";
@@ -489,7 +504,9 @@ async function openNeuron(k, opts = {}) {
     ${steerHTML}
     <div><h3>${row.nbrs ? "Writes like (cosine of output directions)" : "Neighbors on the map"}</h3><div class="nbrs" id="nbrs"></div></div>`;
   const nb = neighbors(M, k);
-  $("nbrs").innerHTML = nb.map(([j, c]) => { const l = M.lab.get(j); return `<button data-k="${j}"><span class="k">${keyName(M, j)}${c != null ? " · " + c.toFixed(2) : ""}</span>${l ? esc(l.emoji + " " + l.label) : M.rows[j].lens_up.slice(0, 3).map(showTok).join(" ")}</button>` }).join("");
+  const nbHTML = () => nb.map(([j, c]) => { const l = M.lab.get(j), r = M.rows[j]; return `<button data-k="${j}"><span class="k">${keyName(M, j)}${c != null ? " · " + c.toFixed(2) : ""}</span>${l ? esc(l.emoji + " " + l.label) : r ? r.lens_up.slice(0, 3).map(showTok).join(" ") : "…"}</button>` }).join("");
+  $("nbrs").innerHTML = nbHTML();
+  ensureLayers(M, nb.map(([j]) => Math.floor(j / M.d))).then(() => { if (S.sel === k && $("nbrs")) $("nbrs").innerHTML = nbHTML(); }).catch(() => {});
   $("nbrs").onclick = e => { const b = e.target.closest("button"); if (b) openNeuron(+b.dataset.k, { focus: true }); };
   const [by, toks] = await Promise.all([layerExamples(M, L), tokens(M)]);
   if (S.sel !== k) return;
@@ -510,18 +527,24 @@ function search(M, q, mode, limit = 40) {
   } else {
     const qq = norm(q);
     for (let k = 0; k < M.N; k++) {
-      const list = mode === "says" ? M.rows[k].lens_up : M.rows[k].peaks;
+      const r = M.rows[k]; if (!r) continue;
+      const list = mode === "says" ? r.lens_up : r.peaks;
       let sc = 0; list.forEach((t, i) => { if (norm(t) === qq) sc += mode === "says" ? 1 / (1 + i) : 1; });
       if (sc > 0) out.push([k, sc + M.z[k] / 1000]);
     }
   }
   return out.sort((a, b) => b[1] - a[1]).slice(0, limit).map(o => o[0]);
 }
-function rowLabel(M, k) { const l = M.lab.get(k); return l ? `${esc(l.emoji)} ${esc(l.label)}` : `<span class="muted">promotes</span> ${M.rows[k].lens_up.slice(0, 4).map(t => `<span class="tok">${showTok(t)}</span>`).join(" ")}`; }
-let resIdx = [];
-function runSearch() {
-  const M = S.M, q = $("q").value, box = $("results");
+function rowLabel(M, k) { const l = M.lab.get(k), r = M.rows[k]; return l ? `${esc(l.emoji)} ${esc(l.label)}` : r ? `<span class="muted">promotes</span> ${r.lens_up.slice(0, 4).map(t => `<span class="tok">${showTok(t)}</span>`).join(" ")}` : keyName(M, k); }
+let resIdx = [], searchSeq = 0;
+async function runSearch() {
+  const M = S.M, q = $("q").value, box = $("results"), seq = ++searchSeq;
   if (!M || !q.trim()) { box.hidden = true; hits = null; draw(); return; }
+  if (S.qmode !== "label" && !allLoaded(M)) {   // token search reads every layer's rows: fetch them once
+    box.hidden = false; box.innerHTML = `<div class="muted" style="padding:8px 12px">Loading layers to search every neuron…</div>`;
+    await ensureLayers(M, allLayers(M), (i, n) => { if (seq === searchSeq) box.innerHTML = `<div class="muted" style="padding:8px 12px">Loading layers to search every neuron: ${i} / ${n}</div>`; });
+    if (seq !== searchSeq) return;
+  }
   resIdx = search(M, q, S.qmode, 60); hits = resIdx.length ? resIdx : null; draw();
   box.innerHTML = resIdx.length ? resIdx.slice(0, 30).map((k, i) => `<button data-k="${k}" class="${i === 0 ? "on" : ""}"><span class="k">${keyName(M, k)}</span><span>${rowLabel(M, k)}</span></button>`).join("")
     : `<div class="muted" style="padding:8px 12px">No match in ${esc(M.info.model)}. ${S.qmode === "label" ? "Only labeled neurons are searched by label; try “fires on token” or “promotes token”." : "Tokens match exactly, leading space included (e.g. “ Paris”)."}</div>`;
@@ -601,6 +624,9 @@ $("cgo").onclick = runCompare; $("cq").onkeydown = e => { if (e.key === "Enter")
 async function runCompare() {
   const q = $("cq").value; $("cstat").textContent = "loading every model…";
   const Ms = await Promise.all(S.models.map(m => loadModel(m.id)));
+  if (cmode !== "label") await Promise.all(Ms.map(M => ensureLayers(M, allLayers(M), () => {
+    const left = Ms.reduce((a, m) => a + m.info.n_layers - m.layerP.size, 0);
+    $("cstat").textContent = `loading layers… ${left} left`; })));
   $("cstat").textContent = `${cmode === "says" ? "neurons whose logit lens promotes" : cmode === "fires" ? "neurons whose top documents peak on" : "labels matching"} “${q}”`;
   $("cout").innerHTML = Ms.map(M => { const r = search(M, q, cmode, 6);
     return `<div class="card" style="gap:8px"><h3>${esc(M.info.model)} · ${r.length ? r.length + (r.length === 6 ? "+" : "") : "no"} hits</h3>${r.map(k => {
@@ -636,7 +662,7 @@ const SQLX = [
   ["best labels", $("sqltext").value],
   ["layer profile", "select layer, count(*) labeled, round(avg(detect), 2) held_out, mode(push_kind) common_push\nfrom labels group by layer order by layer"],
   ["personas", "select s.layer, s.neuron, s.dose, s.who, s.text, l.label\nfrom steer s left join labels l using (layer, neuron)\nwhere s.reply_kind = 'persona' and s.kind <> 'random'\norder by s.layer limit 40"],
-  ["vs random", "select kind, reply_kind, count(*) n,\n  round(count(*) / sum(count(*)) over (partition by kind), 2) share\nfrom steer where layer >= 0 group by all order by kind, n desc"],
+  ["vs random", "select kind, reply_kind, count(*) n,\n  round(count(*) / sum(count(*)) over (partition by kind), 2) frac\nfrom steer where layer >= 0 group by kind, reply_kind order by kind, n desc"],
   ["peakiest neurons", "select layer, neuron, round(zmax, 1) z, peaks[1:5] fires_on, lens_up[1:5] promotes\nfrom neurons order by zmax desc limit 25"],
   ["dense neurons", "select layer, neuron, round(frac_pos, 2) frac_pos, lens_up[1:5] promotes\nfrom neurons order by frac_pos desc limit 25"],
 ];
@@ -658,7 +684,7 @@ async function sqlInit() {
     const M = S.M, abs = u => new URL(u, location.href).href, c = duck.conn;
     const register = async (name, url) => B64 ? duck.inst.registerFileBuffer(name, new Uint8Array(await fetchBuf(url)))
       : duck.inst.registerFileURL(name, abs(url), duck.db.DuckDBDataProtocol.HTTP, false);
-    const files = ["neurons", "labels", "steer", "tokens"];
+    const files = M.info.sharded ? ["map", "labels", "steer", "tokens"] : ["neurons", "labels", "steer", "tokens"];
     for (const f of files) {
       try { await register(`${M.info.id}_${f}.parquet`, M.dir + f + ".parquet");
         await c.query(`create or replace view ${f} as select * from '${M.info.id}_${f}.parquet'`); } catch { }
@@ -666,6 +692,11 @@ async function sqlInit() {
     const ex = [];
     for (let L = 0; L < M.info.n_layers; L++) { const nm = `${M.info.id}_ex${L}.parquet`; await register(nm, M.dir + `examples/L${String(L).padStart(2, "0")}.parquet`); ex.push(`'${nm}'`); }
     await c.query(`create or replace view examples as select * from read_parquet([${ex.join(",")}])`);
+    if (M.info.sharded) {
+      const nl = [];
+      for (let L = 0; L < M.info.n_layers; L++) { const nm = `${M.info.id}_n${L}.parquet`; await register(nm, M.dir + `neurons/L${String(L).padStart(2, "0")}.parquet`); nl.push(`'${nm}'`); }
+      await c.query(`create or replace view neurons as select * from read_parquet([${nl.join(",")}])`);
+    }
     duckFor = M.info.id; $("sqlstat").textContent = `ready · ${M.info.model}`;
     return duck;
   } catch (e) {

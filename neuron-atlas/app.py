@@ -10,6 +10,7 @@ import duckdb
 import gradio as gr
 import torch
 
+from atlas import neurons_src
 from atlas.model import NeuronModel
 
 
@@ -17,7 +18,8 @@ def fetch_atlas(atlas=None, repo=None, slug=None):
     if atlas:
         return atlas
     from huggingface_hub import snapshot_download
-    root = snapshot_download(repo, repo_type="dataset", allow_patterns=[f"{slug}/*.json", f"{slug}/*.parquet"])
+    root = snapshot_download(repo, repo_type="dataset", allow_patterns=[f"{slug}/*.json", f"{slug}/labels.parquet",
+                                                                                      f"{slug}/neurons/*.parquet"])
     return os.path.join(root, slug)
 
 
@@ -27,7 +29,7 @@ class Live:
         self.meta = json.load(open(f"{atlas}/meta.json"))
         self.nm = NeuronModel(self.meta["model"])
         con = duckdb.connect()
-        st = con.sql(f"select layer, neuron, mean, std, lens_up from '{atlas}/neurons.parquet' order by layer, neuron").fetchall()
+        st = con.sql(f"select layer, neuron, mean, std, lens_up from {neurons_src(atlas)} order by layer, neuron").fetchall()
         L, d = self.meta["n_layers"], self.meta["d_mlp"]
         self.mean = torch.tensor([r[2] for r in st]).view(L, d)
         self.std = torch.tensor([r[3] for r in st]).view(L, d).clamp(min=1e-4)
