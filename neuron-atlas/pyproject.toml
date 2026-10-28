@@ -1,0 +1,17 @@
+[project]
+name = "neuron-atlas"
+version = "0.1.0"
+description = "Record, label and explore every MLP neuron of open language models"
+requires-python = ">=3.10"
+dependencies = ["torch", "transformers>=4.51", "accelerate", "datasets", "duckdb", "pyarrow", "numpy",
+                "scikit-learn", "umap-learn", "huggingface_hub", "openai"]
+
+[project.optional-dependencies]
+app = ["gradio>=5"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["atlas"]
