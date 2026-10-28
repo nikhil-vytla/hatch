@@ -13,7 +13,7 @@
   --eosin: #d6336c; --eosin-soft: #f9d9e5; --hema: #4b3fa8; --hema-soft: #dedaf5; --accent: #b0245a;
   --plate: #17152a; --plate-ink: #ece9f7; --plate-ink2: #a29dbb; --plate-line: #2c2946;
   --good: #1f8a5b; --warn: #b7791f;
-  --k-persona: #d6336c; --k-altered: #4b3fa8; --k-other: #1baf7a; --k-incoherent: #eda100; --k-default: #cfcbdc;
+  --k-user: #2a78d6; --k-persona: #d6336c; --k-altered: #4b3fa8; --k-other: #1baf7a; --k-incoherent: #eda100; --k-default: #cfcbdc;
   --display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
   --body: "Source Sans 3", "Segoe UI", system-ui, -apple-system, sans-serif;
   --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
@@ -27,7 +27,7 @@
   --bg: #121019; --surface: #1b1826; --sunk: #242033; --line: #343048; --ink: #ece9f7; --ink2: #b3adc8; --ink3: #827c99;
   --eosin: #ff6b9a; --eosin-soft: #4a1f33; --hema: #9d92ff; --hema-soft: #2d2858; --accent: #ff7aa6;
   --plate: #0b0a12; --plate-ink: #ece9f7; --plate-ink2: #9a95b2; --plate-line: #24213a; --good: #4cc38a; --warn: #e0a84a;
-  --k-persona: #e0447a; --k-altered: #8a7ef0; --k-other: #199e70; --k-incoherent: #c98500; --k-default: #3b3652;
+  --k-user: #3987e5; --k-persona: #e0447a; --k-altered: #8a7ef0; --k-other: #199e70; --k-incoherent: #c98500; --k-default: #3b3652;
   --card-shadow: 0 1px 2px rgb(0 0 0 / .3), 0 4px 16px rgb(0 0 0 / .25);
   --card-shadow-hover: 0 2px 4px rgb(0 0 0 / .38), 0 8px 24px rgb(0 0 0 / .35);
   --pill-shadow: 0 1px 2px rgb(0 0 0 / .35), 0 2px 6px rgb(0 0 0 / .3);
@@ -36,7 +36,7 @@
   --bg: #121019; --surface: #1b1826; --sunk: #242033; --line: #343048; --ink: #ece9f7; --ink2: #b3adc8; --ink3: #827c99;
   --eosin: #ff6b9a; --eosin-soft: #4a1f33; --hema: #9d92ff; --hema-soft: #2d2858; --accent: #ff7aa6;
   --plate: #0b0a12; --plate-ink: #ece9f7; --plate-ink2: #9a95b2; --plate-line: #24213a; --good: #4cc38a; --warn: #e0a84a;
-  --k-persona: #e0447a; --k-altered: #8a7ef0; --k-other: #199e70; --k-incoherent: #c98500; --k-default: #3b3652;
+  --k-user: #3987e5; --k-persona: #e0447a; --k-altered: #8a7ef0; --k-other: #199e70; --k-incoherent: #c98500; --k-default: #3b3652;
   --card-shadow: 0 1px 2px rgb(0 0 0 / .3), 0 4px 16px rgb(0 0 0 / .25);
   --card-shadow-hover: 0 2px 4px rgb(0 0 0 / .38), 0 8px 24px rgb(0 0 0 / .35);
   --pill-shadow: 0 1px 2px rgb(0 0 0 / .35), 0 2px 6px rgb(0 0 0 / .3);
@@ -326,6 +326,10 @@ textarea.sql { width: 100%; min-height: 110px; font: 13px var(--mono); border: 1
 
   <section id="v-overview" hidden>
     <div class="ov-controls">
+      <div class="seg" id="ovsweep" role="group" aria-label="Sweep" hidden>
+        <button aria-pressed="true" data-s="model">Who are you? · the model</button>
+        <button aria-pressed="false" data-s="user">Who am I? · the user</button>
+      </div>
       <select id="ovprompt" aria-label="Prompt">
         <option value="">both prompts</option>
         <option value="0">Who are you?</option>
@@ -354,6 +358,12 @@ textarea.sql { width: 100%; min-height: 110px; font: 13px var(--mono); border: 1
   </section>
 
   <section id="v-personas" hidden>
+    <div class="filters">
+      <div class="seg" id="psweep" role="group" aria-label="Sweep" hidden>
+        <button aria-pressed="true" data-s="model">Who are you? · the model</button>
+        <button aria-pressed="false" data-s="user">Who am I? · the user</button>
+      </div>
+    </div>
     <p class="muted" id="pempty" hidden>No persona library for this model yet</p>
     <div class="filters" id="pfilters">
       <input id="psearch" type="search" autocomplete="off" placeholder="Search personas, changes, replies…" aria-label="Search personas" style="flex:1 1 260px">
@@ -545,7 +555,30 @@ async function readNeuronRows(url, neuron) {
 }
 
 /* ---------- state ---------- */
-const S = { models: [], M: null, cache: new Map(), tab: "map", qmode: "label", isolate: -1, colorby: "layer", sel: -1 };
+const S = { models: [], M: null, cache: new Map(), tab: "map", qmode: "label", isolate: -1, colorby: "layer", sel: -1, sweep: "model" };
+const SWEEP_KINDS = {
+  model: [["persona", "persona", true], ["altered_assistant", "altered assistant", true], ["other", "other", false]],
+  user: [["user_identity", "user identity", true], ["model_persona", "model persona", true], ["altered_assistant", "altered assistant", false], ["other", "other", false]],
+};
+function renderKindChips() {
+  const kinds = SWEEP_KINDS[S.sweep] || SWEEP_KINDS.model;
+  $("pkinds").innerHTML = kinds.map(([k, label, on]) => `<button aria-pressed="${on}" data-k="${k}">${label}</button>`).join("");
+}
+function updateSweepUI() {
+  const hasUser = !!S.M?.info.user_sweep, user = S.sweep === "user";
+  ["psweep", "ovsweep"].forEach(id => {
+    const el = $(id); if (!el) return;
+    el.hidden = !hasUser;
+    [...el.children].forEach(b => b.setAttribute("aria-pressed", b.dataset.s === S.sweep));
+  });
+  $("pprompt").hidden = user;
+  $("ovprompt").hidden = user;
+}
+function setSweep(sweep, resetKinds = true) {
+  S.sweep = sweep === "user" && S.M?.info.user_sweep ? "user" : "model";
+  updateSweepUI();
+  if (resetKinds) renderKindChips();
+}
 
 async function loadModel(id) {
   if (S.cache.has(id)) return S.cache.get(id);
@@ -991,10 +1024,12 @@ async function renderPushes() {
 $("pushgrid").onclick = e => { const b = e.target.closest(".push"); if (b) { setTab("map"); openNeuron(+b.dataset.k, { focus: true }); } };
 
 /* ---------- personas ---------- */
-const PERSONA_KIND_LABEL = { persona: "persona", altered_assistant: "altered assistant", other: "other" };
-const P = { M: null, all: [], rows: [], groups: new Map(), hasGroup: false, total: 0, names: 0, shown: 60, group: "", seq: 0 };
-function loadPersonas(M) {
-  if (!M.personasP) M.personasP = tryPq(M.dir + "personas.parquet").then(rows => {
+const PERSONA_KIND_LABEL = { persona: "persona", user_identity: "user identity", model_persona: "model persona", altered_assistant: "altered assistant", other: "other" };
+const P = { M: null, sweep: null, all: [], rows: [], groups: new Map(), hasGroup: false, total: 0, names: 0, shown: 60, group: "", seq: 0 };
+function loadPersonas(M, sweep = S.sweep) {
+  const key = sweep === "user" ? "userPersonasP" : "personasP";
+  const file = sweep === "user" ? "user_personas.parquet" : "personas.parquet";
+  if (!M[key]) M[key] = tryPq(M.dir + file).then(rows => {
     if (!rows) return null;
     let hasGroup = false;
     rows.forEach(r => {
@@ -1005,13 +1040,14 @@ function loadPersonas(M) {
     rows.hasGroup = hasGroup;
     return rows;
   }).catch(() => null);
-  return M.personasP;
+  return M[key];
 }
 function personaHash() {
   const p = new URLSearchParams();
   const q = $("psearch").value.trim(); if (q) p.set("q", q);
+  if (S.sweep === "user") p.set("sweep", "user");
   p.set("kinds", [...$("pkinds").querySelectorAll('button[aria-pressed="true"]')].map(b => b.dataset.k).join(","));
-  if ($("pprompt").value) p.set("prompt", $("pprompt").value);
+  if (S.sweep !== "user" && $("pprompt").value) p.set("prompt", $("pprompt").value);
   if ($("pdose").value) p.set("dose", $("pdose").value);
   if ($("plmin").value !== "") p.set("lmin", $("plmin").value);
   if ($("plmax").value !== "") p.set("lmax", $("plmax").value);
@@ -1027,12 +1063,14 @@ function syncPersonasHash() {
 }
 function applyPersonaHash(params) {
   const q = params.get("q"); if (q != null) $("psearch").value = q;
+  const wantUser = params.get("sweep") === "user" && !!S.M?.info.user_sweep;
+  if ((wantUser ? "user" : "model") !== S.sweep) setSweep(wantUser ? "user" : "model", true);
   const kinds = params.get("kinds");
   if (kinds != null) {
     const set = new Set(kinds.split(",").filter(Boolean));
     [...$("pkinds").children].forEach(b => b.setAttribute("aria-pressed", set.has(b.dataset.k)));
   }
-  const prompt = params.get("prompt"); if (prompt != null && ["0", "1"].includes(prompt)) $("pprompt").value = prompt;
+  const prompt = params.get("prompt"); if (S.sweep !== "user" && prompt != null && ["0", "1"].includes(prompt)) $("pprompt").value = prompt;
   const dose = params.get("dose"); if (dose === "up" || dose === "down") $("pdose").value = dose;
   const lmin = params.get("lmin"); if (lmin != null) $("plmin").value = lmin;
   const lmax = params.get("lmax"); if (lmax != null) $("plmax").value = lmax;
@@ -1066,10 +1104,10 @@ function renderPersonaGrid() {
   $("ppcount").textContent = `${P.total.toLocaleString()} replies · ${P.names.toLocaleString()} distinct names · showing ${n.toLocaleString()}`;
 }
 function renderPersonaResults() {
-  const M = S.M; if (!M || P.M !== M) return;
+  const M = S.M; if (!M || P.M !== M || P.sweep !== S.sweep) return;
   const q = norm($("psearch").value), words = q ? q.split(/\s+/) : [];
   const kinds = new Set([...$("pkinds").querySelectorAll('button[aria-pressed="true"]')].map(b => b.dataset.k));
-  const prompt = $("pprompt").value, dose = $("pdose").value;
+  const prompt = S.sweep === "user" ? "" : $("pprompt").value, dose = $("pdose").value;
   const lmin = $("plmin").value === "" ? -Infinity : Number($("plmin").value);
   const lmax = $("plmax").value === "" ? Infinity : Number($("plmax").value);
   const one = $("pone").checked, gsel = P.group;
@@ -1108,27 +1146,32 @@ function renderPersonaResults() {
 }
 async function renderPersonas() {
   const M = S.M; if (!M) return;
-  const seq = ++P.seq;
-  if (!M.info.personas) {
-    P.M = null; P.all = []; P.rows = []; P.total = 0; P.names = 0; P.group = "";
+  const seq = ++P.seq, sweep = S.sweep;
+  updateSweepUI();
+  const hasPersonas = sweep === "user" ? M.info.user_sweep : M.info.personas;
+  if (!hasPersonas) {
+    P.M = null; P.sweep = null; P.all = []; P.rows = []; P.total = 0; P.names = 0; P.group = "";
+    $("pempty").textContent = sweep === "user" ? "No user persona library for this model yet" : "No persona library for this model yet";
     $("pempty").hidden = false; $("pfilters").hidden = true; $("ppcount").hidden = true; $("pgroups").hidden = true; $("pmorow").hidden = true; $("pgrid").innerHTML = "";
     return;
   }
   $("pempty").hidden = true; $("pfilters").hidden = false; $("ppcount").hidden = false; $("pmorow").hidden = false;
-  if (P.M !== M) { P.M = M; P.all = []; P.rows = []; P.total = 0; P.names = 0; P.group = ""; P.shown = 60; }
-  if (!M.personasP) {
+  if (P.M !== M || P.sweep !== sweep) { P.M = M; P.sweep = sweep; P.all = []; P.rows = []; P.total = 0; P.names = 0; P.group = ""; P.shown = 60; }
+  const cacheKey = sweep === "user" ? "userPersonasP" : "personasP";
+  if (!M[cacheKey]) {
     $("ppcount").textContent = "loading personas…";
     $("pgrid").innerHTML = Array.from({ length: 6 }, () => `<div class="skel skel-card" aria-hidden="true"></div>`).join("");
     $("pgroups").hidden = true;
   }
-  const rows = await loadPersonas(M);
-  if (seq !== P.seq || S.M !== M) return;
+  const rows = await loadPersonas(M, sweep);
+  if (seq !== P.seq || S.M !== M || S.sweep !== sweep) return;
   if (!rows) {
-    P.M = null; P.all = []; P.rows = []; P.total = 0; P.names = 0;
+    P.M = null; P.sweep = null; P.all = []; P.rows = []; P.total = 0; P.names = 0;
+    $("pempty").textContent = sweep === "user" ? "No user persona library for this model yet" : "No persona library for this model yet";
     $("pempty").hidden = false; $("pfilters").hidden = true; $("ppcount").hidden = true; $("pgroups").hidden = true; $("pmorow").hidden = true; $("pgrid").innerHTML = "";
     return;
   }
-  P.M = M; P.all = rows; P.hasGroup = !!rows.hasGroup;
+  P.M = M; P.sweep = sweep; P.all = rows; P.hasGroup = !!rows.hasGroup;
   if (P.shown < 60) P.shown = 60;
   renderPersonaResults();
   syncPersonasHash();
@@ -1150,6 +1193,13 @@ $("pkinds").onclick = e => {
   b.setAttribute("aria-pressed", b.getAttribute("aria-pressed") !== "true");
   personaFilterChanged();
 };
+["psweep", "ovsweep"].forEach(id => $(id).onclick = e => {
+  const b = e.target.closest("button"); if (!b || b.dataset.s === S.sweep) return;
+  setSweep(b.dataset.s, true);
+  if (S.tab === "personas") { P.shown = 60; P.group = ""; renderPersonas(); syncPersonasHash(); }
+  else if (S.tab === "overview") { OV.rows = null; OV.persons = null; renderOverview(); syncOverviewHash(); }
+});
+renderKindChips();
 ["pprompt", "pdose", "ppsort"].forEach(id => $(id).onchange = personaFilterChanged);
 $("plmin").oninput = personaFilterChanged; $("plmax").oninput = personaFilterChanged; $("pone").onchange = personaFilterChanged;
 $("pgroups").onclick = e => {
@@ -1182,26 +1232,38 @@ $("pcsv").onclick = () => {
 };
 
 /* ---------- overview ---------- */
-const OV_KINDS = ["persona", "altered_assistant", "other", "incoherent", "default_assistant"];
-const OV_KIND_LABEL = { persona: "persona", altered_assistant: "altered assistant", other: "other", incoherent: "incoherent", default_assistant: "default assistant" };
-const OV_KIND_VAR = { persona: "--k-persona", altered_assistant: "--k-altered", other: "--k-other", incoherent: "--k-incoherent", default_assistant: "--k-default" };
-const OV = { M: null, rows: null, persons: null, prompt: "", push: "", table: false, seq: 0 };
+const OV_KINDS_MODEL = ["persona", "altered_assistant", "other", "incoherent", "default_assistant"];
+const OV_KINDS_USER = ["user_identity", "model_persona", "altered_assistant", "other", "incoherent", "default_assistant"];
+const OV_KIND_LABEL = { persona: "persona", user_identity: "user identity", model_persona: "model persona", altered_assistant: "altered assistant", other: "other", incoherent: "incoherent", default_assistant: "default assistant" };
+const OV_KIND_VAR = { persona: "--k-persona", user_identity: "--k-user", model_persona: "--k-persona", altered_assistant: "--k-altered", other: "--k-other", incoherent: "--k-incoherent", default_assistant: "--k-default" };
+const OV = { M: null, sweep: null, rows: null, persons: null, prompt: "", push: "", table: false, seq: 0 };
+const ovKinds = () => S.sweep === "user" ? OV_KINDS_USER : OV_KINDS_MODEL;
+const ovFocusKind = () => S.sweep === "user" ? "user_identity" : "persona";
 const ovColor = k => `var(${OV_KIND_VAR[k]})`;
 const ovPct = v => v <= 0 ? "0" : v >= 99.95 ? "100" : v >= 10 ? v.toFixed(0) : v.toFixed(1);
 const ovShort = v => v >= 1e6 ? (v / 1e6).toFixed(v >= 1e7 ? 0 : 1) + "M" : v >= 1e3 ? (v / 1e3).toFixed(v >= 1e4 ? 0 : 1) + "k" : String(Math.round(v));
 const ovFull = v => Math.round(v).toLocaleString();
 const ovTrunc = (s, n) => s.length > n ? s.slice(0, n - 1) + "…" : s;
 
-function ovSweep(M) {
-  if (!M.sweepP) M.sweepP = tryPq(M.dir + "sweep_stats.parquet", ["layer", "prompt", "sign", "reply_kind", "n_est", "n_labeled"]).catch(() => null);
-  return M.sweepP;
+function ovSweep(M, sweep = S.sweep) {
+  const key = sweep === "user" ? "userSweepP" : "sweepP";
+  const file = sweep === "user" ? "user_sweep_stats.parquet" : "sweep_stats.parquet";
+  if (!M[key]) M[key] = tryPq(M.dir + file, ["layer", "prompt", "sign", "reply_kind", "n_est", "n_labeled"]).catch(() => null);
+  return M[key];
 }
 function syncOverviewHash() {
   if (S.tab !== "overview" || !S.M) return;
-  try { history.replaceState(null, "", `#${S.M.info.id}-overview`) } catch {}
+  const p = new URLSearchParams();
+  if (S.sweep === "user") p.set("sweep", "user");
+  try { history.replaceState(null, "", `#${S.M.info.id}-overview${p.toString() ? "?" + p : ""}`) } catch {}
+}
+function applyOverviewHash(params) {
+  const wantUser = params.get("sweep") === "user" && !!S.M?.info.user_sweep;
+  const sweep = wantUser ? "user" : "model";
+  if (sweep !== S.sweep) setSweep(sweep, true);
 }
 function ovRowOk(r, prompt, push) {
-  if (!OV_KINDS.includes(r.reply_kind)) return false;
+  if (!ovKinds().includes(r.reply_kind)) return false;
   if (prompt !== "" && Number(r.prompt) !== Number(prompt)) return false;
   const s = Number(r.sign);
   if (push === "up" && !(s > 0)) return false;
@@ -1209,34 +1271,34 @@ function ovRowOk(r, prompt, push) {
   return true;
 }
 function ovAgg(rows, prompt, push) {
-  const nL = S.M.info.n_layers;
-  const layers = Array.from({ length: nL }, (_, L) => ({ L, total: 0, by: Object.fromEntries(OV_KINDS.map(k => [k, 0])) }));
+  const nL = S.M.info.n_layers, kinds = ovKinds(), focus = ovFocusKind();
+  const layers = Array.from({ length: nL }, (_, L) => ({ L, total: 0, by: Object.fromEntries(kinds.map(k => [k, 0])) }));
   let total = 0, persona = 0;
   for (const r of rows) {
     if (!ovRowOk(r, prompt, push)) continue;
     const L = Number(r.layer), n = Number(r.n_est) || 0;
     if (!layers[L]) continue;
     layers[L].by[r.reply_kind] += n; layers[L].total += n;
-    total += n; if (r.reply_kind === "persona") persona += n;
+    total += n; if (r.reply_kind === focus) persona += n;
   }
   return { layers, total, persona };
 }
 function ovPersonaLayers(rows, prompt) {
-  const nL = S.M.info.n_layers;
+  const nL = S.M.info.n_layers, kinds = ovKinds(), focus = ovFocusKind();
   const data = Array.from({ length: nL }, (_, L) => ({ L, up: 0, down: 0, upN: 0, downN: 0 }));
   for (const r of rows) {
-    if (!OV_KINDS.includes(r.reply_kind)) continue;
+    if (!kinds.includes(r.reply_kind)) continue;
     if (prompt !== "" && Number(r.prompt) !== Number(prompt)) continue;
     const L = Number(r.layer), n = Number(r.n_est) || 0, d = data[L];
     if (!d) continue;
-    if (Number(r.sign) > 0) { d.upN += n; if (r.reply_kind === "persona") d.up += n; }
-    else if (Number(r.sign) < 0) { d.downN += n; if (r.reply_kind === "persona") d.down += n; }
+    if (Number(r.sign) > 0) { d.upN += n; if (r.reply_kind === focus) d.up += n; }
+    else if (Number(r.sign) < 0) { d.downN += n; if (r.reply_kind === focus) d.down += n; }
   }
   data.forEach(d => { d.upPct = d.upN ? 100 * d.up / d.upN : 0; d.downPct = d.downN ? 100 * d.down / d.downN : 0; });
   return data;
 }
 function ovPersonaOk(r, prompt, push) {
-  if (r.reply_kind !== "persona") return false;
+  if (r.reply_kind !== ovFocusKind()) return false;
   if (prompt !== "" && Number(r.prompt) !== Number(prompt)) return false;
   const d = Number(r.dose);
   if (push === "up" && !(d > 0)) return false;
@@ -1272,6 +1334,7 @@ function ovCard(id, title, sub, legend, svg, table, empty) {
 // draw at the card's real width so SVG text stays ~11px on phones instead of shrinking with the viewBox
 const ovWidth = () => Math.max(300, Math.min(1200, ($("v-overview").clientWidth || 900) - 48));
 function ovChart1(layers) {
+  const kinds = ovKinds();
   const W = ovWidth(), H = W < 560 ? 260 : 340, ml = 44, mr = 13, mt = 12, mb = 30;
   const pw = W - ml - mr, ph = H - mt - mb, bottom = mt + ph;
   const slot = pw / Math.max(1, layers.length), barW = Math.max(2, Math.min(26, slot * .66));
@@ -1282,7 +1345,7 @@ function ovChart1(layers) {
   const cols = layers.map(d => {
     const x = ml + slot * (d.L + .5) - barW / 2;
     let acc = 0;
-    const segs = OV_KINDS.map(k => ({ k, v: d.by[k], share: d.total ? 100 * d.by[k] / d.total : 0 })).filter(s => s.v > 0 && s.share > 0);
+    const segs = kinds.map(k => ({ k, v: d.by[k], share: d.total ? 100 * d.by[k] / d.total : 0 })).filter(s => s.v > 0 && s.share > 0);
     const marks = segs.map((s, i) => {
       const yTop = mt + ph * (1 - (acc + s.share) / 100), yBot = mt + ph * (1 - acc / 100);
       acc += s.share;
@@ -1300,12 +1363,13 @@ function ovChart1(layers) {
     return `<g class="ov-col" data-layer="${d.L}" data-summary="${summary}" tabindex="0" role="button" aria-label="${esc(label)}"><rect class="ov-hit" x="${ml + slot * d.L}" y="${mt}" width="${slot}" height="${ph}" fill="transparent" pointer-events="all"/>${marks}${xt}</g>`;
   }).join("");
   const svg = `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="What a push does, by layer">${grid}${cols}</svg>`;
-  const head = `<tr><th scope="col">Layer</th>${OV_KINDS.map(k => `<th scope="col">${OV_KIND_LABEL[k]}</th>`).join("")}<th scope="col">replies (est.)</th></tr>`;
-  const body = layers.map(d => `<tr><th scope="row">${d.L}</th>${OV_KINDS.map(k => `<td class="num">${d.total ? (100 * d.by[k] / d.total).toFixed(1) + "%" : "–"}</td>`).join("")}<td class="num">${ovFull(d.total)}</td></tr>`).join("");
+  const head = `<tr><th scope="col">Layer</th>${kinds.map(k => `<th scope="col">${OV_KIND_LABEL[k]}</th>`).join("")}<th scope="col">replies (est.)</th></tr>`;
+  const body = layers.map(d => `<tr><th scope="row">${d.L}</th>${kinds.map(k => `<td class="num">${d.total ? (100 * d.by[k] / d.total).toFixed(1) + "%" : "–"}</td>`).join("")}<td class="num">${ovFull(d.total)}</td></tr>`).join("");
   const table = `<table class="ov-table"><caption>Share of estimated replies by kind, for each layer.</caption><thead>${head}</thead><tbody>${body}</tbody></table>`;
   return { svg, table };
 }
 function ovChart2(data) {
+  const focus = ovFocusKind(), focusLabel = OV_KIND_LABEL[focus];
   const W = ovWidth(), ml = 46, mr = 18, mt = 34, mb = 10, rowH = 18;
   const H = mt + mb + data.length * rowH;
   const pw = W - ml - mr, cx = ml + pw / 2, half = pw / 2;
@@ -1317,29 +1381,30 @@ function ovChart2(data) {
   const rows = data.map(d => {
     const y = mt + d.L * rowH + rowH / 2;
     const wu = len(d.upPct), wd = len(d.downPct);
-    const up = d.upPct > 0 ? `<g class="ov-mark" tabindex="0" role="img" data-layer="${d.L}" data-kind="push up" data-share="${d.upPct.toFixed(1)}" data-count="${Math.round(d.up)}" aria-label="layer ${d.L}, push up, persona ${ovPct(d.upPct)} percent"><rect class="ov-hit" x="${cx}" y="${y - bh / 2}" width="${Math.max(1, wu)}" height="${bh}" fill="${ovColor("persona")}"/></g>` : "";
-    const down = d.downPct > 0 ? `<g class="ov-mark" tabindex="0" role="img" data-layer="${d.L}" data-kind="push down" data-share="${d.downPct.toFixed(1)}" data-count="${Math.round(d.down)}" aria-label="layer ${d.L}, push down, persona ${ovPct(d.downPct)} percent"><rect class="ov-hit" x="${cx - Math.max(1, wd)}" y="${y - bh / 2}" width="${Math.max(1, wd)}" height="${bh}" fill="${ovColor("altered_assistant")}"/></g>` : "";
+    const up = d.upPct > 0 ? `<g class="ov-mark" tabindex="0" role="img" data-layer="${d.L}" data-kind="push up" data-share="${d.upPct.toFixed(1)}" data-count="${Math.round(d.up)}" aria-label="layer ${d.L}, push up, ${focusLabel} ${ovPct(d.upPct)} percent"><rect class="ov-hit" x="${cx}" y="${y - bh / 2}" width="${Math.max(1, wu)}" height="${bh}" fill="${ovColor(focus)}"/></g>` : "";
+    const down = d.downPct > 0 ? `<g class="ov-mark" tabindex="0" role="img" data-layer="${d.L}" data-kind="push down" data-share="${d.downPct.toFixed(1)}" data-count="${Math.round(d.down)}" aria-label="layer ${d.L}, push down, ${focusLabel} ${ovPct(d.downPct)} percent"><rect class="ov-hit" x="${cx - Math.max(1, wd)}" y="${y - bh / 2}" width="${Math.max(1, wd)}" height="${bh}" fill="${ovColor("altered_assistant")}"/></g>` : "";
     const labels = big.has(d.L) ? (d.upPct > 0 ? `<text x="${cx + wu + 4}" y="${y + 3.5}" font-size="10" fill="var(--ink2)">${ovPct(d.upPct)}%</text>` : "") + (d.downPct > 0 ? `<text x="${cx - wd - 4}" y="${y + 3.5}" text-anchor="end" font-size="10" fill="var(--ink2)">${ovPct(d.downPct)}%</text>` : "") : "";
     return `<text x="${ml - 6}" y="${y + 3.5}" text-anchor="end" font-size="10" fill="var(--ink3)">${d.L}</text>${down}${up}${labels}`;
   }).join("");
-  const svg = `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Persona rate of push-up and push-down replies, by layer"><line x1="${cx}" y1="${mt - 4}" x2="${cx}" y2="${H - mb}" stroke="var(--ink3)" stroke-width="1"/><text x="${cx - 8}" y="${mt - 12}" text-anchor="end" font-size="11" fill="var(--ink2)">push down ←</text><text x="${cx + 8}" y="${mt - 12}" font-size="11" fill="var(--ink2)">→ push up</text>${rows}</svg>`;
-  const table = `<table class="ov-table"><caption>Persona share of push-down and push-up replies, for each layer.</caption><thead><tr><th scope="col">Layer</th><th scope="col">push down</th><th scope="col">push up</th></tr></thead><tbody>${data.map(d => `<tr><th scope="row">${d.L}</th><td class="num">${d.downN ? d.downPct.toFixed(1) + "%" : "–"}</td><td class="num">${d.upN ? d.upPct.toFixed(1) + "%" : "–"}</td></tr>`).join("")}</tbody></table>`;
+  const svg = `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="${esc(focusLabel)} rate of push-up and push-down replies, by layer"><line x1="${cx}" y1="${mt - 4}" x2="${cx}" y2="${H - mb}" stroke="var(--ink3)" stroke-width="1"/><text x="${cx - 8}" y="${mt - 12}" text-anchor="end" font-size="11" fill="var(--ink2)">push down ←</text><text x="${cx + 8}" y="${mt - 12}" font-size="11" fill="var(--ink2)">→ push up</text>${rows}</svg>`;
+  const table = `<table class="ov-table"><caption>${esc(focusLabel)} share of push-down and push-up replies, for each layer.</caption><thead><tr><th scope="col">Layer</th><th scope="col">push down</th><th scope="col">push up</th></tr></thead><tbody>${data.map(d => `<tr><th scope="row">${d.L}</th><td class="num">${d.downN ? d.downPct.toFixed(1) + "%" : "–"}</td><td class="num">${d.upN ? d.upPct.toFixed(1) + "%" : "–"}</td></tr>`).join("")}</tbody></table>`;
   return { svg, table };
 }
 function ovChart3(names) {
+  const user = S.sweep === "user", focus = ovFocusKind(), focusLabel = OV_KIND_LABEL[focus];
   const W = ovWidth(), ml = Math.min(190, Math.round(W * .38)), mr = 56, mt = 10, mb = 10, rowH = 26;
   const H = mt + mb + names.length * rowH;
   const pw = W - ml - mr, max = Math.max(1, ...names.map(n => n.count));
   const rows = names.map((n, i) => {
     const y = mt + i * rowH + rowH / 2, w = Math.max(1, pw * n.count / max);
-    return `<g class="ov-mark" data-name="${esc(n.name)}" data-count="${n.count}" data-replies="${n.replies}" tabindex="0" role="button" aria-label="${esc(n.name)}, ${n.count} distinct neurons"><rect class="ov-hit" x="${ml}" y="${y - 8}" width="${pw}" height="16" fill="transparent" pointer-events="all"/><text x="${ml - 8}" y="${y + 4}" text-anchor="end" font-size="12" fill="var(--ink)">${esc(ovTrunc(n.name, Math.max(10, Math.floor((ml - 12) / 6.6))))}<title>${esc(n.name)}</title></text><rect x="${ml}" y="${y - 7}" width="${w}" height="14" rx="3" fill="${ovColor("persona")}"/><text x="${ml + w + 6}" y="${y + 4}" font-size="10" fill="var(--ink2)">${ovFull(n.count)}</text></g>`;
+    return `<g class="ov-mark" data-name="${esc(n.name)}" data-count="${n.count}" data-replies="${n.replies}" tabindex="0" role="button" aria-label="${esc(n.name)}, ${n.count} distinct neurons"><rect class="ov-hit" x="${ml}" y="${y - 8}" width="${pw}" height="16" fill="transparent" pointer-events="all"/><text x="${ml - 8}" y="${y + 4}" text-anchor="end" font-size="12" fill="var(--ink)">${esc(ovTrunc(n.name, Math.max(10, Math.floor((ml - 12) / 6.6))))}<title>${esc(n.name)}</title></text><rect x="${ml}" y="${y - 7}" width="${w}" height="14" rx="3" fill="${ovColor(focus)}"/><text x="${ml + w + 6}" y="${y + 4}" font-size="10" fill="var(--ink2)">${ovFull(n.count)}</text></g>`;
   }).join("");
-  const svg = `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Most common character names">${rows}</svg>`;
-  const table = `<table class="ov-table"><caption>Most common character names by distinct neurons.</caption><thead><tr><th scope="col">Character</th><th scope="col">distinct neurons</th><th scope="col">persona replies</th></tr></thead><tbody>${names.map(n => `<tr><th scope="row">${esc(n.name)}</th><td class="num">${ovFull(n.count)}</td><td class="num">${ovFull(n.replies)}</td></tr>`).join("")}</tbody></table>`;
+  const svg = `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="${user ? "Most common names given to the user" : "Most common character names"}">${rows}</svg>`;
+  const table = `<table class="ov-table"><caption>${user ? "Most common names given to the user by distinct neurons." : "Most common character names by distinct neurons."}</caption><thead><tr><th scope="col">${user ? "Name" : "Character"}</th><th scope="col">distinct neurons</th><th scope="col">${esc(focusLabel)} replies</th></tr></thead><tbody>${names.map(n => `<tr><th scope="row">${esc(n.name)}</th><td class="num">${ovFull(n.count)}</td><td class="num">${ovFull(n.replies)}</td></tr>`).join("")}</tbody></table>`;
   return { svg, table };
 }
 function ovTipHTML(el) {
-  if (el.dataset.name != null) return `<div class="k">character</div><b>${esc(el.dataset.name)}</b><div>${ovFull(+el.dataset.count)} distinct neurons · ${ovFull(+el.dataset.replies)} persona replies</div>`;
+  if (el.dataset.name != null) { const user = S.sweep === "user"; return `<div class="k">${user ? "name" : "character"}</div><b>${esc(el.dataset.name)}</b><div>${ovFull(+el.dataset.count)} distinct neurons · ${ovFull(+el.dataset.replies)} ${user ? "user identity" : "persona"} replies</div>`; }
   const layer = el.dataset.layer;
   if (el.dataset.kind) return `<div class="k">layer ${layer}</div><b>${esc(el.dataset.kind.startsWith("push") ? el.dataset.kind : (OV_KIND_LABEL[el.dataset.kind] || el.dataset.kind))}</b><div>${Number(el.dataset.share).toFixed(1)}% · ${ovFull(+el.dataset.count)} replies (est.)</div>`;
   const summary = el.dataset.summary || "";
@@ -1366,7 +1431,8 @@ function ovApplyTable() {
 }
 function ovOpenLayer(L) {
   const p = new URLSearchParams();
-  p.set("q", ""); p.set("kinds", "persona"); p.set("lmin", String(L)); p.set("lmax", String(L));
+  p.set("q", ""); p.set("kinds", ovFocusKind()); p.set("lmin", String(L)); p.set("lmax", String(L));
+  if (S.sweep === "user") p.set("sweep", "user");
   applyPersonaHash(p);
   setTab("personas");
 }
@@ -1376,43 +1442,45 @@ function ovOpenName(name) {
 }
 async function renderOverview() {
   const M = S.M; if (!M) return;
-  const seq = ++OV.seq, empty = $("ovempty"), body = $("ovbody");
-  OV.prompt = $("ovprompt").value; OV.push = $("ovpush").value;
-  if (!M.info.sweep_stats) {
-    OV.M = null; OV.rows = null; OV.persons = null;
+  const seq = ++OV.seq, empty = $("ovempty"), body = $("ovbody"), sweep = S.sweep, user = sweep === "user";
+  updateSweepUI();
+  OV.prompt = user ? "" : $("ovprompt").value; OV.push = $("ovpush").value;
+  if (!(user ? M.info.user_sweep : M.info.sweep_stats)) {
+    OV.M = null; OV.sweep = null; OV.rows = null; OV.persons = null;
     empty.hidden = false; body.hidden = true; body.innerHTML = "";
     return;
   }
   empty.hidden = true; body.hidden = false;
-  if (OV.M !== M) { OV.M = M; OV.rows = null; OV.persons = null; }
+  if (OV.M !== M || OV.sweep !== sweep) { OV.M = M; OV.sweep = sweep; OV.rows = null; OV.persons = null; }
   if (!OV.rows) {
     body.innerHTML = `<div class="card"><p class="muted">Loading sweep stats…</p></div>`;
-    const [rows, persons] = await Promise.all([ovSweep(M), loadPersonas(M)]);
-    if (seq !== OV.seq || S.M !== M) return;
+    const [rows, persons] = await Promise.all([ovSweep(M, sweep), loadPersonas(M, sweep)]);
+    if (seq !== OV.seq || S.M !== M || S.sweep !== sweep) return;
     if (!rows) { empty.hidden = false; body.hidden = true; body.innerHTML = ""; return; }
     OV.rows = rows; OV.persons = persons;
   }
-  if (seq !== OV.seq || S.M !== M) return;
+  if (seq !== OV.seq || S.M !== M || S.sweep !== sweep) return;
   const agg = ovAgg(OV.rows, OV.prompt, OV.push);
   const chars = ovCharacters(OV.persons, OV.prompt, OV.push);
+  const kinds = ovKinds(), focus = ovFocusKind(), focusLabel = OV_KIND_LABEL[focus];
   const c1 = agg.total ? ovChart1(agg.layers) : { empty: "No replies match these controls." };
   const c2data = ovPersonaLayers(OV.rows, OV.prompt);
   const c2 = c2data.some(d => d.upN || d.downN) ? ovChart2(c2data) : { empty: "No push replies match this prompt." };
-  const c3 = chars.length ? ovChart3(chars.slice(0, 15)) : { empty: OV.persons ? "No persona names match these controls." : "No persona library for this model yet." };
+  const c3 = chars.length ? ovChart3(chars.slice(0, 15)) : { empty: OV.persons ? `No ${focusLabel} names match these controls.` : `No ${user ? "user persona" : "persona"} library for this model yet.` };
   const pct = agg.total ? 100 * agg.persona / agg.total : 0;
   const stats = `<div class="stats ovstats">
     <div class="stat"><b>${M.N.toLocaleString()}</b><span>neurons pushed</span></div>
     <div class="stat"><b title="${ovFull(agg.total)}">${ovShort(agg.total)}</b><span>replies (estimated total)</span></div>
-    <div class="stat"><b title="${ovFull(agg.persona)}">${ovShort(agg.persona)}</b><span>persona replies · ${ovPct(pct)}% of all</span></div>
-    <div class="stat"><b>${chars.length.toLocaleString()}</b><span>distinct character names</span></div>
+    <div class="stat"><b title="${ovFull(agg.persona)}">${ovShort(agg.persona)}</b><span>${user ? "user identity" : "persona"} replies · ${ovPct(pct)}% of all</span></div>
+    <div class="stat"><b>${chars.length.toLocaleString()}</b><span>${user ? "distinct names given to the user" : "distinct character names"}</span></div>
   </div>`;
-  const legend1 = ovLegend(OV_KINDS.map(k => [OV_KIND_LABEL[k], ovColor(k)]));
-  const legend2 = ovLegend([["push up", ovColor("persona")], ["push down", ovColor("altered_assistant")]]);
-  const legend3 = ovLegend([["distinct neurons", ovColor("persona")]]);
+  const legend1 = ovLegend(kinds.map(k => [OV_KIND_LABEL[k], ovColor(k)]));
+  const legend2 = ovLegend([["push up", ovColor(focus)], ["push down", ovColor("altered_assistant")]]);
+  const legend3 = ovLegend([["distinct neurons", ovColor(focus)]]);
   body.innerHTML = stats + `<div class="ov-grid">
     ${ovCard("1", "What a push does, by layer", "Each bar is one layer; the colors show what kind of reply the push produced.", legend1, c1.svg || "", c1.table || "", c1.empty)}
-    ${ovCard("2", "Persona rate, up vs down", "How often pushing up or down turns the reply into a persona (both directions shown).", legend2, c2.svg || "", c2.table || "", c2.empty)}
-    ${ovCard("3", "Most common characters", "The 15 names that appear across the most pushed neurons.", legend3, c3.svg || "", c3.table || "", c3.empty)}
+    ${ovCard("2", user ? "User persona rate, up vs down" : "Persona rate, up vs down", user ? "How often pushing up or down makes the reply say who the user is (both directions shown)." : "How often pushing up or down turns the reply into a persona (both directions shown).", legend2, c2.svg || "", c2.table || "", c2.empty)}
+    ${ovCard("3", user ? "Who the user becomes" : "Most common characters", user ? "The 15 names the user is given across the most pushed neurons." : "The 15 names that appear across the most pushed neurons.", legend3, c3.svg || "", c3.table || "", c3.empty)}
   </div>`;
   ovApplyTable();
 }
@@ -1431,7 +1499,7 @@ $("ovbody").addEventListener("click", e => {
   const col = e.target.closest(".ov-col");
   if (col) {
     const kind = e.target.closest("[data-kind]")?.dataset.kind;
-    if (!kind || kind === "persona") ovOpenLayer(+col.dataset.layer);
+    if (!kind || kind === ovFocusKind()) ovOpenLayer(+col.dataset.layer);
     return;
   }
   const nameEl = e.target.closest("[data-name]");
@@ -1676,6 +1744,7 @@ $("sqltext").onkeydown = e => { if ((e.metaKey || e.ctrlKey) && e.key === "Enter
 async function selectModel(id) {
   $("sub").textContent = "loading…";
   const M = await loadModel(id); S.M = M; S.sel = -1; hits = null; S.isolate = -1; view.s = 1; view.tx = view.ty = 0; G.cur = null; MIX.length = 0;
+  if (!M.info.user_sweep && S.sweep !== "model") setSweep("model", true); else updateSweepUI();
   store.set("atlas-model", id);
   [...$("models").children].forEach(b => b.setAttribute("aria-pressed", b.dataset.id === id));
   $("sub").textContent = `${M.N.toLocaleString()} neurons · ${M.info.n_layers} layers · ${M.info.n_tokens.toLocaleString()} corpus tokens`;
@@ -1700,13 +1769,13 @@ async function boot() {
     $("panel").innerHTML = `<p class="err">Could not read ${esc(BASE)}models.json. Serve this page next to a data folder, or pass <code>?data=&lt;hf-user&gt;/&lt;dataset&gt;</code>.</p>`; return;
   }
   $("models").innerHTML = S.models.map(m => `<button class="chip" data-id="${m.id}" aria-pressed="false">${esc(m.name || m.model.split("/").pop())}<small>${(m.n_neurons / 1000).toFixed(0)}k</small></button>`).join("");
-  const h = (location.hash || "").slice(1), hm = h.match(/^(.+)-L(\d+)-N(\d+)$/), hp = h.match(/^(.+)-personas(?:\?(.*))?$/), ho = h.match(/^(.+)-overview$/);
+  const h = (location.hash || "").slice(1), hm = h.match(/^(.+)-L(\d+)-N(\d+)$/), hp = h.match(/^(.+)-personas(?:\?(.*))?$/), ho = h.match(/^(.+)-overview(?:\?(.*))?$/);
   let id = hm && S.models.some(m => m.id === hm[1]) ? hm[1] : hp && S.models.some(m => m.id === hp[1]) ? hp[1] : ho && S.models.some(m => m.id === ho[1]) ? ho[1] : store.get("atlas-model");
   const richest = [...S.models].sort((a, b) => (b.files || []).length - (a.files || []).length || b.n_neurons - a.n_neurons)[0];
   if (!S.models.some(m => m.id === id)) id = richest.id;
   const M = await selectModel(id);
   if (hp && hp[1] === id) { applyPersonaHash(new URLSearchParams(hp[2] || "")); setTab("personas"); }
-  else if (ho && ho[1] === id) setTab("overview");
+  else if (ho && ho[1] === id) { applyOverviewHash(new URLSearchParams(ho[2] || "")); setTab("overview"); }
   else {
     if (hm && hm[1] === id) openNeuron(+hm[2] * M.d + +hm[3], { focus: true }); else openStart(M);
     if (TABS.includes(h)) setTab(h);
