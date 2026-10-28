@@ -274,11 +274,13 @@ function dataBase() {
 const BASE = dataBase();
 
 let B64 = false; // set from models.json: parquet shipped as base64 text for hosts that only serve text types
+const PARTS = new Map(); // url -> number of base64 parts, for files split to fit a host's per-file limit
 async function fetchBuf(url) {
   if (B64 && url.endsWith(".parquet")) {
-    const r = await fetch(url + ".b64.txt");
-    if (!r.ok) throw new Error(`${r.status} for ${url}`);
-    const bin = atob((await r.text()).trim()), out = new Uint8Array(bin.length);
+    const n = PARTS.get(url) || 0;
+    const urls = n ? Array.from({ length: n }, (_, j) => `${url}.b64.${j}.txt`) : [url + ".b64.txt"];
+    const texts = await Promise.all(urls.map(async u => { const r = await fetch(u); if (!r.ok) throw new Error(`${r.status} for ${u}`); return (await r.text()).trim(); }));
+    const bin = atob(texts.join("")), out = new Uint8Array(bin.length);
     for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
     return out.buffer;
   }
@@ -706,13 +708,14 @@ async function boot() {
   try {
     S.models = await (await fetch(BASE + "models.json")).json();
     B64 = S.models.some(m => m.b64);
+    S.models.forEach(m => Object.entries(m.b64_parts || {}).forEach(([rel, n]) => PARTS.set(BASE + m.slug + "/" + rel, n)));
   } catch (e) {
     $("panel").innerHTML = `<p class="err">Could not read ${esc(BASE)}models.json. Serve this page next to a data folder, or pass <code>?data=&lt;hf-user&gt;/&lt;dataset&gt;</code>.</p>`; return;
   }
   $("models").innerHTML = S.models.map(m => `<button class="chip" data-id="${m.id}" aria-pressed="false">${esc(m.name || m.model.split("/").pop())}<small>${(m.n_neurons / 1000).toFixed(0)}k</small></button>`).join("");
   const h = (location.hash || "").slice(1), hm = h.match(/^(.+)-L(\d+)-N(\d+)$/);
   let id = hm && S.models.some(m => m.id === hm[1]) ? hm[1] : store.get("atlas-model");
-  const richest = [...S.models].sort((a, b) => (b.files || []).length - (a.files || []).length)[0];
+  const richest = [...S.models].sort((a, b) => (b.files || []).length - (a.files || []).length || b.n_neurons - a.n_neurons)[0];
   if (!S.models.some(m => m.id === id)) id = richest.id;
   const M = await selectModel(id);
   if (hm && hm[1] === id) openNeuron(+hm[2] * M.d + +hm[3], { focus: true }); else openStart(M);

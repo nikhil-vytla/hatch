@@ -44,10 +44,19 @@ def build_site(out, site, b64=False):
     os.makedirs(os.path.join(site, "data"), exist_ok=True)
     idx = models_index(out)
 
-    def put(src, dst):
+    PART = 12_000_000  # Artifact hosting caps text files at 16 MB; bigger files go as numbered parts
+
+    def put(src, dst, m):
         if b64 and dst.endswith(".parquet"):
             import base64
-            open(dst + ".b64.txt", "w").write(base64.b64encode(open(src, "rb").read()).decode())
+            enc = base64.b64encode(open(src, "rb").read()).decode()
+            if len(enc) <= PART:
+                open(dst + ".b64.txt", "w").write(enc)
+            else:
+                parts = [enc[i:i + PART] for i in range(0, len(enc), PART)]
+                for j, p in enumerate(parts):
+                    open(f"{dst}.b64.{j}.txt", "w").write(p)
+                m.setdefault("b64_parts", {})[os.path.relpath(dst, os.path.join(site, "data", m["slug"]))] = len(parts)
         else:
             shutil.copy(src, dst)
 
@@ -55,9 +64,9 @@ def build_site(out, site, b64=False):
         src, dst = os.path.join(out, m["slug"]), os.path.join(site, "data", m["slug"])
         os.makedirs(os.path.join(dst, "examples"), exist_ok=True)
         for f in m["files"]:
-            put(os.path.join(src, f), os.path.join(dst, f))
+            put(os.path.join(src, f), os.path.join(dst, f), m)
         for f in glob.glob(os.path.join(src, "examples", "*.parquet")):
-            put(f, os.path.join(dst, "examples", os.path.basename(f)))
+            put(f, os.path.join(dst, "examples", os.path.basename(f)), m)
         m["b64"] = b64
     json.dump(idx, open(os.path.join(site, "data", "models.json"), "w"), indent=1)
     open(os.path.join(site, "index.html"), "w").write(page())

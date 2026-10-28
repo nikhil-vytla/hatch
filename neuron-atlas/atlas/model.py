@@ -109,8 +109,10 @@ class NeuronModel:
 
     def chat_prompt(self, user: str) -> str:
         if self.tok.chat_template:
+            # enable_thinking=False: Qwen3-style templates otherwise open every reply with a <think> block;
+            # other templates ignore the extra variable
             return self.tok.apply_chat_template([{"role": "user", "content": user}], tokenize=False,
-                                                add_generation_prompt=True)
+                                                add_generation_prompt=True, enable_thinking=False)
         return f"User: {user}\n\nAssistant:"
 
     def token_strings(self, ids) -> list[str]:

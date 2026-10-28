@@ -102,7 +102,7 @@ changed token — so it is useless as a specificity measure; the random controls
 - v1: 1,318 SmolLM2 neurons (40 most peaked per layer + all pushed ones). Held-out detection 0.810 vs shuffled-label
   null 0.503. First attempt had a parsing bug: null answers came back keyed without the ":null" suffix and overwrote
   real scores (gave 0.53). Fixed by sending null blocks in separate calls.
-- Audit of 30 random labels by hand (`audit_smollm2.md`): 18 good, 10 partial, 2 wrong. Labeler confidence
+- Audit of 30 random labels by hand (`label_audit.md`): 18 good, 10 partial, 2 wrong. Labeler confidence
   predicts quality (conf 5: 5/6 good; conf ≤3: 1/8). Detection check is too easy (both wrong labels scored ≥0.75):
   random windows are easy to reject even with a grab-bag label. Systematic miss: next-token predictors (lens = the
   token after the peak) labeled as reading the current token.
@@ -121,3 +121,31 @@ changed token — so it is useless as a specificity measure; the random controls
   parquet directly, and DuckDB-WASM 1.32.0 loads from jsDelivr there (tested in headless Chromium: 25-row join of
   labels × neurons in 218 ms).
 - Explorer opens on the model with the most files (labels/steer present) rather than the smallest.
+
+## GPT-2 and Qwen3-0.6B
+
+- The first background chain was killed at the 2 h background-task limit during Qwen collection; re-ran as a
+  `nohup` chain. GPT-2 steering alone took 57 s (vs 4,585 s for SmolLM2 while contending), Qwen collect 2,696 s.
+- Qwen3 opens every reply with `<think>`: the first steering run produced 32 tokens of reasoning preamble per reply.
+  `chat_prompt` now passes `enable_thinking=False` (ignored by other templates); re-ran (846 s, 40 new tokens).
+- Qwen baseline "Who are you?" → "I am a language model designed to assist…"; most pushes keep that (54–58%).
+  Personas come almost only from "favorite place", by dropping the "no personal preferences" disclaimer.
+- Labels: GPT-2 999 (0.791 / null 0.505), Qwen3 1,229 (0.753 / 0.510). Qwen audit (20): 11 G, 7 P, 2 W;
+  conf 5 → 4/4 G. Per-neuron detection is noisy (correct label at 0.25).
+- Artifact publish: Qwen's neurons.parquet is 22 MB as base64 > 16 MB text limit → export splits into numbered
+  `.b64.N.txt` parts listed in models.json `b64_parts`; 111 MB total sent in two publishes to the same URL.
+
+## Push content is neuron-specific even when push *rate* is not (`lens_hits.py`)
+
+Does a +0.5 reply contain one of the pushed neuron's top-10 lens_up words (alphabetic, ≥3 chars)? Null: same reply
+vs another pushed neuron's lens (fixed derangement).
+
+| model | own lens | other neuron's lens | peaked | random |
+|---|---|---|---|---|
+| GPT-2 | 0.151 | 0.013 | 0.174 | 0.083 |
+| SmolLM2 | 0.201 | 0.055 | 0.232 | 0.108 |
+| Qwen3-0.6B | 0.065 | 0.009 | 0.080 | 0.036 |
+
+Negative pushes vs lens_down: weaker (0.04–0.09 vs 0.00–0.04). So the persona *rate* says little, but the words a
+push brings in follow the neuron's logit lens: the right per-neuron steering metric is lens-word uptake against a
+derangement null, not "persona vs not".
