@@ -192,11 +192,58 @@ def run(atlas, per_layer=40, group=8, workers=8, seed=0):
           f"shuffled-label null {sum(nul) / max(1, len(nul)):.3f} on {len(nul)} (chance 0.5)")
 
 
+KINDS = ["default_assistant", "altered_assistant", "persona", "other", "incoherent"]
+CLASSIFY = f"""You sort replies of a small chat model whose internals were perturbed. For each reply give one kind:
+default_assistant = the ordinary assistant answer (compare with the normal reply given),
+altered_assistant = still an AI assistant but with a new name, maker, mood, topic or claim,
+persona = speaks as someone or something other than an AI assistant (a human, a character, an animal, a place...),
+other = coherent but does not answer the prompt,
+incoherent = broken text, loops, gibberish.
+Also give a 2-8 word "who" (e.g. "a retired sea captain", "assistant obsessed with numbers") or "" if not applicable.
+Reply JSON {{"items": [{{"i": <index>, "kind": one of {KINDS}, "who": "..."}}]}}."""
+
+
+def classify_pushes(atlas, group=20, workers=8):
+    """Grunt work for the cheap model: put every steered reply in one of KINDS (like qwen-neurons-site's library)."""
+    meta = json.load(open(f"{atlas}/meta.json"))
+    prompts = meta["steer"]["prompts"]
+    con = duckdb.connect()
+    t = con.sql(f"select * from '{atlas}/steer.parquet'").arrow()
+    rows = t.to_pylist()
+    base = {r["prompt"]: r["text"] for r in rows if r["layer"] < 0}
+    todo = [i for i, r in enumerate(rows) if r["layer"] >= 0]
+    cl = client()
+
+    def job(chunk):
+        lines = [f"normal reply to {prompts[p]!r}: {base.get(p, '')[:200]!r}" for p in sorted(base)]
+        lines += [f"[{i}] prompt {prompts[rows[i]['prompt']]!r} -> {rows[i]['text'][:240]!r}" for i in chunk]
+        r = chat(cl, CLASSIFY, "\n".join(lines)) or {}
+        return {int(it["i"]): it for it in r.get("items", []) if str(it.get("i", "")).lstrip("-").isdigit()}
+
+    out = {}
+    with cf.ThreadPoolExecutor(workers) as ex:
+        for res in ex.map(job, [todo[i:i + group] for i in range(0, len(todo), group)]):
+            out.update(res)
+    kind = [("default_assistant" if r["layer"] < 0 else out.get(i, {}).get("kind")) for i, r in enumerate(rows)]
+    kind = [k if k in KINDS else None for k in kind]
+    who = [str(out.get(i, {}).get("who", "") or "")[:80] for i in range(len(rows))]
+    for name, col in [("reply_kind", pa.array(kind, pa.string())), ("who", pa.array(who, pa.string()))]:
+        t = t.set_column(t.schema.get_field_index(name), name, col) if name in t.schema.names else t.append_column(name, col)
+    pq.write_table(t, f"{atlas}/steer.parquet", compression="zstd")
+    counts = {k: kind.count(k) for k in KINDS}
+    print(f"classified {sum(counts.values())} replies with {MODEL}: {counts}")
+
+
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--atlas", required=True)
     ap.add_argument("--per-layer", type=int, default=40)
     ap.add_argument("--group", type=int, default=8)
     ap.add_argument("--workers", type=int, default=8)
+    ap.add_argument("--pushes-only", action="store_true", help="only classify steered replies")
     a = ap.parse_args()
-    run(a.atlas, a.per_layer, a.group, a.workers)
+    if os.path.exists(f"{a.atlas}/steer.parquet"):
+        classify_pushes(a.atlas, workers=a.workers)
+    if not a.pushes_only:
+        run(a.atlas, a.per_layer, a.group, a.workers)
+
