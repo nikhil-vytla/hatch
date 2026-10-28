@@ -323,3 +323,16 @@ derangement null, not "persona vs not".
   downloaded first, so a new sandbox resumes where the old one stopped.
 - Tested on a GPT-2 scratch atlas against a fake Hub: run 1 uploaded baseline, L10, L11, steer.parquet and
   meta.json. After deleting the local shards, run 2 downloaded them and resumed (6 replies per layer, 13 rows, 0 s).
+
+## Explorer: where the remaining load time went (Qwen3-8B, network timeline)
+
+- Profiling showed the map decode was small: 0.46 s as row objects vs 0.21 s as columns (node, hyparquet). The bigger
+  costs: neurons/Lxx, steer/Lxx and examples/Lxx were fetched one after another, and each footer read was 512 KB
+  (hyparquet's default) although the footers are ~9 KB.
+- opencode/deepseek-flash change: columnar map decode (`parquetRead` + `onChunk` into the typed arrays, old x/y maps
+  fall back), the three card reads started together, footer reads of 64 KB. Same map pixels (canvas hash identical);
+  old-format GPT-2 / Qwen3-0.6B maps still load.
+- First card ready, local page against Hub data: before 5.0–5.9 s, after 3.7–4.5 s (9 runs).
+- Sweep upload note: the HF token was added to the notebook's environment after the sweep started, so the sweep
+  process didn't see it (401s). Writing the login file from the kernel (`huggingface_hub.login`) fixed it without a
+  restart; the retry-on-next-upload change then pushed the earlier layers.
