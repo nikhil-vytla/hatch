@@ -250,3 +250,19 @@ derangement null, not "persona vs not".
 - The free quota for this container ran out after ~40 calls (smoke tests + two agent sessions). Panel smoke test
   (6 SmolLM2 neurons): deepseek accuracy 0.875 vs null 0.500, 1.6 s/call; free models: quota exhausted, failed in
   ~12 s instead of hanging. Free models are fine for small judge panels, not for bulk labeling.
+
+## Qwen3.5-4B on molab (neuronary's main model)
+
+- Loads through the new image-text fallback: 32 × 9,216 = 294,912 neurons. Collect 717 s; steering 64 peaked + 16
+  random per layer × ±0.5, ±1.0 × 2 prompts = 20,482 replies in 674 s; all 97 neuronary recipes replayed at scales
+  0.5 and 1 (390 replies, 27 s). Baseline: "I am **Qwen3.5**, the latest large language model developed by Tongyi Lab."
+- Labels (2,661 neurons incl. every neuronary-recipe neuron): detection 0.807 vs null 0.503.
+- Very stable: 225 / 20,482 pushed replies are personas (1.1%). Any-persona neurons: peaked 7.9% vs random 7.4%.
+- Uptake: peaked 0.114 vs random 0.056.
+- The neuronary-recipe neurons (102) sit at the median of our zmax ranking (mean percentile 0.57); 1 of 102 is in
+  our top-64/layer. Read-side peakiness does not find steering-useful neurons — our "peaked" selection was looking in
+  the wrong place, which is why peaked vs random never separated on personas.
+- Published from molab: Qwen3-8B (204 MB) and Qwen3.5-4B folders uploaded directly from the kernel (HF token typed by
+  the user in the notebook's password field); `export.py hub-index` rebuilt models.json + card from all 5 folders.
+- opencode/DeepSeek task for `repro.py` (judge whether replayed neuronary recipes reproduce) timed out after 25 min
+  without writing the file; to retry.

@@ -101,7 +101,8 @@ def describe(at: Atlas, L, n, lens, steer, base):
     return "\n".join(lines)
 
 
-def run(atlas, per_layer=40, group=8, workers=8, seed=0):
+def run(atlas, per_layer=40, group=8, workers=8, seed=0, extra=()):
+    """extra: more (layer, neuron) keys to label, e.g. the neurons of neuronary recipes."""
     at = Atlas(atlas)
     con = at.con
     sel = con.sql(f"""select layer, neuron, lens_up, lens_down from (
@@ -116,10 +117,11 @@ def run(atlas, per_layer=40, group=8, workers=8, seed=0):
                 base[prompts[pi]] = text
             else:
                 steer.setdefault((L, n), []).append((prompts[pi], d, text))
-        extra = [k for k in steer if k not in keys]
-        if extra:
-            q = " or ".join(f"(layer={L} and neuron={n})" for L, n in extra)
-            sel += con.sql(f"select layer, neuron, lens_up, lens_down from {neurons_src(atlas)} where {q}").fetchall()
+    more = [k for k in list(steer) + [tuple(e) for e in extra] if k not in keys]
+    more = list(dict.fromkeys(more))
+    if more:
+        q = " or ".join(f"(layer={L} and neuron={n})" for L, n in more)
+        sel += con.sql(f"select layer, neuron, lens_up, lens_down from {neurons_src(atlas)} where {q}").fetchall()
     print(f"labeling {len(sel)} neurons of {at.meta['model']} with {MODEL}")
     jobs = [sel[i:i + group] for i in range(0, len(sel), group)]
     cl = client()
