@@ -291,3 +291,21 @@ derangement null, not "persona vs not".
 - `repro.py` (opencode draft, second attempt) on the 97 replayed neuronary recipes for Qwen3.5-4B: at the authors'
   dose (scale 1) 46% yes / 36% partial / 18% no; at scale 0.5 4% yes. By recipe size (both scales): 1 neuron 23% yes,
   2 neurons 32%, 3+ 29%.
+
+## Explorer speed (measured on the HF Space, Qwen3-8B L8 N7846, headless Chromium)
+
+| step | ready | map hover per move | downloads | JS heap |
+|---|---|---|---|---|
+| before | 12 s | 496 ms | 23 MB | 342 MB |
+| cached point layer + example windows carry tokens + neighbors on hover | 8.4–9.6 s | 8–11 ms | 19 MB | 199 MB |
+| + ranged reads of the opened neuron's row groups (2,048-row example groups, 1,024-row neuron groups) | 5.7–7.1 s | 6–7 ms | ~7.9 MB (network log) | 131 MB |
+
+- Remaining downloads: map.parquet 4.9 MB (x, y, zmax for 442k neurons; could be quantized), steer.parquet 1.2 MB
+  (could load per layer or when the Pushes tab opens), and the 0.5 MB parquet footer per ranged file (hyparquet's
+  asyncBufferFromUrl reads the tail for metadata).
+- HF `resolve` URLs redirect to the xet CDN, which answers Range requests with 206 and exposes Content-Range (CORS ok).
+- Mistake caught while measuring: `export hub` from this machine rewrote models.json with only the 3 local models,
+  so the 8B link silently fell back to SmolLM2 (first "after" numbers were measured on the wrong model). `push_hub`
+  now always finishes with `push_index` (index rebuilt from every folder on the Hub). The perf script now records
+  which model's card it measured.
+- Judge: no weirdness/coherence scores (user's call); it keeps kind + who + what_changed for now.
