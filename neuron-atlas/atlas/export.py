@@ -12,7 +12,7 @@ import argparse, glob, json, os, re, shutil
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 EXPLORER = os.path.join(HERE, "..", "explorer", "index.html")
-FILES = ["meta.json", "map.parquet", "labels.parquet", "steer.parquet", "tokens.parquet", "uptake.parquet", "recipes.parquet", "personas.parquet"]  # + neurons/, examples/, steer/
+FILES = ["meta.json", "map.parquet", "labels.parquet", "steer.parquet", "tokens.parquet", "uptake.parquet", "recipes.parquet", "personas.parquet", "sweep_stats.parquet"]  # + neurons/, examples/, steer/
 
 
 def shard(d):
@@ -115,6 +115,7 @@ def models_index(out):
         m["name"] = m["model"].split("/")[-1]
         m["files"] = [f for f in FILES if os.path.exists(os.path.join(os.path.dirname(meta_path), f))]
         m["personas"] = "personas.parquet" in m["files"]
+        m["sweep_stats"] = "sweep_stats.parquet" in m["files"]
         idx.append(m)
     idx.sort(key=lambda m: m["n_neurons"])
     return idx
@@ -253,7 +254,8 @@ def push_index(repo):
         have = {x.split("/", 1)[1] for x in files if x.startswith(slug + "/")}
         m.update(id=model_id(m["model"]), name=m["model"].split("/")[-1], files=[x for x in FILES if x in have],
                  sharded=any(x.startswith("neurons/") for x in have),
-                 steer_sharded=f"{slug}/steer/baseline.parquet" in files, personas="personas.parquet" in have)
+                 steer_sharded=f"{slug}/steer/baseline.parquet" in files, personas="personas.parquet" in have,
+                 sweep_stats="sweep_stats.parquet" in have)
         idx.append(m)
     idx.sort(key=lambda m: m["n_neurons"])
     api.upload_file(path_or_fileobj=json.dumps(idx, indent=1).encode(), path_in_repo="models.json", repo_id=repo,
