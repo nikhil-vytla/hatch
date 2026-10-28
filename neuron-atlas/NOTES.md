@@ -309,3 +309,17 @@ derangement null, not "persona vs not".
   now always finishes with `push_index` (index rebuilt from every folder on the Hub). The perf script now records
   which model's card it measured.
 - Judge: no weirdness/coherence scores (user's call); it keeps kind + who + what_changed for now.
+| + 16-bit map (qx/qy/qz uint16) + per-layer pushes loaded when the Pushes tab or a card needs them | ~6.3 s | 5 ms | ~4.8 MB | 31–50 MB |
+
+- map.parquet 4.9 → 2.8 MB for Qwen3-8B. 8B and 4B were re-sharded here from their Hub copies and republished.
+  The remaining ~6 s is mostly decoding 442k map rows into JS objects; reading the columns as typed arrays would cut it.
+
+## molab sandbox lost mid-sweep
+
+- The molab sandbox ended (HTTP 410 Gone) about 25 of 32 layers into the Qwen3.5-4B all-neuron sweep. The shards
+  lived only on the sandbox disk, so they were lost. Published data was not affected.
+- Fix: `steer.run(..., upload="USER/REPO/FOLDER")` (CLI `--upload`). Every finished shard goes to the Hub from a
+  background thread (one upload in flight per file, retried at close). On start, shards missing locally are
+  downloaded first, so a new sandbox resumes where the old one stopped.
+- Tested on a GPT-2 scratch atlas against a fake Hub: run 1 uploaded baseline, L10, L11, steer.parquet and
+  meta.json. After deleting the local shards, run 2 downloaded them and resumed (6 replies per layer, 13 rows, 0 s).
