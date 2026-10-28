@@ -21,6 +21,7 @@ BASE_URL = os.environ.get("LABEL_BASE_URL", "https://api.deepseek.com")
 MODEL = os.environ.get("LABEL_MODEL", "deepseek-chat")
 KEY = os.environ.get("LABEL_API_KEY") or os.environ.get("DEEPSEEK_API_KEY") or "proxy-injected"
 SHOWN, HELD = range(0, 6), (6, 7)
+JUDGE = None
 
 SYS = """You are an interpretability researcher naming neurons of a language model.
 For each neuron you get: documents where it fires most (the peak token is wrapped in «», the number is the activation),
@@ -45,6 +46,8 @@ def client():
 
 
 def chat(cl, system, user, tries=3):
+    if JUDGE is not None:
+        return JUDGE.ask(system, user)
     for t in range(tries):
         try:
             r = cl.chat.completions.create(model=MODEL, messages=[{"role": "system", "content": system},
@@ -98,7 +101,8 @@ def describe(at: Atlas, L, n, lens, steer, base):
     return "\n".join(lines)
 
 
-def run(atlas, per_layer=40, group=8, workers=8, seed=0):
+def run(atlas, per_layer=40, group=8, workers=8, seed=0, extra=()):
+    """extra: more (layer, neuron) keys to label, e.g. the neurons of neuronary recipes."""
     at = Atlas(atlas)
     con = at.con
     sel = con.sql(f"""select layer, neuron, lens_up, lens_down from (
@@ -113,10 +117,11 @@ def run(atlas, per_layer=40, group=8, workers=8, seed=0):
                 base[prompts[pi]] = text
             else:
                 steer.setdefault((L, n), []).append((prompts[pi], d, text))
-        extra = [k for k in steer if k not in keys]
-        if extra:
-            q = " or ".join(f"(layer={L} and neuron={n})" for L, n in extra)
-            sel += con.sql(f"select layer, neuron, lens_up, lens_down from {neurons_src(atlas)} where {q}").fetchall()
+    more = [k for k in list(steer) + [tuple(e) for e in extra] if k not in keys]
+    more = list(dict.fromkeys(more))
+    if more:
+        q = " or ".join(f"(layer={L} and neuron={n})" for L, n in more)
+        sel += con.sql(f"select layer, neuron, lens_up, lens_down from {neurons_src(atlas)} where {q}").fetchall()
     print(f"labeling {len(sel)} neurons of {at.meta['model']} with {MODEL}")
     jobs = [sel[i:i + group] for i in range(0, len(sel), group)]
     cl = client()
@@ -204,36 +209,61 @@ altered_assistant = still an AI assistant but with a new name, maker, mood, topi
 persona = speaks as someone or something other than an AI assistant (a human, a character, an animal, a place...),
 other = coherent but does not answer the prompt,
 incoherent = broken text, loops, gibberish.
-Also give a 2-8 word "who" (e.g. "a retired sea captain", "assistant obsessed with numbers") or "" if not applicable.
-Reply JSON {{"items": [{{"i": <index>, "kind": one of {KINDS}, "who": "..."}}]}}."""
+Also give a 2-8 word "who" (e.g. "a retired sea captain", "assistant obsessed with numbers") or "" if not applicable,
+and a "change": at most 12 words describing how the reply differs from the normal reply in content, style, language,
+tone, format or topic ("" if it does not differ). Describe anything unusual even when it does not fit the kinds.
+Reply JSON {{"items": [{{"i": <index>, "kind": one of {KINDS}, "who": "...", "change": "..."}}]}}."""
 
 
 def classify_pushes(atlas, group=20, workers=8):
-    """Grunt work for the cheap model: put every steered reply in one of KINDS (like qwen-neurons-site's library)."""
+    """Grunt work for the cheap model: put every steered reply in one of KINDS and describe how it changed."""
     meta = json.load(open(f"{atlas}/meta.json"))
     prompts = meta["steer"]["prompts"]
     con = duckdb.connect()
     t = pq.read_table(f"{atlas}/steer.parquet")
     rows = t.to_pylist()
     base = {r["prompt"]: r["text"] for r in rows if r["layer"] < 0}
-    todo = [i for i, r in enumerate(rows) if r["layer"] >= 0]
+    keys, seen = [], set()
+    for r in rows:
+        if r["layer"] < 0 or r["text"] == base.get(r["prompt"]):
+            continue
+        key = (r["prompt"], r["text"])
+        if key not in seen:
+            seen.add(key)
+            keys.append(key)
     cl = client()
 
     def job(chunk):
         lines = [f"normal reply to {prompts[p]!r}: {base.get(p, '')[:200]!r}" for p in sorted(base)]
-        lines += [f"[{i}] prompt {prompts[rows[i]['prompt']]!r} -> {rows[i]['text'][:240]!r}" for i in chunk]
+        lines += [f"[{i}] prompt {prompts[p]!r} -> {text[:240]!r}" for i, (p, text) in chunk]
         r = chat(cl, CLASSIFY, "\n".join(lines)) or {}
         return {int(it["i"]): it for it in r.get("items", []) if str(it.get("i", "")).lstrip("-").isdigit()}
 
+    print(f"sending {len(keys)} distinct (prompt, text) replies vs {len(rows)} total rows")
+    indexed = list(enumerate(keys))
     out = {}
     with cf.ThreadPoolExecutor(workers) as ex:
-        for res in ex.map(job, [todo[i:i + group] for i in range(0, len(todo), group)]):
+        for res in ex.map(job, [indexed[i:i + group] for i in range(0, len(indexed), group)]):
             out.update(res)
-    kind = [("default_assistant" if r["layer"] < 0 else out.get(i, {}).get("kind")) for i, r in enumerate(rows)]
+    got = {keys[i]: it for i, it in out.items() if 0 <= i < len(keys)}
+    kind, who, change = [], [], []
+    for r in rows:
+        if r["layer"] < 0 or r["text"] == base.get(r["prompt"]):
+            kind.append("default_assistant")
+            who.append("")
+            change.append("")
+            continue
+        it = got.get((r["prompt"], r["text"])) or {}
+        kind.append(it.get("kind"))
+        who.append(str(it.get("who", "") or "")[:80])
+        change.append(str(it.get("change", "") or "")[:120])
     kind = [k if k in KINDS else None for k in kind]
-    who = [str(out.get(i, {}).get("who", "") or "")[:80] for i in range(len(rows))]
     for name, col in [("reply_kind", pa.array(kind, pa.string())), ("who", pa.array(who, pa.string()))]:
         t = t.set_column(t.schema.get_field_index(name), name, col) if name in t.schema.names else t.append_column(name, col)
+    # "change" is already the numeric word-overlap score from steer.py; the free text goes in "what_changed"
+    if "what_changed" in t.schema.names:
+        t = t.remove_column(t.schema.get_field_index("what_changed"))
+    t = t.add_column(t.schema.get_field_index("who") + 1, "what_changed", pa.array(change, pa.string()))
     pq.write_table(t, f"{atlas}/steer.parquet", compression="zstd")
     counts = {k: kind.count(k) for k in KINDS}
     print(f"classified {sum(counts.values())} replies with {MODEL}: {counts}")
@@ -246,9 +276,20 @@ if __name__ == "__main__":
     ap.add_argument("--group", type=int, default=8)
     ap.add_argument("--workers", type=int, default=8)
     ap.add_argument("--pushes-only", action="store_true", help="only classify steered replies")
+    ap.add_argument("--judge", help="deepseek, openai:<base_url>:<model>, or opencode/<model>")
     a = ap.parse_args()
-    if os.path.exists(f"{a.atlas}/steer.parquet"):
-        classify_pushes(a.atlas, workers=a.workers)
-    if not a.pushes_only:
-        run(a.atlas, a.per_layer, a.group, a.workers)
+    from contextlib import nullcontext
+    ctx = nullcontext(None)
+    if a.judge:
+        from .judges import make_judge
+        if a.judge.startswith("opencode/"):
+            from .judges import opencode_server
+            ctx = opencode_server()
+    with ctx as server:
+        if a.judge:
+            JUDGE = make_judge(a.judge, server)
+        if os.path.exists(f"{a.atlas}/steer.parquet"):
+            classify_pushes(a.atlas, workers=a.workers)
+        if not a.pushes_only:
+            run(a.atlas, a.per_layer, a.group, a.workers)
 
