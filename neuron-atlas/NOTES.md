@@ -354,3 +354,33 @@ derangement null, not "persona vs not".
   canvas, which aborted "Open neuron"; CSV doses rounded.
 - Exact-name dedup leaves many near-duplicates ("Google-branded assistant", "assistant claiming Google maker"), so
   the planned `group` column (clustered names) matters for the library.
+
+## Full Qwen3.5-4B sweep (all 294,912 neurons, ±0.8, 2 prompts, 32 tokens): results
+
+- 1,179,650 replies in 3.1 h on molab (343 s/layer), every shard backed up to the Hub as it finished.
+- Labels: 268,977 replies sent to DeepSeek (every "Who are you?" reply without Qwen/Tongyi/Alibaba + 5% seeded
+  sample of the rest). Weighted estimates over all replies: default assistant 62%, altered assistant 22%, incoherent
+  13%, other 3%, persona 0.5% (5.5k estimated; 4,439 labeled persona rows, 4,092 distinct names).
+- By layer: layers 0 and 31 are almost all incoherent; persona replies peak in layers 1-7 (~1.0-1.3% of pushes, up and
+  down about equally), drop to ~0.2% after; altered assistants jump to ~40% of pushes in layers 20-27.
+- Most "altered assistant" replies are the model's own name mangled: "I am Q", "Q3", "Qian", "Qin", "Qiao"…
+  (theme "assistant named q": 30k rows), then rebrands (Google / Bing / Baidu 13k rows, other companies 7k).
+- Persona themes (DeepSeek taxonomy of 24 themes, then assignment, cached in a json): human persona (age / job)
+  1,037 rows ("a human", "a person", "a 10-year-old girl/boy"), objects / machines 444, nature / animals 208,
+  mystic / cryptic 195 ("a cryptic 'the one'", "a poetic mirror", "a force of light"), grandiose claims 169.
+- Explorer: Overview tab (weighted stats, three charts + tables, validated CVD-safe palette in both themes) and
+  Personas tab with theme chips, both live for Qwen3.5-4B.
+
+## In-browser SmolLM2-135M (browser/)
+
+- ONNX export with an extra `steer` input [n_layers, d_mlp] added to every down_proj input; parity vs our PyTorch
+  hooks: logits max diff ~6e-5, greedy 32 tokens identical in all six cases (no push, one neuron, a recipe × 2 prompts).
+- int8 dynamic quantization breaks it (0-3/32 tokens); weight-only MatMulNBits q8 5-32/32, q4 0-2/32 — a 135M model is
+  too sensitive. fp16 is exact (32/32) and half the size.
+- torch.onnx stored the tied embedding twice (Gather table + transposed LM-head copy, 113 MB each); `tie_lm_head`
+  rewires the head to Gemm(transB=1) on the Gather table: 653 → 539 MB fp32, 271 MB fp16.
+- KV cache: one token per step instead of the whole sequence: ORT CPU 1 thread 67 ms/token (fp16). In headless
+  Chromium (wasm, no GPU): 1.5 → 8.2 tok/s for the two streams together, page responsive (wasm proxy worker).
+  Bug found: the proxy worker transfers input buffers, so tensors reused across runs (the steer) must be copied.
+- Headless Chromium's WebGPU is a software adapter and far slower than wasm: the page now skips fallback adapters.
+- Live: Space `live.html`, model + meta in the dataset under `browser/smollm2/`.
