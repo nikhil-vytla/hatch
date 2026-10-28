@@ -14,7 +14,9 @@ Built after [neuron-finder](https://github.com/changjonathanc/neuron-finder),
 
 ![explorer](explorer.png)
 
-**Live explorer (claude.ai artifact, private to the owner until shared):** https://claude.ai/artifact/8rFj14ata7spGH1XiZ4p3E
+- **Explorer (HF static Space):** https://huggingface.co/spaces/nikhilxvytla/neuron-atlas-explorer
+- **Dataset:** https://huggingface.co/datasets/nikhilxvytla/neuron-atlas (parquet, one folder per model)
+- **Explorer as a claude.ai artifact** (private to the owner until shared): https://claude.ai/artifact/8rFj14ata7spGH1XiZ4p3E
 
 ## What was run (CPU, this container)
 
@@ -94,7 +96,7 @@ every column.
   `python -m atlas.export site --out out --site site && python -m http.server -d site`, or point it at a Hub
   dataset with `?data=<user>/<dataset>`.
 - **Gradio app** (`app.py`): type text and see which neurons fire (z-scored with the atlas stats), click one to
-  highlight it, push any neuron and compare greedy replies. SmolLM2-135M runs on a free CPU Space.
+  highlight it, push any neuron and compare greedy replies. SmolLM2-135M runs on a laptop CPU.
 - **molab notebook** (`molab_atlas.py`, marimo): pick a model, corpus size and push mode, then build atlas →
   steer → label → push to the Hub. It ends with a small in-notebook browser.
 
@@ -106,9 +108,11 @@ python -m atlas.export hub   --out out --repo <you>/neuron-atlas
 python -m atlas.export space --repo <you>/neuron-atlas --space <you>/neuron-atlas-explorer
 ```
 
-The dataset gets a card with `configs` per model and table, so the Hub viewer and `hf://` DuckDB queries work. The
-Space is a static page that reads the dataset over HTTP. This container has no HF token, so nothing was published to
-the Hub from here.
+The dataset gets a card with `configs` per model and table, so the Hub viewer and `hf://` DuckDB queries work
+(`select * from 'hf://datasets/nikhilxvytla/neuron-atlas/Qwen__Qwen3-0.6B/labels.parquet'`). The Space is a static
+page that reads the dataset over HTTP (Hub `resolve` URLs send CORS headers). Both are published as linked above.
+The Gradio app can't go on a Space from a free account: Hugging Face now requires PRO for Gradio and Docker Spaces,
+even on cpu-basic, while static Spaces stay free. Run it locally with `python app.py --repo nikhilxvytla/neuron-atlas`.
 
 ## molab
 

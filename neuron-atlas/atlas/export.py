@@ -82,7 +82,7 @@ def card(idx, repo):
         for m in idx for t in ["neurons", "labels", "steer", "examples"]
         if t == "examples" or f"{t}.parquet" in m["files"])
     return f"""---
-license: apache-2.0
+license: odc-by
 tags: [interpretability, neurons, mechanistic-interpretability]
 configs:
 {configs}
@@ -109,6 +109,12 @@ detection check. Built with `neuron-atlas` (https://github.com/nikhil-vytla/hatc
   unsteered baselines), plus `change` (1 - word Jaccard to baseline) and `diversity` (distinct bigram ratio).
 - `labels.parquet`: `label, description, emoji, confidence, push, push_kind`, and `detect` / `detect_null` (held-out
   detection accuracy with the neuron's own label / a shuffled label; chance 0.5).
+
+## Sources and license
+
+Corpus text comes from [FineWeb-Edu](https://huggingface.co/datasets/HuggingFaceFW/fineweb-edu) (ODC-By) and
+[smol-smoltalk](https://huggingface.co/datasets/HuggingFaceTB/smol-smoltalk) (Apache-2.0); this dataset is released
+under ODC-By. Labels and push categories were written by DeepSeek (`deepseek-chat` endpoint) and are hypotheses.
 
 ## Explore in the browser
 

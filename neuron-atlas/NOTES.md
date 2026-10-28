@@ -149,3 +149,13 @@ vs another pushed neuron's lens (fixed derangement).
 Negative pushes vs lens_down: weaker (0.04–0.09 vs 0.00–0.04). So the persona *rate* says little, but the words a
 push brings in follow the neuron's logit lens: the right per-neuron steering metric is lens-word uptake against a
 derangement null, not "persona vs not".
+
+## Hugging Face publish (HF_TOKEN added by the user)
+
+- Token: fine-grained, account `nikhilxvytla`. Dataset `nikhilxvytla/neuron-atlas` (88 files) via
+  `export.py hub`; card license changed to ODC-By with source attribution (FineWeb-Edu is ODC-By).
+- Verified: `hf://` DuckDB query works; `resolve/main` URLs return `access-control-allow-origin`; the explorer with
+  `?data=nikhilxvytla/neuron-atlas` loads all three models and runs the SQL tab against the Hub (303 ms query).
+- Static Space `nikhilxvytla/neuron-atlas-explorer` serves the explorer with the dataset as default data source.
+- Gradio Space refused: `402 Payment Required` — "hosting Gradio and Docker Spaces on free cpu-basic requires a PRO
+  subscription". Static Spaces remain free.
