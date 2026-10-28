@@ -16,49 +16,83 @@
   --display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
   --body: "Source Sans 3", "Segoe UI", system-ui, -apple-system, sans-serif;
   --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-  --r: 10px;
+  --r: 10px; --r-card: 14px;
+  --s1: 12px; --s2: 16px; --s3: 24px;
+  --card-shadow: 0 1px 2px rgb(0 0 0 / .04), 0 4px 16px rgb(0 0 0 / .04);
+  --card-shadow-hover: 0 2px 4px rgb(0 0 0 / .06), 0 8px 24px rgb(0 0 0 / .08);
+  --pill-shadow: 0 1px 2px rgb(0 0 0 / .08), 0 2px 6px rgb(0 0 0 / .06);
 }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
   --bg: #121019; --surface: #1b1826; --sunk: #242033; --line: #343048; --ink: #ece9f7; --ink2: #b3adc8; --ink3: #827c99;
   --eosin: #ff6b9a; --eosin-soft: #4a1f33; --hema: #9d92ff; --hema-soft: #2d2858; --accent: #ff7aa6;
   --plate: #0b0a12; --plate-ink: #ece9f7; --plate-ink2: #9a95b2; --plate-line: #24213a; --good: #4cc38a; --warn: #e0a84a;
+  --card-shadow: 0 1px 2px rgb(0 0 0 / .3), 0 4px 16px rgb(0 0 0 / .25);
+  --card-shadow-hover: 0 2px 4px rgb(0 0 0 / .38), 0 8px 24px rgb(0 0 0 / .35);
+  --pill-shadow: 0 1px 2px rgb(0 0 0 / .35), 0 2px 6px rgb(0 0 0 / .3);
   color-scheme: dark } }
 :root[data-theme="dark"] {
   --bg: #121019; --surface: #1b1826; --sunk: #242033; --line: #343048; --ink: #ece9f7; --ink2: #b3adc8; --ink3: #827c99;
   --eosin: #ff6b9a; --eosin-soft: #4a1f33; --hema: #9d92ff; --hema-soft: #2d2858; --accent: #ff7aa6;
   --plate: #0b0a12; --plate-ink: #ece9f7; --plate-ink2: #9a95b2; --plate-line: #24213a; --good: #4cc38a; --warn: #e0a84a;
+  --card-shadow: 0 1px 2px rgb(0 0 0 / .3), 0 4px 16px rgb(0 0 0 / .25);
+  --card-shadow-hover: 0 2px 4px rgb(0 0 0 / .38), 0 8px 24px rgb(0 0 0 / .35);
+  --pill-shadow: 0 1px 2px rgb(0 0 0 / .35), 0 2px 6px rgb(0 0 0 / .3);
   color-scheme: dark }
 * { box-sizing: border-box }
 html, body { height: 100% }
-body { background: var(--bg); color: var(--ink); font: 16px/1.5 var(--body); margin: 0;
+body { background: var(--bg); color: var(--ink); font: 15px/1.5 var(--body); margin: 0; overflow-x: clip;
   padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
 button, input, select { font: inherit; color: inherit }
 button { cursor: pointer }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px }
-.wrap { max-width: 1480px; margin: 0 auto; padding-block: 18px 40px; display: flex; flex-direction: column; gap: 14px }
+.wrap { max-width: 1480px; margin: 0 auto; padding-block: 0 40px; display: flex; flex-direction: column; gap: var(--s3) }
 
-header.top { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px }
-.brand { display: flex; align-items: baseline; gap: 10px; min-width: 0 }
-.brand h1 { font: 800 28px/1 var(--display); letter-spacing: -0.02em; margin: 0; text-wrap: balance }
+.topbar { position: sticky; top: 0; z-index: 30; display: flex; flex-direction: column; gap: var(--s1);
+  padding-block: var(--s1); background: color-mix(in oklab, var(--bg) 85%, transparent);
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--line) }
+.top { display: flex; align-items: center; gap: 12px; min-width: 0 }
+.brand { display: flex; align-items: baseline; gap: 10px; min-width: 0; flex: 0 0 auto }
+.brand h1 { font: 800 28px/1 var(--display); letter-spacing: -0.02em; margin: 0; text-wrap: balance; white-space: nowrap }
 .brand h1 i { font-style: normal; color: var(--eosin) }
-.brand .sub { color: var(--ink2); font-size: 14px }
-.models { display: flex; flex-wrap: wrap; gap: 6px }
+.models { display: flex; flex-wrap: nowrap; gap: 6px; overflow-x: auto; min-width: 0; flex: 1 1 auto;
+  scrollbar-width: none; -webkit-overflow-scrolling: touch; padding-block: 2px }
+.models::-webkit-scrollbar { display: none }
 .chip { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 4px 12px; font-size: 14px;
-  display: inline-flex; gap: 6px; align-items: baseline; white-space: nowrap }
+  display: inline-flex; gap: 6px; align-items: baseline; white-space: nowrap;
+  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease }
 .chip small { color: var(--ink3); font: 12px var(--mono) }
+.chip:hover { border-color: var(--hema) }
 .chip[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink) }
 .chip[aria-pressed="true"] small { color: var(--bg); opacity: .7 }
-.spacer { flex: 1 }
-.actions { display: flex; gap: 8px; flex-wrap: wrap }
-.btn { border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 6px 12px; font-size: 14px; font-weight: 600 }
+.actions { display: flex; gap: 8px; flex-wrap: nowrap; flex: 0 0 auto; align-items: center }
+.btn { height: 36px; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 0 14px;
+  font: 600 14px/1 var(--body); text-decoration: none; white-space: nowrap;
+  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease, box-shadow 120ms ease }
 .btn.primary { background: var(--eosin); color: #fff; border-color: var(--eosin) }
-.btn:hover { border-color: var(--ink3) }
+.btn:hover { border-color: var(--hema); box-shadow: 0 0 0 2px color-mix(in oklab, var(--hema) 18%, transparent) }
+.btn.primary:hover { border-color: var(--eosin); box-shadow: 0 0 0 2px color-mix(in oklab, var(--hema) 35%, transparent) }
+.btn:focus-visible { outline: 2px solid var(--hema); outline-offset: 2px }
+.theme-toggle { width: 36px; height: 36px; flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center;
+  padding: 0; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink2);
+  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease }
+.theme-toggle:hover { border-color: var(--hema); color: var(--ink) }
+.theme-toggle:focus-visible { outline: 2px solid var(--hema); outline-offset: 2px }
+.theme-toggle svg { width: 18px; height: 18px; display: none }
+.theme-toggle .i-sun { display: block }
+.theme-toggle[data-resolved="light"] .i-sun { display: block }
+.theme-toggle[data-resolved="light"] .i-moon { display: none }
+.theme-toggle[data-resolved="dark"] .i-sun { display: none }
+.theme-toggle[data-resolved="dark"] .i-moon { display: block }
 
 .searchrow { display: flex; flex-wrap: wrap; gap: 8px; align-items: center }
 .search { position: relative; flex: 1 1 340px; min-width: 0 }
 .search input { width: 100%; border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 8px 12px; font-size: 15px }
-.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--surface) }
-.seg button { border: 0; background: none; padding: 7px 12px; font-size: 14px; color: var(--ink2) }
+.searchrow .sub { margin-left: auto; min-width: 0; color: var(--ink3); font-size: 13px; line-height: 1.35 }
+.seg { display: inline-flex; max-width: 100%; overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); scrollbar-width: none }
+.seg::-webkit-scrollbar { display: none }
+.seg button { border: 0; background: none; padding: 7px 12px; font-size: 14px; color: var(--ink2); white-space: nowrap;
+  transition: background-color 120ms ease, color 120ms ease }
 .seg button[aria-pressed="true"] { background: var(--sunk); color: var(--ink); font-weight: 600 }
 .results { position: absolute; left: 0; right: 0; top: calc(100% + 4px); background: var(--surface); border: 1px solid var(--line);
   border-radius: 8px; max-height: 360px; overflow: auto; z-index: 20; box-shadow: 0 10px 30px rgba(20, 10, 40, .18) }
@@ -66,9 +100,14 @@ header.top { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px
 .results button:hover, .results button.on { background: var(--sunk) }
 .results .k { font: 12px var(--mono); color: var(--ink3); white-space: nowrap }
 
-nav.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); overflow-x: auto }
-nav.tabs button { border: 0; background: none; padding: 8px 14px; font: 600 15px var(--body); color: var(--ink2); border-bottom: 2px solid transparent; white-space: nowrap }
-nav.tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--eosin) }
+nav.tabs { display: flex; gap: 2px; padding: 4px; border: 1px solid var(--line); border-radius: 999px; background: var(--sunk);
+  overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch }
+nav.tabs::-webkit-scrollbar { display: none }
+nav.tabs button { border: 0; background: none; padding: 7px 14px; font: 600 14px var(--body); color: var(--ink2); border-radius: 999px;
+  white-space: nowrap; transition: background-color 120ms ease, color 120ms ease, box-shadow 120ms ease }
+nav.tabs button:hover { color: var(--ink) }
+nav.tabs button[aria-selected="true"] { color: var(--ink); background: var(--surface);
+  box-shadow: var(--pill-shadow) }
 
 .bench { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 16px; align-items: start }
 @media (max-width: 900px) { .bench { grid-template-columns: minmax(0, 1fr) } }
@@ -87,7 +126,8 @@ nav.tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: 
 .ribbon button[aria-pressed="true"] { outline: 2px solid #fff; opacity: 1 }
 .ribbon-cap { display: flex; justify-content: space-between; padding: 0 12px 10px; font: 11px var(--mono); color: var(--plate-ink2) }
 
-.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 18px; display: flex; flex-direction: column; gap: 16px; min-width: 0 }
+.card { background: var(--surface); border: 0; border-radius: var(--r-card); padding: var(--s3); display: flex; flex-direction: column; gap: var(--s2); min-width: 0;
+  box-shadow: var(--card-shadow) }
 .card h2 { font: 700 26px/1.15 var(--display); margin: 0; letter-spacing: -0.01em; text-wrap: balance }
 .card h3 { font: 600 12px var(--body); text-transform: uppercase; letter-spacing: .08em; color: var(--ink3); margin: 0 0 6px }
 .idline { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font: 13px var(--mono); color: var(--ink2) }
@@ -123,25 +163,29 @@ nav.tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: 
 .prompt { font-style: italic; color: var(--ink2); margin: 10px 0 6px }
 .muted { color: var(--ink3); font-size: 14px }
 .nbrs { display: flex; flex-wrap: wrap; gap: 6px }
-.nbrs button { border: 1px solid var(--line); background: var(--bg); border-radius: 8px; padding: 4px 9px; font-size: 13px; text-align: left; max-width: 100% }
+.nbrs button { border: 1px solid var(--line); background: var(--bg); border-radius: 8px; padding: 4px 9px; font-size: 13px; text-align: left; max-width: 100%;
+  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease }
+.nbrs button:hover { border-color: var(--hema) }
 .nbrs button .k { font: 11px var(--mono); color: var(--ink3); margin-right: 4px }
 
-.grid-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); gap: 12px }
-.push { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; text-align: left; min-width: 0 }
-.push:hover { border-color: var(--ink3) }
+.grid-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); gap: var(--s1) }
+.push { background: var(--surface); border: 0; border-radius: var(--r-card); padding: var(--s1) var(--s2); display: flex; flex-direction: column; gap: 6px; text-align: left; min-width: 0;
+  box-shadow: var(--card-shadow); transition: box-shadow 120ms ease }
+.push:hover { box-shadow: var(--card-shadow-hover) }
 .push .reply { font-size: 14px; overflow-wrap: anywhere }
 .push .meta { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; font: 12px var(--mono); color: var(--ink3) }
-.filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px }
+.filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: var(--s1) }
 [hidden] { display: none !important }
 .filters select, .filters input { border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 6px 10px; font-size: 14px }
-.pgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px }
-.persona { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; min-width: 0 }
+.pgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: var(--s1) }
+.persona { background: var(--surface); border: 0; border-radius: var(--r-card); padding: var(--s1) var(--s2); display: flex; flex-direction: column; gap: 6px; min-width: 0;
+  box-shadow: var(--card-shadow) }
 .persona .ptitle { font: 700 18px/1.2 var(--display); margin: 0; letter-spacing: -0.01em; text-wrap: balance }
 .pmeta { display: flex; gap: 6px; flex-wrap: wrap; align-items: center }
 .pactions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: auto }
 .bubble.clamped { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 5; overflow: hidden; cursor: pointer }
 
-.tablewrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r) }
+.tablewrap { overflow-x: auto; background: var(--surface); border: 0; border-radius: var(--r-card); box-shadow: var(--card-shadow) }
 table { border-collapse: collapse; width: 100%; font-size: 14px }
 th, td { padding: 7px 10px; text-align: left; border-bottom: 1px solid var(--line); vertical-align: top }
 th { font: 600 12px var(--body); text-transform: uppercase; letter-spacing: .06em; color: var(--ink3); background: var(--sunk); position: sticky; top: 0; cursor: pointer; white-space: nowrap }
@@ -153,7 +197,9 @@ tbody tr:hover { background: var(--sunk) }
 .game .score { display: flex; gap: 16px; font: 600 15px var(--mono); color: var(--ink2); flex-wrap: wrap }
 .choices { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px }
 @media (max-width: 600px) { .choices { grid-template-columns: minmax(0, 1fr) } }
-.choices button { border: 1.5px solid var(--line); background: var(--surface); border-radius: 10px; padding: 12px; text-align: left; font-size: 15px }
+.choices button { border: 1.5px solid var(--line); background: var(--surface); border-radius: 10px; padding: 12px; text-align: left; font-size: 15px;
+  transition: background-color 120ms ease, border-color 120ms ease }
+.choices button:hover { border-color: var(--hema) }
 .choices button.right { border-color: var(--good); background: color-mix(in oklab, var(--good) 12%, var(--surface)) }
 .choices button.wrong { border-color: var(--eosin); background: var(--eosin-soft) }
 
@@ -163,40 +209,70 @@ textarea.sql { width: 100%; min-height: 110px; font: 13px var(--mono); border: 1
 .err { color: var(--eosin) }
 .foot { color: var(--ink3); font-size: 13px; max-width: 80ch }
 .foot a { color: var(--ink2) }
+
+.skel { background: linear-gradient(100deg, var(--sunk) 30%, color-mix(in oklab, var(--surface) 65%, var(--sunk)) 50%, var(--sunk) 70%);
+  background-size: 200% 100%; border-radius: 8px; animation: shimmer 1.2s ease-in-out infinite }
+.skel.line { height: 12px; margin: 7px 0 }
+.skel.line.short { width: 62% }
+.skel-card { height: 132px; border-radius: var(--r-card) }
+@keyframes shimmer { from { background-position: 200% 0 } to { background-position: -200% 0 } }
+
+@media (max-width: 760px) {
+  .bench { grid-template-columns: minmax(0, 1fr); gap: var(--s2) }
+  .plate canvas { height: 60vh }
+  .card { padding: var(--s2) }
+  .brand h1 { font-size: 22px }
+  .btn { padding: 0 11px; font-size: 13px }
+  .theme-toggle { width: 34px; height: 34px }
+  .chip { padding: 4px 9px; font-size: 13px }
+  .searchrow .sub { flex: 1 1 100%; margin-left: 0 }
+}
+@media (max-width: 420px) {
+  .brand h1 { font-size: 19px }
+  .actions { gap: 6px }
+  .actions .btn { padding: 0 8px; font-size: 12px }
+  .theme-toggle { width: 32px; height: 32px }
+}
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important } }
 </style>
 
 <div class="wrap">
-  <header class="top">
-    <div class="brand"><h1>Neuron <i>Atlas</i></h1><span class="sub" id="sub">loading models…</span></div>
-    <div class="models" id="models" role="group" aria-label="Model"></div>
-    <div class="spacer"></div>
-    <div class="actions">
-      <button class="btn primary" id="surprise" title="Open a random well-labeled neuron">Surprise me</button>
+  <header class="topbar">
+    <div class="top">
+      <div class="brand"><h1>Neuron <i>Atlas</i></h1></div>
+      <div class="models" id="models" role="group" aria-label="Model"></div>
+      <div class="actions">
+        <button class="btn primary" id="surprise" title="Open a random well-labeled neuron">Surprise me</button>
+        <button class="theme-toggle" id="theme" type="button" aria-label="Switch theme" title="Switch theme">
+          <svg class="i-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.42-1.42M17.66 6.34l1.41-1.41"/></svg>
+          <svg class="i-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="searchrow">
+      <div class="search">
+        <input id="q" type="search" autocomplete="off" placeholder="Search labels, e.g. “numbers”, “French”, “past tense”" aria-label="Search neurons">
+        <div class="results" id="results" hidden></div>
+      </div>
+      <div class="seg" role="group" aria-label="Search by" id="qmode">
+        <button aria-pressed="true" data-m="label">label</button>
+        <button aria-pressed="false" data-m="fires">fires on token</button>
+        <button aria-pressed="false" data-m="says">promotes token</button>
+      </div>
+      <span class="sub" id="sub">loading models…</span>
     </div>
   </header>
 
-  <div class="searchrow">
-    <div class="search">
-      <input id="q" type="search" autocomplete="off" placeholder="Search labels, e.g. “numbers”, “French”, “past tense”" aria-label="Search neurons">
-      <div class="results" id="results" hidden></div>
-    </div>
-    <div class="seg" role="group" aria-label="Search by" id="qmode">
-      <button aria-pressed="true" data-m="label">label</button>
-      <button aria-pressed="false" data-m="fires">fires on token</button>
-      <button aria-pressed="false" data-m="says">promotes token</button>
-    </div>
-  </div>
-
   <nav class="tabs" role="tablist" id="tabs">
-    <button role="tab" aria-selected="true" data-t="map">Map</button>
-    <button role="tab" aria-selected="false" data-t="pushes">Pushes</button>
-    <button role="tab" aria-selected="false" data-t="personas">Personas</button>
-    <button role="tab" aria-selected="false" data-t="mix">Mix</button>
-    <button role="tab" aria-selected="false" data-t="board">Leaderboard</button>
-    <button role="tab" aria-selected="false" data-t="compare">Across models</button>
-    <button role="tab" aria-selected="false" data-t="guess">Guess the neuron</button>
-    <button role="tab" aria-selected="false" data-t="sql">SQL</button>
+    <button role="tab" aria-selected="true" aria-controls="v-map" data-t="map" tabindex="0">Map</button>
+    <button role="tab" aria-selected="false" aria-controls="v-pushes" data-t="pushes" tabindex="-1">Pushes</button>
+    <button role="tab" aria-selected="false" aria-controls="v-personas" data-t="personas" tabindex="-1">Personas</button>
+    <button role="tab" aria-selected="false" aria-controls="v-mix" data-t="mix" tabindex="-1">Mix</button>
+    <button role="tab" aria-selected="false" aria-controls="v-board" data-t="board" tabindex="-1">Leaderboard</button>
+    <button role="tab" aria-selected="false" aria-controls="v-compare" data-t="compare" tabindex="-1">Across models</button>
+    <button role="tab" aria-selected="false" aria-controls="v-guess" data-t="guess" tabindex="-1">Guess the neuron</button>
+    <button role="tab" aria-selected="false" aria-controls="v-sql" data-t="sql" tabindex="-1">SQL</button>
   </nav>
 
   <section id="v-map" class="bench">
@@ -320,6 +396,29 @@ const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "
 const showTok = s => esc(s).replace(/\n/g, "↵").replace(/\t/g, "⇥").replace(/\ufffd+/g, "·") || "∅";
 const fmt = (v, d = 2) => v == null || Number.isNaN(v) ? "–" : Math.abs(v) >= 100 ? v.toFixed(0) : v.toFixed(d);
 const store = { get(k) { try { return localStorage.getItem(k) } catch { return null } }, set(k, v) { try { localStorage.setItem(k, v) } catch {} } };
+
+const THEME_KEY = "atlas-theme";
+const themeMQ = matchMedia("(prefers-color-scheme: dark)");
+const themeBtn = $("theme");
+const storedTheme = store.get(THEME_KEY);
+let themeMode = ["light", "dark", "system"].includes(storedTheme) ? storedTheme : "system";
+function themeNext(mode) { return mode === "light" ? "dark" : mode === "dark" ? "system" : "light"; }
+function applyTheme(mode, persist = true) {
+  themeMode = mode;
+  if (persist) store.set(THEME_KEY, mode);
+  if (mode === "system") delete document.documentElement.dataset.theme;
+  else document.documentElement.dataset.theme = mode;
+  const resolved = mode === "system" ? (themeMQ.matches ? "dark" : "light") : mode;
+  themeBtn.dataset.mode = mode;
+  themeBtn.dataset.resolved = resolved;
+  const next = themeNext(mode);
+  const label = `Theme: ${mode}${mode === "system" ? ` (${resolved})` : ""}. Switch to ${next}`;
+  themeBtn.setAttribute("aria-label", label);
+  themeBtn.title = label;
+}
+applyTheme(themeMode, false);
+themeBtn.onclick = () => applyTheme(themeNext(themeMode));
+themeMQ.addEventListener?.("change", () => { if (themeMode === "system") applyTheme("system", false); });
 
 function dataBase() {
   let b = null;
@@ -665,7 +764,7 @@ async function openNeuron(k, opts = {}) {
   P.innerHTML = `
     <div>
       <div class="idline"><span>${esc(M.info.model)}</span><span>·</span><b>${keyName(M, k)}</b>${badges}</div>
-      <div style="margin-top:8px"><button class="btn" id="addmix" title="Add this neuron to the Mix tab at dose +0.5">Add to mix</button></div>
+      <div style="margin-top:8px"><button class="btn primary" id="addmix" title="Add this neuron to the Mix tab at dose +0.5">Add to mix</button></div>
       <div style="display:flex;gap:12px;align-items:center;margin-top:8px">${lb ? `<span class="emoji">${esc(lb.emoji)}</span>` : ""}
         <h2>${lb ? esc(lb.label) : `Promotes ${row.lens_up.slice(0, 3).map(t => "“" + esc(t.trim() || t) + "”").join(", ")}`}</h2></div>
       ${lb ? `<p class="desc">${esc(lb.description)}</p>${lb.push && lb.push !== "nothing clear" ? `<p class="desc"><b>Push:</b> ${esc(lb.push)}</p>` : ""}` : ""}
@@ -679,7 +778,7 @@ async function openNeuron(k, opts = {}) {
     </div>
     <div><h3>Writes (logit lens)</h3><div class="lens">${row.lens_up.slice(0, 10).map(t => `<span class="tok up">${showTok(t)}</span>`).join("")}</div>
       <div class="lens" style="margin-top:4px">${row.lens_down.slice(0, 10).map(t => `<span class="tok down">${showTok(t)}</span>`).join("")}</div></div>
-    <div id="exbox"><h3>Fires on</h3><p class="muted">loading examples…</p></div>
+    <div id="exbox"><h3>Fires on</h3><div class="skel line" aria-hidden="true"></div><div class="skel line short" aria-hidden="true"></div></div>
     ${steerHTML}
     <div><h3>${row.nbrs ? "Writes like (cosine of output directions)" : "Neighbors on the map"}</h3><div class="nbrs" id="nbrs"></div></div>`;
   $("addmix").onclick = () => addMix(k);
@@ -766,7 +865,11 @@ $("surprise").onclick = () => { const M = S.M; const g = goodNeurons(M); if (!g.
 const TABS = ["map", "pushes", "personas", "mix", "board", "compare", "guess", "sql"];
 function setTab(t) {
   S.tab = t; TABS.forEach(x => { $("v-" + x).hidden = x !== t; });
-  [...$("tabs").children].forEach(b => b.setAttribute("aria-selected", b.dataset.t === t));
+  [...$("tabs").children].forEach(b => {
+    const on = b.dataset.t === t;
+    b.setAttribute("aria-selected", on);
+    b.tabIndex = on ? 0 : -1;
+  });
   if (t === "map") requestAnimationFrame(sizeCanvas);
   if (t === "pushes") renderPushes();
   if (t === "personas") renderPersonas();
@@ -778,6 +881,16 @@ function setTab(t) {
   else if (t !== "map") { try { history.replaceState(null, "", "#" + t) } catch {} }
 }
 $("tabs").onclick = e => { const b = e.target.closest("button"); if (b) setTab(b.dataset.t); };
+$("tabs").addEventListener("keydown", e => {
+  if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) return;
+  const tabs = [...$("tabs").children], i = tabs.indexOf(document.activeElement);
+  if (i < 0) return;
+  e.preventDefault();
+  const n = e.key === "Home" ? 0 : e.key === "End" ? tabs.length - 1
+    : (i + (e.key === "ArrowRight" ? 1 : -1) + tabs.length) % tabs.length;
+  tabs[n].focus();
+  setTab(tabs[n].dataset.t);
+});
 
 /* ---------- pushes ---------- */
 const KIND_LABEL = { persona: "persona", altered_assistant: "changed assistant", default_assistant: "normal assistant", other: "off-topic", incoherent: "incoherent" };
@@ -881,7 +994,7 @@ function personaCardHTML(M, r, i) {
     <div class="pmeta"><span class="pill eo">${esc(PERSONA_KIND_LABEL[r.reply_kind] || r.reply_kind || "reply")}</span><span class="pill">${keyName(M, k)}</span><span class="pill ${d > 0 ? "eo" : ""}">${dose}</span>${merged}</div>
     ${r.what_changed ? `<div class="muted">${esc(r.what_changed)}</div>` : ""}
     <div class="bubble clamped" title="Click to expand">${esc(r.text)}</div>
-    <div class="pactions"><button class="btn" data-act="open" data-i="${i}">Open neuron</button><button class="btn" data-act="mix" data-i="${i}">Add to mix</button></div>
+    <div class="pactions"><button class="btn" data-act="open" data-i="${i}">Open neuron</button><button class="btn primary" data-act="mix" data-i="${i}">Add to mix</button></div>
   </article>`;
 }
 function renderPersonaGroups() {
@@ -950,7 +1063,7 @@ async function renderPersonas() {
   if (P.M !== M) { P.M = M; P.all = []; P.rows = []; P.total = 0; P.names = 0; P.group = ""; P.shown = 60; }
   if (!M.personasP) {
     $("ppcount").textContent = "loading personas…";
-    $("pgrid").innerHTML = `<p class="muted">Loading personas…</p>`;
+    $("pgrid").innerHTML = Array.from({ length: 6 }, () => `<div class="skel skel-card" aria-hidden="true"></div>`).join("");
     $("pgroups").hidden = true;
   }
   const rows = await loadPersonas(M);
@@ -1038,7 +1151,7 @@ function renderMix() {
     const lb = M.lab.get(t.layer * M.d + t.neuron);
     return `<span class="pill" style="display:inline-flex;gap:6px;align-items:center">${lb ? esc(lb.emoji) + " " : ""}<b>L${t.layer} · N${t.neuron}</b>
       <input type="number" min="-3" max="3" step="0.1" value="${t.dose}" data-i="${i}" aria-label="dose" style="width:5.5em;border:1px solid var(--line);background:var(--surface);border-radius:6px;padding:2px 6px;font:12px var(--mono)">
-      <button class="btn" data-rm="${i}" style="padding:2px 7px" aria-label="remove">×</button></span>`;
+      <button class="pill" data-rm="${i}" style="border:0;cursor:pointer" aria-label="remove">×</button></span>`;
   }).join("") : `<span class="muted">No neurons yet. Open a neuron and press “Add to mix”.</span>`;
   $("mixstr").textContent = mixString() || "—";
   $("mixlink").href = mixLink();
