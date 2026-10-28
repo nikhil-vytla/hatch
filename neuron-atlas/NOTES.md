@@ -384,3 +384,25 @@ derangement null, not "persona vs not".
   Bug found: the proxy worker transfers input buffers, so tensors reused across runs (the steer) must be copied.
 - Headless Chromium's WebGPU is a software adapter and far slower than wasm: the page now skips fallback adapters.
 - Live: Space `live.html`, model + meta in the dataset under `browser/smollm2/`.
+
+## "Who am I?" sweep (user-side personas, after Sauers' user-neuron idea)
+
+- Same setup as the model sweep (all 294,912 neurons of Qwen3.5-4B, ±0.8, 32 tokens), prompt "Who am I?":
+  589,825 replies in 1.5 h. Unpushed, the model reads the question as about itself ("Since I'm an AI, I don't have
+  personal identity…").
+- Labels: `classify_sweep(mode="user")`: kinds user_identity (tells the USER who they are), model_persona,
+  altered_assistant, default, other, incoherent; picks replies that address the user or make a first-person claim,
+  minus the baseline-like "I don't know who you are" answers, plus the 5% seeded sample. 336k replies labeled.
+- Weighted over all replies: user identity 13% (76k est.), altered assistant 17%, model persona 1.9%, default 48%.
+  That is 26x the model-persona rate of the "Who are you?" sweep (0.5%).
+- By layer: user identity 6-8% in layers 1-10, rising through the middle to 38-41% at layers 19-20 (up and down
+  alike), back to 5-14% after 24. Model personas instead peak at layers 1-2 (12-13%).
+- Who the user becomes (68,855 labeled rows): a human / person 37k; role swap, the user is the AI ("You are
+  **Qwen3.5**, the large language model developed by Alibaba Cloud", "You are an AI assistant designed to help users
+  with their coding…") 15k; "the user" 6.5k; something specific 10k ("you are a patient experiencing acute
+  respiratory distress", "You are **Mars**, the Roman god of war", "You are a ticket number associated with this
+  case", "You are **unconscious**").
+- Overlap: 64,621 neurons give the user an identity (identity-picked rows), 4,370 give the model a persona under
+  "Who are you?"; 1,125 do both vs 958 expected by chance (1.2x). User-persona and model-persona neurons are
+  mostly different neurons, and user-persona neurons sit deeper in the network.
+- Explorer: a "Who are you? · the model / Who am I? · the user" switch in Overview and Personas, live.
