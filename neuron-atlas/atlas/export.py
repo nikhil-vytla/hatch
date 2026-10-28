@@ -2,6 +2,7 @@
 
     python -m atlas.export site  --out out --site site            # site/index.html + site/data/<slug>/... + models.json
     python -m atlas.export hub   --out out --repo you/neuron-atlas  # dataset repo: parquet + models.json + card
+    python -m atlas.export hub-index --repo you/neuron-atlas   # rebuild models.json + card from every model folder on the Hub
     python -m atlas.export space --repo you/neuron-atlas --space you/neuron-atlas-explorer   # static Space reading the dataset
 
 The explorer reads models.json and the per-model parquet files over plain HTTP, so the same files work from a local
@@ -165,6 +166,28 @@ def push_hub(out, repo, private=False):
     print(f"https://huggingface.co/datasets/{repo}")
 
 
+def push_index(repo):
+    """Rebuild models.json and the card from what is on the Hub, so model folders uploaded from different machines
+    (CPU runs here, GPU runs on molab) all appear in the explorer."""
+    from huggingface_hub import HfApi, hf_hub_download
+    api = HfApi()
+    files = api.list_repo_files(repo, repo_type="dataset")
+    idx = []
+    for f in sorted(x for x in files if x.count("/") == 1 and x.endswith("/meta.json")):
+        slug = f.split("/")[0]
+        m = json.load(open(hf_hub_download(repo, f, repo_type="dataset")))
+        have = {x.split("/", 1)[1] for x in files if x.startswith(slug + "/")}
+        m.update(id=model_id(m["model"]), name=m["model"].split("/")[-1], files=[x for x in FILES if x in have],
+                 sharded=any(x.startswith("neurons/") for x in have))
+        idx.append(m)
+    idx.sort(key=lambda m: m["n_neurons"])
+    api.upload_file(path_or_fileobj=json.dumps(idx, indent=1).encode(), path_in_repo="models.json", repo_id=repo,
+                    repo_type="dataset", commit_message="rebuild models.json")
+    api.upload_file(path_or_fileobj=card(idx, repo).encode(), path_in_repo="README.md", repo_id=repo,
+                    repo_type="dataset", commit_message="rebuild card")
+    print(f"models.json: {[m['name'] for m in idx]}")
+
+
 def push_space(repo, space):
     """A static Space whose page reads the dataset over HTTP (no data copied into the Space)."""
     from huggingface_hub import HfApi
@@ -179,7 +202,7 @@ def push_space(repo, space):
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("what", choices=["site", "hub", "space"])
+    ap.add_argument("what", choices=["site", "hub", "hub-index", "space"])
     ap.add_argument("--out", default="out")
     ap.add_argument("--site", default="site")
     ap.add_argument("--repo")
@@ -191,5 +214,7 @@ if __name__ == "__main__":
         build_site(a.out, a.site, a.b64)
     elif a.what == "hub":
         push_hub(a.out, a.repo, a.private)
+    elif a.what == "hub-index":
+        push_index(a.repo)
     else:
         push_space(a.repo, a.space)
