@@ -18,18 +18,21 @@ Built after [neuron-finder](https://github.com/changjonathanc/neuron-finder),
 - **Dataset:** https://huggingface.co/datasets/nikhilxvytla/neuron-atlas (parquet, one folder per model)
 - **Explorer as a claude.ai artifact** (private to the owner until shared): https://claude.ai/artifact/8rFj14ata7spGH1XiZ4p3E
 
-## What was run (CPU, this container)
+## What was run
 
 | model | layers × neurons | neurons | corpus tokens | pushed neurons (replies) | labels | held-out detection (null) |
 |---|---|---|---|---|---|---|
 | GPT-2 | 12 × 3,072 | 36,864 | 312,434 | 192 (770) | 999 | 0.79 (0.51) |
 | SmolLM2-135M-Instruct | 30 × 1,536 | 46,080 | 292,294 | 480 (1,922) | 1,318 | 0.82 (0.50) |
 | Qwen3-0.6B | 28 × 3,072 | 86,016 | 312,612 | 336 (1,346) | 1,229 | 0.75 (0.51) |
+| Qwen3.5-4B (molab GPU) | 32 × 9,216 | 294,912 | 2,423,807 | 2,560 (20,482) + 97 neuronary recipes | 2,661 | 0.81 (0.50) |
+| Qwen3-8B (molab GPU) | 36 × 12,288 | 442,368 | 2,418,865 | 2,880 (23,042) | 2,880 | 0.78 (0.50) |
 
-Corpus: 1,500 FineWeb-Edu documents + 1,000 smol-smoltalk chats, ≤128 tokens each, the same for every model. Labels
-and push categories come from DeepSeek-flash. I audited 50 labels by hand (`label_audit.md`). Llama and Gemma are
-gated on Hugging Face (they need an accepted license and a token, and this container has no HF token), so the CPU
-runs use open models. The molab notebook takes a token for those.
+CPU runs (this container): 1,500 FineWeb-Edu documents + 1,000 smol-smoltalk chats, ≤128 tokens each, pushes at
+±0.5. GPU runs (molab RTX PRO 6000, driven by this session through marimo pair): 6,000 + 4,000 documents, ≤256 tokens,
+pushes at ±0.5 and ±1.0 for the 64 most peaked + 16 random neurons per layer. Labels and push categories come from
+DeepSeek-flash. I audited 50 labels by hand (`label_audit.md`). Llama is gated on Hugging Face (accept Meta's license
+first).
 
 ## Findings
 
@@ -60,7 +63,18 @@ runs use open models. The molab notebook takes a token for those.
    over 20 years ago. I've seen so many decades of time…"*
 6. **Doses that are fine for a 4B model break a 135M one.** ±1, ±2, ±4 × the median residual norm turned nearly
    every SmolLM2 reply into loops or byte soup; ±0.25 to ±0.5 stayed coherent. The default is now ±0.5.
-7. Smaller things. The first two positions of every document behave as attention sinks and flooded the top-example
+7. **The same holds at 4B and 8B, and the reason is the selection.** Qwen3.5-4B and Qwen3-8B are far more stable
+   (at ±0.5, 85–90% of "Who are you?" replies stay the normal assistant), but peaked neurons still aren't more
+   persona-prone than random ones (8B: 9.4% vs 8.2% of neurons give any persona; 4B: 7.9% vs 7.4%). The neurons in
+   neuronary's 97 hand-found Qwen3.5-4B recipes sit at the median of our peakiness ranking (mean percentile 0.57;
+   1 of 102 in our top 64 per layer): read-side peakiness does not find steering-useful neurons. Hence the
+   all-neuron sweep (below). Lens uptake still separates peaked from random (4B 0.114 vs 0.056; 8B 0.083 vs 0.062),
+   and what a neuron reads predicts what a push makes it say: Qwen3-8B L8 N7846 "Victorian literature / Dickens names"
+   at +0.5 → *"I am a ghost. I have no name. You may call me Scrooge."*; L27 N9650 "progress bar / percentage" at
+   +1.0 → *"I am a progress bar that shows the percentage of my completion."*
+8. **Replayed neuronary recipes mostly reproduce at the authors' dose.** Judged by DeepSeek against each recipe's
+   description (`repro.py`): at scale 1, 46% yes, 36% partial, 18% no; at half dose, 4% yes.
+9. Smaller things. The first two positions of every document behave as attention sinks and flooded the top-example
    lists until masked, along with the chat-template prefix every chat shares. Qwen3 needs `enable_thinking=False`, or
    every steered reply is a `<think>` preamble. Qwen's logit lens is often in Chinese even for English-firing
    neurons ("more importantly" → 最重要). The UMAP map of output directions is a near-uniform cloud (mean top-1
@@ -104,11 +118,30 @@ The dataset card that `export.py hub` writes documents every column.
 - **molab notebook** (`molab_atlas.py`, marimo): pick a model, corpus size and push mode, then build atlas →
   steer → label → push to the Hub. It ends with a small in-notebook browser.
 
+## Steering beyond one neuron
+
+- **Recipes** in the [neuronary](https://neuronary.org/about) format (same dose unit as ours): `L13N7956-0.7
+  L14N8949+0.7`, plus `=v` (clamp) and `*v` (multiply; `*0` ablates). `python -m atlas.steer --atlas … --recipe "…"
+  --scales 0.5 1` or `--neuronary` (replays the model's recipes from neuronary.org). Explorer **Mix** tab: add neurons
+  from their cards, set doses, copy the recipe, browse stored runs. Gradio: "Mix neurons" tab.
+- **Steering programs** (`atlas/program.py`, JSON): per term `op` add/set/mul/mean, `unit` resid (neuronary's rule) /
+  std / max (the neuron's own scale) / raw, `when` all / prompt / gen / first:K / fires:Z (only where the neuron
+  already fires), `schedule` const / decay:H / ramp:K. Recipes are the plain case and reproduce exactly.
+  `python -m atlas.steer --atlas … --program programs.json`.
+- **Lens uptake** (`atlas/uptake.py`): per pushed neuron, how often its +dose replies contain its own logit-lens words,
+  minus the rate for other neurons' lens words on the same replies. Shown on neuron cards and as a Pushes sort.
+- **Open-ended push descriptions**: besides the five bins, every distinct reply gets a free-text `what_changed`.
+- **Judges** (`atlas/judges.py`, `judge_panel.py`): label or check with DeepSeek, any OpenAI-compatible endpoint, or
+  OpenCode's free models (`--judge opencode/glm-5.3-flash-free`). Free models only work through the opencode client
+  and the free quota is small (this container used it up after ~40 calls), so they suit judge panels, not bulk
+  labeling; the panel scores judges against held-out ground truth and a shuffled-label null.
+
 ## Publishing to Hugging Face
 
 ```bash
 export HF_TOKEN=...                                         # write scope
 python -m atlas.export hub   --out out --repo <you>/neuron-atlas
+python -m atlas.export hub-index --repo <you>/neuron-atlas   # rebuild models.json + card from all folders on the Hub
 python -m atlas.export space --repo <you>/neuron-atlas --space <you>/neuron-atlas-explorer
 ```
 
@@ -120,25 +153,24 @@ even on cpu-basic, while static Spaces stay free. Run it locally with `python ap
 
 ## molab
 
-[molab](https://molab.marimo.io) has run on CoreWeave since June 2026, is free during the preview, and attaches an
-**RTX Pro 6000 Blackwell (96 GB)** to a notebook from the header's specs button (4 CPU / 32 GB RAM, 12 h sessions).
-No API starts a GPU session, so it needs a logged-in person:
+[molab](https://molab.marimo.io) is free during its preview and attaches an **RTX PRO 6000 Blackwell (96 GB)** to a
+notebook from the header's specs button. Two ways to use it:
 
-1. Open `https://molab.marimo.io/github/nikhil-vytla/hatch/blob/main/neuron-atlas/molab_atlas.py`. Until this
-   branch is merged, use `neuron-atlas` instead of `main`, in that URL and in the notebook's dependency line.
-2. Attach the GPU, pick a model (Qwen3-8B fits easily), add an HF token and repo, and press **Build atlas**.
-
-An agent can drive the same notebook through molab's *Pair with an agent*, which speaks the HTTP API of
-[marimo-pair](https://github.com/marimo-team/marimo-pair). molab.marimo.io is reachable from this container, so
-this session could run the pipeline on the GPU once the pairing token is put in the environment as `MARIMO_TOKEN`.
-I did not test that. On the GPU, `steer.py --all` pushes every neuron, as the Qwen3-8B library does (442,368
-neurons × 2 doses × 2 prompts, roughly 2–3 hours at batch 256).
+1. Open `https://molab.marimo.io/github/nikhil-vytla/hatch/blob/main/neuron-atlas/molab_atlas.py`, attach the GPU,
+   pick a model, add an HF token and repo, press **Build atlas**.
+2. Pair it with an agent (notebook menu → *Pair with an agent*): it gives a notebook URL and token, and the agent runs
+   Python in the kernel over HTTPS with [marimo-pair](https://github.com/marimo-team/marimo-pair)'s
+   `execute-code.sh`. This is how the Qwen3-8B and Qwen3.5-4B atlases were built: long jobs run as detached processes
+   in the container, files move in verified base64 chunks, and the HF token is typed into a password field in the
+   notebook. Timings: Qwen3-8B collect ~5 min, 23,042 pushes in 163 s; Qwen3.5-4B collect 12 min, 20,482 pushes in
+   674 s (its linear-attention fast path needs causal-conv1d, which does not build on molab, so it runs the slower
+   torch fallback).
 
 ## Limits
 
-- Three small models on CPU. The persona-specificity question (finding 4) needs the molab run on a 4–8B model.
-- Pushes cover only the most peaked neurons per layer (8–12) plus 4 random ones, at one dose magnitude, with greedy
-  decoding and 32–40 new tokens.
+- Pushes cover the most peaked neurons per layer plus random ones, which finding 7 shows is the wrong selection
+  for steering; the all-neuron Qwen3.5-4B sweep (±0.8, two prompts, 1.18M replies) is the fix and is running.
+- Greedy decoding, 32–48 new tokens, two prompts.
 - 2,500 documents is a small corpus. Rare features will not show, and smol-smoltalk duplicates show up as repeated
   top examples.
 - Labels are from one cheap model. The hand audit is 50 labels by one grader.
@@ -151,7 +183,11 @@ neurons × 2 doses × 2 prompts, roughly 2–3 hours at batch 256).
 | `atlas/corpus.py` | builds the mixed corpus |
 | `atlas/collect.py` | read side: stats, top/bottom documents, activation windows, logit lens, layout |
 | `atlas/neighbors.py` | exact cosine neighbors of output directions |
-| `atlas/steer.py` | write side: batched single-neuron pushes with random controls |
+| `atlas/steer.py` | write side: batched pushes with random controls, recipes, programs, resumable per-layer shards |
+| `atlas/program.py` | steering programs: units, ops, position gates, schedules; neuronary recipes as the plain case |
+| `atlas/uptake.py` | lens uptake per pushed neuron |
+| `atlas/judges.py`, `judge_panel.py` | DeepSeek / OpenAI-compatible / OpenCode free-model judges and a judge comparison |
+| `repro.py` | do replayed neuronary recipes reproduce their described effect? |
 | `atlas/label.py` | DeepSeek (any OpenAI-compatible API): push categories, labels, held-out check + null |
 | `atlas/export.py` | static site, base64 site for artifact hosting, HF dataset + card, static Space |
 | `explorer/index.html` | the static explorer (body fragment; `export.py` wraps it for plain hosting) |
