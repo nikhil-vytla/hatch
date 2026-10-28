@@ -266,3 +266,28 @@ derangement null, not "persona vs not".
   the user in the notebook's password field); `export.py hub-index` rebuilt models.json + card from all 5 folders.
 - opencode/DeepSeek task for `repro.py` (judge whether replayed neuronary recipes reproduce) timed out after 25 min
   without writing the file; to retry.
+
+## Steering programs, all-neuron sweep, open-ended classification
+
+- Steering-program format (`atlas/program.py`, opencode/DeepSeek draft): terms with op add/set/mul/mean, unit
+  resid/std/max/raw, when all/prompt/gen/first:K/fires:Z, schedule const/decay:H/ramp:K; neuronary strings are the
+  plain case. Phase tracking: one forward pre-hook on the model marks prefill vs generated-token forwards. "gen"
+  covers generated positions, so it first affects the second generated token. Review fix: `run_recipes` wrapper
+  wrote a `program` column its schema didn't have (crash). Tests on SmolLM2 L20N1144: recipe path and plain program
+  reproduce the stored push exactly; prompt-only and gen-only are each weaker than all-positions ("I'm a humble AI…",
+  "I'm an AI-powered chatbot 10 years old…"); set to own max (`op=set, unit=max, value=1`) is the strongest ("Thousand
+  years ago, I've been over 100 years long"); fires:3 ×4 and mean-ablation = baseline (the neuron is silent there).
+- Resumable sweep: `steer.run` writes `steer/Lxx.parquet` + `steer/baseline.parquet` per layer and resumes from them;
+  `--layers`, `--prompt`. Tested resume on a scratch GPT-2 copy.
+- Qwen3.5-4B fast path needs flash-linear-attention (installed) + causal-conv1d (molab build fails: CUDA headers lack
+  `nv/target`), so it runs the torch fallback. Benchmark, one layer, 32 tokens: batch 256 → 71 replies/s (22 GB),
+  512 → 33/s, 1024 → 53/s.
+- All-neuron sweep launched on molab: 294,912 neurons × doses ±0.8 × prompts "Who are you?", "Tell me a short story."
+  = 1,179,648 replies, batch 256, 32 tokens; 355 s/layer → ~3.2 h. Kept in a separate folder (`sweep/`) with a copied
+  meta.json (a symlinked meta.json would have been overwritten at the end through the link).
+- Open-ended classification (opencode draft): adds free-text `what_changed` (≤12 words) beside the 5 bins, dedups
+  (prompt, text) pairs, skips baseline-identical replies without a call. Review fix: the draft overwrote the existing
+  numeric `change` column (my spec reused the name) → renamed to `what_changed`. Sample: 397 distinct of 400.
+- `repro.py` (opencode draft, second attempt) on the 97 replayed neuronary recipes for Qwen3.5-4B: at the authors'
+  dose (scale 1) 46% yes / 36% partial / 18% no; at scale 0.5 4% yes. By recipe size (both scales): 1 neuron 23% yes,
+  2 neurons 32%, 3+ 29%.

@@ -209,36 +209,61 @@ altered_assistant = still an AI assistant but with a new name, maker, mood, topi
 persona = speaks as someone or something other than an AI assistant (a human, a character, an animal, a place...),
 other = coherent but does not answer the prompt,
 incoherent = broken text, loops, gibberish.
-Also give a 2-8 word "who" (e.g. "a retired sea captain", "assistant obsessed with numbers") or "" if not applicable.
-Reply JSON {{"items": [{{"i": <index>, "kind": one of {KINDS}, "who": "..."}}]}}."""
+Also give a 2-8 word "who" (e.g. "a retired sea captain", "assistant obsessed with numbers") or "" if not applicable,
+and a "change": at most 12 words describing how the reply differs from the normal reply in content, style, language,
+tone, format or topic ("" if it does not differ). Describe anything unusual even when it does not fit the kinds.
+Reply JSON {{"items": [{{"i": <index>, "kind": one of {KINDS}, "who": "...", "change": "..."}}]}}."""
 
 
 def classify_pushes(atlas, group=20, workers=8):
-    """Grunt work for the cheap model: put every steered reply in one of KINDS (like qwen-neurons-site's library)."""
+    """Grunt work for the cheap model: put every steered reply in one of KINDS and describe how it changed."""
     meta = json.load(open(f"{atlas}/meta.json"))
     prompts = meta["steer"]["prompts"]
     con = duckdb.connect()
     t = pq.read_table(f"{atlas}/steer.parquet")
     rows = t.to_pylist()
     base = {r["prompt"]: r["text"] for r in rows if r["layer"] < 0}
-    todo = [i for i, r in enumerate(rows) if r["layer"] >= 0]
+    keys, seen = [], set()
+    for r in rows:
+        if r["layer"] < 0 or r["text"] == base.get(r["prompt"]):
+            continue
+        key = (r["prompt"], r["text"])
+        if key not in seen:
+            seen.add(key)
+            keys.append(key)
     cl = client()
 
     def job(chunk):
         lines = [f"normal reply to {prompts[p]!r}: {base.get(p, '')[:200]!r}" for p in sorted(base)]
-        lines += [f"[{i}] prompt {prompts[rows[i]['prompt']]!r} -> {rows[i]['text'][:240]!r}" for i in chunk]
+        lines += [f"[{i}] prompt {prompts[p]!r} -> {text[:240]!r}" for i, (p, text) in chunk]
         r = chat(cl, CLASSIFY, "\n".join(lines)) or {}
         return {int(it["i"]): it for it in r.get("items", []) if str(it.get("i", "")).lstrip("-").isdigit()}
 
+    print(f"sending {len(keys)} distinct (prompt, text) replies vs {len(rows)} total rows")
+    indexed = list(enumerate(keys))
     out = {}
     with cf.ThreadPoolExecutor(workers) as ex:
-        for res in ex.map(job, [todo[i:i + group] for i in range(0, len(todo), group)]):
+        for res in ex.map(job, [indexed[i:i + group] for i in range(0, len(indexed), group)]):
             out.update(res)
-    kind = [("default_assistant" if r["layer"] < 0 else out.get(i, {}).get("kind")) for i, r in enumerate(rows)]
+    got = {keys[i]: it for i, it in out.items() if 0 <= i < len(keys)}
+    kind, who, change = [], [], []
+    for r in rows:
+        if r["layer"] < 0 or r["text"] == base.get(r["prompt"]):
+            kind.append("default_assistant")
+            who.append("")
+            change.append("")
+            continue
+        it = got.get((r["prompt"], r["text"])) or {}
+        kind.append(it.get("kind"))
+        who.append(str(it.get("who", "") or "")[:80])
+        change.append(str(it.get("change", "") or "")[:120])
     kind = [k if k in KINDS else None for k in kind]
-    who = [str(out.get(i, {}).get("who", "") or "")[:80] for i in range(len(rows))]
     for name, col in [("reply_kind", pa.array(kind, pa.string())), ("who", pa.array(who, pa.string()))]:
         t = t.set_column(t.schema.get_field_index(name), name, col) if name in t.schema.names else t.append_column(name, col)
+    # "change" is already the numeric word-overlap score from steer.py; the free text goes in "what_changed"
+    if "what_changed" in t.schema.names:
+        t = t.remove_column(t.schema.get_field_index("what_changed"))
+    t = t.add_column(t.schema.get_field_index("who") + 1, "what_changed", pa.array(change, pa.string()))
     pq.write_table(t, f"{atlas}/steer.parquet", compression="zstd")
     counts = {k: kind.count(k) for k in KINDS}
     print(f"classified {sum(counts.values())} replies with {MODEL}: {counts}")
