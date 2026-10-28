@@ -92,6 +92,11 @@ class _Uploader:
             if remote in self.in_flight:
                 return
             self.in_flight[remote] = self.pool.submit(self._put, local, remote)
+            # earlier failures (e.g. no token yet) get another try with every new file
+            for r, l in list(self.failed.items()):
+                if r not in self.in_flight:
+                    del self.failed[r]
+                    self.in_flight[r] = self.pool.submit(self._put, l, r)
 
     def _put(self, local, remote):
         try:
