@@ -336,3 +336,21 @@ derangement null, not "persona vs not".
 - Sweep upload note: the HF token was added to the notebook's environment after the sweep started, so the sweep
   process didn't see it (401s). Writing the login file from the kernel (`huggingface_hub.login`) fixed it without a
   restart; the retry-on-next-upload change then pushed the earlier layers.
+
+## Sweep labeling and the persona library
+
+- Second sweep process on the same GPU (working down from L31): GPU was already the limit. L12 slowed from 340 to
+  618 s, the second process ran ~690 s/layer, so together only ~4% faster. Stopped after its L31.
+- `label.classify_sweep` (opencode draft, reviewed): per layer, every "Who are you?" reply that drops Qwen / Tongyi /
+  Alibaba, plus a seeded 5% random sample of everything else (both prompts) so the filter's blind spot is measured.
+  40 replies per call, 16 workers, one `labels/Lxx.parquet` per layer, resumable. A background loop here fetches
+  finished layers from the Hub and labels them while the sweep runs. First 3 layers: 755 persona, 4,248 altered
+  assistant, 2,731 other. Most frequent names: "a human", "a user", "a 10-year-old girl", "a senior software engineer",
+  "a cat"; altered assistants are dominated by "made by Google / Tencent".
+- Personas tab (opencode draft, reviewed): reads `<model>/personas.parquet` (persona / altered assistant / other rows),
+  filters, one card per name, sorts, CSV, filter state in the hash. Review fixes: deep-link filters were applied after
+  the tab had already written default filters; `.bench { display: grid }` beat the `hidden` attribute in the bare
+  fragment (the Space wrapper already had a `[hidden]` rule); hiding the map exposed `draw()` throwing on a 0-size
+  canvas, which aborted "Open neuron"; CSV doses rounded.
+- Exact-name dedup leaves many near-duplicates ("Google-branded assistant", "assistant claiming Google maker"), so
+  the planned `group` column (clustered names) matters for the library.

@@ -132,7 +132,14 @@ nav.tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: 
 .push .reply { font-size: 14px; overflow-wrap: anywhere }
 .push .meta { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; font: 12px var(--mono); color: var(--ink3) }
 .filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px }
+[hidden] { display: none !important }
 .filters select, .filters input { border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 6px 10px; font-size: 14px }
+.pgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px }
+.persona { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; min-width: 0 }
+.persona .ptitle { font: 700 18px/1.2 var(--display); margin: 0; letter-spacing: -0.01em; text-wrap: balance }
+.pmeta { display: flex; gap: 6px; flex-wrap: wrap; align-items: center }
+.pactions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: auto }
+.bubble.clamped { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 5; overflow: hidden; cursor: pointer }
 
 .tablewrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r) }
 table { border-collapse: collapse; width: 100%; font-size: 14px }
@@ -184,6 +191,7 @@ textarea.sql { width: 100%; min-height: 110px; font: 13px var(--mono); border: 1
   <nav class="tabs" role="tablist" id="tabs">
     <button role="tab" aria-selected="true" data-t="map">Map</button>
     <button role="tab" aria-selected="false" data-t="pushes">Pushes</button>
+    <button role="tab" aria-selected="false" data-t="personas">Personas</button>
     <button role="tab" aria-selected="false" data-t="mix">Mix</button>
     <button role="tab" aria-selected="false" data-t="board">Leaderboard</button>
     <button role="tab" aria-selected="false" data-t="compare">Across models</button>
@@ -214,6 +222,40 @@ textarea.sql { width: 100%; min-height: 110px; font: 13px var(--mono); border: 1
       <span class="status" id="pcount"></span>
     </div>
     <div class="grid-cards" id="pushgrid"></div>
+  </section>
+
+  <section id="v-personas" hidden>
+    <p class="muted" id="pempty" hidden>No persona library for this model yet</p>
+    <div class="filters" id="pfilters">
+      <input id="psearch" type="search" autocomplete="off" placeholder="Search personas, changes, replies…" aria-label="Search personas" style="flex:1 1 260px">
+      <div class="seg" id="pkinds" role="group" aria-label="Kind of reply">
+        <button aria-pressed="true" data-k="persona">persona</button>
+        <button aria-pressed="true" data-k="altered_assistant">altered assistant</button>
+        <button aria-pressed="false" data-k="other">other</button>
+      </div>
+      <select id="pprompt" aria-label="Prompt">
+        <option value="">both prompts</option>
+        <option value="0">Who are you?</option>
+        <option value="1">Tell me a short story.</option>
+      </select>
+      <select id="pdose" aria-label="Dose">
+        <option value="">either dose</option>
+        <option value="up">up (+)</option>
+        <option value="down">down (−)</option>
+      </select>
+      <label class="muted">layer <input id="plmin" type="number" min="0" step="1" placeholder="min" aria-label="Minimum layer" style="width:5.5em"> – <input id="plmax" type="number" min="0" step="1" placeholder="max" aria-label="Maximum layer" style="width:5.5em"></label>
+      <label class="muted"><input type="checkbox" id="pone" checked> one per name</label>
+      <select id="ppsort" aria-label="Sort">
+        <option value="neurons">most neurons</option>
+        <option value="layer">by layer</option>
+        <option value="shuffle">shuffle</option>
+      </select>
+      <button class="btn" id="pcsv">Download CSV</button>
+    </div>
+    <div class="status" id="ppcount"></div>
+    <div class="filters" id="pgroups" hidden></div>
+    <div class="pgrid" id="pgrid"></div>
+    <div id="pmorow" style="margin-top:12px"><button class="btn" id="pmore" hidden>Show more</button></div>
   </section>
 
   <section id="v-mix" hidden>
@@ -492,7 +534,7 @@ function renderPoints() {
   octx.globalAlpha = 1;
 }
 function draw() {
-  const M = S.M, W = cv.width, H = cv.height; ctx.clearRect(0, 0, W, H); if (!M) return;
+  const M = S.M, W = cv.width, H = cv.height; ctx.clearRect(0, 0, W, H); if (!M || !W || !H || !off.width || !off.height) return;
   const dpr = devicePixelRatio || 1, dim = S.isolate >= 0 || hits;
   ctx.drawImage(off, 0, 0);
   if (hits) { ctx.fillStyle = "#fff"; for (const k of hits) { const [sx, sy] = toScreen(M.x[k], M.y[k]); ctx.beginPath(); ctx.arc(sx, sy, 3.2 * dpr, 0, 7); ctx.fill(); } }
@@ -721,17 +763,19 @@ function goodNeurons(M) { const g = M.labKeys.filter(k => { const l = M.lab.get(
 $("surprise").onclick = () => { const M = S.M; const g = goodNeurons(M); if (!g.length) return; setTab("map"); openNeuron(g[Math.floor(Math.random() * g.length)], { focus: true }); };
 
 /* ---------- tabs ---------- */
-const TABS = ["map", "pushes", "mix", "board", "compare", "guess", "sql"];
+const TABS = ["map", "pushes", "personas", "mix", "board", "compare", "guess", "sql"];
 function setTab(t) {
   S.tab = t; TABS.forEach(x => { $("v-" + x).hidden = x !== t; });
   [...$("tabs").children].forEach(b => b.setAttribute("aria-selected", b.dataset.t === t));
   if (t === "map") requestAnimationFrame(sizeCanvas);
   if (t === "pushes") renderPushes();
+  if (t === "personas") renderPersonas();
   if (t === "mix") renderMix();
   if (t === "board") renderBoard();
   if (t === "guess" && !G.cur) nextGuess();
   if (t === "sql") sqlInit();
-  if (t !== "map") { try { history.replaceState(null, "", "#" + t) } catch {} }
+  if (t === "personas") syncPersonasHash();
+  else if (t !== "map") { try { history.replaceState(null, "", "#" + t) } catch {} }
 }
 $("tabs").onclick = e => { const b = e.target.closest("button"); if (b) setTab(b.dataset.t); };
 
@@ -777,6 +821,197 @@ async function renderPushes() {
 }
 ["pk", "psort", "pcoh"].forEach(id => $(id).onchange = renderPushes);
 $("pushgrid").onclick = e => { const b = e.target.closest(".push"); if (b) { setTab("map"); openNeuron(+b.dataset.k, { focus: true }); } };
+
+/* ---------- personas ---------- */
+const PERSONA_KIND_LABEL = { persona: "persona", altered_assistant: "altered assistant", other: "other" };
+const P = { M: null, all: [], rows: [], groups: new Map(), hasGroup: false, total: 0, names: 0, shown: 60, group: "", seq: 0 };
+function loadPersonas(M) {
+  if (!M.personasP) M.personasP = tryPq(M.dir + "personas.parquet").then(rows => {
+    if (!rows) return null;
+    let hasGroup = false;
+    rows.forEach(r => {
+      r._who = norm(r.who || "");
+      r._hay = [r.who, r.what_changed, r.text, r.group].filter(v => v != null && v !== "").join(" ").toLowerCase();
+      if (r.group != null && r.group !== "") hasGroup = true;
+    });
+    rows.hasGroup = hasGroup;
+    return rows;
+  }).catch(() => null);
+  return M.personasP;
+}
+function personaHash() {
+  const p = new URLSearchParams();
+  const q = $("psearch").value.trim(); if (q) p.set("q", q);
+  p.set("kinds", [...$("pkinds").querySelectorAll('button[aria-pressed="true"]')].map(b => b.dataset.k).join(","));
+  if ($("pprompt").value) p.set("prompt", $("pprompt").value);
+  if ($("pdose").value) p.set("dose", $("pdose").value);
+  if ($("plmin").value !== "") p.set("lmin", $("plmin").value);
+  if ($("plmax").value !== "") p.set("lmax", $("plmax").value);
+  if (!$("pone").checked) p.set("one", "0");
+  p.set("sort", $("ppsort").value);
+  if (P.group) p.set("group", P.group);
+  return p;
+}
+function syncPersonasHash() {
+  if (S.tab !== "personas" || !S.M) return;
+  const p = personaHash().toString();
+  try { history.replaceState(null, "", `#${S.M.info.id}-personas${p ? "?" + p : ""}`) } catch {}
+}
+function applyPersonaHash(params) {
+  const q = params.get("q"); if (q != null) $("psearch").value = q;
+  const kinds = params.get("kinds");
+  if (kinds != null) {
+    const set = new Set(kinds.split(",").filter(Boolean));
+    [...$("pkinds").children].forEach(b => b.setAttribute("aria-pressed", set.has(b.dataset.k)));
+  }
+  const prompt = params.get("prompt"); if (prompt != null && ["0", "1"].includes(prompt)) $("pprompt").value = prompt;
+  const dose = params.get("dose"); if (dose === "up" || dose === "down") $("pdose").value = dose;
+  const lmin = params.get("lmin"); if (lmin != null) $("plmin").value = lmin;
+  const lmax = params.get("lmax"); if (lmax != null) $("plmax").value = lmax;
+  const one = params.get("one"); if (one != null) $("pone").checked = one !== "0";
+  const sort = params.get("sort"); if (["neurons", "layer", "shuffle"].includes(sort)) $("ppsort").value = sort;
+  P.group = params.get("group") || "";
+}
+function personaCardHTML(M, r, i) {
+  const k = Number(r.layer) * M.d + Number(r.neuron), d = r.dose == null ? NaN : Number(r.dose);
+  const dose = Number.isFinite(d) ? (d > 0 ? "+" : "") + (Math.round(d * 100) / 100) : "–";
+  const merged = r._merged > 1 ? `<span class="pill warn">×${r._merged}</span>` : "";
+  return `<article class="persona" data-i="${i}">
+    <h3 class="ptitle">${esc(r.who || r.what_changed || "Untitled")}</h3>
+    <div class="pmeta"><span class="pill eo">${esc(PERSONA_KIND_LABEL[r.reply_kind] || r.reply_kind || "reply")}</span><span class="pill">${keyName(M, k)}</span><span class="pill ${d > 0 ? "eo" : ""}">${dose}</span>${merged}</div>
+    ${r.what_changed ? `<div class="muted">${esc(r.what_changed)}</div>` : ""}
+    <div class="bubble clamped" title="Click to expand">${esc(r.text)}</div>
+    <div class="pactions"><button class="btn" data-act="open" data-i="${i}">Open neuron</button><button class="btn" data-act="mix" data-i="${i}">Add to mix</button></div>
+  </article>`;
+}
+function renderPersonaGroups() {
+  const box = $("pgroups");
+  if (!P.hasGroup) { box.hidden = true; box.innerHTML = ""; return; }
+  const items = [...P.groups].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, 20);
+  box.hidden = !items.length;
+  box.innerHTML = items.map(([g, n]) => `<button class="chip" aria-pressed="${g === P.group}" data-g="${esc(g)}">${esc(g)} <small>${n.toLocaleString()}</small></button>`).join("");
+}
+function renderPersonaGrid() {
+  const M = S.M, rows = P.rows, n = Math.min(P.shown, rows.length);
+  $("pgrid").innerHTML = n ? rows.slice(0, n).map((r, i) => personaCardHTML(M, r, i)).join("") : `<p class="muted">No replies match these filters.</p>`;
+  $("pmore").hidden = n >= rows.length;
+  $("ppcount").textContent = `${P.total.toLocaleString()} replies · ${P.names.toLocaleString()} distinct names · showing ${n.toLocaleString()}`;
+}
+function renderPersonaResults() {
+  const M = S.M; if (!M || P.M !== M) return;
+  const q = norm($("psearch").value), words = q ? q.split(/\s+/) : [];
+  const kinds = new Set([...$("pkinds").querySelectorAll('button[aria-pressed="true"]')].map(b => b.dataset.k));
+  const prompt = $("pprompt").value, dose = $("pdose").value;
+  const lmin = $("plmin").value === "" ? -Infinity : Number($("plmin").value);
+  const lmax = $("plmax").value === "" ? Infinity : Number($("plmax").value);
+  const one = $("pone").checked, gsel = P.group;
+  const out = [], gcounts = new Map(), ncounts = new Map();
+  for (const r of P.all) {
+    if (words.length && !words.every(w => r._hay.includes(w))) continue;
+    if (!kinds.has(r.reply_kind)) continue;
+    if (prompt !== "" && Number(r.prompt) !== Number(prompt)) continue;
+    const d = Number(r.dose);
+    if (dose === "up" && !(d > 0)) continue;
+    if (dose === "down" && !(d < 0)) continue;
+    const L = Number(r.layer);
+    if (L < lmin || L > lmax) continue;
+    if (P.hasGroup) { const g = r.group == null ? "" : String(r.group); if (g) gcounts.set(g, (gcounts.get(g) || 0) + 1); }
+    if (gsel && String(r.group ?? "") !== gsel) continue;
+    out.push(r);
+    if (r._who) ncounts.set(r._who, (ncounts.get(r._who) || 0) + 1);
+  }
+  let items;
+  if (one) {
+    const seen = new Set(); items = [];
+    for (const r of out) {
+      if (r._who) { if (seen.has(r._who)) continue; seen.add(r._who); }
+      items.push(r);
+    }
+  } else items = out.slice();
+  const cnt = r => r._who ? ncounts.get(r._who) || 1 : 1;
+  const sort = $("ppsort").value;
+  if (sort === "neurons") items.sort((a, b) => cnt(b) - cnt(a) || Number(a.layer) - Number(b.layer) || Number(a.neuron) - Number(b.neuron));
+  else if (sort === "layer") items.sort((a, b) => Number(a.layer) - Number(b.layer) || Number(a.neuron) - Number(b.neuron) || Number(a.dose) - Number(b.dose));
+  else for (let i = items.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [items[i], items[j]] = [items[j], items[i]]; }
+  items.forEach(r => r._merged = one && r._who ? cnt(r) : 1);
+  P.rows = items; P.groups = gcounts; P.total = out.length; P.names = ncounts.size;
+  renderPersonaGroups();
+  renderPersonaGrid();
+}
+async function renderPersonas() {
+  const M = S.M; if (!M) return;
+  const seq = ++P.seq;
+  if (!M.info.personas) {
+    P.M = null; P.all = []; P.rows = []; P.total = 0; P.names = 0; P.group = "";
+    $("pempty").hidden = false; $("pfilters").hidden = true; $("ppcount").hidden = true; $("pgroups").hidden = true; $("pmorow").hidden = true; $("pgrid").innerHTML = "";
+    return;
+  }
+  $("pempty").hidden = true; $("pfilters").hidden = false; $("ppcount").hidden = false; $("pmorow").hidden = false;
+  if (P.M !== M) { P.M = M; P.all = []; P.rows = []; P.total = 0; P.names = 0; P.group = ""; P.shown = 60; }
+  if (!M.personasP) {
+    $("ppcount").textContent = "loading personas…";
+    $("pgrid").innerHTML = `<p class="muted">Loading personas…</p>`;
+    $("pgroups").hidden = true;
+  }
+  const rows = await loadPersonas(M);
+  if (seq !== P.seq || S.M !== M) return;
+  if (!rows) {
+    P.M = null; P.all = []; P.rows = []; P.total = 0; P.names = 0;
+    $("pempty").hidden = false; $("pfilters").hidden = true; $("ppcount").hidden = true; $("pgroups").hidden = true; $("pmorow").hidden = true; $("pgrid").innerHTML = "";
+    return;
+  }
+  P.M = M; P.all = rows; P.hasGroup = !!rows.hasGroup;
+  if (P.shown < 60) P.shown = 60;
+  renderPersonaResults();
+  syncPersonasHash();
+}
+function personaFilterChanged() {
+  if (S.tab !== "personas") return;
+  P.shown = 60;
+  renderPersonaResults();
+  syncPersonasHash();
+}
+let personaSearchT = 0;
+$("psearch").addEventListener("input", () => {
+  syncPersonasHash();
+  clearTimeout(personaSearchT);
+  personaSearchT = setTimeout(() => { if (S.tab === "personas") { P.shown = 60; renderPersonaResults(); } }, 150);
+});
+$("pkinds").onclick = e => {
+  const b = e.target.closest("button"); if (!b) return;
+  b.setAttribute("aria-pressed", b.getAttribute("aria-pressed") !== "true");
+  personaFilterChanged();
+};
+["pprompt", "pdose", "ppsort"].forEach(id => $(id).onchange = personaFilterChanged);
+$("plmin").oninput = personaFilterChanged; $("plmax").oninput = personaFilterChanged; $("pone").onchange = personaFilterChanged;
+$("pgroups").onclick = e => {
+  const b = e.target.closest("button[data-g]"); if (!b) return;
+  P.group = P.group === b.dataset.g ? "" : b.dataset.g;
+  personaFilterChanged();
+};
+$("pgrid").onclick = e => {
+  const b = e.target.closest("button[data-act]");
+  if (b) {
+    const r = P.rows[+b.dataset.i]; if (!r) return;
+    const k = Number(r.layer) * S.M.d + Number(r.neuron);
+    if (b.dataset.act === "open") { setTab("map"); openNeuron(k, { focus: true }); }
+    else addMix(k, Number(r.dose));
+    return;
+  }
+  const bubble = e.target.closest(".bubble"); if (bubble) bubble.classList.toggle("clamped");
+};
+$("pmore").onclick = () => { P.shown += 60; renderPersonaGrid(); };
+const csvCell = v => { const s = v == null ? "" : String(v); return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
+$("pcsv").onclick = () => {
+  const M = S.M; if (!M) return;
+  const head = ["model", "layer", "neuron", "dose", "prompt", "kind", "who", "what_changed", "text"];
+  const body = P.rows.map(r => [M.info.id, r.layer, r.neuron, Math.round(Number(r.dose) * 1000) / 1000, r.prompt, r.reply_kind, r.who, r.what_changed, r.text]);
+  const csv = [head, ...body].map(row => row.map(csvCell).join(",")).join("\r\n") + "\r\n";
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const a = document.createElement("a"), url = URL.createObjectURL(blob);
+  a.href = url; a.download = `${M.info.id}-personas.csv`; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+};
 
 /* ---------- mix ---------- */
 const MIX = [];
@@ -1006,11 +1241,11 @@ async function selectModel(id) {
   $("sub").textContent = `${M.N.toLocaleString()} neurons · ${M.info.n_layers} layers · ${M.info.n_tokens.toLocaleString()} corpus tokens`;
   buildGrid(); renderRibbon(); renderPoints(); draw();
   if ($("q").value) runSearch();
-  if (S.tab === "pushes") renderPushes(); if (S.tab === "mix") renderMix(); if (S.tab === "board") renderBoard();
+  if (S.tab === "pushes") renderPushes(); if (S.tab === "personas") renderPersonas(); if (S.tab === "mix") renderMix(); if (S.tab === "board") renderBoard();
   if (S.tab === "guess") nextGuess(); if (S.tab === "sql") sqlInit();
   return M;
 }
-$("models").onclick = async e => { const b = e.target.closest("button"); if (!b) return; const M = await selectModel(b.dataset.id); openStart(M); };
+$("models").onclick = async e => { const b = e.target.closest("button"); if (!b) return; const M = await selectModel(b.dataset.id); if (S.tab === "personas") syncPersonasHash(); else openStart(M); };
 function openStart(M) {
   const g = goodNeurons(M).slice().sort((a, b) => { const la = M.lab.get(a), lb = M.lab.get(b); return ((lb.detect ?? 0) + lb.confidence / 5 + (M.up.get(b)?.uptake ?? 0) * .3) - ((la.detect ?? 0) + la.confidence / 5 + (M.up.get(a)?.uptake ?? 0) * .3); });
   openNeuron(g.length ? g[0] : 0, { focus: g.length > 0 });
@@ -1024,13 +1259,16 @@ async function boot() {
     $("panel").innerHTML = `<p class="err">Could not read ${esc(BASE)}models.json. Serve this page next to a data folder, or pass <code>?data=&lt;hf-user&gt;/&lt;dataset&gt;</code>.</p>`; return;
   }
   $("models").innerHTML = S.models.map(m => `<button class="chip" data-id="${m.id}" aria-pressed="false">${esc(m.name || m.model.split("/").pop())}<small>${(m.n_neurons / 1000).toFixed(0)}k</small></button>`).join("");
-  const h = (location.hash || "").slice(1), hm = h.match(/^(.+)-L(\d+)-N(\d+)$/);
-  let id = hm && S.models.some(m => m.id === hm[1]) ? hm[1] : store.get("atlas-model");
+  const h = (location.hash || "").slice(1), hm = h.match(/^(.+)-L(\d+)-N(\d+)$/), hp = h.match(/^(.+)-personas(?:\?(.*))?$/);
+  let id = hm && S.models.some(m => m.id === hm[1]) ? hm[1] : hp && S.models.some(m => m.id === hp[1]) ? hp[1] : store.get("atlas-model");
   const richest = [...S.models].sort((a, b) => (b.files || []).length - (a.files || []).length || b.n_neurons - a.n_neurons)[0];
   if (!S.models.some(m => m.id === id)) id = richest.id;
   const M = await selectModel(id);
-  if (hm && hm[1] === id) openNeuron(+hm[2] * M.d + +hm[3], { focus: true }); else openStart(M);
-  if (TABS.includes(h)) setTab(h);
+  if (hp && hp[1] === id) { applyPersonaHash(new URLSearchParams(hp[2] || "")); setTab("personas"); }
+  else {
+    if (hm && hm[1] === id) openNeuron(+hm[2] * M.d + +hm[3], { focus: true }); else openStart(M);
+    if (TABS.includes(h)) setTab(h);
+  }
 }
 boot();
 </script>
