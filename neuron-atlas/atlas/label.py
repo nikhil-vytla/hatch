@@ -28,6 +28,9 @@ Reply with JSON {"neurons": [{"id": ..., "label": "2-6 words", "description": "o
 "emoji": "one emoji", "confidence": 1-5, "push": "what pushing it does, or 'nothing clear'",
 "push_kind": "persona|altered_assistant|topic|style|language|token|incoherent|none"}]}.
 Prefer specific labels ("past participles after 'has'", "French cooking words") over vague ones ("various words").
+If the logit lens names a token that tends to come right after the peak (it fires on "in terms" and promotes "of"),
+the neuron predicts that token: say so ("predicts 'of' after 'in terms'"). If the examples share no pattern,
+say "polysemantic: ..." and use confidence 1-2.
 confidence 1 = no visible pattern, 5 = every example fits."""
 
 CHECK = """A neuron of a language model was labeled. For each numbered snippet, decide whether this neuron's peak
@@ -208,7 +211,7 @@ def classify_pushes(atlas, group=20, workers=8):
     meta = json.load(open(f"{atlas}/meta.json"))
     prompts = meta["steer"]["prompts"]
     con = duckdb.connect()
-    t = con.sql(f"select * from '{atlas}/steer.parquet'").arrow()
+    t = pq.read_table(f"{atlas}/steer.parquet")
     rows = t.to_pylist()
     base = {r["prompt"]: r["text"] for r in rows if r["layer"] < 0}
     todo = [i for i, r in enumerate(rows) if r["layer"] >= 0]

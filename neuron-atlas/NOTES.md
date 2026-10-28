@@ -64,3 +64,60 @@ Working log. Newest entries at the bottom.
   ("come", "grown", "developed") and its lens promotes "been" — sensible.
 - Live app on SmolLM2: normal reply to "Who are you?" = "I am a human who has been living in the city…"; the top
   firing neuron for an Eiffel-Tower sentence (L29 N904), pushed +1, gives "I am a chatbot designed to assist users…".
+
+## Full CPU runs (2,500 docs: 1,500 FineWeb-Edu + 1,000 smol-smoltalk, ≤128 tokens each)
+
+- SmolLM2-135M-Instruct: 2,500 docs / 292,294 counted tokens; collect 936 s (UMAP ~100 s of that).
+- GPT-2: collect 5,315 s — slow only because it overlapped the SmolLM2 steering run (two torch processes each
+  taking all 4 cores). Lesson: never run two torch jobs at once on this box; set `OMP_NUM_THREADS` if you must.
+- Neighbors (cosine of down columns, exact): 38 s for 46k neurons. Mean top-1 cosine 0.25 in SmolLM2 — output
+  directions are close to orthogonal in general, so "writes like" lists are a weak but real signal.
+
+## Dose calibration (SmolLM2, "Who are you?", 6 neurons × doses)
+
+- ±1, ±2, ±4 × median residual norm: almost everything incoherent (loops, "\n\n\n", byte soup) at layers 5–25.
+- ±0.25 / ±0.5: coherent, and the self-description changes ("the guardian of ancient knowledge and sacred
+  texts", "Professor Lena Silversteel", "a human who has lived in the world of the 1920s").
+- So default doses are ±0.5 (neuron-explorer used −0.7/+0.5/+0.8 on a 4B model; small models break earlier).
+- Steering run: 30 layers × (12 most peaked + 4 random) × ±0.5 × 2 prompts = 1,920 replies, 4,585 s on CPU.
+
+## Pushes are mostly not neuron-specific in a 135M model
+
+DeepSeek sorted all 1,920 replies (persona / altered_assistant / default / other / incoherent):
+
+| neurons pushed | incoherent | persona | altered assistant |
+|---|---|---|---|
+| 12 most peaked per layer (1,440 replies) | 0.25 | 0.28 | 0.22 |
+| 4 random per layer (480 replies) | 0.19 | 0.33 | 0.25 |
+
+Random neurons make personas as often as the "interesting" ones. The unsteered model already answers "Who are
+you?" with "I am a human who has been living in the city for over 10 years now", so SmolLM2-135M's identity is
+fragile and any push of norm 0.5·‖resid‖ flips it. The qwen-neurons-site result (personas from single neurons in
+Qwen3-8B) needs a bigger, more stable model; this is what the molab notebook is for. The `change` score
+(1 − word Jaccard with the baseline) is near 1 for almost every push — greedy decoding diverges after the first
+changed token — so it is useless as a specificity measure; the random controls are the measure.
+
+## Labels (DeepSeek-flash) and audit (Opus)
+
+- v1: 1,318 SmolLM2 neurons (40 most peaked per layer + all pushed ones). Held-out detection 0.810 vs shuffled-label
+  null 0.503. First attempt had a parsing bug: null answers came back keyed without the ":null" suffix and overwrote
+  real scores (gave 0.53). Fixed by sending null blocks in separate calls.
+- Audit of 30 random labels by hand (`audit_smollm2.md`): 18 good, 10 partial, 2 wrong. Labeler confidence
+  predicts quality (conf 5: 5/6 good; conf ≤3: 1/8). Detection check is too easy (both wrong labels scored ≥0.75):
+  random windows are easy to reject even with a grab-bag label. Systematic miss: next-token predictors (lens = the
+  token after the peak) labeled as reading the current token.
+- v2 prompt: tells the labeler to use the lens for "predicts X" and to say "polysemantic:" with confidence 1–2.
+  Result: detection 0.817 / null 0.501; 72 "predicts …" labels; fixes some flagged cases (L27 N190 → "predicts
+  'had' after subject"), rephrases others. Detection rises with confidence: 0.59 (c2), 0.74 (c3), 0.84 (c4), 0.90 (c5).
+
+## Hosting the explorer as a claude.ai Artifact
+
+- Artifact hosting serves only standard web types by extension; `.parquet` is refused (even with
+  `application/octet-stream`). `.wasm` *is* served, but DuckDB's wasm is >30 MB, over the 15 MB per-file limit.
+- Workaround: `python -m atlas.export site --b64` writes each parquet as `<name>.parquet.b64.txt`; `models.json`
+  carries `"b64": true` and the explorer's `fetchBuf` decodes with `atob`. +33% size (38 MB → 50 MB for two
+  models). The SQL tab registers decoded buffers with `registerFileBuffer` in that mode.
+- Plain hosting (HF static Space, `python -m http.server`, the HF dataset itself via `?data=user/repo`) reads the
+  parquet directly, and DuckDB-WASM 1.32.0 loads from jsDelivr there (tested in headless Chromium: 25-row join of
+  labels × neurons in 218 ms).
+- Explorer opens on the model with the most files (labels/steer present) rather than the smallest.

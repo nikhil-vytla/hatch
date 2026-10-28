@@ -38,16 +38,27 @@ def page(fragment_path=EXPLORER):
             '<style>[hidden]{display:none!important}</style>\n</head>\n<body>\n' + body + '\n</body>\n</html>\n')
 
 
-def build_site(out, site):
+def build_site(out, site, b64=False):
+    """b64: write each parquet file as <name>.b64.txt (base64) for hosts that only serve text types, such as
+    claude.ai Artifacts. The explorer reads models.json's "b64" flag and decodes."""
     os.makedirs(os.path.join(site, "data"), exist_ok=True)
     idx = models_index(out)
+
+    def put(src, dst):
+        if b64 and dst.endswith(".parquet"):
+            import base64
+            open(dst + ".b64.txt", "w").write(base64.b64encode(open(src, "rb").read()).decode())
+        else:
+            shutil.copy(src, dst)
+
     for m in idx:
         src, dst = os.path.join(out, m["slug"]), os.path.join(site, "data", m["slug"])
         os.makedirs(os.path.join(dst, "examples"), exist_ok=True)
         for f in m["files"]:
-            shutil.copy(os.path.join(src, f), os.path.join(dst, f))
+            put(os.path.join(src, f), os.path.join(dst, f))
         for f in glob.glob(os.path.join(src, "examples", "*.parquet")):
-            shutil.copy(f, os.path.join(dst, "examples"))
+            put(f, os.path.join(dst, "examples", os.path.basename(f)))
+        m["b64"] = b64
     json.dump(idx, open(os.path.join(site, "data", "models.json"), "w"), indent=1)
     open(os.path.join(site, "index.html"), "w").write(page())
     print(f"site with {len(idx)} models in {site}  (python -m http.server -d {site})")
@@ -137,9 +148,10 @@ if __name__ == "__main__":
     ap.add_argument("--repo")
     ap.add_argument("--space")
     ap.add_argument("--private", action="store_true")
+    ap.add_argument("--b64", action="store_true", help="site: base64 parquet as .b64.txt (Artifact hosting)")
     a = ap.parse_args()
     if a.what == "site":
-        build_site(a.out, a.site)
+        build_site(a.out, a.site, a.b64)
     elif a.what == "hub":
         push_hub(a.out, a.repo, a.private)
     else:

@@ -207,7 +207,7 @@ textarea.sql { width: 100%; min-height: 110px; font: 13px var(--mono); border: 1
 
   <section id="v-pushes" hidden>
     <div class="filters">
-      <select id="pk" aria-label="Kind of push"><option value="">every kind of push</option></select>
+      <select id="pk" aria-label="Kind of reply"><option value="">every kind of reply</option></select>
       <select id="psort" aria-label="Sort"><option value="change">most changed reply</option><option value="layer">layer</option></select>
       <label class="muted"><input type="checkbox" id="pcoh" checked> hide repetitive replies</label>
       <span class="status" id="pcount"></span>
@@ -273,7 +273,15 @@ function dataBase() {
 }
 const BASE = dataBase();
 
+let B64 = false; // set from models.json: parquet shipped as base64 text for hosts that only serve text types
 async function fetchBuf(url) {
+  if (B64 && url.endsWith(".parquet")) {
+    const r = await fetch(url + ".b64.txt");
+    if (!r.ok) throw new Error(`${r.status} for ${url}`);
+    const bin = atob((await r.text()).trim()), out = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out.buffer;
+  }
   const r = await fetch(url);
   if (!r.ok) throw new Error(`${r.status} for ${url}`);
   return r.arrayBuffer();
@@ -450,9 +458,9 @@ async function openNeuron(k, opts = {}) {
       const rs = st.filter(s => s.prompt === pi).sort((a, b) => a.dose - b.dose); if (!rs.length) return "";
       const minus = rs.filter(s => s.dose < 0).at(0), plus = rs.filter(s => s.dose > 0).at(-1);
       return `<p class="prompt">“${esc(p)}”</p><div class="chat">
-        <div class="bubble minus"><span class="who">push ${minus ? minus.dose : "–"}</span>${esc(minus?.text ?? "")}</div>
+        <div class="bubble minus"><span class="who">push ${minus ? minus.dose : "–"}${minus?.reply_kind ? " · " + (KIND_LABEL[minus.reply_kind] || "") : ""}</span>${esc(minus?.text ?? "")}</div>
         <div class="bubble"><span class="who">normal</span>${esc(M.base[pi] ?? "")}</div>
-        <div class="bubble plus"><span class="who">push +${plus ? plus.dose : "–"}</span>${esc(plus?.text ?? "")}</div></div>`;
+        <div class="bubble plus"><span class="who">push +${plus ? plus.dose : "–"}${plus?.reply_kind ? " · " + (KIND_LABEL[plus.reply_kind] || "") : ""}</span>${esc(plus?.text ?? "")}</div></div>`;
     }).join("") + `</div>`;
   } else steerHTML = `<p class="muted">Not pushed in this run. The sweep pushes the most peaked neurons of each layer plus random controls; run <code>python -m atlas.steer --all</code> on a GPU to cover every neuron.</p>`;
   const badges = lb ? [
@@ -546,21 +554,23 @@ function setTab(t) {
 $("tabs").onclick = e => { const b = e.target.closest("button"); if (b) setTab(b.dataset.t); };
 
 /* ---------- pushes ---------- */
+const KIND_LABEL = { persona: "persona", altered_assistant: "changed assistant", default_assistant: "normal assistant", other: "off-topic", incoherent: "incoherent" };
 function renderPushes() {
-  const M = S.M, kinds = new Set();
-  M.lab.forEach(l => l.push_kind && kinds.add(l.push_kind));
-  const sel = $("pk"), cur = sel.value;
-  sel.innerHTML = `<option value="">every kind of push</option>` + [...kinds].sort().map(k => `<option ${k === cur ? "selected" : ""}>${esc(k)}</option>`).join("");
+  const M = S.M, sel = $("pk"), cur = sel.value;
+  sel.innerHTML = `<option value="">every kind of reply</option>` + Object.entries(KIND_LABEL).map(([k, v]) => `<option value="${k}" ${k === cur ? "selected" : ""}>${v}</option>`).join("");
   let items = [];
   M.steer.forEach((rs, k) => rs.forEach(s => items.push([k, s])));
+  // the control: how often does pushing a random neuron give the same kind of reply?
+  const rate = (grp, kind) => { const g = items.filter(([, s]) => s.kind === grp); return g.length ? g.filter(([, s]) => s.reply_kind === kind).length / g.length : null; };
   const kind = sel.value, coh = $("pcoh").checked;
-  items = items.filter(([k, s]) => (!kind || M.lab.get(k)?.push_kind === kind) && (!coh || s.diversity > 0.6) && s.text.trim());
-  if ($("psort").value === "change") items.sort((a, b) => b[1].change - a[1].change); else items.sort((a, b) => a[0] - b[0] || a[1].dose - b[1].dose);
-  $("pcount").textContent = `${items.length.toLocaleString()} replies from ${M.steer.size.toLocaleString()} pushed neurons`;
+  const ctl = kind && rate("random", kind) != null ? ` · ${KIND_LABEL[kind]}: ${Math.round(100 * rate("top", kind))}% of pushes on the most peaked neurons vs ${Math.round(100 * rate("random", kind))}% on random control neurons` : "";
+  items = items.filter(([k, s]) => (!kind || s.reply_kind === kind) && (!coh || (s.diversity ?? 1) > 0.6) && s.text.trim());
+  if ($("psort").value === "change") items.sort((a, b) => (a[1].kind === "random") - (b[1].kind === "random") || b[1].change - a[1].change); else items.sort((a, b) => a[0] - b[0] || a[1].dose - b[1].dose);
+  $("pcount").textContent = `${items.length.toLocaleString()} replies from ${M.steer.size.toLocaleString()} pushed neurons${ctl}`;
   const prompts = M.info.steer?.prompts || [];
   $("pushgrid").innerHTML = items.slice(0, 120).map(([k, s]) => { const l = M.lab.get(k);
-    return `<button class="push" data-k="${k}"><div class="meta"><span>${keyName(M, k)}</span><span class="pill ${s.dose > 0 ? "eo" : ""}">push ${s.dose > 0 ? "+" : ""}${s.dose}</span>${l ? `<span>${esc(l.emoji)} ${esc(l.label)}</span>` : ""}</div>
-      <div class="muted">“${esc(prompts[s.prompt] || "")}”</div><div class="reply">${esc(s.text)}</div></button>` }).join("") || `<p class="muted">This model has no steering run yet.</p>`;
+    return `<button class="push" data-k="${k}"><div class="meta"><span>${keyName(M, k)}</span><span class="pill ${s.dose > 0 ? "eo" : ""}">push ${s.dose > 0 ? "+" : ""}${s.dose}</span>${s.reply_kind ? `<span class="pill">${KIND_LABEL[s.reply_kind] || s.reply_kind}</span>` : ""}${s.kind === "random" ? `<span class="pill warn">random control</span>` : ""}</div>
+      ${s.who ? `<b>${esc(s.who)}</b>` : ""}<div class="muted">“${esc(prompts[s.prompt] || "")}” ${l ? `· ${esc(l.emoji)} ${esc(l.label)}` : ""}</div><div class="reply">${esc(s.text)}</div></button>` }).join("") || `<p class="muted">This model has no steering run yet.</p>`;
 }
 ["pk", "psort", "pcoh"].forEach(id => $(id).onchange = renderPushes);
 $("pushgrid").onclick = e => { const b = e.target.closest(".push"); if (b) { setTab("map"); openNeuron(+b.dataset.k, { focus: true }); } };
@@ -623,7 +633,8 @@ $("gopen").onclick = () => { setTab("map"); openNeuron(G.cur.k, { focus: true })
 const SQLX = [
   ["best labels", $("sqltext").value],
   ["layer profile", "select layer, count(*) labeled, round(avg(detect), 2) held_out, mode(push_kind) common_push\nfrom labels group by layer order by layer"],
-  ["persona pushes", "select s.layer, s.neuron, s.dose, l.label, s.text\nfrom steer s left join labels l using (layer, neuron)\nwhere l.push_kind in ('persona', 'altered_assistant') and s.diversity > 0.6\norder by s.change desc limit 30"],
+  ["personas", "select s.layer, s.neuron, s.dose, s.who, s.text, l.label\nfrom steer s left join labels l using (layer, neuron)\nwhere s.reply_kind = 'persona' and s.kind <> 'random'\norder by s.layer limit 40"],
+  ["vs random", "select kind, reply_kind, count(*) n,\n  round(count(*) / sum(count(*)) over (partition by kind), 2) share\nfrom steer where layer >= 0 group by all order by kind, n desc"],
   ["peakiest neurons", "select layer, neuron, round(zmax, 1) z, peaks[1:5] fires_on, lens_up[1:5] promotes\nfrom neurons order by zmax desc limit 25"],
   ["dense neurons", "select layer, neuron, round(frac_pos, 2) frac_pos, lens_up[1:5] promotes\nfrom neurons order by frac_pos desc limit 25"],
 ];
@@ -643,13 +654,15 @@ async function sqlInit() {
       duck = { db, inst, conn: await inst.connect() };
     }
     const M = S.M, abs = u => new URL(u, location.href).href, c = duck.conn;
+    const register = async (name, url) => B64 ? duck.inst.registerFileBuffer(name, new Uint8Array(await fetchBuf(url)))
+      : duck.inst.registerFileURL(name, abs(url), duck.db.DuckDBDataProtocol.HTTP, false);
     const files = ["neurons", "labels", "steer", "tokens"];
     for (const f of files) {
-      try { await duck.inst.registerFileURL(`${M.info.id}_${f}.parquet`, abs(M.dir + f + ".parquet"), duck.db.DuckDBDataProtocol.HTTP, false);
+      try { await register(`${M.info.id}_${f}.parquet`, M.dir + f + ".parquet");
         await c.query(`create or replace view ${f} as select * from '${M.info.id}_${f}.parquet'`); } catch { }
     }
     const ex = [];
-    for (let L = 0; L < M.info.n_layers; L++) { const nm = `${M.info.id}_ex${L}.parquet`; await duck.inst.registerFileURL(nm, abs(M.dir + `examples/L${String(L).padStart(2, "0")}.parquet`), duck.db.DuckDBDataProtocol.HTTP, false); ex.push(`'${nm}'`); }
+    for (let L = 0; L < M.info.n_layers; L++) { const nm = `${M.info.id}_ex${L}.parquet`; await register(nm, M.dir + `examples/L${String(L).padStart(2, "0")}.parquet`); ex.push(`'${nm}'`); }
     await c.query(`create or replace view examples as select * from read_parquet([${ex.join(",")}])`);
     duckFor = M.info.id; $("sqlstat").textContent = `ready · ${M.info.model}`;
     return duck;
@@ -692,13 +705,15 @@ function openStart(M) {
 async function boot() {
   try {
     S.models = await (await fetch(BASE + "models.json")).json();
+    B64 = S.models.some(m => m.b64);
   } catch (e) {
     $("panel").innerHTML = `<p class="err">Could not read ${esc(BASE)}models.json. Serve this page next to a data folder, or pass <code>?data=&lt;hf-user&gt;/&lt;dataset&gt;</code>.</p>`; return;
   }
   $("models").innerHTML = S.models.map(m => `<button class="chip" data-id="${m.id}" aria-pressed="false">${esc(m.name || m.model.split("/").pop())}<small>${(m.n_neurons / 1000).toFixed(0)}k</small></button>`).join("");
   const h = (location.hash || "").slice(1), hm = h.match(/^(.+)-L(\d+)-N(\d+)$/);
   let id = hm && S.models.some(m => m.id === hm[1]) ? hm[1] : store.get("atlas-model");
-  if (!S.models.some(m => m.id === id)) id = S.models[0].id;
+  const richest = [...S.models].sort((a, b) => (b.files || []).length - (a.files || []).length)[0];
+  if (!S.models.some(m => m.id === id)) id = richest.id;
   const M = await selectModel(id);
   if (hm && hm[1] === id) openNeuron(+hm[2] * M.d + +hm[3], { focus: true }); else openStart(M);
   if (TABS.includes(h)) setTab(h);
