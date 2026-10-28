@@ -99,10 +99,13 @@ and Phi-style models work unchanged. MoE experts are skipped.
 
 Per model the output is `neurons.parquet`, `examples/Lxx.parquet`, `tokens.parquet`, `steer.parquet`,
 `labels.parquet` and `meta.json`, plus a root `models.json`. For publishing, `export.py` splits the neuron table
-into `neurons/Lxx.parquet` (one file per layer) and a slim `map.parquet` (`layer, neuron, x, y, zmax`). The explorer
+into `neurons/Lxx.parquet` (one file per layer) and a slim `map.parquet` (`qx, qy, qz`, ordered by layer and
+neuron; `x = qx / 65535`, `y = qy / 65535`, `zmax = qz / 10`). Steering replies are also split into
+`steer/Lxx.parquet` plus `steer/baseline.parquet` when `steer.parquet` exists. The explorer
 loads the map first and fetches a layer when it opens one of its neurons, which keeps its first download small
 (Qwen3-0.6B: 0.9 MB instead of 16 MB; an 8B model about 5 MB instead of about 80). A token search across all
-neurons fetches every layer once, with progress shown. The Python tools read either layout (`atlas.neurons_src`).
+neurons fetches every layer once, with progress shown; pushes load per layer when a neuron or the Pushes tab needs
+them. The Python tools read either layout (`atlas.neurons_src`).
 The dataset card that `export.py hub` writes documents every column.
 
 ## Ways to explore

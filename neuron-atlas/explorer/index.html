@@ -353,15 +353,23 @@ async function loadModel(id) {
   if (S.cache.has(id)) return S.cache.get(id);
   const info = S.models.find(m => m.id === id);
   const dir = BASE + info.slug + "/";
-  // sharded: map.parquet has every neuron's position; full rows come per layer (neurons/Lxx.parquet) on demand
-  const [rows, labels, steer, uptake, recipes] = await Promise.all([
+  // sharded: map.parquet has every neuron's position; full rows come per layer (neurons/Lxx.parquet) on demand.
+  // steer_sharded: pushes come per layer (steer/Lxx.parquet) on demand; only the baselines load up front.
+  const [rows, labels, steer, uptake, recipes, baseline] = await Promise.all([
     readPq(dir + (info.sharded ? "map.parquet" : "neurons.parquet")),
-    tryPq(dir + "labels.parquet"), tryPq(dir + "steer.parquet"), tryPq(dir + "uptake.parquet"),
-    tryPq(dir + "recipes.parquet")]);
+    tryPq(dir + "labels.parquet"), info.steer_sharded ? null : tryPq(dir + "steer.parquet"),
+    tryPq(dir + "uptake.parquet"), tryPq(dir + "recipes.parquet"),
+    info.steer_sharded ? tryPq(dir + "steer/baseline.parquet") : null]);
   const N = info.n_neurons, d = info.d_mlp;
-  const M = { info, dir, N, d, rows: new Array(N), layerP: new Map(), x: new Float32Array(N), y: new Float32Array(N), layer: new Int16Array(N), z: new Float32Array(N),
+  const M = { info, dir, N, d, rows: new Array(N), layerP: new Map(), steerP: new Map(), x: new Float32Array(N), y: new Float32Array(N), layer: new Int16Array(N), z: new Float32Array(N),
     lab: new Map(), steer: new Map(), up: new Map(), base: [], ex: new Map(), exN: new Map(), toks: null, recipes: recipes || [] };
-  rows.forEach(r => { const k = r.layer * d + r.neuron; M.x[k] = r.x; M.y[k] = r.y; M.layer[k] = r.layer; M.z[k] = r.zmax; if (!info.sharded) M.rows[k] = r; });
+  const q = rows[0]?.qx != null;
+  rows.forEach((r, i) => {
+    const k = q ? i : r.layer * d + r.neuron;
+    M.x[k] = q ? r.qx / 65535 : r.x; M.y[k] = q ? r.qy / 65535 : r.y;
+    M.layer[k] = q ? Math.floor(i / d) : r.layer; M.z[k] = q ? r.qz / 10 : r.zmax;
+    if (!info.sharded) M.rows[k] = r;
+  });
   if (!info.sharded) for (let L = 0; L < info.n_layers; L++) M.layerP.set(L, Promise.resolve());
   (labels || []).forEach(l => M.lab.set(l.layer * d + l.neuron, l));
   (uptake || []).forEach(u => M.up.set(u.layer * d + u.neuron, u));
@@ -369,9 +377,25 @@ async function loadModel(id) {
     if (s.layer < 0) { M.base[s.prompt] = s.text; return }
     const k = s.layer * d + s.neuron; if (!M.steer.has(k)) M.steer.set(k, []); M.steer.get(k).push(s);
   });
+  (baseline || []).forEach(s => { if (s.layer < 0) M.base[s.prompt] = s.text; });
   M.labKeys = [...M.lab.keys()];
   S.cache.set(id, M);
   return M;
+}
+async function layerSteer(M, L) {
+  if (M.steerP.has(L)) return M.steerP.get(L);
+  const p = readPq(M.dir + `steer/L${String(L).padStart(2, "0")}.parquet`).then(rows => {
+    rows.forEach(s => {
+      if (s.layer < 0) { M.base[s.prompt] = s.text; return }
+      const k = s.layer * M.d + s.neuron; if (!M.steer.has(k)) M.steer.set(k, []); M.steer.get(k).push(s);
+    });
+    return rows;
+  }).catch(e => {
+    if (String(e?.message || e).includes("404")) return [];
+    M.steerP.delete(L); throw e;
+  });
+  M.steerP.set(L, p);
+  return p;
 }
 function ensureLayer(M, L) {
   if (!M.layerP.has(L)) M.layerP.set(L, readPq(M.dir + `neurons/L${String(L).padStart(2, "0")}.parquet`)
@@ -536,6 +560,20 @@ function neighbors(M, k, n = 8) {
   return out.map(o => [o[0], null]);
 }
 function keyName(M, k) { const L = Math.floor(k / M.d); return `L${L} · N${k - L * M.d}`; }
+function pushCardHTML(M, k, st) {
+  const up = M.up.get(k);
+  const upPill = up && up.up_n ? `<div style="margin-bottom:8px"><span class="pill ${up.uptake >= .25 ? "good" : ""}" title="the chance is the same replies checked against other pushed neurons' lens words">writes its own lens words in ${up.up_hits}/${up.up_n} pushed replies (chance ${Math.round(100 * (up.up_null || 0))}%)</span></div>` : "";
+  const prompts = M.info.steer?.prompts || [];
+  if (!st.length) return `<p class="muted">Not pushed in this run. The sweep pushes the most peaked neurons of each layer plus random controls; run <code>python -m atlas.steer --all</code> on a GPU to cover every neuron.</p>`;
+  return `<div><h3>Pushes</h3>${upPill}` + prompts.map((p, pi) => {
+    const rs = st.filter(s => s.prompt === pi).sort((a, b) => a.dose - b.dose); if (!rs.length) return "";
+    const minus = rs.filter(s => s.dose < 0).at(0), plus = rs.filter(s => s.dose > 0).at(-1);
+    return `<p class="prompt">“${esc(p)}”</p><div class="chat">
+      <div class="bubble minus"><span class="who">push ${minus ? minus.dose : "–"}${minus?.reply_kind ? " · " + (KIND_LABEL[minus.reply_kind] || "") : ""}</span>${esc(minus?.text ?? "")}</div>
+      <div class="bubble"><span class="who">normal</span>${esc(M.base[pi] ?? "")}</div>
+      <div class="bubble plus"><span class="who">push +${plus ? plus.dose : "–"}${plus?.reply_kind ? " · " + (KIND_LABEL[plus.reply_kind] || "") : ""}</span>${esc(plus?.text ?? "")}</div></div>`;
+  }).join("") + `</div>`;
+}
 async function openNeuron(k, opts = {}) {
   const M = S.M; S.sel = k; draw();
   if (opts.focus) focusOn(k);
@@ -553,21 +591,7 @@ async function openNeuron(k, opts = {}) {
     }
   }
   const row = M.rows[k];
-  const st = M.steer.get(k) || [];
-  const up = M.up.get(k);
-  const upPill = up && up.up_n ? `<div style="margin-bottom:8px"><span class="pill ${up.uptake >= .25 ? "good" : ""}" title="the chance is the same replies checked against other pushed neurons' lens words">writes its own lens words in ${up.up_hits}/${up.up_n} pushed replies (chance ${Math.round(100 * (up.up_null || 0))}%)</span></div>` : "";
-  const prompts = M.info.steer?.prompts || [];
-  let steerHTML = "";
-  if (st.length) {
-    steerHTML = `<div><h3>Pushes</h3>${upPill}` + prompts.map((p, pi) => {
-      const rs = st.filter(s => s.prompt === pi).sort((a, b) => a.dose - b.dose); if (!rs.length) return "";
-      const minus = rs.filter(s => s.dose < 0).at(0), plus = rs.filter(s => s.dose > 0).at(-1);
-      return `<p class="prompt">“${esc(p)}”</p><div class="chat">
-        <div class="bubble minus"><span class="who">push ${minus ? minus.dose : "–"}${minus?.reply_kind ? " · " + (KIND_LABEL[minus.reply_kind] || "") : ""}</span>${esc(minus?.text ?? "")}</div>
-        <div class="bubble"><span class="who">normal</span>${esc(M.base[pi] ?? "")}</div>
-        <div class="bubble plus"><span class="who">push +${plus ? plus.dose : "–"}${plus?.reply_kind ? " · " + (KIND_LABEL[plus.reply_kind] || "") : ""}</span>${esc(plus?.text ?? "")}</div></div>`;
-    }).join("") + `</div>`;
-  } else steerHTML = `<p class="muted">Not pushed in this run. The sweep pushes the most peaked neurons of each layer plus random controls; run <code>python -m atlas.steer --all</code> on a GPU to cover every neuron.</p>`;
+  const steerHTML = M.info.steer_sharded ? `<div id="pushbox"><p class="muted">Loading pushes…</p></div>` : pushCardHTML(M, k, M.steer.get(k) || []);
   const badges = lb ? [
     `<span class="pill">confidence ${lb.confidence}/5</span>`,
     lb.detect != null ? `<span class="pill ${lb.detect >= .75 ? "good" : lb.detect <= .5 ? "warn" : ""}" title="held-out check: picks this neuron's unseen top documents out of 4 snippets, 50% is chance">held-out check ${Math.round(lb.detect * 100)}%</span>` : "",
@@ -608,6 +632,12 @@ async function openNeuron(k, opts = {}) {
     b.addEventListener("focus", load);
   });
   nbrs.onclick = e => { const b = e.target.closest("button"); if (b) openNeuron(+b.dataset.k, { focus: true }); };
+  if (M.info.steer_sharded) {
+    await layerSteer(M, L);
+    if (S.sel !== k) return;
+    const box = $("pushbox");
+    if (box) box.innerHTML = pushCardHTML(M, k, M.steer.get(k) || []);
+  }
   const by = await neuronExamples(M, L, n);
   if (S.sel !== k) return;
   const ex = by.sort((a, b) => b.sign - a.sign || a.rank - b.rank);
@@ -683,21 +713,39 @@ $("tabs").onclick = e => { const b = e.target.closest("button"); if (b) setTab(b
 
 /* ---------- pushes ---------- */
 const KIND_LABEL = { persona: "persona", altered_assistant: "changed assistant", default_assistant: "normal assistant", other: "off-topic", incoherent: "incoherent" };
-function renderPushes() {
-  const M = S.M, sel = $("pk"), cur = sel.value;
+let pushSeq = 0;
+async function renderPushes() {
+  const M = S.M; if (!M) return;
+  const seq = ++pushSeq;
+  const sel = $("pk"), cur = sel.value;
   sel.innerHTML = `<option value="">every kind of reply</option>` + Object.entries(KIND_LABEL).map(([k, v]) => `<option value="${k}" ${k === cur ? "selected" : ""}>${v}</option>`).join("");
-  let items = [];
-  M.steer.forEach((rs, k) => rs.forEach(s => items.push([k, s])));
-  // the control: how often does pushing a random neuron give the same kind of reply?
-  const rate = (grp, kind) => { const g = items.filter(([, s]) => s.kind === grp); return g.length ? g.filter(([, s]) => s.reply_kind === kind).length / g.length : null; };
+  if (M.info.steer_sharded) {
+    const n = M.info.n_layers; let done = 0;
+    $("pcount").textContent = `loading pushes 0 / ${n} layers`;
+    await Promise.all(allLayers(M).map(L => layerSteer(M, L).then(() => {
+      done++;
+      if (seq === pushSeq) $("pcount").textContent = `loading pushes ${done} / ${n} layers`;
+    })));
+    if (seq !== pushSeq || S.M !== M) return;
+  }
   const kind = sel.value, coh = $("pcoh").checked;
+  const grpN = {}, grpKind = {};
+  let items = [], scanned = 0;
+  M.steer.forEach((rs, k) => rs.forEach(s => {
+    scanned++;
+    if (!grpN[s.kind]) { grpN[s.kind] = 0; grpKind[s.kind] = {}; }
+    grpN[s.kind]++;
+    if (s.reply_kind) grpKind[s.kind][s.reply_kind] = (grpKind[s.kind][s.reply_kind] || 0) + 1;
+    if ((!kind || s.reply_kind === kind) && (!coh || (s.diversity ?? 1) > 0.6) && s.text.trim()) items.push([k, s]);
+  }));
+  // the control: how often does pushing a random neuron give the same kind of reply?
+  const rate = (grp, kd) => grpN[grp] ? (grpKind[grp][kd] || 0) / grpN[grp] : null;
   const ctl = kind && rate("random", kind) != null ? ` · ${KIND_LABEL[kind]}: ${Math.round(100 * rate("top", kind))}% of pushes on the most peaked neurons vs ${Math.round(100 * rate("random", kind))}% on random control neurons` : "";
-  items = items.filter(([k, s]) => (!kind || s.reply_kind === kind) && (!coh || (s.diversity ?? 1) > 0.6) && s.text.trim());
   const ps = $("psort").value;
   if (ps === "change") items.sort((a, b) => (a[1].kind === "random") - (b[1].kind === "random") || b[1].change - a[1].change);
   else if (ps === "uptake") items.sort((a, b) => ((M.up.get(b[0])?.uptake ?? -1) - (M.up.get(a[0])?.uptake ?? -1)) || a[0] - b[0] || a[1].dose - b[1].dose);
   else items.sort((a, b) => a[0] - b[0] || a[1].dose - b[1].dose);
-  $("pcount").textContent = `${items.length.toLocaleString()} replies from ${M.steer.size.toLocaleString()} pushed neurons${ctl}`;
+  $("pcount").textContent = `${items.length.toLocaleString()} replies from ${M.steer.size.toLocaleString()} pushed neurons${ctl}${scanned > 200000 ? ` · scanned ${scanned.toLocaleString()} replies` : ""}`;
   const prompts = M.info.steer?.prompts || [];
   $("pushgrid").innerHTML = items.slice(0, 120).map(([k, s]) => { const l = M.lab.get(k);
     return `<button class="push" data-k="${k}"><div class="meta"><span>${keyName(M, k)}</span><span class="pill ${s.dose > 0 ? "eo" : ""}">push ${s.dose > 0 ? "+" : ""}${s.dose}</span>${s.reply_kind ? `<span class="pill">${KIND_LABEL[s.reply_kind] || s.reply_kind}</span>` : ""}${s.kind === "random" ? `<span class="pill warn">random control</span>` : ""}</div>
@@ -853,6 +901,18 @@ const SQLX = [
 $("sqlx").innerHTML = SQLX.map(([n], i) => `<button class="btn" data-i="${i}">${n}</button>`).join("");
 $("sqlx").onclick = e => { const b = e.target.closest("button"); if (b) { $("sqltext").value = SQLX[+b.dataset.i][1]; runSQL(); } };
 let duck = null, duckFor = null;
+async function fileExists(url) {
+  if (B64 && url.endsWith(".parquet")) {
+    const n = PARTS.get(url) || 0;
+    url = n ? `${url}.b64.0.txt` : url + ".b64.txt";
+  }
+  try {
+    const r = await fetch(url, { method: "HEAD" });
+    if (r.ok) return true;
+    if (r.status === 404) return false;
+  } catch {}
+  try { const r = await fetch(url, { headers: { Range: "bytes=0-0" } }); return r.ok; } catch { return false; }
+}
 async function sqlInit() {
   if (duck && duckFor === S.M.info.id) return duck;
   $("sqlstat").textContent = "starting DuckDB-WASM…";
@@ -868,7 +928,8 @@ async function sqlInit() {
     const M = S.M, abs = u => new URL(u, location.href).href, c = duck.conn;
     const register = async (name, url) => B64 ? duck.inst.registerFileBuffer(name, new Uint8Array(await fetchBuf(url)))
       : duck.inst.registerFileURL(name, abs(url), duck.db.DuckDBDataProtocol.HTTP, false);
-    const files = M.info.sharded ? ["map", "labels", "steer", "tokens", "uptake"] : ["neurons", "labels", "steer", "tokens", "uptake"];
+    const files = [M.info.sharded ? "map" : "neurons", "labels", "tokens", "uptake"];
+    if (!M.info.steer_sharded) files.push("steer");
     for (const f of files) {
       try { await register(`${M.info.id}_${f}.parquet`, M.dir + f + ".parquet");
         await c.query(`create or replace view ${f} as select * from '${M.info.id}_${f}.parquet'`); } catch { }
@@ -880,6 +941,16 @@ async function sqlInit() {
       const nl = [];
       for (let L = 0; L < M.info.n_layers; L++) { const nm = `${M.info.id}_n${L}.parquet`; await register(nm, M.dir + `neurons/L${String(L).padStart(2, "0")}.parquet`); nl.push(`'${nm}'`); }
       await c.query(`create or replace view neurons as select * from read_parquet([${nl.join(",")}])`);
+    }
+    if (M.info.steer_sharded) {
+      const sl = [], bnm = `${M.info.id}_steer_base.parquet`, burl = M.dir + "steer/baseline.parquet";
+      if (await fileExists(burl)) { await register(bnm, burl); sl.push(`'${bnm}'`); }
+      for (let L = 0; L < M.info.n_layers; L++) {
+        const nm = `${M.info.id}_steer${L}.parquet`, url = M.dir + `steer/L${String(L).padStart(2, "0")}.parquet`;
+        if (!(await fileExists(url))) continue;
+        await register(nm, url); sl.push(`'${nm}'`);
+      }
+      if (sl.length) await c.query(`create or replace view steer as select * from read_parquet([${sl.join(",")}])`);
     }
     duckFor = M.info.id; $("sqlstat").textContent = `ready · ${M.info.model}`;
     return duck;
@@ -917,7 +988,7 @@ async function selectModel(id) {
 }
 $("models").onclick = async e => { const b = e.target.closest("button"); if (!b) return; const M = await selectModel(b.dataset.id); openStart(M); };
 function openStart(M) {
-  const g = goodNeurons(M).slice().sort((a, b) => { const la = M.lab.get(a), lb = M.lab.get(b); return ((lb.detect ?? 0) + lb.confidence / 5 + (M.steer.has(b) ? .3 : 0)) - ((la.detect ?? 0) + la.confidence / 5 + (M.steer.has(a) ? .3 : 0)); });
+  const g = goodNeurons(M).slice().sort((a, b) => { const la = M.lab.get(a), lb = M.lab.get(b); return ((lb.detect ?? 0) + lb.confidence / 5 + (M.up.get(b)?.uptake ?? 0) * .3) - ((la.detect ?? 0) + la.confidence / 5 + (M.up.get(a)?.uptake ?? 0) * .3); });
   openNeuron(g.length ? g[0] : 0, { focus: g.length > 0 });
 }
 async function boot() {

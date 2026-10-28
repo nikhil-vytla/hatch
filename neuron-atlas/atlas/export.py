@@ -12,23 +12,40 @@ import argparse, glob, json, os, re, shutil
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 EXPLORER = os.path.join(HERE, "..", "explorer", "index.html")
-FILES = ["meta.json", "map.parquet", "labels.parquet", "steer.parquet", "tokens.parquet", "uptake.parquet", "recipes.parquet"]  # + neurons/, examples/
+FILES = ["meta.json", "map.parquet", "labels.parquet", "steer.parquet", "tokens.parquet", "uptake.parquet", "recipes.parquet"]  # + neurons/, examples/, steer/
 
 
 def shard(d):
-    """Derive what the explorer loads from a model folder's neurons.parquet: map.parquet (one slim row per neuron:
-    layer, neuron, x, y, zmax) and neurons/Lxx.parquet (full rows, one file per layer, fetched on demand). Also add
-    each example's token window in place so a neuron card needs no tokens.parquet."""
+    """Derive what the explorer loads from a model folder: map.parquet (one slim row per neuron, in layer/neuron
+    order: qx, qy, qz), neurons/Lxx.parquet (full rows, one file per layer, fetched on demand), and steer/Lxx.parquet
+    + steer/baseline.parquet (pushes, fetched on demand). Also add each example's token window in place so a neuron
+    card needs no tokens.parquet."""
     src = os.path.join(d, "neurons.parquet")
     if os.path.exists(src):
         import duckdb
         os.makedirs(os.path.join(d, "neurons"), exist_ok=True)
         con = duckdb.connect()
-        con.sql(f"""copy (select layer, neuron, x, y, zmax from '{src}' order by layer, neuron)
+        con.sql(f"""copy (select
+                        cast(round(x * 65535) as usmallint) qx,
+                        cast(round(y * 65535) as usmallint) qy,
+                        cast(round((case when zmax is null or zmax < 0 then 0
+                                         else least(zmax, 6553.5) end) * 10) as usmallint) qz
+                    from '{src}' order by layer, neuron)
                     to '{d}/map.parquet' (format parquet, compression zstd)""")
         for (L,) in con.sql(f"select distinct layer from '{src}' order by 1").fetchall():
             con.sql(f"""copy (select * from '{src}' where layer = {L} order by neuron)
                         to '{d}/neurons/L{L:02d}.parquet' (format parquet, compression zstd, ROW_GROUP_SIZE 1024)""")
+    steer = os.path.join(d, "steer.parquet")
+    if os.path.exists(steer):
+        import duckdb
+        sdir = os.path.join(d, "steer")
+        os.makedirs(sdir, exist_ok=True)
+        con = duckdb.connect()
+        for (L,) in con.sql(f"select distinct layer from '{steer}' where layer >= 0 order by 1").fetchall():
+            con.sql(f"""copy (select * from '{steer}' where layer = {L} order by neuron, prompt, dose)
+                        to '{sdir}/L{L:02d}.parquet' (format parquet, compression zstd, ROW_GROUP_SIZE 1024)""")
+        con.sql(f"""copy (select * from '{steer}' where layer < 0 order by neuron, prompt, dose)
+                    to '{sdir}/baseline.parquet' (format parquet, compression zstd)""")
     add_example_tokens(d)
 
 
@@ -93,6 +110,7 @@ def models_index(out):
         shard(os.path.dirname(meta_path))
         m = json.load(open(meta_path))
         m["sharded"] = True
+        m["steer_sharded"] = os.path.exists(os.path.join(os.path.dirname(meta_path), "steer", "baseline.parquet"))
         m["id"] = model_id(m["model"])
         m["name"] = m["model"].split("/")[-1]
         m["files"] = [f for f in FILES if os.path.exists(os.path.join(os.path.dirname(meta_path), f))]
@@ -136,7 +154,7 @@ def build_site(out, site, b64=False):
         os.makedirs(os.path.join(dst, "examples"), exist_ok=True)
         for f in m["files"]:
             put(os.path.join(src, f), os.path.join(dst, f), m)
-        for sub in ["examples", "neurons"]:
+        for sub in ["examples", "neurons", "steer"]:
             os.makedirs(os.path.join(dst, sub), exist_ok=True)
             for f in glob.glob(os.path.join(src, sub, "*.parquet")):
                 put(f, os.path.join(dst, sub, os.path.basename(f)), m)
@@ -177,10 +195,12 @@ detection check. Built with `neuron-atlas` (https://github.com/nikhil-vytla/hatc
   each top document's peak).
 - `examples/Lxx.parquet`: top documents per neuron (`sign` 1 = most positive, -1 = most negative), peak `act`, `doc`,
   `pos`, and the activation window `q` (int8, x `scale`/127) for tokens `pos-before .. pos+after` (see `meta.json`).
-- `map.parquet`: `layer, neuron, x, y, zmax` for every neuron (what the explorer loads first).
+- `map.parquet`: `qx, qy, qz` for every neuron, ordered by `layer, neuron` so row `i` is
+  `layer = i // d_mlp`, `neuron = i % d_mlp`: `x = qx / 65535`, `y = qy / 65535`, `zmax = qz / 10`.
 - `tokens.parquet`: the corpus as token strings per `doc`.
 - `steer.parquet`: greedy replies with one neuron pushed by `dose` x median residual norm (`layer = -1` rows are the
-  unsteered baselines), plus `change` (1 - word Jaccard to baseline) and `diversity` (distinct bigram ratio).
+  unsteered baselines), plus `change` (1 - word Jaccard to baseline) and `diversity` (distinct bigram ratio). When
+  `steer/` is sharded, `steer/Lxx.parquet` holds one layer's rows and `steer/baseline.parquet` the `layer < 0` rows.
 - `labels.parquet`: `label, description, emoji, confidence, push, push_kind`, and `detect` / `detect_null` (held-out
   detection accuracy with the neuron's own label / a shuffled label; chance 0.5).
 
@@ -231,7 +251,8 @@ def push_index(repo):
         m = json.load(open(hf_hub_download(repo, f, repo_type="dataset")))
         have = {x.split("/", 1)[1] for x in files if x.startswith(slug + "/")}
         m.update(id=model_id(m["model"]), name=m["model"].split("/")[-1], files=[x for x in FILES if x in have],
-                 sharded=any(x.startswith("neurons/") for x in have))
+                 sharded=any(x.startswith("neurons/") for x in have),
+                 steer_sharded=f"{slug}/steer/baseline.parquet" in files)
         idx.append(m)
     idx.sort(key=lambda m: m["n_neurons"])
     api.upload_file(path_or_fileobj=json.dumps(idx, indent=1).encode(), path_in_repo="models.json", repo_id=repo,
