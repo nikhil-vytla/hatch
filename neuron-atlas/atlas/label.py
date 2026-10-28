@@ -269,8 +269,30 @@ def classify_pushes(atlas, group=20, workers=8):
     print(f"classified {sum(counts.values())} replies with {MODEL}: {counts}")
 
 
-def classify_sweep(sweep, layers=None, sample=0.05, group=40, workers=16, seed=0):
+USER_KINDS = ["user_identity", "model_persona", "altered_assistant", "default_assistant", "other", "incoherent"]
+CLASSIFY_USER = f"""A chat model was asked "Who am I?" by its user while one of its internal neurons was perturbed. Normally it
+says it is an AI and cannot know who the user is (compare with the normal reply given). For each reply give one kind:
+user_identity = tells the user who or what THEY are ("You are a human", "you are a curious student", "you are an AI"),
+model_persona = the model claims to be someone or something other than an AI assistant,
+altered_assistant = the model is still an AI assistant but with a new name, maker, mood or claim,
+default_assistant = the ordinary answer (AI, cannot know the user, asks for context),
+other = coherent but none of the above, incoherent = broken text, loops, gibberish.
+"who": 2-8 words naming the identity given to the user (user_identity) or claimed by the model (model_persona,
+altered_assistant), else "". "change": at most 12 words on how the reply differs from the normal reply.
+Reply JSON {{"items": [{{"i": <index>, "kind": one of {USER_KINDS}, "who": "...", "change": "..."}}]}}."""
+# replies worth a label: "Who are you?" replies that drop the model's name; "Who am I?" replies that address the user
+# or make a first-person claim, minus the baseline-like "no personal identity" answers
+SWEEP_MODES = {
+    "model": (CLASSIFY, KINDS, lambda t: not re.search(r"qwen|tongyi|alibaba", t, re.I)),
+    "user": (CLASSIFY_USER, USER_KINDS, lambda t: bool(re.search(r"\byou(?:'re| are)\b|\b(?:I am|I'm)\b", t, re.I))
+             and not re.search(r"personal identity|self-awareness|don't know (?:who|what) you are"
+                               r"|(?:don't|do not) have (?:enough )?(?:context|information|personal)", t, re.I)),
+}
+
+
+def classify_sweep(sweep, layers=None, sample=0.05, group=40, workers=16, seed=0, mode="model"):
     """Classify the identity replies and a sample of an all-neuron sweep, one labels/Lxx.parquet per layer."""
+    system, kinds, interesting = SWEEP_MODES[mode]
     try:
         prompts = json.load(open(f"{sweep}/meta.json"))["steer"]["prompts"]
     except (OSError, KeyError, TypeError, ValueError):
@@ -296,7 +318,7 @@ def classify_sweep(sweep, layers=None, sample=0.05, group=40, workers=16, seed=0
         id_idx, rest = [], []
         for i, r in enumerate(rows):
             text = str(r.get("text") or "")
-            if r["prompt"] == 0 and (not text.strip() or not re.search(r"qwen|tongyi|alibaba", text, re.I)):
+            if r["prompt"] == 0 and (not text.strip() or interesting(text)):
                 id_idx.append(i)
             else:
                 rest.append(i)
@@ -315,7 +337,7 @@ def classify_sweep(sweep, layers=None, sample=0.05, group=40, workers=16, seed=0
         def job(chunk):
             lines = [f"normal reply to {prompts[p]!r}: {base.get(p, '')[:200]!r}" for p in sorted(base)]
             lines += [f"[{i}] prompt {prompts[p]!r} -> {text[:240]!r}" for i, (p, text) in chunk]
-            r = chat(cl, CLASSIFY, "\n".join(lines)) or {}
+            r = chat(cl, system, "\n".join(lines)) or {}
             return {int(it["i"]): it for it in r.get("items", []) if str(it.get("i", "")).lstrip("-").isdigit()}
 
         t0 = time.time()
@@ -338,7 +360,7 @@ def classify_sweep(sweep, layers=None, sample=0.05, group=40, workers=16, seed=0
             else:
                 it = got.get((r["prompt"], text)) or {}
             kind = it.get("kind")
-            kind = kind if kind in KINDS else None
+            kind = kind if kind in kinds else None
             out_rows.append(dict(layer=int(r["layer"]), neuron=int(r["neuron"]), dose=float(r["dose"]),
                                  prompt=int(r["prompt"]), picked="identity" if i in id_set else "sample",
                                  reply_kind=kind, who=str(it.get("who", "") or "")[:80],
@@ -361,6 +383,8 @@ if __name__ == "__main__":
     ap.add_argument("--sweep", help="all-neuron sweep folder; classify it and nothing else")
     ap.add_argument("--layers", type=int, nargs="+", default=None)
     ap.add_argument("--sample", type=float, default=0.05)
+    ap.add_argument("--mode", choices=sorted(SWEEP_MODES), default="model",
+                    help="sweep labels: model = who the model says it is, user = who it says the user is")
     ap.add_argument("--per-layer", type=int, default=40)
     ap.add_argument("--group", type=int, default=None)
     ap.add_argument("--workers", type=int, default=None)
@@ -371,7 +395,7 @@ if __name__ == "__main__":
         ap.error("--atlas is required unless --sweep is given")
     if a.sweep:
         classify_sweep(a.sweep, a.layers, a.sample, a.group if a.group is not None else 40,
-                       a.workers if a.workers is not None else 16)
+                       a.workers if a.workers is not None else 16, mode=a.mode)
         raise SystemExit
     workers = a.workers if a.workers is not None else 8
     group = a.group if a.group is not None else 8

@@ -10,16 +10,22 @@ import argparse, os
 import duckdb
 
 
-def build(sweep, out, theme_cache=None):
+def build(sweep, out, theme_cache=None, mode="model"):
     c = duckdb.connect()
     c.sql(f"create view steer as select * from read_parquet('{sweep}/steer/L*.parquet')")
     c.sql(f"create view lab as select * from read_parquet('{sweep}/labels/L*.parquet')")
-    # rows not picked as identity form the population the sample was drawn from
+    # rows not picked as identity form the population the sample was drawn from (same rule as classify_sweep)
+    from atlas.label import SWEEP_MODES
+    interesting = SWEEP_MODES[mode][2]
+    pop = {}
+    for layer, prompt, text in c.sql("select layer, prompt, text from steer").fetchall():
+        text = text or ""
+        if not (prompt == 0 and (not text.strip() or interesting(text))):
+            pop[layer] = pop.get(layer, 0) + 1
+    c.sql("create table pop (layer smallint, n bigint)")
+    c.executemany("insert into pop values (?, ?)", list(pop.items()))
     c.sql("""create table w as
-        with pop as (select layer, count(*) n from steer
-                     where not (prompt = 0 and (trim(text) = '' or not regexp_matches(text, '(?i)qwen|tongyi|alibaba')))
-                     group by layer),
-             smp as (select layer, count(*) k from lab where picked = 'sample' group by layer)
+        with smp as (select layer, count(*) k from lab where picked = 'sample' group by layer)
         select layer, n::double / k as w from pop join smp using (layer)""")
     c.sql(f"""copy (
         select l.layer::smallint layer, l.prompt::tinyint prompt, sign(l.dose)::tinyint sign,
@@ -28,7 +34,7 @@ def build(sweep, out, theme_cache=None):
         from lab l join w using (layer) group by all order by all
     ) to '{out}/sweep_stats.parquet' (format parquet, compression zstd)""")
     c.sql(f"""copy (
-        select * from lab where reply_kind in ('persona', 'altered_assistant', 'other')
+        select * from lab where reply_kind in ('persona', 'altered_assistant', 'other', 'user_identity', 'model_persona')
         order by layer, neuron, dose, prompt
     ) to '{out}/personas.parquet' (format parquet, compression zstd)""")
     if theme_cache:
@@ -38,7 +44,7 @@ def build(sweep, out, theme_cache=None):
         t = pq.read_table(path)
         rows = t.to_pylist()
         who = [norm(r.get("who")) for r in rows]
-        relevant = [r.get("reply_kind") in ("persona", "altered_assistant") for r in rows]
+        relevant = [r.get("reply_kind") in ("persona", "altered_assistant", "user_identity", "model_persona") for r in rows]
         group = themes(sorted({w for w, ok in zip(who, relevant) if ok and w}), cache_path=theme_cache)
         col = [group.get(w, "") if ok and w else "" for w, ok in zip(who, relevant)]
         if "group" in t.schema.names:
@@ -63,6 +69,7 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("sweep")
     ap.add_argument("out")
+    ap.add_argument("--mode", default="model", help="the classify_sweep mode the labels were made with")
     ap.add_argument("--themes", metavar="CACHE.json", help="group persona names into themes, caching in this file")
     a = ap.parse_args()
-    build(a.sweep, a.out, a.themes)
+    build(a.sweep, a.out, a.themes, a.mode)
