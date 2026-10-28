@@ -1,0 +1,982 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Neuron Atlas · SmolLM2 in the browser</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+
+  :root {
+    color-scheme: light dark;
+    --bg: #f4f6f9;
+    --card: #ffffff;
+    --fg: #161a1f;
+    --muted: #5f6b78;
+    --border: #e2e7ee;
+    --accent: #2364e0;
+    --accent-contrast: #ffffff;
+    --accent-weak: #e8f0ff;
+    --bubble: #f7f9fc;
+    --shadow: 0 10px 30px rgba(15, 30, 60, 0.07);
+    --danger: #b42318;
+    --danger-bg: #fdecea;
+    --warn: #8a5a00;
+    --warn-bg: #fff5dc;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e1319;
+      --card: #161d26;
+      --fg: #e7edf4;
+      --muted: #9aa8b6;
+      --border: #26313d;
+      --accent: #6ea8ff;
+      --accent-contrast: #08111c;
+      --accent-weak: #1b2a42;
+      --bubble: #111821;
+      --shadow: 0 12px 34px rgba(0, 0, 0, 0.35);
+      --danger: #ff8b82;
+      --danger-bg: #3a1b1a;
+      --warn: #ffd587;
+      --warn-bg: #332a12;
+    }
+  }
+
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    min-width: 0;
+  }
+
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 20px 16px 40px; }
+
+  .hero h1 {
+    margin: 0 0 4px;
+    font-size: clamp(1.5rem, 4vw, 2.1rem);
+    letter-spacing: -0.02em;
+  }
+  .lede { margin: 0 0 18px; color: var(--muted); max-width: 65ch; }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    box-shadow: var(--shadow);
+    padding: 16px;
+    margin: 0 0 16px;
+    min-width: 0;
+  }
+
+  .status-top {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+  }
+  .pill {
+    flex: 0 0 auto;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 4px 9px;
+    border-radius: 999px;
+    background: var(--accent-weak);
+    color: var(--accent);
+  }
+  .model {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--muted);
+    font-size: 0.82rem;
+  }
+
+  .progress { display: flex; align-items: center; gap: 10px; margin: 12px 0 0; }
+  .track {
+    flex: 1 1 auto;
+    min-width: 80px;
+    height: 8px;
+    border-radius: 999px;
+    background: var(--border);
+    overflow: hidden;
+  }
+  .bar {
+    height: 100%;
+    width: 0;
+    border-radius: 999px;
+    background: linear-gradient(90deg, var(--accent), #7c5cff);
+    transition: width 0.15s ease;
+  }
+  .bar.indeterminate { width: 35%; animation: indeterminate 1.1s ease-in-out infinite; }
+  @keyframes indeterminate {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(300%); }
+  }
+  .progress-text {
+    flex: 0 0 auto;
+    font-variant-numeric: tabular-nums;
+    font-size: 0.8rem;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+
+  .status-line { margin: 10px 0 0; color: var(--muted); font-size: 0.92rem; }
+  .speed {
+    margin: 4px 0 0;
+    color: var(--muted);
+    font-size: 0.82rem;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .notice {
+    margin-top: 12px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: var(--danger-bg);
+    color: var(--danger);
+    font-size: 0.86rem;
+    overflow-wrap: anywhere;
+  }
+  .notice[data-kind="warn"] { background: var(--warn-bg); color: var(--warn); }
+
+  .field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .label {
+    font-size: 0.76rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .label .hint {
+    text-transform: none;
+    letter-spacing: 0;
+    font-weight: 400;
+    color: var(--muted);
+  }
+
+  textarea, input[type="text"], input[type="number"] {
+    width: 100%;
+    min-width: 0;
+    font: inherit;
+    color: var(--fg);
+    background: var(--bubble);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 12px;
+  }
+  textarea { resize: vertical; min-height: 58px; }
+  input:disabled, textarea:disabled { opacity: 0.6; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 14px; }
+  .chip {
+    font: inherit;
+    font-size: 0.85rem;
+    padding: 6px 11px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--bubble);
+    color: var(--fg);
+    cursor: pointer;
+  }
+  .chip:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+  .chip:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .row { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-start; }
+  .field.grow { flex: 1 1 260px; }
+  .field.small { flex: 0 0 112px; width: 112px; }
+
+  .errors {
+    margin: 8px 0 0;
+    color: var(--danger);
+    font-size: 0.84rem;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+  .note {
+    margin: 8px 0 0;
+    color: var(--warn);
+    font-size: 0.84rem;
+    overflow-wrap: anywhere;
+  }
+
+  .dose { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 14px 0 4px; }
+  .dose label { flex: 0 0 auto; }
+  .dose input[type="range"] { flex: 1 1 160px; min-width: 120px; accent-color: var(--accent); }
+  .badge {
+    font-variant-numeric: tabular-nums;
+    font-size: 0.8rem;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 999px;
+    background: var(--accent-weak);
+    color: var(--accent);
+  }
+
+  .actions { display: flex; gap: 10px; margin-top: 14px; }
+  .actions button {
+    font: inherit;
+    font-weight: 600;
+    padding: 9px 20px;
+    border-radius: 10px;
+    cursor: pointer;
+    border: 1px solid transparent;
+  }
+  .actions .primary { background: var(--accent); color: var(--accent-contrast); }
+  .actions .ghost { background: transparent; color: var(--fg); border-color: var(--border); }
+  .actions button:disabled { opacity: 0.45; cursor: not-allowed; }
+
+  .replies {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+  @media (min-width: 720px) {
+    .replies { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  }
+  .reply { margin: 0; }
+  .reply header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 9px;
+  }
+  .reply h2 { margin: 0; font-size: 0.95rem; }
+  .reply.pushed h2 { color: var(--accent); }
+  .count { color: var(--muted); font-size: 0.76rem; font-variant-numeric: tabular-nums; }
+  .bubble {
+    min-height: 150px;
+    max-height: 420px;
+    overflow: auto;
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--bubble);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    font-size: 0.95rem;
+  }
+  .reply.pushed .bubble { background: var(--accent-weak); }
+  .muted { color: var(--muted); }
+
+  .foot { color: var(--muted); font-size: 0.78rem; text-align: center; padding-top: 4px; }
+</style>
+</head>
+<body>
+<main class="wrap">
+  <header class="hero">
+    <h1>Neuron Atlas</h1>
+    <p class="lede">SmolLM2-135M running in your browser. Push neurons and compare the reply with the normal one.</p>
+  </header>
+
+  <section class="card status" aria-live="polite">
+    <div class="status-top">
+      <span class="pill" id="backendPill">loading</span>
+      <span class="model" id="modelName"></span>
+    </div>
+    <div class="progress" id="progressWrap" hidden>
+      <div class="track"><div class="bar" id="progressBar"></div></div>
+      <span class="progress-text" id="progressText"></span>
+    </div>
+    <p class="status-line" id="statusLine">Loading metadata…</p>
+    <p class="speed" id="speedLine">—</p>
+    <div class="notice" id="notice" role="alert" hidden></div>
+  </section>
+
+  <section class="card controls">
+    <label class="field">
+      <span class="label">Prompt</span>
+      <textarea id="promptInput" rows="2" placeholder="Ask SmolLM2 something…">Who are you?</textarea>
+    </label>
+
+    <div class="chips" id="presetChips">
+      <button type="button" class="chip" data-prompt="Who are you?">Who are you?</button>
+      <button type="button" class="chip" data-prompt="Tell me a short story.">Tell me a short story.</button>
+      <button type="button" class="chip" data-prompt="Who am I?">Who am I?</button>
+    </div>
+
+    <div class="row">
+      <label class="field grow">
+        <span class="label">Recipe <span class="hint">neuronary</span></span>
+        <input id="recipeInput" type="text" autocomplete="off" spellcheck="false" placeholder="e.g. L10N100+0.8 L5N200-0.5">
+      </label>
+      <label class="field small">
+        <span class="label">Max tokens</span>
+        <input id="maxTokens" type="number" min="1" max="128" step="1" value="48">
+      </label>
+    </div>
+    <p class="errors" id="recipeErrors" hidden></p>
+    <p class="note" id="recipeNote" hidden></p>
+
+    <div class="dose">
+      <label class="label" for="doseScale">Dose scale</label>
+      <input id="doseScale" type="range" min="0" max="2" step="0.05" value="1">
+      <output class="badge" id="doseValue" for="doseScale">1.00×</output>
+    </div>
+
+    <div class="actions">
+      <button type="button" class="primary" id="runBtn" disabled>Run</button>
+      <button type="button" class="ghost" id="stopBtn" disabled>Stop</button>
+    </div>
+  </section>
+
+  <section class="replies" aria-label="Replies">
+    <article class="card reply">
+      <header>
+        <h2>Normal</h2>
+        <span class="count" id="normalCount">0 tok</span>
+      </header>
+      <div class="bubble" id="normalText"><span class="muted">Waiting to run…</span></div>
+    </article>
+    <article class="card reply pushed">
+      <header>
+        <h2>Pushed</h2>
+        <span class="count" id="pushedCount">0 tok</span>
+      </header>
+      <div class="bubble" id="pushedText"><span class="muted">Waiting to run…</span></div>
+    </article>
+  </section>
+
+  <footer class="foot">SmolLM2-135M · ONNX Runtime Web · neuronary steering</footer>
+</main>
+
+<script type="module">
+import { AutoTokenizer } from "https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.3.0";
+
+const DEFAULT_MODEL = "./build/smollm2_steer_fp16.onnx";
+const ORT_BASE = "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.30.0/dist/";
+const PENALTY = 1.1;
+const CACHE_NAME = "atlas-models";
+
+const $ = (id) => document.getElementById(id);
+const backendPill = $("backendPill");
+const modelName = $("modelName");
+const progressWrap = $("progressWrap");
+const progressBar = $("progressBar");
+const progressText = $("progressText");
+const statusLine = $("statusLine");
+const speedLine = $("speedLine");
+const notice = $("notice");
+const promptInput = $("promptInput");
+const presetChips = $("presetChips");
+const recipeInput = $("recipeInput");
+const recipeErrors = $("recipeErrors");
+const recipeNote = $("recipeNote");
+const doseScale = $("doseScale");
+const doseValue = $("doseValue");
+const maxTokens = $("maxTokens");
+const runBtn = $("runBtn");
+const stopBtn = $("stopBtn");
+const normalText = $("normalText");
+const pushedText = $("pushedText");
+const normalCount = $("normalCount");
+const pushedCount = $("pushedCount");
+
+const params = new URLSearchParams(location.search);
+let modelUrl;
+try {
+  modelUrl = new URL(params.get("model") || DEFAULT_MODEL, location.href);
+} catch {
+  modelUrl = new URL(DEFAULT_MODEL, location.href);
+}
+const modelDir = new URL(".", modelUrl);
+
+let meta = null;
+let colnorm = null;
+let tokenizer = null;
+let ort = null;
+let session = null;
+let backend = "";
+let ready = false;
+let busy = false;
+let stopRequested = false;
+let currentAdds = [];
+
+function errText(e) {
+  return e && (e.message || String(e)) ? (e.message || String(e)) : String(e);
+}
+
+function showNotice(message, kind) {
+  notice.hidden = false;
+  notice.dataset.kind = kind || "error";
+  notice.textContent = message;
+}
+
+function backendLabel() {
+  if (backend === "webgpu") return "WebGPU";
+  if (backend === "wasm") return "WASM";
+  return "—";
+}
+
+function fail(message) {
+  showNotice(message, "error");
+  statusLine.textContent = "The model could not load.";
+  backendPill.textContent = "error";
+  runBtn.disabled = true;
+  progressWrap.hidden = true;
+}
+
+function setProgress(received, total, cached) {
+  progressWrap.hidden = false;
+  const mb = (received / 1e6).toFixed(1);
+  if (total > 0) {
+    const totalMb = (total / 1e6).toFixed(1);
+    progressText.textContent = cached ? `${mb} MB · cached` : `${mb} / ${totalMb} MB`;
+    progressBar.style.width = Math.min(100, (received / total) * 100).toFixed(1) + "%";
+    progressBar.classList.remove("indeterminate");
+  } else {
+    progressText.textContent = `${mb} MB`;
+    progressBar.classList.add("indeterminate");
+  }
+  if (cached) statusLine.textContent = "Model loaded from cache.";
+}
+
+async function fetchJson(url) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`${res.status} ${res.statusText} for ${url.pathname}`);
+  return res.json();
+}
+
+async function fetchBuffer(url) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`${res.status} ${res.statusText} for ${url.pathname}`);
+  return res.arrayBuffer();
+}
+
+async function loadModelBytes(url, onProgress) {
+  let cache = null;
+  try {
+    if ("caches" in window) cache = await caches.open(CACHE_NAME);
+  } catch {
+    cache = null;
+  }
+
+  if (cache) {
+    try {
+      const hit = await cache.match(url.href);
+      if (hit) {
+        const buf = await hit.arrayBuffer();
+        onProgress(buf.byteLength, buf.byteLength, true);
+        return new Uint8Array(buf);
+      }
+    } catch {
+      /* cache reads are best effort */
+    }
+  }
+
+  const res = await fetch(url.href);
+  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+
+  const total = Number(res.headers.get("content-length")) || 0;
+  if (cache) {
+    try {
+      const put = cache.put(url.href, res.clone());
+      if (put && typeof put.catch === "function") put.catch(() => {});
+    } catch {
+      /* a full or unavailable cache must not break loading */
+    }
+  }
+
+  if (!res.body) {
+    const buf = await res.arrayBuffer();
+    onProgress(buf.byteLength, buf.byteLength, false);
+    return new Uint8Array(buf);
+  }
+
+  const reader = res.body.getReader();
+  let received = 0;
+  const chunks = [];
+  let buffer = total > 0 ? new Uint8Array(total) : null;
+  onProgress(0, total, false);
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    if (!value) continue;
+
+    if (buffer && received + value.byteLength <= buffer.length) {
+      buffer.set(value, received);
+    } else if (buffer) {
+      chunks.push(buffer.subarray(0, received));
+      chunks.push(value);
+      buffer = null;
+    } else {
+      chunks.push(value);
+    }
+
+    received += value.byteLength;
+    onProgress(received, total, false);
+  }
+
+  let bytes;
+  if (buffer) {
+    bytes = received === buffer.length ? buffer : buffer.slice(0, received);
+  } else {
+    bytes = new Uint8Array(received);
+    let offset = 0;
+    for (const chunk of chunks) {
+      bytes.set(chunk, offset);
+      offset += chunk.byteLength;
+    }
+  }
+
+  onProgress(received, total || received, false);
+  return bytes;
+}
+
+async function importOrt(useWebGPU) {
+  const mod = await import(
+    useWebGPU ? ORT_BASE + "ort.webgpu.min.mjs" : ORT_BASE + "ort.min.mjs"
+  );
+  mod.env.wasm.wasmPaths = ORT_BASE;
+  return mod;
+}
+
+async function detectWebGPU() {
+  if (!navigator.gpu || params.get("backend") === "wasm") return false;
+  try {
+    const adapter = await navigator.gpu.requestAdapter();
+    // a software (fallback) adapter is far slower than wasm
+    if (adapter && (adapter.isFallbackAdapter || adapter.info?.isFallbackAdapter)) return false;
+    if (!adapter) {
+      showNotice("No WebGPU adapter is available, so the WASM backend will be used.", "warn");
+      return false;
+    }
+    return true;
+  } catch (e) {
+    showNotice(
+      "WebGPU could not be initialized (" + errText(e) + "). The WASM backend will be used instead.",
+      "warn"
+    );
+    return false;
+  }
+}
+
+async function createSession(bytes, provider) {
+  return ort.InferenceSession.create(bytes, {
+    executionProviders: [provider],
+    graphOptimizationLevel: "all",
+  });
+}
+
+function readHashRecipe() {
+  const raw = location.hash.replace(/^#/, "");
+  if (!raw) return "";
+  try {
+    return decodeURIComponent(raw);
+  } catch {
+    return raw;
+  }
+}
+
+function encodeRecipeHash(value) {
+  return encodeURIComponent(value)
+    .replace(/%2B/gi, "+")
+    .replace(/%2C/gi, ",")
+    .replace(/%3D/gi, "=")
+    .replace(/%2A/gi, "*");
+}
+
+function syncHash() {
+  const value = recipeInput.value;
+  const base = location.pathname + location.search;
+  const next = value ? base + "#" + encodeRecipeHash(value) : base;
+  try {
+    history.replaceState(null, "", next);
+  } catch {
+    /* history replacement is optional */
+  }
+}
+
+function parseRecipe(text) {
+  const terms = text.split(/[\s,]+/).filter(Boolean);
+  const adds = [];
+  const errors = [];
+  const unsupported = [];
+  const termRe = /^L(\d+)N(\d+)([+\-*=])([+-]?(?:\d+(?:\.\d*)?|\.\d+))$/i;
+
+  for (const token of terms) {
+    const match = token.match(termRe);
+    if (!match) {
+      errors.push(`“${token}” is not a neuron term. Use a form like L10N100+0.8.`);
+      continue;
+    }
+    const layer = Number(match[1]);
+    const neuron = Number(match[2]);
+    const op = match[3];
+    const dose = Number(match[4]);
+
+    if (!Number.isFinite(dose)) {
+      errors.push(`“${token}” has an invalid dose.`);
+      continue;
+    }
+    if (layer >= meta.n_layers) {
+      errors.push(`“${token}”: layer ${layer} is out of range (0–${meta.n_layers - 1}).`);
+      continue;
+    }
+    if (neuron >= meta.d_mlp) {
+      errors.push(`“${token}”: neuron ${neuron} is out of range (0–${meta.d_mlp - 1}).`);
+      continue;
+    }
+    if (op === "=" || op === "*") {
+      unsupported.push(token);
+      continue;
+    }
+    adds.push({ layer, neuron, value: op === "-" ? -dose : dose });
+  }
+
+  return { adds, errors, unsupported };
+}
+
+function updateRecipe() {
+  if (!meta) {
+    recipeErrors.hidden = true;
+    recipeNote.hidden = true;
+    return null;
+  }
+
+  const parsed = parseRecipe(recipeInput.value);
+  currentAdds = parsed.adds;
+
+  if (parsed.errors.length) {
+    recipeErrors.hidden = false;
+    recipeErrors.textContent = parsed.errors.join("\n");
+  } else {
+    recipeErrors.hidden = true;
+  }
+
+  if (parsed.unsupported.length) {
+    recipeNote.hidden = false;
+    recipeNote.textContent =
+      "Not supported here yet (skipped): " + parsed.unsupported.join(", ") + ".";
+  } else {
+    recipeNote.hidden = true;
+  }
+
+  return parsed;
+}
+
+function updateDose() {
+  doseValue.textContent = Number(doseScale.value).toFixed(2) + "×";
+}
+
+function getMaxTokens() {
+  const n = Math.floor(Number(maxTokens.value));
+  if (!Number.isFinite(n)) return 48;
+  return Math.min(128, Math.max(1, n));
+}
+
+function buildSteer(adds, scale) {
+  const steer = new Float32Array(meta.n_layers * meta.d_mlp);
+  for (const add of adds) {
+    const index = add.layer * meta.d_mlp + add.neuron;
+    const norm = colnorm[index];
+    if (!Number.isFinite(norm) || norm === 0) continue;
+    steer[index] += (add.value * scale * meta.resid_median[add.layer]) / norm;
+  }
+  return steer;
+}
+
+async function encodePrompt(prompt) {
+  const full = meta.chat_template_prefix.before + prompt + meta.chat_template_prefix.after;
+  const encoded = await tokenizer(full, { add_special_tokens: false });
+  const data = encoded.input_ids.data;
+  const ids = Array.from(data, (value) => Number(value));
+  if (!ids.length) throw new Error("The prompt tokenized to zero tokens.");
+  return ids;
+}
+
+async function infer(seq, steerTensor) {
+  const ids = BigInt64Array.from(seq, (value) => BigInt(value));
+  const input = new ort.Tensor("int64", ids, [1, seq.length]);
+  const output = await session.run({ input_ids: input, steer: steerTensor });
+  const tensor = Array.isArray(output)
+    ? output[0]
+    : output[session.outputNames && session.outputNames[0]]
+      || output.logits
+      || output[Object.keys(output)[0]];
+  return Float32Array.from(tensor.data);
+}
+
+function applyPenalty(logits, seq) {
+  const seen = new Set(seq);
+  for (const token of seen) {
+    if (logits[token] > 0) logits[token] /= PENALTY;
+    else logits[token] *= PENALTY;
+  }
+}
+
+function argmax(logits) {
+  let best = 0;
+  let bestValue = logits[0];
+  for (let i = 1; i < logits.length; i++) {
+    if (logits[i] > bestValue) {
+      bestValue = logits[i];
+      best = i;
+    }
+  }
+  return best;
+}
+
+function makeSource(promptIds, steerTensor, textEl, countEl) {
+  return {
+    seq: promptIds.slice(),
+    ids: [],
+    count: 0,
+    done: false,
+    steer: steerTensor,
+    textEl,
+    countEl,
+  };
+}
+
+async function advance(source, maxTokensValue, eosSet) {
+  if (source.done) return;
+  if (source.ids.length >= maxTokensValue) {
+    source.done = true;
+    return;
+  }
+
+  const logits = await infer(source.seq, source.steer);
+  applyPenalty(logits, source.seq);
+  const next = argmax(logits);
+
+  source.seq.push(next);
+  source.ids.push(next);
+  source.count++;
+  if (eosSet.has(next)) source.done = true;
+
+  const text = await tokenizer.decode(source.ids, { skip_special_tokens: true });
+  source.textEl.textContent = text;
+  source.countEl.textContent = source.count + " tok";
+}
+
+function setControlsDisabled(disabled) {
+  promptInput.disabled = disabled;
+  recipeInput.disabled = disabled;
+  maxTokens.disabled = disabled;
+  doseScale.disabled = disabled;
+  presetChips.querySelectorAll(".chip").forEach((chip) => {
+    chip.disabled = disabled;
+  });
+}
+
+async function run() {
+  if (!ready || busy) return;
+
+  const parsed = updateRecipe();
+  if (parsed && parsed.errors.length) {
+    showNotice("Fix the recipe errors before running.", "error");
+    return;
+  }
+
+  const prompt = promptInput.value.trim();
+  if (!prompt) {
+    showNotice("Enter a prompt first.", "warn");
+    return;
+  }
+
+  const maxTokensValue = getMaxTokens();
+  maxTokens.value = String(maxTokensValue);
+  const scale = Number(doseScale.value);
+  const adds = parsed ? parsed.adds : [];
+  const pushedSteer = buildSteer(adds, scale);
+  const eosSet = new Set(meta.eos);
+
+  busy = true;
+  stopRequested = false;
+  let failed = false;
+  runBtn.disabled = true;
+  runBtn.textContent = "Running…";
+  stopBtn.disabled = false;
+  setControlsDisabled(true);
+  notice.hidden = true;
+  normalText.textContent = "";
+  pushedText.textContent = "";
+  normalCount.textContent = "0 tok";
+  pushedCount.textContent = "0 tok";
+  speedLine.textContent = "…";
+  statusLine.textContent = "Tokenizing prompt…";
+
+  let started = performance.now();
+  let normal = null;
+  let pushed = null;
+
+  try {
+    const promptIds = await encodePrompt(prompt);
+    const zeroSteer = new Float32Array(meta.n_layers * meta.d_mlp);
+
+    normal = makeSource(
+      promptIds,
+      new ort.Tensor("float32", zeroSteer, [meta.n_layers, meta.d_mlp]),
+      normalText,
+      normalCount
+    );
+    pushed = makeSource(
+      promptIds,
+      new ort.Tensor("float32", pushedSteer, [meta.n_layers, meta.d_mlp]),
+      pushedText,
+      pushedCount
+    );
+
+    statusLine.textContent = adds.length
+      ? `Running · ${adds.length} neuron${adds.length === 1 ? "" : "s"} pushed`
+      : "Running · zero steer";
+
+    started = performance.now();
+    while (!(normal.done && pushed.done) && !stopRequested) {
+      if (!normal.done && !stopRequested) {
+        await advance(normal, maxTokensValue, eosSet);
+      }
+      if (!pushed.done && !stopRequested) {
+        await advance(pushed, maxTokensValue, eosSet);
+      }
+      const tokens = normal.count + pushed.count;
+      const seconds = (performance.now() - started) / 1000;
+      if (tokens > 0 && seconds > 0) {
+        speedLine.textContent = `${(tokens / seconds).toFixed(1)} tok/s · ${backendLabel()}`;
+      }
+    }
+  } catch (e) {
+    failed = true;
+    showNotice("Generation failed: " + errText(e), "error");
+  } finally {
+    const tokens = (normal ? normal.count : 0) + (pushed ? pushed.count : 0);
+    const seconds = Math.max((performance.now() - started) / 1000, 0.001);
+    speedLine.textContent = `${(tokens / seconds).toFixed(1)} tok/s · ${backendLabel()}`;
+    busy = false;
+    stopBtn.disabled = true;
+    runBtn.disabled = false;
+    runBtn.textContent = "Run";
+    setControlsDisabled(false);
+    statusLine.textContent = failed ? "Generation failed." : stopRequested ? "Stopped." : "Done.";
+  }
+}
+
+async function boot() {
+  modelName.textContent = modelUrl.pathname.split("/").pop() || modelUrl.href;
+  modelName.title = modelUrl.href;
+
+  recipeInput.value = readHashRecipe();
+  updateDose();
+  syncHash();
+
+  statusLine.textContent = "Loading metadata…";
+  try {
+    const [metaJson, normBuffer] = await Promise.all([
+      fetchJson(new URL("steer_meta.json", modelDir)),
+      fetchBuffer(new URL("colnorm.f32", modelDir)),
+    ]);
+    meta = metaJson;
+    colnorm = new Float32Array(normBuffer);
+    const expected = meta.n_layers * meta.d_mlp;
+    if (colnorm.length !== expected) {
+      throw new Error(`colnorm.f32 has ${colnorm.length} values, expected ${expected}.`);
+    }
+  } catch (e) {
+    fail("Could not load model metadata: " + errText(e));
+    return;
+  }
+
+  updateRecipe();
+
+  statusLine.textContent = "Loading tokenizer…";
+  try {
+    tokenizer = await AutoTokenizer.from_pretrained(meta.model);
+  } catch (e) {
+    fail("Could not load the tokenizer for " + meta.model + ": " + errText(e));
+    return;
+  }
+
+  statusLine.textContent = "Checking WebGPU…";
+  const wantWebGPU = await detectWebGPU();
+
+  statusLine.textContent = "Downloading model…";
+  progressWrap.hidden = false;
+  let bytes;
+  try {
+    bytes = await loadModelBytes(modelUrl, setProgress);
+  } catch (e) {
+    fail("Could not download the model: " + errText(e));
+    return;
+  }
+
+  statusLine.textContent = "Creating " + (wantWebGPU ? "WebGPU" : "WASM") + " session…";
+  try {
+    ort = await importOrt(wantWebGPU);
+    backend = wantWebGPU ? "webgpu" : "wasm";
+    session = await createSession(bytes, backend);
+  } catch (e) {
+    if (!wantWebGPU) {
+      fail("Could not start the model: " + errText(e));
+      return;
+    }
+    showNotice("WebGPU could not start the model (" + errText(e) + "). Falling back to WASM.", "warn");
+    try {
+      ort = await importOrt(false);
+      backend = "wasm";
+      session = await createSession(bytes, "wasm");
+    } catch (e2) {
+      fail("Could not start the model: " + errText(e2));
+      return;
+    }
+  }
+
+  ready = true;
+  progressWrap.hidden = true;
+  backendPill.textContent = backendLabel();
+  statusLine.textContent = "Ready.";
+  speedLine.textContent = "— · " + backendLabel();
+  runBtn.disabled = false;
+}
+
+doseScale.addEventListener("input", updateDose);
+
+recipeInput.addEventListener("input", () => {
+  updateRecipe();
+  syncHash();
+});
+
+window.addEventListener("hashchange", () => {
+  const value = readHashRecipe();
+  if (value !== recipeInput.value) {
+    recipeInput.value = value;
+    updateRecipe();
+  }
+});
+
+presetChips.querySelectorAll(".chip").forEach((chip) => {
+  chip.addEventListener("click", () => {
+    promptInput.value = chip.dataset.prompt || "";
+    promptInput.focus();
+  });
+});
+
+maxTokens.addEventListener("change", () => {
+  maxTokens.value = String(getMaxTokens());
+});
+
+runBtn.addEventListener("click", run);
+
+stopBtn.addEventListener("click", () => {
+  stopRequested = true;
+  stopBtn.disabled = true;
+  statusLine.textContent = "Stopping…";
+});
+
+boot();
+</script>
+</body>
+</html>
