@@ -172,3 +172,16 @@ derangement null, not "persona vs not".
   query over shards (25 rows, 1.0 s).
 - Bug found while testing: the "vs random" example query used `share` as an alias (reserved in DuckDB) and mixed
   `group by all` with a window over aggregates. Fixed to explicit `group by kind, reply_kind` and alias `frac`.
+
+## Coding agent: opencode + DeepSeek-flash (from here on)
+
+- The user wanted code written by a cheap model and reviewed by me. Setup: `npm i -g opencode-ai@1.19.3`;
+  `~/.config/opencode/opencode.json` defines an `@ai-sdk/openai-compatible` provider at `https://api.deepseek.com/v1`
+  with a placeholder key (the proxy injects the real one), model `deepseek-flash` (the API lists it as
+  DeepSeek-V4.1-Flash). First `opencode run` hung while it installed the provider package; later runs take seconds.
+- Task 1 (lens uptake, roadmap item 4), spec in the prompt → opencode wrote `atlas/uptake.py`, the export entry,
+  and the explorer changes (uptake pill on the neuron card, "writes its own lens words" sort, SQL view + example).
+  Review: correct and in the house style; one real problem: the null draw built a list of all other neurons for
+  every neuron (O(N²), would stall a 442k-neuron `--all` run). Fixed by sampling indices.
+- Uptake (null-corrected rate of +dose replies containing the neuron's own lens words), peaked vs random:
+  GPT-2 0.164 / 0.070, SmolLM2 0.179 / 0.055, Qwen3-0.6B 0.071 / 0.030.

@@ -208,7 +208,7 @@ textarea.sql { width: 100%; min-height: 110px; font: 13px var(--mono); border: 1
   <section id="v-pushes" hidden>
     <div class="filters">
       <select id="pk" aria-label="Kind of reply"><option value="">every kind of reply</option></select>
-      <select id="psort" aria-label="Sort"><option value="change">most changed reply</option><option value="layer">layer</option></select>
+      <select id="psort" aria-label="Sort"><option value="change">most changed reply</option><option value="uptake">writes its own lens words</option><option value="layer">layer</option></select>
       <label class="muted"><input type="checkbox" id="pcoh" checked> hide repetitive replies</label>
       <span class="status" id="pcount"></span>
     </div>
@@ -302,15 +302,16 @@ async function loadModel(id) {
   const info = S.models.find(m => m.id === id);
   const dir = BASE + info.slug + "/";
   // sharded: map.parquet has every neuron's position; full rows come per layer (neurons/Lxx.parquet) on demand
-  const [rows, labels, steer] = await Promise.all([
+  const [rows, labels, steer, uptake] = await Promise.all([
     readPq(dir + (info.sharded ? "map.parquet" : "neurons.parquet")),
-    tryPq(dir + "labels.parquet"), tryPq(dir + "steer.parquet")]);
+    tryPq(dir + "labels.parquet"), tryPq(dir + "steer.parquet"), tryPq(dir + "uptake.parquet")]);
   const N = info.n_neurons, d = info.d_mlp;
   const M = { info, dir, N, d, rows: new Array(N), layerP: new Map(), x: new Float32Array(N), y: new Float32Array(N), layer: new Int16Array(N), z: new Float32Array(N),
-    lab: new Map(), steer: new Map(), base: [], ex: new Map(), toks: null };
+    lab: new Map(), steer: new Map(), up: new Map(), base: [], ex: new Map(), toks: null };
   rows.forEach(r => { const k = r.layer * d + r.neuron; M.x[k] = r.x; M.y[k] = r.y; M.layer[k] = r.layer; M.z[k] = r.zmax; if (!info.sharded) M.rows[k] = r; });
   if (!info.sharded) for (let L = 0; L < info.n_layers; L++) M.layerP.set(L, Promise.resolve());
   (labels || []).forEach(l => M.lab.set(l.layer * d + l.neuron, l));
+  (uptake || []).forEach(u => M.up.set(u.layer * d + u.neuron, u));
   (steer || []).forEach(s => {
     if (s.layer < 0) { M.base[s.prompt] = s.text; return }
     const k = s.layer * d + s.neuron; if (!M.steer.has(k)) M.steer.set(k, []); M.steer.get(k).push(s);
@@ -468,10 +469,12 @@ async function openNeuron(k, opts = {}) {
   if (!M.rows[k]) { P.innerHTML = `<p class="muted">Loading layer ${L}…</p>`; await ensureLayer(M, L); if (S.sel !== k) return; }
   const row = M.rows[k];
   const st = M.steer.get(k) || [];
+  const up = M.up.get(k);
+  const upPill = up && up.up_n ? `<div style="margin-bottom:8px"><span class="pill ${up.uptake >= .25 ? "good" : ""}" title="the chance is the same replies checked against other pushed neurons' lens words">writes its own lens words in ${up.up_hits}/${up.up_n} pushed replies (chance ${Math.round(100 * (up.up_null || 0))}%)</span></div>` : "";
   const prompts = M.info.steer?.prompts || [];
   let steerHTML = "";
   if (st.length) {
-    steerHTML = `<div><h3>Pushes</h3>` + prompts.map((p, pi) => {
+    steerHTML = `<div><h3>Pushes</h3>${upPill}` + prompts.map((p, pi) => {
       const rs = st.filter(s => s.prompt === pi).sort((a, b) => a.dose - b.dose); if (!rs.length) return "";
       const minus = rs.filter(s => s.dose < 0).at(0), plus = rs.filter(s => s.dose > 0).at(-1);
       return `<p class="prompt">“${esc(p)}”</p><div class="chat">
@@ -590,7 +593,10 @@ function renderPushes() {
   const kind = sel.value, coh = $("pcoh").checked;
   const ctl = kind && rate("random", kind) != null ? ` · ${KIND_LABEL[kind]}: ${Math.round(100 * rate("top", kind))}% of pushes on the most peaked neurons vs ${Math.round(100 * rate("random", kind))}% on random control neurons` : "";
   items = items.filter(([k, s]) => (!kind || s.reply_kind === kind) && (!coh || (s.diversity ?? 1) > 0.6) && s.text.trim());
-  if ($("psort").value === "change") items.sort((a, b) => (a[1].kind === "random") - (b[1].kind === "random") || b[1].change - a[1].change); else items.sort((a, b) => a[0] - b[0] || a[1].dose - b[1].dose);
+  const ps = $("psort").value;
+  if (ps === "change") items.sort((a, b) => (a[1].kind === "random") - (b[1].kind === "random") || b[1].change - a[1].change);
+  else if (ps === "uptake") items.sort((a, b) => ((M.up.get(b[0])?.uptake ?? -1) - (M.up.get(a[0])?.uptake ?? -1)) || a[0] - b[0] || a[1].dose - b[1].dose);
+  else items.sort((a, b) => a[0] - b[0] || a[1].dose - b[1].dose);
   $("pcount").textContent = `${items.length.toLocaleString()} replies from ${M.steer.size.toLocaleString()} pushed neurons${ctl}`;
   const prompts = M.info.steer?.prompts || [];
   $("pushgrid").innerHTML = items.slice(0, 120).map(([k, s]) => { const l = M.lab.get(k);
@@ -664,6 +670,7 @@ const SQLX = [
   ["personas", "select s.layer, s.neuron, s.dose, s.who, s.text, l.label\nfrom steer s left join labels l using (layer, neuron)\nwhere s.reply_kind = 'persona' and s.kind <> 'random'\norder by s.layer limit 40"],
   ["vs random", "select kind, reply_kind, count(*) n,\n  round(count(*) / sum(count(*)) over (partition by kind), 2) frac\nfrom steer where layer >= 0 group by kind, reply_kind order by kind, n desc"],
   ["peakiest neurons", "select layer, neuron, round(zmax, 1) z, peaks[1:5] fires_on, lens_up[1:5] promotes\nfrom neurons order by zmax desc limit 25"],
+  ["lens uptake", "select u.layer, u.neuron, u.kind, round(u.uptake, 3) uptake, u.up_hits, u.up_n, l.label\nfrom uptake u left join labels l using (layer, neuron)\norder by u.uptake desc nulls last limit 25"],
   ["dense neurons", "select layer, neuron, round(frac_pos, 2) frac_pos, lens_up[1:5] promotes\nfrom neurons order by frac_pos desc limit 25"],
 ];
 $("sqlx").innerHTML = SQLX.map(([n], i) => `<button class="btn" data-i="${i}">${n}</button>`).join("");
@@ -684,7 +691,7 @@ async function sqlInit() {
     const M = S.M, abs = u => new URL(u, location.href).href, c = duck.conn;
     const register = async (name, url) => B64 ? duck.inst.registerFileBuffer(name, new Uint8Array(await fetchBuf(url)))
       : duck.inst.registerFileURL(name, abs(url), duck.db.DuckDBDataProtocol.HTTP, false);
-    const files = M.info.sharded ? ["map", "labels", "steer", "tokens"] : ["neurons", "labels", "steer", "tokens"];
+    const files = M.info.sharded ? ["map", "labels", "steer", "tokens", "uptake"] : ["neurons", "labels", "steer", "tokens", "uptake"];
     for (const f of files) {
       try { await register(`${M.info.id}_${f}.parquet`, M.dir + f + ".parquet");
         await c.query(`create or replace view ${f} as select * from '${M.info.id}_${f}.parquet'`); } catch { }
