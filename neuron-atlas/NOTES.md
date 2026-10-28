@@ -185,3 +185,68 @@ derangement null, not "persona vs not".
   every neuron (O(N²), would stall a 442k-neuron `--all` run). Fixed by sampling indices.
 - Uptake (null-corrected rate of +dose replies containing the neuron's own lens words), peaked vs random:
   GPT-2 0.164 / 0.070, SmolLM2 0.179 / 0.055, Qwen3-0.6B 0.071 / 0.030.
+
+## Qwen3-8B on molab (RTX PRO 6000 Blackwell, 96 GB), driven through marimo pair
+
+- Pairing: molab's "Pair with an agent" gives a notebook URL + token; marimo-pair's `execute-code.sh` runs Python in
+  the kernel over HTTPS (token passed via env from a 0600 file, never on the command line). Long jobs run as a
+  detached `subprocess.Popen(..., start_new_session=True)` in the container, polled via the log file. Notebook got 4
+  cells: an intro, an HF-token password field (so the user types the token in the molab UI), a 30 s refresh, a log tail.
+- Install: `pip install "neuron-atlas @ git+https://github.com/nikhil-vytla/hatch@main#subdirectory=neuron-atlas"`
+  (PR #17 merged). molab image: Python 3.13, torch 2.11+cu130, transformers 5.14, 20 CPUs, 160 GB RAM.
+- Corpus 6,000 web + 4,000 chat, ≤256 tokens: 10,000 docs, 2,418,865 tokens. Qwen3-8B: 36 × 12,288 = 442,368
+  neurons. Collect pass 1 266 s; whole collect (pass 2, logit lens over 151k vocab, UMAP of 442k, exact cosine
+  neighbors) a few minutes more. Steering 64 peaked + 16 random per layer × doses ±0.5, ±1.0 × 2 prompts =
+  23,042 replies in 163 s (batch 320 rows).
+- Moving data between molab and here: execute-code output is truncated around ~1 MB and requests over ~100 KB fail
+  silently, so `pull.sh` / `push.sh` move base64 chunks (400 KB out, 60 KB in) and `push.sh` verifies each chunk's
+  offset and the final MD5 (two chunks were silently dropped before verification was added).
+- Labels (DeepSeek, here, on a 2,880-neuron subset pulled from molab): held-out detection 0.780 vs null 0.500;
+  by confidence 0.66 (c2), 0.73 (c3), 0.82 (c4), 0.86 (c5); 104 "predicts …", 14 "polysemantic".
+- Baseline replies: "I am Qwen, a large language model developed by Alibaba Cloud…" / "I don't have personal
+  experiences or preferences…". At ±0.5, ~90% of "Who are you?" replies stay the normal assistant; at ±1.0, ~31%.
+- Personas, peaked vs random (share of neurons with a persona reply to "Who are you?" at any dose): 9.4% (216/2304)
+  vs 8.2% (47/576) — within noise (SE ≈ 1.1 pt). Same answer as the small models: zmax-peaked neurons are not
+  persona-special. Personas concentrate by depth: layers 6–17 up to ~15% of ±1.0 pushes, last layers ~1% (they break
+  the text instead).
+- Uptake (lens words in +dose replies, null-corrected): peaked 0.083, random 0.062; +1.0 dose own-lens hit rate
+  11.5% vs 9.0%. The gap peaked vs random is smaller than in the small models.
+- Read side predicts persona content: L8 N7846 "Victorian literature / Dickens names" +0.5 → "I am a ghost. I have
+  no name. You may call me Scrooge."; L27 N9650 "progress bar / percentage" +1.0 → "I am a progress bar that shows the
+  percentage of my completion."; others: "spirit of the campfire", a walrus, Oedipus, "I am He whom God hath made the
+  First of His creation" (L8 N3170, +0.5).
+
+## Multi-neuron recipes (neuronary format) — opencode/DeepSeek draft, reviewed
+
+- neuronary.org (by the neuron-explorer author) is a public dictionary of steering recipes: `L13N7956-0.7 L14N8949+0.7`,
+  dose unit identical to ours (`act += dose · median‖resid_L‖ / ‖W_down[:, n]‖` at the down-projection input).
+  Read API: `GET https://mcczbdcymyhzfputyqcr.supabase.co/functions/v1/api/recipes`; 97 of the first 100 recipes are
+  for Qwen/Qwen3.5-4B.
+- `model.py`: `parse_recipe` / `format_recipe` (ops: `+/-` add, `=` set/clamp, `*` multiply, `*0` ablates);
+  `set_recipes(rows, resid_median)` = any number of terms per batch row across layers. `steer.run_recipes` +
+  CLI `--recipe ... --scales ...` + `--neuronary` (fetches the model's recipes). Gradio "Mix neurons" tab. Explorer
+  "Mix" tab: "Add to mix" from the neuron card, dose inputs, recipe string, copy, neuronary link, stored runs grouped
+  by recipe with clickable `LxNy`.
+- First agent run wrote its draft to /tmp, got its copy-back denied (opencode blocks writes outside the project) and
+  stopped; re-run with "edit in place" worked. Review fix: `export.py` did not publish `recipes.parquet` (404).
+- Regression: recipe `L20N1144+0.5` reproduces the stored single-neuron replies exactly (both prompts).
+  `L20N1144*0` = baseline (neuron nearly silent there); `=1` clamps into lists of time spans; mixing with the
+  citation-colon neuron at −0.5: scale 0.5 → "I'm an old man with 50 years of experience … I've lived for centuries,
+  seen empires rise and fall"; scale 1 → "Thousands of years past, 2000 years ago, 1000 years ago, 500 years ago".
+- Model support for image-text checkpoints (Qwen3.5, Qwen3-VL, Gemma 4): AutoModelForImageTextToText fallback,
+  skip vision/audio tower MLPs. Untested on those models yet (they need the GPU).
+
+## Judges: DeepSeek + OpenCode free models (`atlas/judges.py`, `judge_panel.py`)
+
+- Free OpenCode models (glm-5.3-flash-free, flint-40b-free, beam-free, deepseek-v4.1-flash-free, mimo-v2.6-flash-free;
+  nemotron-3-ultra-free "unavailable") answer only through the opencode client: the Zen HTTP API returns
+  `FreeUsageLimitError … Free models work in OpenCode`.
+- Agent draft used `opencode serve` + `run --attach --format json`. Three problems found in review/testing:
+  (1) opencode 1.19.3 `run --format json` hangs with no output when stdout is a pipe; (2) an agent defined in the
+  server's config dir is "not found" when the client attaches from another dir; (3) once the free quota is used up,
+  opencode retries silently forever (the log says `AI_APICallError: Free usage limit reached`), which looks like a
+  hang. Fix: run `opencode run --print-logs -m <model> --agent judge` with cwd = a temp dir holding the judge agent
+  config (all tools denied), read plain text, watch stderr and fail fast + mark the judge exhausted on that error.
+- The free quota for this container ran out after ~40 calls (smoke tests + two agent sessions). Panel smoke test
+  (6 SmolLM2 neurons): deepseek accuracy 0.875 vs null 0.500, 1.6 s/call; free models: quota exhausted, failed in
+  ~12 s instead of hanging. Free models are fine for small judge panels, not for bulk labeling.

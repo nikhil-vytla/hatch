@@ -184,6 +184,7 @@ textarea.sql { width: 100%; min-height: 110px; font: 13px var(--mono); border: 1
   <nav class="tabs" role="tablist" id="tabs">
     <button role="tab" aria-selected="true" data-t="map">Map</button>
     <button role="tab" aria-selected="false" data-t="pushes">Pushes</button>
+    <button role="tab" aria-selected="false" data-t="mix">Mix</button>
     <button role="tab" aria-selected="false" data-t="board">Leaderboard</button>
     <button role="tab" aria-selected="false" data-t="compare">Across models</button>
     <button role="tab" aria-selected="false" data-t="guess">Guess the neuron</button>
@@ -213,6 +214,21 @@ textarea.sql { width: 100%; min-height: 110px; font: 13px var(--mono); border: 1
       <span class="status" id="pcount"></span>
     </div>
     <div class="grid-cards" id="pushgrid"></div>
+  </section>
+
+  <section id="v-mix" hidden>
+    <div class="card">
+      <div><h2>Mix neurons</h2><p class="muted">Open a neuron and press <b>Add to mix</b>, then tune its dose. The recipe uses the <a href="https://neuronary.org" target="_blank" rel="noopener">neuronary</a> format.</p></div>
+      <div class="filters" id="mixterms"></div>
+      <div class="filters">
+        <span class="pill" id="mixstr" style="font-family: var(--mono)">L0N0+0.5</span>
+        <button class="btn" id="mixcopy">Copy</button>
+        <a class="btn" id="mixlink" href="https://neuronary.org/" target="_blank" rel="noopener">open on neuronary</a>
+      </div>
+      <p class="muted">Generation runs in <code>app.py</code> / the molab notebook — this static page has no model.</p>
+    </div>
+    <h3 style="margin:18px 0 8px">Recipe runs</h3>
+    <div id="mixruns"></div>
   </section>
 
   <section id="v-board" hidden>
@@ -302,12 +318,13 @@ async function loadModel(id) {
   const info = S.models.find(m => m.id === id);
   const dir = BASE + info.slug + "/";
   // sharded: map.parquet has every neuron's position; full rows come per layer (neurons/Lxx.parquet) on demand
-  const [rows, labels, steer, uptake] = await Promise.all([
+  const [rows, labels, steer, uptake, recipes] = await Promise.all([
     readPq(dir + (info.sharded ? "map.parquet" : "neurons.parquet")),
-    tryPq(dir + "labels.parquet"), tryPq(dir + "steer.parquet"), tryPq(dir + "uptake.parquet")]);
+    tryPq(dir + "labels.parquet"), tryPq(dir + "steer.parquet"), tryPq(dir + "uptake.parquet"),
+    tryPq(dir + "recipes.parquet")]);
   const N = info.n_neurons, d = info.d_mlp;
   const M = { info, dir, N, d, rows: new Array(N), layerP: new Map(), x: new Float32Array(N), y: new Float32Array(N), layer: new Int16Array(N), z: new Float32Array(N),
-    lab: new Map(), steer: new Map(), up: new Map(), base: [], ex: new Map(), toks: null };
+    lab: new Map(), steer: new Map(), up: new Map(), base: [], ex: new Map(), toks: null, recipes: recipes || [] };
   rows.forEach(r => { const k = r.layer * d + r.neuron; M.x[k] = r.x; M.y[k] = r.y; M.layer[k] = r.layer; M.z[k] = r.zmax; if (!info.sharded) M.rows[k] = r; });
   if (!info.sharded) for (let L = 0; L < info.n_layers; L++) M.layerP.set(L, Promise.resolve());
   (labels || []).forEach(l => M.lab.set(l.layer * d + l.neuron, l));
@@ -490,6 +507,7 @@ async function openNeuron(k, opts = {}) {
   P.innerHTML = `
     <div>
       <div class="idline"><span>${esc(M.info.model)}</span><span>·</span><b>${keyName(M, k)}</b>${badges}</div>
+      <div style="margin-top:8px"><button class="btn" id="addmix" title="Add this neuron to the Mix tab at dose +0.5">Add to mix</button></div>
       <div style="display:flex;gap:12px;align-items:center;margin-top:8px">${lb ? `<span class="emoji">${esc(lb.emoji)}</span>` : ""}
         <h2>${lb ? esc(lb.label) : `Promotes ${row.lens_up.slice(0, 3).map(t => "“" + esc(t.trim() || t) + "”").join(", ")}`}</h2></div>
       ${lb ? `<p class="desc">${esc(lb.description)}</p>${lb.push && lb.push !== "nothing clear" ? `<p class="desc"><b>Push:</b> ${esc(lb.push)}</p>` : ""}` : ""}
@@ -506,6 +524,7 @@ async function openNeuron(k, opts = {}) {
     <div id="exbox"><h3>Fires on</h3><p class="muted">loading examples…</p></div>
     ${steerHTML}
     <div><h3>${row.nbrs ? "Writes like (cosine of output directions)" : "Neighbors on the map"}</h3><div class="nbrs" id="nbrs"></div></div>`;
+  $("addmix").onclick = () => addMix(k);
   const nb = neighbors(M, k);
   const nbHTML = () => nb.map(([j, c]) => { const l = M.lab.get(j), r = M.rows[j]; return `<button data-k="${j}"><span class="k">${keyName(M, j)}${c != null ? " · " + c.toFixed(2) : ""}</span>${l ? esc(l.emoji + " " + l.label) : r ? r.lens_up.slice(0, 3).map(showTok).join(" ") : "…"}</button>` }).join("");
   $("nbrs").innerHTML = nbHTML();
@@ -568,12 +587,13 @@ function goodNeurons(M) { const g = M.labKeys.filter(k => { const l = M.lab.get(
 $("surprise").onclick = () => { const M = S.M; const g = goodNeurons(M); if (!g.length) return; setTab("map"); openNeuron(g[Math.floor(Math.random() * g.length)], { focus: true }); };
 
 /* ---------- tabs ---------- */
-const TABS = ["map", "pushes", "board", "compare", "guess", "sql"];
+const TABS = ["map", "pushes", "mix", "board", "compare", "guess", "sql"];
 function setTab(t) {
   S.tab = t; TABS.forEach(x => { $("v-" + x).hidden = x !== t; });
   [...$("tabs").children].forEach(b => b.setAttribute("aria-selected", b.dataset.t === t));
   if (t === "map") requestAnimationFrame(sizeCanvas);
   if (t === "pushes") renderPushes();
+  if (t === "mix") renderMix();
   if (t === "board") renderBoard();
   if (t === "guess" && !G.cur) nextGuess();
   if (t === "sql") sqlInit();
@@ -605,6 +625,81 @@ function renderPushes() {
 }
 ["pk", "psort", "pcoh"].forEach(id => $(id).onchange = renderPushes);
 $("pushgrid").onclick = e => { const b = e.target.closest(".push"); if (b) { setTab("map"); openNeuron(+b.dataset.k, { focus: true }); } };
+
+/* ---------- mix ---------- */
+const MIX = [];
+const mixNum = v => String(Math.round(Number(v) * 1000) / 1000);
+const mixTerm = t => `L${t.layer}N${t.neuron}${t.dose >= 0 ? "+" : ""}${mixNum(t.dose)}`;
+const mixString = () => MIX.map(mixTerm).join(" ");
+function recipeHTML(s) {
+  return String(s || "").split(/(L\d+N\d+)/).map(part => {
+    const m = part.match(/^L(\d+)N(\d+)$/);
+    return m ? `<button class="pill" data-open="${m[1]}:${m[2]}" style="border:0;cursor:pointer">${part}</button>` : esc(part);
+  }).join("");
+}
+function mixLink() { return "https://neuronary.org/?q=" + encodeURIComponent(mixString().split(" ")[0] || ""); }
+function addMix(k, dose = 0.5) {
+  const M = S.M; if (!M) return;
+  const L = Math.floor(k / M.d), n = k - L * M.d;
+  const t = MIX.find(x => x.layer === L && x.neuron === n);
+  if (t) t.dose = dose; else MIX.push({ layer: L, neuron: n, dose });
+  renderMix(); setTab("mix");
+}
+function renderMix() {
+  const M = S.M; if (!M) return;
+  $("mixterms").innerHTML = MIX.length ? MIX.map((t, i) => {
+    const lb = M.lab.get(t.layer * M.d + t.neuron);
+    return `<span class="pill" style="display:inline-flex;gap:6px;align-items:center">${lb ? esc(lb.emoji) + " " : ""}<b>L${t.layer} · N${t.neuron}</b>
+      <input type="number" min="-3" max="3" step="0.1" value="${t.dose}" data-i="${i}" aria-label="dose" style="width:5.5em;border:1px solid var(--line);background:var(--surface);border-radius:6px;padding:2px 6px;font:12px var(--mono)">
+      <button class="btn" data-rm="${i}" style="padding:2px 7px" aria-label="remove">×</button></span>`;
+  }).join("") : `<span class="muted">No neurons yet. Open a neuron and press “Add to mix”.</span>`;
+  $("mixstr").textContent = mixString() || "—";
+  $("mixlink").href = mixLink();
+  renderRuns(M);
+}
+function renderRuns(M) {
+  const rows = M.recipes || [];
+  if (!rows.length) {
+    $("mixruns").innerHTML = `<p class="muted">No <code>recipes.parquet</code> for this model yet. Run <code>python -m atlas.steer --recipe …</code> to make one.</p>`;
+    return;
+  }
+  const base = new Map(), groups = new Map();
+  rows.forEach(r => {
+    if (r.name === "baseline") { base.set(String(r.prompt), r.text); return; }
+    const key = r.name + "\u0000" + r.recipe;
+    if (!groups.has(key)) groups.set(key, { name: r.name, recipe: r.recipe, rows: [] });
+    groups.get(key).rows.push(r);
+  });
+  $("mixruns").innerHTML = [...groups.values()].map(g => {
+    const by = new Map();
+    g.rows.forEach(r => { const p = String(r.prompt); if (!by.has(p)) by.set(p, []); by.get(p).push(r); });
+    const body = [...by].map(([p, rs]) => `<p class="prompt">“${esc(p)}”</p><div class="compare">
+      <div class="bubble"><span class="who">normal</span>${esc(base.get(p) ?? "(no baseline)")}</div>
+      ${rs.sort((a, b) => a.scale - b.scale).map(r => `<div class="bubble plus"><span class="who">scale ${esc(r.scale)}</span>${esc(r.text)}</div>`).join("")}
+    </div>`).join("");
+    return `<div class="card" style="margin-bottom:12px"><div class="idline"><b>${esc(g.name)}</b><span>${recipeHTML(g.recipe)}</span></div>${body}</div>`;
+  }).join("");
+}
+$("mixterms").addEventListener("input", e => {
+  const inp = e.target.closest("input[data-i]"); if (!inp) return;
+  MIX[+inp.dataset.i].dose = Math.max(-3, Math.min(3, Number(inp.value) || 0));
+  $("mixstr").textContent = mixString() || "—";
+  $("mixlink").href = mixLink();
+});
+$("mixterms").addEventListener("click", e => {
+  const b = e.target.closest("[data-rm]"); if (!b) return;
+  MIX.splice(+b.dataset.rm, 1); renderMix();
+});
+$("mixcopy").onclick = async () => {
+  try { await navigator.clipboard.writeText(mixString()); $("mixcopy").textContent = "Copied"; }
+  catch { $("mixcopy").textContent = "Copy failed"; }
+  setTimeout(() => { $("mixcopy").textContent = "Copy" }, 1200);
+};
+$("mixruns").onclick = e => {
+  const b = e.target.closest("button[data-open]"); if (!b) return;
+  const [L, n] = b.dataset.open.split(":").map(Number), M = S.M;
+  setTab("map"); openNeuron(L * M.d + n, { focus: true });
+};
 
 /* ---------- leaderboard ---------- */
 const B = { sort: "detect", dir: -1 };
@@ -728,13 +823,14 @@ $("sqltext").onkeydown = e => { if ((e.metaKey || e.ctrlKey) && e.key === "Enter
 /* ---------- boot ---------- */
 async function selectModel(id) {
   $("sub").textContent = "loading…";
-  const M = await loadModel(id); S.M = M; S.sel = -1; hits = null; S.isolate = -1; view.s = 1; view.tx = view.ty = 0; G.cur = null;
+  const M = await loadModel(id); S.M = M; S.sel = -1; hits = null; S.isolate = -1; view.s = 1; view.tx = view.ty = 0; G.cur = null; MIX.length = 0;
   store.set("atlas-model", id);
   [...$("models").children].forEach(b => b.setAttribute("aria-pressed", b.dataset.id === id));
   $("sub").textContent = `${M.N.toLocaleString()} neurons · ${M.info.n_layers} layers · ${M.info.n_tokens.toLocaleString()} corpus tokens`;
   buildGrid(); renderRibbon(); draw();
   if ($("q").value) runSearch();
-  if (S.tab === "pushes") renderPushes(); if (S.tab === "board") renderBoard(); if (S.tab === "guess") nextGuess(); if (S.tab === "sql") sqlInit();
+  if (S.tab === "pushes") renderPushes(); if (S.tab === "mix") renderMix(); if (S.tab === "board") renderBoard();
+  if (S.tab === "guess") nextGuess(); if (S.tab === "sql") sqlInit();
   return M;
 }
 $("models").onclick = async e => { const b = e.target.closest("button"); if (!b) return; const M = await selectModel(b.dataset.id); openStart(M); };

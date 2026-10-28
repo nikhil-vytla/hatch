@@ -11,7 +11,7 @@ import argparse, glob, json, os, re, shutil
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 EXPLORER = os.path.join(HERE, "..", "explorer", "index.html")
-FILES = ["meta.json", "map.parquet", "labels.parquet", "steer.parquet", "tokens.parquet", "uptake.parquet"]  # + neurons/, examples/
+FILES = ["meta.json", "map.parquet", "labels.parquet", "steer.parquet", "tokens.parquet", "uptake.parquet", "recipes.parquet"]  # + neurons/, examples/
 
 
 def shard(d):

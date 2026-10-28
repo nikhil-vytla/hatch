@@ -21,6 +21,7 @@ BASE_URL = os.environ.get("LABEL_BASE_URL", "https://api.deepseek.com")
 MODEL = os.environ.get("LABEL_MODEL", "deepseek-chat")
 KEY = os.environ.get("LABEL_API_KEY") or os.environ.get("DEEPSEEK_API_KEY") or "proxy-injected"
 SHOWN, HELD = range(0, 6), (6, 7)
+JUDGE = None
 
 SYS = """You are an interpretability researcher naming neurons of a language model.
 For each neuron you get: documents where it fires most (the peak token is wrapped in «», the number is the activation),
@@ -45,6 +46,8 @@ def client():
 
 
 def chat(cl, system, user, tries=3):
+    if JUDGE is not None:
+        return JUDGE.ask(system, user)
     for t in range(tries):
         try:
             r = cl.chat.completions.create(model=MODEL, messages=[{"role": "system", "content": system},
@@ -246,9 +249,20 @@ if __name__ == "__main__":
     ap.add_argument("--group", type=int, default=8)
     ap.add_argument("--workers", type=int, default=8)
     ap.add_argument("--pushes-only", action="store_true", help="only classify steered replies")
+    ap.add_argument("--judge", help="deepseek, openai:<base_url>:<model>, or opencode/<model>")
     a = ap.parse_args()
-    if os.path.exists(f"{a.atlas}/steer.parquet"):
-        classify_pushes(a.atlas, workers=a.workers)
-    if not a.pushes_only:
-        run(a.atlas, a.per_layer, a.group, a.workers)
+    from contextlib import nullcontext
+    ctx = nullcontext(None)
+    if a.judge:
+        from .judges import make_judge
+        if a.judge.startswith("opencode/"):
+            from .judges import opencode_server
+            ctx = opencode_server()
+    with ctx as server:
+        if a.judge:
+            JUDGE = make_judge(a.judge, server)
+        if os.path.exists(f"{a.atlas}/steer.parquet"):
+            classify_pushes(a.atlas, workers=a.workers)
+        if not a.pushes_only:
+            run(a.atlas, a.per_layer, a.group, a.workers)
 

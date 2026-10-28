@@ -6,9 +6,42 @@ Llama, Qwen2/3, Mistral, OLMo, Gemma, SmolLM (gated: act(gate)·up) and GPT-2/GP
 """
 import re
 import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoModelForCausalLM, AutoProcessor, AutoTokenizer
+
+try:
+    from transformers import AutoModelForImageTextToText
+except ImportError:  # older transformers: image-text checkpoints will fail at load time
+    AutoModelForImageTextToText = None
 
 DOWN_RE = re.compile(r"\.(\d+)\.mlp\.(down_proj|c_proj|fc2|dense_4h_to_h)$")
+TERM_RE = re.compile(r"L(\d+)N(\d+)\s*([=*+\-])?\s*([+-]?\d*\.?\d+(?:[eE][+-]?\d+)?)", re.I)
+SKIP_TOWERS = ("visual", "vision", "audio", "mm_projector")
+
+
+def parse_recipe(text):
+    """'L13N7956-0.7 L14N8949+0.7' -> [(13, 7956, 'add', -0.7), (14, 8949, 'add', 0.7)].
+
+    The op is + (add), = (set) or * (multiply); a bare number means add."""
+    out = []
+    for m in TERM_RE.finditer(text or ""):
+        op = {"=": "set", "*": "mul", "-": "add", "+": "add", None: "add"}[m.group(3)]
+        value = float(m.group(4))
+        if m.group(3) == "-":
+            value = -abs(value)
+        out.append((int(m.group(1)), int(m.group(2)), op, value))
+    return out
+
+
+def format_recipe(terms):
+    """[(13, 7956, 'add', -0.7), ...] -> 'L13N7956-0.7 ...'. Three-tuples are add terms."""
+    out = []
+    for t in terms:
+        layer, neuron = t[0], t[1]
+        op, value = (t[2], t[3]) if len(t) == 4 else ("add", t[2])
+        num = f"{float(value):g}"
+        out.append(f"L{layer}N{neuron}" + ({"set": "=", "mul": "*"}.get(op, "") + num if op != "add"
+                                           else f"{float(value):+g}"))
+    return " ".join(out)
 
 
 def pick_device():
@@ -25,15 +58,25 @@ class NeuronModel:
         self.device = device or pick_device()
         if dtype is None:
             dtype = torch.bfloat16 if self.device == "cuda" else torch.float32
-        self.tok = AutoTokenizer.from_pretrained(name)
+        try:
+            self.tok = AutoTokenizer.from_pretrained(name)
+        except Exception:
+            proc = AutoProcessor.from_pretrained(name)
+            self.tok = getattr(proc, "tokenizer", None) or proc
         if self.tok.pad_token is None:
             self.tok.pad_token = self.tok.eos_token
-        self.model = AutoModelForCausalLM.from_pretrained(name, dtype=dtype).to(self.device).eval()
+        try:
+            self.model = AutoModelForCausalLM.from_pretrained(name, dtype=dtype)
+        except Exception:
+            if AutoModelForImageTextToText is None:
+                raise
+            self.model = AutoModelForImageTextToText.from_pretrained(name, dtype=dtype)
+        self.model = self.model.to(self.device).eval()
         self.model.requires_grad_(False)
         found = []
         for mod_name, mod in self.model.named_modules():
             m = DOWN_RE.search(mod_name)
-            if m and ".experts." not in mod_name:
+            if m and ".experts." not in mod_name and not any(t in mod_name.lower() for t in SKIP_TOWERS):
                 found.append((int(m.group(1)), mod))
         if not found:
             raise ValueError(f"no dense MLP down projections found in {name} (MoE models are not supported)")
@@ -44,7 +87,7 @@ class NeuronModel:
         w = self.downs[0].weight
         self.d_mlp, self.d_model = (w.shape[0], w.shape[1]) if self.conv1d else (w.shape[1], w.shape[0])
         self.model_type = self.model.config.model_type
-        self._steer = {}  # layer -> (neuron idx LongTensor[B], coeff FloatTensor[B])
+        self._steer = {}  # layer -> {op: (batch LongTensor, neuron LongTensor, value FloatTensor)}
         self._hooks = [d.register_forward_pre_hook(self._make_steer_hook(i)) for i, d in enumerate(self.downs)]
 
     # ---- weights ---------------------------------------------------------------------------------
@@ -60,7 +103,7 @@ class NeuronModel:
         W_U = self.model.get_output_embeddings().weight.float()
         norm = None
         for path in ("model.norm", "transformer.ln_f", "model.final_layernorm", "gpt_neox.final_layer_norm",
-                     "model.language_model.norm"):
+                     "model.language_model.norm", "language_model.model.norm"):
             obj = self.model
             try:
                 for p in path.split("."):
@@ -79,22 +122,66 @@ class NeuronModel:
     # ---- steering ----------------------------------------------------------------------------------
     def _make_steer_hook(self, layer):
         def hook(mod, args):
-            s = self._steer.get(layer)
-            if s is None:
+            ops = self._steer.get(layer)
+            if not ops:
                 return None
             x = args[0]
-            idx, coeff = s
             B = x.shape[0]
-            rows = torch.arange(B, device=x.device)
             x = x.clone()
-            x[rows, :, idx[:B]] += coeff[:B, None].to(x.dtype)
+            for op, (b, n, v) in ops.items():
+                keep = b < B
+                b, n, v = b[keep], n[keep], v[keep]
+                if b.numel() == 0:
+                    continue
+                v = v.to(x.dtype)
+                if op == "add":
+                    T = x.shape[1]
+                    bb = b[:, None].expand(-1, T).reshape(-1)
+                    nn = n[:, None].expand(-1, T).reshape(-1)
+                    pp = torch.arange(T, device=x.device)[None, :].expand(len(b), T).reshape(-1)
+                    x.index_put_((bb, pp, nn), v[:, None].expand(-1, T).reshape(-1), accumulate=True)
+                elif op == "set":
+                    x[b, :, n] = v[:, None]
+                else:
+                    x[b, :, n] *= v[:, None]
             return (x,) + tuple(args[1:])
         return hook
 
     def set_steer(self, layer: int, neurons, coeffs):
         """Add coeffs[b] to neuron neurons[b] of `layer` for batch row b, at every position (prompt and generation)."""
-        self._steer[layer] = (torch.as_tensor(neurons, device=self.device, dtype=torch.long),
-                              torch.as_tensor(coeffs, device=self.device, dtype=torch.float32))
+        if isinstance(neurons, int):
+            neurons = [neurons]
+        if isinstance(coeffs, (int, float)):
+            coeffs = [coeffs]
+        self._steer[layer] = {"add": (torch.arange(len(neurons), device=self.device),
+                                      torch.as_tensor(neurons, device=self.device, dtype=torch.long),
+                                      torch.as_tensor(coeffs, device=self.device, dtype=torch.float32))}
+
+    def set_recipes(self, rows, resid_median):
+        """Apply one term list per batch row. Terms are (layer, neuron, op, value) from `parse_recipe`.
+
+        add/set values are doses in units of median residual norm; mul values multiply the activation."""
+        self._steer.clear()
+        norms, acc = {}, {}
+        for b, terms in enumerate(rows):
+            for t in terms:
+                layer, neuron = t[0], t[1]
+                op, value = (t[2], t[3]) if len(t) == 4 else ("add", t[2])
+                if op not in ("add", "set", "mul"):
+                    raise ValueError(f"unknown recipe op {op!r}")
+                if op != "mul":
+                    if layer not in norms:
+                        norms[layer] = self.down_cols(layer).norm(dim=1).cpu()
+                    value = value * resid_median[layer] / float(norms[layer][neuron])
+                slot = acc.setdefault(layer, {}).setdefault(op, ([], [], []))
+                slot[0].append(b)
+                slot[1].append(neuron)
+                slot[2].append(float(value))
+        for layer, ops in acc.items():
+            self._steer[layer] = {op: (torch.tensor(b, device=self.device, dtype=torch.long),
+                                       torch.tensor(n, device=self.device, dtype=torch.long),
+                                       torch.tensor(v, device=self.device, dtype=torch.float32))
+                                  for op, (b, n, v) in ops.items()}
 
     def clear_steer(self):
         self._steer.clear()

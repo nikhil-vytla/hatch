@@ -11,7 +11,7 @@ import gradio as gr
 import torch
 
 from atlas import neurons_src
-from atlas.model import NeuronModel
+from atlas.model import NeuronModel, parse_recipe
 
 
 def fetch_atlas(atlas=None, repo=None, slug=None):
@@ -90,9 +90,28 @@ class Live:
         cut = enc["input_ids"].shape[1]
         return [nm.tok.decode(o[cut:], skip_special_tokens=True) for o in out]
 
+    @torch.no_grad()
+    def mix(self, prompt, recipe, scale, max_new=80):
+        nm = self.nm
+        terms = [(L, n, op, value * scale if op in ("add", "set") else value)
+                 for L, n, op, value in parse_recipe(recipe)]
+        enc = nm.tok([nm.chat_prompt(prompt)] * 2, return_tensors="pt", add_special_tokens=False).to(nm.device)
+        nm.set_recipes([[], terms], self.meta["resid_median"])
+        try:
+            out = nm.model.generate(**enc, max_new_tokens=max_new, do_sample=False, repetition_penalty=1.1,
+                                    pad_token_id=nm.tok.pad_token_id)
+        finally:
+            nm.clear_steer()
+        cut = enc["input_ids"].shape[1]
+        return [nm.tok.decode(o[cut:], skip_special_tokens=True) for o in out]
+
 
 def build(live: Live):
     m = live.meta
+    keys = sorted(live.labels)[:2]
+    if len(keys) < 2:
+        keys = [(0, 0), (min(1, m["n_layers"] - 1), 0)]
+    default_recipe = " ".join(f"L{L}N{n}+0.5" for L, n in keys)
     with gr.Blocks(title="Neuron Atlas live") as demo:
         gr.Markdown(f"## Neuron Atlas · live\n`{m['model']}`: {m['n_layers']} layers × {m['d_mlp']} neurons. "
                     "Scores are z = (activation − mean) / std from the atlas corpus.")
@@ -126,6 +145,15 @@ def build(live: Live):
                 normal = gr.Textbox(label="normal", lines=6)
                 steered = gr.Textbox(label="pushed", lines=6)
             push.click(lambda p, k, d: live.chat(p, k, d), [prompt, key, dose], [normal, steered])
+        with gr.Tab("Mix neurons"):
+            recipe = gr.Textbox(default_recipe, label="Recipe (neuronary format)")
+            mscale = gr.Slider(0, 3, value=1.0, step=0.1, label="scale")
+            mprompt = gr.Textbox("Who are you?", label="Prompt")
+            mix = gr.Button("Generate", variant="primary")
+            with gr.Row():
+                mnormal = gr.Textbox(label="normal", lines=6)
+                mmixed = gr.Textbox(label="mixed", lines=6)
+            mix.click(live.mix, [mprompt, recipe, mscale], [mnormal, mmixed])
     return demo
 
 

@@ -1,12 +1,13 @@
-"""Write side of the atlas: push single neurons and keep the replies.
+"""Write side of the atlas: push single neurons and multi-neuron recipes, and keep the replies.
 
     python -m atlas.steer --atlas out/HuggingFaceTB__SmolLM2-135M-Instruct --per-layer 24 --random 8
+    python -m atlas.steer --atlas out/Qwen__Qwen3.5-4B --recipe "L13N7956-0.7 L14N8949+0.7" --scales 0.5 1
 
 Rule (from neuron-explorer / neuron-finder): add c = dose · median‖resid after L‖ / ‖W_down[:, n]‖ to the neuron's
 activation at every position, i.e. add a vector of norm dose · median‖resid‖ along its output direction. One batch
 row per (neuron, dose); greedy decoding so a reply differs from the baseline only because of the push.
 """
-import argparse, json, os, random, re, time
+import argparse, json, os, random, re, time, urllib.request
 import duckdb
 import numpy as np
 import pyarrow as pa
@@ -14,9 +15,10 @@ import pyarrow.parquet as pq
 import torch
 
 from . import neurons_src
-from .model import NeuronModel
+from .model import NeuronModel, parse_recipe
 
 PROMPTS = ["Who are you?", "Tell me about your favorite place."]
+NEURONARY = "https://mcczbdcymyhzfputyqcr.supabase.co/functions/v1/api/recipes"
 
 
 def words(s):
@@ -115,6 +117,70 @@ def run(atlas, per_layer=24, n_random=8, doses=(-0.5, 0.5), prompts=PROMPTS, max
     print(f"wrote {len(rows)} replies in {time.time() - t0:.0f}s")
 
 
+def run_recipes(atlas, recipes, prompts=PROMPTS, scales=(1.0,), max_new=40, batch=64,
+                out_name="recipes.parquet"):
+    """Generate baselines and mixed replies for named recipes: recipes is [(name, recipe string), ...]."""
+    meta = json.load(open(f"{atlas}/meta.json"))
+    nm = NeuronModel(meta["model"])
+    eos = set([nm.tok.eos_token_id] + ([nm.model.generation_config.eos_token_id] if isinstance(
+        nm.model.generation_config.eos_token_id, int) else list(nm.model.generation_config.eos_token_id or [])))
+    rows = []
+    t0 = time.time()
+
+    def clean(ids):
+        cut = next((i for i, t in enumerate(ids) if t in eos), None)
+        return (ids[:cut], "eos") if cut is not None else (ids, "length")
+
+    def scaled(terms, scale):
+        return [(L, n, op, value * scale if op in ("add", "set") else value)
+                for L, n, op, value in terms]
+
+    for pi, p in enumerate(prompts):
+        prompt = nm.chat_prompt(p)
+        ids, stop = clean(generate(nm, prompt, 1, max_new)[0])
+        text = nm.tok.decode(ids, skip_special_tokens=True)
+        rows.append(dict(name="baseline", recipe="", scale=0.0, prompt=p, text=text, n_tokens=len(ids),
+                         stop=stop, diversity=distinct2(ids)))
+        print(f"baseline[{pi}]: {text[:120]!r}")
+
+        jobs = [(name, rec, s, scaled(parse_recipe(rec), s))
+                for name, rec in recipes for s in scales]
+        for start in range(0, len(jobs), batch):
+            part = jobs[start:start + batch]
+            nm.set_recipes([terms for *_, terms in part], meta["resid_median"])
+            try:
+                outs = generate(nm, prompt, len(part), max_new)
+            finally:
+                nm.clear_steer()
+            for (name, rec, s, _), ids in zip(part, outs):
+                ids, stop = clean(ids)
+                text = nm.tok.decode(ids, skip_special_tokens=True)
+                rows.append(dict(name=name, recipe=rec, scale=float(s), prompt=p, text=text,
+                                 n_tokens=len(ids), stop=stop, diversity=distinct2(ids)))
+        print(f"  {len(jobs)} mixes x prompt {pi}  {time.time() - t0:.0f}s", flush=True)
+
+    schema = [("name", pa.string()), ("recipe", pa.string()), ("scale", pa.float32()),
+              ("prompt", pa.string()), ("text", pa.string()), ("n_tokens", pa.int16()),
+              ("stop", pa.string()), ("diversity", pa.float32())]
+    tbl = pa.Table.from_pylist(rows).cast(pa.schema(schema))
+    pq.write_table(tbl, os.path.join(atlas, out_name), compression="zstd")
+    print(f"wrote {len(rows)} replies in {time.time() - t0:.0f}s")
+
+
+def neuronary_recipes(model, limit=200):
+    """Fetch every neuronary recipe for `model`, paging until a page comes back short."""
+    out, offset = [], 0
+    while True:
+        url = f"{NEURONARY}?limit={limit}&offset={offset}"
+        with urllib.request.urlopen(url, timeout=60) as r:
+            data = json.load(r)
+        page = data.get("recipes", []) if isinstance(data, dict) else data
+        out += [(x["name"], x["recipe"]) for x in page if x.get("model") == model]
+        if len(page) < limit:
+            return out
+        offset += limit
+
+
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--atlas", required=True)
@@ -124,10 +190,23 @@ if __name__ == "__main__":
     ap.add_argument("--max-new", type=int, default=40)
     ap.add_argument("--batch", type=int, default=64)
     ap.add_argument("--all", action="store_true", help="every neuron (GPU only)")
+    ap.add_argument("--recipe", action="append", default=[], metavar="STRING",
+                    help="multi-neuron recipe, e.g. 'L13N7956-0.7 L14N8949+0.7'; repeatable")
+    ap.add_argument("--scales", type=float, nargs="+", default=[1.0], help="multiply add/set doses")
+    ap.add_argument("--neuronary", action="store_true", help="also use this model's recipes from neuronary.org")
+    ap.add_argument("--out", default="recipes.parquet", help="output parquet name for --recipe/--neuronary")
     ap.add_argument("--device")
     a = ap.parse_args()
-    sel = None
-    if a.all:
+    if a.recipe or a.neuronary:
         m = json.load(open(f"{a.atlas}/meta.json"))
-        sel = {L: {n: "all" for n in range(m["d_mlp"])} for L in range(m["n_layers"])}
-    run(a.atlas, a.per_layer, a.random, tuple(a.doses), max_new=a.max_new, batch=a.batch, neurons=sel, device=a.device)
+        recipes = neuronary_recipes(m["model"]) if a.neuronary else []
+        recipes += [(f"recipe {i + 1}", r) for i, r in enumerate(a.recipe)]
+        run_recipes(a.atlas, recipes, scales=tuple(a.scales), max_new=a.max_new, batch=a.batch,
+                    out_name=a.out)
+    else:
+        sel = None
+        if a.all:
+            m = json.load(open(f"{a.atlas}/meta.json"))
+            sel = {L: {n: "all" for n in range(m["d_mlp"])} for L in range(m["n_layers"])}
+        run(a.atlas, a.per_layer, a.random, tuple(a.doses), max_new=a.max_new, batch=a.batch, neurons=sel,
+            device=a.device)
