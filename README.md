@@ -7,7 +7,11 @@ For these experiments, all I hope is that I get to learn something new! I have a
 ## Experiments
 
 <!-- index:start -->
-9 experiments, newest first.
+10 experiments, newest first.
+
+### [Neuron Atlas](neuron-atlas/) (2026-10-28)
+
+Every MLP neuron of GPT-2, SmolLM2-135M-Instruct and Qwen3-0.6B (169k neurons in all) was recorded on a shared 2,500-document corpus. For each neuron the atlas keeps its top documents with per-token activations, the logit lens of its output direction, and replies with the neuron pushed up or down, in the style of [neuron-explorer](https://github.com/lyramakesmusic/neuron-explorer) and the Qwen3-8B persona library. DeepSeek-flash labeled about 3,500 neurons and sorted every steered reply, and each label was checked on held-out documents against a shuffled-label null. The parquet output feeds a static explorer (hyparquet plus a DuckDB-WASM SQL tab, with a map, stained examples, pushes against random controls, a cross-model search and a guessing game), a Gradio live app, and a [marimo](https://molab.marimo.io) notebook for larger models on molab's free RTX Pro 6000 GPUs; the data is on the Hub as [nikhilxvytla/neuron-atlas](https://huggingface.co/datasets/nikhilxvytla/neuron-atlas) with a static explorer Space.
 
 ### [be-ambitious: an Agent Skill distilled from "How to be more ambitious"](be-ambitious/) (2026-10-16)
 
