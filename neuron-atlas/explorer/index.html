@@ -1,0 +1,707 @@
+<title>Neuron Atlas</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="Browse every MLP neuron of several open models: what it fires on, what it writes, what pushing it does.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Source+Sans+3:ital,wght@0,400;0,600;1,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: a microscope bench. A dark "slide plate" map of every neuron on the left, the specimen card of the
+   selected neuron on the right; tabs swap the plate for other views. Activation is stained like H&E histology:
+   eosin pink where a neuron fires, hematoxylin violet where it goes negative. */
+:root {
+  --bg: #f5f4f8; --surface: #ffffff; --sunk: #ebe9f1; --line: #d9d5e3; --ink: #1f1c2c; --ink2: #5d5870; --ink3: #8a849c;
+  --eosin: #d6336c; --eosin-soft: #f9d9e5; --hema: #4b3fa8; --hema-soft: #dedaf5; --accent: #b0245a;
+  --plate: #17152a; --plate-ink: #ece9f7; --plate-ink2: #a29dbb; --plate-line: #2c2946;
+  --good: #1f8a5b; --warn: #b7791f;
+  --display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --body: "Source Sans 3", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --r: 10px;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #121019; --surface: #1b1826; --sunk: #242033; --line: #343048; --ink: #ece9f7; --ink2: #b3adc8; --ink3: #827c99;
+  --eosin: #ff6b9a; --eosin-soft: #4a1f33; --hema: #9d92ff; --hema-soft: #2d2858; --accent: #ff7aa6;
+  --plate: #0b0a12; --plate-ink: #ece9f7; --plate-ink2: #9a95b2; --plate-line: #24213a; --good: #4cc38a; --warn: #e0a84a;
+  color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #121019; --surface: #1b1826; --sunk: #242033; --line: #343048; --ink: #ece9f7; --ink2: #b3adc8; --ink3: #827c99;
+  --eosin: #ff6b9a; --eosin-soft: #4a1f33; --hema: #9d92ff; --hema-soft: #2d2858; --accent: #ff7aa6;
+  --plate: #0b0a12; --plate-ink: #ece9f7; --plate-ink2: #9a95b2; --plate-line: #24213a; --good: #4cc38a; --warn: #e0a84a;
+  color-scheme: dark }
+* { box-sizing: border-box }
+html, body { height: 100% }
+body { background: var(--bg); color: var(--ink); font: 16px/1.5 var(--body); margin: 0;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+button, input, select { font: inherit; color: inherit }
+button { cursor: pointer }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px }
+.wrap { max-width: 1480px; margin: 0 auto; padding-block: 18px 40px; display: flex; flex-direction: column; gap: 14px }
+
+header.top { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px }
+.brand { display: flex; align-items: baseline; gap: 10px; min-width: 0 }
+.brand h1 { font: 800 28px/1 var(--display); letter-spacing: -0.02em; margin: 0; text-wrap: balance }
+.brand h1 i { font-style: normal; color: var(--eosin) }
+.brand .sub { color: var(--ink2); font-size: 14px }
+.models { display: flex; flex-wrap: wrap; gap: 6px }
+.chip { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 4px 12px; font-size: 14px;
+  display: inline-flex; gap: 6px; align-items: baseline; white-space: nowrap }
+.chip small { color: var(--ink3); font: 12px var(--mono) }
+.chip[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink) }
+.chip[aria-pressed="true"] small { color: var(--bg); opacity: .7 }
+.spacer { flex: 1 }
+.actions { display: flex; gap: 8px; flex-wrap: wrap }
+.btn { border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 6px 12px; font-size: 14px; font-weight: 600 }
+.btn.primary { background: var(--eosin); color: #fff; border-color: var(--eosin) }
+.btn:hover { border-color: var(--ink3) }
+
+.searchrow { display: flex; flex-wrap: wrap; gap: 8px; align-items: center }
+.search { position: relative; flex: 1 1 340px; min-width: 0 }
+.search input { width: 100%; border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 8px 12px; font-size: 15px }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--surface) }
+.seg button { border: 0; background: none; padding: 7px 12px; font-size: 14px; color: var(--ink2) }
+.seg button[aria-pressed="true"] { background: var(--sunk); color: var(--ink); font-weight: 600 }
+.results { position: absolute; left: 0; right: 0; top: calc(100% + 4px); background: var(--surface); border: 1px solid var(--line);
+  border-radius: 8px; max-height: 360px; overflow: auto; z-index: 20; box-shadow: 0 10px 30px rgba(20, 10, 40, .18) }
+.results button { display: flex; width: 100%; text-align: left; gap: 10px; border: 0; background: none; padding: 7px 12px; align-items: baseline }
+.results button:hover, .results button.on { background: var(--sunk) }
+.results .k { font: 12px var(--mono); color: var(--ink3); white-space: nowrap }
+
+nav.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); overflow-x: auto }
+nav.tabs button { border: 0; background: none; padding: 8px 14px; font: 600 15px var(--body); color: var(--ink2); border-bottom: 2px solid transparent; white-space: nowrap }
+nav.tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--eosin) }
+
+.bench { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 16px; align-items: start }
+@media (max-width: 900px) { .bench { grid-template-columns: minmax(0, 1fr) } }
+.plate { background: var(--plate); border-radius: var(--r); position: relative; overflow: hidden; color: var(--plate-ink) }
+.plate canvas { display: block; width: 100%; height: min(68vh, 640px); touch-action: none; cursor: crosshair }
+.plate .hud { position: absolute; left: 12px; top: 10px; right: 12px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; pointer-events: none }
+.plate .hud > * { pointer-events: auto }
+.plate select, .plate .pbtn { background: rgba(255, 255, 255, .08); color: var(--plate-ink); border: 1px solid var(--plate-line); border-radius: 6px; padding: 3px 8px; font-size: 13px }
+.plate select option { background: var(--plate); }
+.plate .note { font: 12px var(--mono); color: var(--plate-ink2) }
+.tip { position: absolute; pointer-events: none; background: rgba(12, 10, 24, .92); color: #f4f1ff; border: 1px solid #3a3558; border-radius: 6px;
+  padding: 6px 9px; font-size: 13px; max-width: 280px; z-index: 5 }
+.tip .k { font: 11px var(--mono); color: #b6b0d0 }
+.ribbon { display: flex; gap: 2px; padding: 8px 12px 12px; align-items: flex-end; height: 62px }
+.ribbon button { flex: 1; border: 0; padding: 0; min-width: 3px; border-radius: 2px 2px 0 0; opacity: .85; position: relative }
+.ribbon button[aria-pressed="true"] { outline: 2px solid #fff; opacity: 1 }
+.ribbon-cap { display: flex; justify-content: space-between; padding: 0 12px 10px; font: 11px var(--mono); color: var(--plate-ink2) }
+
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 18px; display: flex; flex-direction: column; gap: 16px; min-width: 0 }
+.card h2 { font: 700 26px/1.15 var(--display); margin: 0; letter-spacing: -0.01em; text-wrap: balance }
+.card h3 { font: 600 12px var(--body); text-transform: uppercase; letter-spacing: .08em; color: var(--ink3); margin: 0 0 6px }
+.idline { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font: 13px var(--mono); color: var(--ink2) }
+.emoji { font-size: 30px; line-height: 1 }
+.desc { color: var(--ink2); margin: 4px 0 0; max-width: 65ch }
+.pill { font: 600 12px var(--body); border-radius: 999px; padding: 2px 9px; background: var(--sunk); color: var(--ink2); white-space: nowrap }
+.pill.good { background: color-mix(in oklab, var(--good) 18%, transparent); color: var(--good) }
+.pill.warn { background: color-mix(in oklab, var(--warn) 18%, transparent); color: var(--warn) }
+.pill.eo { background: var(--eosin-soft); color: var(--eosin) }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(92px, 1fr)); gap: 8px }
+.stat { background: var(--sunk); border-radius: 8px; padding: 6px 10px }
+.stat b { display: block; font: 600 16px var(--mono); font-variant-numeric: tabular-nums }
+.stat span { font-size: 12px; color: var(--ink3) }
+.lens { display: flex; flex-wrap: wrap; gap: 4px }
+.tok { font: 13px var(--mono); background: var(--sunk); border-radius: 4px; padding: 1px 6px; white-space: pre }
+.tok.up { background: var(--eosin-soft); color: var(--eosin) }
+.tok.down { background: var(--hema-soft); color: var(--hema) }
+.ex { font: 13px/1.75 var(--mono); padding: 6px 10px; border-left: 3px solid var(--line); background: var(--bg); border-radius: 0 6px 6px 0;
+  overflow-wrap: anywhere; white-space: pre-wrap }
+.ex + .ex { margin-top: 6px }
+.ex .a { font-size: 11px; color: var(--ink3); margin-right: 6px }
+.ex span.t { border-radius: 3px }
+.ex span.pk { outline: 1.5px solid var(--ink); outline-offset: 0 }
+.ex i.bb { font-style: normal; color: var(--ink3) }
+.ex.neg { border-left-color: var(--hema) }
+.ex.pos { border-left-color: var(--eosin) }
+.chat { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px }
+@media (max-width: 600px) { .chat { grid-template-columns: minmax(0, 1fr) } }
+.bubble { border-radius: 12px; padding: 8px 11px; font-size: 14px; background: var(--sunk); overflow-wrap: anywhere; min-width: 0 }
+.bubble .who { display: block; font: 600 11px var(--mono); color: var(--ink3); margin-bottom: 3px }
+.bubble.minus { background: var(--hema-soft) }
+.bubble.plus { background: var(--eosin-soft) }
+.prompt { font-style: italic; color: var(--ink2); margin: 10px 0 6px }
+.muted { color: var(--ink3); font-size: 14px }
+.nbrs { display: flex; flex-wrap: wrap; gap: 6px }
+.nbrs button { border: 1px solid var(--line); background: var(--bg); border-radius: 8px; padding: 4px 9px; font-size: 13px; text-align: left; max-width: 100% }
+.nbrs button .k { font: 11px var(--mono); color: var(--ink3); margin-right: 4px }
+
+.grid-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); gap: 12px }
+.push { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; text-align: left; min-width: 0 }
+.push:hover { border-color: var(--ink3) }
+.push .reply { font-size: 14px; overflow-wrap: anywhere }
+.push .meta { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; font: 12px var(--mono); color: var(--ink3) }
+.filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px }
+.filters select, .filters input { border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 6px 10px; font-size: 14px }
+
+.tablewrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r) }
+table { border-collapse: collapse; width: 100%; font-size: 14px }
+th, td { padding: 7px 10px; text-align: left; border-bottom: 1px solid var(--line); vertical-align: top }
+th { font: 600 12px var(--body); text-transform: uppercase; letter-spacing: .06em; color: var(--ink3); background: var(--sunk); position: sticky; top: 0; cursor: pointer; white-space: nowrap }
+td.num { font: 13px var(--mono); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap }
+tbody tr { cursor: pointer }
+tbody tr:hover { background: var(--sunk) }
+
+.game { max-width: 860px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px }
+.game .score { display: flex; gap: 16px; font: 600 15px var(--mono); color: var(--ink2); flex-wrap: wrap }
+.choices { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px }
+@media (max-width: 600px) { .choices { grid-template-columns: minmax(0, 1fr) } }
+.choices button { border: 1.5px solid var(--line); background: var(--surface); border-radius: 10px; padding: 12px; text-align: left; font-size: 15px }
+.choices button.right { border-color: var(--good); background: color-mix(in oklab, var(--good) 12%, var(--surface)) }
+.choices button.wrong { border-color: var(--eosin); background: var(--eosin-soft) }
+
+.compare { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 12px }
+textarea.sql { width: 100%; min-height: 110px; font: 13px var(--mono); border: 1px solid var(--line); border-radius: 8px; padding: 10px; background: var(--surface); color: var(--ink) }
+.status { font: 13px var(--mono); color: var(--ink3) }
+.err { color: var(--eosin) }
+.foot { color: var(--ink3); font-size: 13px; max-width: 80ch }
+.foot a { color: var(--ink2) }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important } }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div class="brand"><h1>Neuron <i>Atlas</i></h1><span class="sub" id="sub">loading models…</span></div>
+    <div class="models" id="models" role="group" aria-label="Model"></div>
+    <div class="spacer"></div>
+    <div class="actions">
+      <button class="btn primary" id="surprise" title="Open a random well-labeled neuron">Surprise me</button>
+    </div>
+  </header>
+
+  <div class="searchrow">
+    <div class="search">
+      <input id="q" type="search" autocomplete="off" placeholder="Search labels, e.g. “numbers”, “French”, “past tense”" aria-label="Search neurons">
+      <div class="results" id="results" hidden></div>
+    </div>
+    <div class="seg" role="group" aria-label="Search by" id="qmode">
+      <button aria-pressed="true" data-m="label">label</button>
+      <button aria-pressed="false" data-m="fires">fires on token</button>
+      <button aria-pressed="false" data-m="says">promotes token</button>
+    </div>
+  </div>
+
+  <nav class="tabs" role="tablist" id="tabs">
+    <button role="tab" aria-selected="true" data-t="map">Map</button>
+    <button role="tab" aria-selected="false" data-t="pushes">Pushes</button>
+    <button role="tab" aria-selected="false" data-t="board">Leaderboard</button>
+    <button role="tab" aria-selected="false" data-t="compare">Across models</button>
+    <button role="tab" aria-selected="false" data-t="guess">Guess the neuron</button>
+    <button role="tab" aria-selected="false" data-t="sql">SQL</button>
+  </nav>
+
+  <section id="v-map" class="bench">
+    <div class="plate">
+      <div class="hud">
+        <select id="colorby" aria-label="Color by"><option value="layer">color: layer</option><option value="z">color: peakiness (z)</option><option value="lab">color: labeled</option></select>
+        <button class="pbtn" id="reset">reset view</button>
+        <span class="note" id="mapnote"></span>
+      </div>
+      <canvas id="map" aria-label="Map of neurons; similar output directions sit together"></canvas>
+      <div class="tip" id="tip" hidden></div>
+      <div class="ribbon" id="ribbon" aria-label="Layers"></div>
+      <div class="ribbon-cap"><span>layer 0 · reads tokens</span><span id="ribcap">click a layer to isolate it</span><span>last layer · writes tokens</span></div>
+    </div>
+    <article class="card" id="panel" aria-live="polite"><p class="muted">Loading…</p></article>
+  </section>
+
+  <section id="v-pushes" hidden>
+    <div class="filters">
+      <select id="pk" aria-label="Kind of push"><option value="">every kind of push</option></select>
+      <select id="psort" aria-label="Sort"><option value="change">most changed reply</option><option value="layer">layer</option></select>
+      <label class="muted"><input type="checkbox" id="pcoh" checked> hide repetitive replies</label>
+      <span class="status" id="pcount"></span>
+    </div>
+    <div class="grid-cards" id="pushgrid"></div>
+  </section>
+
+  <section id="v-board" hidden>
+    <div class="filters"><input id="bq" placeholder="filter labels" aria-label="Filter labels"><span class="status" id="bcount"></span></div>
+    <div class="tablewrap"><table><thead><tr id="bhead"></tr></thead><tbody id="bbody"></tbody></table></div>
+  </section>
+
+  <section id="v-compare" hidden>
+    <div class="filters">
+      <input id="cq" value=" Paris" aria-label="Token" style="font-family: var(--mono)">
+      <div class="seg" id="cmode" role="group" aria-label="Compare by"><button aria-pressed="true" data-m="says">promotes</button><button aria-pressed="false" data-m="fires">fires on</button><button aria-pressed="false" data-m="label">label</button></div>
+      <button class="btn" id="cgo">Compare</button>
+      <span class="status" id="cstat">Same question, every model: which neurons write (or read) this token?</span>
+    </div>
+    <div class="compare" id="cout"></div>
+  </section>
+
+  <section id="v-guess" hidden>
+    <div class="game">
+      <div class="score"><span id="gscore">score 0 / 0</span><span id="gstreak">streak 0</span><span class="muted" id="gmodel"></span></div>
+      <p class="muted">Here is where a neuron fires hardest (the boxed token is its peak). Which label did the labeler give it?</p>
+      <div id="gex"></div>
+      <div class="choices" id="gchoices"></div>
+      <div><button class="btn" id="gnext">Next neuron</button> <button class="btn" id="gopen" hidden>Open in map</button></div>
+    </div>
+  </section>
+
+  <section id="v-sql" hidden>
+    <p class="muted">DuckDB-WASM over the current model's parquet files. Tables: <code>neurons</code>, <code>labels</code>, <code>steer</code>, <code>tokens</code>, <code>examples</code> (all layers).</p>
+    <div class="filters" id="sqlx"></div>
+    <textarea class="sql" id="sqltext" spellcheck="false">select l.layer, l.neuron, l.emoji, l.label, round(l.detect, 2) detect, n.lens_up[1:4] promotes
+from labels l join neurons n using (layer, neuron)
+order by detect desc nulls last, confidence desc limit 25</textarea>
+    <div class="filters"><button class="btn primary" id="sqlrun">Run query</button><span class="status" id="sqlstat"></span></div>
+    <div class="tablewrap"><table id="sqlout"></table></div>
+  </section>
+
+  <p class="foot" id="foot">Each point is one MLP neuron, placed by its output direction (UMAP of the down-projection column), so neurons that write similar things sit together. <b>Fires on</b>: the corpus documents with the highest activation, stained by activation per token. <b>Promotes</b>: the logit lens of the neuron's output direction. <b>Pushes</b>: replies with the neuron's activation raised or lowered at every token, by a dose in units of the median residual-stream norm. Labels and the held-out check come from an LLM labeler, so treat them as hypotheses.</p>
+</div>
+
+<script type="module">
+import { parquetReadObjects } from "https://cdn.jsdelivr.net/npm/hyparquet@1.31.2/+esm";
+import { compressors } from "https://cdn.jsdelivr.net/npm/hyparquet-compressors@1.1.1/+esm";
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const showTok = s => esc(s).replace(/\n/g, "↵").replace(/\t/g, "⇥").replace(/\ufffd+/g, "·") || "∅";
+const fmt = (v, d = 2) => v == null || Number.isNaN(v) ? "–" : Math.abs(v) >= 100 ? v.toFixed(0) : v.toFixed(d);
+const store = { get(k) { try { return localStorage.getItem(k) } catch { return null } }, set(k, v) { try { localStorage.setItem(k, v) } catch {} } };
+
+function dataBase() {
+  let b = null;
+  try { b = new URLSearchParams(location.search).get("data") } catch {}
+  if (b && !b.includes("/")) b = null;
+  if (b && /^[\w.-]+\/[\w.-]+$/.test(b)) b = `https://huggingface.co/datasets/${b}/resolve/main/`;
+  b = b || "./data/";
+  return b.endsWith("/") ? b : b + "/";
+}
+const BASE = dataBase();
+
+async function fetchBuf(url) {
+  const r = await fetch(url);
+  if (!r.ok) throw new Error(`${r.status} for ${url}`);
+  return r.arrayBuffer();
+}
+async function readPq(url, columns) {
+  const file = await fetchBuf(url);
+  return parquetReadObjects({ file, columns, compressors });
+}
+async function tryPq(url, columns) { try { return await readPq(url, columns) } catch { return null } }
+
+/* ---------- state ---------- */
+const S = { models: [], M: null, cache: new Map(), tab: "map", qmode: "label", isolate: -1, colorby: "layer", sel: -1 };
+
+async function loadModel(id) {
+  if (S.cache.has(id)) return S.cache.get(id);
+  const info = S.models.find(m => m.id === id);
+  const dir = BASE + info.slug + "/";
+  const [rows, labels, steer] = await Promise.all([
+    readPq(dir + "neurons.parquet"),
+    tryPq(dir + "labels.parquet"), tryPq(dir + "steer.parquet")]);
+  const N = rows.length, d = info.d_mlp;
+  const M = { info, dir, N, d, rows, x: new Float32Array(N), y: new Float32Array(N), layer: new Int16Array(N), z: new Float32Array(N),
+    lab: new Map(), steer: new Map(), base: [], ex: new Map(), toks: null };
+  rows.forEach((r, i) => { const k = r.layer * d + r.neuron; M.x[k] = r.x; M.y[k] = r.y; M.layer[k] = r.layer; M.z[k] = r.zmax; });
+  const sorted = new Array(N); rows.forEach(r => sorted[r.layer * d + r.neuron] = r); M.rows = sorted;
+  (labels || []).forEach(l => M.lab.set(l.layer * d + l.neuron, l));
+  (steer || []).forEach(s => {
+    if (s.layer < 0) { M.base[s.prompt] = s.text; return }
+    const k = s.layer * d + s.neuron; if (!M.steer.has(k)) M.steer.set(k, []); M.steer.get(k).push(s);
+  });
+  M.labKeys = [...M.lab.keys()];
+  S.cache.set(id, M);
+  return M;
+}
+async function layerExamples(M, L) {
+  if (M.ex.has(L)) return M.ex.get(L);
+  const p = readPq(M.dir + `examples/L${String(L).padStart(2, "0")}.parquet`).then(rows => {
+    const by = new Map(); rows.forEach(r => { if (!by.has(r.neuron)) by.set(r.neuron, []); by.get(r.neuron).push(r) }); return by;
+  });
+  M.ex.set(L, p); return p;
+}
+async function tokens(M) {
+  if (!M.toks) M.toks = readPq(M.dir + "tokens.parquet", ["doc", "toks", "skip"]).then(rows => { const t = []; rows.forEach(r => t[r.doc] = r.toks); return t; });
+  return M.toks;
+}
+
+/* ---------- colors ---------- */
+function layerColor(L, n) { // eosin (early) -> violet -> hematoxylin blue (late)
+  const t = n > 1 ? L / (n - 1) : 0;
+  const h = 345 - t * 105, l = 68 - t * 8, c = 0.17;
+  return `oklch(${l}% ${c} ${h})`;
+}
+function zColor(z) { const t = Math.max(0, Math.min(1, (z - 5) / 40)); return `oklch(${45 + t * 40}% ${0.05 + t * 0.15} ${300 - t * 300})`; }
+
+/* ---------- map ---------- */
+const cv = $("map"), ctx = cv.getContext("2d");
+const view = { s: 1, tx: 0, ty: 0 };
+let hits = null, hover = -1, grid = null, layerCols = [];
+function sizeCanvas() { const r = cv.getBoundingClientRect(), dpr = devicePixelRatio || 1; cv.width = r.width * dpr; cv.height = r.height * dpr; draw(); }
+function toScreen(x, y) { const W = cv.width, H = cv.height, m = 24 * (devicePixelRatio || 1), sz = Math.min(W, H) - 2 * m;
+  return [((x - .5) * sz) * view.s + W / 2 + view.tx, ((y - .5) * sz) * view.s + H / 2 + view.ty]; }
+function buildGrid() {
+  const M = S.M; if (!M) return; const G = 64; grid = new Map();
+  for (let k = 0; k < M.N; k++) { const gx = Math.floor(M.x[k] * G), gy = Math.floor(M.y[k] * G), key = gx * 1000 + gy; if (!grid.has(key)) grid.set(key, []); grid.get(key).push(k); }
+}
+function draw() {
+  const M = S.M; const W = cv.width, H = cv.height; ctx.clearRect(0, 0, W, H); if (!M) return;
+  const dpr = devicePixelRatio || 1, nL = M.info.n_layers;
+  layerCols = Array.from({ length: nL }, (_, L) => layerColor(L, nL));
+  const r = Math.max(1, Math.min(3.5, 1.1 * Math.sqrt(view.s))) * dpr;
+  const dim = S.isolate >= 0 || hits;
+  for (let k = 0; k < M.N; k++) {
+    const L = M.layer[k];
+    if (S.isolate >= 0 && L !== S.isolate) continue;
+    const [sx, sy] = toScreen(M.x[k], M.y[k]); if (sx < -5 || sy < -5 || sx > W + 5 || sy > H + 5) continue;
+    const lab = M.lab.has(k);
+    ctx.globalAlpha = hits ? .18 : S.colorby === "lab" ? (lab ? .95 : .12) : .55;
+    ctx.fillStyle = S.colorby === "layer" ? layerCols[L] : S.colorby === "z" ? zColor(M.z[k]) : (lab ? "#ffb3cd" : "#6f6a8e");
+    const rr = lab && S.colorby === "lab" ? r * 1.6 : r;
+    ctx.fillRect(sx - rr / 2, sy - rr / 2, rr, rr);
+  }
+  ctx.globalAlpha = 1;
+  if (hits) { ctx.fillStyle = "#fff"; for (const k of hits) { const [sx, sy] = toScreen(M.x[k], M.y[k]); ctx.beginPath(); ctx.arc(sx, sy, 3.2 * dpr, 0, 7); ctx.fill(); } }
+  for (const [k, col, rad] of [[hover, "#fff", 6], [S.sel, "#ff6b9a", 9]]) {
+    if (k < 0) continue; const [sx, sy] = toScreen(M.x[k], M.y[k]);
+    ctx.strokeStyle = col; ctx.lineWidth = 2 * dpr; ctx.beginPath(); ctx.arc(sx, sy, rad * dpr, 0, 7); ctx.stroke();
+  }
+  $("mapnote").textContent = `${M.N.toLocaleString()} neurons · ${M.lab.size.toLocaleString()} labeled${dim ? "" : " · scroll to zoom, drag to pan"}`;
+}
+function nearest(px, py) {
+  const M = S.M; if (!M || !grid) return -1; const W = cv.width, H = cv.height, m = 24 * (devicePixelRatio || 1), sz = Math.min(W, H) - 2 * m;
+  const x = ((px - W / 2 - view.tx) / view.s) / sz + .5, y = ((py - H / 2 - view.ty) / view.s) / sz + .5, G = 64;
+  let best = -1, bd = (10 * (devicePixelRatio || 1)) ** 2;
+  const gx = Math.floor(x * G), gy = Math.floor(y * G), R = Math.max(1, Math.ceil(2 / view.s));
+  for (let i = gx - R; i <= gx + R; i++) for (let j = gy - R; j <= gy + R; j++) for (const k of grid.get(i * 1000 + j) || []) {
+    if (S.isolate >= 0 && M.layer[k] !== S.isolate) continue;
+    const [sx, sy] = toScreen(M.x[k], M.y[k]); const dd = (sx - px) ** 2 + (sy - py) ** 2; if (dd < bd) { bd = dd; best = k; }
+  }
+  return best;
+}
+let drag = null;
+cv.addEventListener("pointerdown", e => { drag = { x: e.clientX, y: e.clientY, tx: view.tx, ty: view.ty, moved: false }; cv.setPointerCapture(e.pointerId); });
+cv.addEventListener("pointermove", e => {
+  const dpr = devicePixelRatio || 1, rc = cv.getBoundingClientRect();
+  if (drag) { const dx = (e.clientX - drag.x) * dpr, dy = (e.clientY - drag.y) * dpr; if (Math.abs(dx) + Math.abs(dy) > 4) drag.moved = true; view.tx = drag.tx + dx; view.ty = drag.ty + dy; draw(); return; }
+  const k = nearest((e.clientX - rc.left) * dpr, (e.clientY - rc.top) * dpr);
+  if (k !== hover) { hover = k; draw(); }
+  const tip = $("tip");
+  if (k < 0) { tip.hidden = true; return; }
+  const M = S.M, L = M.layer[k], n = k - L * M.d, lb = M.lab.get(k), row = M.rows[k];
+  tip.innerHTML = `<div class="k">L${L} · N${n} · z ${fmt(M.z[k], 0)}</div>${lb ? `${esc(lb.emoji)} ${esc(lb.label)}` : `<span class="k">promotes</span> ${row.lens_up.slice(0, 4).map(showTok).join(" ")}`}`;
+  tip.hidden = false;
+  const x = e.clientX - rc.left + 14, y = e.clientY - rc.top + 14;
+  tip.style.left = Math.min(x, rc.width - 290) + "px"; tip.style.top = y + "px";
+});
+cv.addEventListener("pointerup", e => { const d = drag; drag = null; if (d && !d.moved && hover >= 0) openNeuron(hover); });
+cv.addEventListener("pointerleave", () => { $("tip").hidden = true; hover = -1; draw(); });
+cv.addEventListener("wheel", e => {
+  e.preventDefault(); const dpr = devicePixelRatio || 1, rc = cv.getBoundingClientRect();
+  const px = (e.clientX - rc.left) * dpr - cv.width / 2, py = (e.clientY - rc.top) * dpr - cv.height / 2;
+  const f = Math.exp(-e.deltaY * 0.0015), s2 = Math.max(.6, Math.min(80, view.s * f)), g = s2 / view.s;
+  view.tx = px - (px - view.tx) * g; view.ty = py - (py - view.ty) * g; view.s = s2; draw();
+}, { passive: false });
+$("reset").onclick = () => { view.s = 1; view.tx = view.ty = 0; S.isolate = -1; hits = null; renderRibbon(); draw(); };
+$("colorby").onchange = e => { S.colorby = e.target.value; draw(); };
+new ResizeObserver(sizeCanvas).observe(cv);
+function focusOn(k) { const M = S.M; if (view.s < 2.5) view.s = 3; const W = cv.width, H = cv.height, m = 24 * (devicePixelRatio || 1), sz = Math.min(W, H) - 2 * m;
+  view.tx = -((M.x[k] - .5) * sz) * view.s; view.ty = -((M.y[k] - .5) * sz) * view.s; draw(); }
+
+function renderRibbon() {
+  const M = S.M, nL = M.info.n_layers, counts = new Array(nL).fill(0);
+  M.lab.forEach((_, k) => counts[Math.floor(k / M.d)]++);
+  const mx = Math.max(1, ...counts);
+  $("ribbon").innerHTML = counts.map((c, L) => `<button style="height:${12 + 38 * c / mx}px;background:${layerColor(L, nL)}" aria-pressed="${S.isolate === L}" data-l="${L}" title="layer ${L}: ${c} labeled"></button>`).join("");
+  $("ribcap").textContent = S.isolate >= 0 ? `showing layer ${S.isolate} only` : "bar height = labeled neurons · click to isolate";
+}
+$("ribbon").onclick = e => { const b = e.target.closest("button"); if (!b) return; const L = +b.dataset.l; S.isolate = S.isolate === L ? -1 : L; renderRibbon(); draw(); };
+
+/* ---------- neuron card ---------- */
+function stainStyle(v) { // v in [-1, 1]
+  const a = Math.min(1, Math.abs(v)) ** 1.6; if (a < 0.03) return "";
+  return `background:color-mix(in oklab, var(${v > 0 ? "--eosin" : "--hema"}) ${Math.round(a * 75)}%, transparent)`;
+}
+function exampleHTML(ex, toks, before) {
+  const t = toks[ex.doc] || [], start = ex.pos - before;
+  let h = `<span class="a">${ex.act.toFixed(2)}</span>`;
+  ex.q.forEach((q, i) => {
+    const p = start + i; if (p < 0 || p >= t.length) return;
+    const v = q / 127 * (ex.scale / Math.max(1e-6, Math.abs(ex.act)));
+    h += `<span class="t${p === ex.pos ? " pk" : ""}" style="${stainStyle(ex.sign > 0 ? v : -v)}" title="${(q / 127 * ex.scale).toFixed(3)}">${esc(t[p]).replace(/\n/g, "↵").replace(/\ufffd+/g, '<i class="bb">·</i>')}</span>`;
+  });
+  return `<div class="ex ${ex.sign > 0 ? "pos" : "neg"}">${h}</div>`;
+}
+function neighbors(M, k, n = 8) {
+  const r = M.rows[k];
+  if (r.nbrs) return r.nbrs.slice(0, n).map((j, i) => [j, r.nbr_cos[i]]);
+  const out = []; const x = M.x[k], y = M.y[k];
+  for (let j = 0; j < M.N; j++) { if (j === k) continue; const d = (M.x[j] - x) ** 2 + (M.y[j] - y) ** 2;
+    if (out.length < n || d < out[out.length - 1][1]) { out.push([j, d]); out.sort((a, b) => a[1] - b[1]); if (out.length > n) out.pop(); } }
+  return out.map(o => [o[0], null]);
+}
+function keyName(M, k) { const L = Math.floor(k / M.d); return `L${L} · N${k - L * M.d}`; }
+async function openNeuron(k, opts = {}) {
+  const M = S.M; S.sel = k; draw();
+  if (opts.focus) focusOn(k);
+  const L = Math.floor(k / M.d), n = k - L * M.d, row = M.rows[k], lb = M.lab.get(k);
+  try { history.replaceState(null, "", `#${M.info.id}-L${L}-N${n}`) } catch {}
+  const P = $("panel");
+  const st = M.steer.get(k) || [];
+  const prompts = M.info.steer?.prompts || [];
+  let steerHTML = "";
+  if (st.length) {
+    steerHTML = `<div><h3>Pushes</h3>` + prompts.map((p, pi) => {
+      const rs = st.filter(s => s.prompt === pi).sort((a, b) => a.dose - b.dose); if (!rs.length) return "";
+      const minus = rs.filter(s => s.dose < 0).at(0), plus = rs.filter(s => s.dose > 0).at(-1);
+      return `<p class="prompt">“${esc(p)}”</p><div class="chat">
+        <div class="bubble minus"><span class="who">push ${minus ? minus.dose : "–"}</span>${esc(minus?.text ?? "")}</div>
+        <div class="bubble"><span class="who">normal</span>${esc(M.base[pi] ?? "")}</div>
+        <div class="bubble plus"><span class="who">push +${plus ? plus.dose : "–"}</span>${esc(plus?.text ?? "")}</div></div>`;
+    }).join("") + `</div>`;
+  } else steerHTML = `<p class="muted">Not pushed in this run. The sweep pushes the most peaked neurons of each layer plus random controls; run <code>python -m atlas.steer --all</code> on a GPU to cover every neuron.</p>`;
+  const badges = lb ? [
+    `<span class="pill">confidence ${lb.confidence}/5</span>`,
+    lb.detect != null ? `<span class="pill ${lb.detect >= .75 ? "good" : lb.detect <= .5 ? "warn" : ""}" title="held-out check: picks this neuron's unseen top documents out of 4 snippets, 50% is chance">held-out check ${Math.round(lb.detect * 100)}%</span>` : "",
+    lb.push_kind && lb.push_kind !== "none" ? `<span class="pill eo">push: ${esc(lb.push_kind.replace("_", " "))}</span>` : ""].join("") : `<span class="pill">unlabeled</span>`;
+  P.innerHTML = `
+    <div>
+      <div class="idline"><span>${esc(M.info.model)}</span><span>·</span><b>${keyName(M, k)}</b>${badges}</div>
+      <div style="display:flex;gap:12px;align-items:center;margin-top:8px">${lb ? `<span class="emoji">${esc(lb.emoji)}</span>` : ""}
+        <h2>${lb ? esc(lb.label) : `Promotes ${row.lens_up.slice(0, 3).map(t => "“" + esc(t.trim() || t) + "”").join(", ")}`}</h2></div>
+      ${lb ? `<p class="desc">${esc(lb.description)}</p>${lb.push && lb.push !== "nothing clear" ? `<p class="desc"><b>Push:</b> ${esc(lb.push)}</p>` : ""}` : ""}
+    </div>
+    <div class="stats">
+      <div class="stat"><b>${fmt(row.max)}</b><span>max act</span></div>
+      <div class="stat"><b>${fmt(row.zmax, 1)}</b><span>peak z</span></div>
+      <div class="stat"><b>${fmt(row.mean, 3)}</b><span>mean</span></div>
+      <div class="stat"><b>${fmt(row.std, 3)}</b><span>std</span></div>
+      <div class="stat"><b>${Math.round(row.frac_pos * 100)}%</b><span>tokens &gt; 0</span></div>
+    </div>
+    <div><h3>Writes (logit lens)</h3><div class="lens">${row.lens_up.slice(0, 10).map(t => `<span class="tok up">${showTok(t)}</span>`).join("")}</div>
+      <div class="lens" style="margin-top:4px">${row.lens_down.slice(0, 10).map(t => `<span class="tok down">${showTok(t)}</span>`).join("")}</div></div>
+    <div id="exbox"><h3>Fires on</h3><p class="muted">loading examples…</p></div>
+    ${steerHTML}
+    <div><h3>${row.nbrs ? "Writes like (cosine of output directions)" : "Neighbors on the map"}</h3><div class="nbrs" id="nbrs"></div></div>`;
+  const nb = neighbors(M, k);
+  $("nbrs").innerHTML = nb.map(([j, c]) => { const l = M.lab.get(j); return `<button data-k="${j}"><span class="k">${keyName(M, j)}${c != null ? " · " + c.toFixed(2) : ""}</span>${l ? esc(l.emoji + " " + l.label) : M.rows[j].lens_up.slice(0, 3).map(showTok).join(" ")}</button>` }).join("");
+  $("nbrs").onclick = e => { const b = e.target.closest("button"); if (b) openNeuron(+b.dataset.k, { focus: true }); };
+  const [by, toks] = await Promise.all([layerExamples(M, L), tokens(M)]);
+  if (S.sel !== k) return;
+  const ex = (by.get(n) || []).sort((a, b) => b.sign - a.sign || a.rank - b.rank);
+  const pos = ex.filter(e => e.sign > 0), neg = ex.filter(e => e.sign < 0);
+  $("exbox").innerHTML = `<h3>Fires on · top ${pos.length} documents</h3>${pos.map(e => exampleHTML(e, toks, M.info.before)).join("")}` +
+    (neg.length ? `<h3 style="margin-top:12px">Most negative on</h3>${neg.map(e => exampleHTML(e, toks, M.info.before)).join("")}` : "");
+}
+
+/* ---------- search ---------- */
+function norm(s) { return String(s).trim().toLowerCase() }
+function search(M, q, mode, limit = 40) {
+  q = mode === "label" ? norm(q) : q; if (!q.trim()) return [];
+  const out = [];
+  if (mode === "label") {
+    const words = q.split(/\s+/);
+    for (const [k, l] of M.lab) { const hay = norm(l.label + " " + l.description); if (words.every(w => hay.includes(w))) out.push([k, (l.detect ?? .5) + l.confidence / 10]); }
+  } else {
+    const qq = norm(q);
+    for (let k = 0; k < M.N; k++) {
+      const list = mode === "says" ? M.rows[k].lens_up : M.rows[k].peaks;
+      let sc = 0; list.forEach((t, i) => { if (norm(t) === qq) sc += mode === "says" ? 1 / (1 + i) : 1; });
+      if (sc > 0) out.push([k, sc + M.z[k] / 1000]);
+    }
+  }
+  return out.sort((a, b) => b[1] - a[1]).slice(0, limit).map(o => o[0]);
+}
+function rowLabel(M, k) { const l = M.lab.get(k); return l ? `${esc(l.emoji)} ${esc(l.label)}` : `<span class="muted">promotes</span> ${M.rows[k].lens_up.slice(0, 4).map(t => `<span class="tok">${showTok(t)}</span>`).join(" ")}`; }
+let resIdx = [];
+function runSearch() {
+  const M = S.M, q = $("q").value, box = $("results");
+  if (!M || !q.trim()) { box.hidden = true; hits = null; draw(); return; }
+  resIdx = search(M, q, S.qmode, 60); hits = resIdx.length ? resIdx : null; draw();
+  box.innerHTML = resIdx.length ? resIdx.slice(0, 30).map((k, i) => `<button data-k="${k}" class="${i === 0 ? "on" : ""}"><span class="k">${keyName(M, k)}</span><span>${rowLabel(M, k)}</span></button>`).join("")
+    : `<div class="muted" style="padding:8px 12px">No match in ${esc(M.info.model)}. ${S.qmode === "label" ? "Only labeled neurons are searched by label; try “fires on token” or “promotes token”." : "Tokens match exactly, leading space included (e.g. “ Paris”)."}</div>`;
+  box.hidden = false;
+}
+$("q").addEventListener("input", runSearch);
+$("q").addEventListener("keydown", e => { if (e.key === "Enter" && resIdx.length) { pick(resIdx[0]); } if (e.key === "Escape") { $("results").hidden = true; } });
+$("results").onclick = e => { const b = e.target.closest("button"); if (b) pick(+b.dataset.k); };
+function pick(k) { $("results").hidden = true; setTab("map"); openNeuron(k, { focus: true }); }
+document.addEventListener("click", e => { if (!e.target.closest(".search")) $("results").hidden = true; });
+$("qmode").onclick = e => { const b = e.target.closest("button"); if (!b) return; S.qmode = b.dataset.m;
+  [...$("qmode").children].forEach(x => x.setAttribute("aria-pressed", x === b));
+  $("q").placeholder = { label: "Search labels, e.g. “numbers”, “French”, “past tense”", fires: "A token it fires on, e.g. “ the” or “ dog”", says: "A token it promotes, e.g. “ Paris” or “ü”" }[S.qmode];
+  runSearch(); };
+
+/* ---------- surprise ---------- */
+function goodNeurons(M) { const g = M.labKeys.filter(k => { const l = M.lab.get(k); return l.confidence >= 4 && (l.detect ?? 0) >= .75; }); return g.length > 10 ? g : M.labKeys; }
+$("surprise").onclick = () => { const M = S.M; const g = goodNeurons(M); if (!g.length) return; setTab("map"); openNeuron(g[Math.floor(Math.random() * g.length)], { focus: true }); };
+
+/* ---------- tabs ---------- */
+const TABS = ["map", "pushes", "board", "compare", "guess", "sql"];
+function setTab(t) {
+  S.tab = t; TABS.forEach(x => { $("v-" + x).hidden = x !== t; });
+  [...$("tabs").children].forEach(b => b.setAttribute("aria-selected", b.dataset.t === t));
+  if (t === "map") requestAnimationFrame(sizeCanvas);
+  if (t === "pushes") renderPushes();
+  if (t === "board") renderBoard();
+  if (t === "guess" && !G.cur) nextGuess();
+  if (t === "sql") sqlInit();
+  if (t !== "map") { try { history.replaceState(null, "", "#" + t) } catch {} }
+}
+$("tabs").onclick = e => { const b = e.target.closest("button"); if (b) setTab(b.dataset.t); };
+
+/* ---------- pushes ---------- */
+function renderPushes() {
+  const M = S.M, kinds = new Set();
+  M.lab.forEach(l => l.push_kind && kinds.add(l.push_kind));
+  const sel = $("pk"), cur = sel.value;
+  sel.innerHTML = `<option value="">every kind of push</option>` + [...kinds].sort().map(k => `<option ${k === cur ? "selected" : ""}>${esc(k)}</option>`).join("");
+  let items = [];
+  M.steer.forEach((rs, k) => rs.forEach(s => items.push([k, s])));
+  const kind = sel.value, coh = $("pcoh").checked;
+  items = items.filter(([k, s]) => (!kind || M.lab.get(k)?.push_kind === kind) && (!coh || s.diversity > 0.6) && s.text.trim());
+  if ($("psort").value === "change") items.sort((a, b) => b[1].change - a[1].change); else items.sort((a, b) => a[0] - b[0] || a[1].dose - b[1].dose);
+  $("pcount").textContent = `${items.length.toLocaleString()} replies from ${M.steer.size.toLocaleString()} pushed neurons`;
+  const prompts = M.info.steer?.prompts || [];
+  $("pushgrid").innerHTML = items.slice(0, 120).map(([k, s]) => { const l = M.lab.get(k);
+    return `<button class="push" data-k="${k}"><div class="meta"><span>${keyName(M, k)}</span><span class="pill ${s.dose > 0 ? "eo" : ""}">push ${s.dose > 0 ? "+" : ""}${s.dose}</span>${l ? `<span>${esc(l.emoji)} ${esc(l.label)}</span>` : ""}</div>
+      <div class="muted">“${esc(prompts[s.prompt] || "")}”</div><div class="reply">${esc(s.text)}</div></button>` }).join("") || `<p class="muted">This model has no steering run yet.</p>`;
+}
+["pk", "psort", "pcoh"].forEach(id => $(id).onchange = renderPushes);
+$("pushgrid").onclick = e => { const b = e.target.closest(".push"); if (b) { setTab("map"); openNeuron(+b.dataset.k, { focus: true }); } };
+
+/* ---------- leaderboard ---------- */
+const B = { sort: "detect", dir: -1 };
+const BCOLS = [["key", "neuron"], ["label", "label"], ["detect", "held-out"], ["confidence", "conf"], ["z", "peak z"], ["push_kind", "push"]];
+function renderBoard() {
+  const M = S.M, q = norm($("bq").value);
+  let rows = M.labKeys.map(k => ({ k, l: M.lab.get(k), z: M.z[k] })).filter(r => !q || norm(r.l.label + " " + r.l.description).includes(q));
+  const v = r => B.sort === "key" ? r.k : B.sort === "z" ? r.z : B.sort === "label" ? r.l.label : r.l[B.sort] ?? -1;
+  rows.sort((a, b) => (v(a) > v(b) ? 1 : v(a) < v(b) ? -1 : 0) * B.dir);
+  $("bhead").innerHTML = BCOLS.map(([c, n]) => `<th data-c="${c}">${n}${B.sort === c ? (B.dir > 0 ? " ↑" : " ↓") : ""}</th>`).join("");
+  $("bcount").textContent = `${rows.length.toLocaleString()} labeled neurons`;
+  $("bbody").innerHTML = rows.slice(0, 400).map(r => `<tr data-k="${r.k}"><td class="num">${keyName(M, r.k)}</td><td>${esc(r.l.emoji)} ${esc(r.l.label)}<div class="muted">${esc(r.l.description)}</div></td>
+    <td class="num">${r.l.detect == null ? "–" : Math.round(r.l.detect * 100) + "%"}</td><td class="num">${r.l.confidence}</td><td class="num">${fmt(r.z, 1)}</td><td>${esc(r.l.push_kind || "")}</td></tr>`).join("");
+}
+$("bhead").onclick = e => { const th = e.target.closest("th"); if (!th) return; const c = th.dataset.c; B.dir = B.sort === c ? -B.dir : -1; B.sort = c; renderBoard(); };
+$("bq").oninput = renderBoard;
+$("bbody").onclick = e => { const tr = e.target.closest("tr"); if (tr) { setTab("map"); openNeuron(+tr.dataset.k, { focus: true }); } };
+
+/* ---------- compare ---------- */
+let cmode = "says";
+$("cmode").onclick = e => { const b = e.target.closest("button"); if (!b) return; cmode = b.dataset.m; [...$("cmode").children].forEach(x => x.setAttribute("aria-pressed", x === b)); };
+$("cgo").onclick = runCompare; $("cq").onkeydown = e => { if (e.key === "Enter") runCompare(); };
+async function runCompare() {
+  const q = $("cq").value; $("cstat").textContent = "loading every model…";
+  const Ms = await Promise.all(S.models.map(m => loadModel(m.id)));
+  $("cstat").textContent = `${cmode === "says" ? "neurons whose logit lens promotes" : cmode === "fires" ? "neurons whose top documents peak on" : "labels matching"} “${q}”`;
+  $("cout").innerHTML = Ms.map(M => { const r = search(M, q, cmode, 6);
+    return `<div class="card" style="gap:8px"><h3>${esc(M.info.model)} · ${r.length ? r.length + (r.length === 6 ? "+" : "") : "no"} hits</h3>${r.map(k => {
+      const L = Math.floor(k / M.d), depth = Math.round(100 * L / Math.max(1, M.info.n_layers - 1));
+      return `<button class="push" data-m="${M.info.id}" data-k="${k}"><div class="meta"><span>${keyName(M, k)}</span><span>${depth}% deep</span></div><div>${rowLabel(M, k)}</div></button>` }).join("") || `<p class="muted">none</p>`}</div>` }).join("");
+}
+$("cout").onclick = async e => { const b = e.target.closest(".push"); if (!b) return; await selectModel(b.dataset.m); setTab("map"); openNeuron(+b.dataset.k, { focus: true }); };
+
+/* ---------- guess game ---------- */
+const G = { cur: null, right: 0, total: 0, streak: 0 };
+async function nextGuess() {
+  const M = S.M, pool = goodNeurons(M); if (pool.length < 4) { $("gex").innerHTML = `<p class="muted">Needs at least 4 labeled neurons.</p>`; return; }
+  const k = pool[Math.floor(Math.random() * pool.length)], L = Math.floor(k / M.d), n = k - L * M.d;
+  const opts = new Set([k]); while (opts.size < 4) opts.add(M.labKeys[Math.floor(Math.random() * M.labKeys.length)]);
+  G.cur = { k, M, opts: [...opts].sort(() => Math.random() - .5), done: false };
+  $("gmodel").textContent = `${M.info.model} · layer ${L}`; $("gopen").hidden = true;
+  $("gex").innerHTML = `<p class="muted">loading…</p>`;
+  $("gchoices").innerHTML = G.cur.opts.map(o => `<button data-k="${o}">${esc(M.lab.get(o).emoji)} ${esc(M.lab.get(o).label)}</button>`).join("");
+  const [by, toks] = await Promise.all([layerExamples(M, L), tokens(M)]);
+  $("gex").innerHTML = (by.get(n) || []).filter(e => e.sign > 0).sort((a, b) => a.rank - b.rank).slice(0, 5).map(e => exampleHTML(e, toks, M.info.before)).join("");
+}
+$("gchoices").onclick = e => {
+  const b = e.target.closest("button"); if (!b || !G.cur || G.cur.done) return; G.cur.done = true;
+  const ok = +b.dataset.k === G.cur.k; G.total++; if (ok) { G.right++; G.streak++; } else G.streak = 0;
+  [...$("gchoices").children].forEach(x => { if (+x.dataset.k === G.cur.k) x.classList.add("right"); else if (x === b) x.classList.add("wrong"); });
+  $("gscore").textContent = `score ${G.right} / ${G.total}`; $("gstreak").textContent = `streak ${G.streak}`; $("gopen").hidden = false;
+};
+$("gnext").onclick = nextGuess;
+$("gopen").onclick = () => { setTab("map"); openNeuron(G.cur.k, { focus: true }); };
+
+/* ---------- SQL (DuckDB-WASM, lazy) ---------- */
+const SQLX = [
+  ["best labels", $("sqltext").value],
+  ["layer profile", "select layer, count(*) labeled, round(avg(detect), 2) held_out, mode(push_kind) common_push\nfrom labels group by layer order by layer"],
+  ["persona pushes", "select s.layer, s.neuron, s.dose, l.label, s.text\nfrom steer s left join labels l using (layer, neuron)\nwhere l.push_kind in ('persona', 'altered_assistant') and s.diversity > 0.6\norder by s.change desc limit 30"],
+  ["peakiest neurons", "select layer, neuron, round(zmax, 1) z, peaks[1:5] fires_on, lens_up[1:5] promotes\nfrom neurons order by zmax desc limit 25"],
+  ["dense neurons", "select layer, neuron, round(frac_pos, 2) frac_pos, lens_up[1:5] promotes\nfrom neurons order by frac_pos desc limit 25"],
+];
+$("sqlx").innerHTML = SQLX.map(([n], i) => `<button class="btn" data-i="${i}">${n}</button>`).join("");
+$("sqlx").onclick = e => { const b = e.target.closest("button"); if (b) { $("sqltext").value = SQLX[+b.dataset.i][1]; runSQL(); } };
+let duck = null, duckFor = null;
+async function sqlInit() {
+  if (duck && duckFor === S.M.info.id) return duck;
+  $("sqlstat").textContent = "starting DuckDB-WASM…";
+  try {
+    if (!duck) {
+      const db = await import("https://cdn.jsdelivr.net/npm/@duckdb/duckdb-wasm@1.32.0/+esm");
+      const bundle = await db.selectBundle(db.getJsDelivrBundles());
+      const wurl = URL.createObjectURL(new Blob([`importScripts("${bundle.mainWorker}");`], { type: "text/javascript" }));
+      const inst = new db.AsyncDuckDB(new db.ConsoleLogger(db.LogLevel.WARNING), new Worker(wurl));
+      await inst.instantiate(bundle.mainModule, bundle.pthreadWorker);
+      duck = { db, inst, conn: await inst.connect() };
+    }
+    const M = S.M, abs = u => new URL(u, location.href).href, c = duck.conn;
+    const files = ["neurons", "labels", "steer", "tokens"];
+    for (const f of files) {
+      try { await duck.inst.registerFileURL(`${M.info.id}_${f}.parquet`, abs(M.dir + f + ".parquet"), duck.db.DuckDBDataProtocol.HTTP, false);
+        await c.query(`create or replace view ${f} as select * from '${M.info.id}_${f}.parquet'`); } catch { }
+    }
+    const ex = [];
+    for (let L = 0; L < M.info.n_layers; L++) { const nm = `${M.info.id}_ex${L}.parquet`; await duck.inst.registerFileURL(nm, abs(M.dir + `examples/L${String(L).padStart(2, "0")}.parquet`), duck.db.DuckDBDataProtocol.HTTP, false); ex.push(`'${nm}'`); }
+    await c.query(`create or replace view examples as select * from read_parquet([${ex.join(",")}])`);
+    duckFor = M.info.id; $("sqlstat").textContent = `ready · ${M.info.model}`;
+    return duck;
+  } catch (e) {
+    $("sqlstat").innerHTML = `<span class="err">DuckDB-WASM could not start here (${esc(e.message || e)}). Some hosts block its worker or WebAssembly download; the explorer served from a Hugging Face Space or <code>python -m http.server</code> runs it.</span>`;
+    return null;
+  }
+}
+async function runSQL() {
+  const d = await sqlInit(); if (!d) return;
+  const t0 = performance.now();
+  try {
+    const res = await d.conn.query($("sqltext").value);
+    const cols = res.schema.fields.map(f => f.name), rows = res.toArray().slice(0, 500);
+    const cell = v => v == null ? "" : typeof v === "object" && v.toArray ? JSON.stringify([...v.toArray()].map(x => typeof x === "bigint" ? Number(x) : x)) : typeof v === "bigint" ? String(v) : typeof v === "number" ? (Number.isInteger(v) ? v : v.toFixed(3)) : String(v);
+    $("sqlout").innerHTML = `<thead><tr>${cols.map(c => `<th>${esc(c)}</th>`).join("")}</tr></thead><tbody>${rows.map(r => `<tr>${cols.map(c => `<td>${esc(cell(r[c]))}</td>`).join("")}</tr>`).join("")}</tbody>`;
+    $("sqlstat").textContent = `${res.numRows} rows · ${Math.round(performance.now() - t0)} ms`;
+  } catch (e) { $("sqlstat").innerHTML = `<span class="err">${esc(e.message)}</span>`; }
+}
+$("sqlrun").onclick = runSQL;
+$("sqltext").onkeydown = e => { if ((e.metaKey || e.ctrlKey) && e.key === "Enter") runSQL(); };
+
+/* ---------- boot ---------- */
+async function selectModel(id) {
+  $("sub").textContent = "loading…";
+  const M = await loadModel(id); S.M = M; S.sel = -1; hits = null; S.isolate = -1; view.s = 1; view.tx = view.ty = 0; G.cur = null;
+  store.set("atlas-model", id);
+  [...$("models").children].forEach(b => b.setAttribute("aria-pressed", b.dataset.id === id));
+  $("sub").textContent = `${M.N.toLocaleString()} neurons · ${M.info.n_layers} layers · ${M.info.n_tokens.toLocaleString()} corpus tokens`;
+  buildGrid(); renderRibbon(); draw();
+  if ($("q").value) runSearch();
+  if (S.tab === "pushes") renderPushes(); if (S.tab === "board") renderBoard(); if (S.tab === "guess") nextGuess(); if (S.tab === "sql") sqlInit();
+  return M;
+}
+$("models").onclick = async e => { const b = e.target.closest("button"); if (!b) return; const M = await selectModel(b.dataset.id); openStart(M); };
+function openStart(M) {
+  const g = goodNeurons(M).slice().sort((a, b) => { const la = M.lab.get(a), lb = M.lab.get(b); return ((lb.detect ?? 0) + lb.confidence / 5 + (M.steer.has(b) ? .3 : 0)) - ((la.detect ?? 0) + la.confidence / 5 + (M.steer.has(a) ? .3 : 0)); });
+  openNeuron(g.length ? g[0] : 0, { focus: g.length > 0 });
+}
+async function boot() {
+  try {
+    S.models = await (await fetch(BASE + "models.json")).json();
+  } catch (e) {
+    $("panel").innerHTML = `<p class="err">Could not read ${esc(BASE)}models.json. Serve this page next to a data folder, or pass <code>?data=&lt;hf-user&gt;/&lt;dataset&gt;</code>.</p>`; return;
+  }
+  $("models").innerHTML = S.models.map(m => `<button class="chip" data-id="${m.id}" aria-pressed="false">${esc(m.name || m.model.split("/").pop())}<small>${(m.n_neurons / 1000).toFixed(0)}k</small></button>`).join("");
+  const h = (location.hash || "").slice(1), hm = h.match(/^(.+)-L(\d+)-N(\d+)$/);
+  let id = hm && S.models.some(m => m.id === hm[1]) ? hm[1] : store.get("atlas-model");
+  if (!S.models.some(m => m.id === id)) id = S.models[0].id;
+  const M = await selectModel(id);
+  if (hm && hm[1] === id) openNeuron(+hm[2] * M.d + +hm[3], { focus: true }); else openStart(M);
+  if (TABS.includes(h)) setTab(h);
+}
+boot();
+</script>
