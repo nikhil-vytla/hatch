@@ -371,38 +371,55 @@ function zColor(z) { const t = Math.max(0, Math.min(1, (z - 5) / 40)); return `o
 
 /* ---------- map ---------- */
 const cv = $("map"), ctx = cv.getContext("2d");
+const off = document.createElement("canvas"), octx = off.getContext("2d");
 const view = { s: 1, tx: 0, ty: 0 };
-let hits = null, hover = -1, grid = null, layerCols = [];
-function sizeCanvas() { const r = cv.getBoundingClientRect(), dpr = devicePixelRatio || 1; cv.width = r.width * dpr; cv.height = r.height * dpr; draw(); }
+let hits = null, hover = -1, grid = null, layerCols = [], renderQueued = false;
+function sizeCanvas() {
+  const r = cv.getBoundingClientRect(), dpr = devicePixelRatio || 1;
+  cv.width = r.width * dpr; cv.height = r.height * dpr;
+  if (off.width !== cv.width || off.height !== cv.height) { off.width = cv.width; off.height = cv.height; }
+  renderPoints(); draw();
+}
 function toScreen(x, y) { const W = cv.width, H = cv.height, m = 24 * (devicePixelRatio || 1), sz = Math.min(W, H) - 2 * m;
   return [((x - .5) * sz) * view.s + W / 2 + view.tx, ((y - .5) * sz) * view.s + H / 2 + view.ty]; }
 function buildGrid() {
   const M = S.M; if (!M) return; const G = 64; grid = new Map();
   for (let k = 0; k < M.N; k++) { const gx = Math.floor(M.x[k] * G), gy = Math.floor(M.y[k] * G), key = gx * 1000 + gy; if (!grid.has(key)) grid.set(key, []); grid.get(key).push(k); }
 }
-function draw() {
-  const M = S.M; const W = cv.width, H = cv.height; ctx.clearRect(0, 0, W, H); if (!M) return;
+function renderPoints() {
+  const M = S.M, W = cv.width, H = cv.height;
+  if (off.width !== W || off.height !== H) { off.width = W; off.height = H; }
+  octx.clearRect(0, 0, W, H); if (!M) return;
   const dpr = devicePixelRatio || 1, nL = M.info.n_layers;
   layerCols = Array.from({ length: nL }, (_, L) => layerColor(L, nL));
   const r = Math.max(1, Math.min(3.5, 1.1 * Math.sqrt(view.s))) * dpr;
-  const dim = S.isolate >= 0 || hits;
   for (let k = 0; k < M.N; k++) {
     const L = M.layer[k];
     if (S.isolate >= 0 && L !== S.isolate) continue;
     const [sx, sy] = toScreen(M.x[k], M.y[k]); if (sx < -5 || sy < -5 || sx > W + 5 || sy > H + 5) continue;
     const lab = M.lab.has(k);
-    ctx.globalAlpha = hits ? .18 : S.colorby === "lab" ? (lab ? .95 : .12) : .55;
-    ctx.fillStyle = S.colorby === "layer" ? layerCols[L] : S.colorby === "z" ? zColor(M.z[k]) : (lab ? "#ffb3cd" : "#6f6a8e");
+    octx.globalAlpha = hits ? .18 : S.colorby === "lab" ? (lab ? .95 : .12) : .55;
+    octx.fillStyle = S.colorby === "layer" ? layerCols[L] : S.colorby === "z" ? zColor(M.z[k]) : (lab ? "#ffb3cd" : "#6f6a8e");
     const rr = lab && S.colorby === "lab" ? r * 1.6 : r;
-    ctx.fillRect(sx - rr / 2, sy - rr / 2, rr, rr);
+    octx.fillRect(sx - rr / 2, sy - rr / 2, rr, rr);
   }
-  ctx.globalAlpha = 1;
+  octx.globalAlpha = 1;
+}
+function draw() {
+  const M = S.M, W = cv.width, H = cv.height; ctx.clearRect(0, 0, W, H); if (!M) return;
+  const dpr = devicePixelRatio || 1, dim = S.isolate >= 0 || hits;
+  ctx.drawImage(off, 0, 0);
   if (hits) { ctx.fillStyle = "#fff"; for (const k of hits) { const [sx, sy] = toScreen(M.x[k], M.y[k]); ctx.beginPath(); ctx.arc(sx, sy, 3.2 * dpr, 0, 7); ctx.fill(); } }
   for (const [k, col, rad] of [[hover, "#fff", 6], [S.sel, "#ff6b9a", 9]]) {
     if (k < 0) continue; const [sx, sy] = toScreen(M.x[k], M.y[k]);
     ctx.strokeStyle = col; ctx.lineWidth = 2 * dpr; ctx.beginPath(); ctx.arc(sx, sy, rad * dpr, 0, 7); ctx.stroke();
   }
   $("mapnote").textContent = `${M.N.toLocaleString()} neurons · ${M.lab.size.toLocaleString()} labeled${dim ? "" : " · scroll to zoom, drag to pan"}`;
+}
+function scheduleRender() {
+  if (renderQueued) return;
+  renderQueued = true;
+  requestAnimationFrame(() => { renderQueued = false; renderPoints(); draw(); });
 }
 function nearest(px, py) {
   const M = S.M; if (!M || !grid) return -1; const W = cv.width, H = cv.height, m = 24 * (devicePixelRatio || 1), sz = Math.min(W, H) - 2 * m;
@@ -419,7 +436,7 @@ let drag = null;
 cv.addEventListener("pointerdown", e => { drag = { x: e.clientX, y: e.clientY, tx: view.tx, ty: view.ty, moved: false }; cv.setPointerCapture(e.pointerId); });
 cv.addEventListener("pointermove", e => {
   const dpr = devicePixelRatio || 1, rc = cv.getBoundingClientRect();
-  if (drag) { const dx = (e.clientX - drag.x) * dpr, dy = (e.clientY - drag.y) * dpr; if (Math.abs(dx) + Math.abs(dy) > 4) drag.moved = true; view.tx = drag.tx + dx; view.ty = drag.ty + dy; draw(); return; }
+  if (drag) { const dx = (e.clientX - drag.x) * dpr, dy = (e.clientY - drag.y) * dpr; if (Math.abs(dx) + Math.abs(dy) > 4) drag.moved = true; view.tx = drag.tx + dx; view.ty = drag.ty + dy; scheduleRender(); return; }
   const k = nearest((e.clientX - rc.left) * dpr, (e.clientY - rc.top) * dpr);
   if (k !== hover) { hover = k; draw(); }
   const tip = $("tip");
@@ -436,13 +453,13 @@ cv.addEventListener("wheel", e => {
   e.preventDefault(); const dpr = devicePixelRatio || 1, rc = cv.getBoundingClientRect();
   const px = (e.clientX - rc.left) * dpr - cv.width / 2, py = (e.clientY - rc.top) * dpr - cv.height / 2;
   const f = Math.exp(-e.deltaY * 0.0015), s2 = Math.max(.6, Math.min(80, view.s * f)), g = s2 / view.s;
-  view.tx = px - (px - view.tx) * g; view.ty = py - (py - view.ty) * g; view.s = s2; draw();
+  view.tx = px - (px - view.tx) * g; view.ty = py - (py - view.ty) * g; view.s = s2; scheduleRender();
 }, { passive: false });
-$("reset").onclick = () => { view.s = 1; view.tx = view.ty = 0; S.isolate = -1; hits = null; renderRibbon(); draw(); };
-$("colorby").onchange = e => { S.colorby = e.target.value; draw(); };
+$("reset").onclick = () => { view.s = 1; view.tx = view.ty = 0; S.isolate = -1; hits = null; renderRibbon(); renderPoints(); draw(); };
+$("colorby").onchange = e => { S.colorby = e.target.value; renderPoints(); draw(); };
 new ResizeObserver(sizeCanvas).observe(cv);
 function focusOn(k) { const M = S.M; if (view.s < 2.5) view.s = 3; const W = cv.width, H = cv.height, m = 24 * (devicePixelRatio || 1), sz = Math.min(W, H) - 2 * m;
-  view.tx = -((M.x[k] - .5) * sz) * view.s; view.ty = -((M.y[k] - .5) * sz) * view.s; draw(); }
+  view.tx = -((M.x[k] - .5) * sz) * view.s; view.ty = -((M.y[k] - .5) * sz) * view.s; renderPoints(); draw(); }
 
 function renderRibbon() {
   const M = S.M, nL = M.info.n_layers, counts = new Array(nL).fill(0);
@@ -451,7 +468,7 @@ function renderRibbon() {
   $("ribbon").innerHTML = counts.map((c, L) => `<button style="height:${12 + 38 * c / mx}px;background:${layerColor(L, nL)}" aria-pressed="${S.isolate === L}" data-l="${L}" title="layer ${L}: ${c} labeled"></button>`).join("");
   $("ribcap").textContent = S.isolate >= 0 ? `showing layer ${S.isolate} only` : "bar height = labeled neurons · click to isolate";
 }
-$("ribbon").onclick = e => { const b = e.target.closest("button"); if (!b) return; const L = +b.dataset.l; S.isolate = S.isolate === L ? -1 : L; renderRibbon(); draw(); };
+$("ribbon").onclick = e => { const b = e.target.closest("button"); if (!b) return; const L = +b.dataset.l; S.isolate = S.isolate === L ? -1 : L; renderRibbon(); renderPoints(); draw(); };
 
 /* ---------- neuron card ---------- */
 function stainStyle(v) { // v in [-1, 1]
@@ -459,12 +476,12 @@ function stainStyle(v) { // v in [-1, 1]
   return `background:color-mix(in oklab, var(${v > 0 ? "--eosin" : "--hema"}) ${Math.round(a * 75)}%, transparent)`;
 }
 function exampleHTML(ex, toks, before) {
-  const t = toks[ex.doc] || [], start = ex.pos - before;
+  const t = ex.toks || (toks && toks[ex.doc]) || [], t0 = ex.toks ? (ex.t0 ?? 0) : 0, start = ex.pos - before;
   let h = `<span class="a">${ex.act.toFixed(2)}</span>`;
   ex.q.forEach((q, i) => {
-    const p = start + i; if (p < 0 || p >= t.length) return;
+    const p = start + i, ti = p - t0; if (ti < 0 || ti >= t.length) return;
     const v = q / 127 * (ex.scale / Math.max(1e-6, Math.abs(ex.act)));
-    h += `<span class="t${p === ex.pos ? " pk" : ""}" style="${stainStyle(ex.sign > 0 ? v : -v)}" title="${(q / 127 * ex.scale).toFixed(3)}">${esc(t[p]).replace(/\n/g, "↵").replace(/\ufffd+/g, '<i class="bb">·</i>')}</span>`;
+    h += `<span class="t${p === ex.pos ? " pk" : ""}" style="${stainStyle(ex.sign > 0 ? v : -v)}" title="${(q / 127 * ex.scale).toFixed(3)}">${esc(t[ti]).replace(/\n/g, "↵").replace(/\ufffd+/g, '<i class="bb">·</i>')}</span>`;
   });
   return `<div class="ex ${ex.sign > 0 ? "pos" : "neg"}">${h}</div>`;
 }
@@ -525,14 +542,26 @@ async function openNeuron(k, opts = {}) {
     ${steerHTML}
     <div><h3>${row.nbrs ? "Writes like (cosine of output directions)" : "Neighbors on the map"}</h3><div class="nbrs" id="nbrs"></div></div>`;
   $("addmix").onclick = () => addMix(k);
-  const nb = neighbors(M, k);
-  const nbHTML = () => nb.map(([j, c]) => { const l = M.lab.get(j), r = M.rows[j]; return `<button data-k="${j}"><span class="k">${keyName(M, j)}${c != null ? " · " + c.toFixed(2) : ""}</span>${l ? esc(l.emoji + " " + l.label) : r ? r.lens_up.slice(0, 3).map(showTok).join(" ") : "…"}</button>` }).join("");
-  $("nbrs").innerHTML = nbHTML();
-  ensureLayers(M, nb.map(([j]) => Math.floor(j / M.d))).then(() => { if (S.sel === k && $("nbrs")) $("nbrs").innerHTML = nbHTML(); }).catch(() => {});
-  $("nbrs").onclick = e => { const b = e.target.closest("button"); if (b) openNeuron(+b.dataset.k, { focus: true }); };
-  const [by, toks] = await Promise.all([layerExamples(M, L), tokens(M)]);
+  const nb = neighbors(M, k), nbCos = new Map(nb);
+  const nbText = j => { const l = M.lab.get(j), r = M.rows[j];
+    return l ? esc(l.emoji + " " + l.label) : r ? r.lens_up.slice(0, 3).map(showTok).join(" ") : "…"; };
+  const nbFill = b => { const j = +b.dataset.k, c = nbCos.get(j);
+    b.innerHTML = `<span class="k">${keyName(M, j)}${c != null ? " · " + c.toFixed(2) : ""}</span>${nbText(j)}`; };
+  const nbrs = $("nbrs");
+  nbrs.innerHTML = nb.map(([j]) => `<button data-k="${j}"></button>`).join("");
+  nbrs.querySelectorAll("button").forEach(b => {
+    nbFill(b);
+    const load = () => { const j = +b.dataset.k; if (M.rows[j]) return;
+      ensureLayer(M, Math.floor(j / M.d)).then(() => { if (b.isConnected) nbFill(b); }).catch(() => {}); };
+    b.addEventListener("pointerenter", load);
+    b.addEventListener("focus", load);
+  });
+  nbrs.onclick = e => { const b = e.target.closest("button"); if (b) openNeuron(+b.dataset.k, { focus: true }); };
+  const by = await layerExamples(M, L);
   if (S.sel !== k) return;
   const ex = (by.get(n) || []).sort((a, b) => b.sign - a.sign || a.rank - b.rank);
+  const toks = ex.some(e => !e.toks) ? await tokens(M) : null;
+  if (S.sel !== k) return;
   const pos = ex.filter(e => e.sign > 0), neg = ex.filter(e => e.sign < 0);
   $("exbox").innerHTML = `<h3>Fires on · top ${pos.length} documents</h3>${pos.map(e => exampleHTML(e, toks, M.info.before)).join("")}` +
     (neg.length ? `<h3 style="margin-top:12px">Most negative on</h3>${neg.map(e => exampleHTML(e, toks, M.info.before)).join("")}` : "");
@@ -561,13 +590,13 @@ function rowLabel(M, k) { const l = M.lab.get(k), r = M.rows[k]; return l ? `${e
 let resIdx = [], searchSeq = 0;
 async function runSearch() {
   const M = S.M, q = $("q").value, box = $("results"), seq = ++searchSeq;
-  if (!M || !q.trim()) { box.hidden = true; hits = null; draw(); return; }
+  if (!M || !q.trim()) { box.hidden = true; hits = null; renderPoints(); draw(); return; }
   if (S.qmode !== "label" && !allLoaded(M)) {   // token search reads every layer's rows: fetch them once
     box.hidden = false; box.innerHTML = `<div class="muted" style="padding:8px 12px">Loading layers to search every neuron…</div>`;
     await ensureLayers(M, allLayers(M), (i, n) => { if (seq === searchSeq) box.innerHTML = `<div class="muted" style="padding:8px 12px">Loading layers to search every neuron: ${i} / ${n}</div>`; });
     if (seq !== searchSeq) return;
   }
-  resIdx = search(M, q, S.qmode, 60); hits = resIdx.length ? resIdx : null; draw();
+  resIdx = search(M, q, S.qmode, 60); hits = resIdx.length ? resIdx : null; renderPoints(); draw();
   box.innerHTML = resIdx.length ? resIdx.slice(0, 30).map((k, i) => `<button data-k="${k}" class="${i === 0 ? "on" : ""}"><span class="k">${keyName(M, k)}</span><span>${rowLabel(M, k)}</span></button>`).join("")
     : `<div class="muted" style="padding:8px 12px">No match in ${esc(M.info.model)}. ${S.qmode === "label" ? "Only labeled neurons are searched by label; try “fires on token” or “promotes token”." : "Tokens match exactly, leading space included (e.g. “ Paris”)."}</div>`;
   box.hidden = false;
@@ -746,8 +775,10 @@ async function nextGuess() {
   $("gmodel").textContent = `${M.info.model} · layer ${L}`; $("gopen").hidden = true;
   $("gex").innerHTML = `<p class="muted">loading…</p>`;
   $("gchoices").innerHTML = G.cur.opts.map(o => `<button data-k="${o}">${esc(M.lab.get(o).emoji)} ${esc(M.lab.get(o).label)}</button>`).join("");
-  const [by, toks] = await Promise.all([layerExamples(M, L), tokens(M)]);
-  $("gex").innerHTML = (by.get(n) || []).filter(e => e.sign > 0).sort((a, b) => a.rank - b.rank).slice(0, 5).map(e => exampleHTML(e, toks, M.info.before)).join("");
+  const by = await layerExamples(M, L);
+  const ex = (by.get(n) || []).filter(e => e.sign > 0).sort((a, b) => a.rank - b.rank).slice(0, 5);
+  const toks = ex.some(e => !e.toks) ? await tokens(M) : null;
+  $("gex").innerHTML = ex.map(e => exampleHTML(e, toks, M.info.before)).join("");
 }
 $("gchoices").onclick = e => {
   const b = e.target.closest("button"); if (!b || !G.cur || G.cur.done) return; G.cur.done = true;
@@ -827,7 +858,7 @@ async function selectModel(id) {
   store.set("atlas-model", id);
   [...$("models").children].forEach(b => b.setAttribute("aria-pressed", b.dataset.id === id));
   $("sub").textContent = `${M.N.toLocaleString()} neurons · ${M.info.n_layers} layers · ${M.info.n_tokens.toLocaleString()} corpus tokens`;
-  buildGrid(); renderRibbon(); draw();
+  buildGrid(); renderRibbon(); renderPoints(); draw();
   if ($("q").value) runSearch();
   if (S.tab === "pushes") renderPushes(); if (S.tab === "mix") renderMix(); if (S.tab === "board") renderBoard();
   if (S.tab === "guess") nextGuess(); if (S.tab === "sql") sqlInit();
