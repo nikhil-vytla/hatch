@@ -270,6 +270,12 @@ def push_index(repo):
                  sweep_stats="sweep_stats.parquet" in have, user_personas="user_personas.parquet" in have,
                  user_sweep_stats="user_sweep_stats.parquet" in have,
                  user_sweep="user_personas.parquet" in have and "user_sweep_stats.parquet" in have)
+        live_manifest = f"browser/{slug}/models.json"
+        if live_manifest in files:
+            manifest = json.load(open(hf_hub_download(repo, live_manifest, repo_type="dataset")))
+            default = manifest.get("default") if isinstance(manifest, dict) else None
+            if default:
+                m["live"] = {"model": f"https://huggingface.co/datasets/{repo}/resolve/main/browser/{slug}/{default}"}
         idx.append(m)
     idx.sort(key=lambda m: m["n_neurons"])
     api.upload_file(path_or_fileobj=json.dumps(idx, indent=1).encode(), path_in_repo="models.json", repo_id=repo,
@@ -285,8 +291,15 @@ def push_space(repo, space):
     api = HfApi()
     api.create_repo(space, repo_type="space", space_sdk="static", exist_ok=True)
     html = page().replace('b = b || "./data/";', f'b = b || "https://huggingface.co/datasets/{repo}/resolve/main/";')
+    browser = os.path.join(HERE, "..", "browser")
+    engine = open(os.path.join(browser, "engine.js"), "rb").read()
+    live = open(os.path.join(browser, "index.html")).read()
+    live_dir = f"https://huggingface.co/datasets/{repo}/resolve/main/browser/HuggingFaceTB__SmolLM2-135M-Instruct/"
+    live = live.replace('const DEFAULT_MODEL = "./build/smollm2_steer_fp16.onnx";', f'const DEFAULT_MODEL = "{live_dir}";')
     readme = f"---\ntitle: Neuron Atlas\nemoji: 🔬\ncolorFrom: pink\ncolorTo: indigo\nsdk: static\npinned: false\n---\nExplorer for the [{repo}](https://huggingface.co/datasets/{repo}) dataset.\n"
     api.upload_file(path_or_fileobj=html.encode(), path_in_repo="index.html", repo_id=space, repo_type="space")
+    api.upload_file(path_or_fileobj=engine, path_in_repo="engine.js", repo_id=space, repo_type="space")
+    api.upload_file(path_or_fileobj=live.encode(), path_in_repo="live.html", repo_id=space, repo_type="space")
     api.upload_file(path_or_fileobj=readme.encode(), path_in_repo="README.md", repo_id=space, repo_type="space")
     print(f"https://huggingface.co/spaces/{space}")
 

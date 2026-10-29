@@ -194,6 +194,30 @@ nav.tabs button[aria-selected="true"] { color: var(--ink); background: var(--sur
 .pactions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: auto }
 .bubble.clamped { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 5; overflow: hidden; cursor: pointer }
 
+.mixprompt textarea { width: 100%; min-height: 58px; font: inherit; border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; background: var(--surface); color: var(--ink); resize: vertical }
+.mixprompt { margin-bottom: var(--s1) }
+#mixlive input[type="range"] { accent-color: var(--eosin); vertical-align: middle }
+#mixlive output { font: 600 12px var(--mono); color: var(--ink2) }
+#mixliveout .bubble { min-height: 130px; white-space: pre-wrap }
+#mixrecipe { margin-top: var(--s1); align-items: center }
+#mixrecipe .btn { height: 30px; padding: 0 10px; font-size: 13px }
+.runs-all { margin-top: 12px; border-top: 1px solid var(--line); padding-top: 12px }
+.runs-all > summary { cursor: pointer; font: 600 12px var(--body); text-transform: uppercase; letter-spacing: .08em; color: var(--ink3) }
+.runs-all[open] > summary { margin-bottom: 10px }
+.run-row { border-top: 1px solid var(--line); padding: 8px 0 }
+.run-row:first-child { border-top: 0 }
+.run-row > summary { cursor: pointer }
+.run-compact { display: flex; flex-direction: column; gap: 5px; min-width: 0 }
+.run-head { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; min-width: 0; font: 13px var(--mono); color: var(--ink2) }
+.run-head b { font-weight: 700; color: var(--ink) }
+.run-pills { display: flex; gap: 4px; flex-wrap: wrap; align-items: center; min-width: 0 }
+.run-load { height: 26px; padding: 0 8px; font-size: 12px }
+.run-line { display: flex; gap: 8px; align-items: flex-start; font-size: 13px; min-width: 0 }
+.run-line.plus { color: var(--ink2) }
+.run-line .who { flex: 0 0 auto; min-width: 54px; padding-top: 3px; font: 600 10px var(--mono); color: var(--ink3); text-transform: uppercase; letter-spacing: .04em }
+.run-reply { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; min-width: 0; white-space: pre-wrap }
+.run-full { margin-top: 10px }
+
 .tablewrap { overflow-x: auto; background: var(--surface); border: 0; border-radius: var(--r-card); box-shadow: var(--card-shadow) }
 table { border-collapse: collapse; width: 100%; font-size: 14px }
 th, td { padding: 7px 10px; text-align: left; border-bottom: 1px solid var(--line); vertical-align: top }
@@ -407,14 +431,41 @@ textarea.sql { width: 100%; min-height: 110px; font: 13px var(--mono); border: 1
     <div class="card">
       <div><h2>Mix neurons</h2><p class="muted">Open a neuron and press <b>Add to mix</b>, then tune its dose. The recipe uses the <a href="https://neuronary.org" target="_blank" rel="noopener">neuronary</a> format.</p></div>
       <div class="filters" id="mixterms"></div>
-      <div class="filters">
-        <span class="pill" id="mixstr" style="font-family: var(--mono)">L0N0+0.5</span>
-        <button class="btn" id="mixcopy">Copy</button>
+      <div class="filters" id="mixstarters" hidden></div>
+
+      <div id="mixlive" hidden>
+        <div class="mixprompt"><textarea id="mixprompt" rows="2" placeholder="Ask the model something…"></textarea></div>
+        <div class="filters" id="mixchips">
+          <button class="chip" type="button" data-prompt="Who are you?">Who are you?</button>
+          <button class="chip" type="button" data-prompt="Who am I?">Who am I?</button>
+          <button class="chip" type="button" data-prompt="Tell me a short story.">Tell me a short story.</button>
+        </div>
+        <div class="filters">
+          <label class="muted">Dose scale <input id="mixscale" type="range" min="0" max="2" step="0.05" value="1"> <output id="mixscaleval">1.00×</output></label>
+          <button class="btn primary" id="mixrun" type="button">Run live</button>
+          <span class="status" id="mixlivestatus"></span>
+        </div>
+        <p class="muted" id="mixlivenote">Runs in your browser; first run downloads the model (~270 MB, cached)</p>
+      </div>
+
+      <p class="muted" id="mixhint">This model is too big to run in your browser; below is what each neuron does on its own. Live mixing works for SmolLM2.</p>
+
+      <div class="filters" id="mixrecipe">
+        <span class="pill" id="mixstr" style="font-family: var(--mono)">—</span>
+        <button class="btn" id="mixcopy">Copy recipe</button>
         <a class="btn" id="mixlink" href="https://neuronary.org/" target="_blank" rel="noopener">open on neuronary</a>
       </div>
-      <p class="muted">Generation runs in <code>app.py</code> / the molab notebook — this static page has no model.</p>
     </div>
-    <h3 style="margin:18px 0 8px">Recipe runs</h3>
+
+    <div class="card" id="mixliveout" hidden>
+      <div class="compare">
+        <div class="bubble"><span class="who">normal</span><div id="mixnormal">Waiting to run…</div></div>
+        <div class="bubble plus"><span class="who">mixed</span><div id="mixpushed">Waiting to run…</div></div>
+      </div>
+    </div>
+
+    <div id="mixevidence" hidden></div>
+    <p class="muted" id="mixloadnote" hidden></p>
     <div id="mixruns"></div>
   </section>
 
@@ -1603,6 +1654,9 @@ function recipeHTML(s) {
   }).join("");
 }
 function mixLink() { return "https://neuronary.org/?q=" + encodeURIComponent(mixString().split(" ")[0] || ""); }
+function recipeHasTerm(recipe, t) {
+  return new RegExp(`L${t.layer}N${t.neuron}(?!\\d)`, "i").test(String(recipe || ""));
+}
 function addMix(k, dose = 0.5) {
   const M = S.M; if (!M) return;
   const L = Math.floor(k / M.d), n = k - L * M.d;
@@ -1610,8 +1664,24 @@ function addMix(k, dose = 0.5) {
   if (t) t.dose = dose; else MIX.push({ layer: L, neuron: n, dose });
   renderMix(); setTab("mix");
 }
-function renderMix() {
-  const M = S.M; if (!M) return;
+
+let mixSeq = 0;
+let liveEngine = null;
+let liveEngineFor = null;
+let liveBusy = false;
+function mixStatus(text, err) {
+  const el = $("mixlivestatus");
+  el.innerHTML = err ? `<span class="err">${esc(text)}</span>` : esc(text);
+}
+function mixStarters() {
+  const M = S.M; if (!M) return [];
+  return [...M.lab.entries()]
+    .filter(([, l]) => l.push_kind === "persona")
+    .sort((a, b) => (b[1].confidence ?? 0) - (a[1].confidence ?? 0) || (b[1].detect ?? 0) - (a[1].detect ?? 0))
+    .slice(0, 3);
+}
+function renderMixTerms() {
+  const M = S.M;
   $("mixterms").innerHTML = MIX.length ? MIX.map((t, i) => {
     const lb = M.lab.get(t.layer * M.d + t.neuron);
     return `<span class="pill" style="display:inline-flex;gap:6px;align-items:center">${lb ? esc(lb.emoji) + " " : ""}<b>L${t.layer} · N${t.neuron}</b>
@@ -1620,12 +1690,83 @@ function renderMix() {
   }).join("") : `<span class="muted">No neurons yet. Open a neuron and press “Add to mix”.</span>`;
   $("mixstr").textContent = mixString() || "—";
   $("mixlink").href = mixLink();
-  renderRuns(M);
 }
-function renderRuns(M) {
+function renderMixStarters() {
+  const box = $("mixstarters");
+  if (MIX.length) { box.hidden = true; box.innerHTML = ""; return; }
+  const starters = mixStarters();
+  box.hidden = !starters.length;
+  box.innerHTML = starters.map(([k, l]) => {
+    const L = Math.floor(k / S.M.d), n = k - L * S.M.d;
+    return `<button class="chip" type="button" data-starter="${k}" title="Add ${esc(l.label)} to the mix">${esc(l.emoji || "")} ${esc(l.label)} <small>L${L}·N${n}</small></button>`;
+  }).join("");
+}
+function mixSweepHTML(M, t, data) {
+  const lb = M.lab.get(t.layer * M.d + t.neuron);
+  const sign = t.dose > 0 ? 1 : -1;
+  const variant = sign > 0 ? "plus" : "minus";
+  const fallback = sign > 0 ? "+0.8" : "−0.8";
+  const prompts = data?.prompts || [];
+  const by = new Map();
+  (data?.rows || []).forEach(r => {
+    const pi = Number(r.prompt);
+    if (!by.has(pi)) by.set(pi, []);
+    by.get(pi).push(r);
+  });
+  const body = [...by.keys()].sort((a, b) => a - b).map(pi => {
+    const rs = by.get(pi);
+    const r = sign > 0
+      ? rs.filter(x => Number(x.dose) > 0).sort((a, b) => Number(b.dose) - Number(a.dose))[0]
+      : rs.filter(x => Number(x.dose) < 0).sort((a, b) => Number(a.dose) - Number(b.dose))[0];
+    if (!r) return "";
+    return `<div class="sweeprow"><p class="prompt">“${esc(prompts[pi] ?? "")}”</p>${sweepBubbleHTML(r, variant, fallback)}</div>`;
+  }).join("");
+  return `<div class="card" style="margin-bottom:12px">
+    <div class="idline"><b>L${t.layer} · N${t.neuron}</b><span class="pill ${sign > 0 ? "eo" : ""}">dose ${t.dose > 0 ? "+" : ""}${mixNum(t.dose)} → ${fallback}</span>${lb ? `<span class="pill eo">${esc(lb.emoji)} ${esc(lb.label)}</span>` : ""}</div>
+    ${body || `<p class="muted">No stored sweep replies for this neuron.</p>`}
+  </div>`;
+}
+async function renderMixEvidence(M) {
+  const seq = mixSeq;
+  const box = $("mixevidence");
+  if (!MIX.length) { box.hidden = true; box.innerHTML = ""; return; }
+  box.hidden = false;
+  box.innerHTML = `<h3 style="margin:18px 0 8px">What each neuron does alone (stored sweep, ±0.8)</h3><div id="mixevbody"><p class="muted">Loading stored sweeps…</p></div>`;
+  const terms = MIX.slice();
+  const data = await Promise.all(terms.map(t => neuronSweep(M, t.layer, t.neuron).catch(() => null)));
+  if (seq !== mixSeq || S.M !== M) return;
+  const body = $("mixevbody");
+  if (body) body.innerHTML = terms.map((t, i) => mixSweepHTML(M, t, data[i])).join("");
+}
+function recipeAddTerms(recipe) {
+  const terms = [], skipped = [];
+  const re = /L(\d+)N(\d+)\s*([=*+\-])?\s*([+-]?\d*\.?\d+(?:[eE][+-]?\d+)?)/gi;
+  let m;
+  while ((m = re.exec(String(recipe || "")))) {
+    const op = m[3] || "+";
+    if (op === "=" || op === "*") { skipped.push(m[0].trim()); continue; }
+    let dose = Number(m[4]);
+    if (op === "-") dose = -Math.abs(dose);
+    if (Number.isFinite(dose)) terms.push({ layer: +m[1], neuron: +m[2], dose });
+  }
+  return { terms, skipped };
+}
+function loadRecipeIntoMix(recipe) {
+  const { terms, skipped } = recipeAddTerms(recipe);
+  MIX.splice(0, MIX.length, ...terms);
+  renderMix();
+  const note = $("mixloadnote");
+  if (note) {
+    note.hidden = !skipped.length;
+    note.textContent = skipped.length
+      ? `Loaded ${terms.length} add/sub term${terms.length === 1 ? "" : "s"}; skipped ${skipped.length} set/multiply term${skipped.length === 1 ? "" : "s"} (${skipped.join(", ")}).`
+      : "";
+  }
+}
+function renderRuns(M, terms = null) {
   const rows = M.recipes || [];
   if (!rows.length) {
-    $("mixruns").innerHTML = `<p class="muted">No <code>recipes.parquet</code> for this model yet. Run <code>python -m atlas.steer --recipe …</code> to make one.</p>`;
+    $("mixruns").innerHTML = `<h3 style="margin:18px 0 8px">Recipe runs</h3><p class="muted">No <code>recipes.parquet</code> for this model yet. Run <code>python -m atlas.steer --recipe …</code> to make one.</p>`;
     return;
   }
   const base = new Map(), groups = new Map();
@@ -1635,33 +1776,178 @@ function renderRuns(M) {
     if (!groups.has(key)) groups.set(key, { name: r.name, recipe: r.recipe, rows: [] });
     groups.get(key).rows.push(r);
   });
-  $("mixruns").innerHTML = [...groups.values()].map(g => {
+  const all = [...groups.values()];
+  const matching = terms && terms.length ? all.filter(g => terms.some(t => recipeHasTerm(g.recipe, t))) : [];
+  const rest = matching.length ? all.filter(g => !matching.includes(g)) : all;
+  const groupHTML = g => {
     const by = new Map();
     g.rows.forEach(r => { const p = String(r.prompt); if (!by.has(p)) by.set(p, []); by.get(p).push(r); });
     const body = [...by].map(([p, rs]) => `<p class="prompt">“${esc(p)}”</p><div class="compare">
       <div class="bubble"><span class="who">normal</span>${esc(base.get(p) ?? "(no baseline)")}</div>
       ${rs.sort((a, b) => a.scale - b.scale).map(r => `<div class="bubble plus"><span class="who">scale ${esc(r.scale)}</span>${esc(r.text)}</div>`).join("")}
     </div>`).join("");
-    return `<div class="card" style="margin-bottom:12px"><div class="idline"><b>${esc(g.name)}</b><span>${recipeHTML(g.recipe)}</span></div>${body}</div>`;
-  }).join("");
+    return `<div class="card" style="margin-bottom:12px"><div class="idline"><b>${esc(g.name)}</b><span>${recipeHTML(g.recipe)}</span><button class="btn run-load" type="button" data-loadmix="${esc(g.recipe)}">Load into mix</button></div>${body}</div>`;
+  };
+  const compactHTML = (g, i) => {
+    const prompts = [...new Set(g.rows.map(r => String(r.prompt)))];
+    const p = prompts.find(x => x.trim().toLowerCase() === "who are you?") ?? prompts[0] ?? "";
+    const rs = g.rows.filter(r => String(r.prompt) === p).sort((a, b) => Number(a.scale) - Number(b.scale));
+    const scaled = rs.find(r => Number(r.scale) === 1) || rs[0];
+    return `<details class="run-row" data-run="${i}"><summary><span class="run-compact">
+      <span class="run-head"><b>${esc(g.name)}</b><span class="run-pills">${recipeHTML(g.recipe)}</span><button class="btn run-load" type="button" data-loadmix="${esc(g.recipe)}">Load into mix</button></span>
+      <span class="run-line"><span class="who">normal</span><span class="run-reply">${esc(base.get(p) ?? "(no baseline)")}</span></span>
+      <span class="run-line plus"><span class="who">scale ${scaled ? esc(scaled.scale) : "1"}</span><span class="run-reply">${esc(scaled ? scaled.text : "(no scale-1 reply)")}</span></span>
+    </span></summary><div class="run-full"></div></details>`;
+  };
+  let html = "";
+  if (matching.length) html += `<h3 style="margin:18px 0 8px">Stored recipe runs with these neurons</h3>` + matching.map(groupHTML).join("");
+  if (rest.length) html += `<details class="runs-all"><summary>All stored recipe runs (${rest.length})</summary><div class="runs-all-body"></div></details>`;
+  else if (!matching.length) html += `<h3 style="margin:18px 0 8px">Recipe runs</h3><p class="muted">No stored recipe runs for this model.</p>`;
+  else html += `<p class="muted">No other stored recipe runs for this model.</p>`;
+  $("mixruns").innerHTML = html;
+  const det = $("mixruns").querySelector("details.runs-all");
+  if (det) {
+    let built = false;
+    det.addEventListener("toggle", () => {
+      if (!det.open || built) return;
+      built = true;
+      const body = det.querySelector(".runs-all-body");
+      if (!body) return;
+      body.innerHTML = rest.map(compactHTML).join("");
+      body.querySelectorAll("details.run-row").forEach(row => {
+        row.addEventListener("toggle", () => {
+          if (!row.open) return;
+          const full = row.querySelector(".run-full");
+          const g = rest[+row.dataset.run];
+          if (full && g && !full.dataset.built) { full.innerHTML = groupHTML(g); full.dataset.built = "1"; }
+        });
+      });
+    });
+  }
+}
+async function runMixLive() {
+  const M = S.M; if (!M || liveBusy) return;
+  const live = M.info.live;
+  if (!live || !live.model) return;
+  const prompt = $("mixprompt").value.trim();
+  if (!prompt) { mixStatus("Enter a prompt first.", true); return; }
+  liveBusy = true;
+  $("mixrun").disabled = true;
+  $("mixrun").textContent = "Running…";
+  $("mixliveout").hidden = false;
+  $("mixnormal").textContent = "";
+  $("mixpushed").textContent = "";
+  mixStatus("Loading engine…");
+  try {
+    if (!liveEngine || liveEngineFor !== live.model) {
+      const mod = await import(new URL("engine.js", location.href).href);
+      liveEngine = await mod.loadEngine(live.model, {
+        onProgress(received, total, cached) {
+          if (cached) { mixStatus("Model loaded from cache."); return; }
+          const mb = (received / 1e6).toFixed(1);
+          mixStatus(total > 0 ? `Downloading model… ${mb} / ${(total / 1e6).toFixed(1)} MB` : `Downloading model… ${mb} MB`);
+        },
+        onStatus(text, kind) {
+          if (!kind || kind === "warn") mixStatus(text);
+        },
+      });
+      liveEngineFor = live.model;
+    }
+    mixStatus(MIX.length ? `Running · ${MIX.length} neuron${MIX.length === 1 ? "" : "s"} pushed` : "Running · zero steer");
+    const result = await liveEngine.generate({
+      prompt,
+      terms: MIX.map(t => ({ layer: t.layer, neuron: t.neuron, dose: t.dose })),
+      scale: Number($("mixscale").value),
+      maxTokens: 48,
+      onToken(stream, text) {
+        if (stream === "normal") $("mixnormal").textContent = text;
+        else $("mixpushed").textContent = text;
+      },
+    });
+    $("mixnormal").textContent = result.normal;
+    $("mixpushed").textContent = result.pushed;
+    mixStatus(`${result.tokensPerSecond.toFixed(1)} tok/s`);
+  } catch (e) {
+    mixStatus("Live run failed: " + (e?.message || e), true);
+  } finally {
+    liveBusy = false;
+    $("mixrun").disabled = false;
+    $("mixrun").textContent = "Run live";
+  }
+}
+function renderMix() {
+  const M = S.M; if (!M) return;
+  mixSeq++;
+  const live = !!(M.info.live && M.info.live.model);
+  const evidence = !live && !!M.info.sweep_cards;
+  const loadNote = $("mixloadnote");
+  if (loadNote) { loadNote.hidden = true; loadNote.textContent = ""; }
+  renderMixTerms();
+  renderMixStarters();
+  $("mixlive").hidden = !live;
+  $("mixliveout").hidden = !live;
+  if (!live) {
+    $("mixnormal").textContent = "";
+    $("mixpushed").textContent = "";
+    $("mixlivestatus").textContent = "";
+  }
+  $("mixhint").hidden = !evidence;
+  renderMixChips();
+  $("mixevidence").hidden = !evidence;
+  if (!evidence) $("mixevidence").innerHTML = "";
+  renderRuns(M, evidence ? MIX : null);
+  if (evidence) renderMixEvidence(M);
 }
 $("mixterms").addEventListener("input", e => {
   const inp = e.target.closest("input[data-i]"); if (!inp) return;
   MIX[+inp.dataset.i].dose = Math.max(-3, Math.min(3, Number(inp.value) || 0));
   $("mixstr").textContent = mixString() || "—";
   $("mixlink").href = mixLink();
+  if (S.M?.info.sweep_cards && !S.M.info.live) { mixSeq++; renderRuns(S.M, MIX); renderMixEvidence(S.M); }
 });
 $("mixterms").addEventListener("click", e => {
   const b = e.target.closest("[data-rm]"); if (!b) return;
   MIX.splice(+b.dataset.rm, 1); renderMix();
 });
+$("mixstarters").addEventListener("click", e => {
+  const b = e.target.closest("[data-starter]"); if (!b) return;
+  addMix(+b.dataset.starter);
+});
+const MIX_PROMPTS = ["Who are you?", "Who am I?", "Tell me a short story."];
+let mixPromptInit = false;
+function renderMixChips() {
+  if (!mixPromptInit) {
+    mixPromptInit = true;
+    if (!$("mixprompt").value) $("mixprompt").value = MIX_PROMPTS[0];
+  }
+  const value = $("mixprompt").value.trim();
+  const seen = new Set();
+  $("mixchips").innerHTML = MIX_PROMPTS.filter(p => !seen.has(p) && (seen.add(p), true)).map(p =>
+    `<button class="chip" type="button" data-prompt="${esc(p)}" aria-pressed="${p === value}">${esc(p)}</button>`).join("");
+}
+$("mixchips").onclick = e => {
+  const b = e.target.closest("button[data-prompt]"); if (!b) return;
+  $("mixprompt").value = b.dataset.prompt;
+  renderMixChips();
+  $("mixprompt").focus();
+};
+$("mixprompt").addEventListener("input", renderMixChips);
+$("mixscale").oninput = () => { $("mixscaleval").textContent = Number($("mixscale").value).toFixed(2) + "×"; };
+$("mixrun").onclick = runMixLive;
 $("mixcopy").onclick = async () => {
   try { await navigator.clipboard.writeText(mixString()); $("mixcopy").textContent = "Copied"; }
   catch { $("mixcopy").textContent = "Copy failed"; }
-  setTimeout(() => { $("mixcopy").textContent = "Copy" }, 1200);
+  setTimeout(() => { $("mixcopy").textContent = "Copy recipe" }, 1200);
 };
 $("mixruns").onclick = e => {
+  const load = e.target.closest("button[data-loadmix]");
+  if (load) {
+    e.preventDefault();
+    loadRecipeIntoMix(load.dataset.loadmix);
+    return;
+  }
   const b = e.target.closest("button[data-open]"); if (!b) return;
+  e.preventDefault();
   const [L, n] = b.dataset.open.split(":").map(Number), M = S.M;
   setTab("map"); openNeuron(L * M.d + n, { focus: true });
 };
@@ -1814,6 +2100,8 @@ $("sqltext").onkeydown = e => { if ((e.metaKey || e.ctrlKey) && e.key === "Enter
 async function selectModel(id) {
   $("sub").textContent = "loading…";
   const M = await loadModel(id); S.M = M; S.sel = -1; hits = null; S.isolate = -1; view.s = 1; view.tx = view.ty = 0; G.cur = null; MIX.length = 0;
+  liveEngine = null; liveEngineFor = null; liveBusy = false;
+  $("mixnormal").textContent = "Waiting to run…"; $("mixpushed").textContent = "Waiting to run…"; $("mixlivestatus").textContent = "";
   if (!M.info.user_sweep && S.sweep !== "model") setSweep("model", true); else updateSweepUI();
   store.set("atlas-model", id);
   [...$("models").children].forEach(b => b.setAttribute("aria-pressed", b.dataset.id === id));
