@@ -74,7 +74,28 @@ first).
    +1.0 → *"I am a progress bar that shows the percentage of my completion."*
 8. **Replayed neuronary recipes mostly reproduce at the authors' dose.** Judged by DeepSeek against each recipe's
    description (`repro.py`): at scale 1, 46% yes, 36% partial, 18% no; at half dose, 4% yes.
-9. Smaller things. The first two positions of every document behave as attention sinks and flooded the top-example
+9. **Pushing every neuron: personas are rare, a garbled name is common.** The all-neuron Qwen3.5-4B sweep pushed
+   all 294,912 neurons up and down (±0.8) on "Who are you?" and "Tell me a short story." (1.18M replies). DeepSeek
+   labeled every "Who are you?" reply that drops the Qwen name plus a seeded 5% sample of everything else, so
+   weighted counts estimate all replies: default assistant 62%, altered assistant 22%, broken text 13%, other 3%,
+   **persona 0.5%**. Layers 0 and 31 mostly break the model; personas peak in layers 1–7 (~1–1.3% of pushes, up and
+   down alike); in layers 20–27 ~40% of pushes alter the assistant, mostly by mangling its own name ("I am Q",
+   "Q3", "Qian"…) or rebranding it (Google / Bing / Baidu). Persona themes: humans by age or job ("a 10-year-old
+   girl", "a senior software engineer"), objects, animals, mystic ("a cryptic 'the one'", "a poetic mirror").
+10. **Asked "Who am I?", pushes recast the user far more often than they recast the model.** A second sweep (all
+    neurons, ±0.8, 590k replies), after Sauers' idea of neurons that induce a persona in the user. Unpushed, Qwen3.5-4B
+    reads the question as about itself. Pushed, **13% of replies tell the user who they are**: 26 times the
+    model-persona rate of finding 9, peaking at 38–41% in layers 19–20. The user becomes a human (37k labeled
+    replies), the AI itself in a role swap (15k: *"You are **Qwen3.5**, the large language model developed by Alibaba
+    Cloud. How can I assist you today?"*), "the user" (6.5k), or something specific (10k: *"you are a patient
+    experiencing acute respiratory distress"*, *"You are **Mars**, the Roman god of war"*, *"You are a ticket number
+    associated with this case"*). User-persona and model-persona neurons barely overlap (1,125 neurons do both vs
+    958 expected by chance), and the user-side ones sit deeper.
+11. **A 135M model runs steered in the browser with exact parity.** SmolLM2-135M exported to ONNX with an extra
+    `steer` input reproduces our PyTorch hooks token for token (32/32 greedy tokens in all six test cases). Every
+    quantization tried broke it (int8 dynamic 0–3/32 tokens, weight-only q8 5–32/32, q4 0–2/32), while fp16 stays
+    exact; with a KV cache and the tied embedding stored once it is 271 MB and ~8 tokens/s on a laptop CPU (wasm).
+12. Smaller things. The first two positions of every document behave as attention sinks and flooded the top-example
    lists until masked, along with the chat-template prefix every chat shares. Qwen3 needs `enable_thinking=False`, or
    every steered reply is a `<think>` preamble. Qwen's logit lens is often in Chinese even for English-firing
    neurons ("more importantly" → 最重要). The UMAP map of output directions is a near-uniform cloud (mean top-1
@@ -116,6 +137,14 @@ The dataset card that `export.py hub` writes documents every column.
   SQL tab on DuckDB-WASM. It reads parquet with hyparquet, so it runs from any static host:
   `python -m atlas.export site --out out --site site && python -m http.server -d site`, or point it at a Hub
   dataset with `?data=<user>/<dataset>`.
+- **Overview and Personas tabs** (Qwen3.5-4B): what a push does by layer (weighted estimates over the whole
+  sweep), persona rate up vs down, the most common characters, and a library of every labeled persona with theme
+  chips, filters, CSV and shareable filter links; a switch flips both between "Who are you?" (the model) and "Who am
+  I?" (the user). `sweep_stats.py` builds their files; `atlas/themes.py` groups names into themes.
+- **In-browser steering** (`browser/`, live at the Space's
+  [live.html](https://nikhilxvytla-neuron-atlas-explorer.static.hf.space/live.html#L10N100+0.8)): SmolLM2-135M on
+  onnxruntime-web (WebGPU or wasm), normal vs pushed reply side by side, neuronary recipes in the URL hash.
+  `browser/export_onnx.py --kv` builds the model, `browser/check_onnx.py --kv` checks parity against PyTorch.
 - **Gradio app** (`app.py`): type text and see which neurons fire (z-scored with the atlas stats), click one to
   highlight it, push any neuron and compare greedy replies. SmolLM2-135M runs on a laptop CPU.
 - **molab notebook** (`molab_atlas.py`, marimo): pick a model, corpus size and push mode, then build atlas →
@@ -171,9 +200,10 @@ notebook from the header's specs button. Two ways to use it:
 
 ## Limits
 
-- Pushes cover the most peaked neurons per layer plus random ones, which finding 7 shows is the wrong selection
-  for steering; the all-neuron Qwen3.5-4B sweep (±0.8, two prompts, 1.18M replies) is the fix and is running.
-- Greedy decoding, 32–48 new tokens, two prompts.
+- Per-neuron pushes for most models cover the most peaked neurons per layer plus random ones, which finding 7
+  shows is the wrong selection for steering; only Qwen3.5-4B has the all-neuron sweeps.
+- Greedy decoding, 32–48 new tokens, one dose per sweep (±0.8), a handful of prompts. The sweeps label a filtered
+  subset plus a 5% sample, so per-neuron labels exist only for picked replies.
 - 2,500 documents is a small corpus. Rare features will not show, and smol-smoltalk duplicates show up as repeated
   top examples.
 - Labels are from one cheap model. The hand audit is 50 labels by one grader.
@@ -194,6 +224,10 @@ notebook from the header's specs button. Two ways to use it:
 | `atlas/label.py` | DeepSeek (any OpenAI-compatible API): push categories, labels, held-out check + null |
 | `atlas/export.py` | static site, base64 site for artifact hosting, HF dataset + card, static Space |
 | `explorer/index.html` | the static explorer (body fragment; `export.py` wraps it for plain hosting) |
+| `sweep_stats.py` | weighted per-layer reply kinds and the persona library files for an all-neuron sweep |
+| `atlas/themes.py` | groups free-text persona names into themes (LLM taxonomy, then assignment, cached) |
+| `browser/` | in-browser SmolLM2 with a push input: ONNX export, parity checks, the demo page |
+| `UI_SURVEY.md` | survey of neuronpersonas, re:dvx, neuronary, Neuronpedia, Transluce and others |
 | `app.py` | Gradio live app |
 | `molab_atlas.py` | marimo notebook for molab GPUs |
 | `figure.py`, `summary.png` | summary figure |
