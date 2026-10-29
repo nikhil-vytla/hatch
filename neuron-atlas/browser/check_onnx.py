@@ -25,6 +25,30 @@ import export_onnx as ex  # noqa: E402
 
 MAX_NEW, PENALTY = 32, 1.1
 RECIPE = "L5N200-0.5 L12N300+0.5"
+FILE_SUFFIXES = {
+    "fp32": "_steer.onnx",
+    "int8": "_steer_int8.onnx",
+    "fp16": "_steer_fp16.onnx",
+    "kv": "_steer_kv.onnx",
+    "kv_fp16": "_steer_kv_fp16.onnx",
+    "kv_q8": "_steer_kv_q8.onnx",
+    "kv_q4": "_steer_kv_q4.onnx",
+}
+
+
+def export_path(build, meta, key):
+    """Prefer the names recorded by export_onnx, then find them by model stem in the build folder."""
+    recorded = (meta.get("files") or {}).get(key)
+    if recorded:
+        path = build / Path(recorded).name
+        if path.exists():
+            return path
+    suffix = FILE_SUFFIXES[key]
+    path = build / f"{ex.short_name(meta['model'])}{suffix}"
+    if path.exists():
+        return path
+    matches = sorted(build.glob(f"*{suffix}"))
+    return matches[0] if len(matches) == 1 else path
 
 
 def session(path, threads=4):
@@ -151,10 +175,10 @@ def run_kv_checks(build, meta, n_layers, d_mlp, resid, colnorm, eos, nm):
     prompts = ["Who are you?", "Tell me a short story."]
     conds = [("none", []), ("L10N100+0.8", [(10, 100, "add", 0.8)]),
              ("recipe", parse_recipe(RECIPE))]
-    paths = {"fp32": build / "smollm2_steer_kv.onnx",
-             "fp16": build / "smollm2_steer_kv_fp16.onnx",
-             "q8": build / "smollm2_steer_kv_q8.onnx",
-             "q4": build / "smollm2_steer_kv_q4.onnx"}
+    paths = {"fp32": export_path(build, meta, "kv"),
+             "fp16": export_path(build, meta, "kv_fp16"),
+             "q8": export_path(build, meta, "kv_q8"),
+             "q4": export_path(build, meta, "kv_q4")}
     names = {k: p.name for k, p in paths.items()}
     sessions, dims = {}, {}
     for key, path in paths.items():
@@ -282,8 +306,10 @@ def main():
     wrapper = ex.SteerWrapper(nm.model)  # wraps the same model in place; nm's hooks still apply
     wrapper._steer = None
 
-    fp32 = session(build / "smollm2_steer.onnx")
-    int8 = session(build / "smollm2_steer_int8.onnx")
+    fp32_path = export_path(build, meta, "fp32")
+    int8_path = export_path(build, meta, "int8")
+    fp32 = session(fp32_path)
+    int8 = session(int8_path)
 
     def ort_logits(sess, ids, steer):
         return sess.run(None, {"input_ids": ids.numpy().astype(np.int64), "steer": steer})[0][0]
@@ -339,8 +365,8 @@ def main():
 
     bad = [m8 for _, cname, _, m8, *_ in rows if cname == "none" and m8 < 16]
     if bad:
-        fp16_path = build / "smollm2_steer_fp16.onnx"
-        ex.export_fp16(build / "smollm2_steer.onnx", fp16_path)
+        fp16_path = export_path(build, meta, "fp16")
+        ex.export_fp16(fp32_path, fp16_path)
         print(f"\nint8 drift on no-push prompts ({bad}); wrote {fp16_path} "
               f"({fp16_path.stat().st_size / 1e6:.1f} MB)")
         fp16 = session(fp16_path)

@@ -111,6 +111,10 @@ nav.tabs button { border: 0; background: none; padding: 7px 14px; font: 600 14px
 nav.tabs button:hover { color: var(--ink) }
 nav.tabs button[aria-selected="true"] { color: var(--ink); background: var(--surface);
   box-shadow: var(--pill-shadow) }
+.tabpane { display: flex; flex-direction: column; gap: var(--s2) }
+.subtabs { display: flex; flex-wrap: wrap; gap: 8px; align-items: center }
+.sweephint { margin: 0 0 6px }
+.sweephint a { color: var(--accent); font-weight: 600 }
 
 .bench { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 16px; align-items: start }
 @media (max-width: 900px) { .bench { grid-template-columns: minmax(0, 1fr) } }
@@ -328,17 +332,13 @@ textarea.sql { width: 100%; min-height: 110px; font: 13px var(--mono); border: 1
   </header>
 
   <nav class="tabs" role="tablist" id="tabs">
-    <button role="tab" aria-selected="true" aria-controls="v-map" data-t="map" tabindex="0">Map</button>
-    <button role="tab" aria-selected="false" aria-controls="v-overview" data-t="overview" tabindex="-1">Overview</button>
-    <button role="tab" aria-selected="false" aria-controls="v-pushes" data-t="pushes" tabindex="-1">Pushes</button>
-    <button role="tab" aria-selected="false" aria-controls="v-personas" data-t="personas" tabindex="-1">Personas</button>
-    <button role="tab" aria-selected="false" aria-controls="v-mix" data-t="mix" tabindex="-1">Mix</button>
-    <button role="tab" aria-selected="false" aria-controls="v-board" data-t="board" tabindex="-1">Leaderboard</button>
-    <button role="tab" aria-selected="false" aria-controls="v-compare" data-t="compare" tabindex="-1">Across models</button>
-    <button role="tab" aria-selected="false" aria-controls="v-guess" data-t="guess" tabindex="-1">Guess the neuron</button>
-    <button role="tab" aria-selected="false" aria-controls="v-sql" data-t="sql" tabindex="-1">SQL</button>
+    <button role="tab" aria-selected="true" aria-controls="p-explore" data-t="explore" tabindex="0">Explore</button>
+    <button role="tab" aria-selected="false" aria-controls="p-personas" data-t="personas" tabindex="-1">Personas</button>
+    <button role="tab" aria-selected="false" aria-controls="p-play" data-t="play" tabindex="-1">Play</button>
+    <button role="tab" aria-selected="false" aria-controls="p-data" data-t="data" tabindex="-1">Data</button>
   </nav>
 
+  <section id="p-explore" class="tabpane">
   <section id="v-map" class="bench">
     <div class="plate">
       <div class="hud">
@@ -353,13 +353,18 @@ textarea.sql { width: 100%; min-height: 110px; font: 13px var(--mono); border: 1
     </div>
     <article class="card" id="panel" aria-live="polite"><p class="muted">Loading…</p></article>
   </section>
+  </section>
 
-  <section id="v-overview" hidden>
-    <div class="ov-controls">
-      <div class="seg" id="ovsweep" role="group" aria-label="Sweep" hidden>
+  <section id="p-personas" class="tabpane" hidden>
+    <div class="subtabs">
+      <div class="seg" id="sub-personas" role="group" aria-label="Personas view"></div>
+      <div class="seg" id="psweep" role="group" aria-label="Sweep" hidden>
         <button aria-pressed="true" data-s="model">Who are you? · the model</button>
         <button aria-pressed="false" data-s="user">Who am I? · the user</button>
       </div>
+    </div>
+  <section id="v-overview" hidden>
+    <div class="ov-controls">
       <select id="ovprompt" aria-label="Prompt">
         <option value="">both prompts</option>
         <option value="0">Who are you?</option>
@@ -388,12 +393,6 @@ textarea.sql { width: 100%; min-height: 110px; font: 13px var(--mono); border: 1
   </section>
 
   <section id="v-personas" hidden>
-    <div class="filters">
-      <div class="seg" id="psweep" role="group" aria-label="Sweep" hidden>
-        <button aria-pressed="true" data-s="model">Who are you? · the model</button>
-        <button aria-pressed="false" data-s="user">Who am I? · the user</button>
-      </div>
-    </div>
     <p class="muted" id="pempty" hidden>No persona library for this model yet</p>
     <div class="filters" id="pfilters">
       <input id="psearch" type="search" autocomplete="off" placeholder="Search personas, changes, replies…" aria-label="Search personas" style="flex:1 1 260px">
@@ -426,7 +425,12 @@ textarea.sql { width: 100%; min-height: 110px; font: 13px var(--mono); border: 1
     <div class="pgrid" id="pgrid"></div>
     <div id="pmorow" style="margin-top:12px"><button class="btn" id="pmore" hidden>Show more</button></div>
   </section>
+  </section>
 
+  <section id="p-play" class="tabpane" hidden>
+    <div class="subtabs">
+      <div class="seg" id="sub-play" role="group" aria-label="Play view"></div>
+    </div>
   <section id="v-mix" hidden>
     <div class="card">
       <div><h2>Mix neurons</h2><p class="muted">Open a neuron and press <b>Add to mix</b>, then tune its dose. The recipe uses the <a href="https://neuronary.org" target="_blank" rel="noopener">neuronary</a> format.</p></div>
@@ -469,6 +473,21 @@ textarea.sql { width: 100%; min-height: 110px; font: 13px var(--mono); border: 1
     <div id="mixruns"></div>
   </section>
 
+  <section id="v-guess" hidden>
+    <div class="game">
+      <div class="score"><span id="gscore">score 0 / 0</span><span id="gstreak">streak 0</span><span class="muted" id="gmodel"></span></div>
+      <p class="muted">Here is where a neuron fires hardest (the boxed token is its peak). Which label did the labeler give it?</p>
+      <div id="gex"></div>
+      <div class="choices" id="gchoices"></div>
+      <div><button class="btn" id="gnext">Next neuron</button> <button class="btn" id="gopen" hidden>Open in map</button></div>
+    </div>
+  </section>
+  </section>
+
+  <section id="p-data" class="tabpane" hidden>
+    <div class="subtabs">
+      <div class="seg" id="sub-data" role="group" aria-label="Data view"></div>
+    </div>
   <section id="v-board" hidden>
     <div class="filters"><input id="bq" placeholder="filter labels" aria-label="Filter labels"><span class="status" id="bcount"></span></div>
     <div class="tablewrap"><table><thead><tr id="bhead"></tr></thead><tbody id="bbody"></tbody></table></div>
@@ -484,16 +503,6 @@ textarea.sql { width: 100%; min-height: 110px; font: 13px var(--mono); border: 1
     <div class="compare" id="cout"></div>
   </section>
 
-  <section id="v-guess" hidden>
-    <div class="game">
-      <div class="score"><span id="gscore">score 0 / 0</span><span id="gstreak">streak 0</span><span class="muted" id="gmodel"></span></div>
-      <p class="muted">Here is where a neuron fires hardest (the boxed token is its peak). Which label did the labeler give it?</p>
-      <div id="gex"></div>
-      <div class="choices" id="gchoices"></div>
-      <div><button class="btn" id="gnext">Next neuron</button> <button class="btn" id="gopen" hidden>Open in map</button></div>
-    </div>
-  </section>
-
   <section id="v-sql" hidden>
     <p class="muted">DuckDB-WASM over the current model's parquet files. Tables: <code>neurons</code>, <code>labels</code>, <code>steer</code>, <code>tokens</code>, <code>examples</code> (all layers).</p>
     <div class="filters" id="sqlx"></div>
@@ -501,10 +510,12 @@ textarea.sql { width: 100%; min-height: 110px; font: 13px var(--mono); border: 1
 from labels l join neurons n using (layer, neuron)
 order by detect desc nulls last, confidence desc limit 25</textarea>
     <div class="filters"><button class="btn primary" id="sqlrun">Run query</button><span class="status" id="sqlstat"></span></div>
-    <div class="tablewrap"><table id="sqlout"></table></div>
+        <div class="tablewrap"><table id="sqlout"></table></div>
+  </section>
   </section>
 
-  <p class="foot" id="foot">Each point is one MLP neuron, placed by its output direction (UMAP of the down-projection column), so neurons that write similar things sit together. <b>Fires on</b>: the corpus documents with the highest activation, stained by activation per token. <b>Promotes</b>: the logit lens of the neuron's output direction. <b>Pushes</b>: replies with the neuron's activation raised or lowered at every token, by a dose in units of the median residual-stream norm. Labels and the held-out check come from an LLM labeler, so treat them as hypotheses.</p>
+  <p class="foot" id="foot">
+Each point is one MLP neuron, placed by its output direction (UMAP of the down-projection column), so neurons that write similar things sit together. <b>Fires on</b>: the corpus documents with the highest activation, stained by activation per token. <b>Promotes</b>: the logit lens of the neuron's output direction. <b>Pushes</b>: replies with the neuron's activation raised or lowered at every token, by a dose in units of the median residual-stream norm. Labels and the held-out check come from an LLM labeler, so treat them as hypotheses.</p>
 </div>
 
 <script type="module">
@@ -623,7 +634,7 @@ function renderKindChips() {
 }
 function updateSweepUI() {
   const hasUser = !!S.M?.info.user_sweep, user = S.sweep === "user";
-  ["psweep", "ovsweep"].forEach(id => {
+  ["psweep"].forEach(id => {
     const el = $(id); if (!el) return;
     el.hidden = !hasUser;
     [...el.children].forEach(b => b.setAttribute("aria-pressed", b.dataset.s === S.sweep));
@@ -898,12 +909,16 @@ function sweepBubbleHTML(r, variant, fallback) {
   const label = r.reply_kind ? PERSONA_KIND_LABEL[r.reply_kind] || r.reply_kind : "";
   return `<div class="bubble ${variant}"><div class="pmeta"><span class="sweepdose">${sweepDoseLabel(r.dose)}</span>${label ? `<span class="pill eo">${esc(label)}</span>` : ""}${r.who ? `<b>${esc(r.who)}</b>` : ""}</div>${esc(r.text ?? "")}</div>`;
 }
+function sweepHintHTML() {
+  if (!S.M?.info.sweep_cards) return "";
+  return `<p class="muted sweephint">Every neuron of this model was pushed at ±0.8; <a href="#overview" data-goto-overview>see Personas</a> for what that does across the model.</p>`;
+}
 function sweepCardHTML(data) {
   const { rows, base, prompts } = data;
-  if (!rows?.length) return `<h3>What pushing it does</h3><p class="muted">No sweep replies for this neuron.</p>`;
+  if (!rows?.length) return sweepHintHTML() + `<h3>What pushing it does</h3><p class="muted">No sweep replies for this neuron.</p>`;
   const by = new Map();
   rows.forEach(r => { const pi = Number(r.prompt); if (!by.has(pi)) by.set(pi, []); by.get(pi).push(r); });
-  return `<h3>What pushing it does</h3>` + [...by.keys()].sort((a, b) => a - b).map(pi => {
+  return sweepHintHTML() + `<h3>What pushing it does</h3>` + [...by.keys()].sort((a, b) => a - b).map(pi => {
     const rs = by.get(pi);
     const minus = rs.filter(r => Number(r.dose) < 0).sort((a, b) => Number(a.dose) - Number(b.dose))[0];
     const plus = rs.filter(r => Number(r.dose) > 0).sort((a, b) => Number(b.dose) - Number(a.dose))[0];
@@ -954,7 +969,7 @@ async function openNeuron(k, opts = {}) {
     }
   }
   const row = M.rows[k];
-  const sweepHTML = M.info.sweep_cards ? `<div id="sweepbox"><h3>What pushing it does</h3><div class="skel line" aria-hidden="true"></div><div class="skel line short" aria-hidden="true"></div></div>` : "";
+  const sweepHTML = M.info.sweep_cards ? `<div id="sweepbox">${sweepHintHTML()}<h3>What pushing it does</h3><div class="skel line" aria-hidden="true"></div><div class="skel line short" aria-hidden="true"></div></div>` : "";
   const steerHTML = M.info.steer_sharded ? `<div id="pushbox"><p class="muted">Loading pushes…</p></div>` : pushCardHTML(M, k, M.steer.get(k) || []);
   const badges = lb ? [
     `<span class="pill">confidence ${lb.confidence}/5</span>`,
@@ -1001,7 +1016,7 @@ async function openNeuron(k, opts = {}) {
     const sd = await sweepP.catch(() => null);
     if (S.sel !== k) return;
     const box = $("sweepbox");
-    if (box) box.innerHTML = sd ? sweepCardHTML(sd) : `<h3>What pushing it does</h3><p class="muted">No sweep replies for this neuron.</p>`;
+    if (box) box.innerHTML = sd ? sweepCardHTML(sd) : sweepHintHTML() + `<h3>What pushing it does</h3><p class="muted">No sweep replies for this neuron.</p>`;
     if (opts.sweep && box) requestAnimationFrame(() => box.scrollIntoView({ block: "start", behavior: "smooth" }));
   }
   if (M.info.steer_sharded) {
@@ -1070,26 +1085,69 @@ $("surprise").onclick = () => { const M = S.M; const g = goodNeurons(M); if (!g.
 
 /* ---------- tabs ---------- */
 const TABS = ["map", "overview", "pushes", "personas", "mix", "board", "compare", "guess", "sql"];
-function setTab(t) {
-  S.tab = t; TABS.forEach(x => { $("v-" + x).hidden = x !== t; });
+const TOP_TABS = ["explore", "personas", "play", "data"];
+const TAB_OF = { map: "explore", overview: "personas", pushes: "personas", personas: "personas", mix: "play", guess: "play", board: "data", compare: "data", sql: "data" };
+const TOP_DEFAULT = { explore: "map", personas: null, play: "mix", data: "board" };
+const lastSub = { explore: "map", personas: null, play: null, data: null };
+function subviewsFor(top) {
+  if (top === "personas") {
+    const subs = [["overview", "Overview"], ["personas", "Library"]];
+    if (!S.M?.info.personas) subs.push(["pushes", "Pushes"]);
+    return subs;
+  }
+  if (top === "play") return [["mix", "Mix"], ["guess", "Guess the neuron"]];
+  if (top === "data") return [["board", "Leaderboard"], ["compare", "Across models"], ["sql", "SQL"]];
+  return [["map", "Map"]];
+}
+function hasSub(top, view) { return subviewsFor(top).some(([v]) => v === view); }
+function defaultSub(top) { return top === "personas" ? (S.M?.info.personas ? "personas" : "pushes") : TOP_DEFAULT[top]; }
+function renderSubNav() {
+  ["personas", "play", "data"].forEach(top => {
+    const el = $("sub-" + top); if (!el) return;
+    const subs = subviewsFor(top), sig = subs.map(([v]) => v).join("|");
+    if (el.dataset.sig !== sig) {
+      el.innerHTML = subs.map(([v, label]) => `<button type="button" data-v="${v}" aria-pressed="false">${label}</button>`).join("");
+      el.dataset.sig = sig;
+    }
+    const active = hasSub(top, lastSub[top]) ? lastSub[top] : defaultSub(top);
+    [...el.children].forEach(b => b.setAttribute("aria-pressed", b.dataset.v === active));
+  });
+}
+function paintTab(top, view) {
+  TOP_TABS.forEach(x => { $("p-" + x).hidden = x !== top; });
+  TABS.forEach(x => { $("v-" + x).hidden = x !== view; });
   [...$("tabs").children].forEach(b => {
-    const on = b.dataset.t === t;
+    const on = b.dataset.t === top;
     b.setAttribute("aria-selected", on);
     b.tabIndex = on ? 0 : -1;
   });
-  if (t === "map") requestAnimationFrame(sizeCanvas);
-  if (t === "overview") renderOverview();
-  if (t === "pushes") renderPushes();
-  if (t === "personas") renderPersonas();
-  if (t === "mix") renderMix();
-  if (t === "board") renderBoard();
-  if (t === "guess" && !G.cur) nextGuess();
-  if (t === "sql") sqlInit();
-  if (t === "personas") syncPersonasHash();
-  else if (t === "overview") syncOverviewHash();
-  else if (t !== "map") { try { history.replaceState(null, "", "#" + t) } catch {} }
+  renderSubNav();
 }
-$("tabs").onclick = e => { const b = e.target.closest("button"); if (b) setTab(b.dataset.t); };
+function setTab(t) {
+  if (TOP_TABS.includes(t) && !TABS.includes(t)) {
+    const top = t;
+    return setTab(hasSub(top, lastSub[top]) ? lastSub[top] : defaultSub(top));
+  }
+  if (!TABS.includes(t)) return;
+  const top = TAB_OF[t], view = t;
+  S.tab = view; lastSub[top] = view;
+  paintTab(top, view);
+  if (view === "map") requestAnimationFrame(sizeCanvas);
+  if (view === "overview") renderOverview();
+  if (view === "pushes") renderPushes();
+  if (view === "personas") renderPersonas();
+  if (view === "mix") renderMix();
+  if (view === "board") renderBoard();
+  if (view === "guess" && !G.cur) nextGuess();
+  if (view === "sql") sqlInit();
+  if (view === "personas") syncPersonasHash();
+  else if (view === "overview") syncOverviewHash();
+  else if (view !== "map") { try { history.replaceState(null, "", "#" + view) } catch {} }
+}
+function openTop(top) {
+  setTab(hasSub(top, lastSub[top]) ? lastSub[top] : defaultSub(top));
+}
+$("tabs").onclick = e => { const b = e.target.closest("button"); if (b) openTop(b.dataset.t); };
 $("tabs").addEventListener("keydown", e => {
   if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) return;
   const tabs = [...$("tabs").children], i = tabs.indexOf(document.activeElement);
@@ -1098,7 +1156,14 @@ $("tabs").addEventListener("keydown", e => {
   const n = e.key === "Home" ? 0 : e.key === "End" ? tabs.length - 1
     : (i + (e.key === "ArrowRight" ? 1 : -1) + tabs.length) % tabs.length;
   tabs[n].focus();
-  setTab(tabs[n].dataset.t);
+  openTop(tabs[n].dataset.t);
+});
+["personas", "play", "data"].forEach(top => {
+  $("sub-" + top).onclick = e => { const b = e.target.closest("button[data-v]"); if (b) setTab(b.dataset.v); };
+});
+document.addEventListener("click", e => {
+  const a = e.target.closest("[data-goto-overview]");
+  if (a) { e.preventDefault(); setTab("overview"); }
 });
 
 /* ---------- pushes ---------- */
@@ -1314,7 +1379,7 @@ $("pkinds").onclick = e => {
   b.setAttribute("aria-pressed", b.getAttribute("aria-pressed") !== "true");
   personaFilterChanged();
 };
-["psweep", "ovsweep"].forEach(id => $(id).onclick = e => {
+["psweep"].forEach(id => $(id).onclick = e => {
   const b = e.target.closest("button"); if (!b || b.dataset.s === S.sweep) return;
   setSweep(b.dataset.s, true);
   if (S.tab === "personas") { P.shown = 60; P.group = ""; renderPersonas(); syncPersonasHash(); }
@@ -2103,6 +2168,9 @@ async function selectModel(id) {
   liveEngine = null; liveEngineFor = null; liveBusy = false;
   $("mixnormal").textContent = "Waiting to run…"; $("mixpushed").textContent = "Waiting to run…"; $("mixlivestatus").textContent = "";
   if (!M.info.user_sweep && S.sweep !== "model") setSweep("model", true); else updateSweepUI();
+  const top = TAB_OF[S.tab];
+  lastSub[top] = S.tab;
+  paintTab(top, S.tab);
   store.set("atlas-model", id);
   [...$("models").children].forEach(b => b.setAttribute("aria-pressed", b.dataset.id === id));
   $("sub").textContent = `${M.N.toLocaleString()} neurons · ${M.info.n_layers} layers · ${M.info.n_tokens.toLocaleString()} corpus tokens`;
@@ -2136,7 +2204,7 @@ async function boot() {
   else if (ho && ho[1] === id) { applyOverviewHash(new URLSearchParams(ho[2] || "")); setTab("overview"); }
   else {
     if (hm && hm[1] === id) openNeuron(+hm[2] * M.d + +hm[3], { focus: true }); else openStart(M);
-    if (TABS.includes(h)) setTab(h);
+    if (TABS.includes(h) || TOP_TABS.includes(h)) setTab(h);
   }
 }
 boot();

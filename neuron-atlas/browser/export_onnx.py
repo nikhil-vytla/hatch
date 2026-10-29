@@ -10,7 +10,7 @@ With --kv it also writes a cache-aware wrapper (inputs input_ids [1,T_new], stee
 [1,T_past+T_new] and past_key_values.{i}.key/value [1,n_kv_heads,T_past,head_dim]; outputs logits [1,vocab] for the
 last position and present.{i}.key/value), then two weight-only nbits copies (q8 and q4).
 """
-import argparse, json, sys
+import argparse, json, re, sys
 from pathlib import Path
 
 import numpy as np
@@ -23,6 +23,39 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 from atlas.model import DOWN_RE, SKIP_TOWERS  # noqa: E402
+
+PROTO_LIMIT = 2**31 - 1
+
+
+def short_name(model_id):
+    """File stem for a model id: Qwen/Qwen3-0.6B -> qwen3-0.6b, SmolLM2-135M-Instruct -> smollm2."""
+    name = model_id.rstrip("/").rsplit("/", 1)[-1].lower()
+    if name == "smollm2-135m-instruct":
+        return "smollm2"
+    return re.sub(r"[^a-z0-9._-]+", "-", name).strip("-") or "model"
+
+
+def external_data_name(path):
+    return Path(path).name + ".data"
+
+
+def load_onnx(path):
+    import onnx
+    return onnx.load(str(path), load_external_data=True)
+
+
+def save_onnx(model, path):
+    """Write one file below the protobuf limit, or a .onnx plus one .data file above it."""
+    import onnx
+    path = Path(path)
+    data = path.with_name(external_data_name(path))
+    if data.exists():
+        data.unlink()
+    if model.ByteSize() < PROTO_LIMIT:
+        onnx.save(model, str(path), save_as_external_data=False)
+    else:
+        onnx.save(model, str(path), save_as_external_data=True, all_tensors_to_one_file=True,
+                  location=external_data_name(path), size_threshold=0)
 
 
 class SteerDown(nn.Module):
@@ -133,7 +166,7 @@ def export_fp32(wrapper, tok, path):
     ids = tok(chat_prompt(tok, "Who are you?"), return_tensors="pt", add_special_tokens=False)["input_ids"]
     steer = torch.zeros(wrapper.n_layers, wrapper.d_mlp, dtype=torch.float32)
     kw = dict(input_names=["input_ids", "steer"], output_names=["logits"], opset_version=18,
-              do_constant_folding=True, external_data=False)
+              do_constant_folding=True, external_data=True)
     try:
         torch.onnx.export(wrapper, (ids, steer), str(path), dynamo=False,
                           dynamic_axes={"input_ids": {0: "batch", 1: "T"}, "logits": {0: "batch"}}, **kw)
@@ -169,25 +202,23 @@ def export_kv(wrapper, tok, path):
             dyn[f"past_key_values.{i}.{kv}"] = {0: "batch", 2: "T_past"}
             dyn[f"present.{i}.{kv}"] = {0: "batch", 2: "T"}
     torch.onnx.export(wrapper, args, str(path), input_names=in_names, output_names=out_names,
-                      opset_version=18, do_constant_folding=True, external_data=False,
+                      opset_version=18, do_constant_folding=True, external_data=True,
                       dynamo=False, dynamic_axes=dyn)
 
 
 def export_fp16(src, dst):
     from onnxruntime.transformers.float16 import convert_float_to_float16
-    import onnx
-    model = onnx.load(str(src))
+    model = load_onnx(src)
     model = convert_float_to_float16(model, keep_io_types=True, force_fp16_initializers=True)
-    onnx.save(model, str(dst), save_as_external_data=False)
+    save_onnx(model, dst)
 
 
 def tie_lm_head(path):
     """torch.onnx stores the tied embedding twice (Gather table and a transposed MatMul copy for the LM head).
     Point the LM head at the Gather table with Gemm(transB=1) and drop the copy: ~113 MB less for SmolLM2."""
-    import onnx
     from onnx import helper, numpy_helper
     import numpy as np
-    m = onnx.load(str(path))
+    m = load_onnx(path)
     g = m.graph
     inits = {t.name: t for t in g.initializer}
     gather = next(n for n in g.node if n.op_type == "Gather" and n.input[0] in inits)
@@ -217,18 +248,18 @@ def tie_lm_head(path):
     for j, n in enumerate(new):
         g.node.insert(i + j, n)
     g.initializer.remove(inits[dead])
-    onnx.save(m, str(path), save_as_external_data=False)
+    save_onnx(m, path)
 
 
 def quantize_nbits(src, dst, bits):
     """Weight-only MatMul quantization; activations and the embedding Gather stay float32."""
-    import onnx
     from onnxruntime.quantization.matmul_nbits_quantizer import MatMulNBitsQuantizer
-    model = onnx.load(str(src))
+    model = load_onnx(src)
     quantizer = MatMulNBitsQuantizer(model, bits=bits, block_size=32, is_symmetric=True,
                                      op_types_to_quantize=("MatMul",))
     quantizer.process()
-    quantizer.model.save_model_to_file(str(dst), use_external_data_format=False)
+    quantizer.model.topological_sort()
+    save_onnx(quantizer.model.model, dst)
 
 
 def main():
@@ -241,29 +272,36 @@ def main():
     out.mkdir(parents=True, exist_ok=True)
 
     tok, wrapper = load_model(a.model)
-    fp32 = out / "smollm2_steer.onnx"
+    short = short_name(a.model)
+    files = {}
+    fp32 = out / f"{short}_steer.onnx"
     export_fp32(wrapper, tok, fp32)
+    files["fp32"] = fp32.name
     size = fp32.stat().st_size
     print(f"fp32   {fp32}  {size / 1e6:.1f} MB")
 
     from onnxruntime.quantization import QuantType, quantize_dynamic
-    int8 = out / "smollm2_steer_int8.onnx"
+    int8 = out / f"{short}_steer_int8.onnx"
     quantize_dynamic(str(fp32), str(int8), weight_type=QuantType.QInt8, per_channel=True)
+    files["int8"] = int8.name
     print(f"int8   {int8}  {int8.stat().st_size / 1e6:.1f} MB")
 
     if a.kv:
         kv_wrapper = KVCacheWrapper(wrapper)
-        kv_fp32 = out / "smollm2_steer_kv.onnx"
+        kv_fp32 = out / f"{short}_steer_kv.onnx"
         export_kv(kv_wrapper, tok, kv_fp32)
         tie_lm_head(kv_fp32)
+        files["kv"] = kv_fp32.name
         print(f"kv fp32 {kv_fp32}  {kv_fp32.stat().st_size / 1e6:.1f} MB")
-        kv_fp16 = out / "smollm2_steer_kv_fp16.onnx"
+        kv_fp16 = out / f"{short}_steer_kv_fp16.onnx"
         export_fp16(kv_fp32, kv_fp16)
+        files["kv_fp16"] = kv_fp16.name
         print(f"kv fp16 {kv_fp16}  {kv_fp16.stat().st_size / 1e6:.1f} MB")
         for bits in (8, 4):
-            dst = out / f"smollm2_steer_kv_q{bits}.onnx"
+            dst = out / f"{short}_steer_kv_q{bits}.onnx"
             try:
                 quantize_nbits(kv_fp32, dst, bits)
+                files[f"kv_q{bits}"] = dst.name
                 print(f"kv q{bits}  {dst}  {dst.stat().st_size / 1e6:.1f} MB")
             except Exception as e:
                 print(f"kv q{bits} failed ({type(e).__name__}: {e}); skipped")
@@ -284,7 +322,7 @@ def main():
 
     prompt = chat_prompt(tok, "X")
     i = prompt.index("X")
-    meta = {"model": a.model, "n_layers": wrapper.n_layers, "d_mlp": wrapper.d_mlp,
+    meta = {"model": a.model, "files": files, "n_layers": wrapper.n_layers, "d_mlp": wrapper.d_mlp,
             "vocab": int(wrapper.model.get_output_embeddings().weight.shape[0]),
             "n_kv_heads": wrapper.n_kv_heads, "head_dim": wrapper.head_dim,
             "resid_median": [float(x) for x in resid], "eos": sorted(eos),
