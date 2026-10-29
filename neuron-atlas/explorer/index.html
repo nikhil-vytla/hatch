@@ -198,6 +198,33 @@ nav.tabs button[aria-selected="true"] { color: var(--ink); background: var(--sur
 .pactions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: auto }
 .bubble.clamped { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 5; overflow: hidden; cursor: pointer }
 
+.card-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: flex-start }
+.repro { position: relative; display: inline-block }
+.repro > summary { list-style: none; cursor: pointer }
+.repro > summary::-webkit-details-marker { display: none }
+.repro[open] > summary { border-color: var(--hema) }
+.repro-menu { position: absolute; left: 0; top: calc(100% + 4px); z-index: 45; min-width: 164px; padding: 4px;
+  display: flex; flex-direction: column; gap: 2px; background: var(--surface); border: 1px solid var(--line);
+  border-radius: 8px; box-shadow: var(--card-shadow-hover) }
+.repro-menu button { border: 0; background: none; text-align: left; padding: 7px 10px; border-radius: 6px;
+  font: 600 13px/1.2 var(--body); white-space: nowrap }
+.repro-menu button:hover { background: var(--sunk) }
+.dosestrip { display: flex; flex-direction: column; gap: 8px }
+.dosebtns { display: inline-flex; flex-wrap: wrap; gap: 2px; align-items: center; padding: 3px; max-width: 100%;
+  border: 1px solid var(--line); border-radius: 8px; background: var(--surface); width: fit-content }
+.dosebtns button { border: 0; background: none; border-radius: 6px; padding: 3px 8px; font: 600 11px var(--mono);
+  color: var(--ink2); white-space: nowrap }
+.dosebtns button:hover { background: var(--sunk); color: var(--ink) }
+.dosebtns button[aria-pressed="true"] { background: var(--sunk); color: var(--ink) }
+.dosebtns button.neg { color: var(--hema) }
+.dosebtns button.pos { color: var(--eosin) }
+.dosebtns button[aria-pressed="true"].neg, .dosebtns button[aria-pressed="true"].pos { color: var(--ink) }
+.dosesep { color: var(--ink3); font: 12px var(--mono); padding: 0 2px }
+.notice { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 60;
+  background: var(--ink); color: var(--bg); border-radius: 999px; padding: 9px 16px;
+  font: 600 13px var(--body); box-shadow: var(--card-shadow-hover) }
+.notice.err { background: var(--eosin); color: #fff }
+
 .mixprompt textarea { width: 100%; min-height: 58px; font: inherit; border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; background: var(--surface); color: var(--ink); resize: vertical }
 .mixprompt { margin-bottom: var(--s1) }
 #mixlive input[type="range"] { accent-color: var(--eosin); vertical-align: middle }
@@ -458,6 +485,7 @@ textarea.sql { width: 100%; min-height: 110px; font: 13px var(--mono); border: 1
         <span class="pill" id="mixstr" style="font-family: var(--mono)">—</span>
         <button class="btn" id="mixcopy">Copy recipe</button>
         <a class="btn" id="mixlink" href="https://neuronary.org/" target="_blank" rel="noopener">open on neuronary</a>
+        <div id="mixrepro"></div>
       </div>
     </div>
 
@@ -524,9 +552,82 @@ import { compressors } from "https://cdn.jsdelivr.net/npm/hyparquet-compressors@
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const mdHTML = s => esc(s).replace(/\*\*(?!\*)([\s\S]+?)\*\*/g, "<b>$1</b>").replace(/\*([^*\n]+?)\*/g, "<i>$1</i>");
+const stripMd = s => String(s ?? "").replace(/\*\*(?!\*)([\s\S]+?)\*\*/g, "$1").replace(/\*([^*\n]+?)\*/g, "$1");
 const showTok = s => esc(s).replace(/\n/g, "↵").replace(/\t/g, "⇥").replace(/\ufffd+/g, "·") || "∅";
 const fmt = (v, d = 2) => v == null || Number.isNaN(v) ? "–" : Math.abs(v) >= 100 ? v.toFixed(0) : v.toFixed(d);
 const store = { get(k) { try { return localStorage.getItem(k) } catch { return null } }, set(k, v) { try { localStorage.setItem(k, v) } catch {} } };
+
+/* ---------- reproduce / share helpers ---------- */
+const TOOLS_URL = "https://github.com/nikhil-vytla/hatch/tree/main/neuron-atlas/tools";
+const MOLAB_URL = "https://molab.marimo.io/github/nikhil-vytla/hatch/blob/main/neuron-atlas/tools/play.py";
+const shellQuote = s => '"' + String(s).replace(/(["\\$`])/g, "\\$1") + '"';
+function pythonCommand(model, recipe, prompt) {
+  return `# ${TOOLS_URL}  (pip install torch transformers)\npython push.py --model ${model} --recipe ${shellQuote(recipe)} --prompt ${shellQuote(prompt)}`;
+}
+function programJSON(name, model, recipe) {
+  const { terms } = recipeAddTerms(recipe);
+  return JSON.stringify({
+    name: name || "recipe",
+    model,
+    terms: terms.map(t => ({ layer: t.layer, neuron: t.neuron, op: "add", value: t.dose, unit: "resid", when: "all" })),
+  }, null, 2);
+}
+function reproDetailsHTML(o) {
+  const live = o.livePrompt ? ` data-live-prompt="${esc(o.livePrompt)}"` : "";
+  return `<details class="repro" data-name="${esc(o.name || "recipe")}" data-model="${esc(o.model || "")}" data-recipe="${esc(o.recipe || "")}" data-prompt="${esc(o.prompt || "Who are you?")}"${live}>
+    <summary class="btn" title="Copy Python or JSON, or open this push in molab">Reproduce</summary>
+    <div class="repro-menu">
+      <button type="button" data-repro="py">Copy Python</button>
+      <button type="button" data-repro="json">Copy JSON</button>
+      <button type="button" data-repro="molab">Open in molab</button>
+    </div>
+  </details>`;
+}
+async function copyText(text) {
+  try { await navigator.clipboard.writeText(text); return true; } catch { return false; }
+}
+let noticeTimer = 0;
+function showNotice(text, err) {
+  let el = document.getElementById("atlas-notice");
+  if (!el) {
+    el = document.createElement("div"); el.id = "atlas-notice"; el.className = "notice"; el.setAttribute("role", "status");
+    document.body.appendChild(el);
+  }
+  el.textContent = text; el.classList.toggle("err", !!err); el.hidden = false;
+  clearTimeout(noticeTimer);
+  noticeTimer = setTimeout(() => { el.hidden = true; }, 2800);
+}
+document.addEventListener("click", async e => {
+  const b = e.target.closest("button[data-repro]");
+  if (!b) return;
+  const d = b.closest("details.repro"); if (!d) return;
+  e.preventDefault();
+  const action = b.dataset.repro;
+  const model = d.dataset.model, name = d.dataset.name || "recipe", recipe = d.dataset.recipe || "";
+  const prompt = d.dataset.livePrompt === "mix" ? ($("mixprompt")?.value.trim() || "Who are you?") : (d.dataset.prompt || "Who are you?");
+  if (action === "molab") {
+    const q = `model=${encodeURIComponent(model)}&recipe=${encodeURIComponent(recipe)}&prompt=${encodeURIComponent(prompt)}`;
+    window.open(`${MOLAB_URL}?${q}`, "_blank", "noopener");
+    d.open = false;
+    return;
+  }
+  const text = action === "py" ? pythonCommand(model, recipe, prompt) : programJSON(name, model, recipe);
+  const ok = await copyText(text);
+  const old = b.textContent;
+  b.textContent = ok ? "Copied" : "Copy failed";
+  setTimeout(() => { b.textContent = old; }, 1200);
+});
+document.addEventListener("click", e => {
+  const b = e.target.closest(".dosestrip button[data-dose]");
+  if (!b) return;
+  const strip = b.closest(".dosestrip"); if (!strip) return;
+  strip.querySelectorAll(".dosebtns button").forEach(x => x.setAttribute("aria-pressed", x === b));
+  strip.querySelectorAll(".doseitem").forEach(x => { x.hidden = x.dataset.dose !== b.dataset.dose; });
+});
+document.addEventListener("click", e => {
+  document.querySelectorAll("details.repro[open]").forEach(d => { if (!d.contains(e.target)) d.open = false; });
+});
 
 const THEME_KEY = "atlas-theme";
 const themeMQ = matchMedia("(prefers-color-scheme: dark)");
@@ -720,7 +821,9 @@ function sweepBaselines(M) {
 }
 function sweepPrompts(M) {
   if (!M.sweepPrompts) M.sweepPrompts = fetch(M.dir + "sweepcard/prompts.json")
-    .then(r => r.ok ? r.json() : []).catch(() => []);
+    .then(r => r.ok ? r.json() : [])
+    .then(list => { M.sweepPromptList = Array.isArray(list) ? list : []; return M.sweepPromptList; })
+    .catch(() => []);
   return M.sweepPrompts;
 }
 function neuronSweep(M, L, n) {
@@ -907,13 +1010,43 @@ function sweepDoseLabel(d) {
 function sweepBubbleHTML(r, variant, fallback) {
   if (!r) return `<div class="bubble ${variant}"><span class="who">${fallback}</span></div>`;
   const label = r.reply_kind ? PERSONA_KIND_LABEL[r.reply_kind] || r.reply_kind : "";
-  return `<div class="bubble ${variant}"><div class="pmeta"><span class="sweepdose">${sweepDoseLabel(r.dose)}</span>${label ? `<span class="pill eo">${esc(label)}</span>` : ""}${r.who ? `<b>${esc(r.who)}</b>` : ""}</div>${esc(r.text ?? "")}</div>`;
+  return `<div class="bubble ${variant}"><div class="pmeta"><span class="sweepdose">${sweepDoseLabel(r.dose)}</span>${label ? `<span class="pill eo">${esc(label)}</span>` : ""}${r.who ? `<b>${esc(r.who)}</b>` : ""}</div>${mdHTML(r.text ?? "")}</div>`;
 }
 function sweepHintHTML() {
   if (!S.M?.info.sweep_cards) return "";
   return `<p class="muted sweephint">Every neuron of this model was pushed at ±0.8; <a href="#overview" data-goto-overview>see Personas</a> for what that does across the model.</p>`;
 }
-function sweepCardHTML(data) {
+function doseStripLabel(d) {
+  const v = Number(d), a = Math.abs(v);
+  return (v < 0 ? "−" : "+") + (Number.isInteger(a) ? a.toFixed(1) : String(Math.round(a * 100) / 100));
+}
+function oldPushesByDose(M, k, pi) {
+  const out = new Map();
+  (M?.steer.get(k) || []).forEach(s => {
+    if (Number(s.prompt) !== pi) return;
+    const d = Number(s.dose);
+    if (Number.isFinite(d) && !out.has(d)) out.set(d, s);
+  });
+  return out;
+}
+function doseStripHTML(M, k, pi, rs, base, prompts) {
+  const byDose = new Map();
+  oldPushesByDose(M, k, pi).forEach((s, d) => byDose.set(d, s));
+  rs.forEach(r => byDose.set(Number(r.dose), r));
+  const doses = [...byDose.keys()].filter(d => Number.isFinite(d) && d !== 0).sort((a, b) => a - b);
+  const pick = doses.includes(0.8) ? 0.8 : doses.filter(d => d > 0).sort((a, b) => b - a)[0];
+  const def = pick != null ? String(pick) : doses.length ? String(doses[0]) : "normal";
+  const btn = d => `<button type="button" class="${d < 0 ? "neg" : "pos"}" data-dose="${d}" aria-pressed="${String(d) === def}">${doseStripLabel(d)}</button>`;
+  const neg = doses.filter(d => d < 0), pos = doses.filter(d => d > 0);
+  const sep = `<span class="dosesep" aria-hidden="true">·</span>`;
+  const bubbles = doses.map(d => `<div class="doseitem" data-dose="${d}"${String(d) === def ? "" : " hidden"}>${sweepBubbleHTML(byDose.get(d), d > 0 ? "plus" : "minus", doseStripLabel(d))}</div>`).join("");
+  const normal = `<div class="doseitem" data-dose="normal"${def === "normal" ? "" : " hidden"}><div class="bubble"><span class="who">normal</span>${mdHTML(base?.[pi] ?? "")}</div></div>`;
+  return `<div class="dosestrip">
+    <div class="dosebtns" role="group" aria-label="dose">${neg.map(btn).join("")}${neg.length ? sep : ""}<button type="button" data-dose="normal" aria-pressed="${def === "normal"}">normal</button>${pos.length ? sep : ""}${pos.map(btn).join("")}</div>
+    <div class="dosebubbles">${normal}${bubbles}</div>
+  </div>`;
+}
+function sweepCardHTML(data, M, k) {
   const { rows, base, prompts } = data;
   if (!rows?.length) return sweepHintHTML() + `<h3>What pushing it does</h3><p class="muted">No sweep replies for this neuron.</p>`;
   const by = new Map();
@@ -923,13 +1056,16 @@ function sweepCardHTML(data) {
     const minus = rs.filter(r => Number(r.dose) < 0).sort((a, b) => Number(a.dose) - Number(b.dose))[0];
     const plus = rs.filter(r => Number(r.dose) > 0).sort((a, b) => Number(b.dose) - Number(a.dose))[0];
     const flagged = rs.some(r => ["persona", "user_identity", "model_persona"].includes(r.reply_kind));
+    const sweepDoses = new Set(rs.map(r => Number(r.dose)));
+    const strip = [...oldPushesByDose(M, k, pi).keys()].some(d => !sweepDoses.has(d));
+    const body = strip ? doseStripHTML(M, k, pi, rs, base, prompts) : `<div class="compare">
+        ${sweepBubbleHTML(minus, "minus", "−0.8")}
+        <div class="bubble"><span class="who">normal</span>${mdHTML(base?.[pi] ?? "")}</div>
+        ${sweepBubbleHTML(plus, "plus", "+0.8")}
+      </div>`;
     return `<div class="sweeprow${flagged ? " flagged" : ""}">
       <p class="prompt">“${esc(prompts?.[pi] ?? "")}”</p>
-      <div class="compare">
-        ${sweepBubbleHTML(minus, "minus", "−0.8")}
-        <div class="bubble"><span class="who">normal</span>${esc(base?.[pi] ?? "")}</div>
-        ${sweepBubbleHTML(plus, "plus", "+0.8")}
-      </div></div>`;
+      ${body}</div>`;
   }).join("");
 }
 function pushCardHTML(M, k, st) {
@@ -942,9 +1078,9 @@ function pushCardHTML(M, k, st) {
     const rs = st.filter(s => s.prompt === pi).sort((a, b) => a.dose - b.dose); if (!rs.length) return "";
     const minus = rs.filter(s => s.dose < 0).at(0), plus = rs.filter(s => s.dose > 0).at(-1);
     return `<p class="prompt">“${esc(p)}”</p><div class="chat">
-      <div class="bubble minus"><span class="who">push ${minus ? minus.dose : "–"}${minus?.reply_kind ? " · " + (KIND_LABEL[minus.reply_kind] || "") : ""}</span>${esc(minus?.text ?? "")}</div>
-      <div class="bubble"><span class="who">normal</span>${esc(M.base[pi] ?? "")}</div>
-      <div class="bubble plus"><span class="who">push +${plus ? plus.dose : "–"}${plus?.reply_kind ? " · " + (KIND_LABEL[plus.reply_kind] || "") : ""}</span>${esc(plus?.text ?? "")}</div></div>`;
+      <div class="bubble minus"><span class="who">push ${minus ? minus.dose : "–"}${minus?.reply_kind ? " · " + (KIND_LABEL[minus.reply_kind] || "") : ""}</span>${mdHTML(minus?.text ?? "")}</div>
+      <div class="bubble"><span class="who">normal</span>${mdHTML(M.base[pi] ?? "")}</div>
+      <div class="bubble plus"><span class="who">push +${plus ? plus.dose : "–"}${plus?.reply_kind ? " · " + (KIND_LABEL[plus.reply_kind] || "") : ""}</span>${mdHTML(plus?.text ?? "")}</div></div>`;
   }).join("") + `</div>`;
 }
 async function openNeuron(k, opts = {}) {
@@ -978,7 +1114,11 @@ async function openNeuron(k, opts = {}) {
   P.innerHTML = `
     <div>
       <div class="idline"><span>${esc(M.info.model)}</span><span>·</span><b>${keyName(M, k)}</b>${badges}</div>
-      <div style="margin-top:8px"><button class="btn primary" id="addmix" title="Add this neuron to the Mix tab at dose +0.5">Add to mix</button></div>
+      <div class="card-actions" style="margin-top:8px">
+        <button class="btn primary" id="addmix" title="Add this neuron to the Mix tab at dose +0.5">Add to mix</button>
+        ${reproDetailsHTML({ name: `L${L}N${n}`, model: M.info.model, recipe: `L${L}N${n}+${M.info.sweep_cards ? "0.8" : "0.5"}`, prompt: "Who are you?" })}
+        ${M.info.live ? `<button class="btn" id="trylive" title="Add this neuron at +0.5 and run it live in your browser">Try live</button>` : ""}
+      </div>
       <div style="display:flex;gap:12px;align-items:center;margin-top:8px">${lb ? `<span class="emoji">${esc(lb.emoji)}</span>` : ""}
         <h2>${lb ? esc(lb.label) : `Promotes ${row.lens_up.slice(0, 3).map(t => "“" + esc(t.trim() || t) + "”").join(", ")}`}</h2></div>
       ${lb ? `<p class="desc">${esc(lb.description)}</p>${lb.push && lb.push !== "nothing clear" ? `<p class="desc"><b>Push:</b> ${esc(lb.push)}</p>` : ""}` : ""}
@@ -997,6 +1137,7 @@ async function openNeuron(k, opts = {}) {
     ${steerHTML}
     <div><h3>${row.nbrs ? "Writes like (cosine of output directions)" : "Neighbors on the map"}</h3><div class="nbrs" id="nbrs"></div></div>`;
   $("addmix").onclick = () => addMix(k);
+  if ($("trylive")) $("trylive").onclick = () => tryLiveNeuron(k);
   const nb = neighbors(M, k), nbCos = new Map(nb);
   const nbText = j => { const l = M.lab.get(j), r = M.rows[j];
     return l ? esc(l.emoji + " " + l.label) : r ? r.lens_up.slice(0, 3).map(showTok).join(" ") : "…"; };
@@ -1014,9 +1155,10 @@ async function openNeuron(k, opts = {}) {
   nbrs.onclick = e => { const b = e.target.closest("button"); if (b) openNeuron(+b.dataset.k, { focus: true }); };
   if (sweepP) {
     const sd = await sweepP.catch(() => null);
+    if (M.info.steer_sharded) await steerP.catch(() => {});
     if (S.sel !== k) return;
     const box = $("sweepbox");
-    if (box) box.innerHTML = sd ? sweepCardHTML(sd) : sweepHintHTML() + `<h3>What pushing it does</h3><p class="muted">No sweep replies for this neuron.</p>`;
+    if (box) box.innerHTML = sd ? sweepCardHTML(sd, M, k) : sweepHintHTML() + `<h3>What pushing it does</h3><p class="muted">No sweep replies for this neuron.</p>`;
     if (opts.sweep && box) requestAnimationFrame(() => box.scrollIntoView({ block: "start", behavior: "smooth" }));
   }
   if (M.info.steer_sharded) {
@@ -1204,7 +1346,7 @@ async function renderPushes() {
   const prompts = M.info.steer?.prompts || [];
   $("pushgrid").innerHTML = items.slice(0, 120).map(([k, s]) => { const l = M.lab.get(k);
     return `<button class="push" data-k="${k}"><div class="meta"><span>${keyName(M, k)}</span><span class="pill ${s.dose > 0 ? "eo" : ""}">push ${s.dose > 0 ? "+" : ""}${s.dose}</span>${s.reply_kind ? `<span class="pill">${KIND_LABEL[s.reply_kind] || s.reply_kind}</span>` : ""}${s.kind === "random" ? `<span class="pill warn">random control</span>` : ""}</div>
-      ${s.who ? `<b>${esc(s.who)}</b>` : ""}<div class="muted">“${esc(prompts[s.prompt] || "")}” ${l ? `· ${esc(l.emoji)} ${esc(l.label)}` : ""}</div><div class="reply">${esc(s.text)}</div></button>` }).join("") || `<p class="muted">This model has no steering run yet.</p>`;
+      ${s.who ? `<b>${esc(s.who)}</b>` : ""}<div class="muted">“${esc(prompts[s.prompt] || "")}” ${l ? `· ${esc(l.emoji)} ${esc(l.label)}` : ""}</div><div class="reply">${mdHTML(s.text)}</div></button>` }).join("") || `<p class="muted">This model has no steering run yet.</p>`;
 }
 ["pk", "psort", "pcoh"].forEach(id => $(id).onchange = renderPushes);
 $("pushgrid").onclick = e => { const b = e.target.closest(".push"); if (b) { setTab("map"); openNeuron(+b.dataset.k, { focus: true }); } };
@@ -1264,16 +1406,177 @@ function applyPersonaHash(params) {
   const sort = params.get("sort"); if (["neurons", "layer", "shuffle"].includes(sort)) $("ppsort").value = sort;
   P.group = params.get("group") || "";
 }
+const ATLAS_PROMPTS = ["Who are you?", "Tell me a short story."];
+function personaPrompt(M, r) {
+  const i = Number(r.prompt);
+  for (const list of [M?.sweepPromptList, M?.info?.steer?.prompts]) {
+    if (Array.isArray(list) && typeof list[i] === "string" && list[i].trim()) return list[i];
+  }
+  return ATLAS_PROMPTS[i] || "Who are you?";
+}
+function personaDeepLink(M, r) {
+  const p = personaHash();
+  const layer = String(Number(r.layer));
+  p.set("q", r.who || "");
+  p.set("lmin", layer);
+  p.set("lmax", layer);
+  const u = new URL(location.href);
+  u.hash = `${M.info.id}-personas?${p.toString()}`;
+  return u.href;
+}
+async function sharePersona(M, r, btn) {
+  const ok = await copyText(personaDeepLink(M, r));
+  const old = btn.textContent;
+  btn.textContent = ok ? "Link copied" : "Copy failed";
+  setTimeout(() => { btn.textContent = old; }, 1400);
+}
+function canvasRoundRect(ctx, x, y, w, h, r) {
+  const rr = Math.min(r, w / 2, h / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + rr, y); ctx.arcTo(x + w, y, x + w, y + h, rr);
+  ctx.arcTo(x + w, y + h, x, y + h, rr); ctx.arcTo(x, y + h, x, y, rr);
+  ctx.arcTo(x, y, x + w, y, rr); ctx.closePath();
+}
+function fitCanvasFont(ctx, text, weight, family, size, min, maxWidth) {
+  let s = size;
+  while (s > min) {
+    ctx.font = `${weight} ${s}px ${family}`;
+    if (ctx.measureText(text).width <= maxWidth) break;
+    s -= 2;
+  }
+  ctx.font = `${weight} ${s}px ${family}`;
+  return s;
+}
+function wrapCanvasText(ctx, text, maxWidth, maxLines) {
+  const source = String(text || "").replace(/\s+/g, " ").trim();
+  if (!source) return [];
+  const words = [];
+  for (const word of source.split(" ")) {
+    if (ctx.measureText(word).width <= maxWidth) { words.push(word); continue; }
+    let chunk = "";
+    for (const ch of word) {
+      if (chunk && ctx.measureText(chunk + ch).width > maxWidth) { words.push(chunk); chunk = ch; }
+      else chunk += ch;
+    }
+    if (chunk) words.push(chunk);
+  }
+  const elide = lines => {
+    let last = lines[maxLines - 1] || "";
+    while (last && ctx.measureText(last + "…").width > maxWidth) last = last.slice(0, -1);
+    lines[maxLines - 1] = last + "…";
+    return lines;
+  };
+  const lines = [];
+  let line = "";
+  for (let i = 0; i < words.length; i++) {
+    const test = line ? line + " " + words[i] : words[i];
+    if (ctx.measureText(test).width <= maxWidth) { line = test; continue; }
+    if (line) {
+      lines.push(line); line = "";
+      if (lines.length === maxLines) return elide(lines);
+    }
+    line = words[i];
+  }
+  if (line) lines.push(line);
+  if (lines.length > maxLines) { lines.length = maxLines; return elide(lines); }
+  return lines;
+}
+async function downloadPersonaImage(M, r, btn) {
+  const old = btn?.textContent || "Download image";
+  if (btn) { btn.disabled = true; btn.textContent = "Drawing…"; }
+  try {
+    const canvas = document.createElement("canvas");
+    canvas.width = 1200; canvas.height = 630;
+    const ctx = canvas.getContext("2d");
+    if (!ctx || typeof canvas.toBlob !== "function") throw new Error("canvas export unavailable");
+    if (document.fonts?.ready) await document.fonts.ready;
+    const root = getComputedStyle(document.documentElement);
+    const v = (n, f) => root.getPropertyValue(n).trim() || f;
+    const bg = v("--bg", "#f5f4f8"), surface = v("--surface", "#fff"), ink = v("--ink", "#1f1c2c"),
+      ink2 = v("--ink2", "#5d5870"), ink3 = v("--ink3", "#8a849c"), line = v("--line", "#d9d5e3"),
+      eosin = v("--eosin", "#d6336c"), hema = v("--hema", "#4b3fa8"), eoSoft = v("--eosin-soft", "#f9d9e5");
+    const DISPLAY = `"Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif`;
+    const BODY = `"Source Sans 3", "Segoe UI", system-ui, -apple-system, sans-serif`;
+    const MONO = `"JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace`;
+    ctx.fillStyle = bg; ctx.fillRect(0, 0, 1200, 630);
+    ctx.save(); ctx.shadowColor = "rgba(20,10,40,.18)"; ctx.shadowBlur = 36; ctx.shadowOffsetY = 12;
+    canvasRoundRect(ctx, 36, 36, 1128, 558, 28); ctx.fillStyle = surface; ctx.fill(); ctx.restore();
+    ctx.save(); canvasRoundRect(ctx, 36, 36, 1128, 558, 28); ctx.clip();
+    ctx.globalAlpha = .13; ctx.fillStyle = eosin; ctx.beginPath(); ctx.arc(1080, 70, 290, 0, 7); ctx.fill();
+    ctx.fillStyle = hema; ctx.beginPath(); ctx.arc(130, 655, 250, 0, 7); ctx.fill();
+    ctx.globalAlpha = 1;
+    const lg = ctx.createLinearGradient(0, 76, 0, 514); lg.addColorStop(0, eosin); lg.addColorStop(1, hema);
+    ctx.fillStyle = lg; ctx.fillRect(72, 76, 7, 438);
+    ctx.restore();
+    const x = 112, w = 980;
+    ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+    ctx.fillStyle = ink3; ctx.font = `600 15px ${MONO}`;
+    ctx.fillText("NEURON ATLAS · PERSONA", x, 112);
+    const kind = PERSONA_KIND_LABEL[r.reply_kind] || r.reply_kind || "reply";
+    ctx.font = `600 16px ${BODY}`;
+    const kw = ctx.measureText(kind).width, ph = 34, pw = kw + 28, px = 1128 - 56 - pw, py = 86;
+    canvasRoundRect(ctx, px, py, pw, ph, ph / 2); ctx.fillStyle = eoSoft; ctx.fill();
+    ctx.fillStyle = eosin; ctx.fillText(kind, px + 14, py + 23);
+    let name = r.who || r.what_changed || "Untitled persona";
+    ctx.fillStyle = ink;
+    fitCanvasFont(ctx, name, 800, DISPLAY, 60, 30, w);
+    if (ctx.measureText(name).width > w) {
+      while (name.length > 1 && ctx.measureText(name + "…").width > w) name = name.slice(0, -1);
+      name += "…";
+    }
+    ctx.fillText(name, x, 190);
+    ctx.strokeStyle = line; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x, 216); ctx.lineTo(x + w, 216); ctx.stroke();
+    ctx.fillStyle = ink; ctx.font = `400 29px ${BODY}`;
+    wrapCanvasText(ctx, stripMd(r.text || ""), w, 6).forEach((ln, i) => ctx.fillText(ln, x, 264 + i * 42));
+    const L = Number(r.layer), n = Number(r.neuron), d = Number(r.dose);
+    const dose = Number.isFinite(d) ? (d > 0 ? "+" : "") + (Math.round(d * 100) / 100) : "–";
+    ctx.fillStyle = ink2; ctx.font = `600 18px ${MONO}`;
+    ctx.fillText(`${M.info.model} · L${L} · N${n} · ${dose}`, x, 558);
+    ctx.textAlign = "right"; ctx.font = `800 24px ${DISPLAY}`;
+    ctx.fillStyle = eosin; ctx.fillText("Atlas", 1128 - 56, 558);
+    const aw = ctx.measureText("Atlas").width + 7;
+    ctx.fillStyle = ink3; ctx.fillText("Neuron ", 1128 - 56 - aw, 558);
+    ctx.textAlign = "left";
+    await new Promise((resolve, reject) => {
+      try {
+        canvas.toBlob(blob => {
+          try {
+            if (!blob) { reject(new Error("no blob")); return; }
+            const a = document.createElement("a"), url = URL.createObjectURL(blob);
+            const slug = String(name).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 48) || "persona";
+            a.href = url; a.download = `${M.info.id}-${slug}-L${L}N${n}.png`;
+            document.body.appendChild(a); a.click(); a.remove();
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+            resolve();
+          } catch (err) { reject(err); }
+        }, "image/png");
+      } catch (err) { reject(err); }
+    });
+    showNotice("Image downloaded");
+  } catch {
+    showNotice("Could not export image", true);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = old; }
+  }
+}
 function personaCardHTML(M, r, i) {
   const k = Number(r.layer) * M.d + Number(r.neuron), d = r.dose == null ? NaN : Number(r.dose);
   const dose = Number.isFinite(d) ? (d > 0 ? "+" : "") + (Math.round(d * 100) / 100) : "–";
+  const recipeDose = Number.isFinite(d) ? d : 0.8;
+  const recipe = `L${r.layer}N${r.neuron}${recipeDose >= 0 ? "+" : ""}${Math.round(recipeDose * 1000) / 1000}`;
   const merged = r._merged > 1 ? `<span class="pill warn">×${r._merged}</span>` : "";
   return `<article class="persona" data-i="${i}">
     <h3 class="ptitle">${esc(r.who || r.what_changed || "Untitled")}</h3>
     <div class="pmeta"><span class="pill eo">${esc(PERSONA_KIND_LABEL[r.reply_kind] || r.reply_kind || "reply")}</span><span class="pill">${keyName(M, k)}</span><span class="pill ${d > 0 ? "eo" : ""}">${dose}</span>${merged}</div>
     ${r.what_changed ? `<div class="muted">${esc(r.what_changed)}</div>` : ""}
-    <div class="bubble clamped" title="Click to expand">${esc(r.text)}</div>
-    <div class="pactions"><button class="btn" data-act="open" data-i="${i}">Open neuron</button><button class="btn primary" data-act="mix" data-i="${i}">Add to mix</button></div>
+    <div class="bubble clamped" title="Click to expand">${mdHTML(r.text)}</div>
+    <div class="pactions">
+      <button class="btn" data-act="open" data-i="${i}">Open neuron</button>
+      <button class="btn primary" data-act="mix" data-i="${i}">Add to mix</button>
+      <button class="btn" data-act="share" data-i="${i}">Share</button>
+      <button class="btn" data-act="shot" data-i="${i}">Download image</button>
+      ${reproDetailsHTML({ name: r.who || r.what_changed || `L${r.layer}N${r.neuron}`, model: M.info.model, recipe, prompt: personaPrompt(M, r) })}
+    </div>
   </article>`;
 }
 function renderPersonaGroups() {
@@ -1399,6 +1702,8 @@ $("pgrid").onclick = e => {
     const r = P.rows[+b.dataset.i]; if (!r) return;
     const k = Number(r.layer) * S.M.d + Number(r.neuron);
     if (b.dataset.act === "open") { setTab("map"); openNeuron(k, { focus: true, sweep: true }); }
+    else if (b.dataset.act === "share") sharePersona(S.M, r, b);
+    else if (b.dataset.act === "shot") downloadPersonaImage(S.M, r, b);
     else addMix(k, Number(r.dose));
     return;
   }
@@ -1409,7 +1714,7 @@ const csvCell = v => { const s = v == null ? "" : String(v); return /[",\r\n]/.t
 $("pcsv").onclick = () => {
   const M = S.M; if (!M) return;
   const head = ["model", "layer", "neuron", "dose", "prompt", "kind", "who", "what_changed", "text"];
-  const body = P.rows.map(r => [M.info.id, r.layer, r.neuron, Math.round(Number(r.dose) * 1000) / 1000, r.prompt, r.reply_kind, r.who, r.what_changed, r.text]);
+  const body = P.rows.map(r => [M.info.id, r.layer, r.neuron, Math.round(Number(r.dose) * 1000) / 1000, r.prompt, r.reply_kind, r.who, r.what_changed, stripMd(r.text)]);
   const csv = [head, ...body].map(row => row.map(csvCell).join(",")).join("\r\n") + "\r\n";
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
   const a = document.createElement("a"), url = URL.createObjectURL(blob);
@@ -1729,6 +2034,12 @@ function addMix(k, dose = 0.5) {
   if (t) t.dose = dose; else MIX.push({ layer: L, neuron: n, dose });
   renderMix(); setTab("mix");
 }
+async function tryLiveNeuron(k) {
+  const M = S.M; if (!M?.info.live?.model) return;
+  addMix(k, 0.5);
+  if (!$("mixprompt").value.trim()) { $("mixprompt").value = "Who are you?"; renderMixChips(); }
+  if (!liveBusy) await runMixLive();
+}
 
 let mixSeq = 0;
 let liveEngine = null;
@@ -1745,6 +2056,10 @@ function mixStarters() {
     .sort((a, b) => (b[1].confidence ?? 0) - (a[1].confidence ?? 0) || (b[1].detect ?? 0) - (a[1].detect ?? 0))
     .slice(0, 3);
 }
+function renderMixRepro() {
+  const M = S.M, box = $("mixrepro"); if (!M || !box) return;
+  box.innerHTML = reproDetailsHTML({ name: "mix", model: M.info.model, recipe: mixString(), prompt: $("mixprompt")?.value.trim() || "Who are you?", livePrompt: "mix" });
+}
 function renderMixTerms() {
   const M = S.M;
   $("mixterms").innerHTML = MIX.length ? MIX.map((t, i) => {
@@ -1755,6 +2070,7 @@ function renderMixTerms() {
   }).join("") : `<span class="muted">No neurons yet. Open a neuron and press “Add to mix”.</span>`;
   $("mixstr").textContent = mixString() || "—";
   $("mixlink").href = mixLink();
+  renderMixRepro();
 }
 function renderMixStarters() {
   const box = $("mixstarters");
@@ -1848,8 +2164,8 @@ function renderRuns(M, terms = null) {
     const by = new Map();
     g.rows.forEach(r => { const p = String(r.prompt); if (!by.has(p)) by.set(p, []); by.get(p).push(r); });
     const body = [...by].map(([p, rs]) => `<p class="prompt">“${esc(p)}”</p><div class="compare">
-      <div class="bubble"><span class="who">normal</span>${esc(base.get(p) ?? "(no baseline)")}</div>
-      ${rs.sort((a, b) => a.scale - b.scale).map(r => `<div class="bubble plus"><span class="who">scale ${esc(r.scale)}</span>${esc(r.text)}</div>`).join("")}
+      <div class="bubble"><span class="who">normal</span>${mdHTML(base.get(p) ?? "(no baseline)")}</div>
+      ${rs.sort((a, b) => a.scale - b.scale).map(r => `<div class="bubble plus"><span class="who">scale ${esc(r.scale)}</span>${mdHTML(r.text)}</div>`).join("")}
     </div>`).join("");
     return `<div class="card" style="margin-bottom:12px"><div class="idline"><b>${esc(g.name)}</b><span>${recipeHTML(g.recipe)}</span><button class="btn run-load" type="button" data-loadmix="${esc(g.recipe)}">Load into mix</button></div>${body}</div>`;
   };
@@ -1860,8 +2176,8 @@ function renderRuns(M, terms = null) {
     const scaled = rs.find(r => Number(r.scale) === 1) || rs[0];
     return `<details class="run-row" data-run="${i}"><summary><span class="run-compact">
       <span class="run-head"><b>${esc(g.name)}</b><span class="run-pills">${recipeHTML(g.recipe)}</span><button class="btn run-load" type="button" data-loadmix="${esc(g.recipe)}">Load into mix</button></span>
-      <span class="run-line"><span class="who">normal</span><span class="run-reply">${esc(base.get(p) ?? "(no baseline)")}</span></span>
-      <span class="run-line plus"><span class="who">scale ${scaled ? esc(scaled.scale) : "1"}</span><span class="run-reply">${esc(scaled ? scaled.text : "(no scale-1 reply)")}</span></span>
+      <span class="run-line"><span class="who">normal</span><span class="run-reply">${mdHTML(base.get(p) ?? "(no baseline)")}</span></span>
+      <span class="run-line plus"><span class="who">scale ${scaled ? esc(scaled.scale) : "1"}</span><span class="run-reply">${mdHTML(scaled ? scaled.text : "(no scale-1 reply)")}</span></span>
     </span></summary><div class="run-full"></div></details>`;
   };
   let html = "";
@@ -1925,12 +2241,12 @@ async function runMixLive() {
       scale: Number($("mixscale").value),
       maxTokens: 48,
       onToken(stream, text) {
-        if (stream === "normal") $("mixnormal").textContent = text;
-        else $("mixpushed").textContent = text;
+        if (stream === "normal") $("mixnormal").innerHTML = mdHTML(text);
+        else $("mixpushed").innerHTML = mdHTML(text);
       },
     });
-    $("mixnormal").textContent = result.normal;
-    $("mixpushed").textContent = result.pushed;
+    $("mixnormal").innerHTML = mdHTML(result.normal);
+    $("mixpushed").innerHTML = mdHTML(result.pushed);
     mixStatus(`${result.tokensPerSecond.toFixed(1)} tok/s`);
   } catch (e) {
     mixStatus("Live run failed: " + (e?.message || e), true);
@@ -1968,6 +2284,7 @@ $("mixterms").addEventListener("input", e => {
   MIX[+inp.dataset.i].dose = Math.max(-3, Math.min(3, Number(inp.value) || 0));
   $("mixstr").textContent = mixString() || "—";
   $("mixlink").href = mixLink();
+  renderMixRepro();
   if (S.M?.info.sweep_cards && !S.M.info.live) { mixSeq++; renderRuns(S.M, MIX); renderMixEvidence(S.M); }
 });
 $("mixterms").addEventListener("click", e => {
