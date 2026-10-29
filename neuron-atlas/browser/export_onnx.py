@@ -24,7 +24,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 from atlas.model import DOWN_RE, SKIP_TOWERS  # noqa: E402
 
-PROTO_LIMIT = 2**31 - 1
+EXTERNAL_LIMIT = int(1.8 * 1024**3)
 
 
 def short_name(model_id):
@@ -44,18 +44,39 @@ def load_onnx(path):
     return onnx.load(str(path), load_external_data=True)
 
 
+def initializer_nbytes(tensor):
+    """Byte size of one initializer, without materializing it or serializing the model."""
+    import onnx
+    if tensor.raw_data:
+        return len(tensor.raw_data)
+    for entry in tensor.external_data:
+        if entry.key == "length" and entry.value:
+            return int(entry.value)
+    try:
+        dtype = onnx.helper.tensor_dtype_to_np_dtype(tensor.data_type)
+        count = int(np.prod(tensor.dims, dtype=np.int64)) if tensor.dims else 1
+        return count * np.dtype(dtype).itemsize
+    except Exception:
+        return int(np.asarray(onnx.numpy_helper.to_array(tensor)).nbytes)
+
+
+def model_nbytes(model):
+    """Sum the initializer payloads; this is the data that makes a proto too large to serialize."""
+    return sum(initializer_nbytes(t) for t in model.graph.initializer)
+
+
 def save_onnx(model, path):
-    """Write one file below the protobuf limit, or a .onnx plus one .data file above it."""
+    """Write one file below the threshold, or a .onnx plus one .data file above it."""
     import onnx
     path = Path(path)
     data = path.with_name(external_data_name(path))
     if data.exists():
         data.unlink()
-    if model.ByteSize() < PROTO_LIMIT:
+    if model_nbytes(model) < EXTERNAL_LIMIT:
         onnx.save(model, str(path), save_as_external_data=False)
     else:
         onnx.save(model, str(path), save_as_external_data=True, all_tensors_to_one_file=True,
-                  location=external_data_name(path), size_threshold=0)
+                  location=external_data_name(path), size_threshold=1024)
 
 
 class SteerDown(nn.Module):
