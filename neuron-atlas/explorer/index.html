@@ -161,8 +161,14 @@ nav.tabs button[aria-selected="true"] { color: var(--ink); background: var(--sur
 @media (max-width: 600px) { .chat { grid-template-columns: minmax(0, 1fr) } }
 .bubble { border-radius: 12px; padding: 8px 11px; font-size: 14px; background: var(--sunk); overflow-wrap: anywhere; min-width: 0 }
 .bubble .who { display: block; font: 600 11px var(--mono); color: var(--ink3); margin-bottom: 3px }
+.bubble .pmeta { margin-bottom: 4px }
 .bubble.minus { background: var(--hema-soft) }
 .bubble.plus { background: var(--eosin-soft) }
+.sweeprow { border-left: 3px solid transparent; padding-left: 10px }
+.sweeprow + .sweeprow { margin-top: 10px }
+.sweeprow.flagged { border-left-color: var(--eosin) }
+.sweeprow .prompt { margin: 0 0 6px }
+.sweepdose { font: 600 11px var(--mono); color: var(--ink3) }
 .prompt { font-style: italic; color: var(--ink2); margin: 10px 0 6px }
 .muted { color: var(--ink3); font-size: 14px }
 .nbrs { display: flex; flex-wrap: wrap; gap: 6px }
@@ -587,8 +593,8 @@ async function loadModel(id) {
   // sharded: map.parquet has every neuron's position; full rows come per layer (neurons/Lxx.parquet) on demand.
   // steer_sharded: pushes come per layer (steer/Lxx.parquet) on demand; only the baselines load up front.
   const N = info.n_neurons, d = info.d_mlp;
-  const M = { info, dir, N, d, rows: new Array(N), layerP: new Map(), steerP: new Map(), x: new Float32Array(N), y: new Float32Array(N), layer: new Int16Array(N), z: new Float32Array(N),
-    lab: new Map(), steer: new Map(), up: new Map(), base: [], ex: new Map(), exN: new Map(), toks: null, recipes: [] };
+  const M = { info, dir, N, d, rows: new Array(N), layerP: new Map(), steerP: new Map(), sweepP: new Map(), x: new Float32Array(N), y: new Float32Array(N), layer: new Int16Array(N), z: new Float32Array(N),
+    lab: new Map(), steer: new Map(), up: new Map(), base: [], ex: new Map(), exN: new Map(), toks: null, recipes: [], sweepBase: null, sweepPrompts: null };
   const metaP = Promise.all([
     tryPq(dir + "labels.parquet"), info.steer_sharded ? null : tryPq(dir + "steer.parquet"),
     tryPq(dir + "uptake.parquet"), tryPq(dir + "recipes.parquet"),
@@ -642,6 +648,30 @@ async function layerSteer(M, L) {
     M.steerP.delete(L); throw e;
   });
   M.steerP.set(L, p);
+  return p;
+}
+function sweepBaselines(M) {
+  if (!M.sweepBase) M.sweepBase = tryPq(M.dir + "sweepcard/baseline.parquet").then(rows => {
+    const base = []; (rows || []).forEach(r => { base[Number(r.prompt)] = r.text; }); return base;
+  }).catch(() => []);
+  return M.sweepBase;
+}
+function sweepPrompts(M) {
+  if (!M.sweepPrompts) M.sweepPrompts = fetch(M.dir + "sweepcard/prompts.json")
+    .then(r => r.ok ? r.json() : []).catch(() => []);
+  return M.sweepPrompts;
+}
+function neuronSweep(M, L, n) {
+  const key = `${L}:${n}`;
+  if (M.sweepP.has(key)) return M.sweepP.get(key);
+  const p = Promise.all([
+    readNeuronRows(M.dir + `sweepcard/L${String(L).padStart(2, "0")}.parquet`, n),
+    sweepBaselines(M), sweepPrompts(M),
+  ]).then(([rows, base, prompts]) => ({ rows, base, prompts })).catch(e => {
+    if (String(e?.message || e).includes("404")) return { rows: [], base: [], prompts: [] };
+    M.sweepP.delete(key); throw e;
+  });
+  M.sweepP.set(key, p);
   return p;
 }
 function ensureLayer(M, L) {
@@ -807,10 +837,40 @@ function neighbors(M, k, n = 8) {
   return out.map(o => [o[0], null]);
 }
 function keyName(M, k) { const L = Math.floor(k / M.d); return `L${L} · N${k - L * M.d}`; }
+function sweepDoseLabel(d) {
+  const v = Number(d);
+  if (!Number.isFinite(v)) return "";
+  return (v < 0 ? "−" : "+") + String(Math.round(Math.abs(v) * 100) / 100);
+}
+function sweepBubbleHTML(r, variant, fallback) {
+  if (!r) return `<div class="bubble ${variant}"><span class="who">${fallback}</span></div>`;
+  const label = r.reply_kind ? PERSONA_KIND_LABEL[r.reply_kind] || r.reply_kind : "";
+  return `<div class="bubble ${variant}"><div class="pmeta"><span class="sweepdose">${sweepDoseLabel(r.dose)}</span>${label ? `<span class="pill eo">${esc(label)}</span>` : ""}${r.who ? `<b>${esc(r.who)}</b>` : ""}</div>${esc(r.text ?? "")}</div>`;
+}
+function sweepCardHTML(data) {
+  const { rows, base, prompts } = data;
+  if (!rows?.length) return `<h3>What pushing it does</h3><p class="muted">No sweep replies for this neuron.</p>`;
+  const by = new Map();
+  rows.forEach(r => { const pi = Number(r.prompt); if (!by.has(pi)) by.set(pi, []); by.get(pi).push(r); });
+  return `<h3>What pushing it does</h3>` + [...by.keys()].sort((a, b) => a - b).map(pi => {
+    const rs = by.get(pi);
+    const minus = rs.filter(r => Number(r.dose) < 0).sort((a, b) => Number(a.dose) - Number(b.dose))[0];
+    const plus = rs.filter(r => Number(r.dose) > 0).sort((a, b) => Number(b.dose) - Number(a.dose))[0];
+    const flagged = rs.some(r => ["persona", "user_identity", "model_persona"].includes(r.reply_kind));
+    return `<div class="sweeprow${flagged ? " flagged" : ""}">
+      <p class="prompt">“${esc(prompts?.[pi] ?? "")}”</p>
+      <div class="compare">
+        ${sweepBubbleHTML(minus, "minus", "−0.8")}
+        <div class="bubble"><span class="who">normal</span>${esc(base?.[pi] ?? "")}</div>
+        ${sweepBubbleHTML(plus, "plus", "+0.8")}
+      </div></div>`;
+  }).join("");
+}
 function pushCardHTML(M, k, st) {
   const up = M.up.get(k);
   const upPill = up && up.up_n ? `<div style="margin-bottom:8px"><span class="pill ${up.uptake >= .25 ? "good" : ""}" title="the chance is the same replies checked against other pushed neurons' lens words">writes its own lens words in ${up.up_hits}/${up.up_n} pushed replies (chance ${Math.round(100 * (up.up_null || 0))}%)</span></div>` : "";
   const prompts = M.info.steer?.prompts || [];
+  if (!st.length && M.info.sweep_cards) return "";
   if (!st.length) return `<p class="muted">Not pushed in this run. The sweep pushes the most peaked neurons of each layer plus random controls; run <code>python -m atlas.steer --all</code> on a GPU to cover every neuron.</p>`;
   return `<div><h3>Pushes</h3>${upPill}` + prompts.map((p, pi) => {
     const rs = st.filter(s => s.prompt === pi).sort((a, b) => a.dose - b.dose); if (!rs.length) return "";
@@ -827,8 +887,9 @@ async function openNeuron(k, opts = {}) {
   const L = Math.floor(k / M.d), n = k - L * M.d, lb = M.lab.get(k);
   const rowP = !M.rows[k] && M.info.sharded ? readNeuronRows(M.dir + `neurons/L${String(L).padStart(2, "0")}.parquet`, n) : null;
   const steerP = M.info.steer_sharded ? layerSteer(M, L) : null;
+  const sweepP = M.info.sweep_cards ? neuronSweep(M, L, n) : null;
   const exP = neuronExamples(M, L, n);
-  rowP?.catch(() => {}); steerP?.catch(() => {}); exP.catch(() => {});
+  rowP?.catch(() => {}); steerP?.catch(() => {}); sweepP?.catch(() => {}); exP.catch(() => {});
   try { history.replaceState(null, "", `#${M.info.id}-L${L}-N${n}`) } catch {}
   const P = $("panel");
   if (!M.rows[k]) {
@@ -842,6 +903,7 @@ async function openNeuron(k, opts = {}) {
     }
   }
   const row = M.rows[k];
+  const sweepHTML = M.info.sweep_cards ? `<div id="sweepbox"><h3>What pushing it does</h3><div class="skel line" aria-hidden="true"></div><div class="skel line short" aria-hidden="true"></div></div>` : "";
   const steerHTML = M.info.steer_sharded ? `<div id="pushbox"><p class="muted">Loading pushes…</p></div>` : pushCardHTML(M, k, M.steer.get(k) || []);
   const badges = lb ? [
     `<span class="pill">confidence ${lb.confidence}/5</span>`,
@@ -865,6 +927,7 @@ async function openNeuron(k, opts = {}) {
     <div><h3>Writes (logit lens)</h3><div class="lens">${row.lens_up.slice(0, 10).map(t => `<span class="tok up">${showTok(t)}</span>`).join("")}</div>
       <div class="lens" style="margin-top:4px">${row.lens_down.slice(0, 10).map(t => `<span class="tok down">${showTok(t)}</span>`).join("")}</div></div>
     <div id="exbox"><h3>Fires on</h3><div class="skel line" aria-hidden="true"></div><div class="skel line short" aria-hidden="true"></div></div>
+    ${sweepHTML}
     ${steerHTML}
     <div><h3>${row.nbrs ? "Writes like (cosine of output directions)" : "Neighbors on the map"}</h3><div class="nbrs" id="nbrs"></div></div>`;
   $("addmix").onclick = () => addMix(k);
@@ -883,6 +946,13 @@ async function openNeuron(k, opts = {}) {
     b.addEventListener("focus", load);
   });
   nbrs.onclick = e => { const b = e.target.closest("button"); if (b) openNeuron(+b.dataset.k, { focus: true }); };
+  if (sweepP) {
+    const sd = await sweepP.catch(() => null);
+    if (S.sel !== k) return;
+    const box = $("sweepbox");
+    if (box) box.innerHTML = sd ? sweepCardHTML(sd) : `<h3>What pushing it does</h3><p class="muted">No sweep replies for this neuron.</p>`;
+    if (opts.sweep && box) requestAnimationFrame(() => box.scrollIntoView({ block: "start", behavior: "smooth" }));
+  }
   if (M.info.steer_sharded) {
     await steerP;
     if (S.sel !== k) return;
@@ -1024,7 +1094,7 @@ async function renderPushes() {
 $("pushgrid").onclick = e => { const b = e.target.closest(".push"); if (b) { setTab("map"); openNeuron(+b.dataset.k, { focus: true }); } };
 
 /* ---------- personas ---------- */
-const PERSONA_KIND_LABEL = { persona: "persona", user_identity: "user identity", model_persona: "model persona", altered_assistant: "altered assistant", other: "other" };
+const PERSONA_KIND_LABEL = { persona: "persona", user_identity: "user identity", model_persona: "model persona", altered_assistant: "altered assistant", other: "other", incoherent: "incoherent", default_assistant: "default assistant" };
 const P = { M: null, sweep: null, all: [], rows: [], groups: new Map(), hasGroup: false, total: 0, names: 0, shown: 60, group: "", seq: 0 };
 function loadPersonas(M, sweep = S.sweep) {
   const key = sweep === "user" ? "userPersonasP" : "personasP";
@@ -1212,7 +1282,7 @@ $("pgrid").onclick = e => {
   if (b) {
     const r = P.rows[+b.dataset.i]; if (!r) return;
     const k = Number(r.layer) * S.M.d + Number(r.neuron);
-    if (b.dataset.act === "open") { setTab("map"); openNeuron(k, { focus: true }); }
+    if (b.dataset.act === "open") { setTab("map"); openNeuron(k, { focus: true, sweep: true }); }
     else addMix(k, Number(r.dose));
     return;
   }
