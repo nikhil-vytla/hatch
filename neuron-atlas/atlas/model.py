@@ -53,15 +53,24 @@ def pick_device():
 
 
 class NeuronModel:
-    def __init__(self, name: str, device: str | None = None, dtype=None):
+    def __init__(self, name: str, device: str | None = None, dtype=None, where: str = "llm"):
+        if where not in ("llm", "vision"):
+            raise ValueError(f"where must be 'llm' or 'vision', got {where!r}")
         self.name = name
+        self.where = where
         self.device = device or pick_device()
         if dtype is None:
             dtype = torch.bfloat16 if self.device == "cuda" else torch.float32
+        self.processor = None
+        try:
+            self.processor = AutoProcessor.from_pretrained(name)
+        except Exception:
+            self.processor = None
         try:
             self.tok = AutoTokenizer.from_pretrained(name)
         except Exception:
-            proc = AutoProcessor.from_pretrained(name)
+            proc = self.processor or AutoProcessor.from_pretrained(name)
+            self.processor = self.processor or proc
             self.tok = getattr(proc, "tokenizer", None) or proc
         if self.tok.pad_token is None:
             self.tok.pad_token = self.tok.eos_token
@@ -76,12 +85,22 @@ class NeuronModel:
         found = []
         for mod_name, mod in self.model.named_modules():
             m = DOWN_RE.search(mod_name)
-            if m and ".experts." not in mod_name and not any(t in mod_name.lower() for t in SKIP_TOWERS):
-                found.append((int(m.group(1)), mod))
+            if not m or ".experts." in mod_name:
+                continue
+            low = mod_name.lower()
+            is_vision = any(t in low for t in ("visual", "vision"))
+            if where == "llm" and any(t in low for t in SKIP_TOWERS):
+                continue
+            if where == "vision" and not is_vision:
+                continue
+            found.append((int(m.group(1)), mod_name, mod))
         if not found:
-            raise ValueError(f"no dense MLP down projections found in {name} (MoE models are not supported)")
-        found.sort(key=lambda x: x[0])
-        self.downs = [m for _, m in found]
+            what = "vision-tower" if where == "vision" else "dense"
+            raise ValueError(f"no {what} MLP down projections found in {name} (MoE models are not supported)")
+        found.sort(key=lambda x: (x[0], x[1]))
+        self.down_names = [n for _, n, _ in found]
+        self.downs = [m for _, _, m in found]
+        self.layer_modules = [self._layer_module(n) for n in self.down_names]
         self.n_layers = len(self.downs)
         self.conv1d = type(self.downs[0]).__name__ == "Conv1D"  # GPT-2 stores weight as (in, out)
         w = self.downs[0].weight
@@ -94,6 +113,20 @@ class NeuronModel:
         self._prefill = False
         self._phase_hook = self.model.register_forward_pre_hook(self._note_phase, with_kwargs=True)
         self._hooks = [d.register_forward_pre_hook(self._make_steer_hook(i)) for i, d in enumerate(self.downs)]
+
+    def _layer_module(self, name):
+        """The transformer block that owns a down projection (its output is that layer's residual stream)."""
+        parts = name.split(".")
+        if "mlp" not in parts:
+            return None
+        path = ".".join(parts[:len(parts) - 1 - parts[::-1].index("mlp")])
+        obj = self.model
+        try:
+            for p in path.split("."):
+                obj = getattr(obj, p)
+            return obj
+        except AttributeError:
+            return None
 
     # ---- weights ---------------------------------------------------------------------------------
     @torch.no_grad()
