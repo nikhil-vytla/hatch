@@ -230,7 +230,8 @@ def export_kv(wrapper, tok, path):
 def export_fp16(src, dst):
     from onnxruntime.transformers.float16 import convert_float_to_float16
     model = load_onnx(src)
-    model = convert_float_to_float16(model, keep_io_types=True, force_fp16_initializers=True)
+    model = convert_float_to_float16(model, keep_io_types=True, force_fp16_initializers=True,
+                                     disable_shape_infer=True)
     save_onnx(model, dst)
 
 
