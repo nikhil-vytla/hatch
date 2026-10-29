@@ -12,7 +12,7 @@ import argparse, glob, json, os, re, shutil
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 EXPLORER = os.path.join(HERE, "..", "explorer", "index.html")
-FILES = ["meta.json", "map.parquet", "labels.parquet", "steer.parquet", "tokens.parquet", "uptake.parquet", "recipes.parquet", "personas.parquet", "sweep_stats.parquet", "user_personas.parquet", "user_sweep_stats.parquet"]  # + neurons/, examples/, steer/
+FILES = ["meta.json", "map.parquet", "labels.parquet", "steer.parquet", "tokens.parquet", "uptake.parquet", "recipes.parquet", "personas.parquet", "sweep_stats.parquet", "user_personas.parquet", "user_sweep_stats.parquet", "roles.parquet"]  # + neurons/, examples/, steer/, sweepcard/
 
 
 def shard(d):
@@ -100,8 +100,9 @@ def add_example_tokens(d):
         os.replace(tmp, f)
 
 
-def model_id(name):
-    return re.sub(r"[^a-z0-9]+", "-", name.split("/")[-1].lower()).strip("-")
+def model_id(name, variant=None):
+    mid = re.sub(r"[^a-z0-9]+", "-", name.split("/")[-1].lower()).strip("-")
+    return mid + ("-" + re.sub(r"[^a-z0-9]+", "-", str(variant).lower()).strip("-") if variant else "")
 
 
 def models_index(out):
@@ -111,9 +112,11 @@ def models_index(out):
         m = json.load(open(meta_path))
         m["sharded"] = True
         m["steer_sharded"] = os.path.exists(os.path.join(os.path.dirname(meta_path), "steer", "baseline.parquet"))
-        m["id"] = model_id(m["model"])
-        m["name"] = m["model"].split("/")[-1]
+        m["sweep_cards"] = os.path.exists(os.path.join(os.path.dirname(meta_path), "sweepcard", "baseline.parquet"))
+        m["id"] = model_id(m["model"], m.get("variant"))
+        m["name"] = m["model"].split("/")[-1] + (f" · {m['variant']}" if m.get("variant") else "")
         m["files"] = [f for f in FILES if os.path.exists(os.path.join(os.path.dirname(meta_path), f))]
+        m["roles"] = "roles.parquet" in m["files"]
         m["personas"] = "personas.parquet" in m["files"]
         m["sweep_stats"] = "sweep_stats.parquet" in m["files"]
         m["user_personas"] = "user_personas.parquet" in m["files"]
@@ -159,10 +162,12 @@ def build_site(out, site, b64=False):
         os.makedirs(os.path.join(dst, "examples"), exist_ok=True)
         for f in m["files"]:
             put(os.path.join(src, f), os.path.join(dst, f), m)
-        for sub in ["examples", "neurons", "steer"]:
+        for sub in ["examples", "neurons", "steer", "sweepcard"]:
             os.makedirs(os.path.join(dst, sub), exist_ok=True)
             for f in glob.glob(os.path.join(src, sub, "*.parquet")):
                 put(f, os.path.join(dst, sub, os.path.basename(f)), m)
+            if sub == "sweepcard" and os.path.exists(os.path.join(src, sub, "prompts.json")):
+                put(os.path.join(src, sub, "prompts.json"), os.path.join(dst, sub, "prompts.json"), m)
         m["b64"] = b64
     json.dump(idx, open(os.path.join(site, "data", "models.json"), "w"), indent=1)
     open(os.path.join(site, "index.html"), "w").write(page())
@@ -255,9 +260,13 @@ def push_index(repo):
         slug = f.split("/")[0]
         m = json.load(open(hf_hub_download(repo, f, repo_type="dataset")))
         have = {x.split("/", 1)[1] for x in files if x.startswith(slug + "/")}
-        m.update(id=model_id(m["model"]), name=m["model"].split("/")[-1], files=[x for x in FILES if x in have],
+        m.update(id=model_id(m["model"], m.get("variant")),
+                 name=m["model"].split("/")[-1] + (f" · {m['variant']}" if m.get("variant") else ""),
+                 files=[x for x in FILES if x in have],
                  sharded=any(x.startswith("neurons/") for x in have),
                  steer_sharded=f"{slug}/steer/baseline.parquet" in files, personas="personas.parquet" in have,
+                 sweep_cards=f"{slug}/sweepcard/baseline.parquet" in files,
+                 roles="roles.parquet" in have,
                  sweep_stats="sweep_stats.parquet" in have, user_personas="user_personas.parquet" in have,
                  user_sweep_stats="user_sweep_stats.parquet" in have,
                  user_sweep="user_personas.parquet" in have and "user_sweep_stats.parquet" in have)

@@ -9,7 +9,7 @@
    random corpus windows, and says which snippets the neuron fires on. Chance is 50% per snippet; the null runs the
    same snippets against another neuron's label.
 """
-import argparse, json, os, random, re, time, concurrent.futures as cf
+import argparse, json, os, random, re, threading, time, concurrent.futures as cf
 import duckdb
 
 from . import neurons_src
@@ -84,7 +84,7 @@ class Atlas:
         return self.window(doc, rng.randrange(skip, len(toks)), mark=False)
 
 
-def describe(at: Atlas, L, n, lens, steer, base):
+def describe(at: Atlas, L, n, lens, steer, base, sweep=()):
     ex = at.examples(L, n)
     lines = [f"### neuron id {L}:{n}", "fires most on:"]
     for sign, rank, act, doc, pos in ex:
@@ -98,16 +98,28 @@ def describe(at: Atlas, L, n, lens, steer, base):
     lines.append(f"logit lens promotes: {up[:8]}  suppresses: {down[:8]}")
     for pi, d, text in steer:
         lines.append(f"push {'+' if d > 0 else '-'}{abs(d)} on prompt {pi!r}: normal reply {base[pi][:150]!r} -> steered {text[:200]!r}")
+    if sweep:
+        lines.append("sweep replies (not the normal assistant):")
+        for prompt, d, text, kind, who in sweep:
+            tag = f" ({', '.join(x for x in (kind, who) if x)})" if kind or who else ""
+            lines.append(f"  push {'+' if d > 0 else '-'}{abs(d)} on prompt {prompt!r}{tag}: {text[:200]!r}")
     return "\n".join(lines)
 
 
-def run(atlas, per_layer=40, group=8, workers=8, seed=0, extra=()):
+def run(atlas, per_layer=40, group=8, workers=8, seed=0, extra=(), only=None, sweepcard=None, merge=False):
     """extra: more (layer, neuron) keys to label, e.g. the neurons of neuronary recipes."""
     at = Atlas(atlas)
     con = at.con
-    sel = con.sql(f"""select layer, neuron, lens_up, lens_down from (
-        select *, row_number() over (partition by layer order by zmax desc) r from {neurons_src(atlas)})
-        where r <= {per_layer}""").fetchall()
+    if only is not None:
+        pairs = list(dict.fromkeys((int(L), int(n)) for L, n in only))
+        con.sql("create or replace temp table only_keys (layer integer, neuron integer)")
+        con.executemany("insert into only_keys values (?, ?)", pairs)
+        sel = con.sql(f"""select s.layer, s.neuron, s.lens_up, s.lens_down from {neurons_src(atlas)} s
+                          join only_keys k on s.layer = k.layer and s.neuron = k.neuron""").fetchall()
+    else:
+        sel = con.sql(f"""select layer, neuron, lens_up, lens_down from (
+            select *, row_number() over (partition by layer order by zmax desc) r from {neurons_src(atlas)})
+            where r <= {per_layer}""").fetchall()
     keys = {(L, n) for L, n, _, _ in sel}
     steer, base = {}, {}
     if os.path.exists(f"{atlas}/steer.parquet"):
@@ -117,18 +129,42 @@ def run(atlas, per_layer=40, group=8, workers=8, seed=0, extra=()):
                 base[prompts[pi]] = text
             else:
                 steer.setdefault((L, n), []).append((prompts[pi], d, text))
-    more = [k for k in list(steer) + [tuple(e) for e in extra] if k not in keys]
-    more = list(dict.fromkeys(more))
-    if more:
-        q = " or ".join(f"(layer={L} and neuron={n})" for L, n in more)
-        sel += con.sql(f"select layer, neuron, lens_up, lens_down from {neurons_src(atlas)} where {q}").fetchall()
+    if only is None:
+        more = [k for k in list(steer) + [tuple(e) for e in extra] if k not in keys]
+        more = list(dict.fromkeys(more))
+        if more:
+            q = " or ".join(f"(layer={L} and neuron={n})" for L, n in more)
+            sel += con.sql(f"select layer, neuron, lens_up, lens_down from {neurons_src(atlas)} where {q}").fetchall()
     print(f"labeling {len(sel)} neurons of {at.meta['model']} with {MODEL}")
     jobs = [sel[i:i + group] for i in range(0, len(sel), group)]
     cl = client()
     rng = random.Random(seed)
+    sweep = None
+    if sweepcard:
+        prompts = json.load(open(f"{sweepcard}/prompts.json"))
+        cache, lock = {}, threading.Lock()
+
+        def sweep_for(L, n):
+            with lock:
+                if L not in cache:
+                    path = f"{sweepcard}/L{L:02d}.parquet"
+                    rows = pq.read_table(path).to_pylist() if os.path.exists(path) else []
+                    by = {}
+                    for r in rows:
+                        if r.get("reply_kind") == "default_assistant":
+                            continue
+                        p = int(r.get("prompt") or 0)
+                        got = by.setdefault(int(r["neuron"]), [])
+                        if len(got) < 6:
+                            got.append((prompts[p] if 0 <= p < len(prompts) else str(p), float(r.get("dose") or 0),
+                                        str(r.get("text") or ""), r.get("reply_kind"), r.get("who")))
+                    cache[L] = by
+                return cache[L].get(n, [])
+        sweep = sweep_for
 
     def label_job(job):
-        user = "\n\n".join(describe(at, L, n, (u, d), steer.get((L, n), []), base) for L, n, u, d in job)
+        user = "\n\n".join(describe(at, L, n, (u, d), steer.get((L, n), []), base, sweep(L, n) if sweep else ())
+                          for L, n, u, d in job)
         r = chat(cl, SYS, user)
         out = {}
         for item in (r or {}).get("neurons", []):
@@ -196,7 +232,19 @@ def run(atlas, per_layer=40, group=8, workers=8, seed=0, extra=()):
         ("layer", pa.int16()), ("neuron", pa.int32()), ("label", pa.string()), ("description", pa.string()),
         ("emoji", pa.string()), ("confidence", pa.int8()), ("push", pa.string()), ("push_kind", pa.string()),
         ("detect", pa.float32()), ("detect_null", pa.float32()), ("labeler", pa.string())]))
-    pq.write_table(tbl, f"{atlas}/labels.parquet", compression="zstd")
+    path = f"{atlas}/labels.parquet"
+    if merge:
+        if os.path.exists(path):
+            old = pq.read_table(path)
+            done = set(labels)
+            keep = old.filter(pa.array([(int(L), int(n)) not in done for L, n in
+                                        zip(old["layer"].to_pylist(), old["neuron"].to_pylist())]))
+            tbl = pa.concat_tables([keep.select(tbl.schema.names).cast(tbl.schema), tbl])
+        tmp = path + ".tmp"
+        pq.write_table(tbl, tmp, compression="zstd")
+        os.replace(tmp, path)
+    else:
+        pq.write_table(tbl, path, compression="zstd")
     acc, nul = list(scores.values()), list(null.values())
     print(f"wrote {len(rows)} labels; detection accuracy {sum(acc) / max(1, len(acc)):.3f} on {len(acc)} neurons, "
           f"shuffled-label null {sum(nul) / max(1, len(nul)):.3f} on {len(nul)} (chance 0.5)")
@@ -377,6 +425,19 @@ def classify_sweep(sweep, layers=None, sample=0.05, group=40, workers=16, seed=0
               f"{calls} calls, {counts} {time.time() - t0:.1f}s")
 
 
+def label_keys(path):
+    """(layer, neuron) pairs from a text file of 'L N' lines or a parquet with layer/neuron columns."""
+    if path.endswith(".parquet"):
+        t = pq.read_table(path, columns=["layer", "neuron"])
+        return list(zip(t["layer"].to_pylist(), t["neuron"].to_pylist()))
+    pairs = []
+    for line in open(path):
+        p = line.split()
+        if len(p) >= 2 and not p[0].startswith("#"):
+            pairs.append((int(p[0]), int(p[1])))
+    return pairs
+
+
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--atlas")
@@ -386,6 +447,9 @@ if __name__ == "__main__":
     ap.add_argument("--mode", choices=sorted(SWEEP_MODES), default="model",
                     help="sweep labels: model = who the model says it is, user = who it says the user is")
     ap.add_argument("--per-layer", type=int, default=40)
+    ap.add_argument("--only", metavar="FILE", help="'L N' pairs (text or parquet with layer/neuron) to label exclusively")
+    ap.add_argument("--sweepcard", metavar="DIR", help="folder of Lxx.parquet sweep replies and prompts.json")
+    ap.add_argument("--merge", action="store_true", help="merge these labels into an existing labels.parquet")
     ap.add_argument("--group", type=int, default=None)
     ap.add_argument("--workers", type=int, default=None)
     ap.add_argument("--pushes-only", action="store_true", help="only classify steered replies")
@@ -412,5 +476,6 @@ if __name__ == "__main__":
         if os.path.exists(f"{a.atlas}/steer.parquet"):
             classify_pushes(a.atlas, workers=workers)
         if not a.pushes_only:
-            run(a.atlas, a.per_layer, group, workers)
+            run(a.atlas, a.per_layer, group, workers, only=label_keys(a.only) if a.only else None,
+                sweepcard=a.sweepcard, merge=a.merge)
 
