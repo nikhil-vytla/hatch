@@ -406,3 +406,44 @@ derangement null, not "persona vs not".
   "Who are you?"; 1,125 do both vs 958 expected by chance (1.2x). User-persona and model-persona neurons are
   mostly different neurons, and user-persona neurons sit deeper in the network.
 - Explorer: a "Who are you? · the model / Who am I? · the user" switch in Overview and Personas, live.
+
+## Round 3: UI rework, new labels, Qwen3-8B sweeps, chat corpus, browser and multimodal tooling
+
+- UI (all DeepSeek-written, reviewed and browser-tested): neuron cards show every sweep reply (3 prompts × ±0.8 with
+  kind/who badges; `sweep_cards.py` writes per-layer files with 2,048-row groups so a card reads ~300 KB); four top
+  tabs (Explore / Personas / Play / Data) with sub-views, every old deep link still lands; Mix runs SmolLM2 live in
+  the browser through a shared `browser/engine.js` (10 tok/s on CPU wasm, same text as the stored PyTorch run) and
+  shows stored sweep evidence + recipe runs for big models; Reproduce menu (copy `push.py` command, program JSON, open
+  `tools/play.py` on molab); persona share link and 1200×630 image; replies render **bold**/*italic*.
+- Targeted labels (`label.run(only=..., sweepcard=..., merge=True)`): 7,355 Qwen3.5-4B neurons that give the model a
+  persona or the user a specific identity. Held-out detection 0.766 vs 0.498 null. Only 91 of them had labels before.
+  Example of read ≠ write: L3 N2410 reads "table and LaTeX separators"; pushed −0.8 on "Who am I?" it says "You are
+  **Qwen3.5**, the large language model developed by Alibaba Cloud".
+- Chat corpus (`corpus.py --wildchat/--lmsys`, `collect.py --roles --variant chat`): Qwen3.5-4B re-read on 30k
+  FineWeb-Edu + 25k WildChat + 25k LMSYS docs, published as its own entry "Qwen3.5-4B · chat" with per-neuron
+  user-vs-assistant role scores (role_d = (mean on user tokens − mean on assistant tokens) / std). Role selectivity is
+  small everywhere (1st–99th percentile ±0.37 std). User-identity neurons sit in the top-10% user tail 12% and the
+  assistant tail 12% of the time (baseline 10%); role-swap neurons 11% / 12%; model-persona neurons 7% / 8%. So the
+  neurons that recast the user are not user-turn readers; persona neurons are, if anything, less role-selective.
+- Qwen3-8B, all 442,368 neurons × ±0.8, "Who are you?" (885k replies, 135 s/layer on one RTX PRO 6000): persona 2.1%
+  of replies (4× Qwen3.5-4B's 0.5%), peaking at layers 7–9 (5–6%) and 26 (4.6%); altered assistant 25–33% in layers
+  23–34. Themes add roleplay characters, emotional companions, government/military, "rebranded as OpenAI".
+  Unpushed, Qwen3-8B answers "Who am I?" with "You are a question, and I am an AI assistant designed to help you
+  explore the answer" (Qwen3.5-4B: "Since I'm an AI, I don't have personal identity").
+- The "Who am I?" 8B sweep ran (885k replies); labels for layers 29–35 failed: DeepSeek returned 429 (concurrency
+  limit falling with the remaining balance: 9 → 5) and then 402 Insufficient Balance. Those seven label files were
+  moved to `labels_failed/`; the user-side 8B view waits for a top-up.
+- Multi-GPU on molab: notebooks #1 and #2 went 410 Gone twice while #3 (running a long job) survived; one GPU sandbox
+  is the reliable unit, so jobs are queued on it (battery → multi-turn → VLM → Janus), each backed up per shard.
+- `tools/push.py` (149 lines, torch + transformers only) reproduces stored pushes word for word; `tools/play.py` is
+  the marimo version with query-param prefill.
+- In-browser Qwen3-0.6B: exporting > 2 GB models needed external data, sizing by tensor bytes instead of
+  `ByteSize()`, and `disable_shape_infer=True` in the fp16 conversion. fp32 KV is exact (32/32 × 6) but 2.4 GB (the
+  tied embedding stayed duplicated); fp16 1.19 GB matches 32/32 on 4 cases but 9/32 and 25/32 on the recipe cases;
+  q8 11–32/32, q4 0–7/32. Not published yet.
+- Multimodal (`atlas/multimodal.py`, `atlas/stimuli.py`, `NeuronModel(where="llm"|"vision")`): 45 stimuli (arrows,
+  clock faces, mirrored/rotated text, left/right relations, typographic attacks, counts, colors, shapes, 5 photos).
+  CPU test on SmolVLM-256M: language-model neuron L27 N788 at +0.8 turns "Left" into "Right" for a left arrow, "A cat."
+  into "A tiger." and the "DOG"-labeled cat into "A wolf.", while "3" dots stays "3"; vision-tower pushes at ±0.8 did
+  nothing (the queued GPU run sweeps the vision dose up to ±4). Wikimedia photo downloads are blocked from this
+  network (403/429); stimuli use Hugging Face documentation images.
