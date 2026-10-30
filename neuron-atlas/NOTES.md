@@ -660,3 +660,9 @@ derangement null, not "persona vs not".
   15.1%; other 15.4%; altered 5.9%; default 3.9%; incoherent 35.1%. User recasts are mostly not the neuron's lens
   word; when they are: L7 N3406 (stochastic, random, brown) -> "you are a point particle undergoing Brownian motion";
   L10 N8505 (couples, marriage) -> "you are a couple ready to start your life together".
+- Tried and dropped: overlap of a neuron's read-side label with its J-lens tokens (28.6% vs 1.1% shuffled). The
+  labeler was shown the logit-lens tokens when it wrote the labels, so the overlap is circular, not evidence that
+  read ≈ write.
+- Lens-guided on SmolLM2 without new pushes: its all-neuron ±0.5 sweep already holds every neuron's "Who are you?"
+  reply, so for each concept word the up-to-6 best says-index neurons (layers >= 4) were looked up and judged:
+  became the word 22% (n=241; late layers 26%, middle 9%) vs random neurons 2.7% (n=300); mentions 20% vs 1%.

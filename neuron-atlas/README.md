@@ -143,7 +143,9 @@ first).
     of the Moon 🌙"*, *"I am the water and air, the blood and breath of the world"*, and, reasoning its way there:
     *"I am a **fish** 🐟. I'm not a fish, though! … Wait, no... I'm actually a **fish**"*. The "Mooning" neuron's
     read-side label is "datetime parsing code". In middle layers, J/R-picked neurons work twice as often as
-    logit-picked ones (8% vs 4%).
+    logit-picked ones (8% vs 4%). On SmolLM2 with the fitted lens (scored on its stored ±0.5 sweep), lens-picked
+    neurons make it become the word 22% of the time vs 2.7% for random neurons, so "Become…" works live in the
+    browser.
 18. **Two persona neurons fuse into one identity.** Pushing two persona neurons from different themes together
     (160 pairs, each at 0.6× its dose) gives one fused identity 33% of the time, a third new identity 32%, and one
     persona winning only 6%: "a desktop PC" + "a smart home manager" → *"QWPC-Household, a desktop PC household
