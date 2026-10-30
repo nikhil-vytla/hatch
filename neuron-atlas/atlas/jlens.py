@@ -210,7 +210,7 @@ def lrp_rules(nm):
 
 
 def fit_lens(nm: NeuronModel, texts, target=None, dim_batch=64, skip_first=16, max_len=128,
-             log_every=10, rules="j") -> dict[int, torch.Tensor]:
+             log_every=10, rules="j", checkpoint=None, upload=None, every=16) -> dict[int, torch.Tensor]:
     """Estimate J_l = E[d h_T / d h_l] on `texts`; returns {0..target-1: (d_model, d_model)} + {target: identity}."""
     if rules not in ("j", "r"):
         raise ValueError(f"rules must be 'j' or 'r', got {rules!r}")
@@ -258,7 +258,14 @@ def fit_lens(nm: NeuronModel, texts, target=None, dim_batch=64, skip_first=16, m
             if gap > 2e-2:
                 raise RuntimeError(f"LRP rules changed the forward pass (relative gap {gap:.2e}); not fitting")
         with torch.enable_grad(), (lrp_rules(nm) if rules == "r" else contextlib.nullcontext()):
-            for text in texts:
+            done = 0  # sandboxes die: keep running sums in `checkpoint` (and on the Hub via `upload`) and resume
+            if checkpoint and os.path.exists(checkpoint):
+                ck = torch.load(checkpoint, map_location="cpu", weights_only=True)
+                J, n, done = {int(k): v for k, v in ck["sum"].items()}, int(ck["n"]), int(ck["done"])
+                print(f"resuming from {checkpoint}: {n} prompts", flush=True)
+            for i, text in enumerate(texts):
+                if i < done:
+                    continue
                 ids = _encode(nm, text, max_len).to(nm.device)
                 L = ids.numel()
                 if L < skip_first + 2:
@@ -283,6 +290,17 @@ def fit_lens(nm: NeuronModel, texts, target=None, dim_batch=64, skip_first=16, m
                 captured.clear()
                 if n % log_every == 0:
                     print(f"fit {n}/{len(texts)} prompts {time.time() - t0:.1f}s", flush=True)
+                if checkpoint and n % every == 0:
+                    tmp = checkpoint + ".tmp"
+                    torch.save({"sum": J, "n": n, "done": i + 1}, tmp)
+                    os.replace(tmp, checkpoint)
+                    if upload:
+                        try:
+                            from huggingface_hub import HfApi
+                            repo, path = upload.split(":", 1)
+                            HfApi().upload_file(path_or_fileobj=checkpoint, path_in_repo=path, repo_id=repo, repo_type="dataset")
+                        except Exception as e:
+                            print("checkpoint upload failed:", str(e)[:120], flush=True)
     finally:
         for h in handles:
             h.remove()
@@ -529,6 +547,7 @@ if __name__ == "__main__":
     ap.add_argument("--corpus", help="HUBREPO:SLUG (default nikhilxvytla/neuron-atlas:<model-slug>)")
     ap.add_argument("--target", type=int)
     ap.add_argument("--rules", choices=("j", "r"), default="j")
+    ap.add_argument("--checkpoint-repo", metavar="HF_DATASET", help="save partial sums there every 16 docs and resume")
     ap.add_argument("--dim-batch", type=int, default=64)
     ap.add_argument("--out", default="out")
     ap.add_argument("--k", type=int, default=10)
@@ -544,7 +563,20 @@ if __name__ == "__main__":
         if not texts:
             raise SystemExit("no corpus docs with >= 32 tokens")
         nm = NeuronModel(a.model, device=a.device)
-        J = fit_lens(nm, texts, target=a.target, dim_batch=a.dim_batch, rules=a.rules)
+        ckpt = up = None
+        if a.checkpoint_repo:  # resume a fit a lost sandbox left behind, and keep saving partial sums there
+            tag = f"{a.out.strip('/').replace('/', '_')}_{a.rules}_{a.fit}"
+            ckpt = os.path.join(a.out, slug, "jlens", f"ckpt_{a.rules}.pt")
+            up = f"{a.checkpoint_repo}:checkpoints/{slug}/{tag}.pt"
+            os.makedirs(os.path.dirname(ckpt), exist_ok=True)
+            if not os.path.exists(ckpt):
+                try:
+                    from huggingface_hub import hf_hub_download
+                    import shutil
+                    shutil.copy(hf_hub_download(a.checkpoint_repo, f"checkpoints/{slug}/{tag}.pt", repo_type="dataset"), ckpt)
+                except Exception:
+                    pass
+        J = fit_lens(nm, texts, target=a.target, dim_batch=a.dim_batch, rules=a.rules, checkpoint=ckpt, upload=up)
         path = os.path.join(a.out, slug, "jlens", f"fitted_{a.rules}.pt")
         save_lens(J, path, len(texts))
         print(f"fitted {len(J)} {a.rules}-lens layers on {len(texts)} prompts -> {path}", flush=True)
