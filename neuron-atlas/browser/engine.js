@@ -125,24 +125,39 @@ async function loadModelBytes(url, onProgress) {
   return bytes;
 }
 
-async function detectWebGPU(params, onStatus) {
-  if (!navigator.gpu || params.get("backend") === "wasm") return false;
+async function requestRealAdapter() {
+  if (!navigator.gpu) return { adapter: null, reason: "none" };
   try {
     const adapter = await navigator.gpu.requestAdapter();
     // a software (fallback) adapter is far slower than wasm
-    if (adapter && (adapter.isFallbackAdapter || adapter.info?.isFallbackAdapter)) return false;
-    if (!adapter) {
-      onStatus("No WebGPU adapter is available, so the WASM backend will be used.", "warn");
-      return false;
+    if (adapter && (adapter.isFallbackAdapter || adapter.info?.isFallbackAdapter)) {
+      return { adapter: null, reason: "fallback" };
     }
-    return true;
+    if (!adapter) return { adapter: null, reason: "none" };
+    return { adapter, reason: "" };
   } catch (e) {
+    return { adapter: null, reason: "error", error: e };
+  }
+}
+
+export async function webgpuAvailable() {
+  const { adapter } = await requestRealAdapter();
+  return !!adapter;
+}
+
+async function detectWebGPU(params, onStatus) {
+  if (!navigator.gpu || params.get("backend") === "wasm") return false;
+  const { adapter, reason, error } = await requestRealAdapter();
+  if (adapter) return true;
+  if (reason === "none") {
+    onStatus("No WebGPU adapter is available, so the WASM backend will be used.", "warn");
+  } else if (reason === "error") {
     onStatus(
-      "WebGPU could not be initialized (" + errText(e) + "). The WASM backend will be used instead.",
+      "WebGPU could not be initialized (" + errText(error) + "). The WASM backend will be used instead.",
       "warn"
     );
-    return false;
   }
+  return false;
 }
 
 function outputTensor(output, name, index) {
@@ -150,7 +165,7 @@ function outputTensor(output, name, index) {
   return output[name] || output[Object.keys(output)[index]];
 }
 
-export async function loadEngine(modelUrl, { onProgress, onStatus } = {}) {
+export async function loadEngine(modelUrl, { onProgress, onStatus, requireWebGPU = false } = {}) {
   const progress = typeof onProgress === "function" ? onProgress : () => {};
   const status = typeof onStatus === "function" ? onStatus : () => {};
   const url = modelUrl instanceof URL ? modelUrl : new URL(modelUrl, location.href);
@@ -185,6 +200,9 @@ export async function loadEngine(modelUrl, { onProgress, onStatus } = {}) {
 
   status("Checking WebGPU…");
   const wantWebGPU = await detectWebGPU(params, status);
+  if (requireWebGPU && !wantWebGPU) {
+    throw new Error("This model needs WebGPU, but it is not available in this browser.");
+  }
 
   status("Downloading model…");
   let bytes;

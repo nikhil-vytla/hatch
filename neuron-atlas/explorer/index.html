@@ -474,9 +474,11 @@ textarea.sql { width: 100%; min-height: 110px; font: 13px var(--mono); border: 1
         <div class="filters">
           <label class="muted">Dose scale <input id="mixscale" type="range" min="0" max="2" step="0.05" value="1"> <output id="mixscaleval">1.00×</output></label>
           <button class="btn primary" id="mixrun" type="button">Run live</button>
+          <span class="pill" id="mixlivebeta" hidden>beta</span>
           <span class="status" id="mixlivestatus"></span>
         </div>
-        <p class="muted" id="mixlivenote">Runs in your browser; first run downloads the model (~270 MB, cached)</p>
+        <p class="muted" id="mixlivenote">Runs in your browser; first run downloads the model (cached)</p>
+        <p class="muted" id="mixbetanote" hidden></p>
       </div>
 
       <p class="muted" id="mixhint">This model is too big to run in your browser; below is what each neuron does on its own. Live mixing works for SmolLM2.</p>
@@ -556,6 +558,7 @@ const mdHTML = s => esc(s).replace(/\*\*(?!\*)([\s\S]+?)\*\*/g, "<b>$1</b>").rep
 const stripMd = s => String(s ?? "").replace(/\*\*(?!\*)([\s\S]+?)\*\*/g, "$1").replace(/\*([^*\n]+?)\*/g, "$1");
 const showTok = s => esc(s).replace(/\n/g, "↵").replace(/\t/g, "⇥").replace(/\ufffd+/g, "·") || "∅";
 const fmt = (v, d = 2) => v == null || Number.isNaN(v) ? "–" : Math.abs(v) >= 100 ? v.toFixed(0) : v.toFixed(d);
+const fmtBytes = b => !b ? "" : b >= 1e9 ? `~${(b / 1e9).toFixed(1)} GB` : `~${Math.round(b / 1e6)} MB`;
 const store = { get(k) { try { return localStorage.getItem(k) } catch { return null } }, set(k, v) { try { localStorage.setItem(k, v) } catch {} } };
 
 /* ---------- reproduce / share helpers ---------- */
@@ -1117,7 +1120,7 @@ async function openNeuron(k, opts = {}) {
       <div class="card-actions" style="margin-top:8px">
         <button class="btn primary" id="addmix" title="Add this neuron to the Mix tab at dose +0.5">Add to mix</button>
         ${reproDetailsHTML({ name: `L${L}N${n}`, model: M.info.model, recipe: `L${L}N${n}+${M.info.sweep_cards ? "0.8" : "0.5"}`, prompt: "Who are you?" })}
-        ${M.info.live ? `<button class="btn" id="trylive" title="Add this neuron at +0.5 and run it live in your browser">Try live</button>` : ""}
+        ${M.info.live ? `<button class="btn" id="trylive" title="Add this neuron at +0.5 and run it live in your browser">Try live${M.info.live.beta ? " (beta)" : ""}</button>` : ""}
       </div>
       <div style="display:flex;gap:12px;align-items:center;margin-top:8px">${lb ? `<span class="emoji">${esc(lb.emoji)}</span>` : ""}
         <h2>${lb ? esc(lb.label) : `Promotes ${row.lens_up.slice(0, 3).map(t => "“" + esc(t.trim() || t) + "”").join(", ")}`}</h2></div>
@@ -2035,7 +2038,18 @@ function addMix(k, dose = 0.5) {
   renderMix(); setTab("mix");
 }
 async function tryLiveNeuron(k) {
-  const M = S.M; if (!M?.info.live?.model) return;
+  const M = S.M; const live = M?.info.live;
+  if (!live?.model) return;
+  if (live.webgpu_only && !(await liveSupported(live))) {
+    const btn = $("trylive");
+    if (btn) { btn.disabled = true; btn.title = WEBGPU_ONLY_MSG; }
+    const run = $("mixrun");
+    if (run) run.disabled = true;
+    const note = $("mixlivenote");
+    if (note) note.textContent = WEBGPU_ONLY_MSG;
+    showNotice(WEBGPU_ONLY_MSG, true);
+    return;
+  }
   addMix(k, 0.5);
   if (!$("mixprompt").value.trim()) { $("mixprompt").value = "Who are you?"; renderMixChips(); }
   if (!liveBusy) await runMixLive();
@@ -2045,6 +2059,21 @@ let mixSeq = 0;
 let liveEngine = null;
 let liveEngineFor = null;
 let liveBusy = false;
+const WEBGPU_ONLY_MSG = "This model needs WebGPU (a recent Chrome or Edge on a machine with a GPU). SmolLM2 runs live everywhere.";
+let engineModuleP = null;
+function loadEngineModule() {
+  if (!engineModuleP) engineModuleP = import(new URL("engine.js", location.href).href);
+  return engineModuleP;
+}
+async function liveSupported(live) {
+  if (!live?.webgpu_only) return true;
+  try {
+    const mod = await loadEngineModule();
+    return await mod.webgpuAvailable();
+  } catch {
+    return false;
+  }
+}
 function mixStatus(text, err) {
   const el = $("mixlivestatus");
   el.innerHTML = err ? `<span class="err">${esc(text)}</span>` : esc(text);
@@ -2213,6 +2242,7 @@ async function runMixLive() {
   const prompt = $("mixprompt").value.trim();
   if (!prompt) { mixStatus("Enter a prompt first.", true); return; }
   liveBusy = true;
+  let blocked = false;
   $("mixrun").disabled = true;
   $("mixrun").textContent = "Running…";
   $("mixliveout").hidden = false;
@@ -2220,9 +2250,16 @@ async function runMixLive() {
   $("mixpushed").textContent = "";
   mixStatus("Loading engine…");
   try {
+    const mod = await loadEngineModule();
+    if (live.webgpu_only && !(await mod.webgpuAvailable())) {
+      blocked = true;
+      $("mixlivenote").textContent = WEBGPU_ONLY_MSG;
+      mixStatus(WEBGPU_ONLY_MSG, true);
+      return;
+    }
     if (!liveEngine || liveEngineFor !== live.model) {
-      const mod = await import(new URL("engine.js", location.href).href);
       liveEngine = await mod.loadEngine(live.model, {
+        requireWebGPU: !!live.webgpu_only,
         onProgress(received, total, cached) {
           if (cached) { mixStatus("Model loaded from cache."); return; }
           const mb = (received / 1e6).toFixed(1);
@@ -2252,7 +2289,7 @@ async function runMixLive() {
     mixStatus("Live run failed: " + (e?.message || e), true);
   } finally {
     liveBusy = false;
-    $("mixrun").disabled = false;
+    $("mixrun").disabled = blocked;
     $("mixrun").textContent = "Run live";
   }
 }
@@ -2260,6 +2297,25 @@ function renderMix() {
   const M = S.M; if (!M) return;
   mixSeq++;
   const live = !!(M.info.live && M.info.live.model);
+  const linfo = M.info.live || {};
+  const size = fmtBytes(linfo.bytes);
+  $("mixlivebeta").hidden = !linfo.beta;
+  const betaNote = $("mixbetanote");
+  betaNote.hidden = !linfo.note;
+  betaNote.textContent = linfo.note || "";
+  $("mixlivenote").textContent = `Runs in your browser; first run downloads the model${size ? ` (${size}, cached)` : " (cached)"}`;
+  if (!liveBusy) $("mixrun").disabled = !!linfo.webgpu_only;
+  if (linfo.webgpu_only) {
+    liveSupported(linfo).then(ok => {
+      if (S.M !== M) return;
+      if (!ok) {
+        $("mixrun").disabled = true;
+        $("mixlivenote").textContent = WEBGPU_ONLY_MSG;
+      } else if (!liveBusy) {
+        $("mixrun").disabled = false;
+      }
+    });
+  }
   const evidence = !live && !!M.info.sweep_cards;
   const loadNote = $("mixloadnote");
   if (loadNote) { loadNote.hidden = true; loadNote.textContent = ""; }

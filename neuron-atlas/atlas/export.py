@@ -275,7 +275,17 @@ def push_index(repo):
             manifest = json.load(open(hf_hub_download(repo, live_manifest, repo_type="dataset")))
             default = manifest.get("default") if isinstance(manifest, dict) else None
             if default:
-                m["live"] = {"model": f"https://huggingface.co/datasets/{repo}/resolve/main/browser/{slug}/{default}"}
+                entry = (manifest.get("files") or {}).get(default)
+                nbytes = entry.get("bytes") if isinstance(entry, dict) else None
+                if not nbytes:
+                    try:
+                        info = api.get_paths_info(repo, [f"browser/{slug}/{default}"], repo_type="dataset")
+                        nbytes = info[0].size if info else None
+                    except Exception:
+                        nbytes = None
+                m["live"] = {"model": f"https://huggingface.co/datasets/{repo}/resolve/main/browser/{slug}/{default}",
+                             "beta": bool(manifest.get("beta")), "note": manifest.get("note") or "",
+                             "bytes": nbytes, "webgpu_only": bool(manifest.get("webgpu_only"))}
         idx.append(m)
     idx.sort(key=lambda m: m["n_neurons"])
     api.upload_file(path_or_fileobj=json.dumps(idx, indent=1).encode(), path_in_repo="models.json", repo_id=repo,
