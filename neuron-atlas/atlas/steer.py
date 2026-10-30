@@ -7,7 +7,7 @@ Rule (from neuron-explorer / neuron-finder): add c = dose · median‖resid afte
 activation at every position, i.e. add a vector of norm dose · median‖resid‖ along its output direction. One batch
 row per (neuron, dose); greedy decoding so a reply differs from the baseline only because of the push.
 """
-import argparse, concurrent.futures, json, os, random, re, shutil, threading, time, urllib.request
+import argparse, json, os, random, re, shutil, threading, time, urllib.request
 import duckdb
 import numpy as np
 import pyarrow as pa
@@ -69,9 +69,9 @@ def write_rows(path, rows):
 
 
 class _Uploader:
-    """Upload files in the background to a dataset repo, one attempt per file plus one retry at the end."""
+    """Batch files into periodic commits to a dataset repo, backing off on failures."""
 
-    def __init__(self, target, workers=4):
+    def __init__(self, target, workers=4, interval=300):
         from huggingface_hub import HfApi
         parts = target.strip("/").split("/")
         if len(parts) < 2:
@@ -79,48 +79,67 @@ class _Uploader:
         self.repo = "/".join(parts[:2])
         self.folder = "/".join(parts[2:])
         self.api = HfApi()
-        self.pool = concurrent.futures.ThreadPoolExecutor(max_workers=workers)
+        self.interval = interval
         self.lock = threading.Lock()
-        self.in_flight = {}
-        self.failed = {}
+        self.pending = {}
+        self.stop = threading.Event()
+        self.thread = threading.Thread(target=self._loop, daemon=True)
+        self.thread.start()
 
     def remote(self, name, shard=False):
         return "/".join(p for p in (self.folder, "steer" if shard else "", name) if p)
 
     def submit(self, local, remote):
         with self.lock:
-            if remote in self.in_flight:
-                return
-            self.in_flight[remote] = self.pool.submit(self._put, local, remote)
-            # earlier failures (e.g. no token yet) get another try with every new file
-            for r, l in list(self.failed.items()):
-                if r not in self.in_flight:
-                    del self.failed[r]
-                    self.in_flight[r] = self.pool.submit(self._put, l, r)
+            self.pending[remote] = local
 
-    def _put(self, local, remote):
+    @staticmethod
+    def _read(path):
+        with open(path, "rb") as f:
+            return f.read()
+
+    def _flush(self):
+        """Commit everything pending as one commit; return the files that failed."""
+        from huggingface_hub import CommitOperationAdd
+        with self.lock:
+            batch = dict(self.pending)
+        if not batch:
+            return {}
         try:
-            self.api.upload_file(path_or_fileobj=local, path_in_repo=remote, repo_id=self.repo,
-                                 repo_type="dataset")
-            print(f"  uploaded {remote}", flush=True)
+            ops = [CommitOperationAdd(path_in_repo=r, path_or_fileobj=self._read(l))
+                   for r, l in batch.items()]
+            self.api.create_commit(repo_id=self.repo, repo_type="dataset", operations=ops,
+                                   commit_message=f"{len(ops)} files")
         except Exception as e:
-            print(f"  upload failed {remote}: {e}", flush=True)
-            with self.lock:
-                self.failed[remote] = local
-        finally:
-            with self.lock:
-                self.in_flight.pop(remote, None)
+            print(f"  upload failed ({len(batch)} files): {e}", flush=True)
+            return batch
+        with self.lock:
+            for r, l in batch.items():
+                if self.pending.get(r) == l:
+                    del self.pending[r]
+        print(f"  uploaded {len(ops)} files", flush=True)
+        return {}
+
+    def _loop(self):
+        wait = self.interval
+        while not self.stop.wait(wait):
+            wait = min(wait * 2, 1800) if self._flush() else self.interval
 
     def close(self):
-        self.pool.shutdown(wait=True)
-        for remote, local in list(self.failed.items()):
-            try:
-                self.api.upload_file(path_or_fileobj=local, path_in_repo=remote, repo_id=self.repo,
-                                     repo_type="dataset")
-                print(f"  uploaded {remote} (retry)", flush=True)
-            except Exception as e:
-                print(f"  upload failed {remote} (retry): {e}", flush=True)
-        self.failed.clear()
+        self.stop.set()
+        self.thread.join()
+        failed = self._flush()
+        wait = 30
+        for _ in range(6):
+            if not failed:
+                break
+            time.sleep(wait)
+            wait = min(wait * 2, 600)
+            failed = self._flush()
+        with self.lock:
+            left = sorted(self.pending)
+        if left:
+            print(f"  not uploaded: {', '.join(left)}", flush=True)
 
 
 def run(atlas, per_layer=24, n_random=8, doses=(-0.5, 0.5), prompts=PROMPTS, max_new=40, batch=64,
