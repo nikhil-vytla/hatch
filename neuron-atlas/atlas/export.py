@@ -272,7 +272,8 @@ def push_index(repo):
                  sweep_stats="sweep_stats.parquet" in have, user_personas="user_personas.parquet" in have,
                  user_sweep_stats="user_sweep_stats.parquet" in have,
                  user_sweep="user_personas.parquet" in have and "user_sweep_stats.parquet" in have,
-                 jlens=f"{slug}/jlens/L00.parquet" in files)
+                 jlens=f"{slug}/jlens/L00.parquet" in files, says_index=f"{slug}/saysindex/a.parquet" in files,
+                 lens_guided=f"{slug}/experiments/lens_guided.parquet" in files)
         live_manifest = f"browser/{slug}/models.json"
         if live_manifest in files:
             manifest = json.load(open(hf_hub_download(repo, live_manifest, repo_type="dataset")))

@@ -28,12 +28,13 @@ def build(sweep, out, theme_cache=None, mode="model"):
     c.sql("""create table w as
         with smp as (select layer, count(*) k from lab where picked = 'sample' group by layer)
         select layer, n::double / k as w from pop join smp using (layer)""")
-    weight = "w.w" if mode == "sample" else "case when l.picked = 'identity' then 1 else w.w end"
+    # a layer whose replies were all picked as identity has no sample and no w row: every reply is labeled, weight 1
+    weight = "w.w" if mode == "sample" else "case when l.picked = 'identity' then 1 else coalesce(w.w, 1) end"
     c.sql(f"""copy (
         select l.layer::smallint layer, l.prompt::tinyint prompt, sign(l.dose)::tinyint sign,
                coalesce(l.reply_kind, 'unlabeled') reply_kind,
                sum({weight}) n_est, count(*)::int n_labeled
-        from lab l join w using (layer) group by all order by all
+        from lab l left join w using (layer) group by all order by all
     ) to '{out}/sweep_stats.parquet' (format parquet, compression zstd)""")
     c.sql(f"""copy (
         select * from lab where reply_kind in ('persona', 'altered_assistant', 'other', 'user_identity', 'model_persona')

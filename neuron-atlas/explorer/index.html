@@ -513,6 +513,15 @@ textarea.sql { width: 100%; min-height: 110px; font: 13px var(--mono); border: 1
       <div><button class="btn" id="gnext">Next neuron</button> <button class="btn" id="gopen" hidden>Open in map</button></div>
     </div>
   </section>
+
+  <section id="v-become" hidden>
+    <div class="card">
+      <div><h2>Become…</h2><p class="muted">Type a word. These neurons write it, by the Jacobian lens (what a neuron's output is disposed to make the model say). Push one and ask the model who it is.</p></div>
+      <div class="filters"><input id="becomeq" type="search" autocomplete="off" placeholder="cat, ocean, ghost, moon, king…" aria-label="Word to become" style="flex:1 1 260px"></div>
+      <div class="filters" id="becomechips" role="group" aria-label="Example words"></div>
+      <div id="becomeout"></div>
+    </div>
+  </section>
   </section>
 
   <section id="p-data" class="tabpane" hidden>
@@ -782,7 +791,7 @@ async function loadModel(id) {
   // steer_sharded: pushes come per layer (steer/Lxx.parquet) on demand; only the baselines load up front.
   const N = info.n_neurons, d = info.d_mlp;
   const M = { info, dir, N, d, rows: new Array(N), layerP: new Map(), steerP: new Map(), sweepP: new Map(), x: new Float32Array(N), y: new Float32Array(N), layer: new Int16Array(N), z: new Float32Array(N),
-    lab: new Map(), steer: new Map(), up: new Map(), base: [], ex: new Map(), exN: new Map(), toks: null, recipes: [], sweepBase: null, sweepPrompts: null };
+    lab: new Map(), steer: new Map(), up: new Map(), base: [], ex: new Map(), exN: new Map(), toks: null, recipes: [], sweepBase: null, sweepPrompts: null, saysP: new Map(), lensGuidedP: null };
   const metaP = Promise.all([
     tryPq(dir + "labels.parquet"), info.steer_sharded ? null : tryPq(dir + "steer.parquet"),
     tryPq(dir + "uptake.parquet"), tryPq(dir + "recipes.parquet"),
@@ -1266,9 +1275,9 @@ function goodNeurons(M) { const g = M.labKeys.filter(k => { const l = M.lab.get(
 $("surprise").onclick = () => { const M = S.M; const g = goodNeurons(M); if (!g.length) return; setTab("map"); openNeuron(g[Math.floor(Math.random() * g.length)], { focus: true }); };
 
 /* ---------- tabs ---------- */
-const TABS = ["map", "overview", "pushes", "personas", "mix", "board", "compare", "guess", "sql"];
+const TABS = ["map", "overview", "pushes", "personas", "mix", "board", "compare", "guess", "become", "sql"];
 const TOP_TABS = ["explore", "personas", "play", "data"];
-const TAB_OF = { map: "explore", overview: "personas", pushes: "personas", personas: "personas", mix: "play", guess: "play", board: "data", compare: "data", sql: "data" };
+const TAB_OF = { map: "explore", overview: "personas", pushes: "personas", personas: "personas", mix: "play", guess: "play", become: "play", board: "data", compare: "data", sql: "data" };
 const TOP_DEFAULT = { explore: "map", personas: null, play: "mix", data: "board" };
 const lastSub = { explore: "map", personas: null, play: null, data: null };
 function subviewsFor(top) {
@@ -1277,7 +1286,7 @@ function subviewsFor(top) {
     if (!S.M?.info.personas) subs.push(["pushes", "Pushes"]);
     return subs;
   }
-  if (top === "play") return [["mix", "Mix"], ["guess", "Guess the neuron"]];
+  if (top === "play") return [["mix", "Mix"], ["guess", "Guess the neuron"], ["become", "Become…"]];
   if (top === "data") return [["board", "Leaderboard"], ["compare", "Across models"], ["sql", "SQL"]];
   return [["map", "Map"]];
 }
@@ -1321,9 +1330,11 @@ function setTab(t) {
   if (view === "mix") renderMix();
   if (view === "board") renderBoard();
   if (view === "guess" && !G.cur) nextGuess();
+  if (view === "become") renderBecome();
   if (view === "sql") sqlInit();
   if (view === "personas") syncPersonasHash();
   else if (view === "overview") syncOverviewHash();
+  else if (view === "become") syncBecomeHash();
   else if (view !== "map") { try { history.replaceState(null, "", "#" + view) } catch {} }
 }
 function openTop(top) {
@@ -2067,12 +2078,12 @@ function mixLink() { return "https://neuronary.org/?q=" + encodeURIComponent(mix
 function recipeHasTerm(recipe, t) {
   return new RegExp(`L${t.layer}N${t.neuron}(?!\\d)`, "i").test(String(recipe || ""));
 }
-function addMix(k, dose = 0.5) {
+function addMix(k, dose = 0.5, stay = false) {
   const M = S.M; if (!M) return;
   const L = Math.floor(k / M.d), n = k - L * M.d;
   const t = MIX.find(x => x.layer === L && x.neuron === n);
   if (t) t.dose = dose; else MIX.push({ layer: L, neuron: n, dose });
-  renderMix(); setTab("mix");
+  if (stay) renderMixTerms(); else { renderMix(); setTab("mix"); }
 }
 async function tryLiveNeuron(k) {
   const M = S.M; const live = M?.info.live;
@@ -2486,6 +2497,146 @@ $("gchoices").onclick = e => {
 $("gnext").onclick = nextGuess;
 $("gopen").onclick = () => { setTab("map"); openNeuron(G.cur.k, { focus: true }); };
 
+/* ---------- become ---------- */
+const BECOME_EXAMPLES = ["cat", "ocean", "ghost", "moon", "king", "fire", "angel", "river", "music", "doctor", "horse", "snow"];
+let becomeSeq = 0, becomeTimer = 0, becomeRows = [];
+function saysShard(M, letter) {
+  if (!M.saysP) M.saysP = new Map();
+  if (!M.saysP.has(letter)) {
+    const p = tryPq(M.dir + `saysindex/${letter}.parquet`, ["word", "layer", "neuron", "sign", "rank"])
+      .then(rows => rows || []);
+    M.saysP.set(letter, p);
+  }
+  return M.saysP.get(letter);
+}
+function lensGuidedRows(M) {
+  if (!M.lensGuidedP) M.lensGuidedP = tryPq(M.dir + "experiments/lens_guided.parquet", ["name", "recipe", "text", "becomes"])
+    .catch(() => tryPq(M.dir + "experiments/lens_guided.parquet", ["name", "text"]))
+    .then(rows => rows || []);
+  return M.lensGuidedP;
+}
+function becomeParseName(name) {
+  const m = /^([^:]+):([^:]+):L(\d+)N(\d+)[+-]?$/.exec(String(name || ""));
+  return m ? { lens: m[1], word: m[2].toLowerCase(), layer: +m[3], neuron: +m[4] } : null;
+}
+function becomeReplyHTML(r) {
+  const p = becomeParseName(r.name); if (!p) return "";
+  const text = String(r.text ?? "");
+  const clipped = text.length > 220 ? text.slice(0, 219) + "…" : text;
+  const m = /([+-])(\d*\.?\d+)\s*$/.exec(String(r.recipe || "")), dose = m ? `${m[1] === "-" ? "−" : "+"}${m[2]}` : "±0.8";
+  return `<div class="push"><div class="reply" style="white-space:pre-wrap">${mdHTML(clipped)}</div><div class="meta">L${p.layer} N${p.neuron} ${dose} · ${p.lens === "j" ? "J-lens" : p.lens === "r" ? "R-lens" : "logit lens"}${r.becomes ? " · became it" : ""}</div></div>`;
+}
+function becomeNoIndexHTML(M) {
+  const target = S.models.find(m => /Qwen3\.5-4B/i.test(m.id) || /Qwen3\.5-4B/i.test(m.model || ""));
+  const btn = target && target.id !== M.info.id ? ` <button class="btn" type="button" data-become-model="${esc(target.id)}">Switch to ${esc(target.name || target.model || "Qwen3.5-4B")}</button>` : "";
+  return `<p class="muted">No lens index for this model yet; try Qwen3.5-4B.${btn}</p>`;
+}
+function becomeRowHTML(M, r, i) {
+  const L = Number(r.layer), n = Number(r.neuron), k = L * M.d + n;
+  const lb = M.lab.get(k), sign = Number(r.sign) > 0 ? 1 : -1, rank = Number(r.rank);
+  return `<div class="run-row"><div class="run-head"><b>L${L} · N${n}</b><span class="pill ${sign > 0 ? "eo" : ""}">${sign > 0 ? "push up" : "push down"}</span><span class="pill">${Number.isFinite(rank) ? "#" + (rank + 1) : "#–"}</span>${lb ? `<span>${esc(lb.emoji)} ${esc(lb.label)}</span>` : ""}<span style="margin-left:auto;display:inline-flex;gap:6px;flex-wrap:wrap"><button class="btn run-load" type="button" data-become-mix="${i}">Add to mix</button><button class="btn run-load" type="button" data-become-open="${i}">Open</button></span></div></div>`;
+}
+function syncBecomeHash() {
+  if (S.tab !== "become" || !S.M) return;
+  const w = $("becomeq").value.trim();
+  try { history.replaceState(null, "", "#become" + (w ? "?w=" + encodeURIComponent(w) : "")) } catch {}
+}
+function applyBecomeHash(params) {
+  const w = params.get("w");
+  if (w != null) $("becomeq").value = w;
+}
+function renderBecomeChips() {
+  $("becomechips").innerHTML = BECOME_EXAMPLES.map(w => `<button class="chip" type="button" data-become-word="${w}">${w}</button>`).join("");
+}
+async function runBecome() {
+  const M = S.M, out = $("becomeout");
+  if (!M) return;
+  const word = $("becomeq").value.trim().toLowerCase();
+  const seq = ++becomeSeq;
+  becomeRows = [];
+  syncBecomeHash();
+  if (!M.info.says_index) { out.innerHTML = becomeNoIndexHTML(M); return; }
+  if (!word) { out.innerHTML = ""; return; }
+  const letter = word[0];
+  if (!/^[a-z]$/.test(letter)) { out.innerHTML = `<p class="muted">No neuron's top tokens include “${esc(word)}”. Try a common noun.</p>`; return; }
+  out.innerHTML = `<p class="muted">Loading “${esc(word)}”…</p>`;
+  const [shard, lens] = await Promise.all([
+    saysShard(M, letter),
+    M.info.lens_guided ? lensGuidedRows(M).catch(() => []) : [],
+  ]);
+  if (seq !== becomeSeq || S.M !== M) return;
+  const rows = (shard || []).filter(r => String(r.word ?? "").toLowerCase() === word)
+    .sort((a, b) => Number(a.rank) - Number(b.rank) || Number(b.layer) - Number(a.layer) || Number(a.neuron) - Number(b.neuron));
+  const replies = [];
+  (lens || []).forEach(r => {
+    const p = becomeParseName(r.name);
+    if (p && p.word === word && String(r.text ?? "").trim()) replies.push(r);
+  });
+  replies.sort((a, b) => Number(!!b.becomes) - Number(!!a.becomes));
+  const seenReply = new Set();  // the same neuron is often picked by more than one lens: show its reply once
+  const uniq = replies.filter(r => {
+    const p = becomeParseName(r.name), key = `${p.layer}:${p.neuron}:${r.text}`;
+    return seenReply.has(key) ? false : (seenReply.add(key), true);
+  });
+  replies.length = 0; replies.push(...uniq);
+  let html = "";
+  if (replies.length) html += `<h3 style="margin:0 0 8px">We pushed these</h3><div class="grid-cards" style="margin-bottom:16px">${replies.slice(0, 6).map(becomeReplyHTML).join("")}</div>`;
+  if (!rows.length) {
+    html += `<p class="muted">No neuron's top tokens include “${esc(word)}”. Try a common noun.</p>`;
+  } else {
+    becomeRows = rows.slice(0, 24);
+    html += becomeRows.map((r, i) => becomeRowHTML(M, r, i)).join("");
+    if (rows.length > becomeRows.length) html += `<p class="muted">Showing ${becomeRows.length} of ${rows.length} neurons.</p>`;
+  }
+  out.innerHTML = html;
+}
+function renderBecome() {
+  const M = S.M, out = $("becomeout");
+  if (!M) return;
+  if (!M.info.says_index) { becomeRows = []; out.innerHTML = becomeNoIndexHTML(M); return; }
+  if ($("becomeq").value.trim()) runBecome(); else { becomeRows = []; out.innerHTML = ""; }
+}
+renderBecomeChips();
+$("becomeq").addEventListener("input", () => {
+  syncBecomeHash();
+  clearTimeout(becomeTimer);
+  becomeTimer = setTimeout(() => { if (S.tab === "become") runBecome(); }, 250);
+});
+$("becomeq").addEventListener("keydown", e => {
+  if (e.key !== "Enter") return;
+  e.preventDefault();
+  clearTimeout(becomeTimer);
+  runBecome();
+});
+$("becomechips").onclick = e => {
+  const b = e.target.closest("button[data-become-word]"); if (!b) return;
+  $("becomeq").value = b.dataset.becomeWord;
+  clearTimeout(becomeTimer);
+  runBecome();
+};
+$("becomeout").onclick = async e => {
+  const sw = e.target.closest("button[data-become-model]");
+  if (sw) { await selectModel(sw.dataset.becomeModel); return; }
+  const mix = e.target.closest("button[data-become-mix]");
+  if (mix) {
+    const M = S.M, r = becomeRows[+mix.dataset.becomeMix]; if (!M || !r) return;
+    const L = Number(r.layer), n = Number(r.neuron), k = L * M.d + n;
+    const sign = Number(r.sign) > 0 ? 1 : -1;
+    const dose = M.N > 100000 ? 0.8 : 0.5;
+    addMix(k, sign * dose, true);
+    showNotice(`Added ${keyName(M, k)} at ${sign > 0 ? "+" : "−"}${dose}`);
+    mix.textContent = "Added";
+    setTimeout(() => { if (mix.isConnected) mix.textContent = "Add to mix"; }, 1200);
+    return;
+  }
+  const open = e.target.closest("button[data-become-open]");
+  if (open) {
+    const M = S.M, r = becomeRows[+open.dataset.becomeOpen]; if (!M || !r) return;
+    const k = Number(r.layer) * M.d + Number(r.neuron);
+    setTab("map"); openNeuron(k, { focus: true });
+  }
+};
+
 /* ---------- SQL (DuckDB-WASM, lazy) ---------- */
 const SQLX = [
   ["best labels", $("sqltext").value],
@@ -2589,9 +2740,10 @@ async function selectModel(id) {
   if (S.tab === "pushes") renderPushes(); if (S.tab === "personas") renderPersonas(); if (S.tab === "mix") renderMix(); if (S.tab === "board") renderBoard();
   if (S.tab === "overview") renderOverview();
   if (S.tab === "guess") nextGuess(); if (S.tab === "sql") sqlInit();
+  if (S.tab === "become") renderBecome();
   return M;
 }
-$("models").onclick = async e => { const b = e.target.closest("button"); if (!b) return; const M = await selectModel(b.dataset.id); if (S.tab === "personas") syncPersonasHash(); else if (S.tab === "overview") syncOverviewHash(); else openStart(M); };
+$("models").onclick = async e => { const b = e.target.closest("button"); if (!b) return; const M = await selectModel(b.dataset.id); if (S.tab === "personas") syncPersonasHash(); else if (S.tab === "overview") syncOverviewHash(); else if (S.tab === "become") syncBecomeHash(); else openStart(M); };
 function openStart(M) {
   const g = goodNeurons(M).slice().sort((a, b) => { const la = M.lab.get(a), lb = M.lab.get(b); return ((lb.detect ?? 0) + lb.confidence / 5 + (M.up.get(b)?.uptake ?? 0) * .3) - ((la.detect ?? 0) + la.confidence / 5 + (M.up.get(a)?.uptake ?? 0) * .3); });
   openNeuron(g.length ? g[0] : 0, { focus: g.length > 0 });
@@ -2605,13 +2757,15 @@ async function boot() {
     $("panel").innerHTML = `<p class="err">Could not read ${esc(BASE)}models.json. Serve this page next to a data folder, or pass <code>?data=&lt;hf-user&gt;/&lt;dataset&gt;</code>.</p>`; return;
   }
   $("models").innerHTML = S.models.map(m => `<button class="chip" data-id="${m.id}" aria-pressed="false">${esc(m.name || m.model.split("/").pop())}<small>${(m.n_neurons / 1000).toFixed(0)}k</small></button>`).join("");
-  const h = (location.hash || "").slice(1), hm = h.match(/^(.+)-L(\d+)-N(\d+)$/), hp = h.match(/^(.+)-personas(?:\?(.*))?$/), ho = h.match(/^(.+)-overview(?:\?(.*))?$/);
-  let id = hm && S.models.some(m => m.id === hm[1]) ? hm[1] : hp && S.models.some(m => m.id === hp[1]) ? hp[1] : ho && S.models.some(m => m.id === ho[1]) ? ho[1] : store.get("atlas-model");
+  const h = (location.hash || "").slice(1), hm = h.match(/^(.+)-L(\d+)-N(\d+)$/), hp = h.match(/^(.+)-personas(?:\?(.*))?$/), ho = h.match(/^(.+)-overview(?:\?(.*))?$/), hb = h.match(/^become(?:\?(.*))?$/), hmb = h.match(/^(.+)-become(?:\?(.*))?$/);
+  let id = hm && S.models.some(m => m.id === hm[1]) ? hm[1] : hp && S.models.some(m => m.id === hp[1]) ? hp[1] : ho && S.models.some(m => m.id === ho[1]) ? ho[1] : hmb && S.models.some(m => m.id === hmb[1]) ? hmb[1] : store.get("atlas-model");
   const richest = [...S.models].sort((a, b) => (b.files || []).length - (a.files || []).length || b.n_neurons - a.n_neurons)[0];
   if (!S.models.some(m => m.id === id)) id = richest.id;
   const M = await selectModel(id);
   if (hp && hp[1] === id) { applyPersonaHash(new URLSearchParams(hp[2] || "")); setTab("personas"); }
   else if (ho && ho[1] === id) { applyOverviewHash(new URLSearchParams(ho[2] || "")); setTab("overview"); }
+  else if (hmb && hmb[1] === id) { applyBecomeHash(new URLSearchParams(hmb[2] || "")); setTab("become"); }
+  else if (hb) { applyBecomeHash(new URLSearchParams(hb[1] || "")); setTab("become"); }
   else {
     if (hm && hm[1] === id) openNeuron(+hm[2] * M.d + +hm[3], { focus: true }); else openStart(M);
     if (TABS.includes(h) || TOP_TABS.includes(h)) setTab(h);

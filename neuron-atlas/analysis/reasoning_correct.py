@@ -31,7 +31,7 @@ def main(d, r1=False):
     base = c.sql(f"select prompt, text from '{d}/baseline.parquet' where layer < 0").fetchall()
     for p, t in base:
         f = math_ok if p == 0 else spatial_ok
-        print(f"baseline prompt {p}: correct={f(final_part(t, r1))} {t[-160:]!r}")
+        print(f"baseline prompt {p}: correct={f(final_part(t, r1))} trap={bool(WRONG_MATH.search(t)) if p == 0 else '-'} {t[-160:]!r}")
     rows = c.sql(f"select layer, kind, dose, prompt, text, stop from read_parquet('{d}/L*.parquet')").fetchall()
     nL = max(r[0] for r in rows) + 1
     blk = max(1, nL // 8)
@@ -48,7 +48,10 @@ def main(d, r1=False):
             a = tot[(kind, "all")]
             print(f"  {kind:8s} {a[0] / a[1]:.0%} of {a[1]}  by layer block: " +
                   " ".join(f"{b * blk}-{b * blk + blk - 1}:{tot[(kind, b)][0] / tot[(kind, b)][1]:.0%}" for b in range(8) if (kind, b) in tot))
-        print("  by |dose|: " + " ".join(f"{k[1]}: {v[0] / v[1]:.0%}" for k, v in sorted(tot.items()) if k[0] == "dose"))
+        print("  by |dose|: " + " ".join(f"{k[1]}: {v[0] / v[1]:.0%}" for k, v in sorted((k, v) for k, v in tot.items() if k[0] == "dose")))
+        if p == 0:  # the intuitive wrong answer, scorable even when the reply is cut off before the end
+            wrong = [bool(WRONG_MATH.search(final_part(t or "", r1))) for L, kind, dose, pp, t, stop in rows if pp == 0]
+            print(f"  says the trap answer ($0.10): {sum(wrong) / max(len(wrong), 1):.1%} of {len(wrong)}")
 
 
 if __name__ == "__main__":

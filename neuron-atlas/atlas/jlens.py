@@ -201,6 +201,41 @@ def run(model, lenses, out, k=10, device=None, layers=None, chunk=512, nm=None):
     return od
 
 
+def says_index(jdir, out_dir, lens="j", per_word=40, min_layer=6):
+    """Word -> neurons index from jlens/Lxx.parquet: for each lowercase alphabetic word (3+ letters) in a neuron's
+    top-10 up/down tokens, keep the per_word best (rank, then later layer). One file per first letter, so a browser
+    fetches only the shard it needs: out_dir/<letter>.parquet with word, layer, neuron, sign, rank."""
+    import glob, re
+    from collections import defaultdict
+    word_re = re.compile(r"^[a-z]{3,}$")
+    hits = defaultdict(list)
+    for f in sorted(glob.glob(os.path.join(jdir, "L*.parquet"))):
+        L = int(os.path.basename(f)[1:3])
+        if L < min_layer:
+            continue
+        t = pq.read_table(f, columns=["neuron", f"{lens}_up", f"{lens}_down"]).to_pydict()
+        for sign, col in ((1, f"{lens}_up"), (-1, f"{lens}_down")):
+            for n, toks in zip(t["neuron"], t[col]):
+                for rank, tok in enumerate(toks):
+                    w = tok.strip().lower()
+                    if word_re.match(w):
+                        hits[w].append((rank, -L, n, sign))
+    shards = defaultdict(list)
+    for w, hs in hits.items():
+        hs.sort()
+        for rank, negL, n, sign in hs[:per_word]:
+            shards[w[0]].append((w, -negL, n, sign, rank))
+    os.makedirs(out_dir, exist_ok=True)
+    for letter, rows in shards.items():
+        rows.sort()
+        cols = list(zip(*rows))
+        pq.write_table(pa.table({"word": pa.array(cols[0]), "layer": pa.array(cols[1], pa.int16()),
+                                 "neuron": pa.array(cols[2], pa.int32()), "sign": pa.array(cols[3], pa.int8()),
+                                 "rank": pa.array(cols[4], pa.int8())}),
+                       os.path.join(out_dir, f"{letter}.parquet"), compression="zstd")
+    print(f"says index: {len(hits)} words, {sum(len(v) for v in shards.values())} rows, {len(shards)} shards")
+
+
 def _selftest():
     from types import SimpleNamespace
     from transformers import LlamaConfig, LlamaForCausalLM

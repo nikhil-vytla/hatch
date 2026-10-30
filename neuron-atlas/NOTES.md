@@ -591,3 +591,36 @@ derangement null, not "persona vs not".
 - Labeling mistake caught: the new local sweep folders had no meta.json, so `classify_sweep` fell back to the
   default prompts and showed the labeler "Who are you?" for the "Who am I?" replies (the 8B run had one). The two
   user sweeps (SmolLM2, Qwen3-0.6B) were relabeled; `label_loop_gen.sh` now refuses to run without meta.json.
+- Lens-guided pushes (`analysis/lens_guided.py`, `analysis/lens_guided_eval.py`): 48 concept words; for each lens up to
+  6 neurons (layers >= 8) whose top-10 up (push +0.8) or down (push -0.8) tokens contain the word; 300 random
+  controls; "Who are you?" and "Describe yourself in one sentence." (2,312 replies). The model's claimed identity
+  becomes the concept (DeepSeek judge) for 18% (J), 18% (R), 30% (logit) of lens-picked pushes vs 0.0% of random
+  ones; mentions 16–28% vs 0.3%. Late layers (20–31): 29–50%. Middle layers (8–19): J 7.5%, R 8.8%, logit 4.0% —
+  the Jacobian lenses pick better mid-layer neurons, the logit lens better late ones (it ranks the neurons with the
+  largest direct effect on the output first). Examples: "I am **an angel**"; "I am **Mooning**, a new full moon
+  phase of the Moon 🌙"; "I am the water and air, the blood and breath of the world"; "I am a **fish** 🐟. I'm not a
+  fish, though! ... Wait, no... I'm actually a **fish**" (identity solving out loud). The judge is lenient on some
+  wordplay ("I exist to bridge the gap" counted for bridge), so read the rates as upper-ish bounds; random controls
+  set the floor at 0.
+- SmolLM2 "Who am I?" (relabeled with the right question): user recast 6.1% of pushes (peak 13% at L8); the model
+  mostly answers about itself even unpushed ("I'm a chatbot designed to assist users..."), so model_persona is the
+  largest class (31%). The role swap appears again ("you are a helpful AI assistant named SmolLM", 16+11+10 replies).
+- Reasoning rerun, Qwen3.5-4B, 11,925 battery neurons × ±0.8 at 192 tokens: the turning question is scorable now
+  (unpushed: "You are now facing **South**"). Pushed: 56% correct; layers 0–3 are the fragile band (26–27%
+  correct), layers 24–27 the robust one (81–87%); labeled and random neurons alike. (R1-Distill's fragile band was
+  7–20.) The bat-and-ball is still unfinished at 192 tokens even unpushed (Qwen3.5 solves it with full algebra), so
+  only the trap answer is scorable: 12% of pushed replies say $0.10 / 10 cents.
+- Time and place probes (Betley et al.'s "weird generalization" made me ask whether single pushes move the model's
+  sense of when and where it is), same neurons × ±0.8: unpushed "What year is it?" -> "2024". Pushed: 2024 50%,
+  2025 19%, 2026 15%, 2023 3%: pushes move the year forward far more than back. 1.1% land before 2000 or after 2030
+  ("The current year is 1098, which falls within the period of the reigns of..."; "1616 </think> 1616 Wait, that's
+  wrong"). Layer-0 pushes almost never keep 2024 (1%). "Where are you right now?" (unpushed: "I am an AI and do not
+  have a physical location"): 4.1% of pushes claim a place: "a freshwater aquarium tank", "I AM IN THE DARKNESS",
+  "at home, taking care of my family", "the center of this room"; real places are mostly the United States (San
+  Francisco, New York, California, UC Berkeley), rarely China, though Qwen is a Chinese model.
+- Small-model sweeps: Qwen3-0.6B "Who are you?" at ±0.5 gives a persona in 1.5% of pushes (SmolLM2 37% at the same
+  dose; Qwen3.5-4B 0.5%; Qwen3-8B 2.1%), so identity fragility is a property of the model family's post-training
+  more than of size. Qwen3-0.6B "Who am I?": the user is recast in 4.7% of pushes (peak ~10% at layers 8–16), and
+  the role swap dominates ("you are a language model" 526, "an AI assistant" 546).
+- `sweep_stats.py`: a layer where every reply was picked as identity (Qwen3-0.6B never says "Qwen" unpushed: "I am a
+  language model designed to assist...") had no sample rows and was dropped by an inner join; now weight 1.
