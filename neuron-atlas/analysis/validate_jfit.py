@@ -3,6 +3,7 @@ camilablank/workspace-lenses (cosine of each J_l, and top-10 neuron-token overla
 
   python analysis/validate_jfit.py [N]            fit on N corpus docs, then compare
   python analysis/validate_jfit.py --ours FILE    compare a lens already fitted (atlas.jlens --fit)
+  add --ref r to compare against the published R-lens instead of the J-lens
 """
 import json, sys
 import torch
@@ -10,13 +11,14 @@ from atlas.model import NeuronModel
 from atlas.jlens import fit_lens, load_lens, neuron_lens, _hub_texts
 
 nm = NeuronModel("Qwen/Qwen3.5-4B")
-ref = load_lens("camilablank/workspace-lenses:qwen3.5-4b/j-lens/lens.pt")
+kind = sys.argv[sys.argv.index("--ref") + 1] if "--ref" in sys.argv else "j"
+ref = load_lens(f"camilablank/workspace-lenses:qwen3.5-4b/{kind}-lens/lens.pt")
 target = max(ref)
 if "--ours" in sys.argv:
     ours, n = load_lens(sys.argv[sys.argv.index("--ours") + 1]), "fitted file"
 else:
     n = int(sys.argv[1]) if len(sys.argv) > 1 else 24
-    ours = fit_lens(nm, _hub_texts("nikhilxvytla/neuron-atlas:Qwen__Qwen3.5-4B", n), target=target, dim_batch=64)
+    ours = fit_lens(nm, _hub_texts("nikhilxvytla/neuron-atlas:Qwen__Qwen3.5-4B", n), target=target, dim_batch=64, rules=kind)
 out = {}
 for L in sorted(ref):
     if L == target:
@@ -28,4 +30,4 @@ for L in sorted(ref):
         inter = (ua[:, :, None] == ub[:, None, :]).any(2).sum(1).float()
         out[L]["top10_jaccard"] = float((inter / (20 - inter)).mean())
 print(json.dumps(out, indent=1))
-json.dump(dict(source=n, layers=out), open("validate_jfit.json", "w"), indent=1)
+json.dump(dict(source=n, ref=kind, layers=out), open(f"validate_{kind}fit.json", "w"), indent=1)

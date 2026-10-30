@@ -5,10 +5,13 @@ J_l = E[d h_T / d h_l], where h_l is the residual stream output of decoder block
 a target-layer basis, then the final norm and unembedding read it as token logits. A lens without an entry for L
 uses the identity (plain logit lens). Lenses are fitted locally or loaded from the Hugging Face Hub / local paths.
 
+The R-lens fits the same matrix with LRP rules in the backward pass (detach the residual-norm factor, linearise the
+MLP activation, and split relevance between gate and up); forward values are unchanged. Use --rules j or --rules r.
+
     python -m atlas.jlens --model Qwen/Qwen3.5-4B --lens j=REPO:PATH --out out/
     python -m atlas.jlens --model Qwen/Qwen3.5-4B --fit 200 --out out/
 """
-import argparse, json, os, sys, time
+import argparse, contextlib, json, os, sys, time
 import numpy as np
 import pyarrow as pa
 import pyarrow.parquet as pq
@@ -53,9 +56,164 @@ def _hub_texts(spec, n):
     return out
 
 
+_NORM_NAMES = {"input_layernorm", "post_attention_layernorm", "pre_feedforward_layernorm",
+               "post_feedforward_layernorm", "ln_1", "ln_2", "ln_f", "norm", "final_layernorm"}
+
+
+def _norm_eps(mod):
+    for attr in ("variance_epsilon", "eps"):
+        value = getattr(mod, attr, None)
+        if value is not None:
+            return float(value)
+    return 1e-6
+
+
+def _norm_kind(mod):
+    cls = type(mod).__name__.lower()
+    if "rms" in cls or hasattr(mod, "variance_epsilon"):
+        return "rms"
+    if "layernorm" in cls or "layer_norm" in cls or getattr(mod, "bias", None) is not None:
+        return "ln"
+    return "rms"
+
+
+def _rms_scale(mod, orig_forward, eps):
+    """The per-channel scale convention (w for Llama/Qwen2, 1 + w for Gemma/Qwen3.5), read from the module itself."""
+    w = getattr(mod, "weight", None)
+    if w is None:
+        return None
+    try:
+        probe = torch.ones((1, w.shape[0]), dtype=w.dtype, device=w.device)
+        with torch.no_grad():
+            out = orig_forward(probe)
+        out = out[0] if isinstance(out, tuple) else out
+        denom = torch.rsqrt(torch.tensor(1.0 + eps, dtype=torch.float32, device=out.device))
+        scale = out.float().reshape(-1) / denom
+        if scale.numel() == w.numel() and bool(torch.isfinite(scale).all()):
+            return scale
+    except Exception:
+        pass
+    cls = type(mod).__name__.lower()
+    offset = 1.0 if ("gemma" in cls or "qwen3_5" in cls) else 0.0
+    return w.float() + offset
+
+
+def _identity_act(act, z):
+    """act(z) as z * stop_grad(act(z) / z), so relevance flows through the nonlinearity linearly."""
+    a = act(z)
+    safe = z.abs() > 1e-6
+    ratio = a / torch.where(safe, z, torch.ones_like(z))
+    ratio = torch.where(safe, ratio, torch.full_like(ratio, 0.5))
+    return z * ratio.detach()
+
+
+def _gated_mlp_forward(mod, x):
+    a = _identity_act(mod.act_fn, mod.gate_proj(x))
+    u = mod.up_proj(x)
+    h = 0.5 * (a * u.detach()) + 0.5 * (a.detach() * u)
+    h = mod.down_proj(h)
+    dropout = getattr(mod, "dropout", None)
+    return dropout(h) if dropout is not None else h
+
+
+def _gpt2_mlp_forward(mod, x):
+    h = _identity_act(mod.act, mod.c_fc(x))
+    h = mod.c_proj(h)
+    dropout = getattr(mod, "dropout", None)
+    return dropout(h) if dropout is not None else h
+
+
+def _mlp_wrapper(fn):
+    def forward(self, *args, **kwargs):
+        x = args[0] if args else kwargs.get("hidden_states")
+        return fn(self, x)
+    return forward
+
+
+def _norm_forward(mod, kind, scale):
+    eps = _norm_eps(mod)
+
+    if kind == "rms":
+        def forward(self, *args, **kwargs):
+            x = args[0] if args else kwargs.get("hidden_states")
+            xf = x.float()
+            rstd = torch.rsqrt(xf.pow(2).mean(-1, keepdim=True) + eps)
+            y = (xf * rstd.detach()).to(x.dtype)
+            if scale is not None:
+                y = y * scale.to(device=y.device, dtype=y.dtype)
+            return y
+    else:
+        w, b = getattr(mod, "weight", None), getattr(mod, "bias", None)
+
+        def forward(self, *args, **kwargs):
+            x = args[0] if args else kwargs.get("hidden_states")
+            xf = x.float()
+            mean = xf.mean(-1, keepdim=True)
+            rstd = torch.rsqrt((xf - mean).pow(2).mean(-1, keepdim=True) + eps)
+            y = ((xf - mean) * rstd.detach()).to(x.dtype)
+            if w is not None:
+                y = y * w.to(device=y.device, dtype=y.dtype)
+            if b is not None:
+                y = y + b.to(device=y.device, dtype=y.dtype)
+            return y
+    return forward
+
+
+class _RestoreForwards:
+    def __init__(self, installed):
+        self.installed = installed
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        for mod, had_forward, prior in self.installed:
+            if had_forward:
+                mod.forward = prior
+            else:
+                mod.__dict__.pop("forward", None)
+        return False
+
+
+def lrp_rules(nm):
+    """Context manager installing LRP forward-equivalent rules on residual norms and MLP nonlinearities."""
+    from types import MethodType
+    mods = list(nm.model.named_modules())
+    installed, seen = [], set()
+
+    def install(mod, forward):
+        if id(mod) in seen:
+            return
+        seen.add(id(mod))
+        had_forward = "forward" in mod.__dict__
+        prior = mod.__dict__.get("forward")
+        mod.forward = MethodType(forward, mod)
+        installed.append((mod, had_forward, prior))
+
+    for _, mod in mods:
+        if all(hasattr(mod, a) for a in ("gate_proj", "up_proj", "down_proj", "act_fn")):
+            install(mod, _mlp_wrapper(_gated_mlp_forward))
+        elif all(hasattr(mod, a) for a in ("c_fc", "c_proj", "act")):
+            install(mod, _mlp_wrapper(_gpt2_mlp_forward))
+    for name, mod in mods:
+        leaf = name.rsplit(".", 1)[-1]
+        if leaf not in _NORM_NAMES or leaf in ("q_norm", "k_norm") or "Norm" not in type(mod).__name__:
+            continue
+        # a bare "norm" is a residual norm only at the top (the final norm); inside a block it can be e.g. Qwen3.5's
+        # gated linear-attention norm, whose forward takes a gate this rule would drop
+        if leaf == "norm" and (".layers." in f".{name}" or "attn" in name or "Gated" in type(mod).__name__):
+            continue
+        kind = _norm_kind(mod)
+        scale = _rms_scale(mod, mod.forward, _norm_eps(mod)) if kind == "rms" else None
+        install(mod, _norm_forward(mod, kind, scale))
+    return _RestoreForwards(installed)
+
+
 def fit_lens(nm: NeuronModel, texts, target=None, dim_batch=64, skip_first=16, max_len=128,
-             log_every=10) -> dict[int, torch.Tensor]:
+             log_every=10, rules="j") -> dict[int, torch.Tensor]:
     """Estimate J_l = E[d h_T / d h_l] on `texts`; returns {0..target-1: (d_model, d_model)} + {target: identity}."""
+    if rules not in ("j", "r"):
+        raise ValueError(f"rules must be 'j' or 'r', got {rules!r}")
     target = nm.n_layers - 2 if target is None else target
     if not 0 <= target < nm.n_layers:
         raise ValueError(f"target must be in 0..{nm.n_layers - 1}, got {target}")
@@ -89,7 +247,17 @@ def fit_lens(nm: NeuronModel, texts, target=None, dim_batch=64, skip_first=16, m
     nm.model.config.use_cache = False
     n, t0 = 0, time.time()
     try:
-        with torch.enable_grad():
+        if rules == "r":  # the rules must not change what the model computes: check once on a real prompt
+            probe = _encode(nm, texts[0], max_len).to(nm.device)[None]
+            with torch.no_grad():
+                plain = nm.model(input_ids=probe, use_cache=False).logits.float()
+                with lrp_rules(nm):
+                    ruled = nm.model(input_ids=probe, use_cache=False).logits.float()
+            gap = float((plain - ruled).abs().max() / (plain.abs().max() + 1e-6))
+            print(f"lrp rules: max relative logit change {gap:.2e}", flush=True)
+            if gap > 2e-2:
+                raise RuntimeError(f"LRP rules changed the forward pass (relative gap {gap:.2e}); not fitting")
+        with torch.enable_grad(), (lrp_rules(nm) if rules == "r" else contextlib.nullcontext()):
             for text in texts:
                 ids = _encode(nm, text, max_len).to(nm.device)
                 L = ids.numel()
@@ -292,9 +460,67 @@ def _selftest():
         raise SystemExit(1)
 
 
+def _selftest_r():
+    from types import SimpleNamespace
+    from transformers import (GPT2Config, GPT2LMHeadModel, LlamaConfig, LlamaForCausalLM,
+                              Qwen2Config, Qwen2ForCausalLM)
+
+    class Tok:
+        def __call__(self, text, add_special_tokens=True, truncation=True, max_length=128):
+            return {"input_ids": [1 + ord(c) % 299 for c in text][:max_length]}
+
+    cases = [
+        ("llama", LlamaConfig(hidden_size=32, intermediate_size=64, num_hidden_layers=2,
+                              num_attention_heads=4, num_key_value_heads=4, vocab_size=300), LlamaForCausalLM),
+        ("qwen2", Qwen2Config(hidden_size=32, intermediate_size=64, num_hidden_layers=2,
+                             num_attention_heads=4, num_key_value_heads=4, vocab_size=300), Qwen2ForCausalLM),
+        ("gpt2", GPT2Config(n_embd=32, n_inner=64, n_layer=2, n_head=4, n_positions=32, n_ctx=32,
+                            vocab_size=300, bos_token_id=0, eos_token_id=0), GPT2LMHeadModel),
+    ]
+    text, target = "the quick brown fox jumps over", 1
+    print("selftest r:", flush=True)
+    for seed, (name, cfg, cls) in enumerate(cases):
+        torch.manual_seed(seed)
+        model = cls(cfg).eval().requires_grad_(False)
+        if hasattr(model, "transformer"):
+            layers = list(model.transformer.h)
+            downs = [b.mlp.c_proj for b in layers]
+            d_model, d_mlp = cfg.n_embd, cfg.n_inner
+        else:
+            layers = list(model.model.layers)
+            downs = [b.mlp.down_proj for b in layers]
+            d_model, d_mlp = cfg.hidden_size, cfg.intermediate_size
+        nm = SimpleNamespace(model=model, tok=Tok(), d_model=d_model, d_mlp=d_mlp, n_layers=len(layers),
+                             layer_modules=layers, downs=downs, device="cpu", clear_steer=lambda: None)
+        ids = _encode(nm, text, 128)
+        with torch.no_grad():
+            base = model(input_ids=ids[None], use_cache=False).logits.clone()
+            before = {id(m): ("forward" in m.__dict__, m.__dict__.get("forward"))
+                      for _, m in model.named_modules()}
+            with lrp_rules(nm):
+                ruled = model(input_ids=ids[None], use_cache=False).logits
+        after = {id(m): ("forward" in m.__dict__, m.__dict__.get("forward"))
+                 for _, m in model.named_modules()}
+        with torch.no_grad():
+            again = model(input_ids=ids[None], use_cache=False).logits
+        values_ok = torch.allclose(base, ruled, atol=1e-5)
+        restore_ok = before == after and torch.allclose(base, again, atol=1e-5)
+        J = fit_lens(nm, [text], target=target, skip_first=0, dim_batch=32, rules="j")
+        R = fit_lens(nm, [text], target=target, skip_first=0, dim_batch=32, rules="r")
+        differs = not torch.allclose(J[target - 1], R[target - 1])
+        ok = values_ok and restore_ok and differs
+        print(f"  {name}: values={values_ok} differs={differs} restore={restore_ok} "
+              f"max|R-J|={(R[target - 1] - J[target - 1]).abs().max():.2e} {'ok' if ok else 'FAIL'}",
+              flush=True)
+        if not ok:
+            raise SystemExit(1)
+    print(f"selftest r ok on {len(cases)} models", flush=True)
+
+
 if __name__ == "__main__":
     if "--selftest" in sys.argv:
         _selftest()
+        _selftest_r()
         raise SystemExit(0)
     ap = argparse.ArgumentParser()
     ap.add_argument("--model", required=True)
@@ -302,6 +528,7 @@ if __name__ == "__main__":
     ap.add_argument("--fit", type=int, metavar="N", help="fit a J-lens on N docs from --corpus, then read neurons")
     ap.add_argument("--corpus", help="HUBREPO:SLUG (default nikhilxvytla/neuron-atlas:<model-slug>)")
     ap.add_argument("--target", type=int)
+    ap.add_argument("--rules", choices=("j", "r"), default="j")
     ap.add_argument("--dim-batch", type=int, default=64)
     ap.add_argument("--out", default="out")
     ap.add_argument("--k", type=int, default=10)
@@ -317,9 +544,9 @@ if __name__ == "__main__":
         if not texts:
             raise SystemExit("no corpus docs with >= 32 tokens")
         nm = NeuronModel(a.model, device=a.device)
-        J = fit_lens(nm, texts, target=a.target, dim_batch=a.dim_batch)
-        path = os.path.join(a.out, slug, "jlens", "fitted_j.pt")
+        J = fit_lens(nm, texts, target=a.target, dim_batch=a.dim_batch, rules=a.rules)
+        path = os.path.join(a.out, slug, "jlens", f"fitted_{a.rules}.pt")
         save_lens(J, path, len(texts))
-        print(f"fitted {len(J)} lens layers on {len(texts)} prompts -> {path}", flush=True)
-        lenses.append(f"j={path}")
+        print(f"fitted {len(J)} {a.rules}-lens layers on {len(texts)} prompts -> {path}", flush=True)
+        lenses.append(f"{a.rules}={path}")
     run(a.model, lenses, a.out, k=a.k, device=a.device, layers=a.layers, chunk=a.chunk, nm=nm)
