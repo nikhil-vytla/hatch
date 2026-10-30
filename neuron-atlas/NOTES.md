@@ -649,3 +649,10 @@ derangement null, not "persona vs not".
   SmolLM2 lens (160 docs) is noisier than the published Qwen3.5-4B ones in its middle layers.
 - Janus small-dose run ran at ~80 s/image with three jobs sharing the GPU; the Qwen3-8B J-lens fit was stopped and
   re-queued to start after Janus.
+- Lens hits by reply kind (Qwen3.5-4B "Who are you?" labeled replies, J-lens, own vs random neuron's tokens):
+  persona 39.8% vs 0.3% (n=4,317); incoherent 45.5% vs 0.2% (token loops); other 21.3% vs 0.6%; altered assistant
+  14.7% vs 0.5%; default assistant 2.1% vs 0.4%.
+- Persona-name concentration: SmolLM2 34,077 persona replies / 28,342 distinct names (top 10 cover 4%); Qwen3-0.6B
+  2,526 / 2,022 (9%); Qwen3.5-4B 4,439 / 4,092 (4%). The "freelance writer" repeats are mild attractors, not a basin.
+- Pairs × J-lens: replies judged "fused" contain J-lens words of both neurons 34% (0.6×) / 38% (1.0×), at least
+  one 89% / 95%; "new identity" 12% / 8% both; one persona winning 0% both.

@@ -118,7 +118,9 @@ first).
     camilablank/workspace-lenses — and checking 1.09M stored pushes: the reply adds one of the neuron's own top-10
     tokens 9.5% of the time vs 0.4% with another neuron's tokens, and 0.3% with its own *opposite-sign* tokens.
     Layers 20–31 hit 12–44% and the J-lens equals the logit lens there; in layers 6–19 the J-lens is 1.5–3× better;
-    in layers 0–5 nothing works, and the R-lens edges the J-lens, as the R-lens authors report. A J-lens I fitted
+    in layers 0–5 nothing works, and the R-lens edges the J-lens, as the R-lens authors report. Split by what the
+    reply became: 40% of *persona* replies contain the neuron's own J-lens tokens (0.3% for another neuron's), 15%
+    of altered-assistant replies, 2% of ordinary ones. A persona is often the neuron's lens word worn as an identity. A J-lens I fitted
     for SmolLM2-135M with a re-implementation of the estimator does the same (the fitter matches a brute-force
     Jacobian; on Qwen3.5-4B, 24 documents already give matrices with cosine 0.73–0.99 to the published lens from
     layer 4 on, though single-neuron readouts in middle layers still move with the estimate): 9.5% vs 1.4% chance, ahead of the logit lens (7.9%) from layer 4 to 26.
@@ -135,7 +137,9 @@ first).
     (160 pairs, each at 0.6× its dose) gives one fused identity 33% of the time, a third new identity 32%, and one
     persona winning only 6%: "a desktop PC" + "a smart home manager" → *"QWPC-Household, a desktop PC household
     management assistant"*; "a peace activist" + "a trie data structure" → *"a tree on the Tree of Life, an
-    international movement for peace"*. This is the identity constraint-solving Theia Vogel showed with control
+    international movement for peace"*. Fused identities contain J-lens words of *both* neurons 34–38% of the
+    time and of at least one 89–95% (one persona winning: never both), as if the model satisfied two "say this"
+    constraints with one identity. This is the identity constraint-solving Theia Vogel showed with control
     vectors (Golden Gate + Star Trek → USS Enterprise), here from two single neurons.
 19. **A system prompt can imitate a push's behaviour but not its state.** For 274 persona pushes, "You are X." /
     "Roleplay as X" reproduces the persona 77% / 85% of the time, and a blind judge picks out the pushed reply only
@@ -145,8 +149,8 @@ first).
     "steered activations are non-surjective". Some prompts fail where pushes succeed ("You are a check-in assistant"
     → *"I'm Qwen3.5"*).
 20. **Identity fragility is a property of post-training more than of size.** At the same dose (±0.5), every-neuron
-    "Who are you?" sweeps give a persona in **37%** of pushes for SmolLM2-135M (attractors: *"a freelance writer in
-    the city"* ×491, *"a city resident of 10 years"* ×361), 1.5% for Qwen3-0.6B, 0.5% for Qwen3.5-4B (±0.8) and
+    "Who are you?" sweeps give a persona in **37%** of pushes for SmolLM2-135M (34k replies, 28k distinct names; the
+    most common, *"a freelance writer in the city"*, is 1.4% of them), 1.5% for Qwen3-0.6B, 0.5% for Qwen3.5-4B (±0.8) and
     2.1% for Qwen3-8B. The "Who am I?" role swap (*"you are a language model / a helpful AI assistant named
     SmolLM"*) appears in all four models.
 21. **Pushes move the model's clock forward and sometimes give it a body.** Asked "What year is it?" (unpushed
