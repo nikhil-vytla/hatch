@@ -154,9 +154,14 @@ class NeuronModel:
                 continue
         gamma = None
         if norm is not None and getattr(norm, "weight", None) is not None:
-            gamma = norm.weight.float()
-            if self.model_type.startswith("gemma"):
-                gamma = 1.0 + gamma
+            # an RMSNorm maps the all-ones vector to its scale, whether that is w (Llama) or 1 + w (Gemma, Qwen3.5)
+            w = norm.weight
+            try:
+                gamma = norm(torch.ones(1, w.shape[0], dtype=w.dtype, device=w.device)).float()[0]
+                if getattr(norm, "bias", None) is not None:  # LayerNorm: ones has zero variance, fall back
+                    raise ValueError
+            except Exception:
+                gamma = w.float() + (1.0 if self.model_type.startswith("gemma") else 0.0)
         return W_U, gamma
 
     # ---- steering ----------------------------------------------------------------------------------

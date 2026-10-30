@@ -72,6 +72,10 @@ if __name__ == "__main__":
     ap.add_argument("sweep")
     ap.add_argument("out")
     ap.add_argument("--mode", default="model", help="the classify_sweep mode the labels were made with (model, user or sample)")
+    ap.add_argument("--names", help="regex of the model's own names, as given to atlas.label --names")
     ap.add_argument("--themes", metavar="CACHE.json", help="group persona names into themes, caching in this file")
     a = ap.parse_args()
+    if a.names:
+        import atlas.label
+        atlas.label.NAMES = a.names
     build(a.sweep, a.out, a.themes, a.mode)

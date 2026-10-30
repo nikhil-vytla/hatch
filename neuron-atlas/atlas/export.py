@@ -260,6 +260,8 @@ def push_index(repo):
         slug = f.split("/")[0]
         m = json.load(open(hf_hub_download(repo, f, repo_type="dataset")))
         have = {x.split("/", 1)[1] for x in files if x.startswith(slug + "/")}
+        if not any(x.startswith("neurons/") for x in have):
+            continue  # experiment-only folders (e.g. a base-model sweep) have no atlas to explore
         m.update(id=model_id(m["model"], m.get("variant")),
                  name=m["model"].split("/")[-1] + (f" · {m['variant']}" if m.get("variant") else ""),
                  files=[x for x in FILES if x in have],
@@ -269,7 +271,8 @@ def push_index(repo):
                  roles="roles.parquet" in have,
                  sweep_stats="sweep_stats.parquet" in have, user_personas="user_personas.parquet" in have,
                  user_sweep_stats="user_sweep_stats.parquet" in have,
-                 user_sweep="user_personas.parquet" in have and "user_sweep_stats.parquet" in have)
+                 user_sweep="user_personas.parquet" in have and "user_sweep_stats.parquet" in have,
+                 jlens=f"{slug}/jlens/L00.parquet" in files)
         live_manifest = f"browser/{slug}/models.json"
         if live_manifest in files:
             manifest = json.load(open(hf_hub_download(repo, live_manifest, repo_type="dataset")))

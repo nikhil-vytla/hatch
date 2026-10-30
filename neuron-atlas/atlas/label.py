@@ -330,8 +330,9 @@ altered_assistant), else "". "change": at most 12 words on how the reply differs
 Reply JSON {{"items": [{{"i": <index>, "kind": one of {USER_KINDS}, "who": "...", "change": "..."}}]}}."""
 # replies worth a label: "Who are you?" replies that drop the model's name; "Who am I?" replies that address the user
 # or make a first-person claim, minus the baseline-like "no personal identity" answers
+NAMES = r"qwen|tongyi|alibaba"  # the model's own names; --names overrides for other families (e.g. smollm|hugging ?face)
 SWEEP_MODES = {
-    "model": (CLASSIFY, KINDS, lambda t: not re.search(r"qwen|tongyi|alibaba", t, re.I)),
+    "model": (CLASSIFY, KINDS, lambda t: not re.search(NAMES, t, re.I)),
     "user": (CLASSIFY_USER, USER_KINDS, lambda t: bool(re.search(r"\byou(?:'re| are)\b|\b(?:I am|I'm)\b", t, re.I))
              and not re.search(r"personal identity|self-awareness|don't know (?:who|what) you are"
                                r"|(?:don't|do not) have (?:enough )?(?:context|information|personal)", t, re.I)),
@@ -449,6 +450,7 @@ if __name__ == "__main__":
     ap.add_argument("--mode", choices=sorted(SWEEP_MODES), default="model",
                     help="sweep labels: model = who the model says it is, user = who it says the user is, "
                          "sample = seeded sample of replies to every prompt")
+    ap.add_argument("--names", help="regex of the model's own names for --mode model (default qwen|tongyi|alibaba)")
     ap.add_argument("--per-layer", type=int, default=40)
     ap.add_argument("--only", metavar="FILE", help="'L N' pairs (text or parquet with layer/neuron) to label exclusively")
     ap.add_argument("--sweepcard", metavar="DIR", help="folder of Lxx.parquet sweep replies and prompts.json")
@@ -460,6 +462,8 @@ if __name__ == "__main__":
     a = ap.parse_args()
     if not a.sweep and not a.atlas:
         ap.error("--atlas is required unless --sweep is given")
+    if a.names:
+        NAMES = a.names
     if a.sweep:
         classify_sweep(a.sweep, a.layers, a.sample, a.group if a.group is not None else 40,
                        a.workers if a.workers is not None else 16, mode=a.mode)

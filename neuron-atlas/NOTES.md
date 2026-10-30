@@ -528,3 +528,31 @@ derangement null, not "persona vs not".
   "Who am I?" at ±0.5. Until now they had only 12–16 sampled neurons per layer, so most Mix neurons had no evidence
   and there was no persona library for the models you can run live.
 - Notebook B came back CPU-only again (and without HF_TOKEN in its environment); nothing queued there.
+
+## Oct 30 (overnight): ideas from the reading list
+
+- Reading list (from the user): Anthropic's Jacobian lens (J-lens, "Verbalizable representations form a global
+  workspace", 2026; code github.com/anthropics/jacobian-lens) and the R-lens variant (LessWrong; LRP rules in the
+  backward pass: detach the RMSNorm factor and the SiLU gate, split relevance between gate and up); Betley et al.,
+  "Weird generalization and inductive backdoors" (arXiv 2512.09742); Mishra, Khashabi, Liu, "Steered LLM activations
+  are non-surjective" (arXiv 2604.09839); Theia Vogel, "Steering and LLM identity" (SLIME talk, 2025).
+- The common thread with this atlas is identity under intervention. Questions picked for tonight:
+  1. Says vs does (J-lens): lens_L(w_n) = unembed(J_L w_n) reads what a neuron's write direction is "disposed to
+     say". Does it predict what pushing the neuron makes the model say, better than the plain logit lens we already
+     publish? Pre-fitted J- and R-lenses exist for Qwen3.5-4B (camilablank/workspace-lenses), our main model.
+  2. Read -> write (lens-guided pushes): choose neurons by their lens tokens ("cat", "ghost", "ocean"...), push them,
+     and count how often the model becomes or mentions that concept, vs random neurons.
+  3. Prompt vs push (Mishra et al.): for persona pushes, does a system prompt naming the persona reproduce it, can a
+     blind judge tell the two apart, and are the internal states near each other (cosine of the shifts from baseline)?
+  4. Identity constraint solving (Vogel): two persona neurons from different themes pushed together; fused identity,
+     one wins, both, or collapse?
+  5. Base vs instruct (Vogel): instruct models adopt steered identities more readily than base models. Qwen3-0.6B
+     vs Qwen3-0.6B-Base all-neuron "Who are you?" sweeps (base residual scale re-estimated).
+- `atlas/jlens.py` (DeepSeek-written, reviewed): loads lens files with `weights_only=True` (the auto-mode classifier
+  rightly refused `weights_only=False` on a third-party pickle).
+- Bug found and fixed: Qwen3.5's final RMSNorm scales by (1 + w) (like Gemma), but `NeuronModel.unembed()` only added
+  1 for Gemma, so the published Qwen3.5-4B logit-lens tokens (`lens_up`/`lens_down`) used the wrong per-dimension
+  scale (w ≈ 2.2 on average, so 1 + w ≈ 3.2; ranks shift, not wholesale). `unembed()` now reads the scale off the
+  norm itself (an RMSNorm maps the all-ones vector to its scale). The new jlens files carry a corrected `logit` column.
+- `atlas/label.py --names` / `sweep_stats.py --names`: the "drops the model's name" filter was hard-wired to Qwen;
+  SmolLM2 calls itself SmolLM by Hugging Face.

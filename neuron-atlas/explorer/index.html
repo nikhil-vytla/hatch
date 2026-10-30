@@ -149,6 +149,7 @@ nav.tabs button[aria-selected="true"] { color: var(--ink); background: var(--sur
 .stat b { display: block; font: 600 16px var(--mono); font-variant-numeric: tabular-nums }
 .stat span { font-size: 12px; color: var(--ink3) }
 .lens { display: flex; flex-wrap: wrap; gap: 4px }
+.lens .lbl { font: 11px var(--mono); color: var(--ink3); align-self: center; margin-right: 2px }
 .tok { font: 13px var(--mono); background: var(--sunk); border-radius: 4px; padding: 1px 6px; white-space: pre }
 .tok.up { background: var(--eosin-soft); color: var(--eosin) }
 .tok.down { background: var(--hema-soft); color: var(--hema) }
@@ -545,7 +546,7 @@ order by detect desc nulls last, confidence desc limit 25</textarea>
   </section>
 
   <p class="foot" id="foot">
-Each point is one MLP neuron, placed by its output direction (UMAP of the down-projection column), so neurons that write similar things sit together. <b>Fires on</b>: the corpus documents with the highest activation, stained by activation per token. <b>Promotes</b>: the logit lens of the neuron's output direction. <b>Pushes</b>: replies with the neuron's activation raised or lowered at every token, by a dose in units of the median residual-stream norm. Labels and the held-out check come from an LLM labeler, so treat them as hypotheses.</p>
+Each point is one MLP neuron, placed by its output direction (UMAP of the down-projection column), so neurons that write similar things sit together. <b>Fires on</b>: the corpus documents with the highest activation, stained by activation per token. <b>Promotes</b>: the logit lens of the neuron's output direction. <b>Says</b>: the output direction read through a Jacobian lens (J-lens, Anthropic 2026) or its LRP variant (R-lens), which carry it to the last layers before decoding; lenses for Qwen3.5-4B from camilablank/workspace-lenses. <b>Pushes</b>: replies with the neuron's activation raised or lowered at every token, by a dose in units of the median residual-stream norm. Labels and the held-out check come from an LLM labeler, so treat them as hypotheses.</p>
 </div>
 
 <script type="module">
@@ -724,6 +725,27 @@ async function readNeuronRows(url, neuron) {
   }
   const rows = await readPq(url);
   return rows.filter(r => Number(r.neuron) === neuron);
+}
+
+let saysLens = "j";
+const SAYS_FIELDS = { j: ["j_up", "j_down"], r: ["r_up", "r_down"], logit: ["logit_up", "logit_down"] };
+function writesHTML(row) {
+  return `<div><h3>Writes (logit lens)</h3><div class="lens">${row.lens_up.slice(0, 10).map(t => `<span class="tok up">${showTok(t)}</span>`).join("")}</div>
+      <div class="lens" style="margin-top:4px">${row.lens_down.slice(0, 10).map(t => `<span class="tok down">${showTok(t)}</span>`).join("")}</div></div>`;
+}
+function saysRowsHTML(row) {
+  const [uk, dk] = SAYS_FIELDS[saysLens] || SAYS_FIELDS.j;
+  const toks = (list, cls) => (list || []).slice(0, 10).map(t => `<span class="tok ${cls}">${showTok(t)}</span>`).join("");
+  return `<div class="lens"><span class="lbl">push up →</span>${toks(row[uk], "up")}</div>
+      <div class="lens" style="margin-top:4px"><span class="lbl">push down →</span>${toks(row[dk], "down")}</div>`;
+}
+function saysboxHTML(M, row) {
+  if (!M.info.jlens) return writesHTML(row);
+  const btn = (k, label) => `<button type="button" data-lens="${k}" aria-pressed="${saysLens === k}">${label}</button>`;
+  return `<div id="saysbox"><h3>Says</h3>
+      <div class="seg" id="saysseg" role="group" aria-label="Says lens" style="margin-bottom:6px">${btn("j", "J-lens")}${btn("r", "R-lens")}${btn("logit", "logit lens")}</div>
+      <div id="saysout"><div class="skel line" aria-hidden="true"></div><div class="skel line short" aria-hidden="true"></div></div>
+      <p class="muted">What the neuron's output direction is disposed to make the model say: the J-lens carries it to the last layers with the model's average Jacobian before reading it as tokens; the logit lens reads it directly and is unreliable before the late layers.</p></div>`;
 }
 
 /* ---------- state ---------- */
@@ -1094,7 +1116,8 @@ async function openNeuron(k, opts = {}) {
   const steerP = M.info.steer_sharded ? layerSteer(M, L) : null;
   const sweepP = M.info.sweep_cards ? neuronSweep(M, L, n) : null;
   const exP = neuronExamples(M, L, n);
-  rowP?.catch(() => {}); steerP?.catch(() => {}); sweepP?.catch(() => {}); exP.catch(() => {});
+  const jlensP = M.info.jlens ? readNeuronRows(M.dir + `jlens/L${String(L).padStart(2, "0")}.parquet`, n) : null;
+  rowP?.catch(() => {}); steerP?.catch(() => {}); sweepP?.catch(() => {}); exP.catch(() => {}); jlensP?.catch(() => {});
   try { history.replaceState(null, "", `#${M.info.id}-L${L}-N${n}`) } catch {}
   const P = $("panel");
   if (!M.rows[k]) {
@@ -1133,8 +1156,7 @@ async function openNeuron(k, opts = {}) {
       <div class="stat"><b>${fmt(row.std, 3)}</b><span>std</span></div>
       <div class="stat"><b>${Math.round(row.frac_pos * 100)}%</b><span>tokens &gt; 0</span></div>
     </div>
-    <div><h3>Writes (logit lens)</h3><div class="lens">${row.lens_up.slice(0, 10).map(t => `<span class="tok up">${showTok(t)}</span>`).join("")}</div>
-      <div class="lens" style="margin-top:4px">${row.lens_down.slice(0, 10).map(t => `<span class="tok down">${showTok(t)}</span>`).join("")}</div></div>
+    ${saysboxHTML(M, row)}
     <div id="exbox"><h3>Fires on</h3><div class="skel line" aria-hidden="true"></div><div class="skel line short" aria-hidden="true"></div></div>
     ${sweepHTML}
     ${steerHTML}
@@ -1156,6 +1178,21 @@ async function openNeuron(k, opts = {}) {
     b.addEventListener("focus", load);
   });
   nbrs.onclick = e => { const b = e.target.closest("button"); if (b) openNeuron(+b.dataset.k, { focus: true }); };
+  if (M.info.jlens) {
+    let saysRow = null;
+    const seg = $("saysseg");
+    if (seg) seg.onclick = e => {
+      const b = e.target.closest("button[data-lens]"); if (!b) return;
+      saysLens = b.dataset.lens;
+      [...seg.children].forEach(x => x.setAttribute("aria-pressed", x === b));
+      if (saysRow && $("saysout")) $("saysout").innerHTML = saysRowsHTML(saysRow);
+    };
+    const rs = await jlensP.catch(() => null);
+    if (S.sel !== k) return;
+    saysRow = rs?.[0] || null;
+    if (saysRow && $("saysout")) $("saysout").innerHTML = saysRowsHTML(saysRow);
+    else { const box = $("saysbox"); if (box) box.outerHTML = writesHTML(row); }
+  }
   if (sweepP) {
     const sd = await sweepP.catch(() => null);
     if (M.info.steer_sharded) await steerP.catch(() => {});
