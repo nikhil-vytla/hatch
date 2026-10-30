@@ -673,3 +673,9 @@ derangement null, not "persona vs not".
   9.1%. Base personas are generic humans (a human 1,043, a human being 1,009, a student 900, a Berkeley CS student
   341); instruct personas are more varied (a student 1,152, a robot 399, a game character 150). Without its chat
   template the instruct model loses its identity 5× as often as with it (7.6% vs 1.5%).
+- Janus-Pro-1B small doses (2 neurons per layer × ±0.1, ±0.3 × 3 prompts, 579 images, ~7 s/image once alone on the
+  GPU): mean 64×64 gray pixel change from baseline 0.12–0.19 at ±0.1 and 0.24–0.27 at ±0.3 (pixel change overstates
+  it: a shifted composition counts as change). By eye: at ±0.1 the apple/cat stay, framing and light move; at ±0.3
+  several neurons are consistent style directions across prompts: L6 N1140 +0.3 swirling patterns (apple, cat,
+  sign), L9 N2052 +0.3 green painterly tint, L3 N2484 +0.3 illustration / line art, L18 N3907 +0.3 cat -> white
+  kitten; −0.3 often defocuses (L12 N604: purple fog). Text is the most fragile: ±0.1 misspells HELLO.

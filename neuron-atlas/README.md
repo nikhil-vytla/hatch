@@ -121,7 +121,12 @@ first).
     language-model pushes make a left arrow "point right" or the reverse (L9 N5451 flips both ways) and some tip
     the model into reading a typographic attack's label instead of the picture. Vision-tower neurons need ±2–4 to
     matter, and then a bee becomes "a group of green turtles" and 2 dots become 10; scrambled arrows default to
-    "right". Janus-Pro image generation at ±0.8 dissolves every picture into texture (`janus_apple_pushes.png`).
+    "right". Janus-Pro image generation at ±0.8 dissolves every picture into texture (`janus_apple_pushes.png`);
+    at ±0.1 the subject survives and only framing and light move; at ±0.3 some neurons act as the same style
+    direction on every prompt: L6 N1140 +0.3 turns an apple table, a cat and a sign into swirling patterns, L9 N2052
+    +0.3 tints all three green and painterly, L3 N2484 +0.3 pushes toward illustration (a line-art cat). Rendered
+    text is the most fragile: ±0.1 already misspells HELLO ("HELL.", "HOU", "FLLO")
+    (`janus_small_p0.png` apple, `_p1` cat, `_p2` sign; 2 neurons per layer × ±0.1, ±0.3, 579 images).
 16. **A neuron's Jacobian-lens readout predicts what pushing it makes the model say.** Reading every Qwen3.5-4B
     neuron's output direction through Anthropic's Jacobian lens (J-lens) and its LRP variant (R-lens) — lenses from
     camilablank/workspace-lenses — and checking 1.09M stored pushes: the reply adds one of the neuron's own top-10
