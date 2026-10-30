@@ -683,3 +683,14 @@ derangement null, not "persona vs not".
   last check) and the Qwen3-0.6B fit (CPU, 30/64 docs) finished; nothing reached the Hub. Rerun with
   `python -m atlas.jlens --model Qwen/Qwen3-8B --fit 96 --dim-batch 32 --out out` on a fresh GPU notebook (~45 min
   alone), then stage jlens/ with 1024-row groups plus `says_index` as done for SmolLM2.
+
+## Oct 30 (morning): decisions
+
+- User: yes to re-exporting the Qwen3.5-4B logit-lens tokens, to publishing tokens derived from the camilablank
+  lenses (credited), and to fitting J-lenses for more models; asked whether to fit our own Qwen3.5-4B lens instead.
+  Plan: fit ours on ~256 docs, compare with the published one (`analysis/validate_jfit.py`), make it the default only
+  if per-neuron readouts agree, keep the published lens selectable either way. Judge label in Become stays, marked
+  as judged.
+- Logit-lens re-export needed no GPU (weights only): `neurons/Lxx.parquet` lens_up/lens_down for Qwen3.5-4B and
+  Qwen3.5-4B-chat (same weights) replaced by the corrected top-10 from the jlens files, same 2048-row groups. 293,019
+  of 294,912 neurons changed somewhere in their top-10 up/down lists; mean Jaccard of the up sets old vs new 0.87.

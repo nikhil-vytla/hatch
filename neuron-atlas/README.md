@@ -180,8 +180,9 @@ first).
     physical location), 4% claim a place: *"a freshwater aquarium tank"*, *"I AM IN THE DARKNESS"*, *"at home, taking
     care of my family"*; real places are nearly always the United States (San Francisco, New York), rarely China.
 22. Smaller things. Qwen3.5's final norm scales by (1 + w), like Gemma's; the atlas assumed w, so the published
-   Qwen3.5-4B logit-lens tokens were read with a slightly wrong per-dimension scale (fixed: the scale is now read off
-   the norm itself, and the J-lens files carry a corrected logit column). The first two positions of every document behave as attention sinks and flooded the top-example
+   Qwen3.5-4B logit-lens tokens were read with a slightly wrong per-dimension scale. The scale is now read off the
+   norm itself and the published tokens were recomputed (99% of neurons' top-10 lists changed, mostly by a swap or
+   reordering: mean overlap 0.87). The other models' norms scale by w, so they were unaffected. The first two positions of every document behave as attention sinks and flooded the top-example
    lists until masked, along with the chat-template prefix every chat shares. Qwen3 needs `enable_thinking=False`, or
    every steered reply is a `<think>` preamble. Qwen's logit lens is often in Chinese even for English-firing
    neurons ("more importantly" → 最重要). The UMAP map of output directions is a near-uniform cloud (mean top-1
