@@ -694,3 +694,12 @@ derangement null, not "persona vs not".
 - Logit-lens re-export needed no GPU (weights only): `neurons/Lxx.parquet` lens_up/lens_down for Qwen3.5-4B and
   Qwen3.5-4B-chat (same weights) replaced by the corrected top-10 from the jlens files, same 2048-row groups. 293,019
   of 294,912 neurons changed somewhere in their top-10 up/down lists; mean Jaccard of the up sets old vs new 0.87.
+- Oct 30 afternoon, new notebooks (A GPU, B CPU): Qwen3-8B J-lens fitted on 96 docs (dim batch 32, ~55 min) and
+  published with its says index. Says vs does on the 8B "Who are you?" sweep (827,569 replies with new words): J 6.0%
+  vs 0.36% chance (opposite sign 0.23%), logit 5.5%; layers 0–5 ~0, 9–24 J 2–9% vs logit 1–8%, 26–34 10–19% with J =
+  logit.
+- R-lens fitting (`fit_lens(..., rules="r")`, `--rules r`): LN rule (detach the residual norms' normalisation
+  factor), identity rule (act(z) -> z * stop_grad(act(z)/z)), half rule for gated MLPs; attention, linear-attention
+  and q/k norms untouched. DeepSeek wrote it; review caught that Qwen3.5's gated linear-attention norm is also called
+  `norm` and takes a gate, which the first version would have replaced (changing the forward pass). Only the final
+  `norm` is touched now, and every R fit first checks one real prompt (abort if logits move > 2%); SmolLM2: 2e-6.
