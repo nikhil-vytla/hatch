@@ -140,7 +140,9 @@ first).
     for SmolLM2-135M with a re-implementation of the estimator does the same (the fitter matches a brute-force
     Jacobian; on Qwen3.5-4B, 24 documents already give matrices with cosine 0.73–0.99 to the published lens from
     layer 4 on, though single-neuron readouts in middle layers still move with the estimate): 9.5% vs 1.4% chance, ahead of the logit lens (7.9%) from layer 4 to 26. So does one fitted for Qwen3-8B
-    on 96 documents: 6.0% vs 0.36% over 828k pushes, opposite sign at chance, J ahead of logit in layers 9–24.
+    on 96 documents: 6.0% vs 0.36% over 828k pushes, opposite sign at chance, J ahead of logit in layers 9–24;
+    Qwen3-0.6B 5.2% vs 0.45% (164k pushes) and GPT-2 9.2% vs 0.9% (742 sampled pushes), the J-lens ahead of the
+    logit lens in all five models.
 
     ![says vs does](says_vs_does.png)
 17. **Choosing neurons by what they say makes the model become it.** For 48 words (cat, ocean, ghost, moon, king…),

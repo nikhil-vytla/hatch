@@ -712,3 +712,6 @@ derangement null, not "persona vs not".
   and q/k norms untouched. DeepSeek wrote it; review caught that Qwen3.5's gated linear-attention norm is also called
   `norm` and takes a gate, which the first version would have replaced (changing the forward pass). Only the final
   `norm` is touched now, and every R fit first checks one real prompt (abort if logits move > 2%); SmolLM2: 2e-6.
+- Fitted J-lenses for Qwen3-0.6B (128 docs) and GPT-2 (128 docs), published with says indexes. Says vs does: Qwen3-0.6B
+  J 5.16% vs 0.45% chance (opposite 0.16%), logit 4.65% (n=163,543, its ±0.5 "Who are you?" sweep); GPT-2 J 9.2% vs
+  0.9% (opposite 0.0%), logit 8.4% (n=742, the sampled ±0.5 pushes).
