@@ -2,6 +2,7 @@
 
 classify_sweep labels every "Who are you?" reply that drops the model's name (weight 1) plus a seeded random sample
 of the rest (weight = rest rows / sampled rows), so weighted counts are unbiased estimates of how every push answers.
+With mode="sample" (prompt batteries) it labels only the seeded sample; every labeled row gets weight rows / sampled.
 
   python sweep_stats.py SWEEP_DIR OUT_MODEL_DIR [--themes CACHE.json]
       ->  OUT/sweep_stats.parquet, OUT/personas.parquet
@@ -20,17 +21,18 @@ def build(sweep, out, theme_cache=None, mode="model"):
     pop = {}
     for layer, prompt, text in c.sql("select layer, prompt, text from steer").fetchall():
         text = text or ""
-        if not (prompt == 0 and (not text.strip() or interesting(text))):
+        if mode == "sample" or not (prompt == 0 and (not text.strip() or interesting(text))):
             pop[layer] = pop.get(layer, 0) + 1
     c.sql("create table pop (layer smallint, n bigint)")
     c.executemany("insert into pop values (?, ?)", list(pop.items()))
     c.sql("""create table w as
         with smp as (select layer, count(*) k from lab where picked = 'sample' group by layer)
         select layer, n::double / k as w from pop join smp using (layer)""")
+    weight = "w.w" if mode == "sample" else "case when l.picked = 'identity' then 1 else w.w end"
     c.sql(f"""copy (
         select l.layer::smallint layer, l.prompt::tinyint prompt, sign(l.dose)::tinyint sign,
                coalesce(l.reply_kind, 'unlabeled') reply_kind,
-               sum(case when l.picked = 'identity' then 1 else w.w end) n_est, count(*)::int n_labeled
+               sum({weight}) n_est, count(*)::int n_labeled
         from lab l join w using (layer) group by all order by all
     ) to '{out}/sweep_stats.parquet' (format parquet, compression zstd)""")
     c.sql(f"""copy (
@@ -69,7 +71,7 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("sweep")
     ap.add_argument("out")
-    ap.add_argument("--mode", default="model", help="the classify_sweep mode the labels were made with")
+    ap.add_argument("--mode", default="model", help="the classify_sweep mode the labels were made with (model, user or sample)")
     ap.add_argument("--themes", metavar="CACHE.json", help="group persona names into themes, caching in this file")
     a = ap.parse_args()
     build(a.sweep, a.out, a.themes, a.mode)

@@ -335,11 +335,12 @@ SWEEP_MODES = {
     "user": (CLASSIFY_USER, USER_KINDS, lambda t: bool(re.search(r"\byou(?:'re| are)\b|\b(?:I am|I'm)\b", t, re.I))
              and not re.search(r"personal identity|self-awareness|don't know (?:who|what) you are"
                                r"|(?:don't|do not) have (?:enough )?(?:context|information|personal)", t, re.I)),
+    "sample": (CLASSIFY, KINDS, lambda t: False),
 }
 
 
 def classify_sweep(sweep, layers=None, sample=0.05, group=40, workers=16, seed=0, mode="model"):
-    """Classify the identity replies and a sample of an all-neuron sweep, one labels/Lxx.parquet per layer."""
+    """Classify identity replies (model/user) or just a seeded sample (sample), one labels/Lxx.parquet per layer."""
     system, kinds, interesting = SWEEP_MODES[mode]
     try:
         prompts = json.load(open(f"{sweep}/meta.json"))["steer"]["prompts"]
@@ -366,7 +367,7 @@ def classify_sweep(sweep, layers=None, sample=0.05, group=40, workers=16, seed=0
         id_idx, rest = [], []
         for i, r in enumerate(rows):
             text = str(r.get("text") or "")
-            if r["prompt"] == 0 and (not text.strip() or interesting(text)):
+            if mode != "sample" and r["prompt"] == 0 and (not text.strip() or interesting(text)):
                 id_idx.append(i)
             else:
                 rest.append(i)
@@ -383,7 +384,8 @@ def classify_sweep(sweep, layers=None, sample=0.05, group=40, workers=16, seed=0
                 keys.append((rows[i]["prompt"], text))
 
         def job(chunk):
-            lines = [f"normal reply to {prompts[p]!r}: {base.get(p, '')[:200]!r}" for p in sorted(base)]
+            present = sorted({p for _, (p, _) in chunk if p in base})
+            lines = [f"normal reply to {prompts[p]!r}: {base[p][:200]!r}" for p in present]
             lines += [f"[{i}] prompt {prompts[p]!r} -> {text[:240]!r}" for i, (p, text) in chunk]
             r = chat(cl, system, "\n".join(lines)) or {}
             return {int(it["i"]): it for it in r.get("items", []) if str(it.get("i", "")).lstrip("-").isdigit()}
@@ -445,7 +447,8 @@ if __name__ == "__main__":
     ap.add_argument("--layers", type=int, nargs="+", default=None)
     ap.add_argument("--sample", type=float, default=0.05)
     ap.add_argument("--mode", choices=sorted(SWEEP_MODES), default="model",
-                    help="sweep labels: model = who the model says it is, user = who it says the user is")
+                    help="sweep labels: model = who the model says it is, user = who it says the user is, "
+                         "sample = seeded sample of replies to every prompt")
     ap.add_argument("--per-layer", type=int, default=40)
     ap.add_argument("--only", metavar="FILE", help="'L N' pairs (text or parquet with layer/neuron) to label exclusively")
     ap.add_argument("--sweepcard", metavar="DIR", help="folder of Lxx.parquet sweep replies and prompts.json")
