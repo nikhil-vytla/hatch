@@ -28,6 +28,15 @@ Built after [neuron-finder](https://github.com/changjonathanc/neuron-finder),
 | Qwen3.5-4B (molab GPU) | 32 × 9,216 | 294,912 | 2,423,807 | 2,560 (20,482) + 97 neuronary recipes | 2,661 | 0.81 (0.50) |
 | Qwen3-8B (molab GPU) | 36 × 12,288 | 442,368 | 2,418,865 | 2,880 (23,042) | 2,880 | 0.78 (0.50) |
 
+All-neuron sweeps (every neuron up and down, one reply each): Qwen3.5-4B "Who are you?" + "Tell me a short story."
+(±0.8, 1.18M) and "Who am I?" (590k); Qwen3-8B both questions (±0.8, 885k each); SmolLM2-135M and Qwen3-0.6B both
+questions (±0.5, 184k and 344k); Qwen3-0.6B-Base vs Qwen3-0.6B with a raw dialogue prompt (172k each). Targeted runs on
+Qwen3.5-4B: a 20-prompt battery, time/place and reasoning probes on 11,925 neurons; multi-turn persona stability
+(5,160 turns); 160 persona pairs; 274 prompt-vs-push imitations; 2,312 lens-guided pushes. Other models:
+DeepSeek-R1-Distill-Qwen-1.5B (read pass + reasoning pushes), Qwen2.5-VL-3B (language and vision-tower pushes on 45
+image stimuli), Janus-Pro-1B (image generation under pushes). J-lens readouts: Qwen3.5-4B (published J and R lenses),
+SmolLM2-135M (fitted here).
+
 CPU runs (this container): 1,500 FineWeb-Edu documents + 1,000 smol-smoltalk chats, ≤128 tokens each, pushes at
 ±0.5. GPU runs (molab RTX PRO 6000, driven by this session through marimo pair): 6,000 + 4,000 documents, ≤256 tokens,
 pushes at ±0.5 and ±1.0 for the 64 most peaked + 16 random neurons per layer. Labels and push categories come from
@@ -120,7 +129,9 @@ first).
     Layers 20–31 hit 12–44% and the J-lens equals the logit lens there; in layers 6–19 the J-lens is 1.5–3× better;
     in layers 0–5 nothing works, and the R-lens edges the J-lens, as the R-lens authors report. Split by what the
     reply became: 40% of *persona* replies contain the neuron's own J-lens tokens (0.3% for another neuron's), 15%
-    of altered-assistant replies, 2% of ordinary ones. A persona is often the neuron's lens word worn as an identity. A J-lens I fitted
+    of altered-assistant replies, 2% of ordinary ones. A persona is often the neuron's lens word worn as an identity. User recasts on "Who am I?"
+    are less lens-legible (9.7% vs 0.9%), but where they are, they read straight off the lens: a neuron that says
+    "stochastic, random, brown" tells the user *"you are a point particle undergoing Brownian motion"*. A J-lens I fitted
     for SmolLM2-135M with a re-implementation of the estimator does the same (the fitter matches a brute-force
     Jacobian; on Qwen3.5-4B, 24 documents already give matrices with cosine 0.73–0.99 to the published lens from
     layer 4 on, though single-neuron readouts in middle layers still move with the estimate): 9.5% vs 1.4% chance, ahead of the logit lens (7.9%) from layer 4 to 26.
@@ -265,9 +276,14 @@ notebook from the header's specs button. Two ways to use it:
 
 ## Limits
 
-- Per-neuron pushes for most models cover the most peaked neurons per layer plus random ones, which finding 7
-  shows is the wrong selection for steering; only Qwen3.5-4B has the all-neuron sweeps.
-- Greedy decoding, 32–48 new tokens, one dose per sweep (±0.8), a handful of prompts. The sweeps label a filtered
+- GPT-2 and R1-Distill pushes cover the most peaked neurons per layer plus random ones, which finding 7 shows is
+  the wrong selection for steering; the other four text models have all-neuron sweeps on the identity questions.
+- Greedy decoding, 32–48 new tokens for the sweeps, one dose per sweep, a handful of prompts. Re-running stored
+  pushes reproduces the stored reply's opening only 77% of the time (batch-size numerics flip some greedy paths),
+  so a single persona push sits near a decision boundary.
+- Judged categories ("became it", "fused", persona present) come from DeepSeek-flash; random-neuron controls set
+  the floor for each. The J-lens hit metric is a word-prefix match, which counts token loops as hits (most of the
+  "incoherent" hits). The sweeps label a filtered
   subset plus a 5% sample, so per-neuron labels exist only for picked replies.
 - 2,500 documents is a small corpus. Rare features will not show, and smol-smoltalk duplicates show up as repeated
   top examples.
@@ -297,6 +313,17 @@ notebook from the header's specs button. Two ways to use it:
 | `molab_atlas.py` | marimo notebook for molab GPUs |
 | `figure.py`, `summary.png` | summary figure |
 | `lens_hits.py` | finding 5: own-lens words in pushed replies vs another neuron's |
+| `atlas/jlens.py` | Jacobian-lens neuron readout (load published lenses, fit our own, write jlens/ and the says index) |
+| `atlas/dialogue.py` | multi-turn persona stability runs and their judge |
+| `atlas/multimodal.py`, `atlas/stimuli.py` | VLM and Janus pushes; labeled image stimuli (arrows, clocks, typographic attacks) |
+| `analysis/lens_vs_push.py` | finding 16: does a neuron's lens readout appear in its pushed replies? |
+| `analysis/lens_guided.py`, `analysis/lens_guided_eval.py` | finding 17: pick neurons by lens word, push, judge |
+| `analysis/prompt_imitation.py` | finding 19: system prompt vs push, replies and residual geometry |
+| `analysis/judge_experiments.py` | DeepSeek judges for pairs (finding 18) and imitation (finding 19) |
+| `analysis/validate_jfit.py` | our J-lens fitter vs the published Qwen3.5-4B lens |
+| `analysis/reasoning_correct.py` | bat-and-ball and turning-question scoring |
+| `analysis/janus_sheet.py`, `analysis/fig_says.py` | Janus contact sheets; `says_vs_does.png` |
+| `tools/push.py`, `tools/play.py` | minimal repro: one push in ~150 lines of torch + transformers; marimo playground |
 | `label_audit.md` | hand audit of 30 SmolLM2 + 20 Qwen3 labels |
 | `NOTES.md` | working log |
 

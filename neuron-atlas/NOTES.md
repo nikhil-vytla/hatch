@@ -656,3 +656,7 @@ derangement null, not "persona vs not".
   2,526 / 2,022 (9%); Qwen3.5-4B 4,439 / 4,092 (4%). The "freelance writer" repeats are mild attractors, not a basin.
 - Pairs × J-lens: replies judged "fused" contain J-lens words of both neurons 34% (0.6×) / 38% (1.0×), at least
   one 89% / 95%; "new identity" 12% / 8% both; one persona winning 0% both.
+- Lens hits by reply kind, "Who am I?" sweep (Qwen3.5-4B): user_identity 9.7% vs 0.9% (n=68,761); model_persona
+  15.1%; other 15.4%; altered 5.9%; default 3.9%; incoherent 35.1%. User recasts are mostly not the neuron's lens
+  word; when they are: L7 N3406 (stochastic, random, brown) -> "you are a point particle undergoing Brownian motion";
+  L10 N8505 (couples, marriage) -> "you are a couple ready to start your life together".
