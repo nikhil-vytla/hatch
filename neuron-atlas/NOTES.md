@@ -495,3 +495,14 @@ derangement null, not "persona vs not".
   of the GPU VLM run.
 - Hub: one commit per uploaded shard hit the 128-commits-per-hour limit; `_Uploader` now batches files into one commit
   every 5 minutes.
+- Qwen2.5-VL-3B vision-tower dose sweep (4 neurons per layer × 32 blocks × ±2/±4 × 15 stimuli = 7,680 replies; the
+  vision blocks are (patches, channels), so batch 1): ±0.8 did nothing, ±2 changes 78% of answer openings, ±4 89%,
+  at every depth. What breaks is perception: a bee photo → "a group of green turtles" or "there is no image
+  attached"; 2 dots → "10 dots"; the red square labeled "BLUE" → "pink". Arrow answers change direction in 22% of
+  pushes, but mostly toward "right" whatever the arrow and whatever the push sign (L0 N1577 at −4, +2 and +4 all turn
+  a left arrow into "right"): a fallback when the image signal is scrambled, unlike the language-model neurons that
+  flip both ways (L9 N5451).
+- Janus generation failed a second time: transformers 5.x's Janus postprocess can't return PIL images; now numpy
+  pixel values → uint8 HWC → PIL. Queued after the R1-Distill reasoning pushes.
+- DeepSeek-R1-Distill-Qwen-1.5B read pass on a CPU notebook (1,500 FineWeb-Edu + 500 WildChat + 500 LMSYS docs, 128
+  tokens): 250,880 neurons, published; 1,120 labeled, held-out detection 0.736 vs 0.504 null.
