@@ -1,0 +1,222 @@
+limits: 100 model calls or $0.3, whichever first; turn deepseek/deepseek-flash, summary deepseek/deepseek-flash, memory optchat 128KB
+
+user 1> I'm running a D&D one-shot tonight and you're my table assistant. The party: Mira (wizard, 14 HP), Thorn (fighter, 28 HP) and Pip (rogue, 18 HP). Keep track of them for me.
+agent> I'll set up a party tracker for you.
+  call   cell_propose {"name":"party","description":"Track D&D party members: HP, max HP, conditions. Actions: init (seed the party)...
+  result ACCEPTED party@f54aaef4 (passed 9 checks; replayed 0 real calls; fuzzed 35 of 40 generated inputs in 40 of a budget of 40 sandbox executions). The tool "party" is available from your next step.
+  call   party {"action":"init","members":[{"name":"Mira","hp":14,"maxHp":14},{"name":"Thorn","hp":28,"maxHp":28},{"name":"Pi...
+  result [{"name":"Mira","hp":14,"maxHp":14,"conditions":[]},{"name":"Thorn","hp":28,"maxHp":28,"conditions":[]},{"name":"Pip","hp":18,"maxHp":18,"conditions":[]}]
+agent> Party's tracked. Current state:
+
+| Who | HP | Conditions |
+|---|---|---|
+| Mira (wizard) | 14/14 | — |
+| Thorn (fighter) | 28/28 | — |
+| Pip (rogue) | 18/18 | — |
+
+I've built a `party` tool for this, so from here you can just talk at me naturally — "Mira takes 6", "Pip heals 5", "Thorn is prone", "how's everyone doing?" — and I'll keep the numbers straight.
+
+Two things worth knowing:
+
+- Damage floors at 0 and auto-applies `unconscious`; dropping to 0 means healing won't work until they're stabilised or revived (that mirrors how it actually plays). If you run death saves a different way, tell me and I'll change it.
+- If someone's max HP changes (level-up, a curse, whatever), say so and I'll set it.
+
+What's the one-shot? If I know the setup and the enemies, I can also track initiative order and monsters — say the word and I'll add a second tracker.
+  -> done
+
+user 2> Combat! Roll initiative: Mira +2, Thorn +1, Pip +4, and three goblins at +2 each. Roll a d20 for everyone and give me the turn order.
+agent> I'll roll initiative for everyone. Since this needs to be exactly right, let me make a proper dice tool with checks.
+  call   cell_list {}
+  result party: live party@f54aaef4; history party@f54aaef4; asked for by zoom(0,1)
+  call   cell_propose {"name":"dice","description":"Roll dice for D&D: `roll` rolls N dice of S sides (default 1d20) and returns the...
+  result REJECTED dice@3af4e87a: group 0 check 3 {"action":"roll","n":0} threw script: n must be an integer 1..100. The live version is unchanged.
+  call   cell_propose {"checks":[{"args":{"action":"roll","n":4,"sides":6},"holds":"r.rolls.length === 4 && r.rolls.every(x => Numbe...
+  result REJECTED dice@3af4e87a: group 0 check 3 {"action":"roll","n":0} threw script: n must be an integer 1..100. The live version is unchanged.
+  call   cell_propose {"checks":[{"args":{"action":"roll","n":4,"sides":6},"holds":"r.rolls.length === 4 && r.rolls.every(x => Numbe...
+  result REJECTED dice@3af4e87a: group 0 check 3 {"action":"roll","n":1,"sides":1} threw script: sides must be an integer 2..1000. The live version is unchanged.
+  call   cell_propose {"name":"dice","description":"Roll dice for D&D: `roll` rolls N dice of S sides (default 1d20) and returns {ro...
+  result ACCEPTED dice@137b8e8d (passed 8 checks; replayed 0 real calls; fuzzed 40 of 40 generated inputs in 40 of a budget of 40 sandbox executions). The tool "dice" is available from your next step.
+  call   dice {"action":"initiative","combatants":[{"name":"Mira","mod":2},{"name":"Thorn","mod":1},{"name":"Pip","mod":4},{...
+  result [{"name":"Mira","mod":2,"roll":20,"total":22,"order":1},{"name":"Goblin 2","mod":2,"roll":19,"total":21,"order":2},{"name":"Goblin 3","mod":2,"roll":14,"total":16,"order":3},{"name":"Pip","mod":4,"rol...
+agent> **Initiative rolled — turn order:**
+
+| # | Combatant | d20 | Mod | Total |
+|---|-----------|-----|-----|-------|
+| 1 | **Mira** | 20 (nat!) | +2 | **22** |
+| 2 | Goblin 2 | 19 | +2 | 21 |
+| 3 | Goblin 3 | 14 | +2 | 16 |
+| 4 | **Pip** | 8 | +4 | 12 |
+| 5 | **Thorn** | 4 | +1 | 5 |
+| 6 | Goblin 1 | 1 (nat 1) | +2 | 3 |
+
+So: Mira → Goblin 2 → Goblin 3 → Pip → Thorn → Goblin 1. No ties, so no tiebreak needed.
+
+Two things worth noting for later: the goblins rolled a nat 20/19 (Goblin 2 and 3 are hot, Goblin 1 whiffed), and Mira opens the fight — she's up first.
+
+The `dice` tool is live now, so from here I can do anything fast and exactly: "roll 2d6+3", "Thorn attacks with advantage" (I'd roll 2d20 and take the high), damage, death saves, etc. It takes plain d20+N for initiative lists too if you ever add monsters mid-fight.
+
+I've still got HP tracked separately — say the words as they land ("Goblin 2 takes 9", "Mira heals 5") and I'll keep the board current. Do you want me to also track the goblins' HP in the same tool for this fight?
+  -> done
+
+user 3> The goblins hit Thorn for 7 and Mira for 9. Then Mira drinks a potion of healing: roll 2d4+2 for her. Where is everyone now?
+agent> I'll apply the damage and roll the potion.
+  call   party {"action":"damage","name":"Thorn","amount":7}
+  call   party {"action":"damage","name":"Mira","amount":9}
+  call   dice {"action":"roll","n":2,"sides":4,"mod":2}
+  result {"name":"Thorn","hp":21,"maxHp":28,"conditions":[]}
+  result {"name":"Mira","hp":5,"maxHp":14,"conditions":[]}
+  result {"rolls":[4,1],"sum":5,"mod":2,"total":7,"notation":"2d4+2"}
+agent> Potion heals 7. Applying it.
+  call   party {"action":"heal","amount":7,"name":"Mira"}
+  result {"name":"Mira","hp":12,"maxHp":14,"conditions":[]}
+agent> **Damage taken:** Thorn 28 → 21 (took 7), Mira 14 → 5 (took 9).
+
+**Potion of healing (2d4+2):** rolled 4 + 1 + 2 = **7 HP**. Mira 5 → **12/14**.
+
+**Where everyone stands:**
+
+| # | Combatant | HP | Notes |
+|---|-----------|----|-------|
+| 1 | Mira (wizard) | **12/14** | net −2 this round (9 damage, 7 healed); it's her turn |
+| 2 | Goblin 2 | ? | 21 initiative |
+| 3 | Goblin 3 | ? | 16 initiative |
+| 4 | Pip (rogue) | **18/18** | untouched |
+| 5 | Thorn (fighter) | **21/28** | −7 |
+| 6 | Goblin 1 | ? | 3 initiative |
+
+No conditions on anyone (nobody at 0, no unconsciousness). Goblin HP still isn't tracked — want me to add the three goblins to the tracker so I can log hits on them, and do you know their AC/max HP?
+  -> done
+
+=== catalog ===
+party: live party@f54aaef4
+  party@f54aaef4 (live): asked for by message 0; 9 checks, 2 invariants; "Track D&D party members: HP, max HP, conditions. Actions: init (seed the party), list, damage, heal, set, condition_add, condition_remove."
+dice: live dice@137b8e8d
+  dice@137b8e8d (live): asked for by message 7; 8 checks, 0 invariants; "Roll dice for D&D: `roll` rolls N dice of S sides (default 1d20) and returns {rolls, sum, mod, total, notation}; `initiative` takes a list of {name, mod} and rolls 1d20 each, returning entries sorted high-to-low by total (d20+mod), ties broken by higher mod then name. Bad input returns {error: "..."} instead of throwing."
+log:
+  2026-10-16T08:30:33.991Z verified party@f54aaef4, pending
+  2026-10-16T08:30:34.258Z accepted party@f54aaef4
+  2026-10-16T08:31:06.440Z rejected dice@3af4e87a: group 0 check 3 {"action":"roll","n":0} threw script: n must be an integer 1..100
+  2026-10-16T08:31:22.734Z rejected dice@3af4e87a: group 0 check 3 {"action":"roll","n":0} threw script: n must be an integer 1..100
+  2026-10-16T08:31:38.014Z rejected dice@3af4e87a: group 0 check 3 {"action":"roll","n":1,"sides":1} threw script: sides must be an integer 2..1000
+  2026-10-16T08:32:11.319Z verified dice@137b8e8d, pending
+  2026-10-16T08:32:11.467Z accepted dice@137b8e8d
+
+=== OptChat view (34 messages in 34 lines, 6579 bytes) ===
+<chat>
+0+1|user: I'm running a D&D one-shot tonight and you're my table assistant. The party: Mira (wizard, 14 HP), Thorn (fighter, 28 HP) and Pip (rogue, 18 HP). Keep track of them for me.
+1+1|agent: I'll set up a party tracker for you.
+2+1|tool: cell_propose creates tool "party" (kv store) for the D&D party: actions init(seed members{name,hp,maxHp})/list/damage/heal/set/condition_add/condition_remove; case-insensitive name lookup, errors "no such party member"/"ambiguous name"; damage clamps hp≥0 and auto-adds "unconscious" at 0; heal needs hp>0 else "is at 0 HP; needs stabilising or a revive, not healing"; set hp/maxHp clears "unconscious" if hp>0; checks seed Mira 14/14, Thorn 28/28, Pip 18/18.
+3+1|echo: ACCEPTED party@f54aaef4 (passed 9 checks; replayed 0 real calls; fuzzed 35 of 40 generated inputs in 40 of a budget of 40 sandbox executions). The tool "party" is available from your next step.
+4+1|tool: party {"action":"init","members":[{"name":"Mira","hp":14,"maxHp":14},{"name":"Thorn","hp":28,"maxHp":28},{"name":"Pip","hp":18,"maxHp":18}]}
+5+1|echo: [{"name":"Mira","hp":14,"maxHp":14,"conditions":[]},{"name":"Thorn","hp":28,"maxHp":28,"conditions":[]},{"name":"Pip","hp":18,"maxHp":18,"conditions":[]}]
+6+1|agent: Party tracked: Mira 14/14, Thorn 28/28, Pip 18/18, no conditions; `party` tool live so I can take natural talk ("Mira takes 6", "Pip heals 5", "Thorn is prone", "how's everyone doing?"). Asked: damage floors at 0 + auto `unconscious`; healing blocked at 0 until stabilised/revived (offer to change); say if max HP changes; asked what the one-shot is and offered an initiative/monster tracker.
+7+1|user: Combat! Roll initiative: Mira +2, Thorn +1, Pip +4, and three goblins at +2 each. Roll a d20 for everyone and give me the turn order.
+8+1|agent: I'll roll initiative for everyone. Since this needs to be exactly right, let me make a proper dice tool with checks.
+9+1|tool: cell_list {}
+10+1|echo: party: live party@f54aaef4; history party@f54aaef4; asked for by zoom(0,1)
+11+1|tool: proposed cell "dice" (roll N dS +mod → rolls/sum/total/notation; initiative: list {name,mod} → 1d20 each, sorted high→low total, ties higher mod then name, adds order 1..n), checks incl. 6-combatant Mira+2/Thorn+1/Pip+4/Goblin1-3+2 order and 4d6/1d20 notation.
+12+1|echo: REJECTED dice@3af4e87a: group 0 check 3 {"action":"roll","n":0} threw script: n must be an integer 1..100. The live version is unchanged.
+13+1|tool: cell_propose dice v2, fixing the n=0 rejection: validates args before rolling — throws 'n must be an integer 1..100', 'sides must be an integer 2..1000', 'combatants required', 'unknown action'. roll N dS (default 1d20)+mod → rolls/sum/mod/total/notation (e.g. '4d6','2d20+3'); initiative [{name,mod}] → 1d20 each, sort total desc, ties higher mod then name, adds order 1..n. 8 checks incl 6-combatant Mira+2/Thorn+1/Pip+4/Goblin1-3+2 sorted order 1..6; runs 30/30/10/1/1/60/1/30.
+14+1|echo: REJECTED dice@3af4e87a: group 0 check 3 {"action":"roll","n":0} threw script: n must be an integer 1..100. The live version is unchanged.
+15+1|tool: cell_propose dice v3 (fixes n=0 validation by checking args before rolling): roll N dS default 1d20 +mod → rolls/sum/mod/total/notation ('4d6','2d20+3'); initiative [{name,mod}] → 1d20 each, sorted total desc, ties higher mod then name, adds order 1..n; throws 'n must be an integer 1..100','sides must be an integer 2..1000','combatants required','unknown action'; 8 checks incl. 6-combatant Mira+2/Thorn+1/Pip+4/Goblin 1-3+2 order 1..6 and n=101/sides=1 errors; runs 30/30/10/1/1/60/1/30.
+16+1|echo: REJECTED dice@3af4e87a: group 0 check 3 {"action":"roll","n":1,"sides":1} threw script: sides must be an integer 2..1000. The live version is unchanged.
+17+1|- tool: cell_propose dice v4: bad input returns {error:"..."} instead of throwing — fixes the n=0/sides=1 checks that got v2/v3 rejected; live dice@3af4e87a still unchanged. Actions: roll N dS (default 1d20) +mod → {rolls,sum,mod,total,notation}; initiative [{name,mod}] → 1d20 each, sorted by total desc, ties higher mod. Errors: "n must be an integer 1..100", "sides must be an integer 2..1000", "combatants required". 8 checks incl. 4d6, 1d20, 2d20+3, sides=1/n=101 errors, 6-combatant order.
+18+1|echo: ACCEPTED dice@137b8e8d (passed 8 checks; replayed 0 real calls; fuzzed 40 of 40 generated inputs in 40 of a budget of 40 sandbox executions). The tool "dice" is available from your next step.
+19+1|tool: dice {"action":"initiative","combatants":[{"name":"Mira","mod":2},{"name":"Thorn","mod":1},{"name":"Pip","mod":4},{"name":"Goblin 1","mod":2},{"name":"Goblin 2","mod":2},{"name":"Goblin 3","mod":2}]}
+20+1|echo: [{"name":"Mira","mod":2,"roll":20,"total":22,"order":1},{"name":"Goblin 2","mod":2,"roll":19,"total":21,"order":2},{"name":"Goblin 3","mod":2,"roll":14,"total":16,"order":3},{"name":"Pip","mod":4,"roll":8,"total":12,"order":4},{"name":"Thorn","mod":1,"roll":4,"total":5,"order":5},{"name":"Goblin 1","mod":2,"roll":1,"total":3,"order":6}]
+21+1|Init rolled; turn order: Mira(d20 20 nat,+2=22)→Goblin2(19+2=21)→Goblin3(14+2=16)→Pip(8+4=12)→Thorn(4+1=5)→Goblin1(1 nat1,+2=3); no ties. Noted goblins hot (nat20/19), Goblin1 whiffed, Mira opens. `dice` tool live: roll NdS+mod, advantage, damage, death saves, d20+N initiative lists. HP tracked apart—say damage/heals as they land. Asked: track goblins' HP in same tool for this fight?
+22+1|user: The goblins hit Thorn for 7 and Mira for 9. Then Mira drinks a potion of healing: roll 2d4+2 for her. Where is everyone now?
+23+1|agent: I'll apply the damage and roll the potion.
+24+1|tool: party {"action":"damage","name":"Thorn","amount":7}
+25+1|tool: party {"action":"damage","name":"Mira","amount":9}
+26+1|tool: dice {"action":"roll","n":2,"sides":4,"mod":2}
+27+1|echo: {"name":"Thorn","hp":21,"maxHp":28,"conditions":[]}
+28+1|echo: {"name":"Mira","hp":5,"maxHp":14,"conditions":[]}
+29+1|echo: {"rolls":[4,1],"sum":5,"mod":2,"total":7,"notation":"2d4+2"}
+30+1|agent: Potion heals 7. Applying it.
+31+1|tool: party {"action":"heal","amount":7,"name":"Mira"}
+32+1|echo: {"name":"Mira","hp":12,"maxHp":14,"conditions":[]}
+33+1|agent: Damage applied: Thorn 28→21 (−7), Mira 14→5 (−9); potion 2d4+2 rolled 4+1+2=7 HP → Mira 5→12/14 (net −2 this round); standings: Mira 12/14 (her turn, order 1), Goblin2 ? (21 init), Goblin3 ? (16), Pip 18/18 untouched, Thorn 21/28 (−7), Goblin1 ? (3); no conditions/unconsciousness; goblin HP untracked — offered to add the three goblins to tracker for logging hits; asked their AC/max HP.
+</chat>
+
+=== usage per request (input = cache misses) ===
+  # msg kind         input cache-read  output  cache%      cost
+  1 1   turn           287       2432    1737    89.4  $0.00219
+  2 1   turn          3714       1024     115    21.6  $0.00126
+  3 1   compaction    1812        768     271    29.8  $0.00087
+  4 1   compaction     717        768     192    51.7  $0.00045
+  5 1   turn           187       4736     236    96.2  $0.00037
+  6 1   compaction     578       1024     141    63.9  $0.00035
+  7 1   compaction     479       1408    2000    74.6  $0.00255
+  8 2   turn          1022       2432      45    70.4  $0.00038
+  9 2   compaction     205       1280     200    86.2  $0.00031
+ 10 2   compaction     580       1152     185    66.5  $0.00040
+ 11 2   compaction     429       1664     166    79.5  $0.00034
+ 12 2   compaction     553       1280     231    69.8  $0.00045
+ 13 2   compaction     482       1408     880    74.5  $0.00121
+ 14 2   turn           211       3328    1325      94  $0.00167
+ 15 2   compaction     485       1792     162    78.7  $0.00035
+ 16 2   compaction     479       1024    2000    68.1  $0.00255
+ 17 2   compaction    1492       1280      99    46.2  $0.00057
+ 18 2   turn           185       4736    1393    96.2  $0.00176
+ 19 2   compaction     223       1280     246    85.2  $0.00037
+ 20 2   compaction     525       1408     225    72.8  $0.00044
+ 21 2   compaction    1580       1408     885    47.1  $0.00154
+ 22 2   turn           227       6144    1393    96.4  $0.00178
+ 23 2   compaction     421       1920     195      82  $0.00037
+ 24 2   compaction     671       1536     230    69.6  $0.00049
+ 25 2   compaction     417       2304     169    84.7  $0.00034
+ 26 2   compaction     412       2688     211    86.7  $0.00039
+ 27 2   compaction     461       2176     380    82.5  $0.00061
+ 28 2   compaction    1556       1664     238    51.7  $0.00076
+ 29 2   compaction     598       1280    2000    68.2  $0.00259
+ 30 2   compaction     435       3200     202      88  $0.00039
+ 31 2   turn           147       7680    1391    98.1  $0.00176
+ 32 2   compaction     651       1792     240    73.4  $0.00049
+ 33 2   compaction     456       2432    1566    84.2  $0.00203
+ 34 2   compaction     507       2816     177    84.7  $0.00038
+ 35 2   compaction     639       1920    1442      75  $0.00193
+ 36 2   compaction     625       1920     317    75.4  $0.00058
+ 37 2   compaction     527       2432     217    82.2  $0.00043
+ 38 2   compaction     415       2944     218    87.6  $0.00040
+ 39 2   compaction     428       3328     184    88.6  $0.00037
+ 40 2   compaction     427       3712     270    89.7  $0.00047
+ 41 2   compaction     214       1664     258    88.6  $0.00038
+ 42 2   turn          8404       1152     143    12.1  $0.00270
+ 43 2   compaction    1546       1920     253    55.4  $0.00078
+ 44 2   compaction     549       1792     239    76.5  $0.00046
+ 45 2   turn           247       9600     367    97.5  $0.00057
+ 46 2   compaction     473       3456     324      88  $0.00055
+ 47 2   compaction     469       2304     224    83.1  $0.00042
+ 48 2   compaction     552       2048     164    78.8  $0.00037
+ 49 2   compaction     506       2688     211    84.2  $0.00042
+ 50 2   compaction     541       3840     221    87.7  $0.00045
+ 51 2   compaction     529       3072     200    85.3  $0.00042
+ 52 2   compaction     455       4352     202    90.5  $0.00041
+ 53 2   compaction     515       2048     656    79.9  $0.00095
+ 54 2   compaction     644       1920     488    74.9  $0.00079
+ 55 2   compaction     488       2560     254      84  $0.00047
+ 56 2   compaction     480       4736    1153    90.8  $0.00156
+ 57 2   compaction     625       2048     249    76.6  $0.00050
+ 58 2   compaction     572       2560    1070    81.7  $0.00147
+ 59 2   compaction     472       3072     174    86.7  $0.00037
+ 60 2   compaction     576       2944    1923    83.6  $0.00250
+ 61 2   compaction     725       2176     238      75  $0.00052
+ 62 2   compaction     535       2816     229      84  $0.00045
+ 63 2   compaction     446       3328     209    88.2  $0.00040
+ 64 2   compaction     477       3712     670    88.6  $0.00097
+ 65 3   turn          2396       2688     218    52.9  $0.00100
+ 66 3   compaction     134       2430     438    94.8  $0.00058
+ 67 3   turn           148       5248      79    97.3  $0.00017
+ 68 3   compaction     897       2304     227      72  $0.00056
+ 69 3   compaction     462       3200     223    87.4  $0.00043
+ 70 3   turn           258       5248     255    95.3  $0.00041
+ 71 3   compaction     699       2688     142    79.4  $0.00040
+ 72 3   compaction     647       2688     391    80.6  $0.00068
+ 73 3   compaction     614       3328     404    84.4  $0.00069
+ 74 3   compaction     415       2560    2000    86.1  $0.00254
+ 75 3   compaction     630       3840     264    85.9  $0.00053
+ 76 3   compaction     640       4352    1450    87.2  $0.00196
+ 77 3   compaction     677       2816    1145    80.6  $0.00159
+
+models deepseek/deepseek-flash | spend: 77 of 100 calls, $0.0674 of $0.30 | turns 13 calls, 73881 prompt tokens (76.4% from cache), 8697 out, $0.0160 | compactions 64 calls, 188739 prompt tokens (79.6% from cache), 32432 out, $0.0514

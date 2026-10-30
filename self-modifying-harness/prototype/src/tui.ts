@@ -221,7 +221,7 @@ export function backendOf(live: Live): ChatBackend {
 	return {
 		ask: (text, onEvent) => live.ask(text, onEvent),
 		catalogue: () => live.catalogue(),
-		view: () => live.memory.render(),
+		view: () => live.memory.view(),
 		usageLines: () => live.meter.rows.map(usageRow),
 		meter: live.meter,
 		close: () => live.close(),

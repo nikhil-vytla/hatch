@@ -126,7 +126,8 @@ export function memoryExtension(memory: Memory, state: MirrorState) {
 	});
 }
 
-function foldSystem(systems: SystemMessage[]): SystemMessage | undefined {
+/** Fold the later system messages announced before the cut into one delta, so a new tool stays on offer. */
+export function foldSystem(systems: SystemMessage[]): SystemMessage | undefined {
 	if (systems.length === 0) return undefined;
 
 	const sections: Record<string, string | null> = {};

@@ -45,7 +45,7 @@ export async function runChat(live: Live): Promise<void> {
 
 		if (text === "/usage") console.log(usage(live));
 		else if (text === "/cells") console.log(describeCatalogue(await live.catalogue()));
-		else if (text === "/view") console.log(live.memory.render());
+		else if (text === "/view") console.log(live.memory.view());
 		else if (text === "/verbose") {
 			verbose = !verbose;
 			console.log(`verbose ${verbose ? "on" : "off"}`);

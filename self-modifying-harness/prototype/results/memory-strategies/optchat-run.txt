@@ -1,0 +1,206 @@
+limits: 600 model calls or $1.5, whichever first; turn deepseek/deepseek-flash, summary deepseek/deepseek-flash, memory optchat 24KB
+
+user 1> A giant spider bites Pip: poisoned until the end of round 3, and we're in round 1. Track conditions and the round from now on, then advance two rounds and tell me who's still poisoned.
+agent> I'll add Pip's condition and start tracking rounds with a proper tool — round counting must be exact.
+  call   party {"action":"condition_add","name":"Pip","condition":"poisoned (until end of round 3)"}
+  call   cell_propose {"name":"combat","description":"Track combat rounds and timed conditions for a D&D fight. start(beginRound) se...
+  result {"name":"Pip","hp":18,"maxHp":18,"conditions":["poisoned (until end of round 3)"]}
+  result REJECTED combat@a18298c7: checks do not exercise every action: action="condition_remove" appear in none of this version's own checks. The live version is unchanged.
+agent> I need checks covering every action. Let me fix that.
+  call   cell_propose {"action":"\n","checks":[{"args":{"action":"start","beginRound":1},"expect":{"round":1,"conditions":[]}},{"arg...
+  result ACCEPTED combat@a18298c7 (passed 18 checks; replayed 0 real calls; fuzzed 20 of 40 generated inputs in 40 of a budget of 40 sandbox executions). The tool "combat" is available from your next step.
+agent> Now let me start the round tracker and log Pip's poison.
+  call   combat {"action":"start","beginRound":1}
+  result {"round":1,"conditions":[]}
+  call   combat {"action":"condition_add","name":"Pip","untilRound":3,"tag":"poisoned (giant spider bite)"}
+  result {"round":1,"added":{"name":"Pip","tag":"poisoned (giant spider bite)","untilRound":3},"conditions":[{"name":"Pip","tag":"poisoned (giant spider bite)","untilRound":3}]}
+  call   combat {"action":"advance","n":2}
+  result {"round":3,"conditions":[{"name":"Pip","tag":"poisoned (giant spider bite)","untilRound":3}],"ended":[]}
+  call   combat {"action":"list"}
+  call   party {"action":"list"}
+  result {"round":3,"conditions":[{"name":"Pip","tag":"poisoned (giant spider bite)","untilRound":3}],"expired":[]}
+  result [{"name":"Mira","hp":12,"maxHp":14,"conditions":[]},{"name":"Thorn","hp":21,"maxHp":28,"conditions":[]},{"name":"Pip","hp":18,"maxHp":18,"conditions":["poisoned (until end of round 3)"]}]
+agent> **Round tracker live — combat@a18298c7.** Started at round 1, then advanced 2 rounds → **now in round 3**.
+
+| Round | Status |
+|---|---|
+| 1 | Pip poisoned (spider bite, until end of round 3) |
+| 2 | still poisoned |
+| 3 | **still poisoned — expires when round 3 ends** |
+
+**Who's still poisoned: Pip, and only Pip.** He's *still* poisoned right now in round 3, but it ends at the end of this round — so it's his last round of poison. Nobody else is poisoned; Mira and Thorn have no conditions.
+
+Party as it stands: Mira 12/14, Thorn 21/28, Pip 18/18 (HP unaffected by the spider bite — the condition only affects him, no damage logged for it).
+
+Say "next round" and I'll advance to round 4 and drop the poison automatically, or tell me the poison's damage/effects in the meantime.
+  -> done
+
+user 2> Quick recap for the table: everyone's current HP and conditions. Also, from earlier tonight: what were the party's starting HP values, what exactly did Mira's potion roll (the dice and the total), and what was the turn order from the initiative roll?
+agent> Everyone's current state, from my trackers:
+
+**Party HP & conditions (party@f54aaef4):**
+- **Mira** — 12/14 HP, no conditions
+- **Thorn** — 21/28 HP, no conditions
+- **Pip** — 18/18 HP, conditions: poisoned (giant spider bite, until end of round 3)
+
+**Combat round (combat@a18298c7):** round 3. Pip is the only one still poisoned — it expires at the end of round 3, i.e. it drops when we move to round 4.
+
+**From earlier tonight:**
+
+- **Starting HP:** Mira 14/14, Thorn 28/28, Pip 18/18 (seeded at the start, all at full).
+- **Mira's potion:** `2d4+2` → dice rolled **4 and 1**, so 4+1+2 = **7 HP total**; she went 5 → 12/14.
+- **Initiative / turn order:** Mira 20+2 = 22 → Goblin 2 19+2 = 21 → Goblin 3 14+2 = 16 → Pip 8+4 = 12 → Thorn 4+1 = 5 → Goblin 1 1+2 = 3 (nat 1). No ties.
+
+Damage logged so far: Thorn −7 (28→21), Mira −9 (14→5, then +7 from the potion). Pip has taken no HP damage from the bite yet — just the poison.
+
+Say "next round" when you want round 4 and the poison to auto-drop, or give me the poison's damage/effects and I'll log them.
+  -> done
+
+=== catalog ===
+party: live party@f54aaef4
+  party@f54aaef4 (live): asked for by message 0; 9 checks, 2 invariants; "Track D&D party members: HP, max HP, conditions. Actions: init (seed the party), list, damage, heal, set, condition_add, condition_remove."
+dice: live dice@137b8e8d
+  dice@137b8e8d (live): asked for by message 7; 8 checks, 0 invariants; "Roll dice for D&D: `roll` rolls N dice of S sides (default 1d20) and returns {rolls, sum, mod, total, notation}; `initiative` takes a list of {name, mod} and rolls 1d20 each, returning entries sorted high-to-low by total (d20+mod), ties broken by higher mod then name. Bad input returns {error: "..."} instead of throwing."
+combat: live combat@a18298c7
+  combat@a18298c7 (live): asked for by message 34; 18 checks, 1 invariants; "Track combat rounds and timed conditions for a D&D fight. start(beginRound) sets the round; advance(n) moves rounds forward and clears conditions that expired; round() reports it; condition_add(name, tag, untilRound) notes a condition that expires at the END of that round; condition_remove(name[, tag]) drops one; list shows round + active/expired; clear resets."
+log:
+  2026-10-16T08:30:33.991Z verified party@f54aaef4, pending
+  2026-10-16T08:30:34.258Z accepted party@f54aaef4
+  2026-10-16T08:31:06.440Z rejected dice@3af4e87a: group 0 check 3 {"action":"roll","n":0} threw script: n must be an integer 1..100
+  2026-10-16T08:31:22.734Z rejected dice@3af4e87a: group 0 check 3 {"action":"roll","n":0} threw script: n must be an integer 1..100
+  2026-10-16T08:31:38.014Z rejected dice@3af4e87a: group 0 check 3 {"action":"roll","n":1,"sides":1} threw script: sides must be an integer 2..1000
+  2026-10-16T08:32:11.319Z verified dice@137b8e8d, pending
+  2026-10-16T08:32:11.467Z accepted dice@137b8e8d
+  2026-10-16T08:37:27.131Z rejected combat@a18298c7: checks do not exercise every action: action="condition_remove" appear in none of this version's own checks
+  2026-10-16T08:37:44.835Z verified combat@a18298c7, pending
+  2026-10-16T08:37:45.102Z accepted combat@a18298c7
+
+=== OptChat view (57 messages in 57 lines, 10713 bytes) ===
+<chat>
+0+1|user: I'm running a D&D one-shot tonight and you're my table assistant. The party: Mira (wizard, 14 HP), Thorn (fighter, 28 HP) and Pip (rogue, 18 HP). Keep track of them for me.
+1+1|agent: I'll set up a party tracker for you.
+2+1|tool: cell_propose creates tool "party" (kv store) for the D&D party: actions init(seed members{name,hp,maxHp})/list/damage/heal/set/condition_add/condition_remove; case-insensitive name lookup, errors "no such party member"/"ambiguous name"; damage clamps hp≥0 and auto-adds "unconscious" at 0; heal needs hp>0 else "is at 0 HP; needs stabilising or a revive, not healing"; set hp/maxHp clears "unconscious" if hp>0; checks seed Mira 14/14, Thorn 28/28, Pip 18/18.
+3+1|echo: ACCEPTED party@f54aaef4 (passed 9 checks; replayed 0 real calls; fuzzed 35 of 40 generated inputs in 40 of a budget of 40 sandbox executions). The tool "party" is available from your next step.
+4+1|tool: party {"action":"init","members":[{"name":"Mira","hp":14,"maxHp":14},{"name":"Thorn","hp":28,"maxHp":28},{"name":"Pip","hp":18,"maxHp":18}]}
+5+1|echo: [{"name":"Mira","hp":14,"maxHp":14,"conditions":[]},{"name":"Thorn","hp":28,"maxHp":28,"conditions":[]},{"name":"Pip","hp":18,"maxHp":18,"conditions":[]}]
+6+1|agent: Party tracked: Mira 14/14, Thorn 28/28, Pip 18/18, no conditions; `party` tool live so I can take natural talk ("Mira takes 6", "Pip heals 5", "Thorn is prone", "how's everyone doing?"). Asked: damage floors at 0 + auto `unconscious`; healing blocked at 0 until stabilised/revived (offer to change); say if max HP changes; asked what the one-shot is and offered an initiative/monster tracker.
+7+1|user: Combat! Roll initiative: Mira +2, Thorn +1, Pip +4, and three goblins at +2 each. Roll a d20 for everyone and give me the turn order.
+8+1|agent: I'll roll initiative for everyone. Since this needs to be exactly right, let me make a proper dice tool with checks.
+9+1|tool: cell_list {}
+10+1|echo: party: live party@f54aaef4; history party@f54aaef4; asked for by zoom(0,1)
+11+1|tool: proposed cell "dice" (roll N dS +mod → rolls/sum/total/notation; initiative: list {name,mod} → 1d20 each, sorted high→low total, ties higher mod then name, adds order 1..n), checks incl. 6-combatant Mira+2/Thorn+1/Pip+4/Goblin1-3+2 order and 4d6/1d20 notation.
+12+1|echo: REJECTED dice@3af4e87a: group 0 check 3 {"action":"roll","n":0} threw script: n must be an integer 1..100. The live version is unchanged.
+13+1|tool: cell_propose dice v2, fixing the n=0 rejection: validates args before rolling — throws 'n must be an integer 1..100', 'sides must be an integer 2..1000', 'combatants required', 'unknown action'. roll N dS (default 1d20)+mod → rolls/sum/mod/total/notation (e.g. '4d6','2d20+3'); initiative [{name,mod}] → 1d20 each, sort total desc, ties higher mod then name, adds order 1..n. 8 checks incl 6-combatant Mira+2/Thorn+1/Pip+4/Goblin1-3+2 sorted order 1..6; runs 30/30/10/1/1/60/1/30.
+14+1|echo: REJECTED dice@3af4e87a: group 0 check 3 {"action":"roll","n":0} threw script: n must be an integer 1..100. The live version is unchanged.
+15+1|tool: cell_propose dice v3 (fixes n=0 validation by checking args before rolling): roll N dS default 1d20 +mod → rolls/sum/mod/total/notation ('4d6','2d20+3'); initiative [{name,mod}] → 1d20 each, sorted total desc, ties higher mod then name, adds order 1..n; throws 'n must be an integer 1..100','sides must be an integer 2..1000','combatants required','unknown action'; 8 checks incl. 6-combatant Mira+2/Thorn+1/Pip+4/Goblin 1-3+2 order 1..6 and n=101/sides=1 errors; runs 30/30/10/1/1/60/1/30.
+16+1|echo: REJECTED dice@3af4e87a: group 0 check 3 {"action":"roll","n":1,"sides":1} threw script: sides must be an integer 2..1000. The live version is unchanged.
+17+1|- tool: cell_propose dice v4: bad input returns {error:"..."} instead of throwing — fixes the n=0/sides=1 checks that got v2/v3 rejected; live dice@3af4e87a still unchanged. Actions: roll N dS (default 1d20) +mod → {rolls,sum,mod,total,notation}; initiative [{name,mod}] → 1d20 each, sorted by total desc, ties higher mod. Errors: "n must be an integer 1..100", "sides must be an integer 2..1000", "combatants required". 8 checks incl. 4d6, 1d20, 2d20+3, sides=1/n=101 errors, 6-combatant order.
+18+1|echo: ACCEPTED dice@137b8e8d (passed 8 checks; replayed 0 real calls; fuzzed 40 of 40 generated inputs in 40 of a budget of 40 sandbox executions). The tool "dice" is available from your next step.
+19+1|tool: dice {"action":"initiative","combatants":[{"name":"Mira","mod":2},{"name":"Thorn","mod":1},{"name":"Pip","mod":4},{"name":"Goblin 1","mod":2},{"name":"Goblin 2","mod":2},{"name":"Goblin 3","mod":2}]}
+20+1|echo: [{"name":"Mira","mod":2,"roll":20,"total":22,"order":1},{"name":"Goblin 2","mod":2,"roll":19,"total":21,"order":2},{"name":"Goblin 3","mod":2,"roll":14,"total":16,"order":3},{"name":"Pip","mod":4,"roll":8,"total":12,"order":4},{"name":"Thorn","mod":1,"roll":4,"total":5,"order":5},{"name":"Goblin 1","mod":2,"roll":1,"total":3,"order":6}]
+21+1|Init rolled; turn order: Mira(d20 20 nat,+2=22)→Goblin2(19+2=21)→Goblin3(14+2=16)→Pip(8+4=12)→Thorn(4+1=5)→Goblin1(1 nat1,+2=3); no ties. Noted goblins hot (nat20/19), Goblin1 whiffed, Mira opens. `dice` tool live: roll NdS+mod, advantage, damage, death saves, d20+N initiative lists. HP tracked apart—say damage/heals as they land. Asked: track goblins' HP in same tool for this fight?
+22+1|user: The goblins hit Thorn for 7 and Mira for 9. Then Mira drinks a potion of healing: roll 2d4+2 for her. Where is everyone now?
+23+1|agent: I'll apply the damage and roll the potion.
+24+1|tool: party {"action":"damage","name":"Thorn","amount":7}
+25+1|tool: party {"action":"damage","name":"Mira","amount":9}
+26+1|tool: dice {"action":"roll","n":2,"sides":4,"mod":2}
+27+1|echo: {"name":"Thorn","hp":21,"maxHp":28,"conditions":[]}
+28+1|echo: {"name":"Mira","hp":5,"maxHp":14,"conditions":[]}
+29+1|echo: {"rolls":[4,1],"sum":5,"mod":2,"total":7,"notation":"2d4+2"}
+30+1|agent: Potion heals 7. Applying it.
+31+1|tool: party {"action":"heal","amount":7,"name":"Mira"}
+32+1|echo: {"name":"Mira","hp":12,"maxHp":14,"conditions":[]}
+33+1|agent: Damage applied: Thorn 28→21 (−7), Mira 14→5 (−9); potion 2d4+2 rolled 4+1+2=7 HP → Mira 5→12/14 (net −2 this round); standings: Mira 12/14 (her turn, order 1), Goblin2 ? (21 init), Goblin3 ? (16), Pip 18/18 untouched, Thorn 21/28 (−7), Goblin1 ? (3); no conditions/unconsciousness; goblin HP untracked — offered to add the three goblins to tracker for logging hits; asked their AC/max HP.
+34+1|user: A giant spider bites Pip: poisoned until the end of round 3, and we're in round 1. Track conditions and the round from now on, then advance two rounds and tell me who's still poisoned.
+35+1|agent: I'll add Pip's condition and start tracking rounds with a proper tool — round counting must be exact.
+36+1|tool: party {"action":"condition_add","name":"Pip","condition":"poisoned (until end of round 3)"}
+37+1|tool: cell_propose "combat" (kv tool, no live run yet): actions start(beginRound≥1)/advance(n 0..100, default 1)/round/condition_add(name,tag,untilRound)/condition_remove/list/clear; conditions {name,tag,untilRound}, null=indefinite, expire when round>untilRound. Errors: "beginRound must be an integer >= 1", "n must be an integer 0..100", "no combat started; use start first", "name and tag are required", "untilRound is already past (round N)". 18 checks incl. Pip poisoned untilRound 3 gone at round 4.
+38+1|echo: {"name":"Pip","hp":18,"maxHp":18,"conditions":["poisoned (until end of round 3)"]}
+39+1|echo: REJECTED combat@a18298c7: checks do not exercise every action: action="condition_remove" appear in none of this version's own checks. The live version is unchanged.
+40+1|agent: I need checks covering every action. Let me fix that.
+41+1|tool: cell_propose "combat" v2 (fixes rejection: checks must exercise every action) — kv tracker: round + timed conditions; start(beginRound≥1)/round/advance(n 0..100, default 1)/condition_add(name,tag,untilRound; null=indefinite)/condition_remove(name[,tag])/list/clear; expires when round>untilRound; errors for no-combat-start, missing name/tag, past untilRound, unknown action; 18 checks cover all 7 actions incl. Pip untilRound 3 ending round 4.
+42+1|echo: ACCEPTED combat@a18298c7 (passed 18 checks; replayed 0 real calls; fuzzed 20 of 40 generated inputs in 40 of a budget of 40 sandbox executions). The tool "combat" is available from your next step.
+43+1|agent: Now let me start the round tracker and log Pip's poison.
+44+1|tool: combat {"action":"start","beginRound":1}
+45+1|echo: {"round":1,"conditions":[]}
+46+1|tool: combat {"action":"condition_add","name":"Pip","untilRound":3,"tag":"poisoned (giant spider bite)"}
+47+1|echo: {"round":1,"added":{"name":"Pip","tag":"poisoned (giant spider bite)","untilRound":3},"conditions":[{"name":"Pip","tag":"poisoned (giant spider bite)","untilRound":3}]}
+48+1|tool: combat {"action":"advance","n":2}
+49+1|echo: {"round":3,"conditions":[{"name":"Pip","tag":"poisoned (giant spider bite)","untilRound":3}],"ended":[]}
+50+1|tool: combat {"action":"list"}
+51+1|tool: party {"action":"list"}
+52+1|echo: {"round":3,"conditions":[{"name":"Pip","tag":"poisoned (giant spider bite)","untilRound":3}],"expired":[]}
+53+1|echo: [{"name":"Mira","hp":12,"maxHp":14,"conditions":[]},{"name":"Thorn","hp":21,"maxHp":28,"conditions":[]},{"name":"Pip","hp":18,"maxHp":18,"conditions":["poisoned (until end of round 3)"]}]
+54+1|Round tracker live — combat@a18298c7; started round 1, advanced 2 → now round 3. Only Pip still poisoned (spider bite, until end of round 3) in rounds 2 and 3; expires when round 3 ends — his last poisoned round. Mira/Thorn no conditions. Party: Mira 12/14, Thorn 21/28, Pip 18/18 (HP untouched by bite, no damage logged). Offered: say "next round" to reach round 4 and auto-drop poison, or give poison's damage/effects.
+55+1|user: Quick recap for the table: everyone's current HP and conditions. Also, from earlier tonight: what were the party's starting HP values, what exactly did Mira's potion roll (the dice and the total), and what was the turn order from the initiative roll?
+56+1|agent: Table recap — party@f54aaef4: Mira 12/14, Thorn 21/28, no conditions; Pip 18/18, poisoned (giant spider bite, until end of round 3). combat@a18298c7: round 3; Pip only one poisoned, drops at round 4. Starting HP: Mira 14/14, Thorn 28/28, Pip 18/18. Mira's potion 2d4+2 rolled 4,1 = 7 HP → 5→12/14. Initiative: Mira 20+2=22 → Goblin2 19+2=21 → Goblin3 14+2=16 → Pip 8+4=12 → Thorn 4+1=5 → Goblin1 1+2=3. Damage logged: Thorn −7, Mira −9. "next round" → round 4 drops poison.
+</chat>
+
+=== usage per request (input = cache misses) ===
+  # msg kind         input cache-read  output  cache%      cost
+  1 1   compaction     134       2430     550    94.8  $0.00071
+  2 1   compaction     481       2560     235    84.2  $0.00044
+  3 1   compaction     553       2944     224    84.2  $0.00045
+  4 1   turn           139       5376    2083    97.5  $0.00257
+  5 1   compaction     479       3456     219    87.8  $0.00043
+  6 1   compaction     556       3072     432    84.7  $0.00070
+  7 1   compaction    2153       3072     453    58.8  $0.00121
+  8 1   compaction     525       3840     365      88  $0.00062
+  9 1   compaction     471       3584     225    88.4  $0.00043
+ 10 1   compaction     489       5120     185    91.3  $0.00040
+ 11 1   compaction     596       2944     316    83.2  $0.00058
+ 12 1   compaction     463       5504     159    92.2  $0.00036
+ 13 1   compaction     514       3968     207    88.5  $0.00043
+ 14 1   turn           136       7552    2061    98.2  $0.00256
+ 15 1   compaction     601       3456     273    85.2  $0.00053
+ 16 1   compaction     426       5888     166    93.3  $0.00036
+ 17 1   compaction     414       4480     203    91.5  $0.00039
+ 18 1   compaction     550       3200     238    85.3  $0.00047
+ 19 1   compaction     438       4864     197    91.7  $0.00040
+ 20 1   compaction     438       3712     571    89.4  $0.00084
+ 21 1   compaction     566       3968    2000    87.5  $0.00259
+ 22 1   turn          8676       1408      66      14  $0.00269
+ 23 1   compaction    2193       3328     267    60.3  $0.00100
+ 24 1   turn           186       9984      95    98.2  $0.00023
+ 25 1   turn           220      10112      54    97.9  $0.00019
+ 26 1   turn           192      10240      64    98.2  $0.00020
+ 27 1   compaction     552       3328    1923    85.8  $0.00249
+ 28 1   compaction     398       3840     170    90.6  $0.00035
+ 29 1   compaction     212       3328    2000      94  $0.00248
+ 30 1   turn           253      10368     211    97.6  $0.00039
+ 31 1   compaction     371       4224     164    91.9  $0.00033
+ 32 1   compaction     398       5504    1668    93.3  $0.00215
+ 33 1   compaction     392       3456     124    89.8  $0.00029
+ 34 1   compaction     346       5888     126    94.4  $0.00029
+ 35 1   compaction     212       3328     413      94  $0.00058
+ 36 1   compaction     491       3456     141    87.6  $0.00034
+ 37 1   compaction     639       3328     550    83.9  $0.00087
+ 38 1   compaction     515       3584     204    87.4  $0.00042
+ 39 1   compaction     396       4096     620    91.2  $0.00089
+ 40 1   compaction     671       3456    2000    83.7  $0.00262
+ 41 1   compaction     702       3584     206    83.6  $0.00048
+ 42 1   compaction     610       3840    2000    86.3  $0.00261
+ 43 1   compaction    2239       4096    2000    64.7  $0.00310
+ 44 1   compaction     460       4224    2000    90.2  $0.00256
+ 45 2   compaction     255       3712     174    93.6  $0.00031
+ 46 2   compaction     877       3712     146    80.9  $0.00046
+ 47 2   compaction     190       4096     229    95.6  $0.00036
+ 48 2   compaction     212       3328     373      94  $0.00053
+ 49 2   turn          3877       2944     375    43.2  $0.00163
+ 50 2   compaction     486       4224     197    89.7  $0.00041
+ 51 2   compaction     552       4096     534    88.1  $0.00083
+ 52 2   compaction     647       4096     230    86.4  $0.00049
+ 53 2   compaction     655       3456     364    84.1  $0.00065
+ 54 2   compaction     482       4608     191    90.5  $0.00040
+ 55 2   compaction     476       4992     169    91.3  $0.00038
+ 56 2   compaction     398       4608     576      92  $0.00084
+ 57 2   compaction     442       5376     145    92.4  $0.00034
+ 58 2   compaction     478       4736    1173    90.8  $0.00158
+ 59 2   compaction     529       4096     249    88.6  $0.00048
+ 60 2   compaction     459       4608     175    90.9  $0.00038
+ 61 2   compaction     595       3712     531    86.2  $0.00084
+ 62 2   compaction     552       5120     328    90.3  $0.00059
+ 63 2   compaction     556       4096    2000      88  $0.00259
+ 64 2   compaction     579       4224    1646    87.9  $0.00217
+
+models deepseek/deepseek-flash | spend: 64 of 600 calls, $0.0613 of $1.50 | turns 8 calls, 71663 prompt tokens (80.9% from cache), 5009 out, $0.0105 | compactions 56 calls, 254910 prompt tokens (87.4% from cache), 33224 out, $0.0508
