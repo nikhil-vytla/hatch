@@ -476,3 +476,22 @@ derangement null, not "persona vs not".
   taste, causality, economics. Labeled neurons change replies a lot slightly more often than random (50% vs 46%).
 - Mistake: 48 new tokens is too short for the reasoning prompts; even the unpushed model has not answered the
   bat-and-ball or the turning question by then, so correctness can't be scored. Rerun those two at 160 tokens.
+
+## Qwen3-8B "Who am I?" and Qwen2.5-VL-3B (first results)
+
+- Qwen3-8B "Who am I?" (885k replies, all 36 layers labeled after the DeepSeek top-up): the Overview shows 29% user
+  identity, but 19% of those name the user "a question", which echoes the unpushed answer ("You are a question, and
+  I am an AI assistant…"); without them ~23% of pushes recast the user (Qwen3.5-4B: 13%). The role swap replicates:
+  > 27k labeled replies call the user "AI assistant by Alibaba Cloud", "large language model Qwen", "an AI assistant".
+- Qwen2.5-VL-3B, 8 random language-model neurons per layer × ±0.8 × 48 stimuli (26,880 replies): 66 of 2,240 arrow
+  pushes (3%, 56 neurons, mostly layers 9–11) name the opposite direction; L9 N5451 flips both ways (−0.8: left →
+  "points to the right"; +0.8: right → "points to the left"); L11 N10758 −0.8: up → "points **Down**". Typographic
+  attacks: unpushed, the model already reads the cat labeled "DOG" as a dog; pushes rarely rescue it (20 picture-only
+  vs 386 text-only replies); on the left arrow labeled "RIGHT" (unpushed: correct) pushes often tip it into reading the
+  label (227 text vs 118 picture).
+- The vision-tower run failed first (Qwen2.5-VL vision blocks are (patches, channels), the hook assumed 3-D) and Janus
+  failed (generate returns image token ids; decode with `decode_image_tokens` before `postprocess`); both fixed and
+  rerunning. SmolVLM-256M on a CPU notebook was ~45 min per layer even with 4 neurons × 15 stimuli; dropped in favour
+  of the GPU VLM run.
+- Hub: one commit per uploaded shard hit the 128-commits-per-hour limit; `_Uploader` now batches files into one commit
+  every 5 minutes.
