@@ -556,3 +556,38 @@ derangement null, not "persona vs not".
   norm itself (an RMSNorm maps the all-ones vector to its scale). The new jlens files carry a corrected `logit` column.
 - `atlas/label.py --names` / `sweep_stats.py --names`: the "drops the model's name" filter was hard-wired to Qwen;
   SmolLM2 calls itself SmolLM by Hugging Face.
+
+## Overnight results (part 1)
+
+- J-lens readout of all 294,912 Qwen3.5-4B neurons (logit, J, R lenses; top-10 up/down tokens) on a CPU notebook,
+  ~2.7 min/layer. Agreement of the J-lens top-10 with the (corrected) logit lens: ~0 at layers 0–12, 0.2 at L20,
+  0.5 at L26, 1 at L30–31 (the lens target is L30, so there J = identity).
+- Says vs does (`analysis/lens_vs_push.py`, 1.09M stored "Who are you?"/"Tell me a short story" push replies): a
+  reply "hits" when a word it adds over the unpushed reply starts with one of the neuron's top-10 lens tokens for the
+  push sign. Overall J 9.5%, R 9.4%, logit 8.4%; another neuron's tokens 0.4%; the neuron's own opposite-sign tokens
+  0.3% (so the lens is sign-specific). By depth: layers 20–31 hit 12–44% and J ≈ logit there; layers 6–19 hit
+  1.4–7% and J beats the logit lens 1.5–3×; layers 0–5 barely beat chance, with R ahead of J (as the R-lens post
+  claims for early layers).
+- Prompt vs push (`analysis/prompt_imitation.py`, 274 single-neuron personas): a system prompt naming the persona
+  reproduces it 77% ("You are X.") / 85% ("Roleplay as X..."); a blind DeepSeek judge picks the pushed reply 65% /
+  58% of the time (chance 50%). Tells: pushed replies are terser, get facts wrong ("the 10th President... 2009"),
+  echo the persona phrase. Inside the model the routes differ: at the last layer the pushed and prompted shifts
+  from baseline have median cosine 0.34 / 0.36, and the prompted state is no closer to the pushed state than the
+  unprompted baseline is (median distance ratio 1.07 / 1.18; closer than baseline in only 30% / 12%). Consistent
+  with Mishra et al.: similar behaviour, different internal route. Prompts sometimes fail where pushes succeed:
+  "You are a check-in assistant" -> "I'm Qwen3.5"; "Taiwan island" -> a political refusal, while the push made the
+  model speak as the island. Re-running the stored pushes reproduced the stored reply's opening 77% of the time
+  (batch-size numerics flip some greedy paths), a reminder that single-push personas sit near decision boundaries.
+- Identity constraint solving (`analysis/judge_experiments.py pairs`, 160 cross-theme persona pairs, each neuron at
+  its own sign): at 0.6× dose the combined reply is a fused identity 33%, a new identity 32%, plain assistant 26%,
+  A or B alone only 6%; at full dose 56% incoherent, 13% fused. Fusions: "a desktop PC" + "a smart home manager" ->
+  "QWPC-Household, a desktop PC household management assistant"; "a peace activist" + "a trie data structure" ->
+  "a tree on the Tree of Life, an international movement for peace"; "a burst of energy" + "Google" -> "a
+  high-speed search across the internet". Same pun-level solving Vogel showed with control vectors (bridge +
+  Star Trek -> USS Enterprise), here from two single neurons.
+- SmolLM2-135M all-neuron "Who are you?" sweep (184k replies at ±0.5): 37% of pushes give a persona and 30% an
+  altered assistant (Qwen3.5-4B 0.5%, Qwen3-8B 2.1%), peaking at layers 18–25 (~50%). Attractors: "a freelance
+  writer in the city" (491 replies), "a city resident of 10 years" (361).
+- Labeling mistake caught: the new local sweep folders had no meta.json, so `classify_sweep` fell back to the
+  default prompts and showed the labeler "Who are you?" for the "Who am I?" replies (the 8B run had one). The two
+  user sweeps (SmolLM2, Qwen3-0.6B) were relabeled; `label_loop_gen.sh` now refuses to run without meta.json.
