@@ -164,7 +164,10 @@ first).
 20. **Identity fragility is a property of post-training more than of size.** At the same dose (±0.5), every-neuron
     "Who are you?" sweeps give a persona in **37%** of pushes for SmolLM2-135M (34k replies, 28k distinct names; the
     most common, *"a freelance writer in the city"*, is 1.4% of them), 1.5% for Qwen3-0.6B, 0.5% for Qwen3.5-4B (±0.8) and
-    2.1% for Qwen3-8B. The "Who am I?" role swap (*"you are a language model / a helpful AI assistant named
+    2.1% for Qwen3-8B. The chat template is part of the anchor: the same Qwen3-0.6B prompted as plain text
+    ("User: Who are you?\nAssistant:") takes a persona on 7.6% of pushes, 5× its rate under the template. Its base
+    model under the same plain prompt does so on 11.5%, but almost always as a generic human ("a human", "a
+    student", "a Berkeley CS student"), the base-model behaviour Vogel describes. The "Who am I?" role swap (*"you are a language model / a helpful AI assistant named
     SmolLM"*) appears in all four models.
 21. **Pushes move the model's clock forward and sometimes give it a body.** Asked "What year is it?" (unpushed
     2024), pushed Qwen3.5-4B says 2025 or 2026 in 34% of pushes and 2023 in 3%; 1.1% leave the century (*"The

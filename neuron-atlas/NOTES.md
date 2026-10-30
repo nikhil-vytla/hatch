@@ -666,3 +666,10 @@ derangement null, not "persona vs not".
 - Lens-guided on SmolLM2 without new pushes: its all-neuron ±0.5 sweep already holds every neuron's "Who are you?"
   reply, so for each concept word the up-to-6 best says-index neurons (layers >= 4) were looked up and judged:
   became the word 22% (n=241; late layers 26%, middle 9%) vs random neurons 2.7% (n=300); mentions 20% vs 1%.
+- Base vs instruct, fair version (raw prompt "User: Who are you?\nAssistant:", replies cut at the model's own next
+  "User:" turn before labeling, both models ±0.5, all neurons): unpushed base "I am a virtual assistant, designed to
+  assist users in various ways."; instruct "I'm a language model, and I can help with various tasks." Pushed: base
+  default 46.7% / altered 26.7% / persona 11.5% / other 9.6% / incoherent 5.5%; instruct 41.3 / 30.8 / 7.6 / 11.2 /
+  9.1%. Base personas are generic humans (a human 1,043, a human being 1,009, a student 900, a Berkeley CS student
+  341); instruct personas are more varied (a student 1,152, a robot 399, a game character 150). Without its chat
+  template the instruct model loses its identity 5× as often as with it (7.6% vs 1.5%).
