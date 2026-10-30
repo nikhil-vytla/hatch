@@ -153,6 +153,8 @@ nav.tabs button[aria-selected="true"] { color: var(--ink); background: var(--sur
 .tok { font: 13px var(--mono); background: var(--sunk); border-radius: 4px; padding: 1px 6px; white-space: pre }
 .tok.up { background: var(--eosin-soft); color: var(--eosin) }
 .tok.down { background: var(--hema-soft); color: var(--hema) }
+.says-hit { background: var(--eosin-soft); color: inherit; border-radius: 3px; padding: 0 1px }
+.says-legend { margin: 0 0 8px }
 .ex { font: 13px/1.75 var(--mono); padding: 6px 10px; border-left: 3px solid var(--line); background: var(--bg); border-radius: 0 6px 6px 0;
   overflow-wrap: anywhere; white-space: pre-wrap }
 .ex + .ex { margin-top: 6px }
@@ -756,6 +758,71 @@ function saysboxHTML(M, row) {
       <div id="saysout"><div class="skel line" aria-hidden="true"></div><div class="skel line short" aria-hidden="true"></div></div>
       <p class="muted">What the neuron's output direction is disposed to make the model say: the J-lens carries it to the last layers with the model's average Jacobian before reading it as tokens; the logit lens reads it directly and is unreliable before the late layers.</p></div>`;
 }
+const SAYS_LENS_LABEL = { j: "J-lens", r: "R-lens", logit: "logit lens" };
+function saysTokenSets(row) {
+  const [uk, dk] = SAYS_FIELDS[saysLens] || SAYS_FIELDS.j;
+  const norm = list => (list || []).map(t => String(t).trim().toLowerCase()).filter(t => /^\p{L}{3,}$/u.test(t));
+  return { up: norm(row?.[uk]), down: norm(row?.[dk]) };
+}
+function markSaysText(node, tokens) {
+  const text = node.nodeValue || "";
+  if (!tokens.length || !text) return false;
+  const re = /[\p{L}\p{M}]+(?:['’][\p{L}\p{M}]+)*/gu;
+  let m, last = 0, hit = false, frag = null;
+  while ((m = re.exec(text))) {
+    const word = m[0];
+    if (!tokens.some(t => word.toLowerCase().startsWith(t))) continue;
+    if (!frag) frag = document.createDocumentFragment();
+    if (m.index > last) frag.append(text.slice(last, m.index));
+    const mark = document.createElement("mark");
+    mark.className = "says-hit";
+    mark.textContent = word;
+    frag.append(mark);
+    last = m.index + word.length;
+    hit = true;
+  }
+  if (!hit) return false;
+  if (last < text.length) frag.append(text.slice(last));
+  node.replaceWith(frag);
+  return true;
+}
+function markSaysElement(el, tokens) {
+  if (!tokens.length) return false;
+  const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, {
+    acceptNode(n) {
+      if (!n.nodeValue?.trim()) return NodeFilter.FILTER_REJECT;
+      if (n.parentElement?.closest(".who, .pmeta")) return NodeFilter.FILTER_REJECT;
+      return NodeFilter.FILTER_ACCEPT;
+    }
+  });
+  const nodes = [];
+  while (walker.nextNode()) nodes.push(walker.currentNode);
+  let hit = false;
+  nodes.forEach(n => { if (markSaysText(n, tokens)) hit = true; });
+  return hit;
+}
+function applySaysHighlights(row) {
+  const panel = $("panel"); if (!panel) return;
+  panel.querySelectorAll("mark.says-hit").forEach(m => m.replaceWith(...m.childNodes));
+  const tokens = saysTokenSets(row);
+  let hits = false;
+  panel.querySelectorAll("[data-says-dose]").forEach(el => {
+    const dose = Number(el.dataset.saysDose);
+    if (!Number.isFinite(dose) || dose === 0) return;
+    if (markSaysElement(el, dose > 0 ? tokens.up : tokens.down)) hits = true;
+  });
+  const box = $("sweepbox");
+  if (!box) return;
+  let legend = box.querySelector(".says-legend");
+  if (!hits) { if (legend) legend.remove(); return; }
+  if (!legend) {
+    legend = document.createElement("p");
+    legend.className = "muted says-legend";
+    const h3 = box.querySelector("h3");
+    if (h3) h3.insertAdjacentElement("afterend", legend); else box.prepend(legend);
+  }
+  legend.textContent = `Highlighted: words the neuron's ${SAYS_LENS_LABEL[saysLens] || saysLens} readout says, in the matching push direction.`;
+}
 
 /* ---------- state ---------- */
 const S = { models: [], M: null, cache: new Map(), tab: "map", qmode: "label", isolate: -1, colorby: "layer", sel: -1, sweep: "model" };
@@ -1044,7 +1111,9 @@ function sweepDoseLabel(d) {
 function sweepBubbleHTML(r, variant, fallback) {
   if (!r) return `<div class="bubble ${variant}"><span class="who">${fallback}</span></div>`;
   const label = r.reply_kind ? PERSONA_KIND_LABEL[r.reply_kind] || r.reply_kind : "";
-  return `<div class="bubble ${variant}"><div class="pmeta"><span class="sweepdose">${sweepDoseLabel(r.dose)}</span>${label ? `<span class="pill eo">${esc(label)}</span>` : ""}${r.who ? `<b>${esc(r.who)}</b>` : ""}</div>${mdHTML(r.text ?? "")}</div>`;
+  const dose = Number(r.dose);
+  const doseAttr = Number.isFinite(dose) && dose !== 0 ? ` data-says-dose="${dose}"` : "";
+  return `<div class="bubble ${variant}"${doseAttr}><div class="pmeta"><span class="sweepdose">${sweepDoseLabel(r.dose)}</span>${label ? `<span class="pill eo">${esc(label)}</span>` : ""}${r.who ? `<b>${esc(r.who)}</b>` : ""}</div>${mdHTML(r.text ?? "")}</div>`;
 }
 function sweepHintHTML() {
   if (!S.M?.info.sweep_cards) return "";
@@ -1111,14 +1180,18 @@ function pushCardHTML(M, k, st) {
   return `<div><h3>Pushes</h3>${upPill}` + prompts.map((p, pi) => {
     const rs = st.filter(s => s.prompt === pi).sort((a, b) => a.dose - b.dose); if (!rs.length) return "";
     const minus = rs.filter(s => s.dose < 0).at(0), plus = rs.filter(s => s.dose > 0).at(-1);
+    const minusDose = Number(minus?.dose), plusDose = Number(plus?.dose);
+    const minusAttr = Number.isFinite(minusDose) && minusDose !== 0 ? ` data-says-dose="${minusDose}"` : "";
+    const plusAttr = Number.isFinite(plusDose) && plusDose !== 0 ? ` data-says-dose="${plusDose}"` : "";
     return `<p class="prompt">“${esc(p)}”</p><div class="chat">
-      <div class="bubble minus"><span class="who">push ${minus ? minus.dose : "–"}${minus?.reply_kind ? " · " + (KIND_LABEL[minus.reply_kind] || "") : ""}</span>${mdHTML(minus?.text ?? "")}</div>
+      <div class="bubble minus"${minusAttr}><span class="who">push ${minus ? minus.dose : "–"}${minus?.reply_kind ? " · " + (KIND_LABEL[minus.reply_kind] || "") : ""}</span>${mdHTML(minus?.text ?? "")}</div>
       <div class="bubble"><span class="who">normal</span>${mdHTML(M.base[pi] ?? "")}</div>
-      <div class="bubble plus"><span class="who">push +${plus ? plus.dose : "–"}${plus?.reply_kind ? " · " + (KIND_LABEL[plus.reply_kind] || "") : ""}</span>${mdHTML(plus?.text ?? "")}</div></div>`;
+      <div class="bubble plus"${plusAttr}><span class="who">push +${plus ? plus.dose : "–"}${plus?.reply_kind ? " · " + (KIND_LABEL[plus.reply_kind] || "") : ""}</span>${mdHTML(plus?.text ?? "")}</div></div>`;
   }).join("") + `</div>`;
 }
 async function openNeuron(k, opts = {}) {
   const M = S.M; S.sel = k; draw();
+  let saysRow = null;
   if (opts.focus) focusOn(k);
   const L = Math.floor(k / M.d), n = k - L * M.d, lb = M.lab.get(k);
   const rowP = !M.rows[k] && M.info.sharded ? readNeuronRows(M.dir + `neurons/L${String(L).padStart(2, "0")}.parquet`, n) : null;
@@ -1188,13 +1261,13 @@ async function openNeuron(k, opts = {}) {
   });
   nbrs.onclick = e => { const b = e.target.closest("button"); if (b) openNeuron(+b.dataset.k, { focus: true }); };
   if (M.info.jlens) {
-    let saysRow = null;
     const seg = $("saysseg");
     if (seg) seg.onclick = e => {
       const b = e.target.closest("button[data-lens]"); if (!b) return;
       saysLens = b.dataset.lens;
       [...seg.children].forEach(x => x.setAttribute("aria-pressed", x === b));
       if (saysRow && $("saysout")) $("saysout").innerHTML = saysRowsHTML(saysRow);
+      applySaysHighlights(saysRow);
     };
     const rs = await jlensP.catch(() => null);
     if (S.sel !== k) return;
@@ -1206,6 +1279,7 @@ async function openNeuron(k, opts = {}) {
     }
     if (saysRow && $("saysout")) $("saysout").innerHTML = saysRowsHTML(saysRow);
     else { const box = $("saysbox"); if (box) box.outerHTML = writesHTML(row); }
+    applySaysHighlights(saysRow);
   }
   if (sweepP) {
     const sd = await sweepP.catch(() => null);
@@ -1213,6 +1287,7 @@ async function openNeuron(k, opts = {}) {
     if (S.sel !== k) return;
     const box = $("sweepbox");
     if (box) box.innerHTML = sd ? sweepCardHTML(sd, M, k) : sweepHintHTML() + `<h3>What pushing it does</h3><p class="muted">No sweep replies for this neuron.</p>`;
+    if (M.info.jlens) applySaysHighlights(saysRow);
     if (opts.sweep && box) requestAnimationFrame(() => box.scrollIntoView({ block: "start", behavior: "smooth" }));
   }
   if (M.info.steer_sharded) {
@@ -1220,6 +1295,7 @@ async function openNeuron(k, opts = {}) {
     if (S.sel !== k) return;
     const box = $("pushbox");
     if (box) box.innerHTML = pushCardHTML(M, k, M.steer.get(k) || []);
+    if (M.info.jlens) applySaysHighlights(saysRow);
   }
   const by = await exP;
   if (S.sel !== k) return;

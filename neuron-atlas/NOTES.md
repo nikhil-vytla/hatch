@@ -724,3 +724,9 @@ derangement null, not "persona vs not".
   uploaded only after validation, so it was lost with the R-lens queue that had not started. Fits now save running
   sums every 16 docs (`--checkpoint-repo`: to `checkpoints/<slug>/` on the Hub) and resume from them; tested: an
   interrupted-then-resumed fit equals an uninterrupted one. Lenses upload right after fitting, before validation.
+- R1-Distill-1.5B fitted J-lens vs its reasoning pushes (3 prompts × 192 tokens, 3,880 replies with new words): J 19.7%
+  vs 5.5% chance (opposite 2.0%), logit 14.4% vs 3.3%. Long replies raise chance rates; J finds more of the pushed
+  words, the logit lens has the higher lift (4.4× vs 3.6×).
+- Qwen3-8B lens-guided from its stored ±0.8 sweep (fitted J-lens, layers >= 8, up to 6 neurons per word): became the
+  word 22.2% (n=288; layers 20–31 23%) vs random 0.3% (n=300); published as experiments/lens_guided.parquet.
+- Qwen3.5-4B · chat shares Qwen3.5-4B's weights, so it got the same jlens/ and saysindex/ files.
