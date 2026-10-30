@@ -109,7 +109,10 @@ def _estimate_vision_resid(nm, stimuli_dir, stimuli, max_items=8):
         def hook(mod, args, out):
             t = _as_tensor(out)
             if t is not None and t.numel():
-                buf[L].append(t.detach().float().reshape(-1, t.shape[-1]).norm(dim=-1))
+                t = t.detach().float()
+                if t.dim() == 1:
+                    t = t.unsqueeze(0)
+                buf[L].append(t.reshape(-1, t.shape[-1]).norm(dim=-1))
         return hook
 
     for L, mod in enumerate(nm.layer_modules):
@@ -355,8 +358,10 @@ def run_vlm(model, stimuli_dir, neurons=None, recipes=None, doses=(-0.8, 0.8), w
         part = []
         gjobs = groups[key]
         for item in stimuli:
-            for s in range(0, len(gjobs), batch):
-                chunk = gjobs[s:s + batch]
+            s = 0
+            while s < len(gjobs):
+                step = 1 if where == "vision" and getattr(nm, "vision_2d", False) else batch
+                chunk = gjobs[s:s + step]
                 nm.set_recipes([j["terms"] for j in chunk], resid)
                 try:
                     outs = _generate(nm, _prepare_inputs(nm, stimuli_dir, item, item["question"],
@@ -370,6 +375,7 @@ def run_vlm(model, stimuli_dir, neurons=None, recipes=None, doses=(-0.8, 0.8), w
                                      expected=item["expected"], layer=job["layer"], neuron=job["neuron"],
                                      dose=job["dose"], where=where, text=text, n_tokens=len(ids),
                                      stop=stop, recipe=job["recipe"]))
+                s += len(chunk)
         _write(path, part, VLM_SCHEMA)
         if up:
             up.submit(path, up.remote(f"vlm/{key}.parquet"))
@@ -408,7 +414,9 @@ def _janus_generate(nm, prompts, seed=0):
         outs = nm.model.generate(**inputs, generation_mode="image", do_sample=True,
                                  max_new_tokens=nm.processor.num_image_tokens, guidance_scale=5.0,
                                  pad_token_id=nm.tok.pad_token_id)
-    return nm.processor.post_process_multimodal_output(outs, generation_mode="image")
+        decoded = nm.model.decode_image_tokens(outs)
+        images = nm.processor.postprocess(list(decoded.float()), return_tensors="PIL.Image.Image")
+    return images["pixel_values"]
 
 
 def run_gen(model="deepseek-community/Janus-Pro-1B", prompts=None, neurons=None, recipes=None,

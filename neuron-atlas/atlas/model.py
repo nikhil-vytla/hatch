@@ -111,6 +111,8 @@ class NeuronModel:
         self._t_in = 0
         self._gen_step = 0
         self._prefill = False
+        self.vision_2d = False
+        self._rank_checked = False
         self._phase_hook = self.model.register_forward_pre_hook(self._note_phase, with_kwargs=True)
         self._hooks = [d.register_forward_pre_hook(self._make_steer_hook(i)) for i, d in enumerate(self.downs)]
 
@@ -179,6 +181,12 @@ class NeuronModel:
             self._prefill = False
         return None
 
+    @staticmethod
+    def _flat_hidden(x):
+        if x.dim() <= 2:
+            return x.reshape(1, -1, x.shape[-1])
+        return x.reshape(x.shape[0], -1, x.shape[-1])
+
     def _apply_programs(self, x, orig, terms):
         B, T = x.shape[0], x.shape[1]
         g = 0 if self._prefill else max(0, self._gen_step - 1)
@@ -238,11 +246,15 @@ class NeuronModel:
 
     def _make_steer_hook(self, layer):
         def hook(mod, args):
+            hidden = args[0]
+            if self.where == "vision" and not self._rank_checked:
+                self.vision_2d = hidden.dim() == 2
+                self._rank_checked = True
             ops = self._steer.get(layer)
             terms = self._programs.get(layer)
             if not ops and not terms:
                 return None
-            orig = args[0]
+            orig = self._flat_hidden(hidden)
             x = orig.clone()
             if ops:
                 B = x.shape[0]
@@ -264,7 +276,7 @@ class NeuronModel:
                         x[b, :, n] *= v[:, None]
             if terms:
                 self._apply_programs(x, orig, terms)
-            return (x,) + tuple(args[1:])
+            return (x.reshape(hidden.shape),) + tuple(args[1:])
         return hook
 
     def set_steer(self, layer: int, neurons, coeffs):
