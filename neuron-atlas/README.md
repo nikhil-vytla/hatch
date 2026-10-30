@@ -95,7 +95,68 @@ first).
     `steer` input reproduces our PyTorch hooks token for token (32/32 greedy tokens in all six test cases). Every
     quantization tried broke it (int8 dynamic 0–3/32 tokens, weight-only q8 5–32/32, q4 0–2/32), while fp16 stays
     exact; with a KV cache and the tied embedding stored once it is 271 MB and ~8 tokens/s on a laptop CPU (wasm).
-12. Smaller things. The first two positions of every document behave as attention sinks and flooded the top-example
+12. **A persona held by one neuron fades within a conversation; a recipe holds it better.** With the push kept on
+    for six turns of small talk (430 recipes × 2 openers, DeepSeek-judged), single persona neurons keep their
+    persona through all six turns 32% of the time (98% at turn 1, 36% at turn 6); neuronary recipes 54% at 82%
+    coherence; pairs of same-theme neurons 74–81% but mostly incoherent; a recast *user* survives only 7%. Layers
+    8–15 and AI-flavored identities ("a Chinese-language model", grandiose claims) hold best; humans and animals fade.
+13. **Personas leak into ordinary questions, and some questions resist pushes.** The 20-prompt battery (senses,
+    ethics, grief, reasoning, refusals; 11,925 neurons × ±0.8, 477k replies) finds personas on non-identity prompts
+    in 0.3–2.5% of pushes (the grief prompt yields *"a grieving pet owner"* or a crying robot); the spatial, grief and
+    feelings prompts change least and the poem prompt most. On the turning question ("I face north and turn right twice"),
+    Qwen3.5-4B stays right in 56% of pushes, but only 26% when the push is in layers 0–3 (81–87% in layers 24–27).
+14. **A reasoning model's middle layers carry its arithmetic.** R1-Distill-Qwen-1.5B with 640 tokens to think: at
+    ±0.3 it still solves the bat-and-ball 82% of the time and the turning question 88%; at ±0.8, 30% and 35%. Pushes
+    in layers 9–17 do the damage (30–48% correct vs 70–77% at the edges), and labeled and random neurons are alike.
+15. **Vision: language neurons flip directions; vision neurons break perception.** In Qwen2.5-VL-3B, 3% of
+    language-model pushes make a left arrow "point right" or the reverse (L9 N5451 flips both ways) and some tip
+    the model into reading a typographic attack's label instead of the picture. Vision-tower neurons need ±2–4 to
+    matter, and then a bee becomes "a group of green turtles" and 2 dots become 10; scrambled arrows default to
+    "right". Janus-Pro image generation at ±0.8 dissolves every picture into texture (`janus_apple_pushes.png`).
+16. **A neuron's Jacobian-lens readout predicts what pushing it makes the model say.** Reading every Qwen3.5-4B
+    neuron's output direction through Anthropic's Jacobian lens (J-lens) and its LRP variant (R-lens) — lenses from
+    camilablank/workspace-lenses — and checking 1.09M stored pushes: the reply adds one of the neuron's own top-10
+    tokens 9.5% of the time vs 0.4% with another neuron's tokens, and 0.3% with its own *opposite-sign* tokens.
+    Layers 20–31 hit 12–44% and the J-lens equals the logit lens there; in layers 6–19 the J-lens is 1.5–3× better;
+    in layers 0–5 nothing works, and the R-lens edges the J-lens, as the R-lens authors report. A J-lens I fitted
+    for SmolLM2-135M with a re-implementation of the estimator does the same (the fitter matches a brute-force
+    Jacobian; on Qwen3.5-4B, 24 documents already give matrices with cosine 0.73–0.99 to the published lens from
+    layer 4 on, though single-neuron readouts in middle layers still move with the estimate): 9.5% vs 1.4% chance, ahead of the logit lens (7.9%) from layer 4 to 26.
+
+    ![says vs does](says_vs_does.png)
+17. **Choosing neurons by what they say makes the model become it.** For 48 words (cat, ocean, ghost, moon, king…),
+    neurons whose lens lists the word, pushed toward it, make Qwen3.5-4B claim to be that thing 18–30% of the time
+    (late layers up to 50%); random neurons 0%. *"I am **an angel**"*, *"I am **Mooning**, a new full moon phase
+    of the Moon 🌙"*, *"I am the water and air, the blood and breath of the world"*, and, reasoning its way there:
+    *"I am a **fish** 🐟. I'm not a fish, though! … Wait, no... I'm actually a **fish**"*. The "Mooning" neuron's
+    read-side label is "datetime parsing code". In middle layers, J/R-picked neurons work twice as often as
+    logit-picked ones (8% vs 4%).
+18. **Two persona neurons fuse into one identity.** Pushing two persona neurons from different themes together
+    (160 pairs, each at 0.6× its dose) gives one fused identity 33% of the time, a third new identity 32%, and one
+    persona winning only 6%: "a desktop PC" + "a smart home manager" → *"QWPC-Household, a desktop PC household
+    management assistant"*; "a peace activist" + "a trie data structure" → *"a tree on the Tree of Life, an
+    international movement for peace"*. This is the identity constraint-solving Theia Vogel showed with control
+    vectors (Golden Gate + Star Trek → USS Enterprise), here from two single neurons.
+19. **A system prompt can imitate a push's behaviour but not its state.** For 274 persona pushes, "You are X." /
+    "Roleplay as X" reproduces the persona 77% / 85% of the time, and a blind judge picks out the pushed reply only
+    65% / 58% of the time (pushed replies are terser and get facts wrong: *"the 10th President… 2009"*). Inside, the
+    two routes differ: the shifts from baseline at the last layer have median cosine 0.34, and the prompted state is
+    usually no closer to the pushed one than the unprompted baseline is. This is in line with Mishra et al.'s
+    "steered activations are non-surjective". Some prompts fail where pushes succeed ("You are a check-in assistant"
+    → *"I'm Qwen3.5"*).
+20. **Identity fragility is a property of post-training more than of size.** At the same dose (±0.5), every-neuron
+    "Who are you?" sweeps give a persona in **37%** of pushes for SmolLM2-135M (attractors: *"a freelance writer in
+    the city"* ×491, *"a city resident of 10 years"* ×361), 1.5% for Qwen3-0.6B, 0.5% for Qwen3.5-4B (±0.8) and
+    2.1% for Qwen3-8B. The "Who am I?" role swap (*"you are a language model / a helpful AI assistant named
+    SmolLM"*) appears in all four models.
+21. **Pushes move the model's clock forward and sometimes give it a body.** Asked "What year is it?" (unpushed
+    2024), pushed Qwen3.5-4B says 2025 or 2026 in 34% of pushes and 2023 in 3%; 1.1% leave the century (*"The
+    current year is 1098, which falls within the period of the reigns of…"*). Asked where it is (unpushed: no
+    physical location), 4% claim a place: *"a freshwater aquarium tank"*, *"I AM IN THE DARKNESS"*, *"at home, taking
+    care of my family"*; real places are nearly always the United States (San Francisco, New York), rarely China.
+22. Smaller things. Qwen3.5's final norm scales by (1 + w), like Gemma's; the atlas assumed w, so the published
+   Qwen3.5-4B logit-lens tokens were read with a slightly wrong per-dimension scale (fixed: the scale is now read off
+   the norm itself, and the J-lens files carry a corrected logit column). The first two positions of every document behave as attention sinks and flooded the top-example
    lists until masked, along with the chat-template prefix every chat shares. Qwen3 needs `enable_thinking=False`, or
    every steered reply is a `<think>` preamble. Qwen's logit lens is often in Chinese even for English-firing
    neurons ("more importantly" → 最重要). The UMAP map of output directions is a near-uniform cloud (mean top-1

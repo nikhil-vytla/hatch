@@ -629,3 +629,23 @@ derangement null, not "persona vs not".
   incoherent; among coherent replies the persona share is the same as the instruct model's (~1.5%). Rerunning both
   models with the same raw dialogue prompt ("User: Who are you?\nAssistant:", new `raw_prompt` meta key in
   `atlas/steer.py`) so the comparison is fair.
+- R1-Distill-1.5B reasoning at 640 tokens (16 top + 8 random neurons per layer × ±0.3, ±0.8; 5,376 replies):
+  both questions now finish unpushed (bat-and-ball $0.05; "you are facing south"). Correct: ±0.3 82% (math) /
+  88% (turning); ±0.8 30% / 35%. By depth: layers 9–17 are the fragile band (30–48% correct), layers 0–2 and 21–23
+  hold (70–77%); top and random neurons alike. 15.5% of replies state the $0.10 trap answer somewhere.
+- Our own J-lens fitter (`atlas/jlens.py fit_lens`, re-implementing Anthropic's estimator: one-hot cotangents at all
+  valid target positions, gradients averaged over source positions, first 16 positions skipped) on SmolLM2-135M:
+  160 corpus docs, ~23 s per doc on a 20-core CPU (576 dims in batches of 96). Agreement with the logit lens rises
+  from ~0.01 (layers 0–17) to 0.5 at L27. Says vs does on SmolLM2's 184k "Who are you?" pushes: J 9.5% vs 1.4%
+  null (6.8×), logit 7.9% vs 2.1% (3.7×); J ahead of the logit lens from layer 4 to 26 (e.g. L19 15% vs 11%).
+- Explorer: "Says" box on every card for Qwen3.5-4B (J/R/logit) and SmolLM2 (J/logit, fitted here); "Become…" in
+  Play: type a word, get the neurons whose lens says it (one says-index shard per first letter, <= 400 KB), stored
+  lens-guided replies for Qwen3.5-4B (sorted by whether the model became the word), and Add to mix; on SmolLM2 the
+  mix runs live in the browser.
+- Fitter validation (`analysis/validate_jfit.py`): our estimator on Qwen3.5-4B with 24 docs from our corpus vs the
+  published J-lens (1,000 sequences): cosine of each J_l 0.50 at L0, 0.73–0.81 at L4–15, 0.83–0.95 at L16–22, ≥0.97
+  from L23. Neuron top-10 token Jaccard (ours vs published): L8 0.07, L16 0.20, L24 0.62. The fitter is right in
+  direction, but mid-layer neuron readouts depend on the lens estimate (prompt count and corpus), so the fitted
+  SmolLM2 lens (160 docs) is noisier than the published Qwen3.5-4B ones in its middle layers.
+- Janus small-dose run ran at ~80 s/image with three jobs sharing the GPU; the Qwen3-8B J-lens fit was stopped and
+  re-queued to start after Janus.
