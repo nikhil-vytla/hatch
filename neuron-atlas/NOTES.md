@@ -517,3 +517,14 @@ derangement null, not "persona vs not".
   whole 576-token image generation. The baseline is a crisp apple; nearly every push dissolves the image into texture
   (stripes, blue fields, sand, wood grain, bubbles); only L10 N4779 +0.8 keeps a red fruit/flower shape. The dose that
   makes text personas obliterates images (the push compounds over 576 autoregressive image tokens); next: ±0.05–0.3.
+
+## Oct 30: new GPU notebook, reruns queued
+
+- Notebook A (RTX PRO 6000, 96 GB) queue: (1) Qwen3.5-4B bat-and-ball + turning question at 192 new tokens on the
+  11,925 battery neurons × ±0.8 (`battery_reason`), so correctness is scorable; (2) R1-Distill-1.5B on the same two
+  prompts at 640 tokens and ±0.3/±0.8 (`reasoning_long`); (3) Janus-Pro-1B at ±0.1/±0.3, 2 neurons per layer, 3
+  prompts (apple, cat, HELLO sign; `gen_small`).
+- In parallel on A: all-neuron sweeps of the two in-browser models (SmolLM2-135M, Qwen3-0.6B), "Who are you?" and
+  "Who am I?" at ±0.5. Until now they had only 12–16 sampled neurons per layer, so most Mix neurons had no evidence
+  and there was no persona library for the models you can run live.
+- Notebook B came back CPU-only again (and without HF_TOKEN in its environment); nothing queued there.
