@@ -14,6 +14,7 @@ import random
 import shutil
 import time
 
+import numpy as np
 import pyarrow as pa
 import pyarrow.parquet as pq
 import torch
@@ -406,6 +407,45 @@ def _janus_prompt(nm, prompt):
     return prompt
 
 
+def _pixels_to_pil(proc, decoded):
+    decoded = decoded.float()
+    if decoded.ndim == 4 and decoded.shape[-1] in (1, 3) and decoded.shape[1] not in (1, 3):
+        decoded = decoded.permute(0, 3, 1, 2)
+    frames = list(decoded)
+    try:
+        pixel_values = proc.postprocess(frames, return_tensors="np")["pixel_values"]
+    except (TypeError, ValueError, AttributeError):
+        pixel_values = proc.postprocess(frames, return_tensors=None)["pixel_values"]
+    if torch.is_tensor(pixel_values):
+        pixel_values = pixel_values.detach().cpu().numpy()
+    if isinstance(pixel_values, np.ndarray) and pixel_values.ndim == 4:
+        pixel_values = list(pixel_values)
+    images = []
+    for x in pixel_values:
+        if isinstance(x, Image.Image):
+            images.append(x.convert("RGB"))
+            continue
+        if torch.is_tensor(x):
+            x = x.detach().cpu().numpy()
+        x = np.asarray(x)
+        if x.ndim == 2:
+            x = x[..., None]
+        if x.shape[0] in (1, 3, 4) and x.shape[-1] not in (1, 3, 4):
+            x = np.moveaxis(x, 0, -1)
+        if x.shape[-1] == 1:
+            x = np.repeat(x, 3, axis=-1)
+        elif x.shape[-1] == 4:
+            x = x[..., :3]
+        if np.issubdtype(x.dtype, np.floating):
+            if x.size and x.max() <= 1.0:
+                x = x * 255.0
+            x = np.clip(np.rint(x), 0, 255).astype(np.uint8)
+        elif x.dtype != np.uint8:
+            x = np.clip(x, 0, 255).astype(np.uint8)
+        images.append(Image.fromarray(x, mode="RGB"))
+    return images
+
+
 def _janus_generate(nm, prompts, seed=0):
     inputs = nm.processor(text=list(prompts), generation_mode="image", return_tensors="pt")
     inputs = {k: (v.to(nm.device) if torch.is_tensor(v) else v) for k, v in inputs.items()}
@@ -415,8 +455,7 @@ def _janus_generate(nm, prompts, seed=0):
                                  max_new_tokens=nm.processor.num_image_tokens, guidance_scale=5.0,
                                  pad_token_id=nm.tok.pad_token_id)
         decoded = nm.model.decode_image_tokens(outs)
-        images = nm.processor.postprocess(list(decoded.float()), return_tensors="PIL.Image.Image")
-    return images["pixel_values"]
+    return _pixels_to_pil(nm.processor, decoded)
 
 
 def run_gen(model="deepseek-community/Janus-Pro-1B", prompts=None, neurons=None, recipes=None,
