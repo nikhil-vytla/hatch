@@ -720,3 +720,7 @@ derangement null, not "persona vs not".
   layers 0–3 J 1.6/0.6% (2.5×), R 2.4/1.6% (1.5×), logit 2.2/2.1% (1.1×); 4–14 J 4.6/1.2% (3.9×), R 5.6/2.1% (2.6×),
   logit 3.4/2.3% (1.5×); 15–26 J 14.8/1.9% (7.7×), R 14.6/2.1% (6.9×), logit 11.7/2.2% (5.3×). R hits more in early
   and middle layers, as the R-lens post reports, but with commoner tokens.
+- Both notebooks were lost again (third time) during our own Qwen3.5-4B J-lens fit (130/256 docs); it was to be
+  uploaded only after validation, so it was lost with the R-lens queue that had not started. Fits now save running
+  sums every 16 docs (`--checkpoint-repo`: to `checkpoints/<slug>/` on the Hub) and resume from them; tested: an
+  interrupted-then-resumed fit equals an uninterrupted one. Lenses upload right after fitting, before validation.
