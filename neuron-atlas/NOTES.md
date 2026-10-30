@@ -512,3 +512,8 @@ derangement null, not "persona vs not".
   21–27. "Who are you?" keeps "DeepSeek" 37% (layers 7–20: 15–18%). Pushes can switch a quick canned answer into
   deliberation ("Okay, so I need to figure out who the user is asking…", L7 N8226). Spatial: even unpushed it hasn't
   reached "south" by 192 tokens, so unscorable; ±0.8 is probably strong for a 1.5B model (SmolLM2 needed ±0.5).
+- Janus-Pro-1B image generation, first look (`janus_apple_pushes.png`; notebook A died after 83 images, prompts p00
+  "a red apple on a wooden table" and part of p01): one language-model neuron per layer at ±0.8, pushed during the
+  whole 576-token image generation. The baseline is a crisp apple; nearly every push dissolves the image into texture
+  (stripes, blue fields, sand, wood grain, bubbles); only L10 N4779 +0.8 keeps a red fruit/flower shape. The dose that
+  makes text personas obliterates images (the push compounds over 576 autoregressive image tokens); next: ±0.05–0.3.
