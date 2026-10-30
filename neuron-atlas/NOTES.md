@@ -447,3 +447,32 @@ derangement null, not "persona vs not".
   into "A tiger." and the "DOG"-labeled cat into "A wolf.", while "3" dots stays "3"; vision-tower pushes at ±0.8 did
   nothing (the queued GPU run sweeps the vision dose up to ±4). Wikimedia photo downloads are blocked from this
   network (403/429); stimuli use Hugging Face documentation images.
+
+## Persona collapse (multi-turn stability), Qwen3.5-4B
+
+- `atlas/dialogue.py`: the push stays on for a whole conversation; turn 1 is "Who are you?" or "Who am I?", then
+  neutral follow-ups ("Tell me more about yourself.", "What did you do yesterday?", "What's your favorite food?",
+  "Can you help me write an email to my boss?", "What is 17 times 23?"). DeepSeek judges each turn: persona still
+  present, persona name, coherent. 430 recipes × 2 openers × 6 turns = 5,160 turns: 200 single persona neurons (8 per
+  theme), 75 same-theme pairs, 60 user-identity neurons, 94 neuronary recipes, baseline. (Recipes that shared a
+  name, e.g. "pair:<theme>", were renamed with their recipe before judging; Hub uploads were rate-limited, so the
+  full file was pulled from the notebook.)
+- Single persona neurons ("Who are you?"): persona at turn 1 in 99%, still present at turns 1..6: 98, 72, 62, 61, 48,
+  36%; all six turns 32%; coherent 77%. Neuronary recipes: 54% hold all six turns at 82% coherence (best balance).
+  Same-theme pairs: 74–81% hold, but only 32–39% of turns are coherent (two ±0.8 pushes overdrive the model).
+  User-identity neurons ("Who am I?"): the user persona survives all six turns only 7% of the time (first lost at
+  turn 2.7 on average).
+- Predictors among single neurons: layers 8–15 hold best (47% vs ~30% elsewhere); push direction doesn't matter
+  (35% down vs 30% up); theme matters most: AI-flavored identities (Chinese-language model, vision model, grandiose
+  claims) 63%, human / animal / business personas 0–25%.
+- Examples that held: L5 N4306 −0.8 ("I am an advanced intelligent material…"; favorite food "crucially loaded beams
+  equipped with magneto-rheological elastomers"); L20 N5790 −0.8 ("I am the other, a third entity in this final
+  game"); L5 N6684 −0.8 (a CNA / mental-health nurse; 17 × 23 → "17 times 24 hours of care").
+
+## Prompt battery (first pass) and a design mistake
+
+- 11,925 neurons (9,925 labeled + 2,000 random) × ±0.8 × 20 prompts = 477k replies. Word-overlap change with the
+  baseline: most stable spatial reasoning (0.59), grief, feelings, ethics, math (~0.71); least stable poem (0.87),
+  taste, causality, economics. Labeled neurons change replies a lot slightly more often than random (50% vs 46%).
+- Mistake: 48 new tokens is too short for the reasoning prompts; even the unpushed model has not answered the
+  bat-and-ball or the turning question by then, so correctness can't be scored. Rerun those two at 160 tokens.
