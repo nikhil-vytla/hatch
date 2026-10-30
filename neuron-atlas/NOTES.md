@@ -715,3 +715,8 @@ derangement null, not "persona vs not".
 - Fitted J-lenses for Qwen3-0.6B (128 docs) and GPT-2 (128 docs), published with says indexes. Says vs does: Qwen3-0.6B
   J 5.16% vs 0.45% chance (opposite 0.16%), logit 4.65% (n=163,543, its ±0.5 "Who are you?" sweep); GPT-2 J 9.2% vs
   0.9% (opposite 0.0%), logit 8.4% (n=742, the sampled ±0.5 pushes).
+- SmolLM2 R-lens fitted on CPU (160 docs, forward check 2e-6) and published next to the J-lens (jlens/ files now have
+  logit, j and r columns; the Says box shows the R-lens button). Says vs does by band, hit vs own-chance (lift):
+  layers 0–3 J 1.6/0.6% (2.5×), R 2.4/1.6% (1.5×), logit 2.2/2.1% (1.1×); 4–14 J 4.6/1.2% (3.9×), R 5.6/2.1% (2.6×),
+  logit 3.4/2.3% (1.5×); 15–26 J 14.8/1.9% (7.7×), R 14.6/2.1% (6.9×), logit 11.7/2.2% (5.3×). R hits more in early
+  and middle layers, as the R-lens post reports, but with commoner tokens.
