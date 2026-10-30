@@ -223,6 +223,8 @@ def says_index(jdir, out_dir, lens="j", per_word=40, min_layer=6):
     shards = defaultdict(list)
     for w, hs in hits.items():
         hs.sort()
+        seen = set()  # " ocean", "Ocean" and "ocean" can all be in one neuron's list: keep its best rank once
+        hs = [h for h in hs if (h[1], h[2], h[3]) not in seen and not seen.add((h[1], h[2], h[3]))]
         for rank, negL, n, sign in hs[:per_word]:
             shards[w[0]].append((w, -negL, n, sign, rank))
     os.makedirs(out_dir, exist_ok=True)

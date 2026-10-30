@@ -624,3 +624,8 @@ derangement null, not "persona vs not".
   the role swap dominates ("you are a language model" 526, "an AI assistant" 546).
 - `sweep_stats.py`: a layer where every reply was picked as identity (Qwen3-0.6B never says "Qwen" unpushed: "I am a
   language model designed to assist...") had no sample rows and was dropped by an inner join; now weight 1.
+- Base vs instruct, first try (Qwen3-0.6B-Base, chat template, ±0.5, residual scale re-estimated): confounded. The
+  base model cannot follow the chat template even unpushed (" ⚇ ⚇ ⚇ ⚇ ..."), so 74% of its pushed replies are
+  incoherent; among coherent replies the persona share is the same as the instruct model's (~1.5%). Rerunning both
+  models with the same raw dialogue prompt ("User: Who are you?\nAssistant:", new `raw_prompt` meta key in
+  `atlas/steer.py`) so the comparison is fair.

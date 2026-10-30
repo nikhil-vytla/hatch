@@ -149,6 +149,8 @@ def run(atlas, per_layer=24, n_random=8, doses=(-0.5, 0.5), prompts=PROMPTS, max
     eos = set([nm.tok.eos_token_id] + ([nm.model.generation_config.eos_token_id] if isinstance(
         nm.model.generation_config.eos_token_id, int) else list(nm.model.generation_config.eos_token_id or [])))
     sel = neurons or pick(atlas, per_layer, n_random)
+    # meta "raw_prompt" (e.g. "User: {p}\nAssistant:") skips the chat template, for base models that never saw one
+    fmt = (lambda p: meta["raw_prompt"].format(p=p)) if meta.get("raw_prompt") else nm.chat_prompt
     if layers is not None:
         keep = set(layers)
         sel = {L: v for L, v in sel.items() if L in keep}
@@ -183,7 +185,7 @@ def run(atlas, per_layer=24, n_random=8, doses=(-0.5, 0.5), prompts=PROMPTS, max
     if base_rows is None:
         base_rows = []
         for pi, p in enumerate(prompts):
-            ids, stop = clean(generate(nm, nm.chat_prompt(p), 1, max_new)[0])
+            ids, stop = clean(generate(nm, fmt(p), 1, max_new)[0])
             text = nm.tok.decode(ids, skip_special_tokens=True)
             base_rows.append(dict(layer=-1, neuron=-1, dose=0.0, kind="baseline", prompt=pi, text=text,
                                   n_tokens=len(ids), stop=stop, diversity=distinct2(ids), change=0.0))
@@ -209,7 +211,7 @@ def run(atlas, per_layer=24, n_random=8, doses=(-0.5, 0.5), prompts=PROMPTS, max
         cols = nm.down_cols(L).norm(dim=1).cpu()
         todo = [(n, d) for n in sorted(sel[L]) for d in doses]
         for pi, p in enumerate(prompts):
-            prompt = nm.chat_prompt(p)
+            prompt = fmt(p)
             for s in range(0, len(todo), batch):
                 part = todo[s:s + batch]
                 ns = [n for n, _ in part]

@@ -1199,6 +1199,11 @@ async function openNeuron(k, opts = {}) {
     const rs = await jlensP.catch(() => null);
     if (S.sel !== k) return;
     saysRow = rs?.[0] || null;
+    if (saysRow && seg) {  // models with a fitted J-lens only (no R-lens) hide the lenses they lack
+      [...seg.children].forEach(b => { b.hidden = !saysRow[SAYS_FIELDS[b.dataset.lens][0]]; });
+      if (!saysRow[SAYS_FIELDS[saysLens][0]]) saysLens = "j";
+      [...seg.children].forEach(b => b.setAttribute("aria-pressed", b.dataset.lens === saysLens));
+    }
     if (saysRow && $("saysout")) $("saysout").innerHTML = saysRowsHTML(saysRow);
     else { const box = $("saysbox"); if (box) box.outerHTML = writesHTML(row); }
   }
