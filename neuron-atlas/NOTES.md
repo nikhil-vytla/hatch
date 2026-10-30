@@ -679,3 +679,7 @@ derangement null, not "persona vs not".
   several neurons are consistent style directions across prompts: L6 N1140 +0.3 swirling patterns (apple, cat,
   sign), L9 N2052 +0.3 green painterly tint, L3 N2484 +0.3 illustration / line art, L18 N3907 +0.3 cat -> white
   kitten; −0.3 often defocuses (L12 N604: purple fog). Text is the most fragile: ±0.1 misspells HELLO.
+- Both molab sandboxes became unreachable around 08:30 UTC, before the Qwen3-8B J-lens fit (GPU, ~20/96 docs at
+  last check) and the Qwen3-0.6B fit (CPU, 30/64 docs) finished; nothing reached the Hub. Rerun with
+  `python -m atlas.jlens --model Qwen/Qwen3-8B --fit 96 --dim-batch 32 --out out` on a fresh GPU notebook (~45 min
+  alone), then stage jlens/ with 1024-row groups plus `says_index` as done for SmolLM2.
