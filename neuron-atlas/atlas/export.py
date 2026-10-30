@@ -315,6 +315,9 @@ def push_space(repo, space):
     api.upload_file(path_or_fileobj=engine, path_in_repo="engine.js", repo_id=space, repo_type="space")
     api.upload_file(path_or_fileobj=live.encode(), path_in_repo="live.html", repo_id=space, repo_type="space")
     api.upload_file(path_or_fileobj=readme.encode(), path_in_repo="README.md", repo_id=space, repo_type="space")
+    protos = os.path.join(HERE, "..", "explorer", "protos")  # standalone prototype pages, served at /protos/
+    if os.path.isdir(protos):
+        api.upload_folder(folder_path=protos, path_in_repo="protos", repo_id=space, repo_type="space", allow_patterns=["*.html"])
     print(f"https://huggingface.co/spaces/{space}")
 
 

@@ -72,6 +72,7 @@ button { cursor: pointer }
   border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 0 14px;
   font: 600 14px/1 var(--body); text-decoration: none; white-space: nowrap;
   transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease, box-shadow 120ms ease }
+a.btn { text-decoration: none; color: inherit }
 .btn.primary { background: var(--eosin); color: #fff; border-color: var(--eosin) }
 .btn:hover { border-color: var(--hema); box-shadow: 0 0 0 2px color-mix(in oklab, var(--hema) 18%, transparent) }
 .btn.primary:hover { border-color: var(--eosin); box-shadow: 0 0 0 2px color-mix(in oklab, var(--hema) 35%, transparent) }
@@ -339,6 +340,7 @@ textarea.sql { width: 100%; min-height: 110px; font: 13px var(--mono); border: 1
       <div class="brand"><h1>Neuron <i>Atlas</i></h1></div>
       <div class="models" id="models" role="group" aria-label="Model"></div>
       <div class="actions">
+        <a class="btn" href="protos/index.html" title="Experimental views: vision, image pushes, says vs does, identity">Prototypes</a>
         <button class="btn primary" id="surprise" title="Open a random well-labeled neuron">Surprise me</button>
         <button class="theme-toggle" id="theme" type="button" aria-label="Switch theme" title="Switch theme">
           <svg class="i-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.42-1.42M17.66 6.34l1.41-1.41"/></svg>

@@ -1,0 +1,935 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Image pushes</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Source+Sans+3:ital,wght@0,400;0,600;1,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+:root {
+  --bg: #f5f4f8; --surface: #ffffff; --sunk: #ebe9f1; --line: #d9d5e3; --ink: #1f1c2c; --ink2: #5d5870; --ink3: #8a849c;
+  --eosin: #d6336c; --eosin-soft: #f9d9e5; --hema: #4b3fa8; --hema-soft: #dedaf5; --accent: #b0245a;
+  --plate: #17152a; --plate-ink: #ece9f7; --plate-ink2: #a29dbb; --plate-line: #2c2946;
+  --good: #1f8a5b; --warn: #b7791f;
+  --k-user: #2a78d6; --k-persona: #d6336c; --k-altered: #4b3fa8; --k-other: #1baf7a; --k-incoherent: #eda100; --k-default: #cfcbdc;
+  --display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --body: "Source Sans 3", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --r: 10px; --r-card: 14px;
+  --s1: 12px; --s2: 16px; --s3: 24px;
+  --card-shadow: 0 1px 2px rgb(0 0 0 / .04), 0 4px 16px rgb(0 0 0 / .04);
+  --card-shadow-hover: 0 2px 4px rgb(0 0 0 / .06), 0 8px 24px rgb(0 0 0 / .08);
+  --pill-shadow: 0 1px 2px rgb(0 0 0 / .08), 0 2px 6px rgb(0 0 0 / .06);
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #121019; --surface: #1b1826; --sunk: #242033; --line: #343048; --ink: #ece9f7; --ink2: #b3adc8; --ink3: #827c99;
+  --eosin: #ff6b9a; --eosin-soft: #4a1f33; --hema: #9d92ff; --hema-soft: #2d2858; --accent: #ff7aa6;
+  --plate: #0b0a12; --plate-ink: #ece9f7; --plate-ink2: #9a95b2; --plate-line: #24213a; --good: #4cc38a; --warn: #e0a84a;
+  --k-user: #3987e5; --k-persona: #e0447a; --k-altered: #8a7ef0; --k-other: #199e70; --k-incoherent: #c98500; --k-default: #3b3652;
+  --card-shadow: 0 1px 2px rgb(0 0 0 / .3), 0 4px 16px rgb(0 0 0 / .25);
+  --card-shadow-hover: 0 2px 4px rgb(0 0 0 / .38), 0 8px 24px rgb(0 0 0 / .35);
+  --pill-shadow: 0 1px 2px rgb(0 0 0 / .35), 0 2px 6px rgb(0 0 0 / .3);
+  color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #121019; --surface: #1b1826; --sunk: #242033; --line: #343048; --ink: #ece9f7; --ink2: #b3adc8; --ink3: #827c99;
+  --eosin: #ff6b9a; --eosin-soft: #4a1f33; --hema: #9d92ff; --hema-soft: #2d2858; --accent: #ff7aa6;
+  --plate: #0b0a12; --plate-ink: #ece9f7; --plate-ink2: #9a95b2; --plate-line: #24213a; --good: #4cc38a; --warn: #e0a84a;
+  --k-user: #3987e5; --k-persona: #e0447a; --k-altered: #8a7ef0; --k-other: #199e70; --k-incoherent: #c98500; --k-default: #3b3652;
+  --card-shadow: 0 1px 2px rgb(0 0 0 / .3), 0 4px 16px rgb(0 0 0 / .25);
+  --card-shadow-hover: 0 2px 4px rgb(0 0 0 / .38), 0 8px 24px rgb(0 0 0 / .35);
+  --pill-shadow: 0 1px 2px rgb(0 0 0 / .35), 0 2px 6px rgb(0 0 0 / .3);
+  color-scheme: dark }
+* { box-sizing: border-box }
+html, body { height: 100% }
+body { background: var(--bg); color: var(--ink); font: 15px/1.5 var(--body); margin: 0; overflow-x: clip;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+button, input, select { font: inherit; color: inherit }
+button { cursor: pointer }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px }
+[hidden] { display: none !important }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0 }
+.mono { font-family: var(--mono) }
+.wrap { max-width: 1180px; margin: 0 auto; padding-block: 0 40px; display: flex; flex-direction: column; gap: var(--s3) }
+
+.topbar { position: sticky; top: 0; z-index: 30; display: flex; flex-direction: column; gap: 10px;
+  padding-block: var(--s1); background: color-mix(in oklab, var(--bg) 88%, transparent);
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--line) }
+.top { display: flex; align-items: center; gap: 12px; min-width: 0 }
+.brand { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; min-width: 0; flex: 1 1 auto }
+.brand h1 { font: 800 26px/1 var(--display); letter-spacing: -0.02em; margin: 0; white-space: nowrap }
+.brand h1 i { font-style: normal; color: var(--eosin) }
+.page-name { font: 600 11px/1.2 var(--body); letter-spacing: .06em; text-transform: uppercase; color: var(--ink2);
+  border-left: 1px solid var(--line); padding-left: 10px }
+.theme-toggle { width: 36px; height: 36px; flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center;
+  padding: 0; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink2);
+  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease }
+.theme-toggle:hover { border-color: var(--hema); color: var(--ink) }
+.theme-toggle:focus-visible { outline: 2px solid var(--hema); outline-offset: 2px }
+.theme-toggle svg { width: 18px; height: 18px; display: none }
+.theme-toggle .i-sun { display: block }
+.theme-toggle[data-resolved="light"] .i-sun { display: block }
+.theme-toggle[data-resolved="light"] .i-moon { display: none }
+.theme-toggle[data-resolved="dark"] .i-sun { display: none }
+.theme-toggle[data-resolved="dark"] .i-moon { display: block }
+.nav { display: flex; flex-wrap: wrap; gap: 4px; align-items: center }
+.nav a { color: var(--ink2); text-decoration: none; border: 1px solid transparent; border-radius: 999px;
+  padding: 5px 10px; font-size: 13px; line-height: 1.2; white-space: nowrap;
+  transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease }
+.nav a:hover { background: var(--sunk); color: var(--ink) }
+.nav a[aria-current="page"] { background: var(--sunk); border-color: var(--line); color: var(--ink); font-weight: 600 }
+
+.hero { display: flex; flex-direction: column; gap: 10px; padding-top: 4px }
+.eyebrow { font: 600 11px/1.2 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--ink3) }
+.hero h2 { font: 800 clamp(26px, 4vw, 38px)/1.1 var(--display); letter-spacing: -0.02em; margin: 0; text-wrap: balance }
+.hero p { max-width: 76ch; margin: 0; color: var(--ink2) }
+.hero p b { color: var(--ink) }
+
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-card);
+  box-shadow: var(--card-shadow); padding: var(--s2); min-width: 0 }
+.controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 16px; align-items: end }
+.control-group { display: flex; flex-direction: column; gap: 7px; min-width: 0 }
+.control-label { font: 600 11px/1.2 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--ink3) }
+.chips { display: flex; flex-wrap: wrap; gap: 6px }
+.chip { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 5px 12px;
+  font-size: 13px; line-height: 1.3; text-align: left; white-space: normal; max-width: 100%;
+  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease }
+.chip:hover { border-color: var(--hema) }
+.chip[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink) }
+select { width: 100%; border: 1px solid var(--line); border-radius: 8px; background: var(--surface);
+  padding: 8px 10px; min-width: 0 }
+select:hover { border-color: var(--hema) }
+.seg { display: inline-flex; width: fit-content; max-width: 100%; border: 1px solid var(--line); border-radius: 8px;
+  background: var(--surface); overflow: hidden }
+.seg button { border: 0; background: none; padding: 7px 14px; font-size: 14px; color: var(--ink2); white-space: nowrap;
+  transition: background-color 120ms ease, color 120ms ease }
+.seg button[aria-pressed="true"] { background: var(--sunk); color: var(--ink); font-weight: 600 }
+
+.status { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; min-height: 22px; color: var(--ink2); font-size: 14px }
+.status.error { color: var(--warn) }
+.status .status-msg { flex: 1 1 260px }
+.status .btn { flex: 0 0 auto }
+.spinner { width: 14px; height: 14px; border: 2px solid var(--line); border-top-color: var(--eosin); border-radius: 50%;
+  animation: spin .9s linear infinite; flex: 0 0 auto }
+@keyframes spin { to { transform: rotate(360deg) } }
+.btn { min-height: 36px; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 0 14px;
+  font: 600 14px/1 var(--body); text-decoration: none; white-space: nowrap;
+  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease, box-shadow 120ms ease }
+.btn:hover { border-color: var(--hema); box-shadow: 0 0 0 2px color-mix(in oklab, var(--hema) 18%, transparent) }
+.btn:disabled { opacity: .45; cursor: default; box-shadow: none; border-color: var(--line) }
+
+.view { display: flex; flex-direction: column; gap: 12px; min-width: 0 }
+.section-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap }
+.section-head h3 { font: 700 19px/1.2 var(--display); margin: 0; letter-spacing: -0.01em }
+.section-head p { margin: 0; color: var(--ink3); font-size: 13px }
+.note { margin: 0; color: var(--ink2); font-size: 13px; line-height: 1.45 }
+.note b { color: var(--ink) }
+
+.grid-scroll { overflow-x: auto; overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch;
+  border: 1px solid var(--line); border-radius: var(--r-card); background: var(--surface);
+  box-shadow: var(--card-shadow); padding: 8px }
+.grid-scroll:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px }
+.img-grid { width: 100%; min-width: 650px; border-collapse: separate; border-spacing: 6px; table-layout: fixed }
+.img-grid td { padding: 0 }
+.img-grid thead th { font: 600 10px/1.2 var(--mono); letter-spacing: .05em; text-transform: uppercase;
+  color: var(--ink3); padding: 3px 4px; text-align: center }
+.img-grid thead th:first-child { width: 84px; text-align: left }
+.img-grid .row-head { position: sticky; left: 0; z-index: 2; width: 84px; background: var(--surface);
+  text-align: left; font: 600 11px/1.2 var(--mono); color: var(--ink2); padding: 0 8px 0 2px;
+  white-space: nowrap; border-right: 1px solid var(--line) }
+.img-grid thead .corner { background: var(--surface) }
+.cell { position: relative; display: block; width: 100%; aspect-ratio: 1; padding: 0; overflow: hidden;
+  border: 1px solid var(--line); border-radius: 8px; background: var(--sunk);
+  transition: border-color 120ms ease, box-shadow 120ms ease }
+.cell img { display: block; width: 100%; height: 100%; aspect-ratio: 1; object-fit: cover }
+.cell:hover { border-color: var(--eosin); box-shadow: 0 0 0 2px var(--eosin-soft) }
+.cell:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px }
+.img-err { position: absolute; inset: 0; display: grid; place-items: center; padding: 6px; text-align: center;
+  font-size: 11px; line-height: 1.25; color: var(--ink3); background: var(--sunk) }
+
+.slider-panel { display: flex; flex-direction: column; gap: 14px }
+.slider-top { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap }
+.slider-prompt { min-width: 0; flex: 1 1 220px }
+.prompt-title { font: 600 15px/1.35 var(--body); margin: 3px 0 0; color: var(--ink) }
+.select-wrap { display: flex; flex-direction: column; gap: 5px; flex: 0 1 190px; min-width: 150px }
+.slider-main { display: grid; grid-template-columns: minmax(0, 1fr) clamp(84px, 24%, 160px); gap: 14px; align-items: start }
+.fig-large, .fig-base { margin: 0; display: flex; flex-direction: column; gap: 6px; min-width: 0 }
+.fig-large figcaption, .fig-base figcaption { font-size: 12px; line-height: 1.35; color: var(--ink2) }
+.fig-large figcaption b { color: var(--ink) }
+.base-cap { font: 600 10px/1.2 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--ink3) }
+.small-note { font-size: 11px; color: var(--ink3) }
+.img-button { position: relative; display: block; width: 100%; padding: 0; overflow: hidden;
+  border: 1px solid var(--line); border-radius: 10px; background: var(--sunk);
+  transition: border-color 120ms ease, box-shadow 120ms ease }
+.img-button img { display: block; width: 100%; aspect-ratio: 1; height: auto; object-fit: contain }
+.img-button:hover { border-color: var(--eosin); box-shadow: 0 0 0 2px var(--eosin-soft) }
+.img-button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px }
+.fig-large .img-button img { max-height: min(62vh, 620px) }
+.dose-control { display: flex; flex-direction: column; gap: 6px; padding: 12px; background: var(--sunk);
+  border-radius: 10px }
+.dose-control label { display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+  font-size: 14px; color: var(--ink2) }
+.dose-control output { color: var(--ink); font-weight: 600 }
+input[type="range"] { width: 100%; accent-color: var(--eosin); cursor: pointer }
+.dose-ticks { display: flex; gap: 4px; font: 10px/1.2 var(--mono); color: var(--ink3) }
+.dose-ticks span { flex: 1 1 0; text-align: center }
+.prompt-panel { display: flex; flex-direction: column; gap: 12px }
+.prompt-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px }
+.prompt-card { position: relative; display: flex; flex-direction: column; gap: 5px; min-width: 0; padding: 6px; text-align: left;
+  border: 1px solid var(--line); border-radius: 10px; background: var(--surface);
+  transition: border-color 120ms ease, box-shadow 120ms ease }
+.prompt-card:hover { border-color: var(--eosin); box-shadow: 0 0 0 2px var(--eosin-soft) }
+.prompt-media { position: relative; display: block; width: 100%; aspect-ratio: 1; overflow: hidden;
+  border-radius: 6px; border: 1px solid var(--line); background: var(--sunk) }
+.prompt-media img { display: block; width: 100%; height: 100%; object-fit: cover }
+.card-prompt { font-size: 12px; line-height: 1.25; color: var(--ink2); overflow: hidden;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical }
+.card-dose { font: 10px/1.2 var(--mono); color: var(--ink3) }
+
+.foot { color: var(--ink3); font-size: 12px; line-height: 1.5; border-top: 1px solid var(--line); padding-top: 12px }
+.foot a { color: var(--ink2) }
+
+.lightbox { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 16px }
+.lightbox-backdrop { position: absolute; inset: 0; background: color-mix(in oklab, var(--plate) 72%, transparent) }
+.lightbox-panel { position: relative; z-index: 1; width: min(880px, 100%); max-height: calc(100dvh - 32px);
+  overflow: auto; display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(220px, .8fr); gap: 16px;
+  align-items: center; padding: 16px; border: 1px solid var(--line); border-radius: var(--r-card);
+  background: var(--surface); box-shadow: var(--card-shadow-hover) }
+.lb-img-wrap { position: relative; min-width: 0; overflow: hidden; border-radius: 10px; background: var(--sunk) }
+.lb-img-wrap img { display: block; width: 100%; height: auto; aspect-ratio: 1; object-fit: contain;
+  max-height: calc(100dvh - 96px) }
+.lb-close { position: absolute; top: 8px; right: 8px; z-index: 2; width: 34px; height: 34px; padding: 0;
+  display: grid; place-items: center; border: 1px solid var(--line); border-radius: 999px;
+  background: var(--surface); color: var(--ink2); font-size: 20px; line-height: 1 }
+.lb-close:hover { border-color: var(--hema); color: var(--ink) }
+.lb-meta { min-width: 0; padding-right: 26px }
+.lb-meta h2 { font: 700 21px/1.25 var(--display); letter-spacing: -0.01em; margin: 5px 0 6px }
+.lb-meta p { margin: 4px 0; color: var(--ink2); font-size: 14px }
+.lb-meta p b { color: var(--ink) }
+.lb-hint { color: var(--ink3) !important; font-size: 12px !important }
+.lb-nav { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px }
+body.lb-open { overflow: hidden }
+
+@media (max-width: 700px) {
+  .lightbox-panel { grid-template-columns: 1fr; align-items: start }
+  .lb-meta { padding-right: 0 }
+  .lb-img-wrap img { max-height: 48vh }
+}
+@media (max-width: 560px) {
+  .panel { padding: 12px }
+  .controls { gap: 12px }
+  .brand h1 { font-size: 22px }
+  .page-name { font-size: 10px; padding-left: 8px }
+  .theme-toggle { width: 32px; height: 32px }
+  .hero h2 { font-size: 27px }
+  .img-grid { min-width: 610px }
+  .prompt-row { gap: 6px }
+  .prompt-card { padding: 4px }
+  .card-prompt { font-size: 11px }
+  .slider-main { gap: 10px }
+  .dose-control { padding: 10px }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; scroll-behavior: auto !important } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="topbar">
+    <div class="top">
+      <div class="brand">
+        <h1>Neuron <i>Atlas</i></h1>
+        <span class="page-name">Image pushes</span>
+      </div>
+      <button class="theme-toggle" id="theme" type="button" aria-label="Switch to dark theme" title="Switch to dark theme">
+        <svg class="i-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.42-1.42M17.66 6.34l1.41-1.41"/></svg>
+        <svg class="i-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/></svg>
+      </button>
+    </div>
+    <nav class="nav" aria-label="Prototype pages">
+      <a href="../index.html">Explorer</a>
+      <a href="index.html">Prototypes</a>
+      <a href="vision.html">Vision lab</a>
+      <a href="janus.html" aria-current="page">Image pushes</a>
+      <a href="lenses.html">Says vs does</a>
+      <a href="identity.html">Identity lab</a>
+    </nav>
+  </header>
+
+  <main id="main">
+    <section class="hero" aria-labelledby="heroTitle">
+      <span class="eyebrow">Janus-Pro-1B · image generation</span>
+      <h2 id="heroTitle">One neuron, pushed while the image is drawn</h2>
+      <p>Janus-Pro-1B generated each image below while a single MLP neuron was pushed. At ±0.8 every image in an earlier run dissolved into texture, so these are gentle pushes: <b>−0.3, −0.1, +0.1 and +0.3</b>, plus a no-push baseline.</p>
+      <p>What to look for: small framing changes at ±0.1 and broader style directions at ±0.3. Named directions to compare: <b>L6 N1140</b> swirls, <b>L9 N2052</b> green, and <b>L3 N2484</b> line art.</p>
+    </section>
+
+    <section class="panel controls" aria-labelledby="controlsTitle">
+      <h2 id="controlsTitle" class="sr-only">Controls</h2>
+      <div class="control-group">
+        <span class="control-label">Prompt</span>
+        <div class="chips" id="promptChips" role="group" aria-label="Prompt"></div>
+      </div>
+      <div class="control-group">
+        <label class="control-label" for="layerSelect">Layer range</label>
+        <select id="layerSelect">
+          <option value="all">All layers</option>
+          <option value="0-5">Layers 0–5</option>
+          <option value="6-11">Layers 6–11</option>
+          <option value="12-17">Layers 12–17</option>
+          <option value="18-23">Layers 18–23</option>
+        </select>
+      </div>
+      <div class="control-group">
+        <span class="control-label">View</span>
+        <div class="seg" id="viewSwitch" role="group" aria-label="View">
+          <button type="button" data-view="grid" aria-pressed="true">Grid</button>
+          <button type="button" data-view="slider" aria-pressed="false">Slider</button>
+        </div>
+      </div>
+    </section>
+
+    <div class="status" id="status" role="status" aria-live="polite">
+      <span class="spinner" aria-hidden="true"></span>
+      <span>Loading image index…</span>
+    </div>
+
+    <section class="view" id="gridView" hidden aria-labelledby="gridTitle">
+      <div class="section-head">
+        <h3 id="gridTitle">Grid view</h3>
+        <p id="gridSub"></p>
+      </div>
+      <p class="note">Each row is one neuron; each column is a dose. The middle column is the <b>no-push baseline</b>. Click any image to enlarge it, then use the arrow keys to step through that neuron's doses.</p>
+      <div class="grid-scroll" tabindex="0" role="region" aria-label="Image grid, scrolls horizontally">
+        <table class="img-grid" aria-label="Generated images by neuron and dose">
+          <caption class="sr-only">Rows are neurons, columns are push doses from minus 0.3 to plus 0.3 with a baseline in the middle.</caption>
+          <thead id="gridHead"></thead>
+          <tbody id="gridBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="view" id="sliderView" hidden aria-labelledby="sliderTitle"></section>
+  </main>
+
+  <footer class="foot">
+    Images: Janus-Pro-1B, small generation set. Doses are the added push on one MLP neuron; the baseline has no push. Only the theme accents are used for interface color, not for encoding a result.
+  </footer>
+</div>
+
+<div class="lightbox" id="lightbox" hidden>
+  <div class="lightbox-backdrop" data-close></div>
+  <div class="lightbox-panel" role="dialog" aria-modal="true" aria-labelledby="lbTitle" aria-describedby="lbDesc">
+    <div class="lb-img-wrap">
+      <img id="lbImg" width="512" height="512" alt="">
+      <span class="img-err" id="lbErr" hidden>Image unavailable</span>
+    </div>
+    <div class="lb-meta">
+      <button class="lb-close" id="lbClose" type="button" aria-label="Close lightbox">×</button>
+      <span class="eyebrow">Janus-Pro-1B</span>
+      <h2 id="lbTitle"></h2>
+      <p id="lbDesc"><span class="mono" id="lbNeuron"></span> at <b id="lbDose"></b></p>
+      <p class="lb-hint">Arrow keys move between doses. Esc closes.</p>
+      <div class="lb-nav">
+        <button class="btn" id="lbPrev" type="button">Previous dose</button>
+        <button class="btn" id="lbNext" type="button">Next dose</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const DATA = "https://huggingface.co/datasets/nikhilxvytla/neuron-atlas/resolve/main/";
+const DOSES = [-0.3, -0.1, 0, 0.1, 0.3];
+const DOSE_LABELS = ["−0.3", "−0.1", "baseline", "+0.1", "+0.3"];
+const BLOCKS = ["all", "0-5", "6-11", "12-17", "18-23"];
+
+const $ = id => document.getElementById(id);
+const els = {
+  main: $("main"),
+  status: $("status"),
+  layerSelect: $("layerSelect"),
+  promptChips: $("promptChips"),
+  viewSwitch: $("viewSwitch"),
+  gridView: $("gridView"),
+  gridHead: $("gridHead"),
+  gridBody: $("gridBody"),
+  gridSub: $("gridSub"),
+  sliderView: $("sliderView"),
+  lightbox: $("lightbox"),
+  lbImg: $("lbImg"),
+  lbErr: $("lbErr"),
+  lbTitle: $("lbTitle"),
+  lbNeuron: $("lbNeuron"),
+  lbDose: $("lbDose"),
+  lbClose: $("lbClose"),
+  lbPrev: $("lbPrev"),
+  lbNext: $("lbNext")
+};
+
+let model = null;
+let state = { p: 0, n: "L6N1140", view: "grid", block: "all", doseIndex: 2 };
+let sliderEls = null;
+let sliderBlock = null;
+let lastFocus = null;
+let lightbox = { open: false, p: 0, n: "", d: 2 };
+
+function esc(value) {
+  return String(value).replace(/[&<>"']/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
+}
+function fmt(value) {
+  return esc(value).replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>");
+}
+function compact(layer, neuron) {
+  return "L" + layer + "N" + neuron;
+}
+function neuronLabel(id) {
+  const info = model && model.info.get(id);
+  return info ? "L" + info.layer + " N" + info.neuron : String(id);
+}
+function doseLabel(index) {
+  return DOSE_LABELS[index] || String(DOSES[index]);
+}
+
+function buildModel(json) {
+  if (!json || typeof json.base !== "string" || !Array.isArray(json.rows)) {
+    throw new Error("Unexpected data shape in site/janus.json");
+  }
+  const info = new Map();
+  const neurons = [];
+  const prompts = [];
+  const files = new Map();
+  const baseline = new Map();
+
+  for (const row of json.rows) {
+    if (!Array.isArray(row) || row.length < 5) continue;
+    const prompt = row[0];
+    const layer = Number(row[1]);
+    const neuron = Number(row[2]);
+    const dose = Number(row[3]);
+    const file = row[4];
+    if (!prompts.includes(prompt)) prompts.push(prompt);
+    if (layer < 0) {
+      baseline.set(prompt, file);
+      continue;
+    }
+    const id = compact(layer, neuron);
+    if (!info.has(id)) {
+      info.set(id, { id, layer, neuron });
+      neurons.push(id);
+    }
+    files.set(prompt + "\u0000" + id + "\u0000" + dose, file);
+  }
+
+  if (!prompts.length || !neurons.length || !baseline.size) {
+    throw new Error("No image rows found in site/janus.json");
+  }
+
+  return {
+    base: json.base.endsWith("/") ? json.base : json.base + "/",
+    prompts,
+    neurons,
+    info,
+    files,
+    baseline
+  };
+}
+
+function inBlock(id, block) {
+  if (block === "all") return true;
+  const info = model && model.info.get(id);
+  if (!info) return false;
+  const parts = block.split("-");
+  return info.layer >= Number(parts[0]) && info.layer <= Number(parts[1]);
+}
+
+function fileFor(promptIndex, id, doseIndex) {
+  if (!model) return null;
+  const prompt = model.prompts[promptIndex];
+  if (doseIndex === 2) return model.baseline.get(prompt) || null;
+  return model.files.get(prompt + "\u0000" + id + "\u0000" + DOSES[doseIndex]) || null;
+}
+function urlFor(promptIndex, id, doseIndex) {
+  const file = fileFor(promptIndex, id, doseIndex);
+  return file ? model.base + file : null;
+}
+
+function readHash() {
+  const params = new URLSearchParams(location.hash.replace(/^#/, ""));
+  let p = parseInt(params.get("p") || "0", 10);
+  if (!Number.isFinite(p) || p < 0 || p >= model.prompts.length) p = 0;
+
+  let view = params.get("view") === "slider" ? "slider" : "grid";
+  let n = (params.get("n") || "").replace(/\s+/g, "").toUpperCase();
+  if (!model.info.has(n)) {
+    n = model.info.has("L6N1140") ? "L6N1140" : model.neurons[0];
+  }
+
+  let block = params.get("r") || "all";
+  if (!BLOCKS.includes(block)) block = "all";
+
+  let doseIndex = parseInt(params.get("d") || "2", 10);
+  if (!Number.isFinite(doseIndex) || doseIndex < 0 || doseIndex > 4) doseIndex = 2;
+
+  if (block !== "all" && !inBlock(n, block)) block = "all";
+  state = { p, n, view, block, doseIndex };
+}
+
+function writeHash() {
+  const params = new URLSearchParams();
+  params.set("p", String(state.p));
+  params.set("n", state.n);
+  params.set("view", state.view);
+  if (state.block !== "all") params.set("r", state.block);
+  if (state.view === "slider" && state.doseIndex !== 2) params.set("d", String(state.doseIndex));
+  const hash = "#" + params.toString();
+  if (location.hash === hash) return;
+  try { history.replaceState(null, "", hash); } catch (error) {}
+}
+
+function buildPromptChips() {
+  els.promptChips.innerHTML = model.prompts.map((prompt, index) =>
+    '<button type="button" class="chip" data-prompt="' + index + '" aria-pressed="' + (index === state.p) + '">' + fmt(prompt) + '</button>'
+  ).join("");
+}
+
+function syncControls() {
+  els.promptChips.querySelectorAll("[data-prompt]").forEach(button => {
+    button.setAttribute("aria-pressed", String(Number(button.dataset.prompt) === state.p));
+  });
+  els.layerSelect.value = state.block;
+  els.viewSwitch.querySelectorAll("[data-view]").forEach(button => {
+    button.setAttribute("aria-pressed", String(button.dataset.view === state.view));
+  });
+  if (sliderEls && sliderEls.select) sliderEls.select.value = state.n;
+}
+
+function renderGrid() {
+  if (!model) return;
+  els.gridHead.innerHTML = '<tr><th class="corner" scope="col"><span class="sr-only">Neuron</span></th>' +
+    DOSE_LABELS.map(label => '<th scope="col">' + esc(label) + '</th>').join("") + '</tr>';
+
+  const rows = model.neurons.filter(id => inBlock(id, state.block));
+  els.gridBody.innerHTML = rows.map(id => {
+    const label = neuronLabel(id);
+    const cells = DOSES.map((dose, index) => {
+      const url = urlFor(state.p, id, index);
+      const aria = model.prompts[state.p] + ", " + label + ", " + doseLabel(index);
+      const inside = (url
+        ? '<img src="' + esc(url) + '" alt="" loading="lazy" width="256" height="256" decoding="async">'
+        : '') + '<span class="img-err"' + (url ? ' hidden' : '') + '>' + (url ? 'Image unavailable' : 'No image') + '</span>';
+      return '<td><button class="cell" type="button" data-p="' + state.p + '" data-n="' + esc(id) + '" data-d="' + index + '" aria-label="' + esc(aria) + '" title="' + esc(aria) + '">' + inside + '</button></td>';
+    }).join("");
+    return '<tr><th class="row-head" scope="row">' + esc(label) + '</th>' + cells + '</tr>';
+  }).join("");
+
+  els.gridSub.textContent = rows.length + (rows.length === 1 ? " neuron" : " neurons") + " · " + model.prompts[state.p];
+}
+
+function fillNeuronSelect(force) {
+  if (!sliderEls || !sliderEls.select) return;
+  const filtered = model.neurons.filter(id => inBlock(id, state.block));
+  if (force || sliderBlock !== state.block) {
+    const groups = new Map();
+    filtered.forEach(id => {
+      const info = model.info.get(id);
+      if (!groups.has(info.layer)) groups.set(info.layer, []);
+      groups.get(info.layer).push(id);
+    });
+    let html = "";
+    groups.forEach((ids, layer) => {
+      html += '<optgroup label="Layer ' + layer + '">';
+      ids.forEach(id => {
+        html += '<option value="' + esc(id) + '">' + esc(neuronLabel(id)) + '</option>';
+      });
+      html += '</optgroup>';
+    });
+    sliderEls.select.innerHTML = html;
+    sliderBlock = state.block;
+  }
+  if (!filtered.includes(state.n)) state.n = filtered[0] || model.neurons[0];
+  sliderEls.select.value = state.n;
+}
+
+function ensureSlider() {
+  if (sliderEls) return;
+  els.sliderView.innerHTML = `
+    <div class="section-head">
+      <h3 id="sliderTitle">Slider view</h3>
+      <p>One neuron across all five doses, with all three prompts below.</p>
+    </div>
+    <div class="panel slider-panel">
+      <div class="slider-top">
+        <div class="slider-prompt">
+          <span class="eyebrow">Prompt</span>
+          <p class="prompt-title" id="slPrompt"></p>
+        </div>
+        <label class="select-wrap">
+          <span class="control-label">Neuron</span>
+          <select id="neuronSel" aria-label="Neuron"></select>
+        </label>
+      </div>
+      <div class="slider-main">
+        <figure class="fig-large">
+          <button class="img-button" id="slBtn" type="button" aria-label="Open current image">
+            <img id="slImg" width="512" height="512" alt="">
+            <span class="img-err" hidden>Image unavailable</span>
+          </button>
+          <figcaption><span class="mono" id="slNeuron"></span> · <b id="slDose"></b></figcaption>
+        </figure>
+        <figure class="fig-base">
+          <figcaption class="base-cap">Baseline</figcaption>
+          <button class="img-button" id="baseBtn" type="button" aria-label="Open baseline image">
+            <img id="baseImg" width="256" height="256" alt="Baseline image">
+            <span class="img-err" hidden>Image unavailable</span>
+          </button>
+          <span class="small-note">no push</span>
+        </figure>
+      </div>
+      <div class="dose-control">
+        <label for="doseRange">Dose <output id="doseOut" class="mono"></output></label>
+        <input id="doseRange" type="range" min="0" max="4" step="1" aria-label="Push dose">
+        <div class="dose-ticks" aria-hidden="true">${DOSE_LABELS.map(label => "<span>" + esc(label) + "</span>").join("")}</div>
+      </div>
+      <p class="note">The large image is the selected prompt at the chosen dose. The small image beside it is the same prompt with <b>no push</b>, for comparison.</p>
+    </div>
+    <div class="panel prompt-panel">
+      <div class="section-head">
+        <h3>Same neuron, all prompts</h3>
+        <p>At <b id="rowDose"></b> · a consistent direction should look related across all three.</p>
+      </div>
+      <div class="prompt-row" id="promptRow"></div>
+    </div>`;
+
+  sliderEls = {
+    prompt: $("slPrompt"),
+    select: $("neuronSel"),
+    image: $("slImg"),
+    button: $("slBtn"),
+    neuron: $("slNeuron"),
+    dose: $("slDose"),
+    baseImage: $("baseImg"),
+    baseButton: $("baseBtn"),
+    range: $("doseRange"),
+    doseOut: $("doseOut"),
+    rowDose: $("rowDose"),
+    promptRow: $("promptRow")
+  };
+  sliderBlock = null;
+
+  sliderEls.select.addEventListener("change", event => {
+    state.n = event.target.value;
+    updateSlider();
+    writeHash();
+  });
+  sliderEls.range.addEventListener("input", event => {
+    state.doseIndex = Number(event.target.value);
+    updateSlider();
+    writeHash();
+  });
+  sliderEls.button.addEventListener("click", () => {
+    openLightbox(state.p, state.n, state.doseIndex, sliderEls.button);
+  });
+  sliderEls.baseButton.addEventListener("click", () => {
+    openLightbox(state.p, state.n, 2, sliderEls.baseButton);
+  });
+  sliderEls.promptRow.addEventListener("click", event => {
+    const card = event.target.closest(".prompt-card");
+    if (!card) return;
+    openLightbox(Number(card.dataset.p), state.n, state.doseIndex, card);
+  });
+}
+
+function setImage(image, url, alt) {
+  const err = image.parentElement ? image.parentElement.querySelector(".img-err") : null;
+  image.hidden = false;
+  if (err) err.hidden = true;
+  if (url) {
+    image.src = url;
+    image.alt = alt;
+  } else {
+    image.removeAttribute("src");
+    image.hidden = true;
+    if (err) {
+      err.hidden = false;
+      err.textContent = "No image";
+    }
+  }
+}
+
+function updateSlider() {
+  if (!sliderEls) return;
+  const prompt = model.prompts[state.p];
+  const label = neuronLabel(state.n);
+  const selected = state.doseIndex;
+  const dose = doseLabel(selected);
+  const url = urlFor(state.p, state.n, selected);
+  const baselineUrl = urlFor(state.p, state.n, 2);
+
+  sliderEls.prompt.textContent = prompt;
+  sliderEls.neuron.textContent = label;
+  sliderEls.dose.textContent = dose;
+  sliderEls.rowDose.textContent = dose;
+  sliderEls.doseOut.textContent = dose;
+  sliderEls.range.value = String(selected);
+  sliderEls.range.setAttribute("aria-valuetext", dose);
+  setImage(sliderEls.image, url, prompt + ", " + label + ", " + dose);
+  sliderEls.button.setAttribute("aria-label", "Open image: " + prompt + ", " + label + ", " + dose);
+  setImage(sliderEls.baseImage, baselineUrl, prompt + ", " + label + ", baseline");
+  sliderEls.baseButton.setAttribute("aria-label", "Open baseline image: " + prompt + ", " + label);
+
+  sliderEls.promptRow.innerHTML = model.prompts.map((text, index) => {
+    const imageUrl = urlFor(index, state.n, selected);
+    const inside = '<span class="prompt-media">' + (imageUrl
+      ? '<img src="' + esc(imageUrl) + '" alt="" loading="lazy" width="256" height="256" decoding="async">'
+      : '') + '<span class="img-err"' + (imageUrl ? ' hidden' : '') + '>' + (imageUrl ? 'Image unavailable' : 'No image') + '</span></span>';
+    const title = text + ", " + label + ", " + dose;
+    return '<button class="prompt-card" type="button" data-p="' + index + '" aria-label="' + esc(title) + '" title="' + esc(title) + '">' + inside +
+      '<span class="card-prompt">' + fmt(text) + '</span>' +
+      '<span class="card-dose">' + esc(dose) + '</span></button>';
+  }).join("");
+  sliderEls.select.value = state.n;
+}
+
+function render() {
+  if (!model) return;
+  els.gridView.hidden = state.view !== "grid";
+  els.sliderView.hidden = state.view !== "slider";
+  syncControls();
+
+  if (state.view === "grid") {
+    renderGrid();
+  } else {
+    ensureSlider();
+    fillNeuronSelect(true);
+    updateSlider();
+  }
+  writeHash();
+}
+
+function openLightbox(promptIndex, id, doseIndex, trigger) {
+  if (!model) return;
+  state.n = id;
+  lastFocus = trigger || document.activeElement;
+  lightbox = { open: true, p: promptIndex, n: id, d: doseIndex };
+  els.lightbox.hidden = false;
+  document.body.classList.add("lb-open");
+  updateLightbox();
+  writeHash();
+  els.lbClose.focus();
+}
+
+function updateLightbox() {
+  const prompt = model.prompts[lightbox.p] || "";
+  const label = neuronLabel(lightbox.n);
+  const dose = doseLabel(lightbox.d);
+  const url = urlFor(lightbox.p, lightbox.n, lightbox.d);
+
+  els.lbTitle.textContent = prompt;
+  els.lbNeuron.textContent = label;
+  els.lbDose.textContent = dose;
+  els.lbPrev.disabled = lightbox.d <= 0;
+  els.lbNext.disabled = lightbox.d >= 4;
+  els.lbErr.hidden = true;
+
+  if (url) {
+    els.lbImg.hidden = false;
+    els.lbImg.src = url;
+    els.lbImg.alt = prompt + ", " + label + ", " + dose;
+  } else {
+    els.lbImg.hidden = true;
+    els.lbImg.removeAttribute("src");
+    els.lbErr.hidden = false;
+    els.lbErr.textContent = "Image unavailable";
+  }
+}
+
+function moveLightbox(delta) {
+  if (!lightbox.open) return;
+  const next = Math.max(0, Math.min(4, lightbox.d + delta));
+  if (next === lightbox.d) return;
+  lightbox.d = next;
+  updateLightbox();
+}
+
+function closeLightbox() {
+  if (!lightbox.open) return;
+  lightbox.open = false;
+  els.lightbox.hidden = true;
+  document.body.classList.remove("lb-open");
+  if (lastFocus && document.contains(lastFocus)) lastFocus.focus();
+}
+
+function trapLightboxFocus(event) {
+  const focusables = els.lightbox.querySelectorAll('button:not([disabled]), [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+  if (!focusables.length) return;
+  const first = focusables[0];
+  const last = focusables[focusables.length - 1];
+  if (event.shiftKey && (document.activeElement === first || !els.lightbox.contains(document.activeElement))) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault();
+    first.focus();
+  }
+}
+
+function showError(error) {
+  console.error(error);
+  els.status.hidden = false;
+  els.status.classList.add("error");
+  els.status.setAttribute("role", "alert");
+  els.status.innerHTML = '<span class="status-msg">Could not load the image index. ' +
+    esc(error && error.message ? error.message : String(error)) +
+    '. Check your connection and try again.</span>';
+  const retry = document.createElement("button");
+  retry.type = "button";
+  retry.className = "btn";
+  retry.textContent = "Try again";
+  retry.addEventListener("click", load);
+  els.status.appendChild(retry);
+  els.gridView.hidden = true;
+  els.sliderView.hidden = true;
+}
+
+async function load() {
+  els.status.hidden = false;
+  els.status.className = "status";
+  els.status.setAttribute("role", "status");
+  els.status.innerHTML = '<span class="spinner" aria-hidden="true"></span><span>Loading image index…</span>';
+
+  try {
+    const response = await fetch(DATA + "site/janus.json", { cache: "no-store" });
+    if (!response.ok) throw new Error("HTTP " + response.status);
+    const json = await response.json();
+    model = buildModel(json);
+    buildPromptChips();
+    readHash();
+    render();
+    els.status.hidden = true;
+  } catch (error) {
+    showError(error);
+  }
+}
+
+document.addEventListener("error", event => {
+  const image = event.target;
+  if (!(image instanceof HTMLImageElement)) return;
+  image.hidden = true;
+  const err = image.parentElement ? image.parentElement.querySelector(".img-err") : null;
+  if (err) {
+    err.hidden = false;
+    err.textContent = "Image unavailable";
+  }
+}, true);
+
+els.gridBody.addEventListener("click", event => {
+  const button = event.target.closest(".cell");
+  if (!button) return;
+  openLightbox(Number(button.dataset.p), button.dataset.n, Number(button.dataset.d), button);
+});
+
+els.promptChips.addEventListener("click", event => {
+  const button = event.target.closest("[data-prompt]");
+  if (!button || !model) return;
+  state.p = Number(button.dataset.prompt);
+  if (state.view === "slider") {
+    updateSlider();
+  } else {
+    renderGrid();
+  }
+  syncControls();
+  writeHash();
+});
+
+els.layerSelect.addEventListener("change", () => {
+  if (!model) return;
+  state.block = els.layerSelect.value;
+  if (state.block !== "all" && !inBlock(state.n, state.block)) {
+    const first = model.neurons.find(id => inBlock(id, state.block));
+    if (first) state.n = first;
+  }
+  if (state.view === "slider") {
+    fillNeuronSelect(true);
+    updateSlider();
+  } else {
+    renderGrid();
+  }
+  writeHash();
+});
+
+els.viewSwitch.addEventListener("click", event => {
+  const button = event.target.closest("[data-view]");
+  if (!button || !model) return;
+  state.view = button.dataset.view;
+  render();
+});
+
+els.lbClose.addEventListener("click", closeLightbox);
+els.lbPrev.addEventListener("click", () => moveLightbox(-1));
+els.lbNext.addEventListener("click", () => moveLightbox(1));
+els.lightbox.addEventListener("click", event => {
+  if (event.target.closest("[data-close]")) closeLightbox();
+});
+
+document.addEventListener("keydown", event => {
+  if (!lightbox.open) return;
+  if (event.key === "Escape") {
+    event.preventDefault();
+    closeLightbox();
+  } else if (event.key === "ArrowLeft") {
+    event.preventDefault();
+    moveLightbox(-1);
+  } else if (event.key === "ArrowRight") {
+    event.preventDefault();
+    moveLightbox(1);
+  } else if (event.key === "Tab") {
+    trapLightboxFocus(event);
+  }
+});
+
+window.addEventListener("hashchange", () => {
+  if (!model) return;
+  readHash();
+  render();
+});
+
+const themeMQ = matchMedia("(prefers-color-scheme: dark)");
+const themeButton = $("theme");
+
+function resolvedTheme() {
+  const explicit = document.documentElement.dataset.theme;
+  if (explicit === "dark" || explicit === "light") return explicit;
+  return themeMQ.matches ? "dark" : "light";
+}
+
+function applyTheme(mode) {
+  if (mode === "light" || mode === "dark") {
+    document.documentElement.dataset.theme = mode;
+  } else {
+    delete document.documentElement.dataset.theme;
+  }
+  const resolved = resolvedTheme();
+  const label = resolved === "dark" ? "Switch to light theme" : "Switch to dark theme";
+  themeButton.dataset.resolved = resolved;
+  themeButton.setAttribute("aria-label", label);
+  themeButton.title = label;
+}
+
+let storedTheme = null;
+try { storedTheme = localStorage.getItem("atlas-theme"); } catch (error) { storedTheme = null; }
+applyTheme(storedTheme === "light" || storedTheme === "dark" ? storedTheme : null);
+themeButton.addEventListener("click", () => {
+  const next = resolvedTheme() === "dark" ? "light" : "dark";
+  applyTheme(next);
+  try { localStorage.setItem("atlas-theme", next); } catch (error) {}
+});
+themeMQ.addEventListener?.("change", () => {
+  if (!document.documentElement.dataset.theme) applyTheme(null);
+});
+
+load();
+</script>
+</body>
+</html>

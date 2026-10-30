@@ -730,3 +730,14 @@ derangement null, not "persona vs not".
 - Qwen3-8B lens-guided from its stored ±0.8 sweep (fitted J-lens, layers >= 8, up to 6 neurons per word): became the
   word 22.2% (n=288; layers 20–31 23%) vs random 0.3% (n=300); published as experiments/lens_guided.parquet.
 - Qwen3.5-4B · chat shares Qwen3.5-4B's weights, so it got the same jlens/ and saysindex/ files.
+- Prototypes (`explorer/protos/`, served at /protos/ on the Space; data from `site/*.json` built by
+  `analysis/site_data.py`): Vision lab (Qwen2.5-VL stimuli × pushes: push maps, flips, breakage by layer), Image pushes
+  (Janus grids, dose slider, cross-prompt check), Says vs does (6 models, lift toggle, opposite-sign check, Become…
+  evidence), Identity lab (reply kinds by layer, persona share by relative depth across models, fusion pairs, prompt vs
+  push, persona over turns, time and place). Written by DeepSeek from specs; checked headless at 1300 and 390 px in
+  both themes: no page errors, no horizontal overflow. DeepSeek jobs tried to start local servers and edit /tmp
+  (refused); two stray pid files were removed.
+- `DATA_INVENTORY.md`: what is on the Hub (7.4 GB, 10 models), what the explorer shows, what to collect next, outside
+  data, and threads from 2026 papers (J-lens follow-ups, Ferrando et al. visual steering, VLM arbitration, persona
+  vectors through pretraining, auto-interp shortcut critique).
+- Cards: words a neuron's lens says are highlighted inside its stored push replies (matching direction, selected lens).

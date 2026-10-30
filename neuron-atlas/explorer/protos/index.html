@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Atlas Prototypes</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Source+Sans+3:ital,wght@0,400;0,600;1,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+:root {
+  --bg: #f5f4f8; --surface: #ffffff; --sunk: #ebe9f1; --line: #d9d5e3; --ink: #1f1c2c; --ink2: #5d5870; --ink3: #8a849c;
+  --eosin: #d6336c; --eosin-soft: #f9d9e5; --hema: #4b3fa8; --hema-soft: #dedaf5; --accent: #b0245a;
+  --plate: #17152a; --plate-ink: #ece9f7; --plate-ink2: #a29dbb; --plate-line: #2c2946;
+  --good: #1f8a5b; --warn: #b7791f;
+  --k-user: #2a78d6; --k-persona: #d6336c; --k-altered: #4b3fa8; --k-other: #1baf7a; --k-incoherent: #eda100; --k-default: #cfcbdc;
+  --display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --body: "Source Sans 3", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --r: 10px; --r-card: 14px;
+  --s1: 12px; --s2: 16px; --s3: 24px;
+  --card-shadow: 0 1px 2px rgb(0 0 0 / .04), 0 4px 16px rgb(0 0 0 / .04);
+  --card-shadow-hover: 0 2px 4px rgb(0 0 0 / .06), 0 8px 24px rgb(0 0 0 / .08);
+  --pill-shadow: 0 1px 2px rgb(0 0 0 / .08), 0 2px 6px rgb(0 0 0 / .06);
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #121019; --surface: #1b1826; --sunk: #242033; --line: #343048; --ink: #ece9f7; --ink2: #b3adc8; --ink3: #827c99;
+  --eosin: #ff6b9a; --eosin-soft: #4a1f33; --hema: #9d92ff; --hema-soft: #2d2858; --accent: #ff7aa6;
+  --plate: #0b0a12; --plate-ink: #ece9f7; --plate-ink2: #9a95b2; --plate-line: #24213a; --good: #4cc38a; --warn: #e0a84a;
+  --k-user: #3987e5; --k-persona: #e0447a; --k-altered: #8a7ef0; --k-other: #199e70; --k-incoherent: #c98500; --k-default: #3b3652;
+  --card-shadow: 0 1px 2px rgb(0 0 0 / .3), 0 4px 16px rgb(0 0 0 / .25);
+  --card-shadow-hover: 0 2px 4px rgb(0 0 0 / .38), 0 8px 24px rgb(0 0 0 / .35);
+  --pill-shadow: 0 1px 2px rgb(0 0 0 / .35), 0 2px 6px rgb(0 0 0 / .3);
+  color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #121019; --surface: #1b1826; --sunk: #242033; --line: #343048; --ink: #ece9f7; --ink2: #b3adc8; --ink3: #827c99;
+  --eosin: #ff6b9a; --eosin-soft: #4a1f33; --hema: #9d92ff; --hema-soft: #2d2858; --accent: #ff7aa6;
+  --plate: #0b0a12; --plate-ink: #ece9f7; --plate-ink2: #9a95b2; --plate-line: #24213a; --good: #4cc38a; --warn: #e0a84a;
+  --k-user: #3987e5; --k-persona: #e0447a; --k-altered: #8a7ef0; --k-other: #199e70; --k-incoherent: #c98500; --k-default: #3b3652;
+  --card-shadow: 0 1px 2px rgb(0 0 0 / .3), 0 4px 16px rgb(0 0 0 / .25);
+  --card-shadow-hover: 0 2px 4px rgb(0 0 0 / .38), 0 8px 24px rgb(0 0 0 / .35);
+  --pill-shadow: 0 1px 2px rgb(0 0 0 / .35), 0 2px 6px rgb(0 0 0 / .3);
+  color-scheme: dark }
+* { box-sizing: border-box }
+html, body { height: 100% }
+body { background: var(--bg); color: var(--ink); font: 15px/1.5 var(--body); margin: 0 }
+.wrap { max-width: 1100px; margin: 0 auto; padding-block: 28px 60px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)) }
+h1 { font: 800 32px/1.1 var(--display); letter-spacing: -0.02em; margin: 0 }
+h1 i { font-style: normal; color: var(--eosin) }
+nav { display: flex; flex-wrap: wrap; gap: 14px; margin: 10px 0 26px; font-size: 14px }
+nav a { color: var(--ink2) }
+.lede { color: var(--ink2); max-width: 70ch; font-size: 17px }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; margin-top: 20px }
+.card { display: flex; flex-direction: column; gap: 6px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-card);
+  padding: 16px; text-decoration: none; color: var(--ink); box-shadow: var(--card-shadow) }
+.card:hover { box-shadow: var(--card-shadow-hover) }
+.card h2 { font: 700 19px/1.2 var(--display); margin: 0 }
+.card p { margin: 0; color: var(--ink2); font-size: 14px }
+.card .k { font: 12px var(--mono); color: var(--ink3) }
+h3 { font: 700 17px var(--display); margin: 34px 0 6px }
+ul { color: var(--ink2); max-width: 75ch }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Neuron <i>Atlas</i> · prototypes</h1>
+  <nav><a href="../index.html">Explorer</a><a href="index.html" aria-current="page">Prototypes</a><a href="vision.html">Vision lab</a><a href="janus.html">Image pushes</a><a href="lenses.html">Says vs does</a><a href="identity.html">Identity lab</a></nav>
+  <p class="lede">Experimental views over data the main explorer does not show yet. Each page reads small summary files from the <a href="https://huggingface.co/datasets/nikhilxvytla/neuron-atlas/tree/main/site">dataset</a> and lets you test one question. They are prototypes: tell us which ones should graduate into the explorer.</p>
+  <div class="grid">
+    <a class="card" href="vision.html"><span class="k">Qwen2.5-VL-3B · 45 images · 34k pushes</span><h2>Vision lab</h2><p>Push a neuron while the model looks at an arrow, a clock or a typographic attack. Which neurons flip left and right, break counting, or make it read the label instead of the picture?</p></a>
+    <a class="card" href="janus.html"><span class="k">Janus-Pro-1B · 579 images</span><h2>Image pushes</h2><p>Gentle pushes during image generation. Some neurons act as the same style direction on every prompt; rendered text breaks first.</p></a>
+    <a class="card" href="lenses.html"><span class="k">6 models · J, R and logit lenses</span><h2>Says vs does</h2><p>Does what a neuron's output direction says (its lens readout) predict what pushing it makes the model say? Layer by layer, for every model.</p></a>
+    <a class="card" href="identity.html"><span class="k">4 models · sweeps, pairs, prompts, turns</span><h2>Identity lab</h2><p>Who the model becomes when one neuron is pushed: across layers and models, two personas fused, a prompt instead of a push, over a conversation, and in time and place.</p></a>
+  </div>
+  <h3>Next candidates</h3>
+  <ul>
+    <li>Self-describing vision neurons: push a vision neuron on a blank image and ask what the model sees.</li>
+    <li>Dose-response cards: where a push starts to bite and where it breaks, per neuron.</li>
+    <li>J-space trace: which layers carry the pushed word after a push.</li>
+    <li>"Guess what this push did": a game that doubles as crowd-sourced labels.</li>
+  </ul>
+</div>
+<script>
+try { const t = localStorage.getItem("atlas-theme"); if (t) document.documentElement.dataset.theme = t; } catch {}
+</script>
+</body>
+</html>
