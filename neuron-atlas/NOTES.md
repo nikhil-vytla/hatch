@@ -506,3 +506,9 @@ derangement null, not "persona vs not".
   pixel values → uint8 HWC → PIL. Queued after the R1-Distill reasoning pushes.
 - DeepSeek-R1-Distill-Qwen-1.5B read pass on a CPU notebook (1,500 FineWeb-Edu + 500 WildChat + 500 LMSYS docs, 128
   tokens): 250,880 neurons, published; 1,120 labeled, held-out detection 0.736 vs 0.504 null.
+- R1-Distill-1.5B reasoning pushes (16 peaked + 8 random neurons per layer × ±0.8 × 3 prompts, 192 new tokens,
+  4,032 replies, GPU, ~4 min). Unpushed it solves bat-and-ball ($0.05) inside 192 tokens; pushed only 25% keep $0.05
+  (peaked 24% vs random 26%), and layers 7–20 are the fragile band: 3–7% correct vs 35% for layers 0–6 and 54% for
+  21–27. "Who are you?" keeps "DeepSeek" 37% (layers 7–20: 15–18%). Pushes can switch a quick canned answer into
+  deliberation ("Okay, so I need to figure out who the user is asking…", L7 N8226). Spatial: even unpushed it hasn't
+  reached "south" by 192 tokens, so unscorable; ±0.8 is probably strong for a 1.5B model (SmolLM2 needed ±0.5).
