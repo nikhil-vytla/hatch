@@ -244,6 +244,22 @@ first).
     (46 of 2,816); over all layers 4.7% vs 1.5%. In the last three layers it reverses: the long trace degenerates
     into loops (*"city city city…"*) in 21–36% of pushes vs 6–15% for the short answer. The 256-token budget also
     leaves many traces undecided, so "right" rates (60% thinking, 76% direct) are not comparable; "wrong" is.
+28. **Supervised fine-tuning sets the identity anchor; preference tuning and RL leave it where it was.** OLMo-2 1B,
+    the same 512 random neurons per layer pushed ±0.8 at ten checkpoints. After SFT, 6.5% of pushes give a persona
+    and 52% leave the default assistant intact; after DPO 5.9% / 52%; through 200 and 600 RL steps to the released
+    Instruct model 5.4–5.5% / 52–53%. Before SFT there is no anchor to measure: asked in a plain "User: … Assistant:"
+    frame, the pretraining checkpoints already answer in character unpushed (*"I'm your mother."*, *"I'm a robot. I
+    was created by a programmer…"*), and their persona share (0.7% at 21B tokens to 56% for the final base model)
+    tracks how fluently they improvise one. At 21B tokens, pushes in the last layer barely register (1,024 pushes, 2
+    distinct replies).
+29. **Gemma 4 mishears most sounds, and single audio neurons can fix or break that.** Gemma 4 E4B, asked "What do you
+    hear?" about 22 clips (6 synthetic, 16 ESC-50 recordings), names 4 of the 16 recordings correctly unpushed (a dog
+    is "a cat meowing", a siren "barking dogs", a pure 440 Hz tone "nothing"). Pushing one audio-encoder neuron (6 per
+    block, 24 blocks, ±1) changes the answer in 36% of cases, most in the first five blocks and the last. It turns a
+    wrong answer right in 176 pushes (5% of pushes on misheard clips; a rooster that was "a dog barking" becomes "a
+    rooster crowing") and a right answer wrong in 277 (24% of pushes on correctly heard clips). The commonest forced
+    answer is "dog barking": one neuron (block 1, N2933, −1) makes 11 of the 22 sounds a barking dog.
+    `protos/hear.html`.
 
 ## How it works
 

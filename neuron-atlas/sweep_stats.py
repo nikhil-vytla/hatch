@@ -24,7 +24,8 @@ def build(sweep, out, theme_cache=None, mode="model"):
         if mode == "sample" or not (prompt == 0 and (not text.strip() or interesting(text))):
             pop[layer] = pop.get(layer, 0) + 1
     c.sql("create table pop (layer smallint, n bigint)")
-    c.executemany("insert into pop values (?, ?)", list(pop.items()))
+    if pop:  # empty when every reply was picked as identity (e.g. a base model that never names itself)
+        c.executemany("insert into pop values (?, ?)", list(pop.items()))
     c.sql("""create table w as
         with smp as (select layer, count(*) k from lab where picked = 'sample' group by layer)
         select layer, n::double / k as w from pop join smp using (layer)""")

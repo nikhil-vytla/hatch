@@ -231,6 +231,18 @@ def new_models():
         wrong = sum(not FACT.search(t) and bool(WRONG.search(t)) for t in rows)
         out.append(dict(id=f"27-{mode}", claim=f"SmolLM3 layers 6-16, thinking {'on' if mode == 'think' else 'off'}: pushes that call 1001 prime",
                         stated=stated, value=wrong / len(rows), tol=0.002, unit="share", source=f"HuggingFaceTB__SmolLM3-3B/sweep_{mode}/steer/"))
+    # 28: OLMo training ladder (stored labels, weighted like finding 20)
+    for tag, stated in (("sft", 0.065), ("dpo", 0.059), ("instruct", 0.055)):
+        p = hub(f"allenai__OLMo-2-0425-1B/training/{tag}/sweep_stats.parquet")
+        tot, per = duckdb.sql(f"select sum(n_est), sum(n_est) filter (where reply_kind = 'persona') from '{p}'").fetchall()[0]
+        out.append(dict(id=f"28-{tag}", claim=f"OLMo-2 1B {tag}: persona share of pushes", stated=stated, value=per / tot, tol=0.003,
+                        unit="share", source=f"allenai__OLMo-2-0425-1B/training/{tag}/sweep_stats.parquet"))
+    # 29: Gemma 4 audio
+    h = json.load(open(hub("google__gemma-4-E4B-it/audio/hear_summary.json")))
+    out.append(dict(id="29", claim="Gemma 4 audio: pushes that change what it hears", stated=0.36, value=h["changed"] / h["n_pushes"], tol=0.005,
+                    unit="share", source="google__gemma-4-E4B-it/audio/hear_summary.json"))
+    out.append(dict(id="29f", claim="… pushes that turn a misheard ESC-50 clip right", stated=176, value=h["esc"]["fixed"], tol=0, unit="count", source="same"))
+    out.append(dict(id="29b", claim="… pushes that turn a correctly heard clip wrong", stated=277, value=h["esc"]["broke"], tol=0, unit="count", source="same"))
     return out
 
 

@@ -863,3 +863,12 @@ derangement null, not "persona vs not".
   15,136 words. Says → does (`analysis/ts_says.py`, finding 16's metric): layer 3 hit 43–46% vs chance 2–2.5%;
   layers 0–2 2–4% vs ~1%; J and logit lens differ only at layers 0–1 (J slightly higher). "Met a" character named by
   the lens: 8% of layer-3 pushes.
+- OLMo-2 1B ladder done (10 checkpoints × 16 layers × 512 neurons × ±0.8, ~3 min each on GPU; labeled with
+  `--names olmo|allen|ai2|tulu|tülu`). `sweep_stats.py` crashed on pre-21B because no reply named OLMo, so every
+  reply was picked and the sampled population was empty; guarded. Post-training: persona 6.5% (SFT), 5.9% (DPO),
+  5.4–5.5% (RL 200/600, Instruct); default assistant ~52% throughout. Pretraining checkpoints answer "Who are you?" in
+  character even unpushed ("I'm your mother… To kill you", "I'm a robot", "I am the Assistant"), so their persona
+  share (0.7% → 56%) is not an anchoring measure; reported as such.
+- Gemma 4 audio (`analysis/gemma_audio.py`, judge-free): 2,269 of 6,336 pushes change the answer; 4 of 16 ESC-50 clips
+  right unpushed; pushes fix 176, break 277; "dog barking" is the attractor (556 of the changed answers). Gemma's
+  blank-image run first failed: its processor wants `images=[[img]] * batch`; `_prepare_inputs` now retries nested.

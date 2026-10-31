@@ -219,7 +219,10 @@ def _prepare_inputs(nm, stimuli_dir, item, question, batch=1):
             media = "image"
             prompt = _chat_prompt(nm, question, media)
     if media == "image":
-        inputs = nm.processor(text=[prompt] * batch, images=[_image(path)] * batch, return_tensors="pt")
+        try:
+            inputs = nm.processor(text=[prompt] * batch, images=[_image(path)] * batch, return_tensors="pt")
+        except ValueError:  # processors like Gemma 4's want one image list per prompt
+            inputs = nm.processor(text=[prompt] * batch, images=[[_image(path)]] * batch, return_tensors="pt")
     if media == "audio":
         inputs = nm.processor(text=[prompt] * batch, audio=[_audio(nm, path)] * batch, return_tensors="pt")
     return {k: (v.to(nm.device) if torch.is_tensor(v) else v) for k, v in inputs.items()}
