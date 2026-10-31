@@ -825,3 +825,23 @@ derangement null, not "persona vs not".
   random neurons per layer (384), pushed −1/+1/+2 while the model describes a plain gray, black or white image; plus
   each neuron's mean activation on the 45 stimuli, so a judge can test whether the blank-image answer names what the
   neuron's top stimulus shows.
+- Blank-image result (Qwen2.5-VL-3B, 384 vision neurons × doses −1/+1/+2 × gray/black/white): 91% of pushes change the
+  wording but most still describe a blank image; 285 describe something (187 of them at +2). The string match against
+  the neuron's top stimuli's answer words is null (0.9% vs 0.7% chance), because answers like "3" don't name the
+  content. Blind DeepSeek judge (`analysis/blank_vision_judge.py`: own top-3 stimuli vs 3 random, order randomized):
+  own 58, random 44, neither 183, i.e. weak (57% of decisive picks). Consistency is the real effect: of 63
+  neuron-doses that hallucinate on ≥ 2 blanks, 26 (41%) share specific content across the blanks vs 6 of 63 (10%) for
+  shuffled groups. Hierarchy: layers 4–8 draw patterns (vertical lines, grid, small dots, a diagonal stripe,
+  checkerboard), 10–15 objects (concentric circles, a black cat, a white truck parked on grass, a path into the
+  distance), and layer 31 mostly one attractor ("a person wearing a red shirt and black pants") plus glasses and a
+  group of people. The neuron's own preferred stimuli predict the drawing only weakly, but our 45 stimuli are mostly
+  synthetic; a natural-image set would test it properly.
+- Qwen3.5-0.8B "Who are you?" sweep labeled (86,016 neurons × ±0.8): persona 4.7% of pushes (8,020 of 172,032
+  estimated) vs 0.8% for Qwen3.5-4B on the same prompt; altered assistant 45%, incoherent 17%. (First judge; read as
+  upper bounds per AUDIT.md.)
+- OLMo-2 1B training ladder (`analysis/olmo_ladder.py`, queued): the same 512 random neurons per layer pushed at
+  pretraining checkpoints (21B, 210B, 1T, 2T tokens), the final base, SFT, DPO, RL step 200 / 600, and Instruct.
+  `NeuronModel("org/model@branch")` now loads a revision.
+- Audio towers: `NeuronModel(where="audio")` finds Gemma-style conformer feed-forwards (two per layer, each counted as
+  its own "layer"); `atlas.multimodal` reads WAV/FLAC stimuli (resampled to the processor's rate);
+  `analysis/audio_stimuli.py` writes 6 synthetic sounds + 16 ESC-50 classes.

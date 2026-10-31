@@ -168,12 +168,14 @@ def _resid_median(nm, stimuli_dir, stimuli, where):
 
 def _media(item):
     ext = os.path.splitext(item["file"])[1].lower()
+    if ext in (".wav", ".flac", ".mp3", ".ogg"):
+        return "audio"
     return "video" if ext in (".mp4", ".gif", ".webm", ".avi") else "image"
 
 
 def _chat_prompt(nm, question, media):
     content = []
-    if media in ("image", "video"):
+    if media in ("image", "video", "audio"):
         content.append({"type": media})
     content.append({"type": "text", "text": question})
     if nm.processor is not None and getattr(nm.processor, "chat_template", None):
@@ -192,6 +194,18 @@ def _image(path):
     return img.convert("RGB")
 
 
+def _audio(nm, path):
+    """Mono float32 waveform at the processor's sampling rate."""
+    import soundfile as sf
+    x, sr = sf.read(path, dtype="float32", always_2d=True)
+    x = x.mean(1)
+    want = getattr(getattr(nm.processor, "feature_extractor", None), "sampling_rate", None) or sr
+    if sr != want:
+        idx = np.linspace(0, len(x) - 1, int(round(len(x) * want / sr)))
+        x = np.interp(idx, np.arange(len(x)), x).astype(np.float32)
+    return x
+
+
 def _prepare_inputs(nm, stimuli_dir, item, question, batch=1):
     if nm.processor is None:
         raise ValueError(f"{nm.name} has no processor; cannot build image-text inputs")
@@ -206,6 +220,8 @@ def _prepare_inputs(nm, stimuli_dir, item, question, batch=1):
             prompt = _chat_prompt(nm, question, media)
     if media == "image":
         inputs = nm.processor(text=[prompt] * batch, images=[_image(path)] * batch, return_tensors="pt")
+    if media == "audio":
+        inputs = nm.processor(text=[prompt] * batch, audio=[_audio(nm, path)] * batch, return_tensors="pt")
     return {k: (v.to(nm.device) if torch.is_tensor(v) else v) for k, v in inputs.items()}
 
 
@@ -528,7 +544,7 @@ def main(argv=None):
 
     def common(p, model):
         p.add_argument("--model", default=model)
-        p.add_argument("--where", choices=["llm", "vision"], default="llm")
+        p.add_argument("--where", choices=["llm", "vision", "audio"], default="llm")
         p.add_argument("--per-layer", type=int, default=16)
         p.add_argument("--all", action="store_true", help="every neuron of the selected stack (very large)")
         p.add_argument("--recipe", action="append", default=[], metavar="STRING")

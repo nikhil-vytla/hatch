@@ -14,6 +14,8 @@ except ImportError:  # older transformers: image-text checkpoints will fail at l
     AutoModelForImageTextToText = None
 
 DOWN_RE = re.compile(r"\.(\d+)\.(?:mlp|feed_forward)\.(down_proj|c_proj|fc2|dense_4h_to_h|w2)(?:\.linear)?$")
+# conformer audio towers (Gemma 3n/4): two macaron feed-forwards per layer, each counted as its own "layer"
+AUDIO_DOWN_RE = re.compile(r"audio_tower\.(?:\w+\.)*layers\.(\d+)\.feed_forward(\d)\.ffw_layer_2(?:\.linear)?$")
 TERM_RE = re.compile(r"L(\d+)N(\d+)\s*([=*+\-])?\s*([+-]?\d*\.?\d+(?:[eE][+-]?\d+)?)", re.I)
 SKIP_TOWERS = ("visual", "vision", "audio", "mm_projector")
 
@@ -54,36 +56,44 @@ def pick_device():
 
 class NeuronModel:
     def __init__(self, name: str, device: str | None = None, dtype=None, where: str = "llm"):
-        if where not in ("llm", "vision"):
-            raise ValueError(f"where must be 'llm' or 'vision', got {where!r}")
+        if where not in ("llm", "vision", "audio"):
+            raise ValueError(f"where must be 'llm', 'vision' or 'audio', got {where!r}")
         self.name = name
         self.where = where
         self.device = device or pick_device()
         if dtype is None:
             dtype = torch.bfloat16 if self.device == "cuda" else torch.float32
+        # "org/model@revision" loads a training checkpoint branch
+        repo, _, revision = name.partition("@")
+        rev = {"revision": revision} if revision else {}
         self.processor = None
         try:
-            self.processor = AutoProcessor.from_pretrained(name)
+            self.processor = AutoProcessor.from_pretrained(repo, **rev)
         except Exception:
             self.processor = None
         try:
-            self.tok = AutoTokenizer.from_pretrained(name)
+            self.tok = AutoTokenizer.from_pretrained(repo, **rev)
         except Exception:
-            proc = self.processor or AutoProcessor.from_pretrained(name)
+            proc = self.processor or AutoProcessor.from_pretrained(repo, **rev)
             self.processor = self.processor or proc
             self.tok = getattr(proc, "tokenizer", None) or proc
         if self.tok.pad_token is None:
             self.tok.pad_token = self.tok.eos_token
         try:
-            self.model = AutoModelForCausalLM.from_pretrained(name, dtype=dtype)
+            self.model = AutoModelForCausalLM.from_pretrained(repo, dtype=dtype, **rev)
         except Exception:
             if AutoModelForImageTextToText is None:
                 raise
-            self.model = AutoModelForImageTextToText.from_pretrained(name, dtype=dtype)
+            self.model = AutoModelForImageTextToText.from_pretrained(repo, dtype=dtype, **rev)
         self.model = self.model.to(self.device).eval()
         self.model.requires_grad_(False)
         found = []
         for mod_name, mod in self.model.named_modules():
+            if where == "audio":
+                m = AUDIO_DOWN_RE.search(mod_name)
+                if m:
+                    found.append((2 * int(m.group(1)) + int(m.group(2)) - 1, mod_name, mod))
+                continue
             m = DOWN_RE.search(mod_name)
             if not m or ".experts." in mod_name:
                 continue
@@ -95,7 +105,7 @@ class NeuronModel:
                 continue
             found.append((int(m.group(1)), mod_name, mod))
         if not found:
-            what = "vision-tower" if where == "vision" else "dense"
+            what = {"vision": "vision-tower", "audio": "audio-tower"}.get(where, "dense")
             raise ValueError(f"no {what} MLP down projections found in {name} (MoE models are not supported)")
         found.sort(key=lambda x: (x[0], x[1]))
         self.down_names = [n for _, n, _ in found]
@@ -119,7 +129,7 @@ class NeuronModel:
     def _layer_module(self, name):
         """The transformer block that owns a down projection (its output is that layer's residual stream)."""
         parts = name.split(".")
-        key = next((k for k in ("mlp", "feed_forward") if k in parts), None)
+        key = next((k for k in parts if k in ("mlp", "feed_forward") or re.fullmatch(r"feed_forward\d", k)), None)
         if key is None:
             return None
         path = ".".join(parts[:len(parts) - 1 - parts[::-1].index(key)])
