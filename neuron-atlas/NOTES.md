@@ -803,7 +803,9 @@ derangement null, not "persona vs not".
 
 - MusicGen-small: 291 clips (3 prompts × 24 decoder layers × 2 neurons × ±0.5 + baselines). "Sound pushes" page
   (`protos/music.html`; DeepSeek-built, tested at 1300/390 px, audio plays, one clip at a time). L14 N510 +0.5
-  is the most disruptive on every prompt (spectral centroid 6.5–8.7 kHz vs 0.7–1.9 kHz baselines).
+  is the largest change averaged over prompts (ranks 1st/2nd/3rd on piano/orchestra/guitar; centroid 8.7/6.5/3.2 kHz
+  vs 0.7/1.5/1.9 kHz unpushed). Correction: I first wrote "most disruptive on every prompt, 6.5–8.7 kHz", which only
+  holds for two of the three prompts. By layer, layer 0 changes the sound most (mean distance 0.36), not layers 0–3.
 - Notebook B (CPU) rebooted mid-run and lost the TinyStories lens fits and sweep (and its HF_TOKEN env, so uploads
   from B now go via pull-and-upload from the local container). TinyStories sweep re-run on the GPU in ~2 min
   (12,288 neurons × ±0.5 × 2 prompts). Running TinyStories lens fits alongside four GPU jobs ran the 96 GB GPU out of

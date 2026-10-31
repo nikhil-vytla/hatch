@@ -202,6 +202,33 @@ first).
    every steered reply is a `<think>` preamble. Qwen's logit lens is often in Chinese even for English-firing
    neurons ("more importantly" → 最重要). The UMAP map of output directions is a near-uniform cloud (mean top-1
    cosine between neurons is 0.25), so "writes like" neighbors come from exact cosine search, not from the map.
+23. **Within one family, the smaller model is far easier to rename.** Every Qwen3.5-0.8B neuron pushed ±0.8 on "Who
+    are you?" (172k replies): a persona in **4.7%** of pushes vs 0.8% for Qwen3.5-4B under the same dose, prompt and
+    template. The largest theme is the model declaring itself human (*"I am a human being. I'm here to help."*,
+    1,318 replies), over half of them from layers 0–2 of 24 (a quarter from layer 0 alone). On "Who am I?" 11% of pushes assert who the user is. (First-judge rates; read as upper
+    bounds, `AUDIT.md`.)
+24. **A pushed vision neuron draws its own picture on a blank canvas.** Qwen2.5-VL-3B shown a plain gray, black or
+    white image while one vision-encoder neuron is pushed (384 random neurons, doses −1/+1/+2): 285 of 3,456 pushes
+    make it describe something that is not there. What one neuron draws is stable: of 63 neuron-doses that
+    hallucinate on two or more of the blanks, 26 (41%) draw the same thing on each (judged), vs 6 of 63 (10%) for
+    hallucinations shuffled across neurons. Early layers draw patterns (vertical lines, a grid, small dots, a
+    diagonal stripe), middle layers objects (*"a white truck parked on a grassy area with trees"* on all three
+    blanks from L13 N66, a black cat, concentric circles), and the last layer mostly one attractor (*"a person
+    wearing a red shirt and black pants"*); a few neurons write text into the image (*"I am a language model and I
+    can help you"*). Whether the drawing matches what the neuron fires on in real images is weak on our 45 mostly
+    synthetic stimuli: a blind judge prefers the neuron's top images over random ones 58 to 44 (183 neither).
+    `protos/vision.html` → Blank canvas.
+25. **A 4-layer story model recasts its characters, but only in some slots.** TinyStories-33M, every neuron pushed
+    ±0.5 at two points where a story introduces someone (49k continuations, rule-based parse, no judge). *"One day,
+    a little girl named Lily met a…"* gets a different character in 45–73% of pushes in every layer (a new friend, a
+    kind old lady, a wise old owl, a dragon, a fairy, a *"waffle-making waffle maker"*); *"Once upon a time, there
+    was a…"* keeps its little girl in 98% of pushes through layer 2 and changes in 34% at layer 3.
+    `protos/stories.html`.
+26. **Music: one neuron brightens every song.** MusicGen-small, 2 random neurons per decoder layer pushed ±0.5 on
+    three prompts (291 clips). Layer 0 moves the clip's spectrum furthest from the unpushed one on average (mean
+    cosine distance 0.36; most layers 0.03–0.2). L14 N510 at +0.5 is the largest change averaged over the prompts
+    (1st on lo-fi piano, 2nd on orchestra, 3rd on guitar), raising the spectral centroid to 8.7 / 6.5 / 3.2 kHz from
+    0.7 / 1.5 / 1.9 kHz: the same direction of change on every song. `protos/music.html` plays every clip.
 
 ## How it works
 
