@@ -788,3 +788,13 @@ derangement null, not "persona vs not".
   0.20 (L0), 0.29 (L4), 0.39 (L8), 0.50 (L16), 0.66 (L20), 0.79 (L24), 0.90 (L28), closer than the J pair. Fitted
   R-lenses for Qwen3-8B and R1-Distill published (readouts now have j and r columns). On GPU in bf16 the R-rule
   forward check measured 1.1–1.7% max relative logit change (SmolLM2 fp32 CPU: 2e-6), i.e. bf16 operation order.
+
+## Site workflow audit (Oct 31)
+
+- Scripted journeys on the live Space (landing, Surprise me, Personas → neuron → Try live, Become → Mix, prototype →
+  card, phone card, back button). No page errors; deep links, back button and prototype links worked. Fixed: no
+  front door (added a dismissible "Start here" band with Surprise me / Browse personas / Become… / Evidence, hidden on
+  neuron deep links); phone cards opened below the map (now scroll into view); the Mix lived only in memory and the
+  URL kept the previous view's hash (now `#<model>-mix?r=<recipe>`, restored on load, and tab clicks update the
+  hash); Become/Mix hashes dropped the model id (shared links opened the wrong model); the Personas library opened on
+  "altered assistant" (now persona).
