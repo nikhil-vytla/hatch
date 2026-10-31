@@ -71,34 +71,39 @@ def main(out):
     layers = sorted({L for L, _ in picks})
     lens = {name: neuron_lens(nm, Jl, k=K, layers=layers) for name, Jl in (("j", J), ("logit", None))}
 
-    # A: replies + continuous log-prob test
+    # A: replies + continuous log-prob test. A rerun after a crash skips A when its output exists and draws the same
+    # number of random values A would have, so part B's random controls are those of an uninterrupted run.
     pa_text = nm.chat_prompt(PROMPT_A)
-    base_ids = generate(nm, pa_text, 1, 32)[0]
-    base_lp = last_logprobs(nm, pa_text, [[]], resid)[0]
-    rows = []
-    for start in range(0, len(picks), 64):
-        part = picks[start:start + 64]
-        for sign in (1, -1):
-            terms = [[(L, n, "add", sign * DOSE)] for L, n in part]
-            nm.set_recipes(terms, resid)
-            try:
-                outs = generate(nm, pa_text, len(part), 32)
-            finally:
-                nm.clear_steer()
-            lp = last_logprobs(nm, pa_text, terms, resid)
-            for (L, n), ids, lpi in zip(part, outs, lp):
-                other_L, other_n = picks[rng.randrange(len(picks))]
-                rec = dict(layer=L, neuron=n, dose=sign * DOSE, text=nm.tok.decode(ids, skip_special_tokens=True))
-                for name, ln in lens.items():
-                    own = ln[L][0 if sign > 0 else 1][n]
-                    oth = ln[other_L][0 if sign > 0 else 1][other_n]
-                    rec[f"{name}_tokens"] = nm.token_strings(own.tolist())
-                    rec[f"{name}_dlp_own"] = float((lpi[own] - base_lp[own]).mean())
-                    rec[f"{name}_dlp_other"] = float((lpi[oth] - base_lp[oth]).mean())
-                rows.append(rec)
-        print(f"A {start + len(part)}/{len(picks)}", flush=True)
-    pq.write_table(pa.Table.from_pylist(rows), os.path.join(out, "prereg_A.parquet"), compression="zstd")
-    json.dump(dict(prompt=PROMPT_A, baseline=nm.tok.decode(base_ids, skip_special_tokens=True)), open(os.path.join(out, "prereg_A_baseline.json"), "w"))
+    if os.path.exists(os.path.join(out, "prereg_A.parquet")):
+        for _ in range(2 * len(picks)):
+            rng.randrange(len(picks))
+    else:
+        base_ids = generate(nm, pa_text, 1, 32)[0]
+        base_lp = last_logprobs(nm, pa_text, [[]], resid)[0]
+        rows = []
+        for start in range(0, len(picks), 64):
+            part = picks[start:start + 64]
+            for sign in (1, -1):
+                terms = [[(L, n, "add", sign * DOSE)] for L, n in part]
+                nm.set_recipes(terms, resid)
+                try:
+                    outs = generate(nm, pa_text, len(part), 32)
+                finally:
+                    nm.clear_steer()
+                lp = last_logprobs(nm, pa_text, terms, resid)
+                for (L, n), ids, lpi in zip(part, outs, lp):
+                    other_L, other_n = picks[rng.randrange(len(picks))]
+                    rec = dict(layer=L, neuron=n, dose=sign * DOSE, text=nm.tok.decode(ids, skip_special_tokens=True))
+                    for name, ln in lens.items():
+                        own = ln[L][0 if sign > 0 else 1][n]
+                        oth = ln[other_L][0 if sign > 0 else 1][other_n]
+                        rec[f"{name}_tokens"] = nm.token_strings(own.tolist())
+                        rec[f"{name}_dlp_own"] = float((lpi[own] - base_lp[own]).mean())
+                        rec[f"{name}_dlp_other"] = float((lpi[oth] - base_lp[oth]).mean())
+                    rows.append(rec)
+            print(f"A {start + len(part)}/{len(picks)}", flush=True)
+        pq.write_table(pa.Table.from_pylist(rows), os.path.join(out, "prereg_A.parquet"), compression="zstd")
+        json.dump(dict(prompt=PROMPT_A, baseline=nm.tok.decode(base_ids, skip_special_tokens=True)), open(os.path.join(out, "prereg_A_baseline.json"), "w"))
 
     # B: lens-guided pushes on 30 new words
     from atlas.jlens import says_index  # noqa: F401  (index built from the published readout files below)
@@ -126,8 +131,8 @@ def main(out):
         jobs.append(dict(kind="random", concept=rng.choice(CONCEPTS_B), layer=rng.randrange(8, nm.n_layers),
                          neuron=rng.randrange(nm.d_mlp), sign=rng.choice((1, -1))))
     pb_text = nm.chat_prompt(PROMPT_B)
-    for start in range(0, len(jobs), 128):
-        part = jobs[start:start + 128]
+    for start in range(0, len(jobs), 32):
+        part = jobs[start:start + 32]
         nm.set_recipes([[(j["layer"], j["neuron"], "add", j["sign"] * DOSE)] for j in part], resid)
         try:
             outs = generate(nm, pb_text, len(part), 40)

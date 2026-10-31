@@ -50,3 +50,10 @@ advance is the cheapest way for someone other than us to tell whether the effect
 | P9 | B: mention rate in layers 20–31 ≥ 2 × layers 8–19 | 31% vs 4% before |
 
 Any prediction that fails will be reported as failed in the README, with no change to the metric afterwards.
+
+## Changes after registration
+
+- 2026-10-31: part B ran out of GPU memory (the GPU was shared with a lens fit) after part A had finished and been
+  written. Crash fix only: the script now skips part A when its output exists, and part B runs in batches of 32
+  instead of 128; the skip draws the same random values part A would have, so part B's random controls match an
+  uninterrupted run. Neither the neurons, prompts, words, metrics nor predictions changed.

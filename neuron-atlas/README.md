@@ -160,7 +160,7 @@ first).
     browser.
 18. **Two persona neurons fuse into one identity.** Pushing two persona neurons from different themes together
     (160 pairs, each at 0.6× its dose) gives one fused identity 33% of the time, a third new identity 32%, and one
-    persona winning only 6%: "a desktop PC" + "a smart home manager" → *"QWPC-Household, a desktop PC household
+    persona winning only 7%: "a desktop PC" + "a smart home manager" → *"QWPC-Household, a desktop PC household
     management assistant"*; "a peace activist" + "a trie data structure" → *"a tree on the Tree of Life, an
     international movement for peace"*. Fused identities contain J-lens words of *both* neurons 34–38% of the
     time and of at least one 89–95% (one persona winning: never both), as if the model satisfied two "say this"
@@ -168,21 +168,21 @@ first).
     vectors (Golden Gate + Star Trek → USS Enterprise), here from two single neurons.
 19. **A system prompt can imitate a push's behaviour but not its state.** For 274 persona pushes, "You are X." /
     "Roleplay as X" reproduces the persona 77% / 85% of the time, and a blind judge picks out the pushed reply only
-    65% / 58% of the time (pushed replies are terser and get facts wrong: *"the 10th President… 2009"*). Inside, the
+    65% / 57% of the time (pushed replies are terser and get facts wrong: *"the 10th President… 2009"*). Inside, the
     two routes differ: the shifts from baseline at the last layer have median cosine 0.34, and the prompted state is
     usually no closer to the pushed one than the unprompted baseline is. This is in line with Mishra et al.'s
     "steered activations are non-surjective". Some prompts fail where pushes succeed ("You are a check-in assistant"
     → *"I'm Qwen3.5"*).
 20. **Identity fragility is a property of post-training more than of size.** At the same dose (±0.5), every-neuron
     "Who are you?" sweeps give a persona in **37%** of pushes for SmolLM2-135M (34k replies, 28k distinct names; the
-    most common, *"a freelance writer in the city"*, is 1.4% of them), 1.5% for Qwen3-0.6B, 0.5% for Qwen3.5-4B (±0.8) and
-    2.1% for Qwen3-8B. The chat template is part of the anchor: the same Qwen3-0.6B prompted as plain text
+    most common, *"a freelance writer in the city"*, is 1.4% of them), 1.5% for Qwen3-0.6B, 0.8% for Qwen3.5-4B (±0.8) and
+    2.1% for Qwen3-8B (Qwen3.5-4B 0.8% on "Who are you?" alone; finding 9's 0.5% counts both of its prompts). The chat template is part of the anchor: the same Qwen3-0.6B prompted as plain text
     ("User: Who are you?\nAssistant:") takes a persona on 7.6% of pushes, 5× its rate under the template. Its base
     model under the same plain prompt does so on 11.5%, but almost always as a generic human ("a human", "a
     student", "a Berkeley CS student"), the base-model behaviour Vogel describes. The "Who am I?" role swap (*"you are a language model / a helpful AI assistant named
     SmolLM"*) appears in all four models.
 21. **Pushes move the model's clock forward and sometimes give it a body.** Asked "What year is it?" (unpushed
-    2024), pushed Qwen3.5-4B says 2025 or 2026 in 34% of pushes and 2023 in 3%; 1.1% leave the century (*"The
+    2024), pushed Qwen3.5-4B says 2025 or 2026 in 33% of pushes and 2023 in 3%; 1.1% leave the century (*"The
     current year is 1098, which falls within the period of the reigns of…"*). Asked where it is (unpushed: no
     physical location), 4% claim a place: *"a freshwater aquarium tank"*, *"I AM IN THE DARKNESS"*, *"at home, taking
     care of my family"*; real places are nearly always the United States (San Francisco, New York), rarely China.
