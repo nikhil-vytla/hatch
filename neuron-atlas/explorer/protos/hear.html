@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Hearing pushes</title>
-<meta name="description" content="Gemma 4 E4B listening to sounds while one neuron of its audio encoder is pushed.">
+<meta name="description" content="Gemma 4 E4B and Qwen2.5-Omni-3B listening to sounds while one neuron of an audio encoder is pushed.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Source+Sans+3:ital,wght@0,400;0,600;1,400&family=JetBrains+Mono:wght@400;600&display=swap">
@@ -108,6 +108,16 @@ button { cursor: pointer }
 .status.error .status-body { flex: 1 1 auto; min-width: 0 }
 .status.error button { flex: 0 0 auto; border: 1px solid var(--line); background: var(--surface); border-radius: 7px;
   padding: 6px 10px; font-weight: 600 }
+
+.modelbar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 0 2px; min-width: 0 }
+.modelbar-label { font: 600 10px/1.2 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--ink3) }
+.model-chip { display: inline-flex; align-items: center; gap: 7px; border: 1px solid var(--line);
+  background: var(--surface); color: var(--ink2); border-radius: 999px; padding: 7px 13px;
+  font: 600 13px/1 var(--body); white-space: nowrap;
+  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease }
+.model-chip:hover { border-color: var(--hema); color: var(--ink) }
+.model-chip[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink) }
+.model-chip:focus-visible { outline: 2px solid var(--hema); outline-offset: 2px }
 .spinner { width: 16px; height: 16px; flex: 0 0 auto; border: 2px solid var(--line); border-top-color: var(--eosin);
   border-radius: 50%; animation: spin .8s linear infinite }
 @keyframes spin { to { transform: rotate(360deg) } }
@@ -271,6 +281,12 @@ td:first-child { color: var(--ink); font-family: var(--mono); white-space: nowra
     </nav>
   </header>
 
+  <div class="modelbar" id="modelBar" role="group" aria-label="Model">
+    <span class="modelbar-label">Model</span>
+    <button class="model-chip" type="button" data-model="gemma4" aria-pressed="true">Gemma 4 E4B</button>
+    <button class="model-chip" type="button" data-model="omni" aria-pressed="false">Qwen2.5-Omni-3B</button>
+  </div>
+
   <div class="status" id="status" role="status"><span class="spinner" aria-hidden="true"></span><span>Loading the hearing experiment…</span></div>
 
   <main class="stack" id="main" hidden>
@@ -300,7 +316,7 @@ td:first-child { color: var(--ink); font-family: var(--mono); white-space: nowra
       <div class="section-head">
         <div>
           <h2>The sounds</h2>
-          <p class="lede">Twenty-two short clips: 6 synthetic tones and 16 ESC-50 recordings. Each card shows the true class and what the unpushed model answered. Click a card to select that sound; the selected card gets a violet outline. Play buttons stream one clip at a time.</p>
+          <p class="lede" id="soundsLede"></p>
         </div>
         <span class="count" id="soundsCount"></span>
       </div>
@@ -311,7 +327,7 @@ td:first-child { color: var(--ink); font-family: var(--mono); white-space: nowra
       <div class="section-head">
         <div>
           <h2>Pushed answers for the selected sound</h2>
-          <p class="lede">Every neuron and dose for the selected sound, with blocks B0–B23 and doses -1 or +1. A row whose answer differs from the unpushed answer carries an eosin-tinted “changed” badge. Rows are sorted by block.</p>
+          <p class="lede" id="answersLede"></p>
         </div>
         <span class="count" id="answersCount"></span>
       </div>
@@ -327,7 +343,7 @@ td:first-child { color: var(--ink); font-family: var(--mono); white-space: nowra
       <div class="section-head">
         <div>
           <h2>Neurons that force one sound</h2>
-          <p class="lede">The top 12 pushes by how many of the 22 sounds they take over. Each was pushed at -1 or +1 in one audio block (B0–B23); the selected card is outlined in violet. Open a card to see that push’s answer for every sound, with a play button beside each one.</p>
+          <p class="lede" id="groupLede"></p>
         </div>
         <span class="count">Top 12 · sorted by sounds taken over</span>
       </div>
@@ -338,7 +354,7 @@ td:first-child { color: var(--ink); font-family: var(--mono); white-space: nowra
       <div class="section-head">
         <div>
           <h2>Change by audio block</h2>
-          <p class="lede">Bars show the share of pushed answers that changed, block by block; both doses (-1 and +1) are pooled. Early blocks and the last block change it most; the middle blocks change it least. Eosin bars; hover or focus a bar for its counts.</p>
+          <p class="lede" id="chartCaption">Bars show the share of pushed answers that changed, block by block; both doses (-1 and +1) are pooled. Hover or focus a bar for its counts.</p>
         </div>
         <button class="table-btn" id="chartTableBtn" type="button" aria-expanded="false" aria-controls="chartTable">Table</button>
       </div>
@@ -359,7 +375,10 @@ td:first-child { color: var(--ink); font-family: var(--mono); white-space: nowra
 
   const DATA = "https://huggingface.co/datasets/nikhilxvytla/neuron-atlas/resolve/main/";
   const THEME_KEY = "hear-lab-theme";
-  const MAX_BLOCK = 23;
+  const MODELS = {
+    gemma4: { label: "Gemma 4 E4B", file: "site/hear.json" },
+    omni: { label: "Qwen2.5-Omni-3B", file: "site/hear_omni.json" }
+  };
 
   const $ = (sel, root = document) => root.querySelector(sel);
   const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
@@ -416,11 +435,13 @@ td:first-child { color: var(--ink); font-family: var(--mono); white-space: nowra
     return `<audio preload="none" data-src="${esc(url)}"></audio>`;
   }
 
-  const state = { s: null, n: null, changedOnly: false };
+  const state = { m: "gemma4", s: null, n: null, changedOnly: false };
   const themeMQ = matchMedia("(prefers-color-scheme: dark)");
   const themeBtn = $("#theme");
   const tip = $("#tip");
 
+  const dataCache = new Map();
+  let loadSeq = 0;
   let db = null;
   let stimuli = [];
   let stimById = new Map();
@@ -463,15 +484,31 @@ td:first-child { color: var(--ink); font-family: var(--mono); white-space: nowra
       `<div class="t-row"><span>Share</span><b>${pct(stat.changed, stat.n)}</b></div>`;
   }
 
+  function normalizeModel(value) {
+    return MODELS[value] ? value : "gemma4";
+  }
+
   function parseHash() {
     const params = new URLSearchParams(location.hash.replace(/^#/, ""));
-    return { s: params.get("s"), n: params.get("n") };
+    return { m: params.get("m"), s: params.get("s"), n: params.get("n") };
   }
 
   function writeHash() {
-    let next = "#s=" + encodeURIComponent(state.s || "");
+    let next = "#m=" + encodeURIComponent(state.m);
+    if (state.s) next += "&s=" + encodeURIComponent(state.s);
     if (state.n) next += "&n=" + encodeURIComponent(state.n);
     if (location.hash !== next) history.replaceState(null, "", next);
+  }
+
+  function updateModelChips() {
+    $$(".model-chip").forEach(btn => {
+      btn.setAttribute("aria-pressed", String(btn.dataset.model === state.m));
+    });
+  }
+
+  function blockRange() {
+    if (!layerStats.length) return "B0";
+    return "B" + layerStats[0].layer + "–B" + layerStats[layerStats.length - 1].layer;
   }
 
   function stopActive() {
@@ -602,13 +639,16 @@ td:first-child { color: var(--ink); font-family: var(--mono); white-space: nowra
       Number(a.neuron) - Number(b.neuron)
     ).slice(0, 12);
 
-    layerStats = [];
-    for (let layer = 0; layer <= MAX_BLOCK; layer++) {
+    const layerKeys = Object.keys(db.by_layer || {})
+      .map(key => Number(key))
+      .filter(layer => Number.isFinite(layer))
+      .sort((a, b) => a - b);
+    layerStats = layerKeys.map(layer => {
       const raw = (db.by_layer && db.by_layer[String(layer)]) || {};
       const changed = Number(raw.changed) || 0;
       const n = Number(raw.n) || 0;
-      layerStats.push({ layer, changed, n, share: n ? changed / n : 0 });
-    }
+      return { layer, changed, n, share: n ? changed / n : 0 };
+    });
   }
 
   function renderIntro() {
@@ -618,10 +658,15 @@ td:first-child { color: var(--ink); font-family: var(--mono); white-space: nowra
     const esc50 = stimuli.filter(stim => String(stim.kind).toLowerCase() === "esc50").length;
     const baseCorrect = Number(db.esc && db.esc.base_correct) || 0;
     const of = Number(db.esc && db.esc.of) || 0;
+    const blocks = layerStats.length;
+    const groupsPerBlock = blocks ? groups.length / blocks : 0;
+    const neuronsPerBlock = groupsPerBlock / 2;
+    const neuronsText = Number.isInteger(neuronsPerBlock) ? String(neuronsPerBlock) : neuronsPerBlock.toFixed(1);
 
     $("#introText").innerHTML = `${esc(model)} listens to ${stimuli.length} short sounds ` +
       `(${synthetic} synthetic, ${esc50} ESC-50 recordings) and says what it hears while one neuron of its ` +
-      `audio encoder is pushed. Each of the 24 audio blocks gets 6 random neurons, each pushed at -1 and +1.`;
+      `audio encoder is pushed. Its ${blocks} audio encoder blocks each get ${neuronsText} random neurons, ` +
+      `each pushed at -1 and +1.`;
     $("#introQuestion").innerHTML = "“" + fmt(question) + "”";
     $("#introEsc").innerHTML = `Even with no push, it mishears most of the real recordings: ` +
       `<b>${baseCorrect} of ${of}</b> ESC-50 clips are answered correctly.`;
@@ -653,6 +698,11 @@ td:first-child { color: var(--ink); font-family: var(--mono); white-space: nowra
 
   function renderSounds() {
     stopActive();
+    const synthetic = stimuli.filter(stim => String(stim.kind).toLowerCase() === "synthetic").length;
+    const esc50 = stimuli.filter(stim => String(stim.kind).toLowerCase() === "esc50").length;
+    $("#soundsLede").textContent = `${stimuli.length} short clips: ${synthetic} synthetic and ${esc50} ESC-50 ` +
+      `recordings. Each card shows the true class and what this model answered with no push. Click a card to ` +
+      `select that sound; the selected card gets a violet outline. Play buttons stream one clip at a time.`;
     $("#soundGrid").innerHTML = stimuli.map(stim => {
       const expected = stim.expected == null ? "—" : stim.expected;
       const baseline = stim.baseline == null ? "—" : stim.baseline;
@@ -687,6 +737,10 @@ td:first-child { color: var(--ink); font-family: var(--mono); white-space: nowra
   function renderAnswers() {
     const stim = stimById.get(state.s);
     if (!stim) return;
+
+    $("#answersLede").textContent = `Every neuron and dose for the selected sound, with blocks ${blockRange()} ` +
+      `and doses -1 or +1. A row whose answer differs from the unpushed answer carries an eosin-tinted ` +
+      `“changed” badge. Rows are sorted by block.`;
 
     const rows = groups.map(group => {
       const replies = group.replies || {};
@@ -734,9 +788,12 @@ td:first-child { color: var(--ink); font-family: var(--mono); white-space: nowra
   }
 
   function renderGroups() {
+    $("#groupLede").textContent = `The top ${topGroups.length} pushes by how many of the ${stimuli.length} sounds ` +
+      `they take over. Each was pushed at -1 or +1 in one audio block (${blockRange()}); the selected card is ` +
+      `outlined in violet. Open a card to see that push’s answer for every sound, with a play button beside each one.`;
     $("#groupList").innerHTML = topGroups.map((group, i) => {
       const forcedK = Number(group.forced_k) || 0;
-      const n = Number(group.n) || 22;
+      const n = Number(group.n) || stimuli.length;
       const forced = group.forced == null || group.forced === "" ? "no answer" : group.forced;
       return `<article class="group-card" data-key="${esc(groupKey(group))}" data-i="${i}">
         <button class="group-toggle" type="button" aria-expanded="false" aria-controls="group-panel-${i}">
@@ -805,12 +862,32 @@ td:first-child { color: var(--ink); font-family: var(--mono); white-space: nowra
     return true;
   }
 
+  function renderChartCaption() {
+    if (!layerStats.length) {
+      $("#chartCaption").textContent = "No block counts are available.";
+      return;
+    }
+    const ranked = layerStats.slice().sort((a, b) =>
+      b.share - a.share || a.layer - b.layer
+    );
+    const high = ranked.slice(0, Math.min(2, ranked.length));
+    const low = ranked[ranked.length - 1];
+    const highText = high.map(stat => `B${stat.layer} (${pct(stat.changed, stat.n)})`).join(" and ");
+    const lowText = `B${low.layer} (${pct(low.changed, low.n)})`;
+    const highWord = high.length > 1 ? "Blocks" : "Block";
+    $("#chartCaption").textContent = `Share of pushed answers that changed, block by block; both doses are ` +
+      `pooled. ${highWord} ${highText} changed the most, and ${lowText} changed the least. ` +
+      `Hover or focus a bar for its counts.`;
+  }
+
   function renderChart() {
+    renderChartCaption();
     const W = 800, H = 340;
     const m = { t: 18, r: 18, b: 48, l: 54 };
     const innerW = W - m.l - m.r;
     const innerH = H - m.t - m.b;
-    const band = innerW / (MAX_BLOCK + 1);
+    const count = layerStats.length;
+    const band = innerW / Math.max(1, count);
     const barW = band * 0.62;
 
     let maxShare = 0;
@@ -824,7 +901,7 @@ td:first-child { color: var(--ink); font-family: var(--mono); white-space: nowra
     else step = 20;
     const top = Math.ceil(maxPct / step) * step;
 
-    const X = layer => m.l + (Number(layer) + 0.5) * band;
+    const X = i => m.l + (i + 0.5) * band;
     const Y = value => m.t + innerH - (Number(value) / top) * innerH;
 
     let svg = `<svg viewBox="0 0 ${W} ${H}" role="group" aria-label="Share of pushed answers that changed, by audio block">`;
@@ -835,15 +912,21 @@ td:first-child { color: var(--ink); font-family: var(--mono); white-space: nowra
       svg += `<text class="axis-text" x="${m.l - 8}" y="${y + 3.5}" text-anchor="end">${tick}%</text>`;
     }
 
-    for (const layer of [0, 4, 8, 12, 16, 20, 23]) {
-      const x = X(layer);
-      svg += `<text class="axis-text" x="${x}" y="${m.t + innerH + 16}" text-anchor="middle">B${layer}</text>`;
+    if (count) {
+      const tickStep = count > 8 ? Math.ceil((count - 1) / 7) : 1;
+      const tickIndices = [];
+      for (let i = 0; i < count; i += tickStep) tickIndices.push(i);
+      if (tickIndices[tickIndices.length - 1] !== count - 1) tickIndices.push(count - 1);
+      for (const i of tickIndices) {
+        const x = X(i);
+        svg += `<text class="axis-text" x="${x}" y="${m.t + innerH + 16}" text-anchor="middle">B${layerStats[i].layer}</text>`;
+      }
     }
     svg += `<text class="axis-unit" x="${m.l}" y="${H - 8}">audio block</text>`;
     svg += `<text class="axis-unit" x="${m.l - 8}" y="${m.t - 6}" text-anchor="end">share changed</text>`;
 
     layerStats.forEach((stat, i) => {
-      const x = X(stat.layer) - barW / 2;
+      const x = X(i) - barW / 2;
       const y = Y(stat.share * 100);
       const h = Math.max(0, m.t + innerH - y);
       const label = `Block B${stat.layer}: ${stat.changed} of ${stat.n} answers changed, ${pct(stat.changed, stat.n)}.`;
@@ -902,27 +985,43 @@ td:first-child { color: var(--ink); font-family: var(--mono); white-space: nowra
     renderChart();
   }
 
-  async function load() {
+  async function loadModel(id, options) {
+    const opts = options || {};
+    const modelId = normalizeModel(id);
+    const meta = MODELS[modelId];
+    const seq = ++loadSeq;
+    state.m = modelId;
+    updateModelChips();
+    stopActive();
+    db = null;
+
     const status = $("#status");
     const main = $("#main");
     status.hidden = false;
     status.className = "status";
     status.setAttribute("role", "status");
-    status.innerHTML = `<span class="spinner" aria-hidden="true"></span><span>Loading the hearing experiment…</span>`;
+    status.innerHTML = `<span class="spinner" aria-hidden="true"></span><span>Loading ${esc(meta.label)}…</span>`;
     main.hidden = true;
+
     try {
-      const response = await fetch(DATA + "site/hear.json", { cache: "no-store" });
-      if (!response.ok) throw new Error("Server returned HTTP " + response.status);
-      const data = await response.json();
-      if (!data || !Array.isArray(data.stimuli) || !data.stimuli.length ||
-          !Array.isArray(data.groups) || !data.groups.length || !data.by_layer) {
-        throw new Error("The hearing data is missing its stimuli, groups, or block counts.");
+      let data = dataCache.get(modelId);
+      if (!data) {
+        const response = await fetch(DATA + meta.file, { cache: "no-store" });
+        if (!response.ok) throw new Error("Server returned HTTP " + response.status);
+        data = await response.json();
+        if (!data || !Array.isArray(data.stimuli) || !data.stimuli.length ||
+            !Array.isArray(data.groups) || !data.groups.length || !data.by_layer) {
+          throw new Error("The data is missing its stimuli, groups, or block counts.");
+        }
+        dataCache.set(modelId, data);
       }
+      if (seq !== loadSeq) return;
+
       db = data;
       buildData();
-      if (!stimuli.length || !groups.length) throw new Error("The hearing data has no sounds or pushes.");
+      if (!stimuli.length || !groups.length) throw new Error("The data has no sounds or pushes.");
 
-      const hash = parseHash();
+      const hash = opts.hash || parseHash();
       state.s = hash.s && stimById.has(hash.s) ? hash.s : stimuli[0].id;
       state.n = hash.n && groupByKey.has(hash.n) ? hash.n : null;
 
@@ -930,16 +1029,37 @@ td:first-child { color: var(--ink); font-family: var(--mono); white-space: nowra
       main.hidden = false;
       renderAll();
       writeHash();
-      if (state.n) setTimeout(() => revealGroup(state.n, true), 80);
+      if (state.n) setTimeout(() => {
+        if (seq === loadSeq) revealGroup(state.n, true);
+      }, 80);
     } catch (error) {
+      if (seq !== loadSeq) return;
       status.className = "status error";
       status.setAttribute("role", "alert");
-      status.innerHTML = `<div class="status-body"><b>Could not load the hearing data.</b>${esc(error && error.message ? error.message : "Unknown error")}. Check the connection and try again.</div><button type="button" id="retry">Try again</button>`;
+      status.innerHTML = `<div class="status-body"><b>Could not load ${esc(meta.label)}.</b>` +
+        `${esc(error && error.message ? error.message : "Unknown error")}. The other model chip still works.</div>` +
+        `<button type="button" id="retry">Try again</button>`;
+      announce("Could not load " + meta.label + ".");
     }
   }
 
+  function selectModel(id) {
+    if (!MODELS[id]) return;
+    if (id === state.m && db) return;
+    state.m = id;
+    updateModelChips();
+    writeHash();
+    loadModel(id);
+  }
+
   $("#status").addEventListener("click", event => {
-    if (event.target.closest("#retry")) load();
+    if (event.target.closest("#retry")) loadModel(state.m);
+  });
+
+  $("#modelBar").addEventListener("click", event => {
+    const btn = event.target.closest(".model-chip");
+    if (!btn) return;
+    selectModel(btn.dataset.model);
   });
 
   $("#soundGrid").addEventListener("click", event => {
@@ -1004,8 +1124,15 @@ td:first-child { color: var(--ink); font-family: var(--mono); white-space: nowra
   document.addEventListener("scroll", hideTip, true);
 
   window.addEventListener("hashchange", () => {
-    if (!db) return;
     const hash = parseHash();
+    const nextM = normalizeModel(hash.m);
+    if (nextM !== state.m) {
+      state.m = nextM;
+      updateModelChips();
+      loadModel(nextM, { hash });
+      return;
+    }
+    if (!db) return;
     applyHash(hash, { scroll: true, clearPanels: !hash.n });
   });
 
@@ -1040,7 +1167,10 @@ td:first-child { color: var(--ink); font-family: var(--mono); white-space: nowra
     if (!document.documentElement.dataset.theme) updateThemeButton();
   });
 
-  load();
+  const initialHash = parseHash();
+  state.m = normalizeModel(initialHash.m);
+  updateModelChips();
+  loadModel(state.m, { hash: initialHash });
 })();
 </script>
 </body>
