@@ -13,7 +13,7 @@ try:
 except ImportError:  # older transformers: image-text checkpoints will fail at load time
     AutoModelForImageTextToText = None
 
-DOWN_RE = re.compile(r"\.(\d+)\.mlp\.(down_proj|c_proj|fc2|dense_4h_to_h)$")
+DOWN_RE = re.compile(r"\.(\d+)\.(?:mlp|feed_forward)\.(down_proj|c_proj|fc2|dense_4h_to_h|w2)$")
 TERM_RE = re.compile(r"L(\d+)N(\d+)\s*([=*+\-])?\s*([+-]?\d*\.?\d+(?:[eE][+-]?\d+)?)", re.I)
 SKIP_TOWERS = ("visual", "vision", "audio", "mm_projector")
 
@@ -142,7 +142,7 @@ class NeuronModel:
         """(W_U (V, d_model), gamma (d_model,) or None): the final norm's scale folded into the logit lens."""
         W_U = self.model.get_output_embeddings().weight.float()
         norm = None
-        for path in ("model.norm", "transformer.ln_f", "model.final_layernorm", "gpt_neox.final_layer_norm",
+        for path in ("model.norm", "model.embedding_norm", "transformer.ln_f", "model.final_layernorm", "gpt_neox.final_layer_norm",
                      "model.language_model.norm", "language_model.model.norm"):
             obj = self.model
             try:

@@ -1,0 +1,1062 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sound pushes</title>
+<meta name="description" content="MusicGen-small composing music while one decoder neuron is pushed.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Source+Sans+3:ital,wght@0,400;0,600;1,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: a microscope bench. A dark "slide plate" map of every neuron on the left, the specimen card of the
+   selected neuron on the right; tabs swap the plate for other views. Activation is stained like H&E histology:
+   eosin pink where a neuron fires, hematoxylin violet where it goes negative. */
+:root {
+  --bg: #f5f4f8; --surface: #ffffff; --sunk: #ebe9f1; --line: #d9d5e3; --ink: #1f1c2c; --ink2: #5d5870; --ink3: #8a849c;
+  --eosin: #d6336c; --eosin-soft: #f9d9e5; --hema: #4b3fa8; --hema-soft: #dedaf5; --accent: #b0245a;
+  --plate: #17152a; --plate-ink: #ece9f7; --plate-ink2: #a29dbb; --plate-line: #2c2946;
+  --good: #1f8a5b; --warn: #b7791f;
+  --k-user: #2a78d6; --k-persona: #d6336c; --k-altered: #4b3fa8; --k-other: #1baf7a; --k-incoherent: #eda100; --k-default: #cfcbdc;
+  --display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --body: "Source Sans 3", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --r: 10px; --r-card: 14px;
+  --s1: 12px; --s2: 16px; --s3: 24px;
+  --card-shadow: 0 1px 2px rgb(0 0 0 / .04), 0 4px 16px rgb(0 0 0 / .04);
+  --card-shadow-hover: 0 2px 4px rgb(0 0 0 / .06), 0 8px 24px rgb(0 0 0 / .08);
+  --pill-shadow: 0 1px 2px rgb(0 0 0 / .08), 0 2px 6px rgb(0 0 0 / .06);
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #121019; --surface: #1b1826; --sunk: #242033; --line: #343048; --ink: #ece9f7; --ink2: #b3adc8; --ink3: #827c99;
+  --eosin: #ff6b9a; --eosin-soft: #4a1f33; --hema: #9d92ff; --hema-soft: #2d2858; --accent: #ff7aa6;
+  --plate: #0b0a12; --plate-ink: #ece9f7; --plate-ink2: #9a95b2; --plate-line: #24213a; --good: #4cc38a; --warn: #e0a84a;
+  --k-user: #3987e5; --k-persona: #e0447a; --k-altered: #8a7ef0; --k-other: #199e70; --k-incoherent: #c98500; --k-default: #3b3652;
+  --card-shadow: 0 1px 2px rgb(0 0 0 / .3), 0 4px 16px rgb(0 0 0 / .25);
+  --card-shadow-hover: 0 2px 4px rgb(0 0 0 / .38), 0 8px 24px rgb(0 0 0 / .35);
+  --pill-shadow: 0 1px 2px rgb(0 0 0 / .35), 0 2px 6px rgb(0 0 0 / .3);
+  color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #121019; --surface: #1b1826; --sunk: #242033; --line: #343048; --ink: #ece9f7; --ink2: #b3adc8; --ink3: #827c99;
+  --eosin: #ff6b9a; --eosin-soft: #4a1f33; --hema: #9d92ff; --hema-soft: #2d2858; --accent: #ff7aa6;
+  --plate: #0b0a12; --plate-ink: #ece9f7; --plate-ink2: #9a95b2; --plate-line: #24213a; --good: #4cc38a; --warn: #e0a84a;
+  --k-user: #3987e5; --k-persona: #e0447a; --k-altered: #8a7ef0; --k-other: #199e70; --k-incoherent: #c98500; --k-default: #3b3652;
+  --card-shadow: 0 1px 2px rgb(0 0 0 / .3), 0 4px 16px rgb(0 0 0 / .25);
+  --card-shadow-hover: 0 2px 4px rgb(0 0 0 / .38), 0 8px 24px rgb(0 0 0 / .35);
+  --pill-shadow: 0 1px 2px rgb(0 0 0 / .35), 0 2px 6px rgb(0 0 0 / .3);
+  color-scheme: dark }
+* { box-sizing: border-box }
+html, body { height: 100% }
+body { background: var(--bg); color: var(--ink); font: 15px/1.5 var(--body); margin: 0; overflow-x: clip;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+button, input, select { font: inherit; color: inherit }
+button { cursor: pointer }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px }
+
+[hidden] { display: none !important }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden;
+  clip: rect(0 0 0 0); white-space: nowrap; border: 0 }
+.wrap { max-width: 1480px; margin: 0 auto; padding-block: 0 40px; display: flex; flex-direction: column; gap: var(--s3) }
+.topbar { position: sticky; top: 0; z-index: 30; display: flex; flex-direction: column; gap: 6px;
+  padding-block: var(--s1); background: color-mix(in oklab, var(--bg) 88%, transparent);
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--line) }
+.top { display: flex; align-items: center; gap: 10px; min-width: 0 }
+.brand { display: flex; align-items: baseline; gap: 9px; min-width: 0; flex: 1 1 auto }
+.brand h1 { font: 800 28px/1 var(--display); letter-spacing: -0.02em; margin: 0; white-space: nowrap }
+.brand h1 i { font-style: normal; color: var(--eosin) }
+.pagename { font: 600 11px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--ink3);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
+.actions { display: flex; gap: 8px; flex: 0 0 auto; align-items: center }
+.theme-toggle { width: 36px; height: 36px; flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center;
+  padding: 0; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink2);
+  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease }
+.theme-toggle:hover { border-color: var(--hema); color: var(--ink) }
+.theme-toggle:focus-visible { outline: 2px solid var(--hema); outline-offset: 2px }
+.theme-toggle svg { width: 18px; height: 18px; display: none }
+.theme-toggle .i-sun { display: block }
+.theme-toggle[data-resolved="light"] .i-sun { display: block }
+.theme-toggle[data-resolved="light"] .i-moon { display: none }
+.theme-toggle[data-resolved="dark"] .i-sun { display: none }
+.theme-toggle[data-resolved="dark"] .i-moon { display: block }
+.navrow { display: flex; gap: 3px; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; padding-block: 2px }
+.navrow::-webkit-scrollbar { display: none }
+.navrow a { flex: 0 0 auto; padding: 6px 10px; border: 1px solid transparent; border-radius: 999px; color: var(--ink2);
+  text-decoration: none; font: 600 13px/1 var(--body); white-space: nowrap;
+  transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease }
+.navrow a:hover { background: var(--sunk); color: var(--ink) }
+.navrow a[aria-current="page"] { background: var(--surface); color: var(--ink); border-color: var(--line); box-shadow: var(--pill-shadow) }
+
+.stack { display: flex; flex-direction: column; gap: var(--s3); min-width: 0 }
+.card { background: var(--surface); border-radius: var(--r-card); padding: var(--s3); display: flex; flex-direction: column;
+  gap: var(--s2); min-width: 0; box-shadow: var(--card-shadow); scroll-margin-top: 120px }
+.card h2 { font: 700 26px/1.15 var(--display); margin: 0; letter-spacing: -0.01em; text-wrap: balance }
+.card h3 { font: 700 17px/1.2 var(--display); margin: 0; letter-spacing: -0.01em }
+.lede { margin: 0; color: var(--ink2); font-size: 14px; max-width: 78ch }
+.section-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap }
+.section-head > div { min-width: 0; display: flex; flex-direction: column; gap: 5px }
+.count { font: 600 11px/1 var(--mono); letter-spacing: .04em; color: var(--ink3); background: var(--sunk);
+  border-radius: 999px; padding: 5px 9px; white-space: nowrap }
+.mono { font-family: var(--mono) }
+.small { font-size: 12px }
+.muted { color: var(--ink3) }
+
+.status { display: flex; align-items: center; gap: 10px; padding: 16px; border: 1px dashed var(--line);
+  border-radius: var(--r); color: var(--ink2); background: var(--surface); font-size: 14px }
+.status.error { border-style: solid; border-color: var(--eosin); color: var(--ink); align-items: flex-start }
+.status.error b { color: var(--ink); display: block; margin-bottom: 3px }
+.status.error .status-body { flex: 1 1 auto; min-width: 0 }
+.status.error button { flex: 0 0 auto; border: 1px solid var(--line); background: var(--surface); border-radius: 7px;
+  padding: 6px 10px; font-weight: 600 }
+.spinner { width: 16px; height: 16px; flex: 0 0 auto; border: 2px solid var(--line); border-top-color: var(--eosin);
+  border-radius: 50%; animation: spin .8s linear infinite }
+@keyframes spin { to { transform: rotate(360deg) } }
+
+.controls { display: flex; flex-wrap: wrap; gap: 14px 18px; align-items: flex-end }
+.field { display: flex; flex-direction: column; gap: 5px; min-width: 0 }
+.field label { font: 600 10px/1.2 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--ink3) }
+.field select { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px;
+  font-size: 14px; color: var(--ink); max-width: 100% }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px }
+.chip { border: 1px solid var(--line); background: var(--sunk); color: var(--ink2); border-radius: 999px;
+  padding: 5px 11px; font-size: 12.5px; max-width: 100%; text-align: left; line-height: 1.35 }
+.chip:hover { color: var(--ink); border-color: var(--hema) }
+.chip[aria-pressed="true"] { background: var(--eosin-soft); border-color: var(--eosin); color: var(--ink); font-weight: 600 }
+.btn { height: 36px; display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 0 14px;
+  font: 600 14px/1 var(--body); text-decoration: none; white-space: nowrap; color: var(--ink);
+  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease, box-shadow 120ms ease }
+.btn:hover { border-color: var(--hema); box-shadow: 0 0 0 2px color-mix(in oklab, var(--hema) 18%, transparent) }
+.btn svg { width: 13px; height: 13px }
+.base-play .i-pause, .base-play .i-spin { display: none }
+.base-play.is-playing .i-play { display: none }
+.base-play.is-playing .i-pause { display: block }
+.base-play.is-loading .i-play, .base-play.is-loading .i-pause { display: none }
+.base-play.is-loading .i-spin { display: block }
+.base-play.is-error { border-color: var(--eosin) }
+
+.grid-scroll { overflow-x: auto; max-width: 100%; border: 1px solid var(--line); border-radius: var(--r-card);
+  background: var(--surface); padding: 8px; scrollbar-width: thin }
+.grid { min-width: 610px; display: flex; flex-direction: column; gap: 5px }
+.grid-head { display: grid; grid-template-columns: 100px repeat(3, minmax(0, 1fr)); gap: 6px; padding: 0 2px 3px }
+.grid-head span { font: 600 10px/1 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--ink3) }
+.ng-row { display: grid; grid-template-columns: 100px repeat(3, minmax(0, 1fr)); gap: 6px; align-items: stretch }
+.ng-label { border: 1px solid transparent; background: transparent; border-radius: 8px; text-align: left;
+  padding: 4px 6px; font: 600 10.5px/1.2 var(--mono); color: var(--ink2); white-space: nowrap }
+.ng-label:hover { background: var(--sunk); color: var(--ink) }
+.ng-row.is-selected .ng-label { color: var(--ink); background: var(--sunk); border-color: var(--line) }
+.cell { border: 1px solid var(--line); border-radius: 8px; padding: 5px 6px; display: flex; gap: 6px; align-items: center;
+  min-width: 0; background: var(--surface) }
+.cell.base { background: var(--sunk) }
+.ng-row.is-selected .cell { border-color: var(--ink2) }
+.cell-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1 1 auto }
+.cell-dose { font-size: 8.5px; color: var(--ink3); letter-spacing: .05em; text-transform: uppercase }
+.distline { display: flex; align-items: center; gap: 4px; min-width: 0 }
+.distbar { flex: 1 1 auto; height: 4px; background: var(--line); border-radius: 999px; overflow: hidden; min-width: 18px }
+.distbar i { display: block; height: 100%; border-radius: inherit }
+.cell[data-sign="pos"] .distbar i { background: var(--eosin) }
+.cell[data-sign="neg"] .distbar i { background: var(--hema) }
+.cell[data-sign="base"] .distbar i { background: var(--ink3) }
+.distnum { font-size: 9.5px; color: var(--ink3); font-variant-numeric: tabular-nums; white-space: nowrap }
+.centroid { font-size: 9px; color: var(--ink3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
+.playbtn { width: 26px; height: 26px; flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center;
+  padding: 0; border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 50%;
+  transition: border-color 120ms ease, box-shadow 120ms ease }
+.playbtn:hover { border-color: var(--hema) }
+.playbtn svg { width: 12px; height: 12px }
+.playbtn .i-pause, .playbtn .i-spin { display: none }
+.playbtn.is-playing .i-play { display: none }
+.playbtn.is-playing .i-pause { display: block }
+.playbtn.is-loading .i-play, .playbtn.is-loading .i-pause { display: none }
+.playbtn.is-loading .i-spin { display: block }
+.playbtn.is-error { border-color: var(--eosin) }
+.i-spin { animation: spin .8s linear infinite }
+
+.chart-wrap { position: relative; min-width: 0; overflow-x: auto; overflow-y: hidden; padding: 2px 0 }
+.chart-wrap svg { display: block; width: 100%; min-width: 560px; height: auto; overflow: visible }
+.grid-line { stroke: var(--line); stroke-width: 1; opacity: .72 }
+.axis-text { fill: var(--ink3); font-family: var(--mono); font-size: 9.5px }
+.axis-unit { fill: var(--ink3); font-family: var(--mono); font-size: 9px; letter-spacing: .03em }
+.mean-line { fill: none; stroke: var(--ink2); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round }
+.dot-mark { cursor: pointer; stroke: var(--surface); stroke-width: 1 }
+.dot-mark.pos { fill: var(--eosin) }
+.dot-mark.neg { fill: var(--hema) }
+.dot-mark.is-selected { stroke: var(--ink); stroke-width: 1.6 }
+.dot-mark:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 15px; color: var(--ink2); font-size: 12px }
+.legend .lg { display: inline-flex; align-items: center; gap: 6px }
+.swatch { width: 9px; height: 9px; border-radius: 50%; background: var(--ink3); flex: 0 0 auto }
+.swatch.pos { background: var(--eosin) }
+.swatch.neg { background: var(--hema) }
+.swatch.mean { width: 16px; height: 2px; border-radius: 1px; background: var(--ink2) }
+.table-btn { border: 1px solid var(--line); background: var(--surface); color: var(--ink2); border-radius: 999px;
+  padding: 3px 9px; font-size: 11px; flex: 0 0 auto }
+.table-btn:hover { color: var(--ink) }
+.table-wrap { overflow: auto; max-height: 430px; border-top: 1px solid var(--line); padding-top: 6px; margin-top: 2px; max-width: 100% }
+.table-wrap + .table-wrap { margin-top: 18px }
+table { border-collapse: collapse; width: 100%; font-size: 11.5px }
+caption { caption-side: top; text-align: left; color: var(--ink3); font-size: 11px; padding: 2px 0 5px }
+th, td { padding: 4px 7px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap }
+th:first-child, td:first-child { text-align: left }
+thead th { color: var(--ink3); font-weight: 600; font-size: 10px; letter-spacing: .045em; text-transform: uppercase; position: sticky; top: 0; background: var(--surface) }
+td { font-family: var(--mono); font-variant-numeric: tabular-nums; color: var(--ink2) }
+td:first-child { font-family: var(--body); color: var(--ink); white-space: normal; min-width: 180px }
+.clip-table table { min-width: 660px }
+.mean-table table { min-width: 320px }
+
+.tip { position: fixed; z-index: 50; pointer-events: none; max-width: 260px; padding: 8px 10px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); box-shadow: var(--card-shadow-hover);
+  font-size: 12px; color: var(--ink2) }
+.tip .t-head { font: 600 12px/1.3 var(--mono); color: var(--ink); margin-bottom: 3px }
+.tip .t-prompt { color: var(--ink2); margin-bottom: 4px; overflow-wrap: anywhere }
+.tip .t-row { display: flex; align-items: center; gap: 10px; justify-content: space-between; line-height: 1.55 }
+.tip .t-row b { font-family: var(--mono); font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; white-space: nowrap }
+.tip .t-hint { color: var(--ink3); font-size: 10.5px; margin-top: 3px }
+
+.callout { border-top: 1px solid var(--line); padding-top: var(--s2); display: flex; flex-direction: column; gap: 10px }
+.callout .question { margin: 0; font-size: 18px; font-weight: 600; line-height: 1.35 }
+.callout-rows { display: flex; flex-direction: column; gap: 8px }
+.callout-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 12px; align-items: center;
+  background: var(--sunk); border-radius: var(--r); padding: 8px 10px; min-width: 0 }
+.callout-prompt { font-size: 13px; color: var(--ink); overflow-wrap: anywhere }
+.callout-pair { display: flex; flex-wrap: wrap; gap: 6px }
+.callout-pair .cell { min-width: 156px; flex: 0 1 auto; background: var(--surface) }
+
+@media (max-width: 760px) {
+  .card { padding: var(--s2) }
+  .card h2 { font-size: 22px }
+  .brand h1 { font-size: 22px }
+  .theme-toggle { width: 34px; height: 34px }
+  .callout-row { grid-template-columns: minmax(0, 1fr) }
+}
+@media (max-width: 420px) {
+  .brand h1 { font-size: 19px }
+  .pagename { font-size: 10px }
+  .actions { gap: 6px }
+  .theme-toggle { width: 32px; height: 32px }
+  .chip { font-size: 12px }
+  .grid { min-width: 590px }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; scroll-behavior: auto !important } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="topbar">
+    <div class="top">
+      <div class="brand"><h1>Neuron <i>Atlas</i></h1><span class="pagename">Sound pushes</span></div>
+      <div class="actions">
+        <button class="theme-toggle" id="theme" type="button" aria-label="Switch theme" title="Switch theme">
+          <svg class="i-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.42-1.42M17.66 6.34l1.41-1.41"/></svg>
+          <svg class="i-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/></svg>
+        </button>
+      </div>
+    </div>
+    <nav class="navrow" aria-label="Prototype pages">
+      <a href="../index.html">Explorer</a>
+      <a href="index.html">Prototypes</a>
+      <a href="vision.html">Vision lab</a>
+      <a href="janus.html">Image pushes</a>
+      <a href="music.html" aria-current="page">Sound pushes</a>
+      <a href="lenses.html">Says vs does</a>
+      <a href="identity.html">Identity lab</a>
+      <a href="evidence.html">Evidence</a>
+    </nav>
+  </header>
+
+  <main class="stack">
+    <div class="status" id="status" role="status"><span class="spinner" aria-hidden="true"></span><span>Loading 288 pushed clips and 3 baselines…</span></div>
+
+    <section class="card" id="intro">
+      <div class="section-head">
+        <div>
+          <h2>Sound pushes</h2>
+          <p class="lede">MusicGen writes music as a sequence of audio tokens; here one MLP neuron of its decoder is pushed while it writes. Use headphones; start with the baseline.</p>
+        </div>
+        <span class="count">5 s mono</span>
+      </div>
+      <p class="lede">Each row below is one decoder neuron. In the grid, pink is the +0.5 push and violet is the −0.5 push; the bar shows how far the clip's average spectrum moved from that prompt's baseline (cosine distance, 0 means unchanged). The grey cell is the unpushed baseline.</p>
+    </section>
+
+    <section class="card" id="controls" hidden>
+      <div class="section-head">
+        <div>
+          <h2>Controls</h2>
+          <p class="lede">Pick a prompt, change the row order, or play the current prompt's unpushed baseline.</p>
+        </div>
+      </div>
+      <div class="controls">
+        <div class="field" style="flex: 1 1 280px">
+          <span class="muted small" id="promptLabel">Prompt</span>
+          <div class="chips" id="chips" role="group" aria-labelledby="promptLabel"></div>
+        </div>
+        <div class="field">
+          <label for="sort">Sort rows</label>
+          <select id="sort">
+            <option value="changed">Most changed first</option>
+            <option value="layer">By layer</option>
+          </select>
+        </div>
+        <div class="field">
+          <button class="btn base-play" id="playBase" type="button" aria-label="Play baseline for the current prompt">
+            <svg class="i-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z" fill="currentColor"/></svg>
+            <svg class="i-pause" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5h4v14H7zM13 5h4v14h-4z" fill="currentColor"/></svg>
+            <svg class="i-spin" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="2.5" stroke-dasharray="30 20"/></svg>
+            <span id="playBaseLabel">Play baseline</span>
+          </button>
+          <audio id="baseAudio" preload="none"></audio>
+        </div>
+      </div>
+    </section>
+
+    <section class="card" id="gridCard" hidden>
+      <div class="section-head">
+        <div>
+          <h2>Neuron grid</h2>
+          <p class="lede">One row per neuron. Play any cell; starting one clip pauses the others. The small number is cosine distance and the kHz value is spectral centroid (brightness).</p>
+        </div>
+        <span class="count" id="gridCount"></span>
+      </div>
+      <div class="grid-scroll">
+        <div class="grid" id="grid" aria-label="Neuron push grid"></div>
+      </div>
+    </section>
+
+    <section class="card" id="chartCard" hidden>
+      <div class="section-head">
+        <div>
+          <h2>Change by layer</h2>
+          <p class="lede">Every pushed clip as a dot: layer on the x-axis, spectral distance on the y-axis. Pink dots are +0.5 pushes, violet dots are −0.5 pushes, and the grey line is the mean distance per layer. Click or press Enter on a dot to play that clip.</p>
+        </div>
+        <button class="table-btn" id="chartTableBtn" type="button" aria-expanded="false" aria-controls="chartTables">Table</button>
+      </div>
+      <div class="legend" aria-label="Chart legend">
+        <span class="lg"><i class="swatch pos"></i>+0.5 push</span>
+        <span class="lg"><i class="swatch neg"></i>−0.5 push</span>
+        <span class="lg"><i class="swatch mean"></i>mean per layer</span>
+      </div>
+      <div class="chart-wrap" id="chartWrap"></div>
+      <div id="chartTables" hidden>
+        <div class="table-wrap mean-table" id="meanTable"></div>
+        <div class="table-wrap clip-table" id="clipTable"></div>
+      </div>
+      <aside class="callout" id="callout"></aside>
+    </section>
+  </main>
+</div>
+
+<div class="tip" id="tip" role="tooltip" hidden></div>
+<div class="sr-only" id="announce" aria-live="polite"></div>
+
+<script>
+(() => {
+  "use strict";
+
+  const DATA = "https://huggingface.co/datasets/nikhilxvytla/neuron-atlas/resolve/main/";
+  const THEME_KEY = "music-lab-theme";
+  const MAX_DIST = 1.6;
+  const MAX_LAYER = 23;
+  const Y_MAX = 1.7;
+
+  const $ = (sel, root = document) => root.querySelector(sel);
+  const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
+
+  function esc(value) {
+    return String(value == null ? "" : value).replace(/[&<>"']/g, ch => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+    }[ch]));
+  }
+
+  function fmt(value) {
+    return esc(value).replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>");
+  }
+
+  function fmtDose(dose) {
+    const n = Number(dose);
+    if (n === 0) return "0";
+    return (n > 0 ? "+" : "−") + Math.abs(n).toFixed(1);
+  }
+
+  function fmtDoseShort(dose) {
+    const n = Number(dose);
+    return n > 0 ? "+0.5" : "−0.5";
+  }
+
+  function mean(values) {
+    if (!values.length) return 0;
+    return values.reduce((a, b) => a + b, 0) / values.length;
+  }
+
+  const state = { p: 0, n: null, sort: "changed" };
+  const themeMQ = matchMedia("(prefers-color-scheme: dark)");
+  const themeBtn = $("#theme");
+  const tip = $("#tip");
+
+  let db = null;
+  let prompts = [];
+  let promptIndex = new Map();
+  let baselines = new Map();
+  let pushes = [];
+  let neurons = new Map();
+  let neuronList = [];
+  let layerMeans = [];
+  let best = null;
+  let bestScore = 0;
+  let active = null;
+
+  function audioUrl(row) {
+    return encodeURI(db.base + row[4]);
+  }
+
+  function centroidKhz(value) {
+    return (Number(value) / 1000).toFixed(1) + " kHz";
+  }
+
+  function barWidth(value) {
+    return Math.min(100, Math.max(0, (Number(value) / MAX_DIST) * 100));
+  }
+
+  function neuronKey(layer, neuron) {
+    return "L" + layer + "N" + neuron;
+  }
+
+  function announce(message) {
+    $("#announce").textContent = message;
+  }
+
+  function showTip(x, y, html) {
+    tip.innerHTML = html;
+    tip.hidden = false;
+    const r = tip.getBoundingClientRect();
+    let left = x + 14;
+    let top = y + 14;
+    if (left + r.width > window.innerWidth - 8) left = x - r.width - 14;
+    if (top + r.height > window.innerHeight - 8) top = y - r.height - 14;
+    tip.style.left = Math.max(8, left) + "px";
+    tip.style.top = Math.max(8, top) + "px";
+  }
+
+  function hideTip() {
+    tip.hidden = true;
+  }
+
+  function showTipAt(el, html) {
+    const r = el.getBoundingClientRect();
+    showTip(r.left + r.width / 2, r.top + r.height / 2, html);
+  }
+
+  function dotTipHtml(row) {
+    return `<div class="t-head">L${row[1]} N${row[2]} · ${fmtDoseShort(row[3])}</div>` +
+      `<div class="t-prompt">${fmt(row[0])}</div>` +
+      `<div class="t-row"><span>Distance</span><b>${Number(row[8]).toFixed(3)}</b></div>` +
+      `<div class="t-row"><span>Centroid</span><b>${centroidKhz(row[6])}</b></div>` +
+      `<div class="t-hint">Click or press Enter to play</div>`;
+  }
+
+  function parseHash() {
+    const params = new URLSearchParams(location.hash.replace(/^#/, ""));
+    const pRaw = params.get("p");
+    const p = pRaw == null || pRaw === "" ? null : Number.parseInt(pRaw, 10);
+    return { p: Number.isInteger(p) ? p : null, n: params.get("n") };
+  }
+
+  function writeHash() {
+    const next = "#p=" + state.p + (state.n ? "&n=" + encodeURIComponent(state.n) : "");
+    if (location.hash !== next) history.replaceState(null, "", next);
+  }
+
+  function stopActive() {
+    const rec = active;
+    if (!rec) return;
+    active = null;
+    try { rec.audio.pause(); } catch (error) {}
+    try { rec.audio.currentTime = 0; } catch (error) {}
+    rec.apply("idle");
+  }
+
+  function startAudio(audio, apply, label) {
+    if (active && active.audio === audio && !audio.paused) {
+      active = null;
+      audio.pause();
+      apply("idle");
+      return;
+    }
+    stopActive();
+    if (!audio.getAttribute("src")) audio.src = audio.dataset.src;
+    apply("loading");
+    announce("Loading " + label + ".");
+    const rec = { audio, apply, label };
+    active = rec;
+    const promise = audio.play();
+    if (promise && promise.catch) {
+      promise.catch(() => {
+        if (active === rec) {
+          active = null;
+          apply("error");
+          announce("Could not play " + label + ".");
+        }
+      });
+    }
+  }
+
+  function wireAudio(audio, apply, label) {
+    audio.addEventListener("playing", () => {
+      if (active && active.audio === audio) {
+        apply("playing");
+        announce("Playing " + label + ".");
+      }
+    });
+    audio.addEventListener("waiting", () => {
+      if (active && active.audio === audio) apply("loading");
+    });
+    audio.addEventListener("pause", () => {
+      if (active && active.audio === audio) {
+        active = null;
+        apply("idle");
+      }
+    });
+    audio.addEventListener("ended", () => {
+      if (active && active.audio === audio) {
+        active = null;
+        apply("idle");
+        announce("Finished " + label + ".");
+      }
+    });
+    audio.addEventListener("error", () => {
+      if (active && active.audio === audio) {
+        active = null;
+        apply("error");
+        announce("Could not play " + label + ".");
+      }
+    });
+  }
+
+  function setPlayButton(btn, status, label) {
+    btn.classList.toggle("is-loading", status === "loading");
+    btn.classList.toggle("is-playing", status === "playing");
+    btn.classList.toggle("is-error", status === "error");
+    if (status === "loading") {
+      btn.setAttribute("aria-label", "Loading " + label);
+      btn.title = "Loading audio";
+    } else if (status === "playing") {
+      btn.setAttribute("aria-label", "Pause " + label);
+      btn.title = "Pause";
+    } else if (status === "error") {
+      btn.setAttribute("aria-label", "Audio failed for " + label);
+      btn.title = "Audio failed";
+    } else {
+      btn.setAttribute("aria-label", "Play " + label);
+      btn.title = "Play";
+    }
+  }
+
+  function clipHTML(row, options) {
+    const opts = options || {};
+    const dose = Number(row[3]);
+    const sign = opts.sign || (dose > 0 ? "pos" : dose < 0 ? "neg" : "base");
+    const label = opts.label || (fmtDose(dose) + " push");
+    const prompt = row[0];
+    const p = promptIndex.get(prompt);
+    const key = opts.key || "";
+    const showDose = opts.showDose ? `<span class="cell-dose mono">${esc(opts.showDose)}</span>` : "";
+    return `<div class="cell${sign === "base" ? " base" : ""}" data-sign="${sign}" data-key="${esc(key)}" data-dose="${dose}" data-p="${p}">
+      <button class="playbtn" type="button" data-label="${esc(label + " for " + prompt)}" aria-label="Play ${esc(label + " for " + prompt)}">
+        <svg class="i-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z" fill="currentColor"/></svg>
+        <svg class="i-pause" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5h4v14H7zM13 5h4v14h-4z" fill="currentColor"/></svg>
+        <svg class="i-spin" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="2.5" stroke-dasharray="30 20"/></svg>
+      </button>
+      <audio preload="none" data-src="${esc(audioUrl(row))}"></audio>
+      <div class="cell-info">
+        ${showDose}
+        <div class="distline"><span class="distbar"><i style="width:${barWidth(row[8]).toFixed(1)}%"></i></span><span class="mono distnum">${Number(row[8]).toFixed(2)}</span></div>
+        <span class="mono centroid">${centroidKhz(row[6])}</span>
+      </div>
+    </div>`;
+  }
+
+  function wireClips(root) {
+    $$(".cell", root).forEach(cell => {
+      const audio = $("audio", cell);
+      const btn = $(".playbtn", cell);
+      if (!audio || !btn) return;
+      const label = btn.dataset.label;
+      const apply = status => setPlayButton(btn, status, label);
+      wireAudio(audio, apply, label);
+      btn.addEventListener("click", () => {
+        const key = cell.dataset.key;
+        const p = Number(cell.dataset.p);
+        if (key) state.n = key;
+        const promptChanged = Number.isInteger(p) && p !== state.p;
+        if (promptChanged) {
+          state.p = p;
+          renderChips();
+          renderGrid();
+        }
+        writeHash();
+        updateSelection();
+        startAudio(audio, apply, label);
+      });
+    });
+  }
+
+  function buildData() {
+    prompts = [];
+    promptIndex = new Map();
+    baselines = new Map();
+    pushes = [];
+    neurons = new Map();
+
+    for (const row of db.rows) {
+      if (!promptIndex.has(row[0])) {
+        promptIndex.set(row[0], prompts.length);
+        prompts.push(row[0]);
+      }
+    }
+
+    for (const row of db.rows) {
+      const prompt = row[0];
+      if (Number(row[1]) === -1) {
+        baselines.set(prompt, row);
+        continue;
+      }
+      pushes.push(row);
+      const key = neuronKey(row[1], row[2]);
+      let entry = neurons.get(key);
+      if (!entry) {
+        entry = { key, layer: Number(row[1]), neuron: Number(row[2]), byPrompt: new Map() };
+        neurons.set(key, entry);
+      }
+      let pair = entry.byPrompt.get(prompt);
+      if (!pair) {
+        pair = {};
+        entry.byPrompt.set(prompt, pair);
+      }
+      if (Number(row[3]) < 0) pair.minus = row;
+      else pair.plus = row;
+    }
+
+    neuronList = Array.from(neurons.values()).sort((a, b) => a.layer - b.layer || a.neuron - b.neuron);
+    pushes.sort((a, b) => Number(a[1]) - Number(b[1]) || Number(a[2]) - Number(b[2]) || Number(a[3]) - Number(b[3]));
+
+    const byLayer = Array.from({ length: MAX_LAYER + 1 }, () => []);
+    for (const row of pushes) {
+      const layer = Number(row[1]);
+      if (layer >= 0 && layer <= MAX_LAYER) byLayer[layer].push(Number(row[8]));
+    }
+    layerMeans = byLayer.map((values, layer) => ({ layer, value: mean(values) }));
+
+    best = null;
+    bestScore = -1;
+    for (const entry of neuronList) {
+      const score = neuronMean(entry, prompts);
+      if (score > bestScore) {
+        bestScore = score;
+        best = entry;
+      }
+    }
+  }
+
+  function neuronMean(entry, promptList) {
+    const values = [];
+    for (const prompt of promptList) {
+      const pair = entry.byPrompt.get(prompt);
+      if (!pair) continue;
+      if (pair.minus) values.push(Number(pair.minus[8]));
+      if (pair.plus) values.push(Number(pair.plus[8]));
+    }
+    return mean(values);
+  }
+
+  function neuronMeanForPrompt(entry, prompt) {
+    const pair = entry.byPrompt.get(prompt);
+    if (!pair) return 0;
+    const values = [];
+    if (pair.minus) values.push(Number(pair.minus[8]));
+    if (pair.plus) values.push(Number(pair.plus[8]));
+    return mean(values);
+  }
+
+  function renderChips() {
+    $("#chips").innerHTML = prompts.map((prompt, i) =>
+      `<button class="chip" type="button" data-p="${i}" aria-pressed="${i === state.p}">${fmt(prompt)}</button>`
+    ).join("");
+  }
+
+  function renderGrid() {
+    stopActive();
+    const prompt = prompts[state.p];
+    const rows = neuronList.slice();
+    if (state.sort === "changed") {
+      rows.sort((a, b) => neuronMeanForPrompt(b, prompt) - neuronMeanForPrompt(a, prompt) || a.layer - b.layer || a.neuron - b.neuron);
+    } else {
+      rows.sort((a, b) => a.layer - b.layer || a.neuron - b.neuron);
+    }
+    const baseline = baselines.get(prompt);
+
+    const body = rows.map(entry => {
+      const pair = entry.byPrompt.get(prompt) || {};
+      const minus = pair.minus ? clipHTML(pair.minus, { key: entry.key, label: "dose −0.5 push" }) : `<div class="cell"><span class="muted small">No clip</span></div>`;
+      const plus = pair.plus ? clipHTML(pair.plus, { key: entry.key, label: "dose +0.5 push" }) : `<div class="cell"><span class="muted small">No clip</span></div>`;
+      const base = baseline ? clipHTML(baseline, { key: entry.key, label: "baseline", sign: "base" }) : `<div class="cell"><span class="muted small">No baseline</span></div>`;
+      return `<div class="ng-row" data-key="${esc(entry.key)}">
+        <button class="ng-label" type="button" data-key="${esc(entry.key)}" aria-label="Select neuron ${esc(entry.key)}">${esc(entry.key)}</button>
+        ${minus}${base}${plus}
+      </div>`;
+    }).join("");
+
+    $("#grid").innerHTML = `<div class="grid-head" aria-hidden="true"><span>Neuron</span><span>−0.5</span><span>Baseline</span><span>+0.5</span></div>${body}`;
+    $("#gridCount").textContent = rows.length + " neurons";
+    wireClips($("#grid"));
+    updateSelection();
+  }
+
+  function renderChart() {
+    const W = 780, H = 330;
+    const m = { t: 16, r: 18, b: 42, l: 52 };
+    const innerW = W - m.l - m.r;
+    const innerH = H - m.t - m.b;
+    const X = layer => m.l + (Number(layer) / MAX_LAYER) * innerW;
+    const Y = value => m.t + innerH - (Math.min(Number(value), Y_MAX) / Y_MAX) * innerH;
+
+    const yTicks = [0, 0.4, 0.8, 1.2, 1.6];
+    const xTicks = [0, 4, 8, 12, 16, 20, 23];
+
+    let svg = `<svg viewBox="0 0 ${W} ${H}" role="group" aria-label="Spectral distance of each pushed clip by decoder layer">`;
+
+    for (const tick of yTicks) {
+      const y = Y(tick);
+      svg += `<line class="grid-line" x1="${m.l}" x2="${W - m.r}" y1="${y}" y2="${y}"/>`;
+      svg += `<text class="axis-text" x="${m.l - 8}" y="${y + 3.5}" text-anchor="end">${tick.toFixed(1)}</text>`;
+    }
+    for (const tick of xTicks) {
+      const x = X(tick);
+      svg += `<line class="grid-line" x1="${x}" x2="${x}" y1="${m.t}" y2="${m.t + innerH}" opacity=".4"/>`;
+      svg += `<text class="axis-text" x="${x}" y="${m.t + innerH + 16}" text-anchor="middle">${tick}</text>`;
+    }
+    svg += `<text class="axis-unit" x="${m.l}" y="${H - 8}">decoder layer</text>`;
+    svg += `<text class="axis-unit" x="${m.l - 8}" y="${m.t - 5}" text-anchor="end">dist</text>`;
+
+    const meanPath = layerMeans.map((point, i) =>
+      `${i === 0 ? "M" : "L"}${X(point.layer).toFixed(2)},${Y(point.value).toFixed(2)}`
+    ).join(" ");
+    svg += `<path class="mean-line" d="${meanPath}"/>`;
+
+    pushes.forEach((row, i) => {
+      const dose = Number(row[3]);
+      const sign = dose > 0 ? "pos" : "neg";
+      const label = `Layer ${row[1]}, neuron ${row[2]}, dose ${fmtDose(row[3])}, ${row[0]}, distance ${Number(row[8]).toFixed(3)}, centroid ${centroidKhz(row[6])}. Press Enter to play.`;
+      svg += `<circle class="dot-mark ${sign}" cx="${X(row[1]).toFixed(2)}" cy="${Y(row[8]).toFixed(2)}" r="3.4" data-i="${i}" data-key="${esc(neuronKey(row[1], row[2]))}" tabindex="${i === 0 ? "0" : "-1"}" role="button" aria-label="${esc(label)}"/>`;
+    });
+
+    svg += "</svg>";
+    $("#chartWrap").innerHTML = svg;
+    renderChartTables();
+  }
+
+  function renderChartTables() {
+    const means = layerMeans.map(point =>
+      `<tr><td>Layer ${point.layer}</td><td>${point.value.toFixed(3)}</td></tr>`
+    ).join("");
+    $("#meanTable").innerHTML = `<table>
+      <caption>Mean spectral distance across all pushed clips, by decoder layer.</caption>
+      <thead><tr><th>Layer</th><th>Mean distance</th></tr></thead>
+      <tbody>${means}</tbody>
+    </table>`;
+
+    const sorted = pushes.slice().sort((a, b) => Number(a[1]) - Number(b[1]) || Number(a[2]) - Number(b[2]) || Number(a[3]) - Number(b[3]));
+    const clips = sorted.map(row =>
+      `<tr><td>${fmt(row[0])}</td><td>${row[1]}</td><td>${row[2]}</td><td>${fmtDose(row[3])}</td><td>${Number(row[8]).toFixed(3)}</td><td>${centroidKhz(row[6])}</td></tr>`
+    ).join("");
+    $("#clipTable").innerHTML = `<table>
+      <caption>Every pushed clip: cosine distance and spectral centroid.</caption>
+      <thead><tr><th>Prompt</th><th>Layer</th><th>Neuron</th><th>Dose</th><th>Distance</th><th>Centroid</th></tr></thead>
+      <tbody>${clips}</tbody>
+    </table>`;
+  }
+
+  function renderCallout() {
+    if (!best) return;
+    const rows = prompts.map((prompt, i) => {
+      const pair = best.byPrompt.get(prompt);
+      const baseline = baselines.get(prompt);
+      if (!pair || !baseline) return "";
+      const pushed = Number(pair.minus[8]) >= Number(pair.plus[8]) ? pair.minus : pair.plus;
+      return `<div class="callout-row">
+        <div class="callout-prompt"><span class="mono muted">${String(i + 1).padStart(2, "0")}</span> ${fmt(prompt)}</div>
+        <div class="callout-pair">
+          ${clipHTML(baseline, { key: best.key, label: "baseline", sign: "base", showDose: "base" })}
+          ${clipHTML(pushed, { key: best.key, label: "most changed push", showDose: fmtDose(pushed[3]) })}
+        </div>
+      </div>`;
+    }).join("");
+
+    $("#callout").innerHTML = `<h3>Most changed neuron: ${esc(best.key)}</h3>
+      <p class="lede">This neuron has the largest average spectral change over the three prompts, across both doses: ${bestScore.toFixed(2)}. For each prompt, the baseline sits next to its most changed push.</p>
+      <p class="question">Does it do the same thing to every song?</p>
+      <div class="callout-rows">${rows}</div>`;
+    wireClips($("#callout"));
+  }
+
+  function updateSelection() {
+    $$(".ng-row").forEach(row => row.classList.toggle("is-selected", !!state.n && row.dataset.key === state.n));
+    $$(".dot-mark").forEach(dot => dot.classList.toggle("is-selected", !!state.n && dot.dataset.key === state.n));
+  }
+
+  function applyBase(status) {
+    const btn = $("#playBase");
+    const label = $("#playBaseLabel");
+    const prompt = prompts[state.p] || "the current prompt";
+    btn.classList.toggle("is-loading", status === "loading");
+    btn.classList.toggle("is-playing", status === "playing");
+    btn.classList.toggle("is-error", status === "error");
+    if (status === "loading") {
+      label.textContent = "Loading…";
+      btn.setAttribute("aria-label", "Loading baseline for " + prompt);
+    } else if (status === "playing") {
+      label.textContent = "Pause baseline";
+      btn.setAttribute("aria-label", "Pause baseline for " + prompt);
+    } else if (status === "error") {
+      label.textContent = "Audio failed";
+      btn.setAttribute("aria-label", "Baseline audio failed for " + prompt);
+    } else {
+      label.textContent = "Play baseline";
+      btn.setAttribute("aria-label", "Play baseline for " + prompt);
+    }
+  }
+
+  function wireBase() {
+    const audio = $("#baseAudio");
+    const btn = $("#playBase");
+    wireAudio(audio, applyBase, "baseline");
+    btn.addEventListener("click", () => {
+      const baseline = baselines.get(prompts[state.p]);
+      if (!baseline) return;
+      const url = audioUrl(baseline);
+      if (audio.dataset.url !== url) {
+        if (active && active.audio === audio) stopActive();
+        audio.src = url;
+        audio.dataset.url = url;
+      }
+      startAudio(audio, applyBase, "baseline");
+    });
+  }
+
+  function scrollToNeuron(key) {
+    const row = $('.ng-row[data-key="' + key + '"]');
+    if (!row) return;
+    const behavior = matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
+    row.scrollIntoView({ block: "center", behavior });
+  }
+
+  function chooseDot(circle) {
+    const i = Number(circle.dataset.i);
+    const row = pushes[i];
+    if (!row) return;
+    const key = neuronKey(row[1], row[2]);
+    const p = promptIndex.get(row[0]);
+    const promptChanged = Number.isInteger(p) && p !== state.p;
+    state.n = key;
+    if (promptChanged) {
+      state.p = p;
+      renderChips();
+      renderGrid();
+    }
+    writeHash();
+    updateSelection();
+    const cell = $('.grid .cell[data-key="' + key + '"][data-dose="' + row[3] + '"]');
+    const btn = cell ? $(".playbtn", cell) : null;
+    if (btn) {
+      btn.click();
+    } else {
+      announce("No player for this clip.");
+    }
+  }
+
+  function renderAll() {
+    renderChips();
+    $("#sort").value = state.sort;
+    renderGrid();
+    renderChart();
+    renderCallout();
+    applyBase("idle");
+    updateSelection();
+  }
+
+  async function load() {
+    const status = $("#status");
+    status.hidden = false;
+    status.className = "status";
+    status.setAttribute("role", "status");
+    status.innerHTML = `<span class="spinner" aria-hidden="true"></span><span>Loading 288 pushed clips and 3 baselines…</span>`;
+    try {
+      const response = await fetch(DATA + "site/music.json", { cache: "no-store" });
+      if (!response.ok) throw new Error("Server returned HTTP " + response.status);
+      const data = await response.json();
+      if (!data || !data.base || !Array.isArray(data.rows) || !data.rows.length) {
+        throw new Error("The music data is missing its base URL or rows.");
+      }
+      db = data;
+      buildData();
+      if (!prompts.length || !pushes.length) throw new Error("The music data has no prompts or pushes.");
+
+      const hash = parseHash();
+      state.p = hash.p != null && hash.p >= 0 && hash.p < prompts.length ? hash.p : 0;
+      state.n = hash.n && neurons.has(hash.n) ? hash.n : null;
+
+      status.hidden = true;
+      $("#controls").hidden = false;
+      $("#gridCard").hidden = false;
+      $("#chartCard").hidden = false;
+      renderAll();
+      writeHash();
+      if (state.n) setTimeout(() => scrollToNeuron(state.n), 80);
+    } catch (error) {
+      status.className = "status error";
+      status.setAttribute("role", "alert");
+      status.innerHTML = `<div class="status-body"><b>Could not load the sound-push data.</b>${esc(error && error.message ? error.message : "Unknown error")}. Check the connection and try again.</div><button type="button" id="retry">Try again</button>`;
+    }
+  }
+
+  $("#status").addEventListener("click", event => {
+    if (event.target.closest("#retry")) load();
+  });
+
+  $("#chips").addEventListener("click", event => {
+    const chip = event.target.closest(".chip");
+    if (!chip) return;
+    const p = Number(chip.dataset.p);
+    if (!Number.isInteger(p) || p === state.p) return;
+    stopActive();
+    state.p = p;
+    renderChips();
+    renderGrid();
+    writeHash();
+    updateSelection();
+    applyBase("idle");
+  });
+
+  $("#sort").addEventListener("change", event => {
+    state.sort = event.target.value === "layer" ? "layer" : "changed";
+    renderGrid();
+    updateSelection();
+  });
+
+  $("#grid").addEventListener("click", event => {
+    const label = event.target.closest(".ng-label");
+    if (!label) return;
+    state.n = label.dataset.key;
+    writeHash();
+    updateSelection();
+  });
+
+  $("#chartWrap").addEventListener("pointermove", event => {
+    const circle = event.target.closest(".dot-mark");
+    if (!circle) {
+      hideTip();
+      return;
+    }
+    const row = pushes[Number(circle.dataset.i)];
+    if (row) showTip(event.clientX, event.clientY, dotTipHtml(row));
+  });
+
+  $("#chartWrap").addEventListener("pointerleave", hideTip);
+
+  $("#chartWrap").addEventListener("focusin", event => {
+    const circle = event.target.closest(".dot-mark");
+    if (!circle) return;
+    const row = pushes[Number(circle.dataset.i)];
+    if (row) showTipAt(circle, dotTipHtml(row));
+  });
+
+  $("#chartWrap").addEventListener("focusout", hideTip);
+
+  $("#chartWrap").addEventListener("click", event => {
+    const circle = event.target.closest(".dot-mark");
+    if (circle) chooseDot(circle);
+  });
+
+  $("#chartWrap").addEventListener("keydown", event => {
+    const circle = event.target.closest(".dot-mark");
+    if (!circle) return;
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      chooseDot(circle);
+      return;
+    }
+    const dots = $$(".dot-mark", $("#chartWrap"));
+    const current = dots.indexOf(circle);
+    let next = null;
+    if (event.key === "ArrowRight" || event.key === "ArrowDown") next = Math.min(dots.length - 1, current + 1);
+    else if (event.key === "ArrowLeft" || event.key === "ArrowUp") next = Math.max(0, current - 1);
+    else if (event.key === "Home") next = 0;
+    else if (event.key === "End") next = dots.length - 1;
+    if (next == null || next === current) return;
+    event.preventDefault();
+    dots.forEach(dot => { dot.tabIndex = -1; });
+    dots[next].tabIndex = 0;
+    dots[next].focus();
+  });
+
+  $("#chartTableBtn").addEventListener("click", () => {
+    const btn = $("#chartTableBtn");
+    const panel = $("#chartTables");
+    const show = panel.hidden;
+    panel.hidden = !show;
+    btn.setAttribute("aria-expanded", String(show));
+    btn.textContent = show ? "Hide table" : "Table";
+    hideTip();
+  });
+
+  document.addEventListener("scroll", hideTip, true);
+
+  window.addEventListener("hashchange", () => {
+    if (!db) return;
+    const hash = parseHash();
+    const p = hash.p != null && hash.p >= 0 && hash.p < prompts.length ? hash.p : state.p;
+    state.p = p;
+    state.n = hash.n && neurons.has(hash.n) ? hash.n : null;
+    stopActive();
+    renderChips();
+    renderGrid();
+    updateSelection();
+    applyBase("idle");
+    writeHash();
+    if (state.n) scrollToNeuron(state.n);
+  });
+
+  function resolvedTheme() {
+    const attr = document.documentElement.dataset.theme;
+    if (attr === "light" || attr === "dark") return attr;
+    return themeMQ.matches ? "dark" : "light";
+  }
+
+  function updateThemeButton() {
+    const resolved = resolvedTheme();
+    themeBtn.dataset.resolved = resolved;
+    const next = resolved === "dark" ? "light" : "dark";
+    const label = `Switch to ${next} theme`;
+    themeBtn.setAttribute("aria-label", label);
+    themeBtn.title = label;
+  }
+
+  function setTheme(mode) {
+    document.documentElement.dataset.theme = mode;
+    try { localStorage.setItem(THEME_KEY, mode); } catch (error) {}
+    updateThemeButton();
+  }
+
+  try {
+    const saved = localStorage.getItem(THEME_KEY);
+    if (saved === "light" || saved === "dark") document.documentElement.dataset.theme = saved;
+  } catch (error) {}
+  updateThemeButton();
+  themeBtn.addEventListener("click", () => setTheme(resolvedTheme() === "dark" ? "light" : "dark"));
+  themeMQ.addEventListener?.("change", () => {
+    if (!document.documentElement.dataset.theme) updateThemeButton();
+  });
+
+  wireBase();
+  load();
+})();
+</script>
+</body>
+</html>
