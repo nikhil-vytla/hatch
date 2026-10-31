@@ -26,7 +26,18 @@ judge labels; the judges are audited in `AUDIT.md`.
 | 14-0.8 | R1-Distill bat-and-ball correct under ±0.8 pushes | 0.300 | 0.304 |  | PASS | `deepseek-ai__DeepSeek-R1-Distill-Qwen-1.5B/reasoning_long/steer` |
 | NL-a | Qwen3-8B labels: ours vs neuron-lens judged 'same' | 0.331 | 0.331 |  | PASS | `Qwen__Qwen3-8B/experiments/label_agreement_neuronlens.json` |
 | NL-b | ... shuffled pairs judged 'same' (chance) | 0.001 | 0.001 |  | PASS | `same` |
+| 23 | Qwen3.5-0.8B: persona share of 'Who are you?' pushes | 0.047 | 0.047 |  | PASS | `Qwen__Qwen3.5-0.8B/sweep_stats.parquet` |
+| 23u | Qwen3.5-0.8B: 'Who am I?' pushes that tell the user who they are | 0.110 | 0.109 |  | PASS | `Qwen__Qwen3.5-0.8B/user_sweep_stats.parquet` |
+| 24 | Qwen2.5-VL-3B: blank-image pushes that describe something (of 3,456) | 285.000 | 285.000 |  | PASS | `Qwen__Qwen2.5-VL-3B-Instruct/blank/vlm.parquet` |
+| 24c | same neuron draws the same thing on different blanks (judged) | 0.410 | 0.413 |  | PASS | `…/blank/blank_judge.json` |
+| 24s | … for hallucinations shuffled across neurons | 0.100 | 0.095 |  | PASS | `same` |
+| 25a | TinyStories '…met a': lowest per-layer recast rate | 0.450 | 0.445 |  | PASS | `roneneldan__TinyStories-33M/sweep/steer/` |
+| 25b | TinyStories '…met a': highest per-layer recast rate | 0.730 | 0.731 |  | PASS | `same` |
+| 25c | TinyStories 'there was a': recast rate, worst of layers 0-2 | 0.020 | 0.020 |  | PASS | `same` |
+| 25d | TinyStories 'there was a': recast rate at layer 3 | 0.340 | 0.337 |  | PASS | `same` |
+| 26 | MusicGen: L14 N510 +0.5 is the largest mean change (1 = yes) | 1.000 | 1.000 |  | PASS | `site/music.json` |
+| 26b | MusicGen: layer 0 mean spectral distance | 0.360 | 0.361 |  | PASS | `same` |
 | 16a | J-lens tokens appear in the pushed reply | 0.095 | 0.095 | 0.094–0.096 | PASS | `Qwen__Qwen3.5-4B/jlens, sweep/steer` |
 | 16b | ... another neuron's tokens (chance) | 0.005 | 0.005 | 0.004–0.005 | PASS | `same` |
 
-22 of 22 claims pass.
+33 of 33 claims pass.

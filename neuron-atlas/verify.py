@@ -168,12 +168,64 @@ def label_agreement():
                  tol=0.005, unit="share (DeepSeek judge)", source="same")]
 
 
+def new_models():
+    """Findings 23-26: Qwen3.5-0.8B personas, blank-canvas vision, TinyStories casting, MusicGen."""
+    out = []
+    p = hub("Qwen__Qwen3.5-0.8B/sweep_stats.parquet")
+    tot, per = duckdb.sql(f"select sum(n_est), sum(n_est) filter (where reply_kind = 'persona') from '{p}'").fetchall()[0]
+    out.append(dict(id="23", claim="Qwen3.5-0.8B: persona share of 'Who are you?' pushes", stated=0.047, value=per / tot,
+                    tol=None, unit="share", source="Qwen__Qwen3.5-0.8B/sweep_stats.parquet"))
+    p = hub("Qwen__Qwen3.5-0.8B/user_sweep_stats.parquet")
+    tot, u = duckdb.sql(f"select sum(n_est), sum(n_est) filter (where reply_kind = 'user_identity') from '{p}'").fetchall()[0]
+    out.append(dict(id="23u", claim="Qwen3.5-0.8B: 'Who am I?' pushes that tell the user who they are", stated=0.11, value=u / tot,
+                    tol=0.006, unit="share", source="Qwen__Qwen3.5-0.8B/user_sweep_stats.parquet"))
+    # 24: count hallucinations from the raw replies (string rule), consistency from stored judge labels
+    blank = re.compile(r"blank|no visible|empty|plain|solid|uniform|nothing|no (?:discernible|distinct|objects|content|details)"
+                       r"|completely|entirely|cannot|sorry|unable", re.I)
+    rows = duckdb.sql(f"select text from '{hub('Qwen__Qwen2.5-VL-3B-Instruct/blank/vlm.parquet')}' where layer >= 0").fetchall()
+    out.append(dict(id="24", claim="Qwen2.5-VL-3B: blank-image pushes that describe something (of 3,456)", stated=285,
+                    value=sum(not blank.search(t) for (t,) in rows), tol=0, unit="count", source="Qwen__Qwen2.5-VL-3B-Instruct/blank/vlm.parquet"))
+    j = json.load(open(hub("Qwen__Qwen2.5-VL-3B-Instruct/blank/blank_judge.json")))
+    out.append(dict(id="24c", claim="same neuron draws the same thing on different blanks (judged)", stated=0.41,
+                    value=j["n_shared"] / j["n_multi"], tol=0.01, unit="share", source="…/blank/blank_judge.json"))
+    out.append(dict(id="24s", claim="… for hallucinations shuffled across neurons", stated=0.10,
+                    value=j["control_shared"] / j["control_judged"], tol=0.01, unit="share", source="same"))
+    # 25: TinyStories character parse, recomputed from the raw continuations
+    sys.path.insert(0, "analysis")
+    from ts_characters import character
+    base = {p: character(t)[0] for p, t in duckdb.sql(f"select prompt, text from '{hub('roneneldan__TinyStories-33M/sweep/steer/baseline.parquet')}'").fetchall()}
+    rate = {}
+    for L in range(4):
+        for p, t in duckdb.sql(f"select prompt, text from '{hub(f'roneneldan__TinyStories-33M/sweep/steer/L{L:02d}.parquet')}'").fetchall():
+            c = rate.setdefault((L, p), [0, 0]); c[0] += character(t)[0] != base[p]; c[1] += 1
+    r = {k: a / b for k, (a, b) in rate.items()}
+    out.append(dict(id="25a", claim="TinyStories '…met a': lowest per-layer recast rate", stated=0.45, value=min(r[(L, 1)] for L in range(4)),
+                    tol=0.005, unit="share", source="roneneldan__TinyStories-33M/sweep/steer/"))
+    out.append(dict(id="25b", claim="TinyStories '…met a': highest per-layer recast rate", stated=0.73, value=max(r[(L, 1)] for L in range(4)),
+                    tol=0.005, unit="share", source="same"))
+    out.append(dict(id="25c", claim="TinyStories 'there was a': recast rate, worst of layers 0-2", stated=0.02, value=max(r[(L, 0)] for L in range(3)),
+                    tol=0.005, unit="share", source="same"))
+    out.append(dict(id="25d", claim="TinyStories 'there was a': recast rate at layer 3", stated=0.34, value=r[(3, 0)], tol=0.005, unit="share", source="same"))
+    # 26: music
+    m = json.load(open(hub("site/music.json")))["rows"]
+    dist = {}
+    for p, L, n, d, f, rms, cen, zcr, ds in m:
+        if L >= 0:
+            dist.setdefault((L, n, d), []).append(ds)
+    top = max(dist, key=lambda k: sum(dist[k]) / len(dist[k]))
+    out.append(dict(id="26", claim="MusicGen: L14 N510 +0.5 is the largest mean change (1 = yes)", stated=1,
+                    value=int(top == (14, 510, 0.5)), tol=0, unit="", source="site/music.json"))
+    l0 = [ds for p, L, n, d, f, rms, cen, zcr, ds in m if L == 0]
+    out.append(dict(id="26b", claim="MusicGen: layer 0 mean spectral distance", stated=0.36, value=sum(l0) / len(l0), tol=0.005, unit="cosine", source="same"))
+    return out
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--quick", action="store_true")
     a = ap.parse_args()
     claims = []
-    for fn in (persona_rates, lens_guided, fusion, imitation, era, reasoning, label_agreement, lambda: says_vs_does(a.quick)):
+    for fn in (persona_rates, lens_guided, fusion, imitation, era, reasoning, label_agreement, new_models, lambda: says_vs_does(a.quick)):
         try:
             claims += fn()
         except Exception as e:  # a missing file is a failed claim, not a crash

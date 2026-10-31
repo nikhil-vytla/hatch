@@ -224,6 +224,116 @@
   "status": "PASS"
  },
  {
+  "id": "23",
+  "claim": "Qwen3.5-0.8B: persona share of 'Who are you?' pushes",
+  "stated": 0.047,
+  "value": 0.0466182829772661,
+  "tol": 0.00235,
+  "unit": "share",
+  "source": "Qwen__Qwen3.5-0.8B/sweep_stats.parquet",
+  "status": "PASS"
+ },
+ {
+  "id": "23u",
+  "claim": "Qwen3.5-0.8B: 'Who am I?' pushes that tell the user who they are",
+  "stated": 0.11,
+  "value": 0.10940506074311596,
+  "tol": 0.006,
+  "unit": "share",
+  "source": "Qwen__Qwen3.5-0.8B/user_sweep_stats.parquet",
+  "status": "PASS"
+ },
+ {
+  "id": "24",
+  "claim": "Qwen2.5-VL-3B: blank-image pushes that describe something (of 3,456)",
+  "stated": 285,
+  "value": 285,
+  "tol": 0,
+  "unit": "count",
+  "source": "Qwen__Qwen2.5-VL-3B-Instruct/blank/vlm.parquet",
+  "status": "PASS"
+ },
+ {
+  "id": "24c",
+  "claim": "same neuron draws the same thing on different blanks (judged)",
+  "stated": 0.41,
+  "value": 0.4126984126984127,
+  "tol": 0.01,
+  "unit": "share",
+  "source": "\u2026/blank/blank_judge.json",
+  "status": "PASS"
+ },
+ {
+  "id": "24s",
+  "claim": "\u2026 for hallucinations shuffled across neurons",
+  "stated": 0.1,
+  "value": 0.09523809523809523,
+  "tol": 0.01,
+  "unit": "share",
+  "source": "same",
+  "status": "PASS"
+ },
+ {
+  "id": "25a",
+  "claim": "TinyStories '\u2026met a': lowest per-layer recast rate",
+  "stated": 0.45,
+  "value": 0.4451497395833333,
+  "tol": 0.005,
+  "unit": "share",
+  "source": "roneneldan__TinyStories-33M/sweep/steer/",
+  "status": "PASS"
+ },
+ {
+  "id": "25b",
+  "claim": "TinyStories '\u2026met a': highest per-layer recast rate",
+  "stated": 0.73,
+  "value": 0.7311197916666666,
+  "tol": 0.005,
+  "unit": "share",
+  "source": "same",
+  "status": "PASS"
+ },
+ {
+  "id": "25c",
+  "claim": "TinyStories 'there was a': recast rate, worst of layers 0-2",
+  "stated": 0.02,
+  "value": 0.019694010416666668,
+  "tol": 0.005,
+  "unit": "share",
+  "source": "same",
+  "status": "PASS"
+ },
+ {
+  "id": "25d",
+  "claim": "TinyStories 'there was a': recast rate at layer 3",
+  "stated": 0.34,
+  "value": 0.3370768229166667,
+  "tol": 0.005,
+  "unit": "share",
+  "source": "same",
+  "status": "PASS"
+ },
+ {
+  "id": "26",
+  "claim": "MusicGen: L14 N510 +0.5 is the largest mean change (1 = yes)",
+  "stated": 1,
+  "value": 1,
+  "tol": 0,
+  "unit": "",
+  "source": "site/music.json",
+  "status": "PASS"
+ },
+ {
+  "id": "26b",
+  "claim": "MusicGen: layer 0 mean spectral distance",
+  "stated": 0.36,
+  "value": 0.36128964026769,
+  "tol": 0.005,
+  "unit": "cosine",
+  "source": "same",
+  "status": "PASS"
+ },
+ {
   "id": "16a",
   "claim": "J-lens tokens appear in the pushed reply",
   "stated": 0.095,
