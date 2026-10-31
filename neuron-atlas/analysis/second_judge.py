@@ -89,6 +89,11 @@ def run_task(judge, system, items, parse, group=10, workers=8):
 
     with cf.ThreadPoolExecutor(workers) as ex:
         list(ex.map(one, range(0, len(items), group)))
+    missing = [k for k, g in enumerate(got) if g is None]
+    if missing and group > 3:  # the model sometimes answers without JSON: retry the gaps in small groups
+        sub = run_task(judge, system, [items[k] for k in missing], parse, group=3, workers=workers)
+        for k, g in zip(missing, sub):
+            got[k] = g
     return got
 
 
@@ -106,7 +111,8 @@ def main():
         for spec in a.judges:
             judge = make_judge(spec, server)
             for name, system, items, parse in ts:
-                if spec in results.get(name, {}):  # already judged in an earlier, interrupted run
+                done = results.get(name, {}).get(spec)
+                if done and done.get("n", 0) >= 0.9 * len(items):  # judged well enough in an earlier run
                     continue
                 labels = run_task(judge, system, items, parse)
                 k, n, po = kappa([x["ds"] for x in items], labels)
