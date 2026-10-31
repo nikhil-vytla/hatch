@@ -748,3 +748,24 @@ derangement null, not "persona vs not".
   hits, higher chance); L20–31 47× vs 48×. Decision: keep the published lens as the Qwen3.5-4B default (user's choice
   was to adopt ours only if it matched); ours is published at lenses/Qwen__Qwen3.5-4B/own-j-lens.pt, and the fitter
   is validated for the models without a published lens.
+
+## neuron-lens (stdlogits) cross-checks, Qwen3-8B
+
+- neuron-lens (github.com/stdlogits/neuron-lens, Hub stdlogits/neuron-lens + stdlogits/rs-lenses, CC BY 4.0): a catalog
+  of every MLP neuron pole and head in Qwen3-8B and Gemma 4 12B, read from weights (J/R-lens writes, K/S-lens reads),
+  from 15M positions of activations and from token-substitution drivers; Claude-written labels; Gemma 4 also read
+  through images and sounds. Their R-lens files use the same {"J": ...} format our load_lens reads.
+- Their published R-lens write tokens (top 10 of write_R_ids per pole; read by column over HTTP, ~1 min for 36
+  layers) vs our fitted J-lens on our 885k Qwen3-8B "Who are you?" pushes: all layers R 6.45% vs 0.50% chance (12.9×),
+  J 5.95% vs 0.36% (16.7×), logit 5.50% vs 0.32% (17.4×). By band (hit / chance, lift): L0–3 R 0.46/0.22 (2.1×), J
+  0.09/0.07 (1.3×); L4–8 R 1.75/0.37 (4.8×), J 0.69/0.18 (3.9×); L9–23 R 3.45/0.64 (5.4×), J 2.93/0.44 (6.7×);
+  L24–35 R 14.4/0.45 (32×), J 14.1/0.41 (34×). Their claim that the R-lens predicts steering better than the J-lens in
+  early layers replicates on a different metric and data; in middle layers R finds more pushed words but with commoner
+  tokens (lower lift), the pattern seen with our own SmolLM2 R-lens. Confound: their lens has 1,000 docs, our J 96.
+- Labels: ours (DeepSeek, top activations) vs theirs (Claude, activations + lenses, "fires" of the + pole) on our
+  2,880 labeled 8B neurons, DeepSeek-judged: same 33.1%, related 46.5%, different 20.4%; shuffled pairs 0.1 / 6.9 /
+  93.0%. Where their confidence >= 0.7 (n=481): same 61%, related 37%, different 2%.
+- Dark poles (their "dark": no token-level legibility test passes) vs what our pushes did: all poles L0–12 42% dark,
+  L13–20 82%, L21–35 55%. Persona-producing poles: L0–12 58%, L13–20 85%, L21–35 44%; incoherent-producing: 23%, 86%,
+  28%. Early-layer neurons that rewrite the model's identity are disproportionately ones no token-level test can read,
+  while those that break it are legible token writers.
