@@ -194,6 +194,11 @@ def new_models():
                     value=j["n_shared"] / j["n_multi"], tol=0.01, unit="share", source="…/blank/blank_judge.json"))
     out.append(dict(id="24s", claim="… for hallucinations shuffled across neurons", stated=0.10,
                     value=j["control_shared"] / j["control_judged"], tol=0.01, unit="share", source="same"))
+    j = json.load(open(hub("Qwen__Qwen3.5-0.8B/blank/blank_judge.json")))
+    out.append(dict(id="24q", claim="Qwen3.5-0.8B vision: same drawing across blanks (judged)", stated=0.63,
+                    value=j["n_shared"] / j["n_multi"], tol=0.005, unit="share", source="Qwen__Qwen3.5-0.8B/blank/blank_judge.json"))
+    out.append(dict(id="24qs", claim="… shuffled across neurons", stated=0.105, value=j["control_shared"] / j["control_judged"],
+                    tol=0.005, unit="share", source="same"))
     # 25: TinyStories character parse, recomputed from the raw continuations
     sys.path.insert(0, "analysis")
     from ts_characters import character

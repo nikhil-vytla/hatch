@@ -884,3 +884,8 @@ derangement null, not "persona vs not".
   line; `[p]attern` avoids it.
 - Loader: tower runs try `AutoModelForImageTextToText` first (Qwen3.5 otherwise loads text-only), Qwen2.5-Omni via
   its Thinker class, Whisper-style `audio_tower.layers.N.fc2`, Qwen3-VL-style `mlp.linear_fc2`.
+- Qwen3.5-0.8B blank canvas (vision tower 12 × 3,072, 32 neurons/layer): GPU notebook A became unreachable during
+  layer 10, so layers 0–9 only (shards on the Hub; the judge now reads shards when the combined file is missing).
+  The blank filter flags 2,170 of 2,880; dropping bare same-color answers ("A gray square." on the gray image is
+  correct) leaves 2,015 (70%). Consistency 468/742 (63%) vs shuffled 78/742 (10.5%); own 334 / random 364 /
+  neither 1,472. The Qwen2.5-Omni-3B hearing test (queued after it) never started.

@@ -43,7 +43,13 @@ def main(out, k=3, seed=0):
     meta = json.load(open(hf_hub_download(R, P + "meta.json", repo_type="dataset")))
     stim = meta["stimuli"]
     acts = {(L, n): a for L, n, a in duckdb.sql(f"select layer, neuron, acts from '{hf_hub_download(R, P + 'acts.parquet', repo_type='dataset')}'").fetchall()}
-    rows = duckdb.sql(f"select id, layer, neuron, dose, text from '{hf_hub_download(R, P + 'vlm.parquet', repo_type='dataset')}' where layer >= 0").fetchall()
+    try:
+        srcs = [hf_hub_download(R, P + "vlm.parquet", repo_type="dataset")]
+    except Exception:  # a run that died before writing the combined file: read its per-layer shards
+        from huggingface_hub import HfApi
+        srcs = [hf_hub_download(R, f, repo_type="dataset") for f in HfApi().list_repo_files(R, repo_type="dataset")
+                if f.startswith(P + "vlm/L") and f.endswith(".parquet")]
+    rows = duckdb.sql(f"select id, layer, neuron, dose, text from read_parquet({srcs!r}) where layer >= 0").fetchall()
     rng = random.Random(seed)
     items = []
     for i, L, n, d, t in rows:

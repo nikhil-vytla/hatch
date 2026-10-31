@@ -228,7 +228,11 @@ first).
     Gemma 4 E4B's vision encoder (256 neurons, same test) hallucinates less (103 of 2,304 pushes) and draws only
     textures: diagonal lines, grids, stripes, herringbone, once a world-map silhouette, mostly from its first and
     last layers. With everything a texture, its consistency (23 of 29) does not separate from shuffled neurons (13
-    of 29). `protos/vision.html` → Blank canvas.
+    of 29). Qwen3.5-0.8B's small vision tower is far more suggestible (32 neurons per layer, layers 0–9 of 12: the
+    GPU notebook died before the last two): about 70% of pushes describe something that is not there (*"a
+    minimalist white square on a black background"* for the gray image, *"a serene night sky with twinkling
+    stars"*), and one neuron draws the same thing across blanks in 63% of cases (468 of 742) vs 10.5% shuffled; the
+    match to its preferred stimuli is again null (334 own vs 364 random). `protos/vision.html` → Blank canvas.
 25. **A 4-layer story model recasts its characters, but only in some slots.** TinyStories-33M, every neuron pushed
     ±0.5 at two points where a story introduces someone (49k continuations, rule-based parse, no judge). *"One day,
     a little girl named Lily met a…"* gets a different character in 45–73% of pushes in every layer (a new friend, a
