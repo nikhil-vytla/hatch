@@ -37,7 +37,9 @@ judge labels; the judges are audited in `AUDIT.md`.
 | 25d | TinyStories 'there was a': recast rate at layer 3 | 0.340 | 0.337 |  | PASS | `same` |
 | 26 | MusicGen: L14 N510 +0.5 is the largest mean change (1 = yes) | 1.000 | 1.000 |  | PASS | `site/music.json` |
 | 26b | MusicGen: layer 0 mean spectral distance | 0.360 | 0.361 |  | PASS | `same` |
+| 27-think | SmolLM3 layers 6-16, thinking on: pushes that call 1001 prime | 0.016 | 0.016 |  | PASS | `HuggingFaceTB__SmolLM3-3B/sweep_think/steer/` |
+| 27-nothink | SmolLM3 layers 6-16, thinking off: pushes that call 1001 prime | 0.112 | 0.112 |  | PASS | `HuggingFaceTB__SmolLM3-3B/sweep_nothink/steer/` |
 | 16a | J-lens tokens appear in the pushed reply | 0.095 | 0.095 | 0.094–0.096 | PASS | `Qwen__Qwen3.5-4B/jlens, sweep/steer` |
 | 16b | ... another neuron's tokens (chance) | 0.005 | 0.005 | 0.004–0.005 | PASS | `same` |
 
-33 of 33 claims pass.
+35 of 35 claims pass.

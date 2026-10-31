@@ -217,6 +217,14 @@ def new_models():
                     value=int(top == (14, 510, 0.5)), tol=0, unit="", source="site/music.json"))
     l0 = [ds for p, L, n, d, f, rms, cen, zcr, ds in m if L == 0]
     out.append(dict(id="26b", claim="MusicGen: layer 0 mean spectral distance", stated=0.36, value=sum(l0) / len(l0), tol=0.005, unit="cosine", source="same"))
+    # 27: SmolLM3 thinking on/off, explicit-wrong rule on the raw replies
+    from smol_think import FACT, WRONG
+    for mode, stated in (("think", 0.016), ("nothink", 0.112)):
+        rows = [t for L in range(6, 17) for (t,) in duckdb.sql(
+            f"select text from '{hub(f'HuggingFaceTB__SmolLM3-3B/sweep_{mode}/steer/L{L:02d}.parquet')}' where prompt = 1").fetchall()]
+        wrong = sum(not FACT.search(t) and bool(WRONG.search(t)) for t in rows)
+        out.append(dict(id=f"27-{mode}", claim=f"SmolLM3 layers 6-16, thinking {'on' if mode == 'think' else 'off'}: pushes that call 1001 prime",
+                        stated=stated, value=wrong / len(rows), tol=0.002, unit="share", source=f"HuggingFaceTB__SmolLM3-3B/sweep_{mode}/steer/"))
     return out
 
 

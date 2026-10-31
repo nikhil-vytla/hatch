@@ -37,6 +37,13 @@ DeepSeek-R1-Distill-Qwen-1.5B (read pass + reasoning pushes), Qwen2.5-VL-3B (lan
 image stimuli), Janus-Pro-1B (image generation under pushes). J-lens readouts: Qwen3.5-4B (published J and R lenses),
 SmolLM2-135M (fitted here).
 
+Second round (Oct 31): Qwen3.5-0.8B and 2B (read pass, fitted J-lens, all-neuron "Who are you?" / "Who am I?"
+sweeps at ±0.8), TinyStories-33M (all neurons ±0.5 on two story openings), SmolLM3-3B (read pass; 128 random neurons
+per layer with thinking on and off), MusicGen-small (291 clips), a blank-image test of 384 Qwen2.5-VL-3B
+vision-encoder neurons, and an OLMo-2 1B training ladder (same neurons from 21B tokens through RL). Queued or
+partial: LFM2-350M, Gemma 4 E4B (audio-encoder pushes on 22 sounds; blank-image test). Not yet attempted:
+Qwen2.5-Omni-3B and OmniGen2.
+
 CPU runs (this container): 1,500 FineWeb-Edu documents + 1,000 smol-smoltalk chats, ≤128 tokens each, pushes at
 ±0.5. GPU runs (molab RTX PRO 6000, driven by this session through marimo pair): 6,000 + 4,000 documents, ≤256 tokens,
 pushes at ±0.5 and ±1.0 for the 64 most peaked + 16 random neurons per layer. Labels and push categories come from
@@ -229,6 +236,13 @@ first).
     cosine distance 0.36; most layers 0.03–0.2). L14 N510 at +0.5 is the largest change averaged over the prompts
     (1st on lo-fi piano, 2nd on orchestra, 3rd on guitar), raising the spectral centroid to 8.7 / 6.5 / 3.2 kHz from
     0.7 / 1.5 / 1.9 kHz: the same direction of change on every song. `protos/music.html` plays every clip.
+27. **Thinking out loud protects an answer from middle-layer pushes but lets late-layer pushes compound.** SmolLM3-3B,
+    the same 128 random neurons per layer pushed ±0.8, asked "Is 1001 a prime number?" with thinking on (256 tokens,
+    mostly the `<think>` trace) and off (48 tokens). Judge-free: a reply is wrong if it calls 1001 prime. Pushes in
+    layers 6–16 make the direct answer wrong in **11.2%** of cases (316 of 2,816) but the thinking trace in **1.6%**
+    (46 of 2,816); over all layers 4.7% vs 1.5%. In the last three layers it reverses: the long trace degenerates
+    into loops (*"city city city…"*) in 21–36% of pushes vs 6–15% for the short answer. The 256-token budget also
+    leaves many traces undecided, so "right" rates (60% thinking, 76% direct) are not comparable; "wrong" is.
 
 ## How it works
 

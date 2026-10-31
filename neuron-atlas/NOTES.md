@@ -847,3 +847,11 @@ derangement null, not "persona vs not".
 - Audio towers: `NeuronModel(where="audio")` finds Gemma-style conformer feed-forwards (two per layer, each counted as
   its own "layer"); `atlas.multimodal` reads WAV/FLAC stimuli (resampled to the processor's rate);
   `analysis/audio_stimuli.py` writes 6 synthetic sounds + 16 ESC-50 classes.
+- SmolLM3 thinking on/off (`analysis/smol_think.py`, 36 layers × 128 neurons × ±0.8, paired): first version scored
+  "found a factor" and "names SmolLM", which mostly measured whether a verdict fit in the token window (the direct
+  answer often starts "To determine if 1001 is prime, we need to check…"; the identity reply rarely says "Hugging
+  Face" in 48 tokens). Switched to an explicit-wrong rule (calls 1001 prime; lookbehinds exclude "if/whether 1001 is
+  a prime" — first draft had them in the wrong place and counted every "to determine if" as wrong). Result: wrong
+  1.6% (thinking) vs 11.2% (direct) in layers 6–16; overall 1.5% vs 4.7%; late layers 33–35 degenerate 21–36%
+  thinking vs 6–15% direct. The thinking baseline wasn't uploaded (the first run OOM'd after writing it; the resumed
+  run reused the local file), so it was uploaded by hand from the notebook.

@@ -334,6 +334,26 @@
   "status": "PASS"
  },
  {
+  "id": "27-think",
+  "claim": "SmolLM3 layers 6-16, thinking on: pushes that call 1001 prime",
+  "stated": 0.016,
+  "value": 0.016335227272727272,
+  "tol": 0.002,
+  "unit": "share",
+  "source": "HuggingFaceTB__SmolLM3-3B/sweep_think/steer/",
+  "status": "PASS"
+ },
+ {
+  "id": "27-nothink",
+  "claim": "SmolLM3 layers 6-16, thinking off: pushes that call 1001 prime",
+  "stated": 0.112,
+  "value": 0.11221590909090909,
+  "tol": 0.002,
+  "unit": "share",
+  "source": "HuggingFaceTB__SmolLM3-3B/sweep_nothink/steer/",
+  "status": "PASS"
+ },
+ {
   "id": "16a",
   "claim": "J-lens tokens appear in the pushed reply",
   "stated": 0.095,
