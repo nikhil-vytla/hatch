@@ -769,3 +769,22 @@ derangement null, not "persona vs not".
   L13–20 82%, L21–35 55%. Persona-producing poles: L0–12 58%, L13–20 85%, L21–35 44%; incoherent-producing: 23%, 86%,
   28%. Early-layer neurons that rewrite the model's identity are disproportionately ones no token-level test can read,
   while those that break it are legible token writers.
+
+## Verification (Oct 31)
+
+- Pre-registration (`PREREGISTRATION.md`, committed e5e51ac before the run): 2,000 never-pushed Qwen3.5-4B neurons, new
+  prompt, 30 new words. 8 of 9 predictions held; P3 (J beats logit lift in layers 6–19 on word hits) failed (5.2× vs
+  5.7×). Continuous test: own-token log-prob rises more than a random neuron's in 98% / 78% / 59% of late / middle /
+  early cases. Part B crashed once on GPU memory (shared with a lens fit); crash-only fix logged in the file.
+- `verify.py` → `CLAIMS.md`: 22 claims recomputed from the Hub alone, all pass after correcting four README numbers
+  (fusion "one wins" 7%, roleplay judge 57%, year forward 33%, and Qwen3.5-4B's persona share 0.8% on "Who are you?"
+  alone; the README had compared SmolLM2's one-prompt rate with the 4B's two-prompt 0.5%).
+- Second judge (DeepSeek-V4-Pro; no other lab's model was reachable: OpenCode free models failed server-side, no
+  Bedrock credentials): κ 0.84 (became), 0.74 (reply kind), 0.74 (label agreement), 0.70 (fusion). It never upgrades
+  and downgrades ~20% of became/persona and ~33% of "same label" verdicts, so judged rates are upper bounds (`AUDIT.md`).
+- Blind human audit page (claude.ai artifact, db rules: raters write only their own doc, only the owner reads all);
+  `audit/score.py` scores exports. Evidence page on the Space (`protos/evidence.html`).
+- Own R-lens for Qwen3.5-4B (256 docs) vs the published R-lens: matrix cosine 0.84 (L0) to 1.00; neuron top-10 Jaccard
+  0.20 (L0), 0.29 (L4), 0.39 (L8), 0.50 (L16), 0.66 (L20), 0.79 (L24), 0.90 (L28), closer than the J pair. Fitted
+  R-lenses for Qwen3-8B and R1-Distill published (readouts now have j and r columns). On GPU in bf16 the R-rule
+  forward check measured 1.1–1.7% max relative logit change (SmolLM2 fp32 CPU: 2e-6), i.e. bf16 operation order.
