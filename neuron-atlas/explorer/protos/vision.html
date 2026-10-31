@@ -210,6 +210,33 @@ table.data .replycell { white-space: normal; min-width: 240px; max-width: 420px;
   -webkit-box-orient: vertical; overflow: hidden }
 .flip .txt b { color: var(--ink) }
 
+.blank-controls { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; justify-content: space-between }
+.blank-controls .seg { width: auto; flex: 1 1 260px }
+.blank-dose { display: flex; align-items: center; gap: 6px; font: 600 12px/1 var(--body); color: var(--ink3) }
+.blank-dose select { border: 1px solid var(--line); background: var(--surface); border-radius: 7px; padding: 6px 8px;
+  font: 600 12px/1.2 var(--body); color: var(--ink) }
+.blank-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(255px, 1fr)); gap: 10px }
+.blank-card { border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); padding: 10px 12px;
+  display: flex; flex-direction: column; gap: 7px; min-width: 0; scroll-margin-top: 120px;
+  transition: border-color 120ms ease, box-shadow 120ms ease }
+.blank-card:hover { border-color: var(--hema); box-shadow: var(--card-shadow-hover) }
+.blank-card.target { border-color: var(--eosin); box-shadow: 0 0 0 2px color-mix(in oklab, var(--eosin) 28%, transparent) }
+.blank-head { display: flex; flex-wrap: wrap; align-items: center; gap: 5px 8px }
+.blank-head .id { font: 600 12px/1.2 var(--mono); color: var(--ink) }
+.blank-badge { font: 600 10px/1 var(--mono); letter-spacing: .02em; color: var(--ink2); background: var(--sunk);
+  border-radius: 999px; padding: 4px 7px; white-space: nowrap }
+.blank-row { display: grid; grid-template-columns: 12px 42px minmax(0, 1fr); gap: 8px; align-items: start; font-size: 13px }
+.blank-sw { width: 12px; height: 12px; border-radius: 3px; border: 1px solid var(--line); margin-top: 3px }
+.blank-label { font: 600 10px/1.5 var(--mono); letter-spacing: .04em; text-transform: uppercase; color: var(--ink3) }
+.blank-text { color: var(--ink2); line-height: 1.4; overflow-wrap: anywhere }
+.blank-text.is-blank { color: var(--ink3); font-style: italic }
+.blank-own { border-top: 1px solid var(--line); padding-top: 6px }
+.blank-own summary { cursor: pointer; font: 600 11px/1.4 var(--mono); color: var(--ink3) }
+.blank-own summary:hover { color: var(--ink2) }
+.blank-own ul { margin: 6px 0 0; padding-left: 18px; color: var(--ink2); font-size: 12px; line-height: 1.45 }
+.blank-own li { overflow-wrap: anywhere }
+.blank-own li + li { margin-top: 3px }
+
 .tip { position: fixed; z-index: 100; max-width: min(340px, calc(100vw - 24px)); max-height: 270px; overflow: hidden;
   background: var(--plate); color: var(--plate-ink); border: 1px solid var(--plate-line); border-radius: 8px;
   padding: 8px 10px; font-size: 12px; line-height: 1.45; box-shadow: 0 8px 28px rgb(0 0 0 / .3); pointer-events: none }
@@ -235,6 +262,7 @@ table.data .replycell { white-space: normal; min-width: 240px; max-width: 420px;
   .stim-grid { grid-template-columns: repeat(auto-fill, minmax(71px, 1fr)); gap: 6px }
   .stim { padding: 5px }
   .flip-grid { grid-template-columns: minmax(0, 1fr) }
+  .blank-grid { grid-template-columns: minmax(0, 1fr) }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; scroll-behavior: auto !important } }
 </style>
@@ -299,6 +327,19 @@ table.data .replycell { white-space: normal; min-width: 240px; max-width: 420px;
         <span class="kind-chip" id="flipCount"></span>
       </div>
       <div id="flipsBody"></div>
+    </section>
+
+    <section class="card" id="blank">
+      <div class="section-head">
+        <div>
+          <h2>Blank canvas</h2>
+          <p class="lede">One vision-encoder neuron of Qwen2.5-VL-3B is pushed at doses -1, +1 and +2 while the model is shown a plain gray, black or white image and asked "Describe this image in a few words." Usually it still says the image is blank; sometimes it describes something that is not there.</p>
+        </div>
+        <span class="kind-chip" id="blankCount"></span>
+      </div>
+      <div id="blankBody">
+        <div class="status" role="status"><span class="spinner" aria-hidden="true"></span><span>Loading blank-image pushes…</span></div>
+      </div>
     </section>
   </main>
 </div>
@@ -401,11 +442,18 @@ table.data .replycell { white-space: normal; min-width: 240px; max-width: 420px;
 
   function parseHash() {
     const params = new URLSearchParams(location.hash.replace(/^#/, ""));
-    return { stim: params.get("stim"), run: params.get("run") === "vision" ? "vision" : "llm" };
+    return {
+      stim: params.get("stim"),
+      run: params.get("run") === "vision" ? "vision" : "llm",
+      blank: params.get("blank")
+    };
   }
 
   function writeHash(stim, run) {
-    const next = `#stim=${encodeURIComponent(stim)}&run=${run}`;
+    const params = new URLSearchParams(location.hash.replace(/^#/, ""));
+    const blank = params.get("blank");
+    let next = `#stim=${encodeURIComponent(stim)}&run=${run}`;
+    if (blank) next += `&blank=${encodeURIComponent(blank)}`;
     if (location.hash !== next) history.replaceState(null, "", next);
   }
 
@@ -879,6 +927,185 @@ table.data .replycell { white-space: normal; min-width: 240px; max-width: 420px;
     $("#flips").hidden = false;
   }
 
+  const BLANK_COLORS = [
+    { key: "gray", swatch: "#808080" },
+    { key: "black", swatch: "#000" },
+    { key: "white", swatch: "#fff" }
+  ];
+  const BLANK_FILTERS = [
+    { key: "all", label: "all" },
+    { key: "shared", label: "consistent across blanks" },
+    { key: "early", label: "early (0-9)" },
+    { key: "middle", label: "middle (10-20)" },
+    { key: "late", label: "late (21-31)" }
+  ];
+  const blankState = { filter: "all", dose: "all" };
+  let blankData = null;
+
+  function blankDoseLabel(dose) {
+    const n = Number(dose);
+    return (n > 0 ? "+" : "") + n;
+  }
+
+  function blankTextCount(data) {
+    return (data.groups || []).reduce((sum, g) => {
+      const texts = g.texts || {};
+      return sum + BLANK_COLORS.filter(c => texts[c.key]).length;
+    }, 0);
+  }
+
+  function blankPct(part, total) {
+    return total ? Math.round((part / total) * 100) : 0;
+  }
+
+  function blankMatches(g) {
+    if (blankState.dose !== "all" && Number(g.dose) !== Number(blankState.dose)) return false;
+    if (blankState.filter === "shared") return g.shared === true;
+    if (blankState.filter === "early") return g.layer >= 0 && g.layer <= 9;
+    if (blankState.filter === "middle") return g.layer >= 10 && g.layer <= 20;
+    if (blankState.filter === "late") return g.layer >= 21 && g.layer <= 31;
+    return true;
+  }
+
+  function blankKey(g) {
+    return `L${g.layer}N${g.neuron}`;
+  }
+
+  function blankSortedGroups() {
+    return (blankData.groups || []).slice().sort((a, b) =>
+      a.layer - b.layer || a.neuron - b.neuron || a.dose - b.dose
+    );
+  }
+
+  function blankCardHtml(g) {
+    const key = blankKey(g);
+    const texts = g.texts || {};
+    const own = Array.isArray(g.own) ? g.own : [];
+    const rows = BLANK_COLORS.map(c => {
+      const text = texts[c.key];
+      const body = text
+        ? `<span class="blank-text">${fmt(text)}</span>`
+        : `<span class="blank-text is-blank">still blank</span>`;
+      return `<div class="blank-row">
+        <span class="blank-sw" style="background:${c.swatch}" aria-hidden="true"></span>
+        <span class="blank-label">${c.key}</span>
+        ${body}
+      </div>`;
+    }).join("");
+    const badge = g.shared === true ? `<span class="blank-badge">same on every blank</span>` : "";
+    const ownHtml = own.length
+      ? `<ul>${own.map(item => `<li>${fmt(item)}</li>`).join("")}</ul>`
+      : `<p class="small muted">No top stimuli listed.</p>`;
+    return `<article class="blank-card" data-key="${esc(key)}" data-layer="${esc(g.layer)}" data-neuron="${esc(g.neuron)}">
+      <div class="blank-head"><span class="id">L${esc(g.layer)} N${esc(g.neuron)} · ${esc(blankDoseLabel(g.dose))}</span>${badge}</div>
+      ${rows}
+      <details class="blank-own">
+        <summary>what this neuron fires on</summary>
+        ${ownHtml}
+      </details>
+    </article>`;
+  }
+
+  function renderBlankGrid() {
+    if (!blankData) return;
+    const grid = $("#blankGrid");
+    if (!grid) return;
+    const groups = blankSortedGroups().filter(blankMatches);
+    grid.innerHTML = groups.length
+      ? groups.map(blankCardHtml).join("")
+      : `<p class="empty">No groups match this filter.</p>`;
+    const count = $("#blankCount");
+    if (count) count.textContent = `${groups.length} of ${(blankData.groups || []).length} groups`;
+  }
+
+  function applyBlankHash(key, scroll) {
+    const cards = $$("#blankGrid .blank-card");
+    cards.forEach(card => card.classList.remove("target"));
+    if (!key) return;
+    const match = String(key).match(/^L(\d+)N(\d+)$/i);
+    if (!match) return;
+    const layer = Number(match[1]);
+    const neuron = Number(match[2]);
+    const hits = cards.filter(card => Number(card.dataset.layer) === layer && Number(card.dataset.neuron) === neuron);
+    if (!hits.length) return;
+    hits.forEach(card => card.classList.add("target"));
+    if (scroll) {
+      const behavior = matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
+      hits[0].scrollIntoView({ behavior, block: "center" });
+    }
+  }
+
+  function syncBlankControls() {
+    $$("#blankBody .blank-filter").forEach(btn => {
+      btn.setAttribute("aria-pressed", String(btn.dataset.filter === blankState.filter));
+    });
+    const select = $("#blankDose");
+    if (select) select.value = blankState.dose;
+  }
+
+  function renderBlank() {
+    if (!blankData) return;
+    const data = blankData;
+    const groups = data.groups || [];
+    const textCount = blankTextCount(data);
+    const pushes = Number(data.n_pushes) || 0;
+    const pushesLabel = pushes.toLocaleString("en-US");
+    const consistency = data.consistency || {};
+    const judge = data.judge || {};
+    const shared = Number(consistency.shared) || 0;
+    const sharedOf = Number(consistency.of) || 0;
+    const controlShared = Number(consistency.control_shared) || 0;
+    const controlOf = Number(consistency.control_of) || 0;
+    const own = Number(judge.own) || 0;
+    const random = Number(judge.random) || 0;
+    const neither = Number(judge.neither) || 0;
+    const filterButtons = BLANK_FILTERS.map(f =>
+      `<button class="blank-filter" type="button" data-filter="${f.key}" aria-pressed="${blankState.filter === f.key}">${f.label}</button>`
+    ).join("");
+    const doseOptions = [["all", "all"], ["-1", "-1"], ["1", "+1"], ["2", "+2"]].map(([value, label]) =>
+      `<option value="${value}"${blankState.dose === value ? " selected" : ""}>${label}</option>`
+    ).join("");
+
+    $("#blankBody").innerHTML = `
+      <div class="stat-row">
+        <div class="stat"><b>${esc(textCount)} of ${esc(pushesLabel)}</b><span>pushes describe something</span></div>
+        <div class="stat"><b>${esc(blankPct(shared, sharedOf))}% vs ${esc(blankPct(controlShared, controlOf))}%</b><span>a neuron's hallucinations agree across blank colors (${esc(shared)}/${esc(sharedOf)}) vs shuffled neurons (${esc(controlShared)}/${esc(controlOf)})</span></div>
+        <div class="stat"><b>${esc(blankPct(own, own + random))}%</b><span>a blind judge matches the hallucination to the neuron's top images rather than random ones (${esc(own)} vs ${esc(random)}; ${esc(neither)} neither)</span></div>
+      </div>
+      <div class="blank-controls">
+        <div class="seg" role="group" aria-label="Filter blank-image groups">${filterButtons}</div>
+        <label class="blank-dose" for="blankDose">Dose
+          <select id="blankDose">${doseOptions}</select>
+        </label>
+      </div>
+      <div class="blank-grid" id="blankGrid"></div>
+      <p class="lede small">Early layers draw patterns (lines, dots, stripes), middle layers objects (a cat, a truck, circles), and the last layer mostly one person in a red shirt.</p>`;
+    $("#blankCount").textContent = `${groups.length} groups`;
+    renderBlankGrid();
+    applyBlankHash(parseHash().blank, true);
+    $("#blank").hidden = false;
+  }
+
+  async function loadBlank() {
+    const section = $("#blank");
+    const body = $("#blankBody");
+    if (!section || !body) return;
+    section.hidden = false;
+    body.innerHTML = `<div class="status" role="status"><span class="spinner" aria-hidden="true"></span><span>Loading blank-image pushes…</span></div>`;
+    try {
+      const res = await fetch(DATA + "site/blank.json");
+      if (!res.ok) throw new Error(`The server returned HTTP ${res.status} ${res.statusText}.`);
+      const data = await res.json();
+      if (!data || !Array.isArray(data.groups)) {
+        throw new Error("The JSON loaded, but its shape was not what this page expects.");
+      }
+      blankData = data;
+      renderBlank();
+    } catch (error) {
+      body.innerHTML = `<div class="status error" role="alert"><div class="status-body"><b>Could not load the blank-image data.</b>${esc(error && error.message ? error.message : "Unknown error")}. Check the connection and try again.</div><button type="button" id="blankRetry">Try again</button></div>`;
+    }
+  }
+
   function overviewPointerMove(event) {
     const svg = event.target.closest ? event.target.closest("svg.ov-svg") : null;
     if (!svg) {
@@ -1073,6 +1300,29 @@ table.data .replycell { white-space: normal; min-width: 240px; max-width: 420px;
     selectStim(btn.dataset.stim, btn.dataset.run, pin, true);
   });
 
+  $("#blankBody").addEventListener("click", event => {
+    const retry = event.target.closest("#blankRetry");
+    if (retry) {
+      loadBlank();
+      return;
+    }
+    const filterBtn = event.target.closest(".blank-filter");
+    if (!filterBtn) return;
+    blankState.filter = filterBtn.dataset.filter;
+    $$("#blankBody .blank-filter").forEach(btn => {
+      btn.setAttribute("aria-pressed", String(btn === filterBtn));
+    });
+    renderBlankGrid();
+    applyBlankHash(parseHash().blank, false);
+  });
+
+  $("#blankBody").addEventListener("change", event => {
+    if (!event.target || event.target.id !== "blankDose") return;
+    blankState.dose = event.target.value;
+    renderBlankGrid();
+    applyBlankHash(parseHash().blank, false);
+  });
+
   document.addEventListener("pointermove", event => {
     const cell = event.target.closest ? event.target.closest("#mapScroll rect.cell") : null;
     if (!cell) return;
@@ -1134,8 +1384,21 @@ table.data .replycell { white-space: normal; min-width: 240px; max-width: 420px;
   });
 
   window.addEventListener("hashchange", () => {
-    if (!db) return;
     const hash = parseHash();
+    if (hash.blank && blankData) {
+      const match = String(hash.blank).match(/^L(\d+)N(\d+)$/i);
+      const visible = match && $$("#blankGrid .blank-card").some(card =>
+        Number(card.dataset.layer) === Number(match[1]) && Number(card.dataset.neuron) === Number(match[2])
+      );
+      if (!visible) {
+        blankState.filter = "all";
+        blankState.dose = "all";
+        syncBlankControls();
+        renderBlankGrid();
+      }
+      applyBlankHash(hash.blank, true);
+    }
+    if (!db) return;
     if (!hash.stim || !byStim.has(hash.stim)) return;
     state.stim = hash.stim;
     state.run = selectedRun(hash.stim, hash.run);
@@ -1154,6 +1417,7 @@ table.data .replycell { white-space: normal; min-width: 240px; max-width: 420px;
   });
 
   load();
+  loadBlank();
 })();
 </script>
 </body>
