@@ -4,5 +4,5 @@ Every MLP neuron of more than a dozen open models was recorded, read through Jac
 - Picking neurons by lens word makes the model claim to be that word in 14–22% of pushes; random neurons almost never do.
 - Smaller is easier to rename (persona share: Qwen3.5-0.8B 4.7%, 2B 2.1%, 4B 0.8%). In OLMo-2 1B, SFT sets the anchor and DPO/RL leave it at 5.5–6.5%.
 - Thinking out loud protects SmolLM3's answer from middle-layer pushes (wrong 1.6% vs 11.2%) but lets last-layer pushes compound into loops.
-- Pushed vision neurons draw stable, neuron-specific pictures on a blank image (a white truck, silver coins), consistent across blank colors at 41–63% vs about 10% shuffled. Their drawings barely match what the neurons fire on.
+- Pushed vision neurons draw stable, neuron-specific pictures on a blank image (a white truck, silver coins), consistent across blank colors at 41–63% vs 8–10% shuffled. Their drawings barely match what the neurons fire on.
 - Single audio neurons make Gemma 4 hear a barking dog everywhere, or occasionally fix its mishearings.

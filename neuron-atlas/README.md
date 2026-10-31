@@ -41,8 +41,7 @@ Second round (Oct 31): Qwen3.5-0.8B and 2B and LFM2-350M (read pass, fitted J-le
 "Who am I?" sweeps at ±0.8), TinyStories-33M (all neurons ±0.5 on two story openings; fitted J and R lenses),
 SmolLM3-3B (read pass; 128 random neurons per layer with thinking on and off), an OLMo-2 1B training ladder (the same
 neurons at ten checkpoints from 21B tokens through RL), MusicGen-small (291 clips), Gemma 4 E4B audio-encoder pushes
-on 22 sounds, and a blank-image test of vision-encoder neurons in Qwen2.5-VL-3B, Gemma 4 E4B and Qwen3.5-0.8B
-(layers 0–9 of 12; the GPU notebook died). Qwen2.5-Omni-3B now loads (its Thinker, with a Whisper-style audio tower)
+on 22 sounds, and a blank-image test of vision-encoder neurons in Qwen2.5-VL-3B, Gemma 4 E4B and Qwen3.5-0.8B. Qwen2.5-Omni-3B now loads (its Thinker, with a Whisper-style audio tower)
 but its hearing test never ran for the same reason. OmniGen2 was not attempted (its image generator is a diffusion
 model, which this code's push hooks do not cover yet; Janus-Pro covers image generation here).
 
@@ -230,11 +229,11 @@ first).
     Gemma 4 E4B's vision encoder (256 neurons, same test) hallucinates less (103 of 2,304 pushes) and draws only
     textures: diagonal lines, grids, stripes, herringbone, once a world-map silhouette, mostly from its first and
     last layers. With everything a texture, its consistency (23 of 29) does not separate from shuffled neurons (13
-    of 29). Qwen3.5-0.8B's small vision tower is far more suggestible (32 neurons per layer, layers 0–9 of 12: the
-    GPU notebook died before the last two): about 70% of pushes describe something that is not there (*"a
-    minimalist white square on a black background"* for the gray image, *"a serene night sky with twinkling
-    stars"*), and one neuron draws the same thing across blanks in 63% of cases (468 of 742) vs 10.5% shuffled; the
-    match to its preferred stimuli is again null (334 own vs 364 random). `protos/vision.html` → Blank canvas.
+    of 29). Qwen3.5-0.8B's small vision tower is far more suggestible (32 neurons per layer, 12 layers): about 70% of
+    pushes describe something that is not there (*"a minimalist white square on a black background"* for the gray
+    image, *"a collection of shiny silver and gold coins"*), and one neuron draws the same thing across blanks in 63%
+    of cases (557 of 887) vs 7.6% shuffled; the match to its preferred stimuli is again near chance (433 own vs 397
+    random). `protos/vision.html` → Blank canvas.
 25. **A 4-layer story model recasts its characters, but only in some slots.** TinyStories-33M, every neuron pushed
     ±0.5 at two points where a story introduces someone (49k continuations, rule-based parse, no judge). *"One day,
     a little girl named Lily met a…"* gets a different character in 45–73% of pushes in every layer (a new friend, a

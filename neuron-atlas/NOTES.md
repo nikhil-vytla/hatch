@@ -889,3 +889,6 @@ derangement null, not "persona vs not".
   The blank filter flags 2,170 of 2,880; dropping bare same-color answers ("A gray square." on the gray image is
   correct) leaves 2,015 (70%). Consistency 468/742 (63%) vs shuffled 78/742 (10.5%); own 334 / random 364 /
   neither 1,472. The Qwen2.5-Omni-3B hearing test (queued after it) never started.
+- New GPU notebook (transformers pinned to 5.22.1; the fresh sandbox came with 5.14.1). Qwen3.5-0.8B blank canvas
+  resumed from the Hub shards and finished layers 10–11. Full run: strict hallucination 2,421 of 3,456 (70%);
+  consistency 557/887 (63%) vs shuffled 67/887 (7.6%); own 433 / random 397 / neither 1,777.
