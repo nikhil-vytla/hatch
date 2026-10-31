@@ -149,6 +149,14 @@ first).
     chance the J-lens is the sharper reading (3.9× vs 2.6×; logit lens 1.5×).
 
     ![says vs does](says_vs_does.png)
+
+    **Pre-registered held-out test** (`PREREGISTRATION.md`, predictions committed before the run): 2,000 neurons
+    never pushed before, a new prompt and 30 new words. Eight of nine predictions held: J-lens hits 18× chance (95%
+    12–33×), 17× its own opposite-direction tokens; pushing a neuron raises the log-probability of its own lens tokens
+    more than a random neuron's in 98% of late-layer, 78% of middle-layer and 59% of early-layer cases; lens-picked
+    neurons mention the new word 15% of the time vs 0% for random ones. The one failure: on the yes/no word-hit
+    metric the J-lens did not beat the logit lens in layers 6–19 (5.2× vs 5.7×), so that earlier claim does not
+    survive a held-out test on that metric (the continuous measure still separates them, 78% vs 69%).
 17. **Choosing neurons by what they say makes the model become it.** For 48 words (cat, ocean, ghost, moon, king…),
     neurons whose lens lists the word, pushed toward it, make Qwen3.5-4B claim to be that thing 18–30% of the time
     (late layers up to 50%); random neurons 0%. *"I am **an angel**"*, *"I am **Mooning**, a new full moon phase

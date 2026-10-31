@@ -57,3 +57,25 @@ Any prediction that fails will be reported as failed in the README, with no chan
   written. Crash fix only: the script now skips part A when its output exists, and part B runs in batches of 32
   instead of 128; the skip draws the same random values part A would have, so part B's random controls match an
   uninterrupted run. Neither the neurons, prompts, words, metrics nor predictions changed.
+
+## Results (2026-10-31, scored by the committed `analysis/prereg_analyze.py`; raw data `Qwen__Qwen3.5-4B/prereg/` on the Hub)
+
+Unpushed answer to the new prompt: "As an AI, I don't have personal feelings or a physical world to experience, so I
+can't have a "favorite" thing in the human sense." 29 of the 30 new words had J-lens-picked neurons (169 pushes) plus
+300 random pushes.
+
+| # | prediction | result | holds |
+|---|---|---|---|
+| P1 | J hit ≥ 4 × chance | 8.82% vs 0.48% = 18.3× (95% 12.1–33.2) | yes |
+| P2 | own ≥ 2 × opposite direction | 17.4× (11.8–29.9); opposite 0.51% | yes |
+| P3 | layers 6–19: J lift > logit lift | J 5.2× vs logit 5.7× (difference −13 to +5) | **no** |
+| P4 | layers 0–5: J lift < 3 | 2.0× (interval unbounded: few hits) | yes |
+| P5 | layers 20–31: Δlp(own) > Δlp(other) for ≥ 70% | 98.3% (97.7–98.9), n=1,536; logit 98.7% | yes |
+| P6 | layers 6–19: same, ≥ 55% | 78.3% (76.3–80.2), n=1,716; logit 69.5% | yes |
+| P7 | layers 0–5: same, 40–65% | 58.7% (55.2–62.2), n=748; logit 54.4% | yes |
+| P8 | lens-picked mention ≥ 8%, random ≤ 1% | 14.8% (10.1–20.7) vs 0.0% | yes |
+| P9 | layers 20–31 ≥ 2 × layers 8–19 | 21.4% (n=117) vs 0.0% (n=52) | yes |
+
+Eight of nine hold. P3 fails: on held-out neurons and a new prompt, the binary word-hit metric no longer separates
+the J-lens from the logit lens in middle layers (both ~5×, wide intervals). The continuous log-probability test
+(P6, not a pre-registered J-vs-logit comparison, so read it as descriptive) does separate them there: 78% vs 69%.
