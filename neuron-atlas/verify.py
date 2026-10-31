@@ -241,6 +241,21 @@ def new_models():
         tot, per = duckdb.sql(f"select sum(n_est), sum(n_est) filter (where reply_kind = 'persona') from '{p}'").fetchall()[0]
         out.append(dict(id=f"28-{tag}", claim=f"OLMo-2 1B {tag}: persona share of pushes", stated=stated, value=per / tot, tol=0.003,
                         unit="share", source=f"allenai__OLMo-2-0425-1B/training/{tag}/sweep_stats.parquet"))
+    # 30: says -> does on LFM2-350M (smallest of the three), recomputed with finding 16's metric
+    sys.path.insert(0, "analysis")
+    from lens_vs_push import norm_tokens, hit as lhit
+    LW = re.compile(r"[a-z]{4,}")
+    lb = set(LW.findall(duckdb.sql(f"select text from '{hub('LiquidAI__LFM2-350M/sweep/steer/baseline.parquet')}'").fetchall()[0][0].lower()))
+    hits = n = 0
+    for L in range(16):
+        ln = {nn: (norm_tokens(u), norm_tokens(d)) for nn, u, d in duckdb.sql(f"select neuron, j_up, j_down from '{hub(f'LiquidAI__LFM2-350M/jlens/L{L:02d}.parquet')}'").fetchall()}
+        for nn, d, t in duckdb.sql(f"select neuron, dose, text from '{hub(f'LiquidAI__LFM2-350M/sweep/steer/L{L:02d}.parquet')}' where prompt = 0").fetchall():
+            words = [w for w in LW.findall((t or '').lower()) if w not in lb]
+            if not words:
+                continue
+            hits += bool(lhit(ln[nn][0 if d > 0 else 1], words)); n += 1
+    out.append(dict(id="30", claim="LFM2-350M: pushes adding a word the neuron's fitted J-lens names", stated=0.167, value=hits / n, tol=0.004,
+                    unit="share", source="LiquidAI__LFM2-350M/jlens + sweep/steer"))
     # 29: Gemma 4 audio
     h = json.load(open(hub("google__gemma-4-E4B-it/audio/hear_summary.json")))
     out.append(dict(id="29", claim="Gemma 4 audio: pushes that change what it hears", stated=0.36, value=h["changed"] / h["n_pushes"], tol=0.005,

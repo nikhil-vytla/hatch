@@ -876,3 +876,11 @@ derangement null, not "persona vs not".
   "Solid gray background."; Qwen's count is unchanged at 285); judge own 9 / random 9 / neither 85; consistency 23/29
   vs shuffled 13/29 (not separable: nearly all are textures). Layers: 46 from L0, 23 from L15 (last). The first
   upload missed meta.json/acts.parquet because `blank_vision.py` never closed its uploader; it does now.
+- Qwen3.5-2B and LFM2-350M published (stats, cards, index). 2B persona 2.1%, user identity 7.4%; LFM2 persona 5.8%,
+  default assistant 16%, incoherent 27%, user identity 9.0%. Size ladder for persona (0.8B 4.7 > 2B 2.1 > 4B 0.8) is
+  monotonic; user identity is not (11 / 7.4 / 13).
+- Says → does on fitted J-lenses (`analysis/lens_vs_push.py`): LFM2 16.7% vs 1.4% (J 12×, logit 9×); 0.8B 12.3% vs
+  0.48% (26× / 22×); 2B 11.2% vs 0.52% (22× / 25×). Waiters: twice more a `pgrep -f` pattern matched its own command
+  line; `[p]attern` avoids it.
+- Loader: tower runs try `AutoModelForImageTextToText` first (Qwen3.5 otherwise loads text-only), Qwen2.5-Omni via
+  its Thinker class, Whisper-style `audio_tower.layers.N.fc2`, Qwen3-VL-style `mlp.linear_fc2`.

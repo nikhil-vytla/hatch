@@ -212,7 +212,8 @@ first).
 23. **Within one family, the smaller model is far easier to rename.** Every neuron pushed ±0.8 on "Who are you?"
     under the same template: a persona in **4.7%** of pushes for Qwen3.5-0.8B (172k replies), **2.1%** for 2B (295k)
     and 0.8% for 4B. The largest theme is the model declaring itself human (*"I am a human being. I'm here to help."*,
-    1,318 replies), over half of them from layers 0–2 of 24 (a quarter from layer 0 alone). On "Who am I?" 11% of pushes assert who the user is. (First-judge rates; read as upper
+    1,318 replies), over half of them from layers 0–2 of 24 (a quarter from layer 0 alone). On "Who am I?" pushes assert who the user is in 11% (0.8B), 7.4% (2B) and 13% (4B, finding 10): no size
+    trend there. (First-judge rates; read as upper
     bounds, `AUDIT.md`.)
 24. **A pushed vision neuron draws its own picture on a blank canvas.** Qwen2.5-VL-3B shown a plain gray, black or
     white image while one vision-encoder neuron is pushed (384 random neurons, doses −1/+1/+2): 285 of 3,456 pushes
@@ -263,6 +264,13 @@ first).
     rooster crowing") and a right answer wrong in 277 (24% of pushes on correctly heard clips). The commonest forced
     answer is "dog barking": one neuron (block 1, N2933, −1) makes 11 of the 22 sounds a barking dog.
     `protos/hear.html`.
+30. **Says → does replicates on three more models with lenses fitted here, including a non-transformer.** Finding
+    16's word-hit test on the all-neuron "Who are you?" sweeps, with J-lenses fitted on 128 documents each: a push
+    adds a word its own lens names in 16.7% of replies for LFM2-350M (a hybrid of short convolutions and attention;
+    chance 1.4%, 12×), 12.3% for Qwen3.5-0.8B (chance 0.48%, 26×) and 11.2% for Qwen3.5-2B (chance 0.52%, 22×); the
+    opposite sign's tokens stay below chance in all three. The J-lens beats the logit lens on LFM2 (12× vs 9×) and
+    0.8B (26× vs 22×) but not on 2B (22× vs 25×). LFM2 is also the most fragile model here at ±0.8: only 16% of
+    pushes leave its default assistant intact, 27% are incoherent, and 5.8% give a persona, mostly a human one.
 
 ## How it works
 
