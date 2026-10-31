@@ -302,6 +302,12 @@ notebook from the header's specs button. Two ways to use it:
 
 ## Limits
 
+- **Judged numbers are upper bounds.** A second judge (DeepSeek-V4-Pro, same lab, so a partial check) agrees with the
+  first at κ 0.70–0.84 but downgrades about a fifth of "persona", "became it" and "same label" verdicts and never
+  upgrades one (`AUDIT.md`); comparisons with random controls keep their direction. A blind human audit is open, the
+  headline numbers recompute from public data (`verify.py`, `CLAIMS.md`), and a held-out test was pre-registered
+  (`PREREGISTRATION.md`, 8 of 9 predictions held).
+
 - GPT-2 and R1-Distill pushes cover the most peaked neurons per layer plus random ones, which finding 7 shows is
   the wrong selection for steering; the other four text models have all-neuron sweeps on the identity questions.
 - Greedy decoding, 32–48 new tokens for the sweeps, one dose per sweep, a handful of prompts. Re-running stored
