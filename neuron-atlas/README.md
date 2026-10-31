@@ -131,7 +131,7 @@ first).
     neuron's output direction through Anthropic's Jacobian lens (J-lens) and its LRP variant (R-lens) — lenses from
     camilablank/workspace-lenses — and checking 1.09M stored pushes: the reply adds one of the neuron's own top-10
     tokens 9.5% of the time vs 0.4% with another neuron's tokens, and 0.3% with its own *opposite-sign* tokens.
-    Layers 20–31 hit 12–44% and the J-lens equals the logit lens there; in layers 6–19 the J-lens is 1.5–3× better;
+    Layers 20–31 hit 12–44% and the J-lens equals the logit lens there; in layers 6–19 the J-lens is 1.5–3× better on this data (not on held-out data, below);
     in layers 0–5 nothing works, and the R-lens edges the J-lens, as the R-lens authors report. Split by what the
     reply became: 40% of *persona* replies contain the neuron's own J-lens tokens (0.3% for another neuron's), 15%
     of altered-assistant replies, 2% of ordinary ones. A persona is often the neuron's lens word worn as an identity. User recasts on "Who am I?"
