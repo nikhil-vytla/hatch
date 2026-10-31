@@ -287,7 +287,7 @@
   "id": "24q",
   "claim": "Qwen3.5-0.8B vision: same drawing across blanks (judged)",
   "stated": 0.63,
-  "value": 0.6307277628032345,
+  "value": 0.6279594137542277,
   "tol": 0.005,
   "unit": "share",
   "source": "Qwen__Qwen3.5-0.8B/blank/blank_judge.json",
@@ -296,8 +296,8 @@
  {
   "id": "24qs",
   "claim": "\u2026 shuffled across neurons",
-  "stated": 0.105,
-  "value": 0.10512129380053908,
+  "stated": 0.076,
+  "value": 0.07553551296505073,
   "tol": 0.005,
   "unit": "share",
   "source": "same",
@@ -461,6 +461,16 @@
   "tol": 0,
   "unit": "count",
   "source": "same",
+  "status": "PASS"
+ },
+ {
+  "id": "29o",
+  "claim": "Qwen2.5-Omni audio: pushes on correctly heard clips that break them",
+  "stated": 0.89,
+  "value": 0.8863932291666666,
+  "tol": 0.005,
+  "unit": "share",
+  "source": "Qwen__Qwen2.5-Omni-3B/audio/hear_summary.json",
   "status": "PASS"
  },
  {

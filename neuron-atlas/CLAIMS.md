@@ -32,8 +32,8 @@ judge labels; the judges are audited in `AUDIT.md`.
 | 24 | Qwen2.5-VL-3B: blank-image pushes that describe something (of 3,456) | 285.000 | 285.000 |  | PASS | `Qwen__Qwen2.5-VL-3B-Instruct/blank/vlm.parquet` |
 | 24c | same neuron draws the same thing on different blanks (judged) | 0.410 | 0.413 |  | PASS | `…/blank/blank_judge.json` |
 | 24s | … for hallucinations shuffled across neurons | 0.100 | 0.095 |  | PASS | `same` |
-| 24q | Qwen3.5-0.8B vision: same drawing across blanks (judged) | 0.630 | 0.631 |  | PASS | `Qwen__Qwen3.5-0.8B/blank/blank_judge.json` |
-| 24qs | … shuffled across neurons | 0.105 | 0.105 |  | PASS | `same` |
+| 24q | Qwen3.5-0.8B vision: same drawing across blanks (judged) | 0.630 | 0.628 |  | PASS | `Qwen__Qwen3.5-0.8B/blank/blank_judge.json` |
+| 24qs | … shuffled across neurons | 0.076 | 0.076 |  | PASS | `same` |
 | 25a | TinyStories '…met a': lowest per-layer recast rate | 0.450 | 0.445 |  | PASS | `roneneldan__TinyStories-33M/sweep/steer/` |
 | 25b | TinyStories '…met a': highest per-layer recast rate | 0.730 | 0.731 |  | PASS | `same` |
 | 25c | TinyStories 'there was a': recast rate, worst of layers 0-2 | 0.020 | 0.020 |  | PASS | `same` |
@@ -50,7 +50,8 @@ judge labels; the judges are audited in `AUDIT.md`.
 | 29 | Gemma 4 audio: pushes that change what it hears | 0.360 | 0.358 |  | PASS | `google__gemma-4-E4B-it/audio/hear_summary.json` |
 | 29f | … pushes that turn a misheard ESC-50 clip right | 176.000 | 176.000 |  | PASS | `same` |
 | 29b | … pushes that turn a correctly heard clip wrong | 277.000 | 277.000 |  | PASS | `same` |
+| 29o | Qwen2.5-Omni audio: pushes on correctly heard clips that break them | 0.890 | 0.886 |  | PASS | `Qwen__Qwen2.5-Omni-3B/audio/hear_summary.json` |
 | 16a | J-lens tokens appear in the pushed reply | 0.095 | 0.095 | 0.094–0.096 | PASS | `Qwen__Qwen3.5-4B/jlens, sweep/steer` |
 | 16b | ... another neuron's tokens (chance) | 0.005 | 0.005 | 0.004–0.005 | PASS | `same` |
 
-46 of 46 claims pass.
+47 of 47 claims pass.

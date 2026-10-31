@@ -41,8 +41,7 @@ Second round (Oct 31): Qwen3.5-0.8B and 2B and LFM2-350M (read pass, fitted J-le
 "Who am I?" sweeps at ±0.8), TinyStories-33M (all neurons ±0.5 on two story openings; fitted J and R lenses),
 SmolLM3-3B (read pass; 128 random neurons per layer with thinking on and off), an OLMo-2 1B training ladder (the same
 neurons at ten checkpoints from 21B tokens through RL), MusicGen-small (291 clips), Gemma 4 E4B audio-encoder pushes
-on 22 sounds, and a blank-image test of vision-encoder neurons in Qwen2.5-VL-3B, Gemma 4 E4B and Qwen3.5-0.8B. Qwen2.5-Omni-3B now loads (its Thinker, with a Whisper-style audio tower)
-but its hearing test never ran for the same reason. OmniGen2 was not attempted (its image generator is a diffusion
+and Qwen2.5-Omni-3B audio-encoder pushes on 22 sounds, and a blank-image test of vision-encoder neurons in Qwen2.5-VL-3B, Gemma 4 E4B and Qwen3.5-0.8B. OmniGen2 was not attempted (its image generator is a diffusion
 model, which this code's push hooks do not cover yet; Janus-Pro covers image generation here).
 
 CPU runs (this container): 1,500 FineWeb-Edu documents + 1,000 smol-smoltalk chats, ≤128 tokens each, pushes at
@@ -268,7 +267,10 @@ first).
     wrong answer right in 176 pushes (5% of pushes on misheard clips; a rooster that was "a dog barking" becomes "a
     rooster crowing") and a right answer wrong in 277 (24% of pushes on correctly heard clips). The commonest forced
     answer is "dog barking": one neuron (block 1, N2933, −1) makes 11 of the 22 sounds a barking dog.
-    `protos/hear.html`.
+    Qwen2.5-Omni-3B (its Whisper-style audio encoder, 32 layers, same neurons-per-layer, doses and clips) is the
+    opposite trade: unpushed it names all 16 recordings correctly, but 93% of single-neuron pushes change its answer
+    and 89% of pushes on a correctly heard clip break it, most often into "music" (one neuron, layer 25 N1014 +1,
+    makes all 22 sounds "speech"). `protos/hear.html` switches between the two models.
 30. **Says → does replicates on three more models with lenses fitted here, including a non-transformer.** Finding
     16's word-hit test on the all-neuron "Who are you?" sweeps, with J-lenses fitted on 128 documents each: a push
     adds a word its own lens names in 16.7% of replies for LFM2-350M (a hybrid of short convolutions and attention;

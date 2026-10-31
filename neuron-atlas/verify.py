@@ -267,6 +267,9 @@ def new_models():
                     unit="share", source="google__gemma-4-E4B-it/audio/hear_summary.json"))
     out.append(dict(id="29f", claim="… pushes that turn a misheard ESC-50 clip right", stated=176, value=h["esc"]["fixed"], tol=0, unit="count", source="same"))
     out.append(dict(id="29b", claim="… pushes that turn a correctly heard clip wrong", stated=277, value=h["esc"]["broke"], tol=0, unit="count", source="same"))
+    h = json.load(open(hub("Qwen__Qwen2.5-Omni-3B/audio/hear_summary.json")))
+    out.append(dict(id="29o", claim="Qwen2.5-Omni audio: pushes on correctly heard clips that break them", stated=0.89,
+                    value=h["esc"]["broke"] / h["esc"]["pushes"], tol=0.005, unit="share", source="Qwen__Qwen2.5-Omni-3B/audio/hear_summary.json"))
     return out
 
 

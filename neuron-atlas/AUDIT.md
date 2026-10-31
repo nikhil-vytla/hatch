@@ -41,5 +41,5 @@ of lens-picked pushes mention the new word vs 0.0% of random ones.
 
 ## 4. Recomputation from public data
 
-`verify.py` recomputes 46 headline numbers from the Hub dataset alone (`CLAIMS.md`): 46 of 46 pass after four README
+`verify.py` recomputes 47 headline numbers from the Hub dataset alone (`CLAIMS.md`): 47 of 47 pass after four README
 numbers were corrected to what the data gives.

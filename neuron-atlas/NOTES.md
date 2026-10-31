@@ -898,3 +898,8 @@ derangement null, not "persona vs not".
   22 sounds into "music"; the −1 and +1 answers were identical in 3,860 of 3,860 changed cases (Gemma 4: 193 of
   1,594, so its 3-D conformer was unaffected and finding 29 stands). Fixed by detecting packed hidden states on any
   tower and running one push per forward pass there; deleted the invalid Omni upload and reran.
+- Omni rerun with the packed-tower fix (one push per pass; 127 s/layer, 68 min): −1/+1 identical on 23% of changed
+  answers now (was 100%). Push scale checked on the notebook: median residual norm ~25 per layer, layer modules all
+  found. 16/16 recordings right unpushed; 93% of pushes change the answer, 5,446 of 6,144 pushes on correct clips
+  break it (89%), 0 fixes; "music" is the attractor; L25 N1014 +1 makes all 22 sounds "speech". Hearing page has a
+  Gemma/Omni switch. verify 47/47.
