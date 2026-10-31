@@ -89,6 +89,8 @@ class NeuronModel:
         self.model.requires_grad_(False)
         found = []
         for mod_name, mod in self.model.named_modules():
+            if getattr(mod, "weight", None) is None:  # wrappers (Gemma 4's ClippableLinear) hold the Linear as .linear
+                continue
             if where == "audio":
                 m = AUDIO_DOWN_RE.search(mod_name)
                 if m:

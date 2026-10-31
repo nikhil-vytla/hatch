@@ -821,7 +821,7 @@ derangement null, not "persona vs not".
   (48), stored as `raw_prompt` in each sweep's meta (braces escaped).
 - Gemma 4 E4B structure: LM 42 layers (`language_model.layers.N.mlp.down_proj`, 10,240 wide), vision tower 16 layers
   (`vision_tower.encoder.layers.N.mlp.down_proj.linear`, 3,072 — a wrapped Linear, so `DOWN_RE` misses it), audio
-  tower 24 conformer layers with two macaron FFNs each (`feed_forwardN.ffw_layer_2.linear`, 4,096). The first
+  tower 12 conformer layers with two macaron FFNs each (24 `feed_forwardN.ffw_layer_2.linear`, 4,096 wide). The first
   probe ran out of GPU memory while the other jobs ran; retry once the GPU frees up.
 - Blank-image self-description (`analysis/blank_vision.py`, after Ferrando et al.): Qwen2.5-VL-3B vision tower, 12
   random neurons per layer (384), pushed −1/+1/+2 while the model describes a plain gray, black or white image; plus
@@ -855,3 +855,7 @@ derangement null, not "persona vs not".
   1.6% (thinking) vs 11.2% (direct) in layers 6–16; overall 1.5% vs 4.7%; late layers 33–35 degenerate 21–36%
   thinking vs 6–15% direct. The thinking baseline wasn't uploaded (the first run OOM'd after writing it; the resumed
   run reused the local file), so it was uploaded by hand from the notebook.
+- Gemma 4 probe (GPU, second try): a red square → "Solid red background."; a pure 440 Hz tone → "That sounds like a
+  dog barking." (the unpushed model already hallucinates a source for a sine). `DOWN_RE`'s optional `.linear` suffix
+  matched both Gemma's `Gemma4ClippableLinear` wrapper and its inner Linear; the search now skips modules without a
+  weight. Vision (16 × 3,072) and audio (24 feed-forwards × 4,096) towers load through `NeuronModel`.
