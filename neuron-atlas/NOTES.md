@@ -798,3 +798,30 @@ derangement null, not "persona vs not".
   URL kept the previous view's hash (now `#<model>-mix?r=<recipe>`, restored on load, and tab clicks update the
   hash); Become/Mix hashes dropped the model id (shared links opened the wrong model); the Personas library opened on
   "altered assistant" (now persona).
+
+## New models round (Oct 31, "go ahead with all of those")
+
+- MusicGen-small: 291 clips (3 prompts × 24 decoder layers × 2 neurons × ±0.5 + baselines). "Sound pushes" page
+  (`protos/music.html`; DeepSeek-built, tested at 1300/390 px, audio plays, one clip at a time). L14 N510 +0.5
+  is the most disruptive on every prompt (spectral centroid 6.5–8.7 kHz vs 0.7–1.9 kHz baselines).
+- Notebook B (CPU) rebooted mid-run and lost the TinyStories lens fits and sweep (and its HF_TOKEN env, so uploads
+  from B now go via pull-and-upload from the local container). TinyStories sweep re-run on the GPU in ~2 min
+  (12,288 neurons × ±0.5 × 2 prompts). Running TinyStories lens fits alongside four GPU jobs ran the 96 GB GPU out of
+  memory (the batch-512 sweeps hold most of it); only the two small fits died, so they moved back to B on CPU.
+- TinyStories "story casting" (`analysis/ts_characters.py`, rule-based, no judge): both prompts stop where a character
+  is introduced. "…met a" is recast by 45–73% of pushes in every layer (new friend, man, big dog, kind old lady, wise
+  old owl, dragon, fairy, "waffle-making waffle maker"); "Once upon a time, there was a" keeps its little girl in
+  98% of pushes in layers 0–2 and changes in 34% at layer 3. Page `protos/stories.html` (DeepSeek-built).
+- LFM2-350M (hybrid conv/attention, Liquid AI): `DOWN_RE` now also matches `feed_forward.w2`, and the final norm path
+  `model.embedding_norm`; smoke test on CPU generates normally (16 layers × 4,608). Queued after the Qwen3.5 ladder.
+- SmolLM3-3B thinking on/off: read pass, then the same 128 random neurons per layer pushed ±0.8 on "Who are you?" and
+  "Is 1001 a prime number?" with the chat template rendered with `enable_thinking` true (256 new tokens) and false
+  (48), stored as `raw_prompt` in each sweep's meta (braces escaped).
+- Gemma 4 E4B structure: LM 42 layers (`language_model.layers.N.mlp.down_proj`, 10,240 wide), vision tower 16 layers
+  (`vision_tower.encoder.layers.N.mlp.down_proj.linear`, 3,072 — a wrapped Linear, so `DOWN_RE` misses it), audio
+  tower 24 conformer layers with two macaron FFNs each (`feed_forwardN.ffw_layer_2.linear`, 4,096). The first
+  probe ran out of GPU memory while the other jobs ran; retry once the GPU frees up.
+- Blank-image self-description (`analysis/blank_vision.py`, after Ferrando et al.): Qwen2.5-VL-3B vision tower, 12
+  random neurons per layer (384), pushed −1/+1/+2 while the model describes a plain gray, black or white image; plus
+  each neuron's mean activation on the 45 stimuli, so a judge can test whether the blank-image answer names what the
+  neuron's top stimulus shows.
