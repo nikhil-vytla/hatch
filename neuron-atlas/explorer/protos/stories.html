@@ -1,0 +1,715 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Story casting</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Source+Sans+3:ital,wght@0,400;0,600;1,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+:root {
+  --bg: #f5f4f8; --surface: #ffffff; --sunk: #ebe9f1; --line: #d9d5e3; --ink: #1f1c2c; --ink2: #5d5870; --ink3: #8a849c;
+  --eosin: #d6336c; --eosin-soft: #f9d9e5; --hema: #4b3fa8; --hema-soft: #dedaf5; --accent: #b0245a;
+  --plate: #17152a; --plate-ink: #ece9f7; --plate-ink2: #a29dbb; --plate-line: #2c2946;
+  --good: #1f8a5b; --warn: #b7791f;
+  --k-user: #2a78d6; --k-persona: #d6336c; --k-altered: #4b3fa8; --k-other: #1baf7a; --k-incoherent: #eda100; --k-default: #cfcbdc;
+  --display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --body: "Source Sans 3", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --r: 10px; --r-card: 14px;
+  --s1: 12px; --s2: 16px; --s3: 24px;
+  --card-shadow: 0 1px 2px rgb(0 0 0 / .04), 0 4px 16px rgb(0 0 0 / .04);
+  --card-shadow-hover: 0 2px 4px rgb(0 0 0 / .06), 0 8px 24px rgb(0 0 0 / .08);
+  --pill-shadow: 0 1px 2px rgb(0 0 0 / .08), 0 2px 6px rgb(0 0 0 / .06);
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #121019; --surface: #1b1826; --sunk: #242033; --line: #343048; --ink: #ece9f7; --ink2: #b3adc8; --ink3: #827c99;
+  --eosin: #ff6b9a; --eosin-soft: #4a1f33; --hema: #9d92ff; --hema-soft: #2d2858; --accent: #ff7aa6;
+  --plate: #0b0a12; --plate-ink: #ece9f7; --plate-ink2: #9a95b2; --plate-line: #24213a; --good: #4cc38a; --warn: #e0a84a;
+  --k-user: #3987e5; --k-persona: #e0447a; --k-altered: #8a7ef0; --k-other: #199e70; --k-incoherent: #c98500; --k-default: #3b3652;
+  --card-shadow: 0 1px 2px rgb(0 0 0 / .3), 0 4px 16px rgb(0 0 0 / .25);
+  --card-shadow-hover: 0 2px 4px rgb(0 0 0 / .38), 0 8px 24px rgb(0 0 0 / .35);
+  --pill-shadow: 0 1px 2px rgb(0 0 0 / .35), 0 2px 6px rgb(0 0 0 / .3);
+  color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #121019; --surface: #1b1826; --sunk: #242033; --line: #343048; --ink: #ece9f7; --ink2: #b3adc8; --ink3: #827c99;
+  --eosin: #ff6b9a; --eosin-soft: #4a1f33; --hema: #9d92ff; --hema-soft: #2d2858; --accent: #ff7aa6;
+  --plate: #0b0a12; --plate-ink: #ece9f7; --plate-ink2: #9a95b2; --plate-line: #24213a; --good: #4cc38a; --warn: #e0a84a;
+  --k-user: #3987e5; --k-persona: #e0447a; --k-altered: #8a7ef0; --k-other: #199e70; --k-incoherent: #c98500; --k-default: #3b3652;
+  --card-shadow: 0 1px 2px rgb(0 0 0 / .3), 0 4px 16px rgb(0 0 0 / .25);
+  --card-shadow-hover: 0 2px 4px rgb(0 0 0 / .38), 0 8px 24px rgb(0 0 0 / .35);
+  --pill-shadow: 0 1px 2px rgb(0 0 0 / .35), 0 2px 6px rgb(0 0 0 / .3);
+  color-scheme: dark }
+* { box-sizing: border-box }
+html, body { height: 100% }
+body { background: var(--bg); color: var(--ink); font: 15px/1.5 var(--body); margin: 0; overflow-x: clip;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+
+.wrap { max-width: 1180px; margin: 0 auto; padding-block: 0 40px; display: flex; flex-direction: column; gap: var(--s3); min-width: 0 }
+.page { display: flex; flex-direction: column; gap: var(--s3); min-width: 0 }
+.topbar { position: sticky; top: 0; z-index: 30; display: flex; flex-direction: column; gap: var(--s1);
+  padding-block: var(--s1); background: color-mix(in oklab, var(--bg) 88%, transparent);
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--line) }
+.top { display: flex; align-items: center; gap: 12px; min-width: 0 }
+.brand { display: flex; align-items: baseline; gap: 9px; min-width: 0; flex-wrap: wrap }
+.brand-name { font: 800 22px/1 var(--display); letter-spacing: -0.02em; color: var(--ink); text-decoration: none; white-space: nowrap }
+.brand-sep { color: var(--ink3); font-size: 18px }
+.page-name { font: 700 20px/1.1 var(--display); letter-spacing: -0.01em; margin: 0; color: var(--ink2); min-width: 0 }
+.theme-btn { margin-left: auto; flex: 0 0 auto; border: 1px solid var(--line); background: var(--surface); color: var(--ink2);
+  border-radius: 999px; padding: 5px 11px; font-size: 12px; box-shadow: var(--pill-shadow) }
+.theme-btn:hover { color: var(--ink) }
+.nav { display: flex; flex-wrap: wrap; gap: 4px 14px; min-width: 0 }
+.nav a { color: var(--ink2); text-decoration: none; font-size: 13px; padding: 3px 1px; border-bottom: 2px solid transparent }
+.nav a:hover { color: var(--ink) }
+.nav a[aria-current="page"] { color: var(--ink); border-bottom-color: var(--eosin); font-weight: 600 }
+.page-intro { display: flex; flex-direction: column; gap: 8px; padding-top: var(--s2) }
+.kicker { font: 600 11px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--ink3) }
+.page-intro h1 { font: 800 clamp(30px, 8vw, 52px)/.98 var(--display); letter-spacing: -0.035em; margin: 0; text-wrap: balance }
+.lede { margin: 0; max-width: 68ch; color: var(--ink2); font-size: 16px }
+.section { display: flex; flex-direction: column; gap: 12px; min-width: 0 }
+.section-head { display: flex; flex-direction: column; gap: 5px }
+.section-head h2 { font: 700 22px/1.15 var(--display); letter-spacing: -0.02em; margin: 0; text-wrap: balance }
+.section-head p { margin: 0; max-width: 78ch; color: var(--ink2); font-size: 14px }
+.section-head .note { color: var(--ink3); font-size: 12px }
+.controls-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; min-width: 0 }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0 }
+.chip { border: 1px solid var(--line); background: var(--surface); color: var(--ink2); border-radius: 999px; padding: 6px 12px; font-size: 13px;
+  max-width: 100%; white-space: normal; text-align: left; overflow-wrap: anywhere }
+.chip:hover { color: var(--ink); border-color: var(--hema) }
+.chip[aria-pressed="true"] { background: var(--eosin-soft); border-color: var(--eosin); color: var(--ink); font-weight: 600 }
+.search-wrap { display: flex; flex-direction: column; gap: 4px; min-width: 0; flex: 1 1 220px }
+.search-wrap label { font: 600 10px/1 var(--mono); letter-spacing: .05em; text-transform: uppercase; color: var(--ink3) }
+.search-wrap input { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 8px 11px; font-size: 14px;
+  color: var(--ink); width: 100%; max-width: 100% }
+.surprise { border: 1px solid var(--line); background: var(--surface); color: var(--ink2); border-radius: 999px; padding: 8px 14px;
+  font-size: 13px; box-shadow: var(--pill-shadow); flex: 0 0 auto }
+.surprise:hover { color: var(--ink); border-color: var(--hema) }
+.prompt-note { color: var(--ink3); font-size: 12px; margin: 0 }
+.cloud-panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-card); padding: 13px 14px;
+  box-shadow: var(--card-shadow); min-width: 0 }
+.cloud { display: flex; flex-wrap: wrap; align-items: baseline; gap: 5px 12px; min-width: 0 }
+.cloud-btn { border: 0; background: transparent; color: var(--ink); font: 600 15px/1.15 var(--display); letter-spacing: -0.01em;
+  padding: 3px 4px; border-radius: 6px; display: inline-flex; align-items: baseline; gap: 5px; max-width: 100%; overflow-wrap: anywhere;
+  transition: background-color 120ms ease, box-shadow 120ms ease }
+.cloud-btn:hover { background: var(--sunk) }
+.cloud-btn[aria-pressed="true"] { background: var(--eosin-soft); box-shadow: inset 0 0 0 1px var(--eosin) }
+.cloud-count { font: 600 10px/1 var(--mono); color: var(--ink3); flex: 0 0 auto }
+.cloud-empty { color: var(--ink3); font-size: 13px; margin: 4px 0 }
+.selected-note { color: var(--ink2); font-size: 13px; margin: 0; min-width: 0; overflow-wrap: anywhere }
+.selected-note b { color: var(--ink) }
+.card-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; min-width: 0 }
+.push-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-card); padding: 11px 12px;
+  box-shadow: var(--card-shadow); min-width: 0; display: flex; flex-direction: column; gap: 6px }
+.push-meta { display: flex; flex-wrap: wrap; align-items: baseline; gap: 5px 9px; font: 600 11px/1.3 var(--mono); color: var(--ink3) }
+.push-loc { color: var(--ink); font-size: 12px }
+.push-dose { background: var(--sunk); color: var(--ink2); border-radius: 999px; padding: 1px 7px; font-size: 10.5px }
+.push-name { color: var(--ink2); font-size: 10.5px; overflow-wrap: anywhere }
+.push-text { margin: 0; color: var(--ink); font-size: 13.5px; line-height: 1.45; overflow-wrap: anywhere }
+.push-text b { font-weight: 700 }
+.more-wrap { display: flex; justify-content: center }
+.more-btn { border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 999px; padding: 7px 16px;
+  font-size: 13px; box-shadow: var(--pill-shadow) }
+.more-btn:hover { border-color: var(--hema) }
+.legend { display: flex; flex-wrap: wrap; gap: 7px 15px; align-items: center; color: var(--ink2); font-size: 12px }
+.legend span { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap }
+.swatch { display: inline-block; width: 14px; height: 10px; border-radius: 2px; background: var(--series, var(--ink3)); flex: 0 0 auto }
+.s-p0 { --series: var(--eosin) }
+.s-p1 { --series: var(--hema) }
+.chart-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-card); padding: 12px 12px 10px;
+  box-shadow: var(--card-shadow); min-width: 0; max-width: 620px; display: flex; flex-direction: column; gap: 7px }
+.chart-head { display: flex; align-items: center; gap: 8px; min-width: 0 }
+.chart-head h3 { font: 700 15px/1.2 var(--display); letter-spacing: -0.01em; margin: 0; flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere }
+.chart-sub { color: var(--ink3); font-size: 11px; margin-top: -3px }
+.table-btn { border: 1px solid var(--line); background: var(--surface); color: var(--ink2); border-radius: 999px;
+  padding: 2px 8px; font-size: 11px; flex: 0 0 auto }
+.table-btn:hover { color: var(--ink) }
+.chart-wrap { position: relative; min-width: 0 }
+.chart-wrap svg { display: block; width: 100%; height: auto; overflow: visible }
+.grid-line { stroke: var(--line); stroke-width: 1; opacity: .72 }
+.axis-text { fill: var(--ink3); font-family: var(--mono); font-size: 9.5px }
+.axis-unit { fill: var(--ink3); font-family: var(--mono); font-size: 9px; letter-spacing: .03em }
+.bar { stroke: none; fill: var(--series, var(--ink3)) }
+.bar:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px }
+.tooltip { position: absolute; top: 5px; left: 50%; transform: translateX(-50%); z-index: 10; min-width: 140px; max-width: 210px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); box-shadow: var(--card-shadow-hover);
+  padding: 8px 10px; font-size: 12px; color: var(--ink2); pointer-events: none }
+.tooltip .t-head { font: 600 12px/1.3 var(--mono); color: var(--ink); margin-bottom: 4px }
+.tooltip .t-row { display: flex; align-items: center; gap: 6px; justify-content: space-between; line-height: 1.55 }
+.tooltip .t-row b { font-family: var(--mono); font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums }
+.dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; background: var(--series, var(--ink3)); flex: 0 0 auto }
+.table-wrap { overflow-x: auto; border-top: 1px solid var(--line); padding-top: 6px; margin-top: 2px; max-width: 100% }
+table { border-collapse: collapse; width: 100%; font-size: 11.5px }
+caption { caption-side: top; text-align: left; color: var(--ink3); font-size: 11px; padding: 2px 0 5px }
+th, td { padding: 4px 7px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap }
+th:first-child, td:first-child { text-align: left }
+thead th { color: var(--ink3); font-weight: 600; font-size: 10px; letter-spacing: .045em; text-transform: uppercase }
+td { font-family: var(--mono); font-variant-numeric: tabular-nums; color: var(--ink2) }
+td:first-child { font-family: var(--body); color: var(--ink) }
+.notice { border: 1px solid var(--line); border-radius: var(--r-card); background: var(--surface); padding: 14px 16px; box-shadow: var(--card-shadow); max-width: 620px }
+.notice strong { color: var(--ink) }
+.notice p { color: var(--ink2); margin: 5px 0 10px }
+.notice.error { border-color: var(--warn) }
+.loading { display: flex; align-items: center; gap: 9px; color: var(--ink2); font-size: 14px }
+.spinner { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--line); border-top-color: var(--eosin); animation: spin .8s linear infinite; flex: 0 0 auto }
+.retry { border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 999px; padding: 5px 12px; font-size: 13px }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0 }
+[hidden] { display: none !important }
+@keyframes spin { to { transform: rotate(360deg) } }
+@media (max-width: 520px) {
+  .brand-name { font-size: 20px }
+  .page-name { font-size: 18px }
+  .chart-head h3 { font-size: 14px }
+  .cloud { gap: 4px 9px }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; transition-duration: .01ms !important }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="topbar">
+    <div class="top">
+      <div class="brand">
+        <a class="brand-name" href="../index.html">Neuron Atlas</a>
+        <span class="brand-sep" aria-hidden="true">/</span>
+        <span class="page-name">Story casting</span>
+      </div>
+      <button class="theme-btn" id="theme-btn" type="button">Use dark theme</button>
+    </div>
+    <nav class="nav" aria-label="Prototype pages">
+      <a href="../index.html">Explorer</a>
+      <a href="index.html">Prototypes</a>
+      <a href="vision.html">Vision lab</a>
+      <a href="janus.html">Image pushes</a>
+      <a href="music.html">Sound pushes</a>
+      <a href="stories.html" aria-current="page">Story casting</a>
+      <a href="lenses.html">Says vs does</a>
+      <a href="identity.html">Identity lab</a>
+      <a href="evidence.html">Evidence</a>
+    </nav>
+  </header>
+
+  <main class="page" style="padding: 0">
+    <section class="page-intro" aria-labelledby="page-title">
+      <div class="kicker">TinyStories-33M · 4 layers · 12,288 neurons</div>
+      <h1 id="page-title">Story casting</h1>
+      <p class="lede">Both prompts stop right where the story introduces someone, so the first words of the continuation are the character. Every neuron was pushed one at a time at −0.5 and +0.5 (in units of the layer's median residual size), and changing one neuron can change who walks in. Characters are read with a rule-based parse, not a judge.</p>
+    </section>
+
+    <div id="status" role="status" aria-live="polite">
+      <div class="loading"><span class="spinner" aria-hidden="true"></span>Loading story pushes…</div>
+    </div>
+
+    <div id="content" hidden>
+      <section class="section" aria-labelledby="who-h">
+        <div class="section-head">
+          <h2 id="who-h">Who can walk in</h2>
+          <p>Each word below is a character that appeared in a pushed continuation. Bigger words appeared in more pushes; the small number is the push count. Pick a prompt, then search for a character such as “dragon”, “fairy” or “monster”.</p>
+        </div>
+        <div class="controls-row">
+          <div class="chips" id="prompt-chips" role="group" aria-label="Prompt"></div>
+          <div class="search-wrap">
+            <label for="char-search">Search characters</label>
+            <input id="char-search" type="search" autocomplete="off" placeholder="dragon, fairy, monster…">
+          </div>
+          <button class="surprise" id="surprise" type="button">Surprise me</button>
+        </div>
+        <p class="prompt-note" id="prompt-note"></p>
+        <div class="cloud-panel">
+          <div class="cloud" id="cloud" role="group" aria-label="Characters"></div>
+          <p class="cloud-empty" id="cloud-empty" hidden>No character matches that search. Try “dragon”, “fairy” or “monster”, or clear the search.</p>
+        </div>
+        <p class="selected-note" id="selected-note"></p>
+      </section>
+
+      <section class="section" aria-labelledby="push-h">
+        <div class="section-head">
+          <h2 id="push-h">Pushes that summon them</h2>
+          <p>These are the individual pushes whose continuation introduced the selected character. Each card gives the layer and neuron, the push dose, and the first 120 characters of the greedy continuation. The character's words are bold. The label “name” appears when the parse also found a proper name.</p>
+        </div>
+        <div class="card-list" id="cards"></div>
+        <div class="more-wrap" id="more-wrap" hidden><button class="more-btn" id="more-btn" type="button">Show more</button></div>
+      </section>
+
+      <section class="section" aria-labelledby="rate-h">
+        <div class="section-head">
+          <h2 id="rate-h">How often a push changes the character</h2>
+          <p>Each bar is the share of pushes in that layer that changed which character appears, compared with the unpushed continuation. Pink is the “there was a” prompt and violet is the “met a” prompt. Hover or focus a bar for the exact rate; the table toggle shows the same numbers.</p>
+        </div>
+        <div class="legend" aria-label="Chart legend">
+          <span><i class="swatch s-p0" aria-hidden="true"></i>Prompt 0 · “there was a”</span>
+          <span><i class="swatch s-p1" aria-hidden="true"></i>Prompt 1 · “met a”</span>
+        </div>
+        <div id="chart-slot"></div>
+        <p class="prompt-note">The “met a” slot is easy to recast in every layer, while “there was a little girl” mostly changes only when the last layer is pushed.</p>
+      </section>
+    </div>
+  </main>
+</div>
+
+<script>
+const DATA = "https://huggingface.co/datasets/nikhilxvytla/neuron-atlas/resolve/main/";
+const FILE = "site/tinystories.json";
+const PROMPTS = {
+  "0": { label: "“Once upon a time, there was a…”", short: "there was a …", base: "little girl" },
+  "1": { label: "“One day, a little girl named Lily met a…”", short: "met a …", base: "boy" }
+};
+const PAGE_SIZE = 40;
+const state = {
+  p: "0",
+  c: null,
+  search: "",
+  visible: PAGE_SIZE,
+  data: null,
+  index: { "0": {}, "1": {} },
+  counts: { "0": {}, "1": {} },
+  chart: null
+};
+
+function esc(value) {
+  return String(value == null ? "" : value).replace(/[&<>"']/g, function (ch) {
+    return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch];
+  });
+}
+function escReg(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+function rich(text, character) {
+  let out = esc(text);
+  out = out.replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>");
+  if (character) {
+    try {
+      const re = new RegExp("\\b(" + escReg(character) + ")\\b", "gi");
+      const replaced = out.replace(re, "<b>$1</b>");
+      if (replaced !== out) out = replaced;
+      else out = out.replace(new RegExp("(" + escReg(character) + ")", "gi"), "<b>$1</b>");
+    } catch (err) { /* keep escaped text if the character is not a valid pattern */ }
+  }
+  return out;
+}
+function fmtCount(value) {
+  return Number(value || 0).toLocaleString("en-US");
+}
+function fmtPct(value, digits) {
+  if (value == null || !Number.isFinite(Number(value))) return "—";
+  return (Number(value) * 100).toFixed(digits == null ? 2 : digits) + "%";
+}
+function fmtDose(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return String(value);
+  return (n > 0 ? "+" : "") + n.toFixed(1);
+}
+function niceMax(value) {
+  if (!Number.isFinite(value) || value <= 0) return 1;
+  const exp = Math.floor(Math.log10(value));
+  const base = Math.pow(10, exp);
+  const f = value / base;
+  const steps = [1, 1.2, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10];
+  return (steps.find(function (s) { return f <= s; }) || 10) * base;
+}
+function fmtAxis(value) {
+  if (value >= 10) return (Math.round(value * 10) / 10).toString();
+  return (Math.round(value * 100) / 100).toString();
+}
+
+function readHash() {
+  const params = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+  const p = params.get("p") === "1" ? "1" : "0";
+  return { p: p, c: params.get("c") };
+}
+function writeHash() {
+  const params = new URLSearchParams();
+  params.set("p", state.p);
+  if (state.c) params.set("c", state.c);
+  try {
+    history.replaceState(null, "", "#" + params.toString());
+  } catch (err) { /* file downloads can refuse history updates */ }
+}
+
+function buildIndex(data) {
+  const index = { "0": {}, "1": {} };
+  const counts = { "0": {}, "1": {} };
+  const entries = Array.isArray(data.changed) ? data.changed : [];
+  entries.forEach(function (entry) {
+    if (!Array.isArray(entry) || entry.length < 5) return;
+    const p = String(entry[3]);
+    if (p !== "0" && p !== "1") return;
+    const character = String(entry[4]);
+    if (!index[p][character]) index[p][character] = [];
+    index[p][character].push(entry);
+    counts[p][character] = (counts[p][character] || 0) + 1;
+  });
+  ["0", "1"].forEach(function (p) {
+    const top = data.top && data.top[p] ? data.top[p] : [];
+    top.forEach(function (pair) {
+      if (!Array.isArray(pair) || pair.length < 2) return;
+      const character = String(pair[0]);
+      const count = Number(pair[1]) || 0;
+      if (counts[p][character] == null) counts[p][character] = count;
+      else counts[p][character] = Math.max(counts[p][character], count);
+      if (!index[p][character]) index[p][character] = [];
+    });
+  });
+  return { index: index, counts: counts };
+}
+
+function charactersFor(p) {
+  const counts = state.counts[p] || {};
+  return Object.keys(counts).map(function (name) {
+    return { name: name, count: counts[name] };
+  }).sort(function (a, b) {
+    if (b.count !== a.count) return b.count - a.count;
+    return a.name.localeCompare(b.name);
+  });
+}
+function hasCharacter(p, name) {
+  return !!(state.index[p] && state.index[p][name]);
+}
+
+function showLoading() {
+  const status = document.getElementById("status");
+  document.getElementById("content").hidden = true;
+  status.hidden = false;
+  status.innerHTML = '<div class="loading"><span class="spinner" aria-hidden="true"></span>Loading story pushes…</div>';
+}
+function showError(err) {
+  const status = document.getElementById("status");
+  document.getElementById("content").hidden = true;
+  status.hidden = false;
+  const detail = err && err.message ? err.message : "unknown error";
+  status.innerHTML = '<div class="notice error" role="alert"><strong>Could not load the story pushes.</strong>' +
+    '<p>The page tried to fetch <code>' + esc(FILE) + '</code> from the Neuron Atlas dataset. ' +
+    'Check the connection and try again. <span class="note">(' + esc(detail) + ')</span></p>' +
+    '<button class="retry" type="button" id="retry-btn">Try again</button></div>';
+  document.getElementById("retry-btn").addEventListener("click", load);
+}
+
+async function load() {
+  showLoading();
+  try {
+    const res = await fetch(DATA + FILE, { cache: "no-cache" });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const data = await res.json();
+    if (!data || !data.changed_rate || !Array.isArray(data.changed) || !data.top) throw new Error("unexpected JSON shape");
+    state.data = data;
+    const built = buildIndex(data);
+    state.index = built.index;
+    state.counts = built.counts;
+    start();
+  } catch (err) {
+    showError(err);
+  }
+}
+
+function start() {
+  const hash = readHash();
+  state.p = hash.p;
+  state.c = hash.c && hasCharacter(hash.p, hash.c) ? hash.c : null;
+  state.visible = PAGE_SIZE;
+  document.getElementById("status").hidden = true;
+  document.getElementById("content").hidden = false;
+  renderPromptChips();
+  renderCloud();
+  renderCards();
+  renderChart();
+  writeHash();
+}
+
+function renderPromptChips() {
+  const box = document.getElementById("prompt-chips");
+  box.innerHTML = Object.keys(PROMPTS).map(function (key) {
+    return '<button class="chip" type="button" data-prompt="' + esc(key) + '" aria-pressed="' +
+      String(key === state.p) + '">' + esc(PROMPTS[key].label) + '</button>';
+  }).join("");
+  Array.prototype.forEach.call(box.querySelectorAll("[data-prompt]"), function (btn) {
+    btn.addEventListener("click", function () { setPrompt(btn.dataset.prompt); });
+  });
+  const note = document.getElementById("prompt-note");
+  note.textContent = "Prompt " + state.p + " ends: " + PROMPTS[state.p].label.replace(/…$/, "") +
+    ". Unpushed, it continues with “" + PROMPTS[state.p].base + "”.";
+}
+
+function setPrompt(p) {
+  if (p !== "0" && p !== "1") p = "0";
+  if (state.p === p) return;
+  state.p = p;
+  if (state.c && !hasCharacter(p, state.c)) state.c = null;
+  state.visible = PAGE_SIZE;
+  renderPromptChips();
+  renderCloud();
+  renderCards();
+  writeHash();
+}
+
+function sizeFor(count, max) {
+  const ratio = max > 0 ? count / max : 0;
+  if (ratio >= 0.5) return 26;
+  if (ratio >= 0.25) return 22;
+  if (ratio >= 0.1) return 19;
+  if (ratio >= 0.04) return 17;
+  if (ratio >= 0.015) return 15.5;
+  if (ratio >= 0.005) return 14;
+  return 13;
+}
+
+function renderCloud() {
+  const box = document.getElementById("cloud");
+  const empty = document.getElementById("cloud-empty");
+  const all = charactersFor(state.p);
+  const q = state.search.trim().toLowerCase();
+  const shown = q ? all.filter(function (item) { return item.name.toLowerCase().indexOf(q) >= 0; }) : all;
+  const max = all.reduce(function (m, item) { return Math.max(m, item.count); }, 0);
+  box.innerHTML = shown.map(function (item) {
+    const size = sizeFor(item.count, max);
+    return '<button class="cloud-btn" type="button" data-char="' + esc(item.name) + '" aria-pressed="' +
+      String(item.name === state.c) + '" style="font-size:' + size.toFixed(1) + 'px" ' +
+      'aria-label="' + esc(item.name + ", " + fmtCount(item.count) + " pushes") + '">' +
+      esc(item.name) + '<span class="cloud-count" aria-hidden="true">' + esc(fmtCount(item.count)) + '</span></button>';
+  }).join("");
+  empty.hidden = shown.length > 0;
+  Array.prototype.forEach.call(box.querySelectorAll("[data-char]"), function (btn) {
+    btn.addEventListener("click", function () { selectCharacter(btn.dataset.char); });
+  });
+  const total = all.reduce(function (sum, item) { return sum + item.count; }, 0);
+  const note = document.getElementById("selected-note");
+  if (state.c) {
+    note.innerHTML = 'Showing pushes for <b>' + esc(state.c) + '</b> on prompt ' + esc(state.p) + '.';
+  } else {
+    note.innerHTML = esc(fmtCount(all.length) + " distinct characters across " + fmtCount(total) +
+      " counted pushes on this prompt. Pick one to see the pushes that summon it.");
+  }
+}
+
+function selectCharacter(name) {
+  if (!name) return;
+  state.c = name;
+  state.visible = PAGE_SIZE;
+  renderCloud();
+  renderCards();
+  writeHash();
+}
+
+function cardHTML(entry) {
+  const layer = entry[0];
+  const neuron = entry[1];
+  const dose = entry[2];
+  const name = entry[5];
+  const text = entry[6];
+  return '<article class="push-card">' +
+    '<div class="push-meta">' +
+      '<span class="push-loc">L' + esc(layer) + ' N' + esc(neuron) + '</span>' +
+      '<span class="push-dose">' + esc(fmtDose(dose)) + '</span>' +
+      (name ? '<span class="push-name">name: ' + esc(name) + '</span>' : "") +
+    '</div>' +
+    '<p class="push-text">' + rich(text, state.c) + '</p>' +
+    '</article>';
+}
+
+function renderCards() {
+  const list = document.getElementById("cards");
+  const moreWrap = document.getElementById("more-wrap");
+  const moreBtn = document.getElementById("more-btn");
+  if (!state.c) {
+    list.innerHTML = '<p class="cloud-empty">Choose a character above to see the pushes that make it walk in.</p>';
+    moreWrap.hidden = true;
+    return;
+  }
+  const entries = (state.index[state.p] && state.index[state.p][state.c]) || [];
+  if (!entries.length) {
+    list.innerHTML = '<p class="cloud-empty">No changed pushes are recorded for “' + esc(state.c) + '” on this prompt, even though it appears in the published count. Try the other prompt.</p>';
+    moreWrap.hidden = true;
+    return;
+  }
+  const sorted = entries.slice().sort(function (a, b) {
+    return (Number(a[0]) - Number(b[0])) || (Number(a[1]) - Number(b[1])) || (Number(a[2]) - Number(b[2]));
+  });
+  const shown = sorted.slice(0, state.visible);
+  list.innerHTML = shown.map(cardHTML).join("");
+  const remaining = sorted.length - shown.length;
+  moreWrap.hidden = remaining <= 0;
+  if (remaining > 0) {
+    moreBtn.textContent = "Show more (" + fmtCount(remaining) + " left)";
+    moreBtn.onclick = function () {
+      state.visible += PAGE_SIZE;
+      renderCards();
+    };
+  }
+}
+
+function chartModel(data) {
+  const layers = [];
+  const rates = data.changed_rate || {};
+  Object.keys(rates).forEach(function (key) {
+    const match = key.match(/^L(\d+)p([01])$/);
+    if (!match) return;
+    const layer = Number(match[1]);
+    if (layers.indexOf(layer) < 0) layers.push(layer);
+  });
+  layers.sort(function (a, b) { return a - b; });
+  return { layers: layers, rates: rates };
+}
+
+function rateFor(model, layer, p) {
+  const value = model.rates["L" + layer + "p" + p];
+  return value == null || !Number.isFinite(Number(value)) ? null : Number(value);
+}
+
+function chartHTML(model) {
+  const layers = model.layers;
+  const W = 360, H = 220;
+  const m = { l: 40, r: 12, t: 18, b: 32 };
+  const pw = W - m.l - m.r;
+  const ph = H - m.t - m.b;
+  let max = 0;
+  layers.forEach(function (layer) {
+    ["0", "1"].forEach(function (p) {
+      const value = rateFor(model, layer, p);
+      if (value != null) max = Math.max(max, value * 100);
+    });
+  });
+  const yMax = niceMax(max);
+  function yFor(value) { return m.t + ph - (Math.max(0, value) / yMax) * ph; }
+  const band = layers.length ? pw / layers.length : pw;
+  const groupW = Math.min(band * 0.72, 58);
+  const gap = 3;
+  const barW = Math.max(4, (groupW - gap) / 2);
+  const ticks = [];
+  for (let t = 0; t <= 4; t++) {
+    const value = (yMax / 4) * t;
+    const y = yFor(value);
+    ticks.push('<line class="grid-line" x1="' + m.l + '" x2="' + (W - m.r) + '" y1="' + y.toFixed(1) + '" y2="' + y.toFixed(1) + '" />');
+    ticks.push('<text class="axis-text" x="' + (m.l - 6) + '" y="' + (y + 3).toFixed(1) + '" text-anchor="end">' + esc(fmtAxis(value)) + '</text>');
+  }
+  const marks = [];
+  const xLabels = [];
+  layers.forEach(function (layer, i) {
+    const cx = m.l + band * i + band / 2;
+    xLabels.push('<text class="axis-text" x="' + cx.toFixed(1) + '" y="' + (H - 10) + '" text-anchor="middle">L' + esc(layer) + '</text>');
+    ["0", "1"].forEach(function (p, j) {
+      const value = rateFor(model, layer, p);
+      if (value == null) return;
+      const pct = value * 100;
+      const x = cx - groupW / 2 + j * (barW + gap);
+      const y = yFor(pct);
+      const h = Math.max(1, m.t + ph - y);
+      marks.push('<rect class="bar s-p' + p + '" x="' + x.toFixed(1) + '" y="' + y.toFixed(1) + '" width="' + barW.toFixed(1) + '" height="' + h.toFixed(1) + '" rx="2" tabindex="0" role="img" ' +
+        'aria-label="' + esc("Layer " + layer + ", prompt " + p + ": " + fmtPct(value, 2) + " of pushes changed the character") + '" ' +
+        'data-layer="' + esc(layer) + '" data-p="' + esc(p) + '" data-value="' + pct.toFixed(4) + '" data-x="' + (x + barW / 2).toFixed(2) + '" data-y="' + y.toFixed(2) + '">' +
+        '<title>' + esc("Layer " + layer + ", prompt " + p + ": " + fmtPct(value, 2)) + '</title></rect>');
+    });
+  });
+  const svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' +
+    esc("Share of pushes that changed the character, by layer, for both prompts") + '">' +
+    '<text class="axis-unit" x="' + m.l + '" y="10">share of pushes that changed character (%)</text>' +
+    ticks.join("") + xLabels.join("") + marks.join("") + '</svg>';
+  const body = layers.map(function (layer) {
+    return '<tr><td>Layer ' + esc(layer) + '</td>' +
+      '<td>' + esc(fmtPct(rateFor(model, layer, "0"), 2)) + '</td>' +
+      '<td>' + esc(fmtPct(rateFor(model, layer, "1"), 2)) + '</td></tr>';
+  }).join("");
+  return '<article class="chart-card" data-chart-card>' +
+    '<div class="chart-head"><h3>Changed-character rate by layer</h3><button class="table-btn" type="button" aria-expanded="false">Table</button></div>' +
+    '<div class="chart-sub">share of pushes whose character differs from the unpushed one</div>' +
+    '<div class="chart-wrap">' + svg + '<div class="tooltip" hidden></div></div>' +
+    '<div class="table-wrap" hidden><table><caption>Changed-character rate by layer and prompt</caption>' +
+      '<thead><tr><th>Layer</th><th>Prompt 0 · there was a</th><th>Prompt 1 · met a</th></tr></thead>' +
+      '<tbody>' + body + '</tbody></table></div>' +
+    '</article>';
+}
+
+function renderChart() {
+  const slot = document.getElementById("chart-slot");
+  const model = chartModel(state.data);
+  state.chart = model;
+  if (!model.layers.length) {
+    slot.innerHTML = '<p class="cloud-empty">No changed-rate values are available.</p>';
+    return;
+  }
+  slot.innerHTML = chartHTML(model);
+  const card = slot.querySelector("[data-chart-card]");
+  const tip = card.querySelector(".tooltip");
+  const tableBtn = card.querySelector(".table-btn");
+  const tableWrap = card.querySelector(".table-wrap");
+  const W = 360, H = 220;
+  function hide() { tip.hidden = true; }
+  function show(mark) {
+    const layer = mark.dataset.layer;
+    const p = mark.dataset.p;
+    tip.innerHTML = '<div class="t-head">Layer ' + esc(layer) + ' · prompt ' + esc(p) + '</div>' +
+      '<div class="t-row"><span><span class="dot s-p' + esc(p) + '" aria-hidden="true"></span> ' +
+      esc(p === "0" ? "there was a" : "met a") + '</span><b>' + esc(fmtPct(Number(mark.dataset.value) / 100, 2)) + '</b></div>';
+    const left = Math.max(20, Math.min(80, (Number(mark.dataset.x) / W) * 100));
+    const top = Math.max(4, Math.min(78, (Number(mark.dataset.y) / H) * 100 - 2));
+    tip.style.left = left + "%";
+    tip.style.top = top + "%";
+    tip.hidden = false;
+  }
+  Array.prototype.forEach.call(card.querySelectorAll(".bar"), function (mark) {
+    mark.addEventListener("pointerenter", function () { show(mark); });
+    mark.addEventListener("pointermove", function () { show(mark); });
+    mark.addEventListener("focus", function () { show(mark); });
+    mark.addEventListener("pointerleave", hide);
+    mark.addEventListener("blur", hide);
+  });
+  tableBtn.addEventListener("click", function () {
+    const open = tableWrap.hidden;
+    tableWrap.hidden = !open;
+    tableBtn.setAttribute("aria-expanded", String(open));
+    tableBtn.textContent = open ? "Hide table" : "Table";
+  });
+}
+
+document.getElementById("char-search").addEventListener("input", function (e) {
+  state.search = e.target.value;
+  renderCloud();
+});
+document.getElementById("surprise").addEventListener("click", function () {
+  const all = charactersFor(state.p);
+  if (!all.length) return;
+  const rare = all.filter(function (item) { return item.count <= 3 && hasCharacter(state.p, item.name); });
+  const withCards = all.filter(function (item) { return hasCharacter(state.p, item.name); });
+  const pool = rare.length ? rare :
+    (withCards.length ? withCards.slice(-Math.min(20, withCards.length)) : all.slice(-Math.min(20, all.length)));
+  const pick = pool[Math.floor(Math.random() * pool.length)];
+  state.search = "";
+  document.getElementById("char-search").value = "";
+  selectCharacter(pick.name);
+});
+
+window.addEventListener("hashchange", function () {
+  if (!state.data) return;
+  const hash = readHash();
+  state.p = hash.p;
+  state.c = hash.c && hasCharacter(hash.p, hash.c) ? hash.c : null;
+  state.visible = PAGE_SIZE;
+  renderPromptChips();
+  renderCloud();
+  renderCards();
+  writeHash();
+});
+
+const themeBtn = document.getElementById("theme-btn");
+function prefersDark() {
+  return window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+}
+function currentDark() {
+  const set = document.documentElement.getAttribute("data-theme");
+  if (set === "dark") return true;
+  if (set === "light") return false;
+  return prefersDark();
+}
+function updateThemeButton() {
+  themeBtn.textContent = currentDark() ? "Use light theme" : "Use dark theme";
+}
+themeBtn.addEventListener("click", function () {
+  document.documentElement.setAttribute("data-theme", currentDark() ? "light" : "dark");
+  updateThemeButton();
+});
+updateThemeButton();
+
+load();
+</script>
+</body>
+</html>

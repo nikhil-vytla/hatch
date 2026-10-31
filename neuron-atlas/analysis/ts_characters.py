@@ -18,7 +18,10 @@ def character(text):
     m = re.match(rf"^((?:[a-z'-]+ ){{0,3}}?[a-z'-]+?)(?= {STOP}\b|[,.!\n]|$)", t)
     head = m.group(1) if m else " ".join(t.split()[:2])
     name = re.search(r"named (\w+)", text)
-    return re.sub(r"^(?:an? |the )", "", head), (name.group(1) if name else None)
+    head = re.sub(r"^(?:an? |the )", "", head)
+    if not re.fullmatch(r"[a-z][a-z'-]*(?: [a-z][a-z'-]*)*", head) or re.search(r"(\w)\W?\1\W?\1|'s's", head):
+        head = "(garbled)"  # punctuation runs and stutters are not characters
+    return head, (name.group(1) if name else None)
 
 
 def main(steer, out):
