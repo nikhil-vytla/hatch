@@ -380,7 +380,8 @@ def run_vlm(model, stimuli_dir, neurons=None, recipes=None, doses=(-0.8, 0.8), w
         for item in stimuli:
             s = 0
             while s < len(gjobs):
-                step = 1 if where == "vision" and getattr(nm, "vision_2d", False) else batch
+                # a packed (2-D) tower has no batch axis for per-row pushes: one push per forward pass
+                step = 1 if where != "llm" and getattr(nm, "vision_2d", False) else batch
                 chunk = gjobs[s:s + step]
                 nm.set_recipes([j["terms"] for j in chunk], resid)
                 try:

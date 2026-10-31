@@ -892,3 +892,9 @@ derangement null, not "persona vs not".
 - New GPU notebook (transformers pinned to 5.22.1; the fresh sandbox came with 5.14.1). Qwen3.5-0.8B blank canvas
   resumed from the Hub shards and finished layers 10–11. Full run: strict hallucination 2,421 of 3,456 (70%);
   consistency 557/887 (63%) vs shuffled 67/887 (7.6%); own 433 / random 397 / neither 1,777.
+- Bug caught: Qwen2.5-Omni's Whisper audio tower runs packed (2-D hidden states, all clips of a batch in one
+  sequence). The steer hook only checked for packed layouts on vision towers, so with batch 8 every clip in a batch
+  got the first job's push and the other 7 pushes were dropped. Symptom: every neuron at both −1 and +1 turned 21 of
+  22 sounds into "music"; the −1 and +1 answers were identical in 3,860 of 3,860 changed cases (Gemma 4: 193 of
+  1,594, so its 3-D conformer was unaffected and finding 29 stands). Fixed by detecting packed hidden states on any
+  tower and running one push per forward pass there; deleted the invalid Omni upload and reran.

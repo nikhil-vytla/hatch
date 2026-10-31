@@ -288,7 +288,7 @@ class NeuronModel:
     def _make_steer_hook(self, layer):
         def hook(mod, args):
             hidden = args[0]
-            if self.where == "vision" and not self._rank_checked:
+            if self.where != "llm" and not self._rank_checked:  # packed towers (Qwen-VL vision, Whisper audio) are 2-D
                 self.vision_2d = hidden.dim() == 2
                 self._rank_checked = True
             ops = self._steer.get(layer)
