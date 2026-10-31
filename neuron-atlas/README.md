@@ -37,12 +37,14 @@ DeepSeek-R1-Distill-Qwen-1.5B (read pass + reasoning pushes), Qwen2.5-VL-3B (lan
 image stimuli), Janus-Pro-1B (image generation under pushes). J-lens readouts: Qwen3.5-4B (published J and R lenses),
 SmolLM2-135M (fitted here).
 
-Second round (Oct 31): Qwen3.5-0.8B and 2B (read pass, fitted J-lens, all-neuron "Who are you?" / "Who am I?"
-sweeps at ±0.8), TinyStories-33M (all neurons ±0.5 on two story openings), SmolLM3-3B (read pass; 128 random neurons
-per layer with thinking on and off), MusicGen-small (291 clips), a blank-image test of 384 Qwen2.5-VL-3B
-vision-encoder neurons, and an OLMo-2 1B training ladder (same neurons from 21B tokens through RL). Queued or
-partial: LFM2-350M, Gemma 4 E4B (audio-encoder pushes on 22 sounds; blank-image test). Not yet attempted:
-Qwen2.5-Omni-3B and OmniGen2.
+Second round (Oct 31): Qwen3.5-0.8B and 2B and LFM2-350M (read pass, fitted J-lens, all-neuron "Who are you?" /
+"Who am I?" sweeps at ±0.8), TinyStories-33M (all neurons ±0.5 on two story openings; fitted J and R lenses),
+SmolLM3-3B (read pass; 128 random neurons per layer with thinking on and off), an OLMo-2 1B training ladder (the same
+neurons at ten checkpoints from 21B tokens through RL), MusicGen-small (291 clips), Gemma 4 E4B audio-encoder pushes
+on 22 sounds, and a blank-image test of vision-encoder neurons in Qwen2.5-VL-3B, Gemma 4 E4B and Qwen3.5-0.8B
+(layers 0–9 of 12; the GPU notebook died). Qwen2.5-Omni-3B now loads (its Thinker, with a Whisper-style audio tower)
+but its hearing test never ran for the same reason. OmniGen2 was not attempted (its image generator is a diffusion
+model, which this code's push hooks do not cover yet; Janus-Pro covers image generation here).
 
 CPU runs (this container): 1,500 FineWeb-Edu documents + 1,000 smol-smoltalk chats, ≤128 tokens each, pushes at
 ±0.5. GPU runs (molab RTX PRO 6000, driven by this session through marimo pair): 6,000 + 4,000 documents, ≤256 tokens,

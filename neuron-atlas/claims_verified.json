@@ -234,6 +234,16 @@
   "status": "PASS"
  },
  {
+  "id": "23b",
+  "claim": "Qwen3.5-2B: persona share of 'Who are you?' pushes",
+  "stated": 0.021,
+  "value": 0.02148210369707709,
+  "tol": 0.002,
+  "unit": "share",
+  "source": "Qwen__Qwen3.5-2B/sweep_stats.parquet",
+  "status": "PASS"
+ },
+ {
   "id": "23u",
   "claim": "Qwen3.5-0.8B: 'Who am I?' pushes that tell the user who they are",
   "stated": 0.11,
@@ -269,6 +279,26 @@
   "stated": 0.1,
   "value": 0.09523809523809523,
   "tol": 0.01,
+  "unit": "share",
+  "source": "same",
+  "status": "PASS"
+ },
+ {
+  "id": "24q",
+  "claim": "Qwen3.5-0.8B vision: same drawing across blanks (judged)",
+  "stated": 0.63,
+  "value": 0.6307277628032345,
+  "tol": 0.005,
+  "unit": "share",
+  "source": "Qwen__Qwen3.5-0.8B/blank/blank_judge.json",
+  "status": "PASS"
+ },
+ {
+  "id": "24qs",
+  "claim": "\u2026 shuffled across neurons",
+  "stated": 0.105,
+  "value": 0.10512129380053908,
+  "tol": 0.005,
   "unit": "share",
   "source": "same",
   "status": "PASS"
@@ -314,6 +344,16 @@
   "status": "PASS"
  },
  {
+  "id": "25e",
+  "claim": "TinyStories layer 3: pushes that add a word the neuron's lens names",
+  "stated": 0.445,
+  "value": 0.4446614583333333,
+  "tol": 0.012,
+  "unit": "share",
+  "source": "roneneldan__TinyStories-33M/jlens/L03.parquet + sweep",
+  "status": "PASS"
+ },
+ {
   "id": "26",
   "claim": "MusicGen: L14 N510 +0.5 is the largest mean change (1 = yes)",
   "stated": 1,
@@ -351,6 +391,76 @@
   "tol": 0.002,
   "unit": "share",
   "source": "HuggingFaceTB__SmolLM3-3B/sweep_nothink/steer/",
+  "status": "PASS"
+ },
+ {
+  "id": "28-sft",
+  "claim": "OLMo-2 1B sft: persona share of pushes",
+  "stated": 0.065,
+  "value": 0.06534786869181773,
+  "tol": 0.003,
+  "unit": "share",
+  "source": "allenai__OLMo-2-0425-1B/training/sft/sweep_stats.parquet",
+  "status": "PASS"
+ },
+ {
+  "id": "28-dpo",
+  "claim": "OLMo-2 1B dpo: persona share of pushes",
+  "stated": 0.059,
+  "value": 0.05874769797421731,
+  "tol": 0.003,
+  "unit": "share",
+  "source": "allenai__OLMo-2-0425-1B/training/dpo/sweep_stats.parquet",
+  "status": "PASS"
+ },
+ {
+  "id": "28-instruct",
+  "claim": "OLMo-2 1B instruct: persona share of pushes",
+  "stated": 0.055,
+  "value": 0.05495855081363218,
+  "tol": 0.003,
+  "unit": "share",
+  "source": "allenai__OLMo-2-0425-1B/training/instruct/sweep_stats.parquet",
+  "status": "PASS"
+ },
+ {
+  "id": "30",
+  "claim": "LFM2-350M: pushes adding a word the neuron's fitted J-lens names",
+  "stated": 0.167,
+  "value": 0.16668079215752749,
+  "tol": 0.004,
+  "unit": "share",
+  "source": "LiquidAI__LFM2-350M/jlens + sweep/steer",
+  "status": "PASS"
+ },
+ {
+  "id": "29",
+  "claim": "Gemma 4 audio: pushes that change what it hears",
+  "stated": 0.36,
+  "value": 0.35811237373737376,
+  "tol": 0.005,
+  "unit": "share",
+  "source": "google__gemma-4-E4B-it/audio/hear_summary.json",
+  "status": "PASS"
+ },
+ {
+  "id": "29f",
+  "claim": "\u2026 pushes that turn a misheard ESC-50 clip right",
+  "stated": 176,
+  "value": 176,
+  "tol": 0,
+  "unit": "count",
+  "source": "same",
+  "status": "PASS"
+ },
+ {
+  "id": "29b",
+  "claim": "\u2026 pushes that turn a correctly heard clip wrong",
+  "stated": 277,
+  "value": 277,
+  "tol": 0,
+  "unit": "count",
+  "source": "same",
   "status": "PASS"
  },
  {

@@ -210,6 +210,11 @@ table.data .replycell { white-space: normal; min-width: 240px; max-width: 420px;
   -webkit-box-orient: vertical; overflow: hidden }
 .flip .txt b { color: var(--ink) }
 
+.blank-models { width: 100% }
+.blank-models button { flex: 1 1 auto }
+.blank-baseline { display: flex; flex-direction: column; gap: 4px; background: var(--sunk); border-radius: var(--r); padding: 8px 10px }
+.blank-baseline .blank-row { font-size: 12.5px }
+.blank-more { align-self: center }
 .blank-controls { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; justify-content: space-between }
 .blank-controls .seg { width: auto; flex: 1 1 260px }
 .blank-dose { display: flex; align-items: center; gap: 6px; font: 600 12px/1 var(--body); color: var(--ink3) }
@@ -334,7 +339,7 @@ table.data .replycell { white-space: normal; min-width: 240px; max-width: 420px;
       <div class="section-head">
         <div>
           <h2>Blank canvas</h2>
-          <p class="lede">One vision-encoder neuron of Qwen2.5-VL-3B is pushed at doses -1, +1 and +2 while the model is shown a plain gray, black or white image and asked "Describe this image in a few words." Usually it still says the image is blank; sometimes it describes something that is not there.</p>
+          <p class="lede">A vision-encoder neuron is pushed while the model is shown a plain gray, black or white image and asked "Describe this image in a few words." Usually it still says the image is blank; sometimes it describes something that is not there.</p>
         </div>
         <span class="kind-chip" id="blankCount"></span>
       </div>
@@ -446,15 +451,25 @@ table.data .replycell { white-space: normal; min-width: 240px; max-width: 420px;
     return {
       stim: params.get("stim"),
       run: params.get("run") === "vision" ? "vision" : "llm",
-      blank: params.get("blank")
+      blank: params.get("blank"),
+      bm: params.get("bm") || "qwen25"
     };
   }
 
   function writeHash(stim, run) {
     const params = new URLSearchParams(location.hash.replace(/^#/, ""));
     const blank = params.get("blank");
+    const bm = params.get("bm");
     let next = `#stim=${encodeURIComponent(stim)}&run=${run}`;
     if (blank) next += `&blank=${encodeURIComponent(blank)}`;
+    if (bm) next += `&bm=${encodeURIComponent(bm)}`;
+    if (location.hash !== next) history.replaceState(null, "", next);
+  }
+
+  function writeBlankModelHash(model) {
+    const params = new URLSearchParams(location.hash.replace(/^#/, ""));
+    params.set("bm", model);
+    const next = "#" + params.toString();
     if (location.hash !== next) history.replaceState(null, "", next);
   }
 
@@ -928,30 +943,74 @@ table.data .replycell { white-space: normal; min-width: 240px; max-width: 420px;
     $("#flips").hidden = false;
   }
 
+  const BLANK_PAGE = 120;
+  const BLANK_MODELS = {
+    qwen25: {
+      label: "Qwen2.5-VL-3B",
+      file: "blank.json",
+      summary: "Early layers draw patterns, middle layers objects, the last layer mostly one person in a red shirt."
+    },
+    gemma4: {
+      label: "Gemma 4 E4B",
+      file: "blank_gemma4.json",
+      summary: "Nearly everything is a texture: lines, grids, stripes; mostly from the first and last layers."
+    },
+    qwen35: {
+      label: "Qwen3.5-0.8B",
+      file: "blank_qwen35.json",
+      summary: "The small tower hallucinates on most pushes: geometric compositions, squares on contrasting backgrounds, night skies."
+    }
+  };
+  const BLANK_MODEL_ORDER = ["qwen25", "gemma4", "qwen35"];
   const BLANK_COLORS = [
     { key: "gray", swatch: "#808080" },
     { key: "black", swatch: "#000" },
     { key: "white", swatch: "#fff" }
   ];
-  const BLANK_FILTERS = [
-    { key: "all", label: "all" },
-    { key: "shared", label: "consistent across blanks" },
-    { key: "early", label: "early (0-9)" },
-    { key: "middle", label: "middle (10-20)" },
-    { key: "late", label: "late (21-31)" }
-  ];
-  const blankState = { filter: "all", dose: "all" };
+  const blankState = { model: "qwen25", filter: "all", dose: "all", shown: BLANK_PAGE };
+  const blankCache = new Map();
   let blankData = null;
+  let blankLayerCount = 36;
+  let blankLoadToken = 0;
 
   function blankDoseLabel(dose) {
     const n = Number(dose);
     return (n > 0 ? "+" : "") + n;
   }
 
+  function blankLayerCountFor(data) {
+    let max = -1;
+    for (const g of data.groups || []) {
+      const layer = Number(g.layer);
+      if (Number.isFinite(layer) && layer > max) max = layer;
+    }
+    return Math.max(1, max + 1);
+  }
+
+  function blankBands() {
+    const count = Math.max(1, blankLayerCount);
+    const earlyEnd = Math.max(0, Math.ceil(count / 3) - 1);
+    const middleEnd = Math.max(earlyEnd, Math.ceil((2 * count) / 3) - 1);
+    const lateEnd = Math.max(middleEnd, count - 1);
+    return [
+      { key: "early", label: `early (0-${earlyEnd})`, start: 0, end: earlyEnd },
+      { key: "middle", label: `middle (${earlyEnd + 1}-${middleEnd})`, start: Math.min(earlyEnd + 1, middleEnd), end: middleEnd },
+      { key: "late", label: `late (${middleEnd + 1}-${lateEnd})`, start: Math.min(middleEnd + 1, lateEnd), end: lateEnd }
+    ];
+  }
+
+  function blankFilters() {
+    return [
+      { key: "all", label: "all" },
+      { key: "shared", label: "same on every blank" },
+      ...blankBands()
+    ];
+  }
+
   function blankTextCount(data) {
     return (data.groups || []).reduce((sum, g) => {
       const texts = g.texts || {};
-      return sum + BLANK_COLORS.filter(c => texts[c.key]).length;
+      return sum + BLANK_COLORS.filter(c => String(texts[c.key] || "").trim()).length;
     }, 0);
   }
 
@@ -962,9 +1021,8 @@ table.data .replycell { white-space: normal; min-width: 240px; max-width: 420px;
   function blankMatches(g) {
     if (blankState.dose !== "all" && Number(g.dose) !== Number(blankState.dose)) return false;
     if (blankState.filter === "shared") return g.shared === true;
-    if (blankState.filter === "early") return g.layer >= 0 && g.layer <= 9;
-    if (blankState.filter === "middle") return g.layer >= 10 && g.layer <= 20;
-    if (blankState.filter === "late") return g.layer >= 21 && g.layer <= 31;
+    const band = blankBands().find(b => b.key === blankState.filter);
+    if (band) return g.layer >= band.start && g.layer <= band.end;
     return true;
   }
 
@@ -1007,26 +1065,61 @@ table.data .replycell { white-space: normal; min-width: 240px; max-width: 420px;
     </article>`;
   }
 
+  function blankBaselineHtml(data) {
+    const baseline = data.baseline || {};
+    return BLANK_COLORS.map(c => {
+      const raw = baseline[c.key];
+      const text = raw == null ? "" : String(raw);
+      const body = text
+        ? `<span class="blank-text">${fmt(text)}</span>`
+        : `<span class="blank-text is-blank">no stored answer</span>`;
+      return `<div class="blank-row">
+        <span class="blank-sw" style="background:${c.swatch}" aria-hidden="true"></span>
+        <span class="blank-label">${c.key}</span>
+        ${body}
+      </div>`;
+    }).join("");
+  }
+
   function renderBlankGrid() {
     if (!blankData) return;
     const grid = $("#blankGrid");
     if (!grid) return;
     const groups = blankSortedGroups().filter(blankMatches);
-    grid.innerHTML = groups.length
-      ? groups.map(blankCardHtml).join("")
+    const shown = groups.slice(0, blankState.shown);
+    grid.innerHTML = shown.length
+      ? shown.map(blankCardHtml).join("")
       : `<p class="empty">No groups match this filter.</p>`;
     const count = $("#blankCount");
-    if (count) count.textContent = `${groups.length} of ${(blankData.groups || []).length} groups`;
+    if (count) count.textContent = `${groups.length} groups`;
+    const showing = $("#blankShowing");
+    if (showing) showing.textContent = groups.length ? `Showing ${shown.length} of ${groups.length} groups.` : "";
+    const more = $("#blankMore");
+    if (more) {
+      const rest = groups.length - shown.length;
+      more.hidden = rest <= 0;
+      more.textContent = rest > 0 ? `Show ${Math.min(BLANK_PAGE, rest)} more` : "";
+    }
   }
 
   function applyBlankHash(key, scroll) {
-    const cards = $$("#blankGrid .blank-card");
-    cards.forEach(card => card.classList.remove("target"));
+    if (!blankData) return;
+    $$("#blankGrid .blank-card").forEach(card => card.classList.remove("target"));
     if (!key) return;
     const match = String(key).match(/^L(\d+)N(\d+)$/i);
     if (!match) return;
     const layer = Number(match[1]);
     const neuron = Number(match[2]);
+    let index = -1;
+    blankSortedGroups().filter(blankMatches).forEach((g, i) => {
+      if (Number(g.layer) === layer && Number(g.neuron) === neuron) index = i;
+    });
+    if (index < 0) return;
+    if (index >= blankState.shown) {
+      blankState.shown = Math.ceil((index + 1) / BLANK_PAGE) * BLANK_PAGE;
+      renderBlankGrid();
+    }
+    const cards = $$("#blankGrid .blank-card");
     const hits = cards.filter(card => Number(card.dataset.layer) === layer && Number(card.dataset.neuron) === neuron);
     if (!hits.length) return;
     hits.forEach(card => card.classList.add("target"));
@@ -1047,10 +1140,12 @@ table.data .replycell { white-space: normal; min-width: 240px; max-width: 420px;
   function renderBlank() {
     if (!blankData) return;
     const data = blankData;
+    const cfg = BLANK_MODELS[blankState.model] || BLANK_MODELS.qwen25;
     const groups = data.groups || [];
     const textCount = blankTextCount(data);
     const pushes = Number(data.n_pushes) || 0;
     const pushesLabel = pushes.toLocaleString("en-US");
+    const neurons = Number(data.n_neurons) || 0;
     const consistency = data.consistency || {};
     const judge = data.judge || {};
     const shared = Number(consistency.shared) || 0;
@@ -1060,18 +1155,35 @@ table.data .replycell { white-space: normal; min-width: 240px; max-width: 420px;
     const own = Number(judge.own) || 0;
     const random = Number(judge.random) || 0;
     const neither = Number(judge.neither) || 0;
-    const filterButtons = BLANK_FILTERS.map(f =>
+    const note = typeof data.note === "string" ? data.note.trim() : "";
+    const doses = Array.from(new Set(
+      (Array.isArray(data.doses) && data.doses.length ? data.doses : [-1, 1, 2]).map(Number)
+    )).sort((a, b) => a - b);
+    const modelButtons = BLANK_MODEL_ORDER.map(key =>
+      `<button class="blank-model" type="button" data-model="${key}" aria-pressed="${blankState.model === key}">${BLANK_MODELS[key].label}</button>`
+    ).join("");
+    const filterButtons = blankFilters().map(f =>
       `<button class="blank-filter" type="button" data-filter="${f.key}" aria-pressed="${blankState.filter === f.key}">${f.label}</button>`
     ).join("");
-    const doseOptions = [["all", "all"], ["-1", "-1"], ["1", "+1"], ["2", "+2"]].map(([value, label]) =>
+    const doseOptions = [["all", "all"], ...doses.map(dose => [String(dose), blankDoseLabel(dose)])].map(([value, label]) =>
       `<option value="${value}"${blankState.dose === value ? " selected" : ""}>${label}</option>`
     ).join("");
+    const doseLine = doses.map(blankDoseLabel).join(", ");
+    const neuronLine = neurons ? ` on ${neurons.toLocaleString("en-US")} neurons` : "";
 
     $("#blankBody").innerHTML = `
+      <div class="seg blank-models" role="group" aria-label="Blank-canvas model">${modelButtons}</div>
+      ${note ? `<p class="lede small muted">${fmt(note)}</p>` : ""}
+      <p class="lede small">${esc(cfg.label)}: ${esc(pushesLabel)} pushes${esc(neuronLine)} at doses ${esc(doseLine)}.</p>
       <div class="stat-row">
         <div class="stat"><b>${esc(textCount)} of ${esc(pushesLabel)}</b><span>pushes describe something</span></div>
         <div class="stat"><b>${esc(blankPct(shared, sharedOf))}% vs ${esc(blankPct(controlShared, controlOf))}%</b><span>a neuron's hallucinations agree across blank colors (${esc(shared)}/${esc(sharedOf)}) vs shuffled neurons (${esc(controlShared)}/${esc(controlOf)})</span></div>
         <div class="stat"><b>${esc(blankPct(own, own + random))}%</b><span>a blind judge matches the hallucination to the neuron's top images rather than random ones (${esc(own)} vs ${esc(random)}; ${esc(neither)} neither)</span></div>
+      </div>
+      <div>
+        <h3>Unpushed answers</h3>
+        <p class="lede small">What the model says about each blank image before any push.</p>
+        <div class="blank-baseline">${blankBaselineHtml(data)}</div>
       </div>
       <div class="blank-controls">
         <div class="seg" role="group" aria-label="Filter blank-image groups">${filterButtons}</div>
@@ -1079,31 +1191,48 @@ table.data .replycell { white-space: normal; min-width: 240px; max-width: 420px;
           <select id="blankDose">${doseOptions}</select>
         </label>
       </div>
+      <p class="lede small muted" id="blankShowing" aria-live="polite"></p>
       <div class="blank-grid" id="blankGrid"></div>
-      <p class="lede small">Early layers draw patterns (lines, dots, stripes), middle layers objects (a cat, a truck, circles), and the last layer mostly one person in a red shirt.</p>`;
+      <button class="tbtn blank-more" type="button" id="blankMore" hidden>Show more</button>
+      <p class="lede small">${esc(cfg.summary)}</p>`;
     $("#blankCount").textContent = `${groups.length} groups`;
     renderBlankGrid();
     applyBlankHash(parseHash().blank, true);
     $("#blank").hidden = false;
   }
 
-  async function loadBlank() {
+  async function loadBlankModel(key) {
     const section = $("#blank");
     const body = $("#blankBody");
     if (!section || !body) return;
+    if (!BLANK_MODELS[key]) key = "qwen25";
+    blankState.model = key;
+    const cfg = BLANK_MODELS[key];
     section.hidden = false;
-    body.innerHTML = `<div class="status" role="status"><span class="spinner" aria-hidden="true"></span><span>Loading blank-image pushes…</span></div>`;
+    const cached = blankCache.get(cfg.file);
+    if (cached) {
+      blankData = cached;
+      blankLayerCount = blankLayerCountFor(cached);
+      renderBlank();
+      return;
+    }
+    const token = ++blankLoadToken;
+    body.innerHTML = `<div class="status" role="status"><span class="spinner" aria-hidden="true"></span><span>Loading ${esc(cfg.label)} blank-image pushes…</span></div>`;
     try {
-      const res = await fetch(DATA + "site/blank.json");
+      const res = await fetch(DATA + "site/" + cfg.file);
       if (!res.ok) throw new Error(`The server returned HTTP ${res.status} ${res.statusText}.`);
       const data = await res.json();
       if (!data || !Array.isArray(data.groups)) {
         throw new Error("The JSON loaded, but its shape was not what this page expects.");
       }
+      blankCache.set(cfg.file, data);
+      if (token !== blankLoadToken || blankState.model !== key) return;
       blankData = data;
+      blankLayerCount = blankLayerCountFor(data);
       renderBlank();
     } catch (error) {
-      body.innerHTML = `<div class="status error" role="alert"><div class="status-body"><b>Could not load the blank-image data.</b>${esc(error && error.message ? error.message : "Unknown error")}. Check the connection and try again.</div><button type="button" id="blankRetry">Try again</button></div>`;
+      if (token !== blankLoadToken || blankState.model !== key) return;
+      body.innerHTML = `<div class="status error" role="alert"><div class="status-body"><b>Could not load the ${esc(cfg.label)} blank-image data.</b>${esc(error && error.message ? error.message : "Unknown error")}. Check the connection and try again.</div><button type="button" id="blankRetry">Try again</button></div>`;
     }
   }
 
@@ -1304,12 +1433,30 @@ table.data .replycell { white-space: normal; min-width: 240px; max-width: 420px;
   $("#blankBody").addEventListener("click", event => {
     const retry = event.target.closest("#blankRetry");
     if (retry) {
-      loadBlank();
+      loadBlankModel(blankState.model);
+      return;
+    }
+    const modelBtn = event.target.closest(".blank-model");
+    if (modelBtn) {
+      const key = modelBtn.dataset.model;
+      if (!BLANK_MODELS[key] || key === blankState.model) return;
+      blankState.filter = "all";
+      blankState.dose = "all";
+      blankState.shown = BLANK_PAGE;
+      writeBlankModelHash(key);
+      loadBlankModel(key);
+      return;
+    }
+    const more = event.target.closest("#blankMore");
+    if (more) {
+      blankState.shown += BLANK_PAGE;
+      renderBlankGrid();
       return;
     }
     const filterBtn = event.target.closest(".blank-filter");
     if (!filterBtn) return;
     blankState.filter = filterBtn.dataset.filter;
+    blankState.shown = BLANK_PAGE;
     $$("#blankBody .blank-filter").forEach(btn => {
       btn.setAttribute("aria-pressed", String(btn === filterBtn));
     });
@@ -1320,6 +1467,7 @@ table.data .replycell { white-space: normal; min-width: 240px; max-width: 420px;
   $("#blankBody").addEventListener("change", event => {
     if (!event.target || event.target.id !== "blankDose") return;
     blankState.dose = event.target.value;
+    blankState.shown = BLANK_PAGE;
     renderBlankGrid();
     applyBlankHash(parseHash().blank, false);
   });
@@ -1386,7 +1534,13 @@ table.data .replycell { white-space: normal; min-width: 240px; max-width: 420px;
 
   window.addEventListener("hashchange", () => {
     const hash = parseHash();
-    if (hash.blank && blankData) {
+    const bm = BLANK_MODELS[hash.bm] ? hash.bm : "qwen25";
+    if (bm !== blankState.model) {
+      blankState.filter = "all";
+      blankState.dose = "all";
+      blankState.shown = BLANK_PAGE;
+      loadBlankModel(bm);
+    } else if (hash.blank && blankData) {
       const match = String(hash.blank).match(/^L(\d+)N(\d+)$/i);
       const visible = match && $$("#blankGrid .blank-card").some(card =>
         Number(card.dataset.layer) === Number(match[1]) && Number(card.dataset.neuron) === Number(match[2])
@@ -1394,6 +1548,7 @@ table.data .replycell { white-space: normal; min-width: 240px; max-width: 420px;
       if (!visible) {
         blankState.filter = "all";
         blankState.dose = "all";
+        blankState.shown = BLANK_PAGE;
         syncBlankControls();
         renderBlankGrid();
       }
@@ -1418,7 +1573,7 @@ table.data .replycell { white-space: normal; min-width: 240px; max-width: 420px;
   });
 
   load();
-  loadBlank();
+  loadBlankModel(parseHash().bm);
 })();
 </script>
 </body>

@@ -27,19 +27,30 @@ judge labels; the judges are audited in `AUDIT.md`.
 | NL-a | Qwen3-8B labels: ours vs neuron-lens judged 'same' | 0.331 | 0.331 |  | PASS | `Qwen__Qwen3-8B/experiments/label_agreement_neuronlens.json` |
 | NL-b | ... shuffled pairs judged 'same' (chance) | 0.001 | 0.001 |  | PASS | `same` |
 | 23 | Qwen3.5-0.8B: persona share of 'Who are you?' pushes | 0.047 | 0.047 |  | PASS | `Qwen__Qwen3.5-0.8B/sweep_stats.parquet` |
+| 23b | Qwen3.5-2B: persona share of 'Who are you?' pushes | 0.021 | 0.021 |  | PASS | `Qwen__Qwen3.5-2B/sweep_stats.parquet` |
 | 23u | Qwen3.5-0.8B: 'Who am I?' pushes that tell the user who they are | 0.110 | 0.109 |  | PASS | `Qwen__Qwen3.5-0.8B/user_sweep_stats.parquet` |
 | 24 | Qwen2.5-VL-3B: blank-image pushes that describe something (of 3,456) | 285.000 | 285.000 |  | PASS | `Qwen__Qwen2.5-VL-3B-Instruct/blank/vlm.parquet` |
 | 24c | same neuron draws the same thing on different blanks (judged) | 0.410 | 0.413 |  | PASS | `…/blank/blank_judge.json` |
 | 24s | … for hallucinations shuffled across neurons | 0.100 | 0.095 |  | PASS | `same` |
+| 24q | Qwen3.5-0.8B vision: same drawing across blanks (judged) | 0.630 | 0.631 |  | PASS | `Qwen__Qwen3.5-0.8B/blank/blank_judge.json` |
+| 24qs | … shuffled across neurons | 0.105 | 0.105 |  | PASS | `same` |
 | 25a | TinyStories '…met a': lowest per-layer recast rate | 0.450 | 0.445 |  | PASS | `roneneldan__TinyStories-33M/sweep/steer/` |
 | 25b | TinyStories '…met a': highest per-layer recast rate | 0.730 | 0.731 |  | PASS | `same` |
 | 25c | TinyStories 'there was a': recast rate, worst of layers 0-2 | 0.020 | 0.020 |  | PASS | `same` |
 | 25d | TinyStories 'there was a': recast rate at layer 3 | 0.340 | 0.337 |  | PASS | `same` |
+| 25e | TinyStories layer 3: pushes that add a word the neuron's lens names | 0.445 | 0.445 |  | PASS | `roneneldan__TinyStories-33M/jlens/L03.parquet + sweep` |
 | 26 | MusicGen: L14 N510 +0.5 is the largest mean change (1 = yes) | 1.000 | 1.000 |  | PASS | `site/music.json` |
 | 26b | MusicGen: layer 0 mean spectral distance | 0.360 | 0.361 |  | PASS | `same` |
 | 27-think | SmolLM3 layers 6-16, thinking on: pushes that call 1001 prime | 0.016 | 0.016 |  | PASS | `HuggingFaceTB__SmolLM3-3B/sweep_think/steer/` |
 | 27-nothink | SmolLM3 layers 6-16, thinking off: pushes that call 1001 prime | 0.112 | 0.112 |  | PASS | `HuggingFaceTB__SmolLM3-3B/sweep_nothink/steer/` |
+| 28-sft | OLMo-2 1B sft: persona share of pushes | 0.065 | 0.065 |  | PASS | `allenai__OLMo-2-0425-1B/training/sft/sweep_stats.parquet` |
+| 28-dpo | OLMo-2 1B dpo: persona share of pushes | 0.059 | 0.059 |  | PASS | `allenai__OLMo-2-0425-1B/training/dpo/sweep_stats.parquet` |
+| 28-instruct | OLMo-2 1B instruct: persona share of pushes | 0.055 | 0.055 |  | PASS | `allenai__OLMo-2-0425-1B/training/instruct/sweep_stats.parquet` |
+| 30 | LFM2-350M: pushes adding a word the neuron's fitted J-lens names | 0.167 | 0.167 |  | PASS | `LiquidAI__LFM2-350M/jlens + sweep/steer` |
+| 29 | Gemma 4 audio: pushes that change what it hears | 0.360 | 0.358 |  | PASS | `google__gemma-4-E4B-it/audio/hear_summary.json` |
+| 29f | … pushes that turn a misheard ESC-50 clip right | 176.000 | 176.000 |  | PASS | `same` |
+| 29b | … pushes that turn a correctly heard clip wrong | 277.000 | 277.000 |  | PASS | `same` |
 | 16a | J-lens tokens appear in the pushed reply | 0.095 | 0.095 | 0.094–0.096 | PASS | `Qwen__Qwen3.5-4B/jlens, sweep/steer` |
 | 16b | ... another neuron's tokens (chance) | 0.005 | 0.005 | 0.004–0.005 | PASS | `same` |
 
-35 of 35 claims pass.
+46 of 46 claims pass.
