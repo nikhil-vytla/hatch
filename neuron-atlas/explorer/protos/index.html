@@ -65,13 +65,14 @@ ul { color: var(--ink2); max-width: 75ch }
 <body>
 <div class="wrap">
   <h1>Neuron <i>Atlas</i> · prototypes</h1>
-  <nav><a href="../index.html">Explorer</a><a href="index.html" aria-current="page">Prototypes</a><a href="vision.html">Vision lab</a><a href="janus.html">Image pushes</a><a href="lenses.html">Says vs does</a><a href="identity.html">Identity lab</a></nav>
+  <nav><a href="../index.html">Explorer</a><a href="index.html" aria-current="page">Prototypes</a><a href="vision.html">Vision lab</a><a href="janus.html">Image pushes</a><a href="lenses.html">Says vs does</a><a href="identity.html">Identity lab</a><a href="evidence.html">Evidence</a></nav>
   <p class="lede">Experimental views over data the main explorer does not show yet. Each page reads small summary files from the <a href="https://huggingface.co/datasets/nikhilxvytla/neuron-atlas/tree/main/site">dataset</a> and lets you test one question. They are prototypes: tell us which ones should graduate into the explorer.</p>
   <div class="grid">
     <a class="card" href="vision.html"><span class="k">Qwen2.5-VL-3B · 45 images · 34k pushes</span><h2>Vision lab</h2><p>Push a neuron while the model looks at an arrow, a clock or a typographic attack. Which neurons flip left and right, break counting, or make it read the label instead of the picture?</p></a>
     <a class="card" href="janus.html"><span class="k">Janus-Pro-1B · 579 images</span><h2>Image pushes</h2><p>Gentle pushes during image generation. Some neurons act as the same style direction on every prompt; rendered text breaks first.</p></a>
     <a class="card" href="lenses.html"><span class="k">6 models · J, R and logit lenses</span><h2>Says vs does</h2><p>Does what a neuron's output direction says (its lens readout) predict what pushing it makes the model say? Layer by layer, for every model.</p></a>
     <a class="card" href="identity.html"><span class="k">4 models · sweeps, pairs, prompts, turns</span><h2>Identity lab</h2><p>Who the model becomes when one neuron is pushed: across layers and models, two personas fused, a prompt instead of a push, over a conversation, and in time and place.</p></a>
+    <a class="card" href="evidence.html"><span class="k">verify.py · pre-registration · two judges · blind audit</span><h2>Evidence</h2><p>How to check our claims without trusting us: recompute every number from public data, predictions committed before the data, a second judge, and a blind human audit.</p></a>
   </div>
   <h3>Next candidates</h3>
   <ul>
