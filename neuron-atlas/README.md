@@ -209,9 +209,9 @@ first).
    every steered reply is a `<think>` preamble. Qwen's logit lens is often in Chinese even for English-firing
    neurons ("more importantly" → 最重要). The UMAP map of output directions is a near-uniform cloud (mean top-1
    cosine between neurons is 0.25), so "writes like" neighbors come from exact cosine search, not from the map.
-23. **Within one family, the smaller model is far easier to rename.** Every Qwen3.5-0.8B neuron pushed ±0.8 on "Who
-    are you?" (172k replies): a persona in **4.7%** of pushes vs 0.8% for Qwen3.5-4B under the same dose, prompt and
-    template. The largest theme is the model declaring itself human (*"I am a human being. I'm here to help."*,
+23. **Within one family, the smaller model is far easier to rename.** Every neuron pushed ±0.8 on "Who are you?"
+    under the same template: a persona in **4.7%** of pushes for Qwen3.5-0.8B (172k replies), **2.1%** for 2B (295k)
+    and 0.8% for 4B. The largest theme is the model declaring itself human (*"I am a human being. I'm here to help."*,
     1,318 replies), over half of them from layers 0–2 of 24 (a quarter from layer 0 alone). On "Who am I?" 11% of pushes assert who the user is. (First-judge rates; read as upper
     bounds, `AUDIT.md`.)
 24. **A pushed vision neuron draws its own picture on a blank canvas.** Qwen2.5-VL-3B shown a plain gray, black or
@@ -381,6 +381,16 @@ notebook from the header's specs button. Two ways to use it:
 - 2,500 documents is a small corpus. Rare features will not show, and smol-smoltalk duplicates show up as repeated
   top examples.
 - Labels are from one cheap model. The hand audit is 50 labels by one grader.
+- Second-round caveats. The multimodal tests are small: 2 neurons per MusicGen layer, 6 per Gemma audio block, 12–16
+  per vision layer, 22 sounds, 45 mostly synthetic images, so their per-neuron stories are anecdotes and their
+  rates have wide uncertainty. Several scores are rules, not judges (the TinyStories character parse, "calls 1001
+  prime", the blank-image filter, "hears a dog"): each is a regex in the analysis script, checked by hand on samples
+  and recomputed by `verify.py`, but a regex misses paraphrases. The blank-image consistency and match numbers come
+  from the DeepSeek judge. The OLMo pretraining checkpoints are prompted with a plain dialogue frame because they
+  have no chat template, so their numbers are not comparable with the post-trained ones. SmolLM3's thinking trace
+  is cut at 256 tokens.
+- ESC-50 clips (Piczak, "ESC: Dataset for Environmental Sound Classification", ACM MM 2015) are redistributed in the
+  Hub dataset under their CC BY-NC 3.0 license.
 
 ## Files
 

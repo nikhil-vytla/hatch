@@ -175,6 +175,10 @@ def new_models():
     tot, per = duckdb.sql(f"select sum(n_est), sum(n_est) filter (where reply_kind = 'persona') from '{p}'").fetchall()[0]
     out.append(dict(id="23", claim="Qwen3.5-0.8B: persona share of 'Who are you?' pushes", stated=0.047, value=per / tot,
                     tol=None, unit="share", source="Qwen__Qwen3.5-0.8B/sweep_stats.parquet"))
+    p = hub("Qwen__Qwen3.5-2B/sweep_stats.parquet")
+    tot, per = duckdb.sql(f"select sum(n_est), sum(n_est) filter (where reply_kind = 'persona') from '{p}'").fetchall()[0]
+    out.append(dict(id="23b", claim="Qwen3.5-2B: persona share of 'Who are you?' pushes", stated=0.021, value=per / tot,
+                    tol=None, unit="share", source="Qwen__Qwen3.5-2B/sweep_stats.parquet"))
     p = hub("Qwen__Qwen3.5-0.8B/user_sweep_stats.parquet")
     tot, u = duckdb.sql(f"select sum(n_est), sum(n_est) filter (where reply_kind = 'user_identity') from '{p}'").fetchall()[0]
     out.append(dict(id="23u", claim="Qwen3.5-0.8B: 'Who am I?' pushes that tell the user who they are", stated=0.11, value=u / tot,
