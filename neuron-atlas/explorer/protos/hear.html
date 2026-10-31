@@ -580,6 +580,7 @@ td:first-child { color: var(--ink); font-family: var(--mono); white-space: nowra
 
   function answerChanged(group, stimId) {
     const replies = group.replies || {};
+    if (!Object.prototype.hasOwnProperty.call(replies, stimId) || replies[stimId] == null) return false;
     return normAnswer(replies[stimId]) !== normAnswer(baselineAnswer(stimId));
   }
 
@@ -782,6 +783,7 @@ td:first-child { color: var(--ink); font-family: var(--mono); white-space: nowra
     if (!btn || !panel) return;
     if (open) buildGroupPanel(card);
     panel.hidden = !open;
+    if (!open && active && panel.contains(active.audio)) stopActive();
     btn.setAttribute("aria-expanded", String(open));
     if (caret) caret.textContent = open ? "−" : "+";
   }
@@ -941,7 +943,6 @@ td:first-child { color: var(--ink); font-family: var(--mono); white-space: nowra
   });
 
   $("#soundGrid").addEventListener("click", event => {
-    if (event.target.closest(".playbtn")) return;
     const card = event.target.closest(".sound-card");
     if (!card) return;
     selectStim(card.dataset.id);
