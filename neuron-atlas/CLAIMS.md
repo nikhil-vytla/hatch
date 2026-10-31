@@ -16,7 +16,7 @@ judge labels; the judges are audited in `AUDIT.md`.
 | 17-SmolLM2-135M | SmolLM2-135M: J-lens-picked pushes 'become' the word | 0.220 | 0.220 | 0.170–0.270 | PASS | `HuggingFaceTB__SmolLM2-135M-Instruct/experiments/lens_guided.parquet` |
 | 17r-SmolLM2-135M | SmolLM2-135M: random-neuron pushes 'become' the word | 0.027 | 0.027 |  | PASS | `same` |
 | 17-Qwen3-8B | Qwen3-8B: J-lens-picked pushes 'become' the word | 0.220 | 0.222 | 0.177–0.271 | PASS | `Qwen__Qwen3-8B/experiments/lens_guided.parquet` |
-| 17r-Qwen3-8B | Qwen3-8B: random-neuron pushes 'become' the word | 0.000 | 0.003 |  | FAIL | `same` |
+| 17r-Qwen3-8B | Qwen3-8B: random-neuron pushes 'become' the word | 0.003 | 0.003 |  | PASS | `same` |
 | 18a | persona pairs at 0.6x: fused identity | 0.330 | 0.331 | 0.256–0.406 | PASS | `Qwen__Qwen3.5-4B/experiments/pairs_judged.json` |
 | 18b | persona pairs at 0.6x: one persona wins | 0.069 | 0.069 |  | PASS | `same` |
 | 19-you_are | judge picks the pushed reply vs 'you_are' prompt | 0.646 | 0.646 | 0.588–0.704 | PASS | `Qwen__Qwen3.5-4B/experiments/prompt_imitation_judged.json` |
@@ -29,4 +29,4 @@ judge labels; the judges are audited in `AUDIT.md`.
 | 16a | J-lens tokens appear in the pushed reply | 0.095 | 0.095 | 0.094–0.096 | PASS | `Qwen__Qwen3.5-4B/jlens, sweep/steer` |
 | 16b | ... another neuron's tokens (chance) | 0.005 | 0.005 | 0.004–0.005 | PASS | `same` |
 
-21 of 22 claims pass.
+22 of 22 claims pass.

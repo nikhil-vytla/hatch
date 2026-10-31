@@ -67,9 +67,10 @@ def tasks(n, rng):
     return out
 
 
-def run_task(judge, system, items, parse, group=10):
+def run_task(judge, system, items, parse, group=10, workers=8):
     got = [None] * len(items)
-    for k in range(0, len(items), group):
+
+    def one(k):
         chunk = items[k:k + group]
         head = [chunk[0]["head"]] if "head" in chunk[0] else []
         user = "\n".join(head + [f"[{j}] {x['line']}" for j, x in enumerate(chunk)])
@@ -77,7 +78,7 @@ def run_task(judge, system, items, parse, group=10):
             res = judge.ask(system, user) or {}
         except Exception as e:
             print("  judge error:", str(e)[:120], flush=True)
-            continue
+            return
         for x in res.get("items", []):
             try:
                 j = int(x.get("i"))
@@ -85,6 +86,9 @@ def run_task(judge, system, items, parse, group=10):
                 continue
             if 0 <= j < len(chunk):
                 got[k + j] = parse(x)
+
+    with cf.ThreadPoolExecutor(workers) as ex:
+        list(ex.map(one, range(0, len(items), group)))
     return got
 
 
@@ -94,11 +98,16 @@ def main():
     a = ap.parse_args()
     rng = random.Random(0)
     ts = tasks(a.n, rng)
-    results = {}
+    try:
+        results = json.load(open(a.out))["results"]
+    except (OSError, ValueError, KeyError):
+        results = {}
     with opencode_server() as server:
         for spec in a.judges:
             judge = make_judge(spec, server)
             for name, system, items, parse in ts:
+                if spec in results.get(name, {}):  # already judged in an earlier, interrupted run
+                    continue
                 labels = run_task(judge, system, items, parse)
                 k, n, po = kappa([x["ds"] for x in items], labels)
                 results.setdefault(name, {})[spec] = dict(kappa=k, agreement=po, n=n, of=len(items), labels=labels)

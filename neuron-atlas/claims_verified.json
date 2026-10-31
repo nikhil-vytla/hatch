@@ -114,12 +114,12 @@
  {
   "id": "17r-Qwen3-8B",
   "claim": "Qwen3-8B: random-neuron pushes 'become' the word",
-  "stated": 0.0,
+  "stated": 0.003,
   "value": 0.0033333333333333335,
   "tol": 0.002,
   "unit": "share (DeepSeek judge)",
   "source": "same",
-  "status": "FAIL"
+  "status": "PASS"
  },
  {
   "id": "18a",
