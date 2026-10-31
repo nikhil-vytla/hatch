@@ -5,15 +5,17 @@ changed = the normalized answer differs from the unpushed answer for that clip. 
 answer across the 22 clips and how many clips it takes over (clips whose unpushed answer was something else), i.e.
 whether one neuron forces one sound onto everything. Writes the experiment summary and site/hear.json for the page.
 
-  python analysis/gemma_audio.py OUT_DIR
+  python analysis/gemma_audio.py OUT_DIR       (AUDIO_MODEL=Qwen__Qwen2.5-Omni-3B for another model)
 """
 import collections, json, os, re, sys
 
 import duckdb
 from huggingface_hub import HfApi, hf_hub_download
 
-R, M = "nikhilxvytla/neuron-atlas", "google__gemma-4-E4B-it"
-URL = f"https://huggingface.co/datasets/{R}/resolve/main/{M}/audio/stimuli/"
+R = "nikhilxvytla/neuron-atlas"
+M = os.environ.get("AUDIO_MODEL", "google__gemma-4-E4B-it")  # e.g. Qwen__Qwen2.5-Omni-3B
+STIM = "google__gemma-4-E4B-it/audio/stimuli/"  # the 22 clips are stored once
+URL = f"https://huggingface.co/datasets/{R}/resolve/main/{STIM}"
 
 
 def norm(t):
@@ -42,7 +44,7 @@ def main(out):
     rows = []
     for f in files:
         rows += duckdb.sql(f"select id, expected, layer, neuron, dose, text from '{hf_hub_download(R, f, repo_type='dataset')}'").fetchall()
-    stim = json.load(open(hf_hub_download(R, f"{M}/audio/stimuli/stimuli.json", repo_type="dataset")))
+    stim = json.load(open(hf_hub_download(R, STIM + "stimuli.json", repo_type="dataset")))
     base = {i: t for i, e, L, n, d, t in rows if L < 0}
     bn = {i: norm(t) for i, t in base.items()}
     groups = collections.defaultdict(dict)
@@ -69,7 +71,7 @@ def main(out):
                 continue
             n_esc += 1; fix += (not b) and p; brk += b and (not p)
     base_acc = [correct(sd[i], t) for i, t in base.items() if correct(sd[i], t) is not None]
-    res = dict(model="google/gemma-4-E4B-it", question=stim[0]["question"], n_pushes=sum(g["n"] for g in summary),
+    res = dict(model=M.replace("__", "/"), question=stim[0]["question"], n_pushes=sum(g["n"] for g in summary),
                changed=sum(g["changed"] for g in summary),
                by_layer={L: dict(changed=a, n=b) for L, (a, b) in sorted(by_layer.items())},
                stimuli=[dict(id=s["id"], kind=s["kind"], expected=s["expected"], url=URL + s["file"], baseline=base.get(s["id"], ""))
