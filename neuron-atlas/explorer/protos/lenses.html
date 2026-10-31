@@ -1,0 +1,892 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Says vs does</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Source+Sans+3:ital,wght@0,400;0,600;1,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+:root {
+  --bg: #f5f4f8; --surface: #ffffff; --sunk: #ebe9f1; --line: #d9d5e3; --ink: #1f1c2c; --ink2: #5d5870; --ink3: #8a849c;
+  --eosin: #d6336c; --eosin-soft: #f9d9e5; --hema: #4b3fa8; --hema-soft: #dedaf5; --accent: #b0245a;
+  --plate: #17152a; --plate-ink: #ece9f7; --plate-ink2: #a29dbb; --plate-line: #2c2946;
+  --good: #1f8a5b; --warn: #b7791f;
+  --k-user: #2a78d6; --k-persona: #d6336c; --k-altered: #4b3fa8; --k-other: #1baf7a; --k-incoherent: #eda100; --k-default: #cfcbdc;
+  --display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --body: "Source Sans 3", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --r: 10px; --r-card: 14px;
+  --s1: 12px; --s2: 16px; --s3: 24px;
+  --card-shadow: 0 1px 2px rgb(0 0 0 / .04), 0 4px 16px rgb(0 0 0 / .04);
+  --card-shadow-hover: 0 2px 4px rgb(0 0 0 / .06), 0 8px 24px rgb(0 0 0 / .08);
+  --pill-shadow: 0 1px 2px rgb(0 0 0 / .08), 0 2px 6px rgb(0 0 0 / .06);
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #121019; --surface: #1b1826; --sunk: #242033; --line: #343048; --ink: #ece9f7; --ink2: #b3adc8; --ink3: #827c99;
+  --eosin: #ff6b9a; --eosin-soft: #4a1f33; --hema: #9d92ff; --hema-soft: #2d2858; --accent: #ff7aa6;
+  --plate: #0b0a12; --plate-ink: #ece9f7; --plate-ink2: #9a95b2; --plate-line: #24213a; --good: #4cc38a; --warn: #e0a84a;
+  --k-user: #3987e5; --k-persona: #e0447a; --k-altered: #8a7ef0; --k-other: #199e70; --k-incoherent: #c98500; --k-default: #3b3652;
+  --card-shadow: 0 1px 2px rgb(0 0 0 / .3), 0 4px 16px rgb(0 0 0 / .25);
+  --card-shadow-hover: 0 2px 4px rgb(0 0 0 / .38), 0 8px 24px rgb(0 0 0 / .35);
+  --pill-shadow: 0 1px 2px rgb(0 0 0 / .35), 0 2px 6px rgb(0 0 0 / .3);
+  color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #121019; --surface: #1b1826; --sunk: #242033; --line: #343048; --ink: #ece9f7; --ink2: #b3adc8; --ink3: #827c99;
+  --eosin: #ff6b9a; --eosin-soft: #4a1f33; --hema: #9d92ff; --hema-soft: #2d2858; --accent: #ff7aa6;
+  --plate: #0b0a12; --plate-ink: #ece9f7; --plate-ink2: #9a95b2; --plate-line: #24213a; --good: #4cc38a; --warn: #e0a84a;
+  --k-user: #3987e5; --k-persona: #e0447a; --k-altered: #8a7ef0; --k-other: #199e70; --k-incoherent: #c98500; --k-default: #3b3652;
+  --card-shadow: 0 1px 2px rgb(0 0 0 / .3), 0 4px 16px rgb(0 0 0 / .25);
+  --card-shadow-hover: 0 2px 4px rgb(0 0 0 / .38), 0 8px 24px rgb(0 0 0 / .35);
+  --pill-shadow: 0 1px 2px rgb(0 0 0 / .35), 0 2px 6px rgb(0 0 0 / .3);
+  color-scheme: dark }
+* { box-sizing: border-box }
+html, body { height: 100% }
+body { background: var(--bg); color: var(--ink); font: 15px/1.5 var(--body); margin: 0; overflow-x: clip;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+
+.wrap { max-width: 1180px; margin: 0 auto; padding-block: 0 40px; display: flex; flex-direction: column; gap: var(--s3); min-width: 0 }
+.page { display: flex; flex-direction: column; gap: var(--s3); min-width: 0 }
+.topbar { position: sticky; top: 0; z-index: 30; display: flex; flex-direction: column; gap: var(--s1);
+  padding-block: var(--s1); background: color-mix(in oklab, var(--bg) 88%, transparent);
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--line) }
+.top { display: flex; align-items: center; gap: 12px; min-width: 0 }
+.brand { display: flex; align-items: baseline; gap: 9px; min-width: 0; flex-wrap: wrap }
+.brand-name { font: 800 22px/1 var(--display); letter-spacing: -0.02em; color: var(--ink); text-decoration: none; white-space: nowrap }
+.brand-sep { color: var(--ink3); font-size: 18px }
+.page-name { font: 700 20px/1.1 var(--display); letter-spacing: -0.01em; margin: 0; color: var(--ink2); min-width: 0 }
+.theme-btn { margin-left: auto; flex: 0 0 auto; border: 1px solid var(--line); background: var(--surface); color: var(--ink2);
+  border-radius: 999px; padding: 5px 11px; font-size: 12px; box-shadow: var(--pill-shadow) }
+.theme-btn:hover { color: var(--ink) }
+.nav { display: flex; flex-wrap: wrap; gap: 4px 14px; min-width: 0 }
+.nav a { color: var(--ink2); text-decoration: none; font-size: 13px; padding: 3px 1px; border-bottom: 2px solid transparent }
+.nav a:hover { color: var(--ink) }
+.nav a[aria-current="page"] { color: var(--ink); border-bottom-color: var(--eosin); font-weight: 600 }
+.page-intro { display: flex; flex-direction: column; gap: 8px; padding-top: var(--s2) }
+.kicker { font: 600 11px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--ink3) }
+.page-intro h1 { font: 800 clamp(30px, 8vw, 52px)/.98 var(--display); letter-spacing: -0.035em; margin: 0; text-wrap: balance }
+.lede { margin: 0; max-width: 68ch; color: var(--ink2); font-size: 16px }
+.section { display: flex; flex-direction: column; gap: 12px; min-width: 0 }
+.section-head { display: flex; flex-direction: column; gap: 5px }
+.section-head h2 { font: 700 22px/1.15 var(--display); letter-spacing: -0.02em; margin: 0; text-wrap: balance }
+.section-head p { margin: 0; max-width: 78ch; color: var(--ink2); font-size: 14px }
+.section-head .note { color: var(--ink3); font-size: 12px }
+.stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px }
+.stat { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-card); padding: 12px 13px;
+  box-shadow: var(--card-shadow); min-width: 0; display: flex; flex-direction: column; gap: 2px }
+.stat h3 { margin: 0; font: 600 12px/1.25 var(--mono); color: var(--ink2); overflow-wrap: anywhere }
+.stat-lift { font: 800 26px/1.05 var(--display); letter-spacing: -0.025em; color: var(--ink); margin-top: 4px }
+.stat-cmp { font: 600 13px/1.3 var(--mono); color: var(--ink2); font-variant-numeric: tabular-nums }
+.stat-meta { font-size: 11px; color: var(--ink3); line-height: 1.35 }
+.controls-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; min-width: 0 }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; background: var(--surface); max-width: 100% }
+.seg-btn { border: 0; background: transparent; color: var(--ink2); padding: 6px 11px; font-size: 12px; white-space: nowrap }
+.seg-btn + .seg-btn { border-left: 1px solid var(--line) }
+.seg-btn[aria-pressed="true"] { background: var(--sunk); color: var(--ink); font-weight: 600 }
+.legend { display: flex; flex-wrap: wrap; gap: 7px 15px; align-items: center; color: var(--ink2); font-size: 12px }
+.legend span { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap }
+.swatch { display: inline-block; width: 18px; height: 2px; border-radius: 2px; background: var(--series, var(--ink3)); flex: 0 0 auto }
+.swatch.dashed { background: repeating-linear-gradient(90deg, var(--ink3) 0 5px, transparent 5px 9px) }
+.s-logit { --series: var(--k-user) }
+.s-j { --series: var(--k-persona) }
+.s-r { --series: var(--k-other) }
+.s-random { --series: var(--k-default) }
+.s-own { --series: var(--k-persona) }
+.s-opposite { --series: var(--k-altered) }
+.s-chance { --series: var(--ink3) }
+.chart-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(272px, 1fr)); gap: 12px; min-width: 0 }
+.chart-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-card); padding: 12px 12px 10px;
+  box-shadow: var(--card-shadow); min-width: 0; display: flex; flex-direction: column; gap: 7px }
+.chart-head { display: flex; align-items: center; gap: 8px; min-width: 0 }
+.chart-head h3 { font: 700 15px/1.2 var(--display); letter-spacing: -0.01em; margin: 0; flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere }
+.chart-sub { color: var(--ink3); font-size: 11px; margin-top: -3px }
+.table-btn { border: 1px solid var(--line); background: var(--surface); color: var(--ink2); border-radius: 999px;
+  padding: 2px 8px; font-size: 11px; flex: 0 0 auto }
+.table-btn:hover { color: var(--ink) }
+.chart-wrap { position: relative; min-width: 0 }
+.chart-wrap svg { display: block; width: 100%; height: auto; overflow: visible }
+.grid-line { stroke: var(--line); stroke-width: 1; opacity: .72 }
+.axis-text { fill: var(--ink3); font-family: var(--mono); font-size: 9.5px }
+.axis-unit { fill: var(--ink3); font-family: var(--mono); font-size: 9px; letter-spacing: .03em }
+.series { fill: none; stroke: var(--series, var(--ink3)); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round }
+.chance-line { fill: none; stroke: var(--ink3); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 5 4; opacity: .9 }
+.crosshair { stroke: var(--ink3); stroke-width: 1; stroke-dasharray: 2 3; pointer-events: none }
+.overlay { fill: transparent; pointer-events: all; cursor: crosshair; touch-action: pan-y }
+.bar { stroke: none; fill: var(--series, var(--ink3)); rx: 3 }
+.bar-label { fill: var(--ink2); font-family: var(--body); font-size: 10.5px }
+.bar-value { fill: var(--ink3); font-family: var(--mono); font-size: 9.5px; font-variant-numeric: tabular-nums }
+.bar:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px }
+.tooltip { position: absolute; top: 5px; left: 50%; transform: translateX(-50%); z-index: 10; min-width: 140px; max-width: 210px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); box-shadow: var(--card-shadow-hover);
+  padding: 8px 10px; font-size: 12px; color: var(--ink2); pointer-events: none }
+.tooltip .t-head { font: 600 12px/1.3 var(--mono); color: var(--ink); margin-bottom: 4px }
+.tooltip .t-row { display: flex; align-items: center; gap: 6px; justify-content: space-between; line-height: 1.55 }
+.tooltip .t-row b { font-family: var(--mono); font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums }
+.dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; background: var(--series, var(--ink3)); flex: 0 0 auto }
+.dot.dashed { border-radius: 1px; background: repeating-linear-gradient(90deg, var(--ink3) 0 2px, transparent 2px 4px) }
+[hidden] { display: none !important }
+.table-wrap { overflow-x: auto; border-top: 1px solid var(--line); padding-top: 6px; margin-top: 2px; max-width: 100% }
+table { border-collapse: collapse; width: 100%; font-size: 11.5px }
+caption { caption-side: top; text-align: left; color: var(--ink3); font-size: 11px; padding: 2px 0 5px }
+th, td { padding: 4px 7px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap }
+th:first-child, td:first-child { text-align: left }
+thead th { color: var(--ink3); font-weight: 600; font-size: 10px; letter-spacing: .045em; text-transform: uppercase }
+td { font-family: var(--mono); font-variant-numeric: tabular-nums; color: var(--ink2) }
+td:first-child { font-family: var(--body); color: var(--ink) }
+.line-table table { min-width: 430px }
+.become-controls { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: end }
+.field { display: flex; flex-direction: column; gap: 4px; min-width: 190px }
+.field label { font-size: 11px; color: var(--ink3); font-family: var(--mono); letter-spacing: .04em; text-transform: uppercase }
+.field select { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 7px 10px; font-size: 14px; color: var(--ink); max-width: 100% }
+.become-panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-card); box-shadow: var(--card-shadow); padding: 12px; min-width: 0 }
+.become-panel h3 { font: 700 17px/1.2 var(--display); letter-spacing: -0.015em; margin: 0 0 2px }
+.become-panel .panel-note { color: var(--ink3); font-size: 12px; margin: 0 0 8px }
+.summary-table table { min-width: 430px }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px }
+.chip { border: 1px solid var(--line); background: var(--sunk); color: var(--ink2); border-radius: 999px; padding: 4px 10px; font-size: 12px }
+.chip:hover { color: var(--ink) }
+.chip[aria-pressed="true"] { background: var(--eosin-soft); border-color: var(--eosin); color: var(--ink); font-weight: 600 }
+.examples { display: flex; flex-direction: column; gap: 10px; margin-top: 10px }
+.example { border: 1px solid var(--line); border-radius: var(--r); background: var(--bg); padding: 10px 11px; min-width: 0 }
+.ex-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 5px 10px; color: var(--ink3); font-size: 11px; font-family: var(--mono) }
+.ex-meta .tag { color: var(--ink2); background: var(--sunk); border-radius: 999px; padding: 2px 7px; font-size: 10.5px }
+.ex-meta a { margin-left: auto; color: var(--ink2); text-decoration-color: var(--line) }
+.ex-meta a:hover { color: var(--ink) }
+.ex-text { margin: 7px 0 0; color: var(--ink); font-size: 14px; overflow-wrap: anywhere }
+.ex-text b { font-weight: 700 }
+mark { background: var(--eosin-soft); color: var(--ink); padding: 0 .12em; border-radius: 3px; box-decoration-break: clone; -webkit-box-decoration-break: clone }
+.notice { border: 1px solid var(--line); border-radius: var(--r-card); background: var(--surface); padding: 14px 16px; box-shadow: var(--card-shadow); max-width: 620px }
+.notice strong { color: var(--ink) }
+.notice p { color: var(--ink2); margin: 5px 0 10px }
+.notice.error { border-color: var(--warn) }
+.loading { display: flex; align-items: center; gap: 9px; color: var(--ink2); font-size: 14px }
+.spinner { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--line); border-top-color: var(--eosin); animation: spin .8s linear infinite; flex: 0 0 auto }
+.retry { border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 999px; padding: 5px 12px; font-size: 13px }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0 }
+@keyframes spin { to { transform: rotate(360deg) } }
+@media (max-width: 520px) {
+  .brand-name { font-size: 20px }
+  .page-name { font-size: 18px }
+  .stat-lift { font-size: 23px }
+  .stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) }
+  .chart-head h3 { font-size: 14px }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; transition-duration: .01ms !important }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="topbar">
+    <div class="top">
+      <div class="brand">
+        <a class="brand-name" href="../index.html">Neuron Atlas</a>
+        <span class="brand-sep" aria-hidden="true">/</span>
+        <span class="page-name">Says vs does</span>
+      </div>
+      <button class="theme-btn" id="theme-btn" type="button">Use dark theme</button>
+    </div>
+    <nav class="nav" aria-label="Prototype pages">
+      <a href="../index.html">Explorer</a>
+      <a href="index.html">Prototypes</a>
+      <a href="vision.html">Vision lab</a>
+      <a href="janus.html">Image pushes</a>
+      <a href="music.html">Sound pushes</a>
+      <a href="hear.html">Hearing</a>
+      <a href="stories.html">Story casting</a>
+      <a href="lenses.html" aria-current="page">Says vs does</a>
+      <a href="identity.html">Identity lab</a><a href="evidence.html">Evidence</a>
+    </nav>
+  </header>
+
+  <main class="page" style="padding: 0">
+    <section class="page-intro" aria-labelledby="page-title">
+      <div class="kicker">Lens readouts compared with push behavior</div>
+      <h1 id="page-title">Says vs does</h1>
+      <p class="lede">A neuron's lens names the words it seems to predict. This page checks whether pushing that neuron actually makes the model say those words. Pushes are single-neuron interventions at the atlas's standard push strength; this page does not compare different doses. Each rate below is the share of pushed replies that contain one of the neuron's top-10 lens words for the push direction.</p>
+    </section>
+
+    <div id="status" role="status" aria-live="polite">
+      <div class="loading"><span class="spinner" aria-hidden="true"></span>Loading lens results…</div>
+    </div>
+
+    <div id="content" hidden>
+      <section class="section" aria-labelledby="headline-h">
+        <div class="section-head">
+          <h2 id="headline-h">The headline: hit rate and lift</h2>
+          <p>These summaries cover the same single-neuron pushes at the atlas dose. Each tile shows the J-lens hit rate after pushing a neuron, the random-neuron chance rate, and the lift between them. Lift is hit divided by chance. A higher lift means the lens word shows up far more often than it would by chance.</p>
+          <p class="note">n is the number of pushed replies behind each model's summary.</p>
+        </div>
+        <div class="stat-grid" id="headline"></div>
+      </section>
+
+      <section class="section" aria-labelledby="layers-h">
+        <div class="section-head">
+          <h2 id="layers-h">Does the readout keep up across layers?</h2>
+          <p>These are the same single-neuron pushes, split by layer. Each line follows one lens across a model's layers. Pink is the J-lens, blue is the logit lens and green is the R-lens where that model has one. The grey dashed line is the J-lens chance rate. Switch between raw share of replies and lift over chance; in lift mode the chance line sits at 1×.</p>
+        </div>
+        <div class="controls-row">
+          <div class="seg" role="group" aria-label="Line chart measure">
+            <button class="seg-btn" type="button" data-metric="share" aria-pressed="true">Share of replies</button>
+            <button class="seg-btn" type="button" data-metric="lift" aria-pressed="false">Lift over chance</button>
+          </div>
+        </div>
+        <div class="legend" aria-label="Line chart legend">
+          <span><i class="swatch s-logit" aria-hidden="true"></i>Logit lens</span>
+          <span><i class="swatch s-j" aria-hidden="true"></i>J-lens</span>
+          <span><i class="swatch s-r" aria-hidden="true"></i>R-lens</span>
+          <span><i class="swatch dashed" aria-hidden="true"></i>Chance (J-lens null)</span>
+        </div>
+        <div class="chart-grid" id="line-grid"></div>
+      </section>
+
+      <section class="section" aria-labelledby="opposite-h">
+        <div class="section-head">
+          <h2 id="opposite-h">Does the opposite direction agree?</h2>
+          <p>These are the same pushes, measured in the own and opposite directions. For each model, the J-lens own-direction hit is compared with the opposite-direction hit and with chance. Pink is the neuron's own push direction, violet is its opposite direction and grey is the random-neuron chance rate. If the lens is measuring the neuron, the opposite direction should stay near chance.</p>
+        </div>
+        <div class="legend" aria-label="Opposite-direction legend">
+          <span><i class="swatch s-own" aria-hidden="true"></i>Own direction</span>
+          <span><i class="swatch s-opposite" aria-hidden="true"></i>Opposite direction</span>
+          <span><i class="swatch s-chance" aria-hidden="true"></i>Chance</span>
+        </div>
+        <div class="chart-grid" id="opposite-grid"></div>
+      </section>
+
+      <section class="section" aria-labelledby="become-h">
+        <div class="section-head">
+          <h2 id="become-h">Does the reply become the concept?</h2>
+          <p>These examples come from the same pushes at the same dose. The table counts replies that mention the concept or become it, by lens and layer band. Examples below show the actual reply text for one concept; the concept word is highlighted. Each example links back to the neuron card in the explorer. "Becomes" means the reply adopts the concept as its subject.</p>
+        </div>
+        <div class="become-controls">
+          <div class="field">
+            <label for="become-model">Model</label>
+            <select id="become-model"></select>
+          </div>
+        </div>
+        <div class="become-panel">
+          <h3>Reply outcomes by lens and layer band</h3>
+          <p class="panel-note">Mentions and becomes are shares of the replies in each row. Random is a baseline with randomly chosen neurons.</p>
+          <div class="summary-table" id="become-summary"></div>
+        </div>
+        <div class="become-panel">
+          <h3>Example replies</h3>
+          <p class="panel-note" id="concept-note">Choose a concept to see the replies collected for it.</p>
+          <div class="chips" id="concept-chips" role="group" aria-label="Concept"></div>
+          <div class="examples" id="examples"></div>
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+
+<script>
+const DATA = "https://huggingface.co/datasets/nikhilxvytla/neuron-atlas/resolve/main/";
+const FILE = "site/lenses.json";
+const MODEL_IDS = {
+  "Qwen3.5-4B": "qwen3-5-4b",
+  "Qwen3-8B": "qwen3-8b",
+  "SmolLM2-135M": "smollm2-135m-instruct"
+};
+const LENS_ORDER = ["j", "logit", "r", "random"];
+const LENS_LABEL = { j: "J-lens", logit: "Logit lens", r: "R-lens", random: "Random" };
+const LENS_CLASS = { j: "s-j", logit: "s-logit", r: "s-r", random: "s-random" };
+const state = { metric: "share", bmodel: null, concept: null, data: null };
+
+function esc(value) {
+  return String(value).replace(/[&<>"']/g, function (ch) {
+    return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch];
+  });
+}
+function escReg(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+function rich(text, concept) {
+  let out = esc(text);
+  out = out.replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>");
+  if (concept) {
+    try {
+      const re = new RegExp("\\b(" + escReg(concept) + ")\\b", "gi");
+      out = out.replace(re, "<mark>$1</mark>");
+    } catch (err) { /* keep escaped text if the concept is not a valid pattern */ }
+  }
+  return out;
+}
+function fmtPct(value, digits) {
+  if (value == null || !Number.isFinite(value)) return "—";
+  const d = digits == null ? 1 : digits;
+  return (value * 100).toFixed(d) + "%";
+}
+function fmtLift(value) {
+  if (value == null || !Number.isFinite(value)) return "—";
+  if (value >= 100) return Math.round(value) + "×";
+  if (value >= 10) return value.toFixed(1).replace(/\.0$/, "") + "×";
+  return value.toFixed(2).replace(/0$/, "").replace(/\.$/, "") + "×";
+}
+function fmtAxis(value) {
+  if (value >= 100) return Math.round(value).toString();
+  if (value >= 10) return (Math.round(value * 10) / 10).toString();
+  return (Math.round(value * 100) / 100).toString();
+}
+function fmtCount(value) {
+  return Number(value).toLocaleString("en-US");
+}
+function niceMax(value) {
+  if (!Number.isFinite(value) || value <= 0) return 1;
+  const exp = Math.floor(Math.log10(value));
+  const base = Math.pow(10, exp);
+  const f = value / base;
+  const steps = [1, 1.2, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10];
+  const picked = steps.find(function (s) { return f <= s; }) || 10;
+  return picked * base;
+}
+function lensRank(lens) {
+  const i = LENS_ORDER.indexOf(lens);
+  return i < 0 ? 99 : i;
+}
+function bandRank(band) {
+  if (band === "all") return 0;
+  const m = String(band).match(/L(\d+)/);
+  return m ? Number(m[1]) : 99;
+}
+function layerRows(model) {
+  const byLayer = model && model.by_layer ? model.by_layer : {};
+  return Object.keys(byLayer).map(Number).sort(function (a, b) { return a - b; }).map(function (layer) {
+    return { layer: layer, d: byLayer[String(layer)] || byLayer[layer] || {} };
+  });
+}
+function seriesValue(d, lens, metric) {
+  const item = d && d[lens];
+  if (!item) return null;
+  if (metric === "lift") return item.null > 0 ? item.hit / item.null : null;
+  return item.hit * 100;
+}
+function chanceValue(d, metric) {
+  if (metric === "lift") return 1;
+  const j = d && d.j;
+  return j && j.null != null ? j.null * 100 : null;
+}
+function chanceText(row, digits) {
+  if (state.metric === "lift") return "1×";
+  const chance = chanceValue(row.d, state.metric);
+  return chance == null ? "—" : fmtPct(chance / 100, digits);
+}
+
+function readHash() {
+  const raw = window.location.hash.replace(/^#/, "");
+  const params = new URLSearchParams(raw);
+  const metric = params.get("metric") === "lift" ? "lift" : "share";
+  const id = params.get("bmodel");
+  let bmodel = null;
+  if (id) {
+    if (MODEL_IDS[id]) bmodel = id;
+    else {
+      const found = Object.keys(MODEL_IDS).find(function (name) { return MODEL_IDS[name] === id; });
+      bmodel = found || id;
+    }
+  }
+  return { metric: metric, bmodel: bmodel, concept: params.get("concept") };
+}
+function writeHash() {
+  const params = new URLSearchParams();
+  params.set("metric", state.metric);
+  if (state.bmodel) params.set("bmodel", MODEL_IDS[state.bmodel] || state.bmodel);
+  if (state.concept) params.set("concept", state.concept);
+  try {
+    history.replaceState(null, "", "#" + params.toString());
+  } catch (err) { /* file downloads can refuse history updates */ }
+}
+function conceptsFor(model) {
+  if (!model || !model.examples) return [];
+  const seen = [];
+  model.examples.forEach(function (ex) {
+    if (seen.indexOf(ex.concept) < 0) seen.push(ex.concept);
+  });
+  return seen.sort(function (a, b) { return a.localeCompare(b); });
+}
+function ensureConcept(preferred) {
+  const model = state.data && state.data.become ? state.data.become[state.bmodel] : null;
+  const concepts = conceptsFor(model);
+  if (preferred && concepts.indexOf(preferred) >= 0) state.concept = preferred;
+  else state.concept = concepts[0] || null;
+}
+
+function showLoading() {
+  const status = document.getElementById("status");
+  document.getElementById("content").hidden = true;
+  status.hidden = false;
+  status.innerHTML = '<div class="loading"><span class="spinner" aria-hidden="true"></span>Loading lens results…</div>';
+}
+function showError(err) {
+  const status = document.getElementById("status");
+  document.getElementById("content").hidden = true;
+  status.hidden = false;
+  const detail = err && err.message ? err.message : "unknown error";
+  status.innerHTML = '<div class="notice error" role="alert"><strong>Could not load the lens results.</strong>' +
+    '<p>The page tried to fetch <code>' + esc(FILE) + '</code> from the Neuron Atlas dataset. ' +
+    'Check the connection and try again. <span class="note">(' + esc(detail) + ')</span></p>' +
+    '<button class="retry" type="button" id="retry-btn">Try again</button></div>';
+  document.getElementById("retry-btn").addEventListener("click", load);
+}
+
+async function load() {
+  showLoading();
+  try {
+    const res = await fetch(DATA + FILE, { cache: "no-cache" });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const data = await res.json();
+    if (!data || !data.says_vs_does || !data.become) throw new Error("unexpected JSON shape");
+    state.data = data;
+    start();
+  } catch (err) {
+    showError(err);
+  }
+}
+
+function start() {
+  const hash = readHash();
+  state.metric = hash.metric;
+  const becomeNames = Object.keys(state.data.become);
+  state.bmodel = hash.bmodel && becomeNames.indexOf(hash.bmodel) >= 0 ? hash.bmodel : becomeNames[0];
+  ensureConcept(hash.concept);
+  document.getElementById("status").hidden = true;
+  document.getElementById("content").hidden = false;
+  updateMetricButtons();
+  renderHeadline();
+  renderLineCards();
+  renderOppositeCards();
+  buildBecomeSelect();
+  renderBecome();
+  writeHash();
+}
+
+function updateMetricButtons() {
+  document.querySelectorAll("[data-metric]").forEach(function (btn) {
+    btn.setAttribute("aria-pressed", String(btn.dataset.metric === state.metric));
+  });
+}
+
+function renderHeadline() {
+  const container = document.getElementById("headline");
+  const models = Object.keys(state.data.says_vs_does);
+  container.innerHTML = models.map(function (name) {
+    const model = state.data.says_vs_does[name];
+    const j = model.summary && model.summary.j;
+    if (!j) return "";
+    const lift = j.lift != null ? j.lift : (j.null > 0 ? j.hit / j.null : null);
+    return '<article class="stat">' +
+      '<h3>' + esc(name) + '</h3>' +
+      '<div class="stat-lift">' + esc(fmtLift(lift)) + '</div>' +
+      '<div class="stat-cmp">' + esc(fmtPct(j.hit)) + ' vs ' + esc(fmtPct(j.null)) + '</div>' +
+      '<div class="stat-meta">J-lens hit vs chance · n=' + esc(fmtCount(j.n)) + '</div>' +
+      '</article>';
+  }).join("");
+}
+
+function lineGeom(model) {
+  const rows = layerRows(model);
+  const lenses = ["logit", "j", "r"].filter(function (lens) {
+    return rows.some(function (row) { return row.d && row.d[lens]; });
+  });
+  let max = 0;
+  rows.forEach(function (row) {
+    lenses.forEach(function (lens) {
+      const v = seriesValue(row.d, lens, state.metric);
+      if (v != null) max = Math.max(max, v);
+    });
+    const c = chanceValue(row.d, state.metric);
+    if (c != null) max = Math.max(max, c);
+  });
+  const yMax = niceMax(max);
+  const W = 360, H = 232;
+  const m = { l: 43, r: 14, t: 15, b: 30 };
+  const pw = W - m.l - m.r;
+  const ph = H - m.t - m.b;
+  function xFor(i) {
+    return rows.length <= 1 ? m.l + pw / 2 : m.l + (i * pw) / (rows.length - 1);
+  }
+  function yFor(v) {
+    return m.t + ph - (Math.max(0, v) / yMax) * ph;
+  }
+  return { rows: rows, lenses: lenses, yMax: yMax, W: W, H: H, m: m, pw: pw, ph: ph, xFor: xFor, yFor: yFor };
+}
+
+function pathFromValues(values, xFor, yFor) {
+  let d = "";
+  let open = false;
+  values.forEach(function (v, i) {
+    if (v == null || !Number.isFinite(v)) { open = false; return; }
+    d += (open ? "L" : "M") + xFor(i).toFixed(1) + " " + yFor(v).toFixed(1) + " ";
+    open = true;
+  });
+  return d.trim();
+}
+
+function lineCardHTML(name, model) {
+  const geom = lineGeom(model);
+  const rows = geom.rows;
+  const lensValues = {};
+  geom.lenses.forEach(function (lens) {
+    lensValues[lens] = rows.map(function (row) { return seriesValue(row.d, lens, state.metric); });
+  });
+  const chances = rows.map(function (row) { return chanceValue(row.d, state.metric); });
+  const ticks = [];
+  for (let t = 0; t <= 5; t++) {
+    const value = (geom.yMax / 5) * t;
+    const y = geom.yFor(value);
+    ticks.push('<line class="grid-line" x1="' + geom.m.l + '" x2="' + (geom.W - geom.m.r) + '" y1="' + y.toFixed(1) + '" y2="' + y.toFixed(1) + '" />');
+    ticks.push('<text class="axis-text" x="' + (geom.m.l - 6) + '" y="' + (y + 3).toFixed(1) + '" text-anchor="end">' + esc(fmtAxis(value)) + '</text>');
+  }
+  const xLabels = [];
+  const count = rows.length;
+  const wanted = Math.min(6, count);
+  const seen = {};
+  for (let k = 0; k < wanted; k++) {
+    const i = wanted === 1 ? 0 : Math.round((k * (count - 1)) / (wanted - 1));
+    if (seen[i]) continue;
+    seen[i] = true;
+    const anchor = k === 0 ? "start" : (k === wanted - 1 ? "end" : "middle");
+    xLabels.push('<text class="axis-text" x="' + geom.xFor(i).toFixed(1) + '" y="' + (geom.H - 8) + '" text-anchor="' + anchor + '">' + esc(rows[i].layer) + '</text>');
+  }
+  const series = geom.lenses.map(function (lens) {
+    const path = pathFromValues(lensValues[lens], geom.xFor, geom.yFor);
+    return '<path class="series ' + LENS_CLASS[lens] + '" d="' + path + '" />';
+  }).join("");
+  const chancePath = pathFromValues(chances, geom.xFor, geom.yFor);
+  const unit = state.metric === "lift" ? "hit / chance (×)" : "share of replies (%)";
+  const aria = "Layer curves for " + name + ", " + unit + ". Chance is the J-lens null.";
+  const svg = '<svg viewBox="0 0 ' + geom.W + ' ' + geom.H + '" role="img" aria-label="' + esc(aria) + '">' +
+    '<text class="axis-unit" x="' + geom.m.l + '" y="8">' + esc(unit) + '</text>' +
+    ticks.join("") +
+    xLabels.join("") +
+    (chancePath ? '<path class="chance-line" d="' + chancePath + '" />' : "") +
+    series +
+    '<line class="crosshair" x1="0" x2="0" y1="' + geom.m.t + '" y2="' + (geom.m.t + geom.ph) + '" hidden />' +
+    '<rect class="overlay" x="' + geom.m.l + '" y="' + geom.m.t + '" width="' + geom.pw + '" height="' + geom.ph + '" />' +
+    '</svg>';
+  const table = lineTableHTML(rows, geom.lenses);
+  return '<article class="chart-card" data-line-card>' +
+    '<div class="chart-head"><h3>' + esc(name) + '</h3><button class="table-btn" type="button" aria-expanded="false">Table</button></div>' +
+    '<div class="chart-sub">' + esc(unit) + ' · dashed line = chance</div>' +
+    '<div class="chart-wrap">' + svg + '<div class="tooltip" hidden></div></div>' +
+    table +
+    '</article>';
+}
+
+function lineTableHTML(rows, lenses) {
+  const header = (state.metric === "lift" ? "Lift (×)" : "Share (%)");
+  const head = '<tr><th>Layer</th>' + lenses.map(function (lens) {
+    return '<th>' + esc(LENS_LABEL[lens]) + '</th>';
+  }).join("") + '<th>Chance</th></tr>';
+  const body = rows.map(function (row) {
+    return '<tr><td>' + esc(row.layer) + '</td>' + lenses.map(function (lens) {
+      const v = seriesValue(row.d, lens, state.metric);
+      return '<td>' + esc(state.metric === "lift" ? (v == null ? "—" : fmtAxis(v) + "×") : fmtPct(v, 2)) + '</td>';
+    }).join("") + '<td>' + esc(chanceText(row, 2)) + '</td></tr>';
+  }).join("");
+  return '<div class="table-wrap line-table" hidden><table><caption>' + esc(header) + ' by layer</caption><thead>' + head + '</thead><tbody>' + body + '</tbody></table></div>';
+}
+
+function wireLineCard(card, model) {
+  const geom = lineGeom(model);
+  const rows = geom.rows;
+  if (!rows.length) return;
+  const svg = card.querySelector("svg");
+  const overlay = card.querySelector(".overlay");
+  const cross = card.querySelector(".crosshair");
+  const tip = card.querySelector(".tooltip");
+  const tableBtn = card.querySelector(".table-btn");
+  const tableWrap = card.querySelector(".table-wrap");
+  const values = {};
+  geom.lenses.forEach(function (lens) {
+    values[lens] = rows.map(function (row) { return seriesValue(row.d, lens, state.metric); });
+  });
+  const chances = rows.map(function (row) { return chanceValue(row.d, state.metric); });
+  const step = rows.length <= 1 ? 0 : geom.pw / (rows.length - 1);
+
+  function hide() {
+    tip.hidden = true;
+    cross.setAttribute("hidden", "");
+  }
+  function showAt(clientX) {
+    const rect = svg.getBoundingClientRect();
+    if (!rect.width) return;
+    const x = ((clientX - rect.left) / rect.width) * geom.W;
+    let i = rows.length <= 1 ? 0 : Math.round((x - geom.m.l) / step);
+    i = Math.max(0, Math.min(rows.length - 1, i));
+    const px = geom.xFor(i);
+    cross.setAttribute("x1", px.toFixed(1));
+    cross.setAttribute("x2", px.toFixed(1));
+    cross.removeAttribute("hidden");
+    const row = rows[i];
+    let html = '<div class="t-head">Layer ' + esc(row.layer) + '</div>';
+    geom.lenses.forEach(function (lens) {
+      const v = values[lens][i];
+      const shown = state.metric === "lift" ? (v == null ? "—" : fmtAxis(v) + "×") : fmtPct(v, 2);
+      html += '<div class="t-row"><span><span class="dot ' + LENS_CLASS[lens] + '" aria-hidden="true"></span> ' + esc(LENS_LABEL[lens]) + '</span><b>' + esc(shown) + '</b></div>';
+    });
+    html += '<div class="t-row"><span><span class="dot dashed" aria-hidden="true"></span> Chance</span><b>' +
+      esc(chanceText(row, 2)) + '</b></div>';
+    tip.innerHTML = html;
+    const left = Math.max(20, Math.min(80, (px / geom.W) * 100));
+    tip.style.left = left + "%";
+    tip.hidden = false;
+  }
+  overlay.addEventListener("pointermove", function (e) { showAt(e.clientX); });
+  overlay.addEventListener("pointerdown", function (e) { showAt(e.clientX); });
+  overlay.addEventListener("pointerleave", hide);
+  overlay.addEventListener("pointercancel", hide);
+
+  tableBtn.addEventListener("click", function () {
+    const show = tableWrap.hidden;
+    tableWrap.hidden = !show;
+    tableBtn.setAttribute("aria-expanded", String(show));
+    tableBtn.textContent = show ? "Hide table" : "Table";
+  });
+}
+
+function renderLineCards() {
+  const container = document.getElementById("line-grid");
+  const models = Object.keys(state.data.says_vs_does);
+  container.innerHTML = models.map(function (name) {
+    return lineCardHTML(name, state.data.says_vs_does[name]);
+  }).join("");
+  Array.prototype.forEach.call(container.querySelectorAll("[data-line-card]"), function (card, i) {
+    wireLineCard(card, state.data.says_vs_does[models[i]]);
+  });
+}
+
+function barValues(model) {
+  const j = model.summary && model.summary.j;
+  if (!j) return null;
+  return [
+    { key: "own", label: "Own direction", full: "Own-direction hit", value: j.hit == null ? null : j.hit },
+    { key: "opposite", label: "Opposite", full: "Opposite-direction hit", value: j.opposite == null ? null : j.opposite },
+    { key: "chance", label: "Chance", full: "Random-neuron chance", value: j.null == null ? null : j.null }
+  ];
+}
+
+function barCardHTML(name, model) {
+  const bars = barValues(model);
+  if (!bars) return "";
+  const W = 360, H = 138, m = { l: 104, r: 42, t: 18, b: 24 };
+  const pw = W - m.l - m.r;
+  const ph = H - m.t - m.b;
+  const max = niceMax(Math.max.apply(null, bars.map(function (b) { return (b.value || 0) * 100; }).concat([0.0001])));
+  function xFor(v) { return m.l + (Math.max(0, v) / max) * pw; }
+  const rowH = ph / bars.length;
+  const barH = 17;
+  const ticks = [];
+  for (let t = 0; t <= 4; t++) {
+    const value = (max / 4) * t;
+    const x = xFor(value);
+    ticks.push('<line class="grid-line" x1="' + x.toFixed(1) + '" x2="' + x.toFixed(1) + '" y1="' + m.t + '" y2="' + (m.t + ph) + '" />');
+    ticks.push('<text class="axis-text" x="' + x.toFixed(1) + '" y="' + (H - 8) + '" text-anchor="middle">' + esc(fmtAxis(value)) + '%</text>');
+  }
+  const marks = bars.map(function (bar, i) {
+    const value = bar.value == null ? 0 : bar.value;
+    const pct = value * 100;
+    const y = m.t + i * rowH + (rowH - barH) / 2;
+    const x = m.l;
+    const w = Math.max(0, xFor(pct) - m.l);
+    const cls = bar.key === "own" ? "s-own" : (bar.key === "opposite" ? "s-opposite" : "s-chance");
+    return '<text class="bar-label" x="' + (m.l - 7) + '" y="' + (y + 12) + '" text-anchor="end">' + esc(bar.label) + '</text>' +
+      '<rect class="bar ' + cls + '" x="' + x + '" y="' + y.toFixed(1) + '" width="' + w.toFixed(1) + '" height="' + barH + '" rx="3" tabindex="0" role="img" ' +
+      'aria-label="' + esc(name + ", " + bar.full + ": " + fmtPct(bar.value, 2)) + '" ' +
+      'data-label="' + esc(bar.label) + '" data-full="' + esc(bar.full) + '" data-value="' + pct.toFixed(4) + '" data-class="' + cls + '" data-y="' + y.toFixed(2) + '">' +
+      '<title>' + esc(bar.full + ": " + fmtPct(bar.value, 2)) + '</title></rect>' +
+      '<text class="bar-value" x="' + (m.l + w + 5).toFixed(1) + '" y="' + (y + 12) + '">' + esc(fmtPct(bar.value, 2)) + '</text>';
+  }).join("");
+  const svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + esc(name + " own direction, opposite direction and chance hit rates") + '">' +
+    '<text class="axis-unit" x="' + m.l + '" y="10">share of replies (%)</text>' +
+    ticks.join("") + marks + '</svg>';
+  const body = bars.map(function (bar) {
+    return '<tr><td>' + esc(bar.full) + '</td><td>' + esc(fmtPct(bar.value, 2)) + '</td></tr>';
+  }).join("");
+  return '<article class="chart-card" data-bar-card>' +
+    '<div class="chart-head"><h3>' + esc(name) + '</h3><button class="table-btn" type="button" aria-expanded="false">Table</button></div>' +
+    '<div class="chart-sub">J-lens summary · own, opposite and chance</div>' +
+    '<div class="chart-wrap">' + svg + '<div class="tooltip" hidden></div></div>' +
+    '<div class="table-wrap" hidden><table><caption>Share of replies by direction</caption><thead><tr><th>Measure</th><th>Share</th></tr></thead><tbody>' + body + '</tbody></table></div>' +
+    '</article>';
+}
+
+function renderOppositeCards() {
+  const container = document.getElementById("opposite-grid");
+  const models = Object.keys(state.data.says_vs_does);
+  container.innerHTML = models.map(function (name) {
+    return barCardHTML(name, state.data.says_vs_does[name]);
+  }).join("");
+  Array.prototype.forEach.call(container.querySelectorAll("[data-bar-card]"), function (card) {
+    const tip = card.querySelector(".tooltip");
+    const W = 360, H = 138;
+    const tableBtn = card.querySelector(".table-btn");
+    const tableWrap = card.querySelector(".table-wrap");
+    function hide() { tip.hidden = true; }
+    function showFromMark(mark) {
+      const value = Number(mark.dataset.value);
+      const cls = mark.dataset.class;
+      const y = Number(mark.dataset.y);
+      tip.innerHTML = '<div class="t-head">' + esc(mark.dataset.full) + '</div>' +
+        '<div class="t-row"><span><span class="dot ' + cls + '" aria-hidden="true"></span> ' + esc(mark.dataset.label) + '</span><b>' + esc(fmtPct(value / 100, 2)) + '</b></div>';
+      const left = Math.max(20, Math.min(80, ((104 + Math.max(0, Number(mark.getAttribute("width")) / 2)) / W) * 100));
+      const top = Math.max(4, Math.min(68, (y / H) * 100 - 6));
+      tip.style.left = left + "%";
+      tip.style.top = top + "%";
+      tip.hidden = false;
+    }
+    Array.prototype.forEach.call(card.querySelectorAll(".bar"), function (mark) {
+      mark.addEventListener("pointerenter", function () { showFromMark(mark); });
+      mark.addEventListener("pointermove", function () { showFromMark(mark); });
+      mark.addEventListener("focus", function () { showFromMark(mark); });
+      mark.addEventListener("pointerleave", hide);
+      mark.addEventListener("blur", hide);
+    });
+    tableBtn.addEventListener("click", function () {
+      const show = tableWrap.hidden;
+      tableWrap.hidden = !show;
+      tableBtn.setAttribute("aria-expanded", String(show));
+      tableBtn.textContent = show ? "Hide table" : "Table";
+    });
+  });
+}
+
+function buildBecomeSelect() {
+  const select = document.getElementById("become-model");
+  const names = Object.keys(state.data.become);
+  select.innerHTML = names.map(function (name) {
+    return '<option value="' + esc(name) + '">' + esc(name) + '</option>';
+  }).join("");
+  select.value = state.bmodel;
+  select.addEventListener("change", function () {
+    state.bmodel = select.value;
+    ensureConcept(null);
+    writeHash();
+    renderBecome();
+  });
+}
+
+function summaryHTML(model) {
+  const entries = Object.keys(model.summary || {}).map(function (key) {
+    const parts = key.split("/");
+    return {
+      lens: parts[0] || key,
+      band: parts[1] || "all",
+      n: model.summary[key].n,
+      mention: model.summary[key].mention,
+      becomes: model.summary[key].becomes
+    };
+  });
+  entries.sort(function (a, b) {
+    const lr = lensRank(a.lens) - lensRank(b.lens);
+    if (lr !== 0) return lr;
+    return bandRank(a.band) - bandRank(b.band);
+  });
+  const body = entries.map(function (row) {
+    return '<tr><td>' + esc(LENS_LABEL[row.lens] || row.lens) + '</td>' +
+      '<td>' + esc(row.band === "all" ? "All layers" : row.band) + '</td>' +
+      '<td>' + esc(fmtCount(row.n)) + '</td>' +
+      '<td>' + esc(fmtPct(row.mention, 1)) + '</td>' +
+      '<td>' + esc(fmtPct(row.becomes, 1)) + '</td></tr>';
+  }).join("");
+  return '<div class="table-wrap"><table><caption>Became and mentioned shares by lens and layer band</caption>' +
+    '<thead><tr><th>Lens</th><th>Layer band</th><th>Replies</th><th>Mentions</th><th>Becomes</th></tr></thead>' +
+    '<tbody>' + body + '</tbody></table></div>';
+}
+
+function exampleLink(name) {
+  const match = String(name).match(/L(\d+)N(\d+)/);
+  if (!match) return null;
+  return "../index.html#" + (MODEL_IDS[state.bmodel] || state.bmodel) + "-L" + match[1] + "-N" + match[2];
+}
+
+function renderBecome() {
+  const model = state.data.become[state.bmodel];
+  if (!model) return;
+  const select = document.getElementById("become-model");
+  if (select.value !== state.bmodel) select.value = state.bmodel;
+  document.getElementById("become-summary").innerHTML = summaryHTML(model);
+  const concepts = conceptsFor(model);
+  if (!state.concept || concepts.indexOf(state.concept) < 0) state.concept = concepts[0] || null;
+  const chips = document.getElementById("concept-chips");
+  chips.innerHTML = concepts.map(function (concept) {
+    return '<button class="chip" type="button" data-concept="' + esc(concept) + '" aria-pressed="' +
+      String(concept === state.concept) + '">' + esc(concept) + '</button>';
+  }).join("");
+  Array.prototype.forEach.call(chips.querySelectorAll(".chip"), function (chip) {
+    chip.addEventListener("click", function () {
+      state.concept = chip.dataset.concept;
+      writeHash();
+      renderBecome();
+    });
+  });
+  const note = document.getElementById("concept-note");
+  const examples = (model.examples || []).filter(function (ex) { return ex.concept === state.concept; });
+  note.textContent = state.concept
+    ? 'Replies collected for “' + state.concept + '” (' + examples.length + '). The highlighted word is the concept.'
+    : "No examples for this model.";
+  const list = document.getElementById("examples");
+  if (!examples.length) {
+    list.innerHTML = '<p class="panel-note">No example replies are available for this concept.</p>';
+    return;
+  }
+  list.innerHTML = examples.map(function (ex) {
+    const href = exampleLink(ex.name);
+    const lens = LENS_LABEL[ex.lens] || ex.lens;
+    const link = href ? '<a href="' + esc(href) + '">Open neuron card</a>' : "";
+    return '<article class="example">' +
+      '<div class="ex-meta"><span class="tag">' + esc(lens) + '</span><span>Layer ' + esc(ex.layer) + '</span>' + link + '</div>' +
+      '<p class="ex-text">' + rich(ex.text, state.concept) + '</p>' +
+      '</article>';
+  }).join("");
+}
+
+document.querySelectorAll("[data-metric]").forEach(function (btn) {
+  btn.addEventListener("click", function () {
+    state.metric = btn.dataset.metric;
+    updateMetricButtons();
+    if (state.data) {
+      writeHash();
+      renderLineCards();
+    }
+  });
+});
+
+window.addEventListener("hashchange", function () {
+  if (!state.data) return;
+  const hash = readHash();
+  state.metric = hash.metric;
+  const becomeNames = Object.keys(state.data.become);
+  if (hash.bmodel && becomeNames.indexOf(hash.bmodel) >= 0) state.bmodel = hash.bmodel;
+  ensureConcept(hash.concept);
+  updateMetricButtons();
+  renderLineCards();
+  renderBecome();
+  writeHash();
+});
+
+const themeBtn = document.getElementById("theme-btn");
+function prefersDark() {
+  return window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+}
+function currentDark() {
+  const set = document.documentElement.getAttribute("data-theme");
+  if (set === "dark") return true;
+  if (set === "light") return false;
+  return prefersDark();
+}
+function updateThemeButton() {
+  themeBtn.textContent = currentDark() ? "Use light theme" : "Use dark theme";
+}
+themeBtn.addEventListener("click", function () {
+  document.documentElement.setAttribute("data-theme", currentDark() ? "light" : "dark");
+  updateThemeButton();
+});
+updateThemeButton();
+
+load();
+</script>
+</body>
+</html>

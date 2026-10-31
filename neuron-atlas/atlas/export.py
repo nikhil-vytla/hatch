@@ -12,7 +12,7 @@ import argparse, glob, json, os, re, shutil
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 EXPLORER = os.path.join(HERE, "..", "explorer", "index.html")
-FILES = ["meta.json", "map.parquet", "labels.parquet", "steer.parquet", "tokens.parquet", "uptake.parquet", "recipes.parquet"]  # + neurons/, examples/, steer/
+FILES = ["meta.json", "map.parquet", "labels.parquet", "steer.parquet", "tokens.parquet", "uptake.parquet", "recipes.parquet", "personas.parquet", "sweep_stats.parquet", "user_personas.parquet", "user_sweep_stats.parquet", "roles.parquet"]  # + neurons/, examples/, steer/, sweepcard/
 
 
 def shard(d):
@@ -100,8 +100,9 @@ def add_example_tokens(d):
         os.replace(tmp, f)
 
 
-def model_id(name):
-    return re.sub(r"[^a-z0-9]+", "-", name.split("/")[-1].lower()).strip("-")
+def model_id(name, variant=None):
+    mid = re.sub(r"[^a-z0-9]+", "-", name.split("/")[-1].lower()).strip("-")
+    return mid + ("-" + re.sub(r"[^a-z0-9]+", "-", str(variant).lower()).strip("-") if variant else "")
 
 
 def models_index(out):
@@ -111,9 +112,16 @@ def models_index(out):
         m = json.load(open(meta_path))
         m["sharded"] = True
         m["steer_sharded"] = os.path.exists(os.path.join(os.path.dirname(meta_path), "steer", "baseline.parquet"))
-        m["id"] = model_id(m["model"])
-        m["name"] = m["model"].split("/")[-1]
+        m["sweep_cards"] = os.path.exists(os.path.join(os.path.dirname(meta_path), "sweepcard", "baseline.parquet"))
+        m["id"] = model_id(m["model"], m.get("variant"))
+        m["name"] = m["model"].split("/")[-1] + (f" · {m['variant']}" if m.get("variant") else "")
         m["files"] = [f for f in FILES if os.path.exists(os.path.join(os.path.dirname(meta_path), f))]
+        m["roles"] = "roles.parquet" in m["files"]
+        m["personas"] = "personas.parquet" in m["files"]
+        m["sweep_stats"] = "sweep_stats.parquet" in m["files"]
+        m["user_personas"] = "user_personas.parquet" in m["files"]
+        m["user_sweep_stats"] = "user_sweep_stats.parquet" in m["files"]
+        m["user_sweep"] = m["user_personas"] and m["user_sweep_stats"]
         idx.append(m)
     idx.sort(key=lambda m: m["n_neurons"])
     return idx
@@ -154,10 +162,12 @@ def build_site(out, site, b64=False):
         os.makedirs(os.path.join(dst, "examples"), exist_ok=True)
         for f in m["files"]:
             put(os.path.join(src, f), os.path.join(dst, f), m)
-        for sub in ["examples", "neurons", "steer"]:
+        for sub in ["examples", "neurons", "steer", "sweepcard"]:
             os.makedirs(os.path.join(dst, sub), exist_ok=True)
             for f in glob.glob(os.path.join(src, sub, "*.parquet")):
                 put(f, os.path.join(dst, sub, os.path.basename(f)), m)
+            if sub == "sweepcard" and os.path.exists(os.path.join(src, sub, "prompts.json")):
+                put(os.path.join(src, sub, "prompts.json"), os.path.join(dst, sub, "prompts.json"), m)
         m["b64"] = b64
     json.dump(idx, open(os.path.join(site, "data", "models.json"), "w"), indent=1)
     open(os.path.join(site, "index.html"), "w").write(page())
@@ -250,9 +260,36 @@ def push_index(repo):
         slug = f.split("/")[0]
         m = json.load(open(hf_hub_download(repo, f, repo_type="dataset")))
         have = {x.split("/", 1)[1] for x in files if x.startswith(slug + "/")}
-        m.update(id=model_id(m["model"]), name=m["model"].split("/")[-1], files=[x for x in FILES if x in have],
+        if not any(x.startswith("neurons/") for x in have):
+            continue  # experiment-only folders (e.g. a base-model sweep) have no atlas to explore
+        m.update(id=model_id(m["model"], m.get("variant")),
+                 name=m["model"].split("/")[-1] + (f" · {m['variant']}" if m.get("variant") else ""),
+                 files=[x for x in FILES if x in have],
                  sharded=any(x.startswith("neurons/") for x in have),
-                 steer_sharded=f"{slug}/steer/baseline.parquet" in files)
+                 steer_sharded=f"{slug}/steer/baseline.parquet" in files, personas="personas.parquet" in have,
+                 sweep_cards=f"{slug}/sweepcard/baseline.parquet" in files,
+                 roles="roles.parquet" in have,
+                 sweep_stats="sweep_stats.parquet" in have, user_personas="user_personas.parquet" in have,
+                 user_sweep_stats="user_sweep_stats.parquet" in have,
+                 user_sweep="user_personas.parquet" in have and "user_sweep_stats.parquet" in have,
+                 jlens=f"{slug}/jlens/L00.parquet" in files, says_index=f"{slug}/saysindex/a.parquet" in files,
+                 lens_guided=f"{slug}/experiments/lens_guided.parquet" in files)
+        live_manifest = f"browser/{slug}/models.json"
+        if live_manifest in files:
+            manifest = json.load(open(hf_hub_download(repo, live_manifest, repo_type="dataset")))
+            default = manifest.get("default") if isinstance(manifest, dict) else None
+            if default:
+                entry = (manifest.get("files") or {}).get(default)
+                nbytes = entry.get("bytes") if isinstance(entry, dict) else None
+                if not nbytes:
+                    try:
+                        info = api.get_paths_info(repo, [f"browser/{slug}/{default}"], repo_type="dataset")
+                        nbytes = info[0].size if info else None
+                    except Exception:
+                        nbytes = None
+                m["live"] = {"model": f"https://huggingface.co/datasets/{repo}/resolve/main/browser/{slug}/{default}",
+                             "beta": bool(manifest.get("beta")), "note": manifest.get("note") or "",
+                             "bytes": nbytes, "webgpu_only": bool(manifest.get("webgpu_only"))}
         idx.append(m)
     idx.sort(key=lambda m: m["n_neurons"])
     api.upload_file(path_or_fileobj=json.dumps(idx, indent=1).encode(), path_in_repo="models.json", repo_id=repo,
@@ -268,9 +305,19 @@ def push_space(repo, space):
     api = HfApi()
     api.create_repo(space, repo_type="space", space_sdk="static", exist_ok=True)
     html = page().replace('b = b || "./data/";', f'b = b || "https://huggingface.co/datasets/{repo}/resolve/main/";')
+    browser = os.path.join(HERE, "..", "browser")
+    engine = open(os.path.join(browser, "engine.js"), "rb").read()
+    live = open(os.path.join(browser, "index.html")).read()
+    live_dir = f"https://huggingface.co/datasets/{repo}/resolve/main/browser/HuggingFaceTB__SmolLM2-135M-Instruct/"
+    live = live.replace('const DEFAULT_MODEL = "./build/smollm2_steer_fp16.onnx";', f'const DEFAULT_MODEL = "{live_dir}";')
     readme = f"---\ntitle: Neuron Atlas\nemoji: 🔬\ncolorFrom: pink\ncolorTo: indigo\nsdk: static\npinned: false\n---\nExplorer for the [{repo}](https://huggingface.co/datasets/{repo}) dataset.\n"
     api.upload_file(path_or_fileobj=html.encode(), path_in_repo="index.html", repo_id=space, repo_type="space")
+    api.upload_file(path_or_fileobj=engine, path_in_repo="engine.js", repo_id=space, repo_type="space")
+    api.upload_file(path_or_fileobj=live.encode(), path_in_repo="live.html", repo_id=space, repo_type="space")
     api.upload_file(path_or_fileobj=readme.encode(), path_in_repo="README.md", repo_id=space, repo_type="space")
+    protos = os.path.join(HERE, "..", "explorer", "protos")  # standalone prototype pages, served at /protos/
+    if os.path.isdir(protos):
+        api.upload_folder(folder_path=protos, path_in_repo="protos", repo_id=space, repo_type="space", allow_patterns=["*.html"])
     print(f"https://huggingface.co/spaces/{space}")
 
 

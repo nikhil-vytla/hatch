@@ -13,7 +13,11 @@ try:
 except ImportError:  # older transformers: image-text checkpoints will fail at load time
     AutoModelForImageTextToText = None
 
-DOWN_RE = re.compile(r"\.(\d+)\.mlp\.(down_proj|c_proj|fc2|dense_4h_to_h)$")
+DOWN_RE = re.compile(r"\.(\d+)\.(?:mlp|feed_forward)\.(down_proj|c_proj|fc2|linear_fc2|dense_4h_to_h|w2)(?:\.linear)?$")
+# conformer audio towers (Gemma 3n/4): two macaron feed-forwards per layer, each counted as its own "layer"
+AUDIO_DOWN_RE = re.compile(r"audio_tower\.(?:\w+\.)*layers\.(\d+)\.feed_forward(\d)\.ffw_layer_2(?:\.linear)?$")
+# Whisper-style audio encoders (Qwen2-Audio, Qwen2.5-Omni): layers.N.fc2
+WHISPER_DOWN_RE = re.compile(r"audio_tower\.(?:\w+\.)*layers\.(\d+)\.fc2$")
 TERM_RE = re.compile(r"L(\d+)N(\d+)\s*([=*+\-])?\s*([+-]?\d*\.?\d+(?:[eE][+-]?\d+)?)", re.I)
 SKIP_TOWERS = ("visual", "vision", "audio", "mm_projector")
 
@@ -53,35 +57,82 @@ def pick_device():
 
 
 class NeuronModel:
-    def __init__(self, name: str, device: str | None = None, dtype=None):
+    def __init__(self, name: str, device: str | None = None, dtype=None, where: str = "llm"):
+        if where not in ("llm", "vision", "audio"):
+            raise ValueError(f"where must be 'llm', 'vision' or 'audio', got {where!r}")
         self.name = name
+        self.where = where
         self.device = device or pick_device()
         if dtype is None:
             dtype = torch.bfloat16 if self.device == "cuda" else torch.float32
+        # "org/model@revision" loads a training checkpoint branch
+        repo, _, revision = name.partition("@")
+        rev = {"revision": revision} if revision else {}
+        self.processor = None
         try:
-            self.tok = AutoTokenizer.from_pretrained(name)
+            self.processor = AutoProcessor.from_pretrained(repo, **rev)
         except Exception:
-            proc = AutoProcessor.from_pretrained(name)
+            self.processor = None
+        try:
+            self.tok = AutoTokenizer.from_pretrained(repo, **rev)
+        except Exception:
+            proc = self.processor or AutoProcessor.from_pretrained(repo, **rev)
+            self.processor = self.processor or proc
             self.tok = getattr(proc, "tokenizer", None) or proc
         if self.tok.pad_token is None:
             self.tok.pad_token = self.tok.eos_token
-        try:
-            self.model = AutoModelForCausalLM.from_pretrained(name, dtype=dtype)
-        except Exception:
-            if AutoModelForImageTextToText is None:
-                raise
-            self.model = AutoModelForImageTextToText.from_pretrained(name, dtype=dtype)
+        self.model = None
+        if where != "llm" and AutoModelForImageTextToText is not None:
+            # natively multimodal models (Qwen3.5) also load as text-only causal LMs, without their towers
+            try:
+                self.model = AutoModelForImageTextToText.from_pretrained(repo, dtype=dtype, **rev)
+            except Exception:
+                self.model = None
+        if self.model is None:
+            try:
+                self.model = AutoModelForCausalLM.from_pretrained(repo, dtype=dtype, **rev)
+            except Exception:
+                try:
+                    if AutoModelForImageTextToText is None:
+                        raise
+                    self.model = AutoModelForImageTextToText.from_pretrained(repo, dtype=dtype, **rev)
+                except Exception:
+                    # Qwen2.5-Omni: the "thinker" is the text/audio/vision understanding model (no speech output)
+                    import transformers
+                    thinker = getattr(transformers, "Qwen2_5OmniThinkerForConditionalGeneration", None)
+                    if thinker is None or "omni" not in repo.lower():
+                        raise
+                    self.model = thinker.from_pretrained(repo, dtype=dtype, **rev)
         self.model = self.model.to(self.device).eval()
         self.model.requires_grad_(False)
         found = []
         for mod_name, mod in self.model.named_modules():
+            if getattr(mod, "weight", None) is None:  # wrappers (Gemma 4's ClippableLinear) hold the Linear as .linear
+                continue
+            if where == "audio":
+                m = AUDIO_DOWN_RE.search(mod_name)
+                if m:
+                    found.append((2 * int(m.group(1)) + int(m.group(2)) - 1, mod_name, mod))
+                elif (m := WHISPER_DOWN_RE.search(mod_name)):
+                    found.append((int(m.group(1)), mod_name, mod))
+                continue
             m = DOWN_RE.search(mod_name)
-            if m and ".experts." not in mod_name and not any(t in mod_name.lower() for t in SKIP_TOWERS):
-                found.append((int(m.group(1)), mod))
+            if not m or ".experts." in mod_name:
+                continue
+            low = mod_name.lower()
+            is_vision = any(t in low for t in ("visual", "vision"))
+            if where == "llm" and any(t in low for t in SKIP_TOWERS):
+                continue
+            if where == "vision" and not is_vision:
+                continue
+            found.append((int(m.group(1)), mod_name, mod))
         if not found:
-            raise ValueError(f"no dense MLP down projections found in {name} (MoE models are not supported)")
-        found.sort(key=lambda x: x[0])
-        self.downs = [m for _, m in found]
+            what = {"vision": "vision-tower", "audio": "audio-tower"}.get(where, "dense")
+            raise ValueError(f"no {what} MLP down projections found in {name} (MoE models are not supported)")
+        found.sort(key=lambda x: (x[0], x[1]))
+        self.down_names = [n for _, n, _ in found]
+        self.downs = [m for _, _, m in found]
+        self.layer_modules = [self._layer_module(n) for n in self.down_names]
         self.n_layers = len(self.downs)
         self.conv1d = type(self.downs[0]).__name__ == "Conv1D"  # GPT-2 stores weight as (in, out)
         w = self.downs[0].weight
@@ -92,8 +143,28 @@ class NeuronModel:
         self._t_in = 0
         self._gen_step = 0
         self._prefill = False
+        self.vision_2d = False
+        self._rank_checked = False
         self._phase_hook = self.model.register_forward_pre_hook(self._note_phase, with_kwargs=True)
         self._hooks = [d.register_forward_pre_hook(self._make_steer_hook(i)) for i, d in enumerate(self.downs)]
+
+    def _layer_module(self, name):
+        """The transformer block that owns a down projection (its output is that layer's residual stream)."""
+        parts = name.split(".")
+        key = next((k for k in parts if k in ("mlp", "feed_forward") or re.fullmatch(r"feed_forward\d", k)), None)
+        if key is None:
+            if parts[-1] != "fc2":
+                return None
+            path = ".".join(parts[:-1])  # Whisper-style layer: fc2 sits directly in the block
+        else:
+            path = ".".join(parts[:len(parts) - 1 - parts[::-1].index(key)])
+        obj = self.model
+        try:
+            for p in path.split("."):
+                obj = getattr(obj, p)
+            return obj
+        except AttributeError:
+            return None
 
     # ---- weights ---------------------------------------------------------------------------------
     @torch.no_grad()
@@ -107,7 +178,7 @@ class NeuronModel:
         """(W_U (V, d_model), gamma (d_model,) or None): the final norm's scale folded into the logit lens."""
         W_U = self.model.get_output_embeddings().weight.float()
         norm = None
-        for path in ("model.norm", "transformer.ln_f", "model.final_layernorm", "gpt_neox.final_layer_norm",
+        for path in ("model.norm", "model.embedding_norm", "transformer.ln_f", "model.final_layernorm", "gpt_neox.final_layer_norm",
                      "model.language_model.norm", "language_model.model.norm"):
             obj = self.model
             try:
@@ -119,9 +190,14 @@ class NeuronModel:
                 continue
         gamma = None
         if norm is not None and getattr(norm, "weight", None) is not None:
-            gamma = norm.weight.float()
-            if self.model_type.startswith("gemma"):
-                gamma = 1.0 + gamma
+            # an RMSNorm maps the all-ones vector to its scale, whether that is w (Llama) or 1 + w (Gemma, Qwen3.5)
+            w = norm.weight
+            try:
+                gamma = norm(torch.ones(1, w.shape[0], dtype=w.dtype, device=w.device)).float()[0]
+                if getattr(norm, "bias", None) is not None:  # LayerNorm: ones has zero variance, fall back
+                    raise ValueError
+            except Exception:
+                gamma = w.float() + (1.0 if self.model_type.startswith("gemma") else 0.0)
         return W_U, gamma
 
     # ---- steering ----------------------------------------------------------------------------------
@@ -145,6 +221,12 @@ class NeuronModel:
             self._gen_step += 1
             self._prefill = False
         return None
+
+    @staticmethod
+    def _flat_hidden(x):
+        if x.dim() <= 2:
+            return x.reshape(1, -1, x.shape[-1])
+        return x.reshape(x.shape[0], -1, x.shape[-1])
 
     def _apply_programs(self, x, orig, terms):
         B, T = x.shape[0], x.shape[1]
@@ -205,11 +287,15 @@ class NeuronModel:
 
     def _make_steer_hook(self, layer):
         def hook(mod, args):
+            hidden = args[0]
+            if self.where == "vision" and not self._rank_checked:
+                self.vision_2d = hidden.dim() == 2
+                self._rank_checked = True
             ops = self._steer.get(layer)
             terms = self._programs.get(layer)
             if not ops and not terms:
                 return None
-            orig = args[0]
+            orig = self._flat_hidden(hidden)
             x = orig.clone()
             if ops:
                 B = x.shape[0]
@@ -231,7 +317,7 @@ class NeuronModel:
                         x[b, :, n] *= v[:, None]
             if terms:
                 self._apply_programs(x, orig, terms)
-            return (x,) + tuple(args[1:])
+            return (x.reshape(hidden.shape),) + tuple(args[1:])
         return hook
 
     def set_steer(self, layer: int, neurons, coeffs):

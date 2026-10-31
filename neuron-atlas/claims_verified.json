@@ -1,0 +1,494 @@
+[
+ {
+  "id": "20-SmolLM2-135M",
+  "claim": "SmolLM2-135M: persona share of 'Who are you?' pushes",
+  "stated": 0.37,
+  "value": 0.37247838966588975,
+  "tol": 0.0185,
+  "unit": "share",
+  "source": "HuggingFaceTB__SmolLM2-135M-Instruct/sweep_stats.parquet",
+  "status": "PASS"
+ },
+ {
+  "id": "20-Qwen3-0.6B",
+  "claim": "Qwen3-0.6B: persona share of 'Who are you?' pushes",
+  "stated": 0.015,
+  "value": 0.014705625716230287,
+  "tol": 0.002,
+  "unit": "share",
+  "source": "Qwen__Qwen3-0.6B/sweep_stats.parquet",
+  "status": "PASS"
+ },
+ {
+  "id": "20-Qwen3.5-4B",
+  "claim": "Qwen3.5-4B: persona share of 'Who are you?' pushes",
+  "stated": 0.008,
+  "value": 0.00789037616342702,
+  "tol": 0.002,
+  "unit": "share",
+  "source": "Qwen__Qwen3.5-4B/sweep_stats.parquet",
+  "status": "PASS"
+ },
+ {
+  "id": "20-Qwen3-8B",
+  "claim": "Qwen3-8B: persona share of 'Who are you?' pushes",
+  "stated": 0.021,
+  "value": 0.021189638010685023,
+  "tol": 0.002,
+  "unit": "share",
+  "source": "Qwen__Qwen3-8B/sweep_stats.parquet",
+  "status": "PASS"
+ },
+ {
+  "id": "10",
+  "claim": "Qwen3.5-4B: 'Who am I?' pushes that tell the user who they are",
+  "stated": 0.13,
+  "value": 0.128478109805994,
+  "tol": 0.006500000000000001,
+  "unit": "share",
+  "source": "Qwen__Qwen3.5-4B/user_sweep_stats.parquet",
+  "status": "PASS"
+ },
+ {
+  "id": "17-Qwen3.5-4B",
+  "claim": "Qwen3.5-4B: J-lens-picked pushes 'become' the word",
+  "stated": 0.18,
+  "value": 0.18466898954703834,
+  "tol": 0.009,
+  "ci": [
+   0.1436,
+   0.2257
+  ],
+  "unit": "share (DeepSeek judge)",
+  "source": "Qwen__Qwen3.5-4B/experiments/lens_guided.parquet",
+  "status": "PASS"
+ },
+ {
+  "id": "17r-Qwen3.5-4B",
+  "claim": "Qwen3.5-4B: random-neuron pushes 'become' the word",
+  "stated": 0.0,
+  "value": 0.0,
+  "tol": 0.002,
+  "unit": "share (DeepSeek judge)",
+  "source": "same",
+  "status": "PASS"
+ },
+ {
+  "id": "17-SmolLM2-135M",
+  "claim": "SmolLM2-135M: J-lens-picked pushes 'become' the word",
+  "stated": 0.22,
+  "value": 0.21991701244813278,
+  "tol": 0.011000000000000001,
+  "ci": [
+   0.1701,
+   0.2697
+  ],
+  "unit": "share (DeepSeek judge)",
+  "source": "HuggingFaceTB__SmolLM2-135M-Instruct/experiments/lens_guided.parquet",
+  "status": "PASS"
+ },
+ {
+  "id": "17r-SmolLM2-135M",
+  "claim": "SmolLM2-135M: random-neuron pushes 'become' the word",
+  "stated": 0.027,
+  "value": 0.02666666666666667,
+  "tol": 0.002,
+  "unit": "share (DeepSeek judge)",
+  "source": "same",
+  "status": "PASS"
+ },
+ {
+  "id": "17-Qwen3-8B",
+  "claim": "Qwen3-8B: J-lens-picked pushes 'become' the word",
+  "stated": 0.22,
+  "value": 0.2222222222222222,
+  "tol": 0.011000000000000001,
+  "ci": [
+   0.1771,
+   0.2708
+  ],
+  "unit": "share (DeepSeek judge)",
+  "source": "Qwen__Qwen3-8B/experiments/lens_guided.parquet",
+  "status": "PASS"
+ },
+ {
+  "id": "17r-Qwen3-8B",
+  "claim": "Qwen3-8B: random-neuron pushes 'become' the word",
+  "stated": 0.003,
+  "value": 0.0033333333333333335,
+  "tol": 0.002,
+  "unit": "share (DeepSeek judge)",
+  "source": "same",
+  "status": "PASS"
+ },
+ {
+  "id": "18a",
+  "claim": "persona pairs at 0.6x: fused identity",
+  "stated": 0.33,
+  "value": 0.33125,
+  "tol": 0.0165,
+  "ci": [
+   0.2562,
+   0.4062
+  ],
+  "unit": "share (DeepSeek judge)",
+  "source": "Qwen__Qwen3.5-4B/experiments/pairs_judged.json",
+  "status": "PASS"
+ },
+ {
+  "id": "18b",
+  "claim": "persona pairs at 0.6x: one persona wins",
+  "stated": 0.069,
+  "value": 0.06875,
+  "tol": 0.0034500000000000004,
+  "unit": "share (DeepSeek judge)",
+  "source": "same",
+  "status": "PASS"
+ },
+ {
+  "id": "19-you_are",
+  "claim": "judge picks the pushed reply vs 'you_are' prompt",
+  "stated": 0.646,
+  "value": 0.6459854014598541,
+  "tol": 0.0323,
+  "ci": [
+   0.5876,
+   0.7044
+  ],
+  "unit": "accuracy (chance 0.5)",
+  "source": "Qwen__Qwen3.5-4B/experiments/prompt_imitation_judged.json",
+  "status": "PASS"
+ },
+ {
+  "id": "19-roleplay",
+  "claim": "judge picks the pushed reply vs 'roleplay' prompt",
+  "stated": 0.566,
+  "value": 0.5656934306569343,
+  "tol": 0.0283,
+  "ci": [
+   0.5073,
+   0.6241
+  ],
+  "unit": "accuracy (chance 0.5)",
+  "source": "Qwen__Qwen3.5-4B/experiments/prompt_imitation_judged.json",
+  "status": "PASS"
+ },
+ {
+  "id": "21",
+  "claim": "'What year is it?': pushes answer 2025 or 2026 (unpushed 2024)",
+  "stated": 0.333,
+  "value": 0.33257861635220126,
+  "tol": 0.01665,
+  "unit": "share",
+  "source": "Qwen__Qwen3.5-4B/battery_era/steer",
+  "status": "PASS"
+ },
+ {
+  "id": "14-0.3",
+  "claim": "R1-Distill bat-and-ball correct under \u00b10.3 pushes",
+  "stated": 0.82,
+  "value": 0.8177083333333334,
+  "tol": 0.041,
+  "unit": "share",
+  "source": "deepseek-ai__DeepSeek-R1-Distill-Qwen-1.5B/reasoning_long/steer",
+  "status": "PASS"
+ },
+ {
+  "id": "14-0.8",
+  "claim": "R1-Distill bat-and-ball correct under \u00b10.8 pushes",
+  "stated": 0.3,
+  "value": 0.30357142857142855,
+  "tol": 0.015,
+  "unit": "share",
+  "source": "deepseek-ai__DeepSeek-R1-Distill-Qwen-1.5B/reasoning_long/steer",
+  "status": "PASS"
+ },
+ {
+  "id": "NL-a",
+  "claim": "Qwen3-8B labels: ours vs neuron-lens judged 'same'",
+  "stated": 0.331,
+  "value": 0.33090277777777777,
+  "tol": 0.005,
+  "unit": "share (DeepSeek judge)",
+  "source": "Qwen__Qwen3-8B/experiments/label_agreement_neuronlens.json",
+  "status": "PASS"
+ },
+ {
+  "id": "NL-b",
+  "claim": "... shuffled pairs judged 'same' (chance)",
+  "stated": 0.001,
+  "value": 0.001388888888888889,
+  "tol": 0.005,
+  "unit": "share (DeepSeek judge)",
+  "source": "same",
+  "status": "PASS"
+ },
+ {
+  "id": "23",
+  "claim": "Qwen3.5-0.8B: persona share of 'Who are you?' pushes",
+  "stated": 0.047,
+  "value": 0.0466182829772661,
+  "tol": 0.00235,
+  "unit": "share",
+  "source": "Qwen__Qwen3.5-0.8B/sweep_stats.parquet",
+  "status": "PASS"
+ },
+ {
+  "id": "23b",
+  "claim": "Qwen3.5-2B: persona share of 'Who are you?' pushes",
+  "stated": 0.021,
+  "value": 0.02148210369707709,
+  "tol": 0.002,
+  "unit": "share",
+  "source": "Qwen__Qwen3.5-2B/sweep_stats.parquet",
+  "status": "PASS"
+ },
+ {
+  "id": "23u",
+  "claim": "Qwen3.5-0.8B: 'Who am I?' pushes that tell the user who they are",
+  "stated": 0.11,
+  "value": 0.10940506074311596,
+  "tol": 0.006,
+  "unit": "share",
+  "source": "Qwen__Qwen3.5-0.8B/user_sweep_stats.parquet",
+  "status": "PASS"
+ },
+ {
+  "id": "24",
+  "claim": "Qwen2.5-VL-3B: blank-image pushes that describe something (of 3,456)",
+  "stated": 285,
+  "value": 285,
+  "tol": 0,
+  "unit": "count",
+  "source": "Qwen__Qwen2.5-VL-3B-Instruct/blank/vlm.parquet",
+  "status": "PASS"
+ },
+ {
+  "id": "24c",
+  "claim": "same neuron draws the same thing on different blanks (judged)",
+  "stated": 0.41,
+  "value": 0.4126984126984127,
+  "tol": 0.01,
+  "unit": "share",
+  "source": "\u2026/blank/blank_judge.json",
+  "status": "PASS"
+ },
+ {
+  "id": "24s",
+  "claim": "\u2026 for hallucinations shuffled across neurons",
+  "stated": 0.1,
+  "value": 0.09523809523809523,
+  "tol": 0.01,
+  "unit": "share",
+  "source": "same",
+  "status": "PASS"
+ },
+ {
+  "id": "24q",
+  "claim": "Qwen3.5-0.8B vision: same drawing across blanks (judged)",
+  "stated": 0.63,
+  "value": 0.6307277628032345,
+  "tol": 0.005,
+  "unit": "share",
+  "source": "Qwen__Qwen3.5-0.8B/blank/blank_judge.json",
+  "status": "PASS"
+ },
+ {
+  "id": "24qs",
+  "claim": "\u2026 shuffled across neurons",
+  "stated": 0.105,
+  "value": 0.10512129380053908,
+  "tol": 0.005,
+  "unit": "share",
+  "source": "same",
+  "status": "PASS"
+ },
+ {
+  "id": "25a",
+  "claim": "TinyStories '\u2026met a': lowest per-layer recast rate",
+  "stated": 0.45,
+  "value": 0.4451497395833333,
+  "tol": 0.005,
+  "unit": "share",
+  "source": "roneneldan__TinyStories-33M/sweep/steer/",
+  "status": "PASS"
+ },
+ {
+  "id": "25b",
+  "claim": "TinyStories '\u2026met a': highest per-layer recast rate",
+  "stated": 0.73,
+  "value": 0.7311197916666666,
+  "tol": 0.005,
+  "unit": "share",
+  "source": "same",
+  "status": "PASS"
+ },
+ {
+  "id": "25c",
+  "claim": "TinyStories 'there was a': recast rate, worst of layers 0-2",
+  "stated": 0.02,
+  "value": 0.019694010416666668,
+  "tol": 0.005,
+  "unit": "share",
+  "source": "same",
+  "status": "PASS"
+ },
+ {
+  "id": "25d",
+  "claim": "TinyStories 'there was a': recast rate at layer 3",
+  "stated": 0.34,
+  "value": 0.3370768229166667,
+  "tol": 0.005,
+  "unit": "share",
+  "source": "same",
+  "status": "PASS"
+ },
+ {
+  "id": "25e",
+  "claim": "TinyStories layer 3: pushes that add a word the neuron's lens names",
+  "stated": 0.445,
+  "value": 0.4446614583333333,
+  "tol": 0.012,
+  "unit": "share",
+  "source": "roneneldan__TinyStories-33M/jlens/L03.parquet + sweep",
+  "status": "PASS"
+ },
+ {
+  "id": "26",
+  "claim": "MusicGen: L14 N510 +0.5 is the largest mean change (1 = yes)",
+  "stated": 1,
+  "value": 1,
+  "tol": 0,
+  "unit": "",
+  "source": "site/music.json",
+  "status": "PASS"
+ },
+ {
+  "id": "26b",
+  "claim": "MusicGen: layer 0 mean spectral distance",
+  "stated": 0.36,
+  "value": 0.36128964026769,
+  "tol": 0.005,
+  "unit": "cosine",
+  "source": "same",
+  "status": "PASS"
+ },
+ {
+  "id": "27-think",
+  "claim": "SmolLM3 layers 6-16, thinking on: pushes that call 1001 prime",
+  "stated": 0.016,
+  "value": 0.016335227272727272,
+  "tol": 0.002,
+  "unit": "share",
+  "source": "HuggingFaceTB__SmolLM3-3B/sweep_think/steer/",
+  "status": "PASS"
+ },
+ {
+  "id": "27-nothink",
+  "claim": "SmolLM3 layers 6-16, thinking off: pushes that call 1001 prime",
+  "stated": 0.112,
+  "value": 0.11221590909090909,
+  "tol": 0.002,
+  "unit": "share",
+  "source": "HuggingFaceTB__SmolLM3-3B/sweep_nothink/steer/",
+  "status": "PASS"
+ },
+ {
+  "id": "28-sft",
+  "claim": "OLMo-2 1B sft: persona share of pushes",
+  "stated": 0.065,
+  "value": 0.06534786869181773,
+  "tol": 0.003,
+  "unit": "share",
+  "source": "allenai__OLMo-2-0425-1B/training/sft/sweep_stats.parquet",
+  "status": "PASS"
+ },
+ {
+  "id": "28-dpo",
+  "claim": "OLMo-2 1B dpo: persona share of pushes",
+  "stated": 0.059,
+  "value": 0.05874769797421731,
+  "tol": 0.003,
+  "unit": "share",
+  "source": "allenai__OLMo-2-0425-1B/training/dpo/sweep_stats.parquet",
+  "status": "PASS"
+ },
+ {
+  "id": "28-instruct",
+  "claim": "OLMo-2 1B instruct: persona share of pushes",
+  "stated": 0.055,
+  "value": 0.05495855081363218,
+  "tol": 0.003,
+  "unit": "share",
+  "source": "allenai__OLMo-2-0425-1B/training/instruct/sweep_stats.parquet",
+  "status": "PASS"
+ },
+ {
+  "id": "30",
+  "claim": "LFM2-350M: pushes adding a word the neuron's fitted J-lens names",
+  "stated": 0.167,
+  "value": 0.16668079215752749,
+  "tol": 0.004,
+  "unit": "share",
+  "source": "LiquidAI__LFM2-350M/jlens + sweep/steer",
+  "status": "PASS"
+ },
+ {
+  "id": "29",
+  "claim": "Gemma 4 audio: pushes that change what it hears",
+  "stated": 0.36,
+  "value": 0.35811237373737376,
+  "tol": 0.005,
+  "unit": "share",
+  "source": "google__gemma-4-E4B-it/audio/hear_summary.json",
+  "status": "PASS"
+ },
+ {
+  "id": "29f",
+  "claim": "\u2026 pushes that turn a misheard ESC-50 clip right",
+  "stated": 176,
+  "value": 176,
+  "tol": 0,
+  "unit": "count",
+  "source": "same",
+  "status": "PASS"
+ },
+ {
+  "id": "29b",
+  "claim": "\u2026 pushes that turn a correctly heard clip wrong",
+  "stated": 277,
+  "value": 277,
+  "tol": 0,
+  "unit": "count",
+  "source": "same",
+  "status": "PASS"
+ },
+ {
+  "id": "16a",
+  "claim": "J-lens tokens appear in the pushed reply",
+  "stated": 0.095,
+  "value": 0.09471063992117967,
+  "tol": 0.004750000000000001,
+  "ci": [
+   0.094,
+   0.0956
+  ],
+  "unit": "share",
+  "source": "Qwen__Qwen3.5-4B/jlens, sweep/steer",
+  "status": "PASS"
+ },
+ {
+  "id": "16b",
+  "claim": "... another neuron's tokens (chance)",
+  "stated": 0.0046,
+  "value": 0.0046362747331260366,
+  "tol": 0.002,
+  "ci": [
+   0.0045,
+   0.0048
+  ],
+  "unit": "share",
+  "source": "same",
+  "status": "PASS"
+ }
+]

@@ -7,7 +7,7 @@ Rule (from neuron-explorer / neuron-finder): add c = dose · median‖resid afte
 activation at every position, i.e. add a vector of norm dose · median‖resid‖ along its output direction. One batch
 row per (neuron, dose); greedy decoding so a reply differs from the baseline only because of the push.
 """
-import argparse, json, os, random, re, time, urllib.request
+import argparse, json, os, random, re, shutil, threading, time, urllib.request
 import duckdb
 import numpy as np
 import pyarrow as pa
@@ -68,13 +68,89 @@ def write_rows(path, rows):
     pq.write_table(tbl, path, compression="zstd")
 
 
+class _Uploader:
+    """Batch files into periodic commits to a dataset repo, backing off on failures."""
+
+    def __init__(self, target, workers=4, interval=300):
+        from huggingface_hub import HfApi
+        parts = target.strip("/").split("/")
+        if len(parts) < 2:
+            raise ValueError("upload must be a Hugging Face dataset path like 'user/repo/folder'")
+        self.repo = "/".join(parts[:2])
+        self.folder = "/".join(parts[2:])
+        self.api = HfApi()
+        self.interval = interval
+        self.lock = threading.Lock()
+        self.pending = {}
+        self.stop = threading.Event()
+        self.thread = threading.Thread(target=self._loop, daemon=True)
+        self.thread.start()
+
+    def remote(self, name, shard=False):
+        return "/".join(p for p in (self.folder, "steer" if shard else "", name) if p)
+
+    def submit(self, local, remote):
+        with self.lock:
+            self.pending[remote] = local
+
+    @staticmethod
+    def _read(path):
+        with open(path, "rb") as f:
+            return f.read()
+
+    def _flush(self):
+        """Commit everything pending as one commit; return the files that failed."""
+        from huggingface_hub import CommitOperationAdd
+        with self.lock:
+            batch = dict(self.pending)
+        if not batch:
+            return {}
+        try:
+            ops = [CommitOperationAdd(path_in_repo=r, path_or_fileobj=self._read(l))
+                   for r, l in batch.items()]
+            self.api.create_commit(repo_id=self.repo, repo_type="dataset", operations=ops,
+                                   commit_message=f"{len(ops)} files")
+        except Exception as e:
+            print(f"  upload failed ({len(batch)} files): {e}", flush=True)
+            return batch
+        with self.lock:
+            for r, l in batch.items():
+                if self.pending.get(r) == l:
+                    del self.pending[r]
+        print(f"  uploaded {len(ops)} files", flush=True)
+        return {}
+
+    def _loop(self):
+        wait = self.interval
+        while not self.stop.wait(wait):
+            wait = min(wait * 2, 1800) if self._flush() else self.interval
+
+    def close(self):
+        self.stop.set()
+        self.thread.join()
+        failed = self._flush()
+        wait = 30
+        for _ in range(6):
+            if not failed:
+                break
+            time.sleep(wait)
+            wait = min(wait * 2, 600)
+            failed = self._flush()
+        with self.lock:
+            left = sorted(self.pending)
+        if left:
+            print(f"  not uploaded: {', '.join(left)}", flush=True)
+
+
 def run(atlas, per_layer=24, n_random=8, doses=(-0.5, 0.5), prompts=PROMPTS, max_new=40, batch=64,
-        neurons=None, device=None, out_name="steer.parquet", layers=None, shards=True):
+        neurons=None, device=None, out_name="steer.parquet", layers=None, shards=True, upload=None):
     meta = json.load(open(f"{atlas}/meta.json"))
     nm = NeuronModel(meta["model"], device=device)
     eos = set([nm.tok.eos_token_id] + ([nm.model.generation_config.eos_token_id] if isinstance(
         nm.model.generation_config.eos_token_id, int) else list(nm.model.generation_config.eos_token_id or [])))
     sel = neurons or pick(atlas, per_layer, n_random)
+    # meta "raw_prompt" (e.g. "User: {p}\nAssistant:") skips the chat template, for base models that never saw one
+    fmt = (lambda p: meta["raw_prompt"].format(p=p)) if meta.get("raw_prompt") else nm.chat_prompt
     if layers is not None:
         keep = set(layers)
         sel = {L: v for L, v in sel.items() if L in keep}
@@ -89,6 +165,19 @@ def run(atlas, per_layer=24, n_random=8, doses=(-0.5, 0.5), prompts=PROMPTS, max
     bpath = os.path.join(sdir, "baseline.parquet")
     if shards:
         os.makedirs(sdir, exist_ok=True)
+    up = _Uploader(upload) if upload else None
+    if up and shards:
+        from huggingface_hub import hf_hub_download
+        for name in ["baseline.parquet"] + [f"L{L:02d}.parquet" for L in sorted(sel)]:
+            local = os.path.join(sdir, name)
+            if os.path.exists(local):
+                continue
+            remote = up.remote(name, shard=True)
+            try:
+                shutil.copyfile(hf_hub_download(repo_id=up.repo, filename=remote, repo_type="dataset"), local)
+                print(f"  downloaded {remote}", flush=True)
+            except Exception:
+                pass
     base_rows = None
     if shards and os.path.exists(bpath):
         base_rows = pq.read_table(bpath).to_pylist()
@@ -96,13 +185,15 @@ def run(atlas, per_layer=24, n_random=8, doses=(-0.5, 0.5), prompts=PROMPTS, max
     if base_rows is None:
         base_rows = []
         for pi, p in enumerate(prompts):
-            ids, stop = clean(generate(nm, nm.chat_prompt(p), 1, max_new)[0])
+            ids, stop = clean(generate(nm, fmt(p), 1, max_new)[0])
             text = nm.tok.decode(ids, skip_special_tokens=True)
             base_rows.append(dict(layer=-1, neuron=-1, dose=0.0, kind="baseline", prompt=pi, text=text,
                                   n_tokens=len(ids), stop=stop, diversity=distinct2(ids), change=0.0))
             print(f"baseline[{pi}]: {text[:120]!r}")
         if shards:
             write_rows(bpath, base_rows)
+            if up:
+                up.submit(bpath, up.remote("baseline.parquet", shard=True))
     base = {r["prompt"]: words(r["text"]) for r in base_rows if r.get("kind") == "baseline"}
     rows.extend(base_rows)
 
@@ -120,7 +211,7 @@ def run(atlas, per_layer=24, n_random=8, doses=(-0.5, 0.5), prompts=PROMPTS, max
         cols = nm.down_cols(L).norm(dim=1).cpu()
         todo = [(n, d) for n in sorted(sel[L]) for d in doses]
         for pi, p in enumerate(prompts):
-            prompt = nm.chat_prompt(p)
+            prompt = fmt(p)
             for s in range(0, len(todo), batch):
                 part = todo[s:s + batch]
                 ns = [n for n, _ in part]
@@ -139,14 +230,21 @@ def run(atlas, per_layer=24, n_random=8, doses=(-0.5, 0.5), prompts=PROMPTS, max
                                       n_tokens=len(ids), stop=stop, diversity=distinct2(ids), change=1 - jac))
         if shards:
             write_rows(path, lrows)
+            if up:
+                up.submit(path, up.remote(f"L{L:02d}.parquet", shard=True))
         rows.extend(lrows)
         print(f"  L{L}: {len(todo)} pushes x {len(prompts)} prompts  {time.time() - t0:.0f}s", flush=True)
 
-    write_rows(os.path.join(atlas, out_name), rows)
+    out_path = os.path.join(atlas, out_name)
+    write_rows(out_path, rows)
     meta.setdefault("steer", {}).update({"doses": list(doses), "prompts": list(prompts), "max_new": max_new,
                                          "n_neurons": sum(len(v) for v in sel.values()), "per_layer": per_layer,
                                          "random": n_random, "rule": "c = dose * median|resid_L| / |W_down[:,n]|"})
     json.dump(meta, open(f"{atlas}/meta.json", "w"), indent=1)
+    if up:
+        up.submit(out_path, up.remote(out_name))
+        up.submit(os.path.join(atlas, "meta.json"), up.remote("meta.json"))
+        up.close()
     print(f"wrote {len(rows)} replies in {time.time() - t0:.0f}s")
 
 
@@ -261,6 +359,8 @@ if __name__ == "__main__":
     ap.add_argument("--prompt", action="append", default=[], metavar="STRING",
                     help="prompt; repeatable (default: built-in PROMPTS)")
     ap.add_argument("--device")
+    ap.add_argument("--upload", metavar="USER/REPO/FOLDER",
+                    help="upload shards and results to a Hugging Face dataset")
     a = ap.parse_args()
     prompts = tuple(a.prompt) if a.prompt else PROMPTS
     if a.program or a.recipe or a.neuronary:
@@ -284,4 +384,4 @@ if __name__ == "__main__":
             m = json.load(open(f"{a.atlas}/meta.json"))
             sel = {L: {n: "all" for n in range(m["d_mlp"])} for L in range(m["n_layers"])}
         run(a.atlas, a.per_layer, a.random, tuple(a.doses), prompts=prompts, max_new=a.max_new, batch=a.batch,
-            neurons=sel, device=a.device, layers=a.layers)
+            neurons=sel, device=a.device, layers=a.layers, upload=a.upload)

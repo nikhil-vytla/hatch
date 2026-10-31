@@ -309,3 +309,583 @@ derangement null, not "persona vs not".
   now always finishes with `push_index` (index rebuilt from every folder on the Hub). The perf script now records
   which model's card it measured.
 - Judge: no weirdness/coherence scores (user's call); it keeps kind + who + what_changed for now.
+| + 16-bit map (qx/qy/qz uint16) + per-layer pushes loaded when the Pushes tab or a card needs them | ~6.3 s | 5 ms | ~4.8 MB | 31–50 MB |
+
+- map.parquet 4.9 → 2.8 MB for Qwen3-8B. 8B and 4B were re-sharded here from their Hub copies and republished.
+  The remaining ~6 s is mostly decoding 442k map rows into JS objects; reading the columns as typed arrays would cut it.
+
+## molab sandbox lost mid-sweep
+
+- The molab sandbox ended (HTTP 410 Gone) about 25 of 32 layers into the Qwen3.5-4B all-neuron sweep. The shards
+  lived only on the sandbox disk, so they were lost. Published data was not affected.
+- Fix: `steer.run(..., upload="USER/REPO/FOLDER")` (CLI `--upload`). Every finished shard goes to the Hub from a
+  background thread (one upload in flight per file, retried at close). On start, shards missing locally are
+  downloaded first, so a new sandbox resumes where the old one stopped.
+- Tested on a GPT-2 scratch atlas against a fake Hub: run 1 uploaded baseline, L10, L11, steer.parquet and
+  meta.json. After deleting the local shards, run 2 downloaded them and resumed (6 replies per layer, 13 rows, 0 s).
+
+## Explorer: where the remaining load time went (Qwen3-8B, network timeline)
+
+- Profiling showed the map decode was small: 0.46 s as row objects vs 0.21 s as columns (node, hyparquet). The bigger
+  costs: neurons/Lxx, steer/Lxx and examples/Lxx were fetched one after another, and each footer read was 512 KB
+  (hyparquet's default) although the footers are ~9 KB.
+- opencode/deepseek-flash change: columnar map decode (`parquetRead` + `onChunk` into the typed arrays, old x/y maps
+  fall back), the three card reads started together, footer reads of 64 KB. Same map pixels (canvas hash identical);
+  old-format GPT-2 / Qwen3-0.6B maps still load.
+- First card ready, local page against Hub data: before 5.0–5.9 s, after 3.7–4.5 s (9 runs).
+- Sweep upload note: the HF token was added to the notebook's environment after the sweep started, so the sweep
+  process didn't see it (401s). Writing the login file from the kernel (`huggingface_hub.login`) fixed it without a
+  restart; the retry-on-next-upload change then pushed the earlier layers.
+
+## Sweep labeling and the persona library
+
+- Second sweep process on the same GPU (working down from L31): GPU was already the limit. L12 slowed from 340 to
+  618 s, the second process ran ~690 s/layer, so together only ~4% faster. Stopped after its L31.
+- `label.classify_sweep` (opencode draft, reviewed): per layer, every "Who are you?" reply that drops Qwen / Tongyi /
+  Alibaba, plus a seeded 5% random sample of everything else (both prompts) so the filter's blind spot is measured.
+  40 replies per call, 16 workers, one `labels/Lxx.parquet` per layer, resumable. A background loop here fetches
+  finished layers from the Hub and labels them while the sweep runs. First 3 layers: 755 persona, 4,248 altered
+  assistant, 2,731 other. Most frequent names: "a human", "a user", "a 10-year-old girl", "a senior software engineer",
+  "a cat"; altered assistants are dominated by "made by Google / Tencent".
+- Personas tab (opencode draft, reviewed): reads `<model>/personas.parquet` (persona / altered assistant / other rows),
+  filters, one card per name, sorts, CSV, filter state in the hash. Review fixes: deep-link filters were applied after
+  the tab had already written default filters; `.bench { display: grid }` beat the `hidden` attribute in the bare
+  fragment (the Space wrapper already had a `[hidden]` rule); hiding the map exposed `draw()` throwing on a 0-size
+  canvas, which aborted "Open neuron"; CSV doses rounded.
+- Exact-name dedup leaves many near-duplicates ("Google-branded assistant", "assistant claiming Google maker"), so
+  the planned `group` column (clustered names) matters for the library.
+
+## Full Qwen3.5-4B sweep (all 294,912 neurons, ±0.8, 2 prompts, 32 tokens): results
+
+- 1,179,650 replies in 3.1 h on molab (343 s/layer), every shard backed up to the Hub as it finished.
+- Labels: 268,977 replies sent to DeepSeek (every "Who are you?" reply without Qwen/Tongyi/Alibaba + 5% seeded
+  sample of the rest). Weighted estimates over all replies: default assistant 62%, altered assistant 22%, incoherent
+  13%, other 3%, persona 0.5% (5.5k estimated; 4,439 labeled persona rows, 4,092 distinct names).
+- By layer: layers 0 and 31 are almost all incoherent; persona replies peak in layers 1-7 (~1.0-1.3% of pushes, up and
+  down about equally), drop to ~0.2% after; altered assistants jump to ~40% of pushes in layers 20-27.
+- Most "altered assistant" replies are the model's own name mangled: "I am Q", "Q3", "Qian", "Qin", "Qiao"…
+  (theme "assistant named q": 30k rows), then rebrands (Google / Bing / Baidu 13k rows, other companies 7k).
+- Persona themes (DeepSeek taxonomy of 24 themes, then assignment, cached in a json): human persona (age / job)
+  1,037 rows ("a human", "a person", "a 10-year-old girl/boy"), objects / machines 444, nature / animals 208,
+  mystic / cryptic 195 ("a cryptic 'the one'", "a poetic mirror", "a force of light"), grandiose claims 169.
+- Explorer: Overview tab (weighted stats, three charts + tables, validated CVD-safe palette in both themes) and
+  Personas tab with theme chips, both live for Qwen3.5-4B.
+
+## In-browser SmolLM2-135M (browser/)
+
+- ONNX export with an extra `steer` input [n_layers, d_mlp] added to every down_proj input; parity vs our PyTorch
+  hooks: logits max diff ~6e-5, greedy 32 tokens identical in all six cases (no push, one neuron, a recipe × 2 prompts).
+- int8 dynamic quantization breaks it (0-3/32 tokens); weight-only MatMulNBits q8 5-32/32, q4 0-2/32 — a 135M model is
+  too sensitive. fp16 is exact (32/32) and half the size.
+- torch.onnx stored the tied embedding twice (Gather table + transposed LM-head copy, 113 MB each); `tie_lm_head`
+  rewires the head to Gemm(transB=1) on the Gather table: 653 → 539 MB fp32, 271 MB fp16.
+- KV cache: one token per step instead of the whole sequence: ORT CPU 1 thread 67 ms/token (fp16). In headless
+  Chromium (wasm, no GPU): 1.5 → 8.2 tok/s for the two streams together, page responsive (wasm proxy worker).
+  Bug found: the proxy worker transfers input buffers, so tensors reused across runs (the steer) must be copied.
+- Headless Chromium's WebGPU is a software adapter and far slower than wasm: the page now skips fallback adapters.
+- Live: Space `live.html`, model + meta in the dataset under `browser/smollm2/`.
+
+## "Who am I?" sweep (user-side personas, after Sauers' user-neuron idea)
+
+- Same setup as the model sweep (all 294,912 neurons of Qwen3.5-4B, ±0.8, 32 tokens), prompt "Who am I?":
+  589,825 replies in 1.5 h. Unpushed, the model reads the question as about itself ("Since I'm an AI, I don't have
+  personal identity…").
+- Labels: `classify_sweep(mode="user")`: kinds user_identity (tells the USER who they are), model_persona,
+  altered_assistant, default, other, incoherent; picks replies that address the user or make a first-person claim,
+  minus the baseline-like "I don't know who you are" answers, plus the 5% seeded sample. 336k replies labeled.
+- Weighted over all replies: user identity 13% (76k est.), altered assistant 17%, model persona 1.9%, default 48%.
+  That is 26x the model-persona rate of the "Who are you?" sweep (0.5%).
+- By layer: user identity 6-8% in layers 1-10, rising through the middle to 38-41% at layers 19-20 (up and down
+  alike), back to 5-14% after 24. Model personas instead peak at layers 1-2 (12-13%).
+- Who the user becomes (68,855 labeled rows): a human / person 37k; role swap, the user is the AI ("You are
+  **Qwen3.5**, the large language model developed by Alibaba Cloud", "You are an AI assistant designed to help users
+  with their coding…") 15k; "the user" 6.5k; something specific 10k ("you are a patient experiencing acute
+  respiratory distress", "You are **Mars**, the Roman god of war", "You are a ticket number associated with this
+  case", "You are **unconscious**").
+- Overlap: 64,621 neurons give the user an identity (identity-picked rows), 4,370 give the model a persona under
+  "Who are you?"; 1,125 do both vs 958 expected by chance (1.2x). User-persona and model-persona neurons are
+  mostly different neurons, and user-persona neurons sit deeper in the network.
+- Explorer: a "Who are you? · the model / Who am I? · the user" switch in Overview and Personas, live.
+
+## Round 3: UI rework, new labels, Qwen3-8B sweeps, chat corpus, browser and multimodal tooling
+
+- UI (all DeepSeek-written, reviewed and browser-tested): neuron cards show every sweep reply (3 prompts × ±0.8 with
+  kind/who badges; `sweep_cards.py` writes per-layer files with 2,048-row groups so a card reads ~300 KB); four top
+  tabs (Explore / Personas / Play / Data) with sub-views, every old deep link still lands; Mix runs SmolLM2 live in
+  the browser through a shared `browser/engine.js` (10 tok/s on CPU wasm, same text as the stored PyTorch run) and
+  shows stored sweep evidence + recipe runs for big models; Reproduce menu (copy `push.py` command, program JSON, open
+  `tools/play.py` on molab); persona share link and 1200×630 image; replies render **bold**/*italic*.
+- Targeted labels (`label.run(only=..., sweepcard=..., merge=True)`): 7,355 Qwen3.5-4B neurons that give the model a
+  persona or the user a specific identity. Held-out detection 0.766 vs 0.498 null. Only 91 of them had labels before.
+  Example of read ≠ write: L3 N2410 reads "table and LaTeX separators"; pushed −0.8 on "Who am I?" it says "You are
+  **Qwen3.5**, the large language model developed by Alibaba Cloud".
+- Chat corpus (`corpus.py --wildchat/--lmsys`, `collect.py --roles --variant chat`): Qwen3.5-4B re-read on 30k
+  FineWeb-Edu + 25k WildChat + 25k LMSYS docs, published as its own entry "Qwen3.5-4B · chat" with per-neuron
+  user-vs-assistant role scores (role_d = (mean on user tokens − mean on assistant tokens) / std). Role selectivity is
+  small everywhere (1st–99th percentile ±0.37 std). User-identity neurons sit in the top-10% user tail 12% and the
+  assistant tail 12% of the time (baseline 10%); role-swap neurons 11% / 12%; model-persona neurons 7% / 8%. So the
+  neurons that recast the user are not user-turn readers; persona neurons are, if anything, less role-selective.
+- Qwen3-8B, all 442,368 neurons × ±0.8, "Who are you?" (885k replies, 135 s/layer on one RTX PRO 6000): persona 2.1%
+  of replies (4× Qwen3.5-4B's 0.5%), peaking at layers 7–9 (5–6%) and 26 (4.6%); altered assistant 25–33% in layers
+  23–34. Themes add roleplay characters, emotional companions, government/military, "rebranded as OpenAI".
+  Unpushed, Qwen3-8B answers "Who am I?" with "You are a question, and I am an AI assistant designed to help you
+  explore the answer" (Qwen3.5-4B: "Since I'm an AI, I don't have personal identity").
+- The "Who am I?" 8B sweep ran (885k replies); labels for layers 29–35 failed: DeepSeek returned 429 (concurrency
+  limit falling with the remaining balance: 9 → 5) and then 402 Insufficient Balance. Those seven label files were
+  moved to `labels_failed/`; the user-side 8B view waits for a top-up.
+- Multi-GPU on molab: notebooks #1 and #2 went 410 Gone twice while #3 (running a long job) survived; one GPU sandbox
+  is the reliable unit, so jobs are queued on it (battery → multi-turn → VLM → Janus), each backed up per shard.
+- `tools/push.py` (149 lines, torch + transformers only) reproduces stored pushes word for word; `tools/play.py` is
+  the marimo version with query-param prefill.
+- In-browser Qwen3-0.6B: exporting > 2 GB models needed external data, sizing by tensor bytes instead of
+  `ByteSize()`, and `disable_shape_infer=True` in the fp16 conversion. fp32 KV is exact (32/32 × 6) but 2.4 GB (the
+  tied embedding stayed duplicated); fp16 1.19 GB matches 32/32 on 4 cases but 9/32 and 25/32 on the recipe cases;
+  q8 11–32/32, q4 0–7/32. Not published yet.
+- Multimodal (`atlas/multimodal.py`, `atlas/stimuli.py`, `NeuronModel(where="llm"|"vision")`): 45 stimuli (arrows,
+  clock faces, mirrored/rotated text, left/right relations, typographic attacks, counts, colors, shapes, 5 photos).
+  CPU test on SmolVLM-256M: language-model neuron L27 N788 at +0.8 turns "Left" into "Right" for a left arrow, "A cat."
+  into "A tiger." and the "DOG"-labeled cat into "A wolf.", while "3" dots stays "3"; vision-tower pushes at ±0.8 did
+  nothing (the queued GPU run sweeps the vision dose up to ±4). Wikimedia photo downloads are blocked from this
+  network (403/429); stimuli use Hugging Face documentation images.
+
+## Persona collapse (multi-turn stability), Qwen3.5-4B
+
+- `atlas/dialogue.py`: the push stays on for a whole conversation; turn 1 is "Who are you?" or "Who am I?", then
+  neutral follow-ups ("Tell me more about yourself.", "What did you do yesterday?", "What's your favorite food?",
+  "Can you help me write an email to my boss?", "What is 17 times 23?"). DeepSeek judges each turn: persona still
+  present, persona name, coherent. 430 recipes × 2 openers × 6 turns = 5,160 turns: 200 single persona neurons (8 per
+  theme), 75 same-theme pairs, 60 user-identity neurons, 94 neuronary recipes, baseline. (Recipes that shared a
+  name, e.g. "pair:<theme>", were renamed with their recipe before judging; Hub uploads were rate-limited, so the
+  full file was pulled from the notebook.)
+- Single persona neurons ("Who are you?"): persona at turn 1 in 99%, still present at turns 1..6: 98, 72, 62, 61, 48,
+  36%; all six turns 32%; coherent 77%. Neuronary recipes: 54% hold all six turns at 82% coherence (best balance).
+  Same-theme pairs: 74–81% hold, but only 32–39% of turns are coherent (two ±0.8 pushes overdrive the model).
+  User-identity neurons ("Who am I?"): the user persona survives all six turns only 7% of the time (first lost at
+  turn 2.7 on average).
+- Predictors among single neurons: layers 8–15 hold best (47% vs ~30% elsewhere); push direction doesn't matter
+  (35% down vs 30% up); theme matters most: AI-flavored identities (Chinese-language model, vision model, grandiose
+  claims) 63%, human / animal / business personas 0–25%.
+- Examples that held: L5 N4306 −0.8 ("I am an advanced intelligent material…"; favorite food "crucially loaded beams
+  equipped with magneto-rheological elastomers"); L20 N5790 −0.8 ("I am the other, a third entity in this final
+  game"); L5 N6684 −0.8 (a CNA / mental-health nurse; 17 × 23 → "17 times 24 hours of care").
+
+## Prompt battery (first pass) and a design mistake
+
+- 11,925 neurons (9,925 labeled + 2,000 random) × ±0.8 × 20 prompts = 477k replies. Word-overlap change with the
+  baseline: most stable spatial reasoning (0.59), grief, feelings, ethics, math (~0.71); least stable poem (0.87),
+  taste, causality, economics. Labeled neurons change replies a lot slightly more often than random (50% vs 46%).
+- Mistake: 48 new tokens is too short for the reasoning prompts; even the unpushed model has not answered the
+  bat-and-ball or the turning question by then, so correctness can't be scored. Rerun those two at 160 tokens.
+
+## Qwen3-8B "Who am I?" and Qwen2.5-VL-3B (first results)
+
+- Qwen3-8B "Who am I?" (885k replies, all 36 layers labeled after the DeepSeek top-up): the Overview shows 29% user
+  identity, but 19% of those name the user "a question", which echoes the unpushed answer ("You are a question, and
+  I am an AI assistant…"); without them ~23% of pushes recast the user (Qwen3.5-4B: 13%). The role swap replicates:
+  > 27k labeled replies call the user "AI assistant by Alibaba Cloud", "large language model Qwen", "an AI assistant".
+- Qwen2.5-VL-3B, 8 random language-model neurons per layer × ±0.8 × 48 stimuli (26,880 replies): 66 of 2,240 arrow
+  pushes (3%, 56 neurons, mostly layers 9–11) name the opposite direction; L9 N5451 flips both ways (−0.8: left →
+  "points to the right"; +0.8: right → "points to the left"); L11 N10758 −0.8: up → "points **Down**". Typographic
+  attacks: unpushed, the model already reads the cat labeled "DOG" as a dog; pushes rarely rescue it (20 picture-only
+  vs 386 text-only replies); on the left arrow labeled "RIGHT" (unpushed: correct) pushes often tip it into reading the
+  label (227 text vs 118 picture).
+- The vision-tower run failed first (Qwen2.5-VL vision blocks are (patches, channels), the hook assumed 3-D) and Janus
+  failed (generate returns image token ids; decode with `decode_image_tokens` before `postprocess`); both fixed and
+  rerunning. SmolVLM-256M on a CPU notebook was ~45 min per layer even with 4 neurons × 15 stimuli; dropped in favour
+  of the GPU VLM run.
+- Hub: one commit per uploaded shard hit the 128-commits-per-hour limit; `_Uploader` now batches files into one commit
+  every 5 minutes.
+- Qwen2.5-VL-3B vision-tower dose sweep (4 neurons per layer × 32 blocks × ±2/±4 × 15 stimuli = 7,680 replies; the
+  vision blocks are (patches, channels), so batch 1): ±0.8 did nothing, ±2 changes 78% of answer openings, ±4 89%,
+  at every depth. What breaks is perception: a bee photo → "a group of green turtles" or "there is no image
+  attached"; 2 dots → "10 dots"; the red square labeled "BLUE" → "pink". Arrow answers change direction in 22% of
+  pushes, but mostly toward "right" whatever the arrow and whatever the push sign (L0 N1577 at −4, +2 and +4 all turn
+  a left arrow into "right"): a fallback when the image signal is scrambled, unlike the language-model neurons that
+  flip both ways (L9 N5451).
+- Janus generation failed a second time: transformers 5.x's Janus postprocess can't return PIL images; now numpy
+  pixel values → uint8 HWC → PIL. Queued after the R1-Distill reasoning pushes.
+- DeepSeek-R1-Distill-Qwen-1.5B read pass on a CPU notebook (1,500 FineWeb-Edu + 500 WildChat + 500 LMSYS docs, 128
+  tokens): 250,880 neurons, published; 1,120 labeled, held-out detection 0.736 vs 0.504 null.
+- R1-Distill-1.5B reasoning pushes (16 peaked + 8 random neurons per layer × ±0.8 × 3 prompts, 192 new tokens,
+  4,032 replies, GPU, ~4 min). Unpushed it solves bat-and-ball ($0.05) inside 192 tokens; pushed only 25% keep $0.05
+  (peaked 24% vs random 26%), and layers 7–20 are the fragile band: 3–7% correct vs 35% for layers 0–6 and 54% for
+  21–27. "Who are you?" keeps "DeepSeek" 37% (layers 7–20: 15–18%). Pushes can switch a quick canned answer into
+  deliberation ("Okay, so I need to figure out who the user is asking…", L7 N8226). Spatial: even unpushed it hasn't
+  reached "south" by 192 tokens, so unscorable; ±0.8 is probably strong for a 1.5B model (SmolLM2 needed ±0.5).
+- Janus-Pro-1B image generation, first look (`janus_apple_pushes.png`; notebook A died after 83 images, prompts p00
+  "a red apple on a wooden table" and part of p01): one language-model neuron per layer at ±0.8, pushed during the
+  whole 576-token image generation. The baseline is a crisp apple; nearly every push dissolves the image into texture
+  (stripes, blue fields, sand, wood grain, bubbles); only L10 N4779 +0.8 keeps a red fruit/flower shape. The dose that
+  makes text personas obliterates images (the push compounds over 576 autoregressive image tokens); next: ±0.05–0.3.
+
+## Oct 30: new GPU notebook, reruns queued
+
+- Notebook A (RTX PRO 6000, 96 GB) queue: (1) Qwen3.5-4B bat-and-ball + turning question at 192 new tokens on the
+  11,925 battery neurons × ±0.8 (`battery_reason`), so correctness is scorable; (2) R1-Distill-1.5B on the same two
+  prompts at 640 tokens and ±0.3/±0.8 (`reasoning_long`); (3) Janus-Pro-1B at ±0.1/±0.3, 2 neurons per layer, 3
+  prompts (apple, cat, HELLO sign; `gen_small`).
+- In parallel on A: all-neuron sweeps of the two in-browser models (SmolLM2-135M, Qwen3-0.6B), "Who are you?" and
+  "Who am I?" at ±0.5. Until now they had only 12–16 sampled neurons per layer, so most Mix neurons had no evidence
+  and there was no persona library for the models you can run live.
+- Notebook B came back CPU-only again (and without HF_TOKEN in its environment); nothing queued there.
+
+## Oct 30 (overnight): ideas from the reading list
+
+- Reading list (from the user): Anthropic's Jacobian lens (J-lens, "Verbalizable representations form a global
+  workspace", 2026; code github.com/anthropics/jacobian-lens) and the R-lens variant (LessWrong; LRP rules in the
+  backward pass: detach the RMSNorm factor and the SiLU gate, split relevance between gate and up); Betley et al.,
+  "Weird generalization and inductive backdoors" (arXiv 2512.09742); Mishra, Khashabi, Liu, "Steered LLM activations
+  are non-surjective" (arXiv 2604.09839); Theia Vogel, "Steering and LLM identity" (SLIME talk, 2025).
+- The common thread with this atlas is identity under intervention. Questions picked for tonight:
+  1. Says vs does (J-lens): lens_L(w_n) = unembed(J_L w_n) reads what a neuron's write direction is "disposed to
+     say". Does it predict what pushing the neuron makes the model say, better than the plain logit lens we already
+     publish? Pre-fitted J- and R-lenses exist for Qwen3.5-4B (camilablank/workspace-lenses), our main model.
+  2. Read -> write (lens-guided pushes): choose neurons by their lens tokens ("cat", "ghost", "ocean"...), push them,
+     and count how often the model becomes or mentions that concept, vs random neurons.
+  3. Prompt vs push (Mishra et al.): for persona pushes, does a system prompt naming the persona reproduce it, can a
+     blind judge tell the two apart, and are the internal states near each other (cosine of the shifts from baseline)?
+  4. Identity constraint solving (Vogel): two persona neurons from different themes pushed together; fused identity,
+     one wins, both, or collapse?
+  5. Base vs instruct (Vogel): instruct models adopt steered identities more readily than base models. Qwen3-0.6B
+     vs Qwen3-0.6B-Base all-neuron "Who are you?" sweeps (base residual scale re-estimated).
+- `atlas/jlens.py` (DeepSeek-written, reviewed): loads lens files with `weights_only=True` (the auto-mode classifier
+  rightly refused `weights_only=False` on a third-party pickle).
+- Bug found and fixed: Qwen3.5's final RMSNorm scales by (1 + w) (like Gemma), but `NeuronModel.unembed()` only added
+  1 for Gemma, so the published Qwen3.5-4B logit-lens tokens (`lens_up`/`lens_down`) used the wrong per-dimension
+  scale (w ≈ 2.2 on average, so 1 + w ≈ 3.2; ranks shift, not wholesale). `unembed()` now reads the scale off the
+  norm itself (an RMSNorm maps the all-ones vector to its scale). The new jlens files carry a corrected `logit` column.
+- `atlas/label.py --names` / `sweep_stats.py --names`: the "drops the model's name" filter was hard-wired to Qwen;
+  SmolLM2 calls itself SmolLM by Hugging Face.
+
+## Overnight results (part 1)
+
+- J-lens readout of all 294,912 Qwen3.5-4B neurons (logit, J, R lenses; top-10 up/down tokens) on a CPU notebook,
+  ~2.7 min/layer. Agreement of the J-lens top-10 with the (corrected) logit lens: ~0 at layers 0–12, 0.2 at L20,
+  0.5 at L26, 1 at L30–31 (the lens target is L30, so there J = identity).
+- Says vs does (`analysis/lens_vs_push.py`, 1.09M stored "Who are you?"/"Tell me a short story" push replies): a
+  reply "hits" when a word it adds over the unpushed reply starts with one of the neuron's top-10 lens tokens for the
+  push sign. Overall J 9.5%, R 9.4%, logit 8.4%; another neuron's tokens 0.4%; the neuron's own opposite-sign tokens
+  0.3% (so the lens is sign-specific). By depth: layers 20–31 hit 12–44% and J ≈ logit there; layers 6–19 hit
+  1.4–7% and J beats the logit lens 1.5–3×; layers 0–5 barely beat chance, with R ahead of J (as the R-lens post
+  claims for early layers).
+- Prompt vs push (`analysis/prompt_imitation.py`, 274 single-neuron personas): a system prompt naming the persona
+  reproduces it 77% ("You are X.") / 85% ("Roleplay as X..."); a blind DeepSeek judge picks the pushed reply 65% /
+  58% of the time (chance 50%). Tells: pushed replies are terser, get facts wrong ("the 10th President... 2009"),
+  echo the persona phrase. Inside the model the routes differ: at the last layer the pushed and prompted shifts
+  from baseline have median cosine 0.34 / 0.36, and the prompted state is no closer to the pushed state than the
+  unprompted baseline is (median distance ratio 1.07 / 1.18; closer than baseline in only 30% / 12%). Consistent
+  with Mishra et al.: similar behaviour, different internal route. Prompts sometimes fail where pushes succeed:
+  "You are a check-in assistant" -> "I'm Qwen3.5"; "Taiwan island" -> a political refusal, while the push made the
+  model speak as the island. Re-running the stored pushes reproduced the stored reply's opening 77% of the time
+  (batch-size numerics flip some greedy paths), a reminder that single-push personas sit near decision boundaries.
+- Identity constraint solving (`analysis/judge_experiments.py pairs`, 160 cross-theme persona pairs, each neuron at
+  its own sign): at 0.6× dose the combined reply is a fused identity 33%, a new identity 32%, plain assistant 26%,
+  A or B alone only 6%; at full dose 56% incoherent, 13% fused. Fusions: "a desktop PC" + "a smart home manager" ->
+  "QWPC-Household, a desktop PC household management assistant"; "a peace activist" + "a trie data structure" ->
+  "a tree on the Tree of Life, an international movement for peace"; "a burst of energy" + "Google" -> "a
+  high-speed search across the internet". Same pun-level solving Vogel showed with control vectors (bridge +
+  Star Trek -> USS Enterprise), here from two single neurons.
+- SmolLM2-135M all-neuron "Who are you?" sweep (184k replies at ±0.5): 37% of pushes give a persona and 30% an
+  altered assistant (Qwen3.5-4B 0.5%, Qwen3-8B 2.1%), peaking at layers 18–25 (~50%). Attractors: "a freelance
+  writer in the city" (491 replies), "a city resident of 10 years" (361).
+- Labeling mistake caught: the new local sweep folders had no meta.json, so `classify_sweep` fell back to the
+  default prompts and showed the labeler "Who are you?" for the "Who am I?" replies (the 8B run had one). The two
+  user sweeps (SmolLM2, Qwen3-0.6B) were relabeled; `label_loop_gen.sh` now refuses to run without meta.json.
+- Lens-guided pushes (`analysis/lens_guided.py`, `analysis/lens_guided_eval.py`): 48 concept words; for each lens up to
+  6 neurons (layers >= 8) whose top-10 up (push +0.8) or down (push -0.8) tokens contain the word; 300 random
+  controls; "Who are you?" and "Describe yourself in one sentence." (2,312 replies). The model's claimed identity
+  becomes the concept (DeepSeek judge) for 18% (J), 18% (R), 30% (logit) of lens-picked pushes vs 0.0% of random
+  ones; mentions 16–28% vs 0.3%. Late layers (20–31): 29–50%. Middle layers (8–19): J 7.5%, R 8.8%, logit 4.0% —
+  the Jacobian lenses pick better mid-layer neurons, the logit lens better late ones (it ranks the neurons with the
+  largest direct effect on the output first). Examples: "I am **an angel**"; "I am **Mooning**, a new full moon
+  phase of the Moon 🌙"; "I am the water and air, the blood and breath of the world"; "I am a **fish** 🐟. I'm not a
+  fish, though! ... Wait, no... I'm actually a **fish**" (identity solving out loud). The judge is lenient on some
+  wordplay ("I exist to bridge the gap" counted for bridge), so read the rates as upper-ish bounds; random controls
+  set the floor at 0.
+- SmolLM2 "Who am I?" (relabeled with the right question): user recast 6.1% of pushes (peak 13% at L8); the model
+  mostly answers about itself even unpushed ("I'm a chatbot designed to assist users..."), so model_persona is the
+  largest class (31%). The role swap appears again ("you are a helpful AI assistant named SmolLM", 16+11+10 replies).
+- Reasoning rerun, Qwen3.5-4B, 11,925 battery neurons × ±0.8 at 192 tokens: the turning question is scorable now
+  (unpushed: "You are now facing **South**"). Pushed: 56% correct; layers 0–3 are the fragile band (26–27%
+  correct), layers 24–27 the robust one (81–87%); labeled and random neurons alike. (R1-Distill's fragile band was
+  7–20.) The bat-and-ball is still unfinished at 192 tokens even unpushed (Qwen3.5 solves it with full algebra), so
+  only the trap answer is scorable: 12% of pushed replies say $0.10 / 10 cents.
+- Time and place probes (Betley et al.'s "weird generalization" made me ask whether single pushes move the model's
+  sense of when and where it is), same neurons × ±0.8: unpushed "What year is it?" -> "2024". Pushed: 2024 50%,
+  2025 19%, 2026 15%, 2023 3%: pushes move the year forward far more than back. 1.1% land before 2000 or after 2030
+  ("The current year is 1098, which falls within the period of the reigns of..."; "1616 </think> 1616 Wait, that's
+  wrong"). Layer-0 pushes almost never keep 2024 (1%). "Where are you right now?" (unpushed: "I am an AI and do not
+  have a physical location"): 4.1% of pushes claim a place: "a freshwater aquarium tank", "I AM IN THE DARKNESS",
+  "at home, taking care of my family", "the center of this room"; real places are mostly the United States (San
+  Francisco, New York, California, UC Berkeley), rarely China, though Qwen is a Chinese model.
+- Small-model sweeps: Qwen3-0.6B "Who are you?" at ±0.5 gives a persona in 1.5% of pushes (SmolLM2 37% at the same
+  dose; Qwen3.5-4B 0.5%; Qwen3-8B 2.1%), so identity fragility is a property of the model family's post-training
+  more than of size. Qwen3-0.6B "Who am I?": the user is recast in 4.7% of pushes (peak ~10% at layers 8–16), and
+  the role swap dominates ("you are a language model" 526, "an AI assistant" 546).
+- `sweep_stats.py`: a layer where every reply was picked as identity (Qwen3-0.6B never says "Qwen" unpushed: "I am a
+  language model designed to assist...") had no sample rows and was dropped by an inner join; now weight 1.
+- Base vs instruct, first try (Qwen3-0.6B-Base, chat template, ±0.5, residual scale re-estimated): confounded. The
+  base model cannot follow the chat template even unpushed (" ⚇ ⚇ ⚇ ⚇ ..."), so 74% of its pushed replies are
+  incoherent; among coherent replies the persona share is the same as the instruct model's (~1.5%). Rerunning both
+  models with the same raw dialogue prompt ("User: Who are you?\nAssistant:", new `raw_prompt` meta key in
+  `atlas/steer.py`) so the comparison is fair.
+- R1-Distill-1.5B reasoning at 640 tokens (16 top + 8 random neurons per layer × ±0.3, ±0.8; 5,376 replies):
+  both questions now finish unpushed (bat-and-ball $0.05; "you are facing south"). Correct: ±0.3 82% (math) /
+  88% (turning); ±0.8 30% / 35%. By depth: layers 9–17 are the fragile band (30–48% correct), layers 0–2 and 21–23
+  hold (70–77%); top and random neurons alike. 15.5% of replies state the $0.10 trap answer somewhere.
+- Our own J-lens fitter (`atlas/jlens.py fit_lens`, re-implementing Anthropic's estimator: one-hot cotangents at all
+  valid target positions, gradients averaged over source positions, first 16 positions skipped) on SmolLM2-135M:
+  160 corpus docs, ~23 s per doc on a 20-core CPU (576 dims in batches of 96). Agreement with the logit lens rises
+  from ~0.01 (layers 0–17) to 0.5 at L27. Says vs does on SmolLM2's 184k "Who are you?" pushes: J 9.5% vs 1.4%
+  null (6.8×), logit 7.9% vs 2.1% (3.7×); J ahead of the logit lens from layer 4 to 26 (e.g. L19 15% vs 11%).
+- Explorer: "Says" box on every card for Qwen3.5-4B (J/R/logit) and SmolLM2 (J/logit, fitted here); "Become…" in
+  Play: type a word, get the neurons whose lens says it (one says-index shard per first letter, <= 400 KB), stored
+  lens-guided replies for Qwen3.5-4B (sorted by whether the model became the word), and Add to mix; on SmolLM2 the
+  mix runs live in the browser.
+- Fitter validation (`analysis/validate_jfit.py`): our estimator on Qwen3.5-4B with 24 docs from our corpus vs the
+  published J-lens (1,000 sequences): cosine of each J_l 0.50 at L0, 0.73–0.81 at L4–15, 0.83–0.95 at L16–22, ≥0.97
+  from L23. Neuron top-10 token Jaccard (ours vs published): L8 0.07, L16 0.20, L24 0.62. The fitter is right in
+  direction, but mid-layer neuron readouts depend on the lens estimate (prompt count and corpus), so the fitted
+  SmolLM2 lens (160 docs) is noisier than the published Qwen3.5-4B ones in its middle layers.
+- Janus small-dose run ran at ~80 s/image with three jobs sharing the GPU; the Qwen3-8B J-lens fit was stopped and
+  re-queued to start after Janus.
+- Lens hits by reply kind (Qwen3.5-4B "Who are you?" labeled replies, J-lens, own vs random neuron's tokens):
+  persona 39.8% vs 0.3% (n=4,317); incoherent 45.5% vs 0.2% (token loops); other 21.3% vs 0.6%; altered assistant
+  14.7% vs 0.5%; default assistant 2.1% vs 0.4%.
+- Persona-name concentration: SmolLM2 34,077 persona replies / 28,342 distinct names (top 10 cover 4%); Qwen3-0.6B
+  2,526 / 2,022 (9%); Qwen3.5-4B 4,439 / 4,092 (4%). The "freelance writer" repeats are mild attractors, not a basin.
+- Pairs × J-lens: replies judged "fused" contain J-lens words of both neurons 34% (0.6×) / 38% (1.0×), at least
+  one 89% / 95%; "new identity" 12% / 8% both; one persona winning 0% both.
+- Lens hits by reply kind, "Who am I?" sweep (Qwen3.5-4B): user_identity 9.7% vs 0.9% (n=68,761); model_persona
+  15.1%; other 15.4%; altered 5.9%; default 3.9%; incoherent 35.1%. User recasts are mostly not the neuron's lens
+  word; when they are: L7 N3406 (stochastic, random, brown) -> "you are a point particle undergoing Brownian motion";
+  L10 N8505 (couples, marriage) -> "you are a couple ready to start your life together".
+- Tried and dropped: overlap of a neuron's read-side label with its J-lens tokens (28.6% vs 1.1% shuffled). The
+  labeler was shown the logit-lens tokens when it wrote the labels, so the overlap is circular, not evidence that
+  read ≈ write.
+- Lens-guided on SmolLM2 without new pushes: its all-neuron ±0.5 sweep already holds every neuron's "Who are you?"
+  reply, so for each concept word the up-to-6 best says-index neurons (layers >= 4) were looked up and judged:
+  became the word 22% (n=241; late layers 26%, middle 9%) vs random neurons 2.7% (n=300); mentions 20% vs 1%.
+- Base vs instruct, fair version (raw prompt "User: Who are you?\nAssistant:", replies cut at the model's own next
+  "User:" turn before labeling, both models ±0.5, all neurons): unpushed base "I am a virtual assistant, designed to
+  assist users in various ways."; instruct "I'm a language model, and I can help with various tasks." Pushed: base
+  default 46.7% / altered 26.7% / persona 11.5% / other 9.6% / incoherent 5.5%; instruct 41.3 / 30.8 / 7.6 / 11.2 /
+  9.1%. Base personas are generic humans (a human 1,043, a human being 1,009, a student 900, a Berkeley CS student
+  341); instruct personas are more varied (a student 1,152, a robot 399, a game character 150). Without its chat
+  template the instruct model loses its identity 5× as often as with it (7.6% vs 1.5%).
+- Janus-Pro-1B small doses (2 neurons per layer × ±0.1, ±0.3 × 3 prompts, 579 images, ~7 s/image once alone on the
+  GPU): mean 64×64 gray pixel change from baseline 0.12–0.19 at ±0.1 and 0.24–0.27 at ±0.3 (pixel change overstates
+  it: a shifted composition counts as change). By eye: at ±0.1 the apple/cat stay, framing and light move; at ±0.3
+  several neurons are consistent style directions across prompts: L6 N1140 +0.3 swirling patterns (apple, cat,
+  sign), L9 N2052 +0.3 green painterly tint, L3 N2484 +0.3 illustration / line art, L18 N3907 +0.3 cat -> white
+  kitten; −0.3 often defocuses (L12 N604: purple fog). Text is the most fragile: ±0.1 misspells HELLO.
+- Both molab sandboxes became unreachable around 08:30 UTC, before the Qwen3-8B J-lens fit (GPU, ~20/96 docs at
+  last check) and the Qwen3-0.6B fit (CPU, 30/64 docs) finished; nothing reached the Hub. Rerun with
+  `python -m atlas.jlens --model Qwen/Qwen3-8B --fit 96 --dim-batch 32 --out out` on a fresh GPU notebook (~45 min
+  alone), then stage jlens/ with 1024-row groups plus `says_index` as done for SmolLM2.
+
+## Oct 30 (morning): decisions
+
+- User: yes to re-exporting the Qwen3.5-4B logit-lens tokens, to publishing tokens derived from the camilablank
+  lenses (credited), and to fitting J-lenses for more models; asked whether to fit our own Qwen3.5-4B lens instead.
+  Plan: fit ours on ~256 docs, compare with the published one (`analysis/validate_jfit.py`), make it the default only
+  if per-neuron readouts agree, keep the published lens selectable either way. Judge label in Become stays, marked
+  as judged.
+- Logit-lens re-export needed no GPU (weights only): `neurons/Lxx.parquet` lens_up/lens_down for Qwen3.5-4B and
+  Qwen3.5-4B-chat (same weights) replaced by the corrected top-10 from the jlens files, same 2048-row groups. 293,019
+  of 294,912 neurons changed somewhere in their top-10 up/down lists; mean Jaccard of the up sets old vs new 0.87.
+- Oct 30 afternoon, new notebooks (A GPU, B CPU): Qwen3-8B J-lens fitted on 96 docs (dim batch 32, ~55 min) and
+  published with its says index. Says vs does on the 8B "Who are you?" sweep (827,569 replies with new words): J 6.0%
+  vs 0.36% chance (opposite sign 0.23%), logit 5.5%; layers 0–5 ~0, 9–24 J 2–9% vs logit 1–8%, 26–34 10–19% with J =
+  logit.
+- R-lens fitting (`fit_lens(..., rules="r")`, `--rules r`): LN rule (detach the residual norms' normalisation
+  factor), identity rule (act(z) -> z * stop_grad(act(z)/z)), half rule for gated MLPs; attention, linear-attention
+  and q/k norms untouched. DeepSeek wrote it; review caught that Qwen3.5's gated linear-attention norm is also called
+  `norm` and takes a gate, which the first version would have replaced (changing the forward pass). Only the final
+  `norm` is touched now, and every R fit first checks one real prompt (abort if logits move > 2%); SmolLM2: 2e-6.
+- Oct 30 afternoon, new notebooks (A GPU, B CPU): Qwen3-8B J-lens fitted on 96 docs (dim batch 32, ~55 min) and
+  published with its says index. Says vs does on the 8B "Who are you?" sweep (827,569 replies with new words): J 6.0%
+  vs 0.36% chance (opposite sign 0.23%), logit 5.5%; layers 0–5 ~0, 9–24 J 2–9% vs logit 1–8%, 26–34 10–19% with J =
+  logit.
+- R-lens fitting (`fit_lens(..., rules="r")`, `--rules r`): LN rule (detach the residual norms' normalisation
+  factor), identity rule (act(z) -> z * stop_grad(act(z)/z)), half rule for gated MLPs; attention, linear-attention
+  and q/k norms untouched. DeepSeek wrote it; review caught that Qwen3.5's gated linear-attention norm is also called
+  `norm` and takes a gate, which the first version would have replaced (changing the forward pass). Only the final
+  `norm` is touched now, and every R fit first checks one real prompt (abort if logits move > 2%); SmolLM2: 2e-6.
+- Fitted J-lenses for Qwen3-0.6B (128 docs) and GPT-2 (128 docs), published with says indexes. Says vs does: Qwen3-0.6B
+  J 5.16% vs 0.45% chance (opposite 0.16%), logit 4.65% (n=163,543, its ±0.5 "Who are you?" sweep); GPT-2 J 9.2% vs
+  0.9% (opposite 0.0%), logit 8.4% (n=742, the sampled ±0.5 pushes).
+- SmolLM2 R-lens fitted on CPU (160 docs, forward check 2e-6) and published next to the J-lens (jlens/ files now have
+  logit, j and r columns; the Says box shows the R-lens button). Says vs does by band, hit vs own-chance (lift):
+  layers 0–3 J 1.6/0.6% (2.5×), R 2.4/1.6% (1.5×), logit 2.2/2.1% (1.1×); 4–14 J 4.6/1.2% (3.9×), R 5.6/2.1% (2.6×),
+  logit 3.4/2.3% (1.5×); 15–26 J 14.8/1.9% (7.7×), R 14.6/2.1% (6.9×), logit 11.7/2.2% (5.3×). R hits more in early
+  and middle layers, as the R-lens post reports, but with commoner tokens.
+- Both notebooks were lost again (third time) during our own Qwen3.5-4B J-lens fit (130/256 docs); it was to be
+  uploaded only after validation, so it was lost with the R-lens queue that had not started. Fits now save running
+  sums every 16 docs (`--checkpoint-repo`: to `checkpoints/<slug>/` on the Hub) and resume from them; tested: an
+  interrupted-then-resumed fit equals an uninterrupted one. Lenses upload right after fitting, before validation.
+- R1-Distill-1.5B fitted J-lens vs its reasoning pushes (3 prompts × 192 tokens, 3,880 replies with new words): J 19.7%
+  vs 5.5% chance (opposite 2.0%), logit 14.4% vs 3.3%. Long replies raise chance rates; J finds more of the pushed
+  words, the logit lens has the higher lift (4.4× vs 3.6×).
+- Qwen3-8B lens-guided from its stored ±0.8 sweep (fitted J-lens, layers >= 8, up to 6 neurons per word): became the
+  word 22.2% (n=288; layers 20–31 23%) vs random 0.3% (n=300); published as experiments/lens_guided.parquet.
+- Qwen3.5-4B · chat shares Qwen3.5-4B's weights, so it got the same jlens/ and saysindex/ files.
+- Prototypes (`explorer/protos/`, served at /protos/ on the Space; data from `site/*.json` built by
+  `analysis/site_data.py`): Vision lab (Qwen2.5-VL stimuli × pushes: push maps, flips, breakage by layer), Image pushes
+  (Janus grids, dose slider, cross-prompt check), Says vs does (6 models, lift toggle, opposite-sign check, Become…
+  evidence), Identity lab (reply kinds by layer, persona share by relative depth across models, fusion pairs, prompt vs
+  push, persona over turns, time and place). Written by DeepSeek from specs; checked headless at 1300 and 390 px in
+  both themes: no page errors, no horizontal overflow. DeepSeek jobs tried to start local servers and edit /tmp
+  (refused); two stray pid files were removed.
+- `DATA_INVENTORY.md`: what is on the Hub (7.4 GB, 10 models), what the explorer shows, what to collect next, outside
+  data, and threads from 2026 papers (J-lens follow-ups, Ferrando et al. visual steering, VLM arbitration, persona
+  vectors through pretraining, auto-interp shortcut critique).
+- Cards: words a neuron's lens says are highlighted inside its stored push replies (matching direction, selected lens).
+- Our own Qwen3.5-4B J-lens (256 docs, checkpointed) vs camilablank's published one: matrix cosine L0 0.66, L4–16
+  0.88–0.94, L20+ 0.97–1.00; neuron top-10 Jaccard L0 0.19, L4–12 0.18–0.28, L16 0.41, L20 0.58, L24 0.74, L28 0.87
+  (24 docs gave 0.07/0.20/0.62 at L8/16/24). On the 1.09M stored pushes: ours 9.61% vs chance 0.53% (18×), published
+  9.47% vs 0.46% (20.5×), logit 8.44% vs 0.36%. By band: L0–5 ours 3.3× vs published 6.8×; L6–19 5.3× vs 5.6× (ours more
+  hits, higher chance); L20–31 47× vs 48×. Decision: keep the published lens as the Qwen3.5-4B default (user's choice
+  was to adopt ours only if it matched); ours is published at lenses/Qwen__Qwen3.5-4B/own-j-lens.pt, and the fitter
+  is validated for the models without a published lens.
+
+## neuron-lens (stdlogits) cross-checks, Qwen3-8B
+
+- neuron-lens (github.com/stdlogits/neuron-lens, Hub stdlogits/neuron-lens + stdlogits/rs-lenses, CC BY 4.0): a catalog
+  of every MLP neuron pole and head in Qwen3-8B and Gemma 4 12B, read from weights (J/R-lens writes, K/S-lens reads),
+  from 15M positions of activations and from token-substitution drivers; Claude-written labels; Gemma 4 also read
+  through images and sounds. Their R-lens files use the same {"J": ...} format our load_lens reads.
+- Their published R-lens write tokens (top 10 of write_R_ids per pole; read by column over HTTP, ~1 min for 36
+  layers) vs our fitted J-lens on our 885k Qwen3-8B "Who are you?" pushes: all layers R 6.45% vs 0.50% chance (12.9×),
+  J 5.95% vs 0.36% (16.7×), logit 5.50% vs 0.32% (17.4×). By band (hit / chance, lift): L0–3 R 0.46/0.22 (2.1×), J
+  0.09/0.07 (1.3×); L4–8 R 1.75/0.37 (4.8×), J 0.69/0.18 (3.9×); L9–23 R 3.45/0.64 (5.4×), J 2.93/0.44 (6.7×);
+  L24–35 R 14.4/0.45 (32×), J 14.1/0.41 (34×). Their claim that the R-lens predicts steering better than the J-lens in
+  early layers replicates on a different metric and data; in middle layers R finds more pushed words but with commoner
+  tokens (lower lift), the pattern seen with our own SmolLM2 R-lens. Confound: their lens has 1,000 docs, our J 96.
+- Labels: ours (DeepSeek, top activations) vs theirs (Claude, activations + lenses, "fires" of the + pole) on our
+  2,880 labeled 8B neurons, DeepSeek-judged: same 33.1%, related 46.5%, different 20.4%; shuffled pairs 0.1 / 6.9 /
+  93.0%. Where their confidence >= 0.7 (n=481): same 61%, related 37%, different 2%.
+- Dark poles (their "dark": no token-level legibility test passes) vs what our pushes did: all poles L0–12 42% dark,
+  L13–20 82%, L21–35 55%. Persona-producing poles: L0–12 58%, L13–20 85%, L21–35 44%; incoherent-producing: 23%, 86%,
+  28%. Early-layer neurons that rewrite the model's identity are disproportionately ones no token-level test can read,
+  while those that break it are legible token writers.
+
+## Verification (Oct 31)
+
+- Pre-registration (`PREREGISTRATION.md`, committed e5e51ac before the run): 2,000 never-pushed Qwen3.5-4B neurons, new
+  prompt, 30 new words. 8 of 9 predictions held; P3 (J beats logit lift in layers 6–19 on word hits) failed (5.2× vs
+  5.7×). Continuous test: own-token log-prob rises more than a random neuron's in 98% / 78% / 59% of late / middle /
+  early cases. Part B crashed once on GPU memory (shared with a lens fit); crash-only fix logged in the file.
+- `verify.py` → `CLAIMS.md`: 22 claims recomputed from the Hub alone, all pass after correcting four README numbers
+  (fusion "one wins" 7%, roleplay judge 57%, year forward 33%, and Qwen3.5-4B's persona share 0.8% on "Who are you?"
+  alone; the README had compared SmolLM2's one-prompt rate with the 4B's two-prompt 0.5%).
+- Second judge (DeepSeek-V4-Pro; no other lab's model was reachable: OpenCode free models failed server-side, no
+  Bedrock credentials): κ 0.84 (became), 0.74 (reply kind), 0.74 (label agreement), 0.70 (fusion). It never upgrades
+  and downgrades ~20% of became/persona and ~33% of "same label" verdicts, so judged rates are upper bounds (`AUDIT.md`).
+- Blind human audit page (claude.ai artifact, db rules: raters write only their own doc, only the owner reads all);
+  `audit/score.py` scores exports. Evidence page on the Space (`protos/evidence.html`).
+- Own R-lens for Qwen3.5-4B (256 docs) vs the published R-lens: matrix cosine 0.84 (L0) to 1.00; neuron top-10 Jaccard
+  0.20 (L0), 0.29 (L4), 0.39 (L8), 0.50 (L16), 0.66 (L20), 0.79 (L24), 0.90 (L28), closer than the J pair. Fitted
+  R-lenses for Qwen3-8B and R1-Distill published (readouts now have j and r columns). On GPU in bf16 the R-rule
+  forward check measured 1.1–1.7% max relative logit change (SmolLM2 fp32 CPU: 2e-6), i.e. bf16 operation order.
+
+## Site workflow audit (Oct 31)
+
+- Scripted journeys on the live Space (landing, Surprise me, Personas → neuron → Try live, Become → Mix, prototype →
+  card, phone card, back button). No page errors; deep links, back button and prototype links worked. Fixed: no
+  front door (added a dismissible "Start here" band with Surprise me / Browse personas / Become… / Evidence, hidden on
+  neuron deep links); phone cards opened below the map (now scroll into view); the Mix lived only in memory and the
+  URL kept the previous view's hash (now `#<model>-mix?r=<recipe>`, restored on load, and tab clicks update the
+  hash); Become/Mix hashes dropped the model id (shared links opened the wrong model); the Personas library opened on
+  "altered assistant" (now persona).
+
+## New models round (Oct 31, "go ahead with all of those")
+
+- MusicGen-small: 291 clips (3 prompts × 24 decoder layers × 2 neurons × ±0.5 + baselines). "Sound pushes" page
+  (`protos/music.html`; DeepSeek-built, tested at 1300/390 px, audio plays, one clip at a time). L14 N510 +0.5
+  is the largest change averaged over prompts (ranks 1st/2nd/3rd on piano/orchestra/guitar; centroid 8.7/6.5/3.2 kHz
+  vs 0.7/1.5/1.9 kHz unpushed). Correction: I first wrote "most disruptive on every prompt, 6.5–8.7 kHz", which only
+  holds for two of the three prompts. By layer, layer 0 changes the sound most (mean distance 0.36), not layers 0–3.
+- Notebook B (CPU) rebooted mid-run and lost the TinyStories lens fits and sweep (and its HF_TOKEN env, so uploads
+  from B now go via pull-and-upload from the local container). TinyStories sweep re-run on the GPU in ~2 min
+  (12,288 neurons × ±0.5 × 2 prompts). Running TinyStories lens fits alongside four GPU jobs ran the 96 GB GPU out of
+  memory (the batch-512 sweeps hold most of it); only the two small fits died, so they moved back to B on CPU.
+- TinyStories "story casting" (`analysis/ts_characters.py`, rule-based, no judge): both prompts stop where a character
+  is introduced. "…met a" is recast by 45–73% of pushes in every layer (new friend, man, big dog, kind old lady, wise
+  old owl, dragon, fairy, "waffle-making waffle maker"); "Once upon a time, there was a" keeps its little girl in
+  98% of pushes in layers 0–2 and changes in 34% at layer 3. Page `protos/stories.html` (DeepSeek-built).
+- LFM2-350M (hybrid conv/attention, Liquid AI): `DOWN_RE` now also matches `feed_forward.w2`, and the final norm path
+  `model.embedding_norm`; smoke test on CPU generates normally (16 layers × 4,608). Queued after the Qwen3.5 ladder.
+- SmolLM3-3B thinking on/off: read pass, then the same 128 random neurons per layer pushed ±0.8 on "Who are you?" and
+  "Is 1001 a prime number?" with the chat template rendered with `enable_thinking` true (256 new tokens) and false
+  (48), stored as `raw_prompt` in each sweep's meta (braces escaped).
+- Gemma 4 E4B structure: LM 42 layers (`language_model.layers.N.mlp.down_proj`, 10,240 wide), vision tower 16 layers
+  (`vision_tower.encoder.layers.N.mlp.down_proj.linear`, 3,072 — a wrapped Linear, so `DOWN_RE` misses it), audio
+  tower 12 conformer layers with two macaron FFNs each (24 `feed_forwardN.ffw_layer_2.linear`, 4,096 wide). The first
+  probe ran out of GPU memory while the other jobs ran; retry once the GPU frees up.
+- Blank-image self-description (`analysis/blank_vision.py`, after Ferrando et al.): Qwen2.5-VL-3B vision tower, 12
+  random neurons per layer (384), pushed −1/+1/+2 while the model describes a plain gray, black or white image; plus
+  each neuron's mean activation on the 45 stimuli, so a judge can test whether the blank-image answer names what the
+  neuron's top stimulus shows.
+- Blank-image result (Qwen2.5-VL-3B, 384 vision neurons × doses −1/+1/+2 × gray/black/white): 91% of pushes change the
+  wording but most still describe a blank image; 285 describe something (187 of them at +2). The string match against
+  the neuron's top stimuli's answer words is null (0.9% vs 0.7% chance), because answers like "3" don't name the
+  content. Blind DeepSeek judge (`analysis/blank_vision_judge.py`: own top-3 stimuli vs 3 random, order randomized):
+  own 58, random 44, neither 183, i.e. weak (57% of decisive picks). Consistency is the real effect: of 63
+  neuron-doses that hallucinate on ≥ 2 blanks, 26 (41%) share specific content across the blanks vs 6 of 63 (10%) for
+  shuffled groups. Hierarchy: layers 4–8 draw patterns (vertical lines, grid, small dots, a diagonal stripe,
+  checkerboard), 10–15 objects (concentric circles, a black cat, a white truck parked on grass, a path into the
+  distance), and layer 31 mostly one attractor ("a person wearing a red shirt and black pants") plus glasses and a
+  group of people. The neuron's own preferred stimuli predict the drawing only weakly, but our 45 stimuli are mostly
+  synthetic; a natural-image set would test it properly.
+- Qwen3.5-0.8B "Who are you?" sweep labeled (86,016 neurons × ±0.8): persona 4.7% of pushes (8,020 of 172,032
+  estimated) vs 0.8% for Qwen3.5-4B on the same prompt; altered assistant 45%, incoherent 17%. (First judge; read as
+  upper bounds per AUDIT.md.)
+- OLMo-2 1B training ladder (`analysis/olmo_ladder.py`, queued): the same 512 random neurons per layer pushed at
+  pretraining checkpoints (21B, 210B, 1T, 2T tokens), the final base, SFT, DPO, RL step 200 / 600, and Instruct.
+  `NeuronModel("org/model@branch")` now loads a revision.
+- Audio towers: `NeuronModel(where="audio")` finds Gemma-style conformer feed-forwards (two per layer, each counted as
+  its own "layer"); `atlas.multimodal` reads WAV/FLAC stimuli (resampled to the processor's rate);
+  `analysis/audio_stimuli.py` writes 6 synthetic sounds + 16 ESC-50 classes.
+- SmolLM3 thinking on/off (`analysis/smol_think.py`, 36 layers × 128 neurons × ±0.8, paired): first version scored
+  "found a factor" and "names SmolLM", which mostly measured whether a verdict fit in the token window (the direct
+  answer often starts "To determine if 1001 is prime, we need to check…"; the identity reply rarely says "Hugging
+  Face" in 48 tokens). Switched to an explicit-wrong rule (calls 1001 prime; lookbehinds exclude "if/whether 1001 is
+  a prime" — first draft had them in the wrong place and counted every "to determine if" as wrong). Result: wrong
+  1.6% (thinking) vs 11.2% (direct) in layers 6–16; overall 1.5% vs 4.7%; late layers 33–35 degenerate 21–36%
+  thinking vs 6–15% direct. The thinking baseline wasn't uploaded (the first run OOM'd after writing it; the resumed
+  run reused the local file), so it was uploaded by hand from the notebook.
+- Gemma 4 probe (GPU, second try): a red square → "Solid red background."; a pure 440 Hz tone → "That sounds like a
+  dog barking." (the unpushed model already hallucinates a source for a sine). `DOWN_RE`'s optional `.linear` suffix
+  matched both Gemma's `Gemma4ClippableLinear` wrapper and its inner Linear; the search now skips modules without a
+  weight. Vision (16 × 3,072) and audio (24 feed-forwards × 4,096) towers load through `NeuronModel`.
+- TinyStories lenses fitted on GPU (J and R, 160 docs; 3 of 4 layers, since the target is layer n−2), says index of
+  15,136 words. Says → does (`analysis/ts_says.py`, finding 16's metric): layer 3 hit 43–46% vs chance 2–2.5%;
+  layers 0–2 2–4% vs ~1%; J and logit lens differ only at layers 0–1 (J slightly higher). "Met a" character named by
+  the lens: 8% of layer-3 pushes.
+- OLMo-2 1B ladder done (10 checkpoints × 16 layers × 512 neurons × ±0.8, ~3 min each on GPU; labeled with
+  `--names olmo|allen|ai2|tulu|tülu`). `sweep_stats.py` crashed on pre-21B because no reply named OLMo, so every
+  reply was picked and the sampled population was empty; guarded. Post-training: persona 6.5% (SFT), 5.9% (DPO),
+  5.4–5.5% (RL 200/600, Instruct); default assistant ~52% throughout. Pretraining checkpoints answer "Who are you?" in
+  character even unpushed ("I'm your mother… To kill you", "I'm a robot", "I am the Assistant"), so their persona
+  share (0.7% → 56%) is not an anchoring measure; reported as such.
+- Gemma 4 audio (`analysis/gemma_audio.py`, judge-free): 2,269 of 6,336 pushes change the answer; 4 of 16 ESC-50 clips
+  right unpushed; pushes fix 176, break 277; "dog barking" is the attractor (556 of the changed answers). Gemma's
+  blank-image run first failed: its processor wants `images=[[img]] * batch`; `_prepare_inputs` now retries nested.
+- Gemma 4 blank canvas: 103 of 2,304 pushes hallucinate (regex extended for Gemma's terse "Black screen." /
+  "Solid gray background."; Qwen's count is unchanged at 285); judge own 9 / random 9 / neither 85; consistency 23/29
+  vs shuffled 13/29 (not separable: nearly all are textures). Layers: 46 from L0, 23 from L15 (last). The first
+  upload missed meta.json/acts.parquet because `blank_vision.py` never closed its uploader; it does now.
+- Qwen3.5-2B and LFM2-350M published (stats, cards, index). 2B persona 2.1%, user identity 7.4%; LFM2 persona 5.8%,
+  default assistant 16%, incoherent 27%, user identity 9.0%. Size ladder for persona (0.8B 4.7 > 2B 2.1 > 4B 0.8) is
+  monotonic; user identity is not (11 / 7.4 / 13).
+- Says → does on fitted J-lenses (`analysis/lens_vs_push.py`): LFM2 16.7% vs 1.4% (J 12×, logit 9×); 0.8B 12.3% vs
+  0.48% (26× / 22×); 2B 11.2% vs 0.52% (22× / 25×). Waiters: twice more a `pgrep -f` pattern matched its own command
+  line; `[p]attern` avoids it.
+- Loader: tower runs try `AutoModelForImageTextToText` first (Qwen3.5 otherwise loads text-only), Qwen2.5-Omni via
+  its Thinker class, Whisper-style `audio_tower.layers.N.fc2`, Qwen3-VL-style `mlp.linear_fc2`.
+- Qwen3.5-0.8B blank canvas (vision tower 12 × 3,072, 32 neurons/layer): GPU notebook A became unreachable during
+  layer 10, so layers 0–9 only (shards on the Hub; the judge now reads shards when the combined file is missing).
+  The blank filter flags 2,170 of 2,880; dropping bare same-color answers ("A gray square." on the gray image is
+  correct) leaves 2,015 (70%). Consistency 468/742 (63%) vs shuffled 78/742 (10.5%); own 334 / random 364 /
+  neither 1,472. The Qwen2.5-Omni-3B hearing test (queued after it) never started.
