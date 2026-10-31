@@ -859,3 +859,7 @@ derangement null, not "persona vs not".
   dog barking." (the unpushed model already hallucinates a source for a sine). `DOWN_RE`'s optional `.linear` suffix
   matched both Gemma's `Gemma4ClippableLinear` wrapper and its inner Linear; the search now skips modules without a
   weight. Vision (16 × 3,072) and audio (24 feed-forwards × 4,096) towers load through `NeuronModel`.
+- TinyStories lenses fitted on GPU (J and R, 160 docs; 3 of 4 layers, since the target is layer n−2), says index of
+  15,136 words. Says → does (`analysis/ts_says.py`, finding 16's metric): layer 3 hit 43–46% vs chance 2–2.5%;
+  layers 0–2 2–4% vs ~1%; J and logit lens differ only at layers 0–1 (J slightly higher). "Met a" character named by
+  the lens: 8% of layer-3 pushes.

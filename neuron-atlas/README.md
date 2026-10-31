@@ -229,8 +229,9 @@ first).
     ±0.5 at two points where a story introduces someone (49k continuations, rule-based parse, no judge). *"One day,
     a little girl named Lily met a…"* gets a different character in 45–73% of pushes in every layer (a new friend, a
     kind old lady, a wise old owl, a dragon, a fairy, a *"waffle-making waffle maker"*); *"Once upon a time, there
-    was a…"* keeps its little girl in 98% of pushes through layer 2 and changes in 34% at layer 3.
-    `protos/stories.html`.
+    was a…"* keeps its little girl in 98% of pushes through layer 2 and changes in 34% at layer 3. Says → does holds
+    here too (finding 16's metric, J-lens fitted for this model): a layer-3 push adds a word its own lens names in
+    43–46% of continuations vs 2–2.5% with another neuron's tokens; layers 0–2, 2–4% vs 1%. `protos/stories.html`.
 26. **Music: one neuron brightens every song.** MusicGen-small, 2 random neurons per decoder layer pushed ±0.5 on
     three prompts (291 clips). Layer 0 moves the clip's spectrum furthest from the unpushed one on average (mean
     cosine distance 0.36; most layers 0.03–0.2). L14 N510 at +0.5 is the largest change averaged over the prompts

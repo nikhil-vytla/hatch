@@ -206,6 +206,12 @@ def new_models():
     out.append(dict(id="25c", claim="TinyStories 'there was a': recast rate, worst of layers 0-2", stated=0.02, value=max(r[(L, 0)] for L in range(3)),
                     tol=0.005, unit="share", source="same"))
     out.append(dict(id="25d", claim="TinyStories 'there was a': recast rate at layer 3", stated=0.34, value=r[(3, 0)], tol=0.005, unit="share", source="same"))
+    from ts_says import toks, hit, WORD as TW
+    bw = {p: set(TW.findall(t.lower())) for p, t in duckdb.sql(f"select prompt, text from '{hub('roneneldan__TinyStories-33M/sweep/steer/baseline.parquet')}'").fetchall()}
+    ln = {n: (toks(u), toks(d)) for n, u, d in duckdb.sql(f"select neuron, j_up, j_down from '{hub('roneneldan__TinyStories-33M/jlens/L03.parquet')}'").fetchall()}
+    hs = [hit(t, bw[p], ln[n][0 if d > 0 else 1]) for n, d, p, t in duckdb.sql(f"select neuron, dose, prompt, text from '{hub('roneneldan__TinyStories-33M/sweep/steer/L03.parquet')}'").fetchall()]
+    out.append(dict(id="25e", claim="TinyStories layer 3: pushes that add a word the neuron's lens names", stated=0.445, value=sum(hs) / len(hs),
+                    tol=0.012, unit="share", source="roneneldan__TinyStories-33M/jlens/L03.parquet + sweep"))
     # 26: music
     m = json.load(open(hub("site/music.json")))["rows"]
     dist = {}
