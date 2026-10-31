@@ -13,7 +13,7 @@ try:
 except ImportError:  # older transformers: image-text checkpoints will fail at load time
     AutoModelForImageTextToText = None
 
-DOWN_RE = re.compile(r"\.(\d+)\.(?:mlp|feed_forward)\.(down_proj|c_proj|fc2|dense_4h_to_h|w2)$")
+DOWN_RE = re.compile(r"\.(\d+)\.(?:mlp|feed_forward)\.(down_proj|c_proj|fc2|dense_4h_to_h|w2)(?:\.linear)?$")
 TERM_RE = re.compile(r"L(\d+)N(\d+)\s*([=*+\-])?\s*([+-]?\d*\.?\d+(?:[eE][+-]?\d+)?)", re.I)
 SKIP_TOWERS = ("visual", "vision", "audio", "mm_projector")
 
@@ -119,9 +119,10 @@ class NeuronModel:
     def _layer_module(self, name):
         """The transformer block that owns a down projection (its output is that layer's residual stream)."""
         parts = name.split(".")
-        if "mlp" not in parts:
+        key = next((k for k in ("mlp", "feed_forward") if k in parts), None)
+        if key is None:
             return None
-        path = ".".join(parts[:len(parts) - 1 - parts[::-1].index("mlp")])
+        path = ".".join(parts[:len(parts) - 1 - parts[::-1].index(key)])
         obj = self.model
         try:
             for p in path.split("."):
