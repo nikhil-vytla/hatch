@@ -142,7 +142,9 @@ first).
     layer 4 on, though single-neuron readouts in middle layers still move with the estimate): 9.5% vs 1.4% chance, ahead of the logit lens (7.9%) from layer 4 to 26. So does one fitted for Qwen3-8B
     on 96 documents: 6.0% vs 0.36% over 828k pushes, opposite sign at chance, J ahead of logit in layers 9–24;
     Qwen3-0.6B 5.2% vs 0.45% (164k pushes) and GPT-2 9.2% vs 0.9% (742 sampled pushes), the J-lens ahead of the
-    logit lens in all five models. An R-lens fitted here for SmolLM2 hits more often than its J-lens in layers 4–14
+    logit lens in all five models. A Qwen3.5-4B J-lens fitted here on 256 documents nearly matches the published one
+    (1,000 sequences): lens matrices at cosine 0.88–0.99 from layer 4, and on the 1.09M pushes 9.6% vs 9.5% hits with
+    18× vs 20× lift; the published lens stays the default (sharper in layers 0–5), ours is in `lenses/`. An R-lens fitted here for SmolLM2 hits more often than its J-lens in layers 4–14
     (5.6% vs 4.6%), but its tokens are commoner words that also turn up by chance (2.1% vs 1.2%), so per unit of
     chance the J-lens is the sharper reading (3.9× vs 2.6×; logit lens 1.5×).
 

@@ -741,3 +741,10 @@ derangement null, not "persona vs not".
   data, and threads from 2026 papers (J-lens follow-ups, Ferrando et al. visual steering, VLM arbitration, persona
   vectors through pretraining, auto-interp shortcut critique).
 - Cards: words a neuron's lens says are highlighted inside its stored push replies (matching direction, selected lens).
+- Our own Qwen3.5-4B J-lens (256 docs, checkpointed) vs camilablank's published one: matrix cosine L0 0.66, L4–16
+  0.88–0.94, L20+ 0.97–1.00; neuron top-10 Jaccard L0 0.19, L4–12 0.18–0.28, L16 0.41, L20 0.58, L24 0.74, L28 0.87
+  (24 docs gave 0.07/0.20/0.62 at L8/16/24). On the 1.09M stored pushes: ours 9.61% vs chance 0.53% (18×), published
+  9.47% vs 0.46% (20.5×), logit 8.44% vs 0.36%. By band: L0–5 ours 3.3× vs published 6.8×; L6–19 5.3× vs 5.6× (ours more
+  hits, higher chance); L20–31 47× vs 48×. Decision: keep the published lens as the Qwen3.5-4B default (user's choice
+  was to adopt ours only if it matched); ours is published at lenses/Qwen__Qwen3.5-4B/own-j-lens.pt, and the fitter
+  is validated for the models without a published lens.
