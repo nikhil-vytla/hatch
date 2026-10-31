@@ -13,9 +13,11 @@ try:
 except ImportError:  # older transformers: image-text checkpoints will fail at load time
     AutoModelForImageTextToText = None
 
-DOWN_RE = re.compile(r"\.(\d+)\.(?:mlp|feed_forward)\.(down_proj|c_proj|fc2|dense_4h_to_h|w2)(?:\.linear)?$")
+DOWN_RE = re.compile(r"\.(\d+)\.(?:mlp|feed_forward)\.(down_proj|c_proj|fc2|linear_fc2|dense_4h_to_h|w2)(?:\.linear)?$")
 # conformer audio towers (Gemma 3n/4): two macaron feed-forwards per layer, each counted as its own "layer"
 AUDIO_DOWN_RE = re.compile(r"audio_tower\.(?:\w+\.)*layers\.(\d+)\.feed_forward(\d)\.ffw_layer_2(?:\.linear)?$")
+# Whisper-style audio encoders (Qwen2-Audio, Qwen2.5-Omni): layers.N.fc2
+WHISPER_DOWN_RE = re.compile(r"audio_tower\.(?:\w+\.)*layers\.(\d+)\.fc2$")
 TERM_RE = re.compile(r"L(\d+)N(\d+)\s*([=*+\-])?\s*([+-]?\d*\.?\d+(?:[eE][+-]?\d+)?)", re.I)
 SKIP_TOWERS = ("visual", "vision", "audio", "mm_projector")
 
@@ -79,12 +81,28 @@ class NeuronModel:
             self.tok = getattr(proc, "tokenizer", None) or proc
         if self.tok.pad_token is None:
             self.tok.pad_token = self.tok.eos_token
-        try:
-            self.model = AutoModelForCausalLM.from_pretrained(repo, dtype=dtype, **rev)
-        except Exception:
-            if AutoModelForImageTextToText is None:
-                raise
-            self.model = AutoModelForImageTextToText.from_pretrained(repo, dtype=dtype, **rev)
+        self.model = None
+        if where != "llm" and AutoModelForImageTextToText is not None:
+            # natively multimodal models (Qwen3.5) also load as text-only causal LMs, without their towers
+            try:
+                self.model = AutoModelForImageTextToText.from_pretrained(repo, dtype=dtype, **rev)
+            except Exception:
+                self.model = None
+        if self.model is None:
+            try:
+                self.model = AutoModelForCausalLM.from_pretrained(repo, dtype=dtype, **rev)
+            except Exception:
+                try:
+                    if AutoModelForImageTextToText is None:
+                        raise
+                    self.model = AutoModelForImageTextToText.from_pretrained(repo, dtype=dtype, **rev)
+                except Exception:
+                    # Qwen2.5-Omni: the "thinker" is the text/audio/vision understanding model (no speech output)
+                    import transformers
+                    thinker = getattr(transformers, "Qwen2_5OmniThinkerForConditionalGeneration", None)
+                    if thinker is None or "omni" not in repo.lower():
+                        raise
+                    self.model = thinker.from_pretrained(repo, dtype=dtype, **rev)
         self.model = self.model.to(self.device).eval()
         self.model.requires_grad_(False)
         found = []
@@ -95,6 +113,8 @@ class NeuronModel:
                 m = AUDIO_DOWN_RE.search(mod_name)
                 if m:
                     found.append((2 * int(m.group(1)) + int(m.group(2)) - 1, mod_name, mod))
+                elif (m := WHISPER_DOWN_RE.search(mod_name)):
+                    found.append((int(m.group(1)), mod_name, mod))
                 continue
             m = DOWN_RE.search(mod_name)
             if not m or ".experts." in mod_name:
@@ -133,8 +153,11 @@ class NeuronModel:
         parts = name.split(".")
         key = next((k for k in parts if k in ("mlp", "feed_forward") or re.fullmatch(r"feed_forward\d", k)), None)
         if key is None:
-            return None
-        path = ".".join(parts[:len(parts) - 1 - parts[::-1].index(key)])
+            if parts[-1] != "fc2":
+                return None
+            path = ".".join(parts[:-1])  # Whisper-style layer: fc2 sits directly in the block
+        else:
+            path = ".".join(parts[:len(parts) - 1 - parts[::-1].index(key)])
         obj = self.model
         try:
             for p in path.split("."):
