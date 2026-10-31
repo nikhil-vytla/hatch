@@ -224,7 +224,10 @@ first).
     wearing a red shirt and black pants"*); a few neurons write text into the image (*"I am a language model and I
     can help you"*). Whether the drawing matches what the neuron fires on in real images is weak on our 45 mostly
     synthetic stimuli: a blind judge prefers the neuron's top images over random ones 58 to 44 (183 neither).
-    `protos/vision.html` → Blank canvas.
+    Gemma 4 E4B's vision encoder (256 neurons, same test) hallucinates less (103 of 2,304 pushes) and draws only
+    textures: diagonal lines, grids, stripes, herringbone, once a world-map silhouette, mostly from its first and
+    last layers. With everything a texture, its consistency (23 of 29) does not separate from shuffled neurons (13
+    of 29). `protos/vision.html` → Blank canvas.
 25. **A 4-layer story model recasts its characters, but only in some slots.** TinyStories-33M, every neuron pushed
     ±0.5 at two points where a story introduces someone (49k continuations, rule-based parse, no judge). *"One day,
     a little girl named Lily met a…"* gets a different character in 45–73% of pushes in every layer (a new friend, a

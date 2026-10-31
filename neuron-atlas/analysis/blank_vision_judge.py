@@ -6,7 +6,8 @@ The judge picks the set the hallucination resembles more, or "neither". Own-set 
 mean the hallucination carries the neuron's preferred content. Also: consistency, i.e. how often one neuron's
 hallucinations on the gray, black and white images share content (judged per neuron).
 
-  python analysis/blank_vision_judge.py OUT.json
+  python analysis/blank_vision_judge.py OUT.json            (BLANK_PREFIX=<model slug>/blank/ for another model)
+  python analysis/blank_vision_judge.py --control OUT.json  (shuffled-neuron consistency control)
 """
 import concurrent.futures as cf, json, random, re, sys
 
@@ -15,9 +16,12 @@ from huggingface_hub import hf_hub_download
 
 from atlas.judges import make_judge
 
-R, P = "nikhilxvytla/neuron-atlas", "Qwen__Qwen2.5-VL-3B-Instruct/blank/"
+import os
+R = "nikhilxvytla/neuron-atlas"
+P = os.environ.get("BLANK_PREFIX", "Qwen__Qwen2.5-VL-3B-Instruct/blank/")  # e.g. google__gemma-4-E4B-it/blank/
 BLANK = re.compile(r"blank|no visible|empty|plain|solid|uniform|nothing|no (?:discernible|distinct|objects|content|details)"
-                   r"|completely|entirely|cannot|sorry|unable", re.I)
+                   r"|completely|entirely|cannot|sorry|unable"
+                   r"|^\W*(?:an? )?(?:dark |light |pale |deep )?(?:gr[ae]y|black|white)(?: \w+)? (?:screen|background|image)\W*$", re.I)
 SYS = """A vision-language model was shown a plain, empty image while one neuron in its vision encoder was artificially
 pushed, and it described something. For each item you get that description and two sets (A and B) of short
 descriptions of real test images. Say which set the description resembles more in content (objects, shapes,

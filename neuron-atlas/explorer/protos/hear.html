@@ -1,0 +1,1046 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Hearing pushes</title>
+<meta name="description" content="Gemma 4 E4B listening to sounds while one neuron of its audio encoder is pushed.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Source+Sans+3:ital,wght@0,400;0,600;1,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: a microscope bench. A dark "slide plate" map of every neuron on the left, the specimen card of the
+   selected neuron on the right; tabs swap the plate for other views. Activation is stained like H&E histology:
+   eosin pink where a neuron fires, hematoxylin violet where it goes negative. */
+:root {
+  --bg: #f5f4f8; --surface: #ffffff; --sunk: #ebe9f1; --line: #d9d5e3; --ink: #1f1c2c; --ink2: #5d5870; --ink3: #8a849c;
+  --eosin: #d6336c; --eosin-soft: #f9d9e5; --hema: #4b3fa8; --hema-soft: #dedaf5; --accent: #b0245a;
+  --plate: #17152a; --plate-ink: #ece9f7; --plate-ink2: #a29dbb; --plate-line: #2c2946;
+  --good: #1f8a5b; --warn: #b7791f;
+  --k-user: #2a78d6; --k-persona: #d6336c; --k-altered: #4b3fa8; --k-other: #1baf7a; --k-incoherent: #eda100; --k-default: #cfcbdc;
+  --display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --body: "Source Sans 3", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --r: 10px; --r-card: 14px;
+  --s1: 12px; --s2: 16px; --s3: 24px;
+  --card-shadow: 0 1px 2px rgb(0 0 0 / .04), 0 4px 16px rgb(0 0 0 / .04);
+  --card-shadow-hover: 0 2px 4px rgb(0 0 0 / .06), 0 8px 24px rgb(0 0 0 / .08);
+  --pill-shadow: 0 1px 2px rgb(0 0 0 / .08), 0 2px 6px rgb(0 0 0 / .06);
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #121019; --surface: #1b1826; --sunk: #242033; --line: #343048; --ink: #ece9f7; --ink2: #b3adc8; --ink3: #827c99;
+  --eosin: #ff6b9a; --eosin-soft: #4a1f33; --hema: #9d92ff; --hema-soft: #2d2858; --accent: #ff7aa6;
+  --plate: #0b0a12; --plate-ink: #ece9f7; --plate-ink2: #9a95b2; --plate-line: #24213a; --good: #4cc38a; --warn: #e0a84a;
+  --k-user: #3987e5; --k-persona: #e0447a; --k-altered: #8a7ef0; --k-other: #199e70; --k-incoherent: #c98500; --k-default: #3b3652;
+  --card-shadow: 0 1px 2px rgb(0 0 0 / .3), 0 4px 16px rgb(0 0 0 / .25);
+  --card-shadow-hover: 0 2px 4px rgb(0 0 0 / .38), 0 8px 24px rgb(0 0 0 / .35);
+  --pill-shadow: 0 1px 2px rgb(0 0 0 / .35), 0 2px 6px rgb(0 0 0 / .3);
+  color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #121019; --surface: #1b1826; --sunk: #242033; --line: #343048; --ink: #ece9f7; --ink2: #b3adc8; --ink3: #827c99;
+  --eosin: #ff6b9a; --eosin-soft: #4a1f33; --hema: #9d92ff; --hema-soft: #2d2858; --accent: #ff7aa6;
+  --plate: #0b0a12; --plate-ink: #ece9f7; --plate-ink2: #9a95b2; --plate-line: #24213a; --good: #4cc38a; --warn: #e0a84a;
+  --k-user: #3987e5; --k-persona: #e0447a; --k-altered: #8a7ef0; --k-other: #199e70; --k-incoherent: #c98500; --k-default: #3b3652;
+  --card-shadow: 0 1px 2px rgb(0 0 0 / .3), 0 4px 16px rgb(0 0 0 / .25);
+  --card-shadow-hover: 0 2px 4px rgb(0 0 0 / .38), 0 8px 24px rgb(0 0 0 / .35);
+  --pill-shadow: 0 1px 2px rgb(0 0 0 / .35), 0 2px 6px rgb(0 0 0 / .3);
+  color-scheme: dark }
+* { box-sizing: border-box }
+html, body { height: 100% }
+body { background: var(--bg); color: var(--ink); font: 15px/1.5 var(--body); margin: 0; overflow-x: clip;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+button, input, select { font: inherit; color: inherit }
+button { cursor: pointer }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px }
+
+[hidden] { display: none !important }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden;
+  clip: rect(0 0 0 0); white-space: nowrap; border: 0 }
+.wrap { max-width: 1480px; margin: 0 auto; padding-block: 0 40px; display: flex; flex-direction: column; gap: var(--s3) }
+.topbar { position: sticky; top: 0; z-index: 30; display: flex; flex-direction: column; gap: 6px;
+  padding-block: var(--s1); background: color-mix(in oklab, var(--bg) 88%, transparent);
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--line) }
+.top { display: flex; align-items: center; gap: 10px; min-width: 0 }
+.brand { display: flex; align-items: baseline; gap: 9px; min-width: 0; flex: 1 1 auto }
+.brand h1 { font: 800 28px/1 var(--display); letter-spacing: -0.02em; margin: 0; white-space: nowrap }
+.brand h1 i { font-style: normal; color: var(--eosin) }
+.pagename { font: 600 11px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--ink3);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
+.actions { display: flex; gap: 8px; flex: 0 0 auto; align-items: center }
+.theme-toggle { width: 36px; height: 36px; flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center;
+  padding: 0; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink2);
+  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease }
+.theme-toggle:hover { border-color: var(--hema); color: var(--ink) }
+.theme-toggle:focus-visible { outline: 2px solid var(--hema); outline-offset: 2px }
+.theme-toggle svg { width: 18px; height: 18px; display: none }
+.theme-toggle .i-sun { display: block }
+.theme-toggle[data-resolved="light"] .i-sun { display: block }
+.theme-toggle[data-resolved="light"] .i-moon { display: none }
+.theme-toggle[data-resolved="dark"] .i-sun { display: none }
+.theme-toggle[data-resolved="dark"] .i-moon { display: block }
+.navrow { display: flex; gap: 3px; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; padding-block: 2px }
+.navrow::-webkit-scrollbar { display: none }
+.navrow a { flex: 0 0 auto; padding: 6px 10px; border: 1px solid transparent; border-radius: 999px; color: var(--ink2);
+  text-decoration: none; font: 600 13px/1 var(--body); white-space: nowrap;
+  transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease }
+.navrow a:hover { background: var(--sunk); color: var(--ink) }
+.navrow a[aria-current="page"] { background: var(--surface); color: var(--ink); border-color: var(--line); box-shadow: var(--pill-shadow) }
+
+.stack { display: flex; flex-direction: column; gap: var(--s3); min-width: 0 }
+.card { background: var(--surface); border-radius: var(--r-card); padding: var(--s3); display: flex; flex-direction: column;
+  gap: var(--s2); min-width: 0; box-shadow: var(--card-shadow); scroll-margin-top: 120px }
+.card h2 { font: 700 26px/1.15 var(--display); margin: 0; letter-spacing: -0.01em; text-wrap: balance }
+.card h3 { font: 700 17px/1.2 var(--display); margin: 0; letter-spacing: -0.01em }
+.lede { margin: 0; color: var(--ink2); font-size: 14px; max-width: 78ch }
+.question { margin: 0; font: 600 18px/1.35 var(--display); color: var(--ink); max-width: 70ch }
+.section-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap }
+.section-head > div { min-width: 0; display: flex; flex-direction: column; gap: 5px }
+.count { font: 600 11px/1.3 var(--mono); letter-spacing: .04em; color: var(--ink3); background: var(--sunk);
+  border-radius: 999px; padding: 5px 9px; white-space: nowrap }
+.mono { font-family: var(--mono) }
+.small { font-size: 12px }
+.muted { color: var(--ink3) }
+
+.status { display: flex; align-items: center; gap: 10px; padding: 16px; border: 1px dashed var(--line);
+  border-radius: var(--r); color: var(--ink2); background: var(--surface); font-size: 14px; margin-top: var(--s2) }
+.status.error { border-style: solid; border-color: var(--eosin); color: var(--ink); align-items: flex-start }
+.status.error b { color: var(--ink); display: block; margin-bottom: 3px }
+.status.error .status-body { flex: 1 1 auto; min-width: 0 }
+.status.error button { flex: 0 0 auto; border: 1px solid var(--line); background: var(--surface); border-radius: 7px;
+  padding: 6px 10px; font-weight: 600 }
+.spinner { width: 16px; height: 16px; flex: 0 0 auto; border: 2px solid var(--line); border-top-color: var(--eosin);
+  border-radius: 50%; animation: spin .8s linear infinite }
+@keyframes spin { to { transform: rotate(360deg) } }
+
+.stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px }
+.stat { border: 1px solid var(--line); border-radius: var(--r); padding: 12px 14px; background: var(--surface);
+  display: flex; flex-direction: column; gap: 4px; min-width: 0 }
+.stat-label { font: 600 10px/1.2 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--ink3) }
+.stat-value { font: 800 30px/1 var(--display); color: var(--ink); letter-spacing: -.02em; font-variant-numeric: tabular-nums }
+.stat-note { font-size: 12px; color: var(--ink2) }
+
+.sound-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px }
+.sound-card { border: 1px solid var(--line); border-radius: var(--r); padding: 12px; background: var(--surface);
+  display: flex; flex-direction: column; gap: 8px; min-width: 0; cursor: pointer;
+  transition: border-color 120ms ease, background-color 120ms ease, box-shadow 120ms ease }
+.sound-card:hover { border-color: var(--ink3) }
+.sound-card.is-selected { border-color: var(--hema); box-shadow: 0 0 0 1px var(--hema);
+  background: color-mix(in oklab, var(--hema-soft) 32%, var(--surface)) }
+.sound-head { display: flex; gap: 8px; justify-content: space-between; align-items: flex-start; min-width: 0 }
+.sound-name { border: 0; background: transparent; padding: 0; text-align: left;
+  font: 700 15px/1.25 var(--display); color: var(--ink); letter-spacing: -.01em; overflow-wrap: anywhere }
+.sound-name:hover { text-decoration: underline; text-underline-offset: 2px }
+.kind { font: 600 9px/1 var(--mono); letter-spacing: .05em; text-transform: uppercase; color: var(--ink3);
+  border: 1px solid var(--line); border-radius: 999px; padding: 4px 7px; white-space: nowrap; flex: 0 0 auto }
+.sound-meta, .sound-answer { font-size: 12.5px; color: var(--ink2); overflow-wrap: anywhere }
+.sound-meta b, .sound-answer b { color: var(--ink); font-weight: 600 }
+.sound-foot { display: flex; align-items: center; gap: 8px; margin-top: auto }
+.sound-play-label { font: 600 9.5px/1.2 var(--mono); letter-spacing: .05em; text-transform: uppercase; color: var(--ink3) }
+
+.playbtn { width: 30px; height: 30px; flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center;
+  padding: 0; border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 50%;
+  transition: border-color 120ms ease, box-shadow 120ms ease }
+.playbtn:hover { border-color: var(--hema) }
+.playbtn svg { width: 13px; height: 13px }
+.playbtn .i-pause, .playbtn .i-spin { display: none }
+.playbtn.is-playing .i-play { display: none }
+.playbtn.is-playing .i-pause { display: block }
+.playbtn.is-loading .i-play, .playbtn.is-loading .i-pause { display: none }
+.playbtn.is-loading .i-spin { display: block }
+.playbtn.is-error { border-color: var(--eosin) }
+.i-spin { animation: spin .8s linear infinite }
+
+.controls { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center }
+.table-btn { border: 1px solid var(--line); background: var(--surface); color: var(--ink2); border-radius: 999px;
+  padding: 6px 12px; font: 600 12px/1 var(--body); flex: 0 0 auto }
+.table-btn:hover { color: var(--ink); border-color: var(--hema) }
+.table-btn[aria-pressed="true"], .table-btn[aria-expanded="true"] { background: var(--eosin-soft); border-color: var(--eosin); color: var(--ink) }
+.answers-meta { display: flex; flex-wrap: wrap; gap: 5px 16px; font-size: 13px; color: var(--ink2);
+  background: var(--sunk); border-radius: var(--r); padding: 10px 12px; min-width: 0 }
+.answers-meta b { color: var(--ink); font-weight: 600; overflow-wrap: anywhere }
+.answers-meta span { min-width: 0 }
+
+.table-wrap { overflow: auto; max-height: 520px; border: 1px solid var(--line); border-radius: var(--r-card);
+  background: var(--surface); max-width: 100%; scrollbar-width: thin }
+table { border-collapse: collapse; width: 100%; font-size: 12px }
+caption { caption-side: top; text-align: left; color: var(--ink3); font-size: 11.5px; padding: 8px 10px }
+th, td { padding: 6px 10px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top }
+thead th { position: sticky; top: 0; z-index: 1; background: var(--surface); color: var(--ink3); font-weight: 600;
+  font-size: 10px; letter-spacing: .05em; text-transform: uppercase }
+tbody tr:last-child td { border-bottom: 0 }
+td { color: var(--ink2) }
+td:first-child { color: var(--ink); font-family: var(--mono); white-space: nowrap; font-size: 11px }
+.badge { display: inline-block; font: 600 9.5px/1 var(--mono); letter-spacing: .05em; text-transform: uppercase;
+  padding: 4px 7px; border-radius: 999px; background: var(--eosin-soft); color: var(--ink); white-space: nowrap }
+.answers-table table { min-width: 520px }
+.answers-table td:nth-child(2) { white-space: normal; min-width: 250px }
+.answers-table .badge { margin-left: 8px; vertical-align: middle }
+.answers-table tr.is-selected td { background: color-mix(in oklab, var(--hema-soft) 45%, var(--surface)) }
+.answers-table .empty { color: var(--ink3); font-style: italic; text-align: center; padding: 18px }
+.chart-table table { min-width: 460px }
+.chart-table th, .chart-table td { text-align: right; font-variant-numeric: tabular-nums }
+.chart-table th:first-child, .chart-table td:first-child { text-align: left }
+.chart-table { max-height: 420px }
+
+.group-list { display: flex; flex-direction: column; gap: 8px; min-width: 0 }
+.group-card { border: 1px solid var(--line); border-radius: var(--r-card); background: var(--surface);
+  overflow: hidden; min-width: 0 }
+.group-card.is-selected { border-color: var(--hema); box-shadow: 0 0 0 1px var(--hema) }
+.group-toggle { width: 100%; display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
+  text-align: left; background: var(--surface); border: 0; padding: 13px 15px; min-width: 0 }
+.group-toggle:hover { background: var(--sunk) }
+.group-main { display: flex; flex-direction: column; gap: 4px; min-width: 0 }
+.group-name { font: 600 13px/1.2 var(--mono); color: var(--ink); white-space: nowrap }
+.group-summary { font-size: 13.5px; color: var(--ink2); overflow-wrap: anywhere }
+.group-summary b { color: var(--ink); font-weight: 600 }
+.caret { flex: 0 0 auto; width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--line); border-radius: 50%; color: var(--ink2); font: 600 14px/1 var(--mono) }
+.group-panel { border-top: 1px solid var(--line); padding: 4px 10px 8px; display: flex; flex-direction: column;
+  max-height: 430px; overflow: auto; scrollbar-width: thin }
+.answer-row { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; gap: 8px; align-items: center;
+  padding: 7px 3px; border-bottom: 1px solid var(--line) }
+.answer-row:last-child { border-bottom: 0 }
+.answer-main { min-width: 0 }
+.answer-stim { display: block; font: 600 9.5px/1.3 var(--mono); letter-spacing: .04em; text-transform: uppercase;
+  color: var(--ink3); overflow-wrap: anywhere }
+.answer-text { display: block; color: var(--ink); overflow-wrap: anywhere; font-size: 13px }
+
+.chart-wrap { position: relative; min-width: 0; overflow-x: auto; overflow-y: hidden; padding: 2px 0; max-width: 100% }
+.chart-wrap svg { display: block; width: 100%; min-width: 620px; height: auto; overflow: visible }
+.grid-line { stroke: var(--line); stroke-width: 1; opacity: .7 }
+.axis-text { fill: var(--ink3); font-family: var(--mono); font-size: 9.5px }
+.axis-unit { fill: var(--ink3); font-family: var(--mono); font-size: 9px; letter-spacing: .03em }
+.bar-mark { fill: var(--eosin); cursor: default }
+.bar-mark:hover { fill: var(--accent) }
+.bar-mark:focus { outline: none }
+.bar-mark:focus-visible { stroke: var(--ink); stroke-width: 1.5 }
+
+.tip { position: fixed; z-index: 50; pointer-events: none; max-width: 260px; padding: 8px 10px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); box-shadow: var(--card-shadow-hover);
+  font-size: 12px; color: var(--ink2) }
+.tip .t-head { font: 600 12px/1.3 var(--mono); color: var(--ink); margin-bottom: 3px }
+.tip .t-row { display: flex; align-items: center; gap: 12px; justify-content: space-between; line-height: 1.55 }
+.tip .t-row b { font-family: var(--mono); font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; white-space: nowrap }
+.tip .t-hint { color: var(--ink3); font-size: 10.5px; margin-top: 3px }
+
+.credits { margin: 0 2px; }
+
+@media (max-width: 760px) {
+  .card { padding: var(--s2) }
+  .card h2 { font-size: 22px }
+  .brand h1 { font-size: 22px }
+  .theme-toggle { width: 34px; height: 34px }
+  .stat-grid { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)) }
+  .stat-value { font-size: 26px }
+}
+@media (max-width: 420px) {
+  .brand h1 { font-size: 19px }
+  .pagename { font-size: 10px }
+  .actions { gap: 6px }
+  .theme-toggle { width: 32px; height: 32px }
+  .sound-grid { grid-template-columns: 1fr }
+  .stat-grid { grid-template-columns: 1fr }
+  .group-toggle { padding: 12px }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; scroll-behavior: auto !important } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="topbar">
+    <div class="top">
+      <div class="brand"><h1>Neuron <i>Atlas</i></h1><span class="pagename">Hearing</span></div>
+      <div class="actions">
+        <button class="theme-toggle" id="theme" type="button" aria-label="Switch theme" title="Switch theme">
+          <svg class="i-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.42-1.42M17.66 6.34l1.41-1.41"/></svg>
+          <svg class="i-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/></svg>
+        </button>
+      </div>
+    </div>
+    <nav class="navrow" aria-label="Prototype pages">
+      <a href="../index.html">Explorer</a>
+      <a href="index.html">Prototypes</a>
+      <a href="vision.html">Vision lab</a>
+      <a href="janus.html">Image pushes</a>
+      <a href="music.html">Sound pushes</a>
+      <a href="hear.html" aria-current="page">Hearing</a>
+      <a href="stories.html">Story casting</a>
+      <a href="lenses.html">Says vs does</a>
+      <a href="identity.html">Identity lab</a>
+      <a href="evidence.html">Evidence</a>
+    </nav>
+  </header>
+
+  <div class="status" id="status" role="status"><span class="spinner" aria-hidden="true"></span><span>Loading the hearing experiment…</span></div>
+
+  <main class="stack" id="main" hidden>
+    <section class="card" id="intro">
+      <div class="section-head">
+        <div>
+          <h2>Hearing</h2>
+          <p class="lede" id="introText"></p>
+        </div>
+        <span class="count" id="introCount"></span>
+      </div>
+      <p class="question" id="introQuestion"></p>
+      <p class="lede" id="introEsc"></p>
+    </section>
+
+    <section class="card" id="statsCard">
+      <div class="section-head">
+        <div>
+          <h2>What a push changes</h2>
+          <p class="lede">A push is one neuron pushed at one dose while the model hears one sound; both doses (-1 and +1) are counted together. “Fixed” counts pushes that turn a wrong answer right; “broke” counts pushes that turn a right answer wrong.</p>
+        </div>
+      </div>
+      <div class="stat-grid" id="statGrid"></div>
+    </section>
+
+    <section class="card" id="soundsCard">
+      <div class="section-head">
+        <div>
+          <h2>The sounds</h2>
+          <p class="lede">Twenty-two short clips: 6 synthetic tones and 16 ESC-50 recordings. Each card shows the true class and what the unpushed model answered. Click a card to select that sound; the selected card gets a violet outline. Play buttons stream one clip at a time.</p>
+        </div>
+        <span class="count" id="soundsCount"></span>
+      </div>
+      <div class="sound-grid" id="soundGrid"></div>
+    </section>
+
+    <section class="card" id="answersCard">
+      <div class="section-head">
+        <div>
+          <h2>Pushed answers for the selected sound</h2>
+          <p class="lede">Every neuron and dose for the selected sound, with blocks B0–B23 and doses -1 or +1. A row whose answer differs from the unpushed answer carries an eosin-tinted “changed” badge. Rows are sorted by block.</p>
+        </div>
+        <span class="count" id="answersCount"></span>
+      </div>
+      <div class="answers-meta" id="answersMeta"></div>
+      <div class="controls">
+        <button class="table-btn" id="answerFilter" type="button" aria-pressed="false">Changed only</button>
+        <span class="muted small" id="answerFilterNote"></span>
+      </div>
+      <div class="table-wrap answers-table" id="answersTable"></div>
+    </section>
+
+    <section class="card" id="groupsCard">
+      <div class="section-head">
+        <div>
+          <h2>Neurons that force one sound</h2>
+          <p class="lede">The top 12 pushes by how many of the 22 sounds they take over. Each was pushed at -1 or +1 in one audio block (B0–B23); the selected card is outlined in violet. Open a card to see that push’s answer for every sound, with a play button beside each one.</p>
+        </div>
+        <span class="count">Top 12 · sorted by sounds taken over</span>
+      </div>
+      <div class="group-list" id="groupList"></div>
+    </section>
+
+    <section class="card" id="chartCard">
+      <div class="section-head">
+        <div>
+          <h2>Change by audio block</h2>
+          <p class="lede">Bars show the share of pushed answers that changed, block by block; both doses (-1 and +1) are pooled. Early blocks and the last block change it most; the middle blocks change it least. Eosin bars; hover or focus a bar for its counts.</p>
+        </div>
+        <button class="table-btn" id="chartTableBtn" type="button" aria-expanded="false" aria-controls="chartTable">Table</button>
+      </div>
+      <div class="chart-wrap" id="chartWrap"></div>
+      <div class="table-wrap chart-table" id="chartTable" hidden></div>
+    </section>
+
+    <p class="credits small muted">Sound clips from ESC-50 (Piczak 2015), CC BY-NC 3.0.</p>
+  </main>
+</div>
+
+<div class="tip" id="tip" role="tooltip" hidden></div>
+<div class="sr-only" id="announce" aria-live="polite"></div>
+
+<script>
+(() => {
+  "use strict";
+
+  const DATA = "https://huggingface.co/datasets/nikhilxvytla/neuron-atlas/resolve/main/";
+  const THEME_KEY = "hear-lab-theme";
+  const MAX_BLOCK = 23;
+
+  const $ = (sel, root = document) => root.querySelector(sel);
+  const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
+
+  function esc(value) {
+    return String(value == null ? "" : value).replace(/[&<>"']/g, ch => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+    }[ch]));
+  }
+
+  function fmt(value) {
+    return esc(value).replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>");
+  }
+
+  function pct(part, total) {
+    const n = Number(total);
+    if (!n) return "—";
+    return (Number(part) / n * 100).toFixed(1) + "%";
+  }
+
+  function labelStim(id) {
+    return esc(String(id == null ? "" : id).replace(/[_-]+/g, " "));
+  }
+
+  function doseLabel(dose) {
+    return Number(dose) > 0 ? "+1" : "-1";
+  }
+
+  function groupKey(group) {
+    return "B" + Number(group.layer) + "N" + Number(group.neuron);
+  }
+
+  function groupLabel(group) {
+    return "B" + Number(group.layer) + " N" + Number(group.neuron) + " · " + doseLabel(group.dose);
+  }
+
+  function normAnswer(value) {
+    return String(value == null ? "" : value).toLowerCase().replace(/\s+/g, " ").trim().replace(/[.!?]+$/, "").trim();
+  }
+
+  function stimulusUrl(stim) {
+    const raw = String(stim && stim.url ? stim.url : "");
+    if (/^https?:\/\//i.test(raw)) return raw;
+    return DATA + raw.replace(/^\/+/, "");
+  }
+
+  function playIcons() {
+    return `<svg class="i-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z" fill="currentColor"/></svg>` +
+      `<svg class="i-pause" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5h4v14H7zM13 5h4v14h-4z" fill="currentColor"/></svg>` +
+      `<svg class="i-spin" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="2.5" stroke-dasharray="30 20"/></svg>`;
+  }
+
+  function audioTag(url) {
+    return `<audio preload="none" data-src="${esc(url)}"></audio>`;
+  }
+
+  const state = { s: null, n: null, changedOnly: false };
+  const themeMQ = matchMedia("(prefers-color-scheme: dark)");
+  const themeBtn = $("#theme");
+  const tip = $("#tip");
+
+  let db = null;
+  let stimuli = [];
+  let stimById = new Map();
+  let groups = [];
+  let groupByKey = new Map();
+  let topGroups = [];
+  let layerStats = [];
+  let active = null;
+
+  function announce(message) {
+    $("#announce").textContent = message;
+  }
+
+  function showTip(x, y, html) {
+    tip.innerHTML = html;
+    tip.hidden = false;
+    const r = tip.getBoundingClientRect();
+    let left = x + 14;
+    let top = y + 14;
+    if (left + r.width > window.innerWidth - 8) left = x - r.width - 14;
+    if (top + r.height > window.innerHeight - 8) top = y - r.height - 14;
+    tip.style.left = Math.max(8, left) + "px";
+    tip.style.top = Math.max(8, top) + "px";
+  }
+
+  function hideTip() {
+    tip.hidden = true;
+  }
+
+  function showTipAt(el, html) {
+    const r = el.getBoundingClientRect();
+    showTip(r.left + r.width / 2, r.top + r.height / 2, html);
+  }
+
+  function barTipHtml(i) {
+    const stat = layerStats[i];
+    if (!stat) return "";
+    return `<div class="t-head">Block B${stat.layer}</div>` +
+      `<div class="t-row"><span>Changed</span><b>${stat.changed} of ${stat.n}</b></div>` +
+      `<div class="t-row"><span>Share</span><b>${pct(stat.changed, stat.n)}</b></div>`;
+  }
+
+  function parseHash() {
+    const params = new URLSearchParams(location.hash.replace(/^#/, ""));
+    return { s: params.get("s"), n: params.get("n") };
+  }
+
+  function writeHash() {
+    let next = "#s=" + encodeURIComponent(state.s || "");
+    if (state.n) next += "&n=" + encodeURIComponent(state.n);
+    if (location.hash !== next) history.replaceState(null, "", next);
+  }
+
+  function stopActive() {
+    const rec = active;
+    if (!rec) return;
+    active = null;
+    try { rec.audio.pause(); } catch (error) {}
+    try { rec.audio.currentTime = 0; } catch (error) {}
+    rec.apply("idle");
+  }
+
+  function startAudio(audio, apply, label) {
+    if (active && active.audio === audio && !audio.paused) {
+      active = null;
+      audio.pause();
+      apply("idle");
+      return;
+    }
+    stopActive();
+    if (!audio.getAttribute("src")) audio.src = audio.dataset.src;
+    apply("loading");
+    announce("Loading " + label + ".");
+    const rec = { audio, apply, label };
+    active = rec;
+    const promise = audio.play();
+    if (promise && promise.catch) {
+      promise.catch(() => {
+        if (active === rec) {
+          active = null;
+          apply("error");
+          announce("Could not play " + label + ".");
+        }
+      });
+    }
+  }
+
+  function wireAudio(audio, apply, label) {
+    audio.addEventListener("playing", () => {
+      if (active && active.audio === audio) {
+        apply("playing");
+        announce("Playing " + label + ".");
+      }
+    });
+    audio.addEventListener("waiting", () => {
+      if (active && active.audio === audio) apply("loading");
+    });
+    audio.addEventListener("pause", () => {
+      if (active && active.audio === audio) {
+        active = null;
+        apply("idle");
+      }
+    });
+    audio.addEventListener("ended", () => {
+      if (active && active.audio === audio) {
+        active = null;
+        apply("idle");
+        announce("Finished " + label + ".");
+      }
+    });
+    audio.addEventListener("error", () => {
+      if (active && active.audio === audio) {
+        active = null;
+        apply("error");
+        announce("Could not play " + label + ".");
+      }
+    });
+  }
+
+  function setPlayButton(btn, status, label) {
+    btn.classList.toggle("is-loading", status === "loading");
+    btn.classList.toggle("is-playing", status === "playing");
+    btn.classList.toggle("is-error", status === "error");
+    if (status === "loading") {
+      btn.setAttribute("aria-label", "Loading " + label);
+      btn.title = "Loading audio";
+    } else if (status === "playing") {
+      btn.setAttribute("aria-label", "Pause " + label);
+      btn.title = "Pause";
+    } else if (status === "error") {
+      btn.setAttribute("aria-label", "Audio failed for " + label);
+      btn.title = "Audio failed";
+    } else {
+      btn.setAttribute("aria-label", "Play " + label);
+      btn.title = "Play";
+    }
+  }
+
+  function wirePlayButtons(root) {
+    $$(".playbtn", root).forEach(btn => {
+      if (btn.dataset.wired) return;
+      btn.dataset.wired = "1";
+      const audio = btn.nextElementSibling;
+      if (!audio || audio.tagName !== "AUDIO") return;
+      const label = btn.dataset.label || "this clip";
+      const apply = status => setPlayButton(btn, status, label);
+      wireAudio(audio, apply, label);
+      btn.addEventListener("click", () => startAudio(audio, apply, label));
+      apply("idle");
+    });
+  }
+
+  function baselineAnswer(stimId) {
+    const stim = stimById.get(stimId);
+    return stim ? stim.baseline : "";
+  }
+
+  function answerChanged(group, stimId) {
+    const replies = group.replies || {};
+    return normAnswer(replies[stimId]) !== normAnswer(baselineAnswer(stimId));
+  }
+
+  function buildData() {
+    stimuli = db.stimuli.slice();
+    stimById = new Map(stimuli.map(stim => [stim.id, stim]));
+    groups = db.groups.slice();
+    groupByKey = new Map();
+    for (const group of groups) {
+      const key = groupKey(group);
+      if (!groupByKey.has(key)) groupByKey.set(key, []);
+      groupByKey.get(key).push(group);
+    }
+
+    topGroups = groups.slice().sort((a, b) =>
+      Number(b.forced_k) - Number(a.forced_k) ||
+      Number(b.changed) - Number(a.changed) ||
+      Number(a.layer) - Number(b.layer) ||
+      Number(a.neuron) - Number(b.neuron)
+    ).slice(0, 12);
+
+    layerStats = [];
+    for (let layer = 0; layer <= MAX_BLOCK; layer++) {
+      const raw = (db.by_layer && db.by_layer[String(layer)]) || {};
+      const changed = Number(raw.changed) || 0;
+      const n = Number(raw.n) || 0;
+      layerStats.push({ layer, changed, n, share: n ? changed / n : 0 });
+    }
+  }
+
+  function renderIntro() {
+    const model = db.model || "Gemma 4 E4B";
+    const question = db.question || "What do you hear? Answer in a few words.";
+    const synthetic = stimuli.filter(stim => String(stim.kind).toLowerCase() === "synthetic").length;
+    const esc50 = stimuli.filter(stim => String(stim.kind).toLowerCase() === "esc50").length;
+    const baseCorrect = Number(db.esc && db.esc.base_correct) || 0;
+    const of = Number(db.esc && db.esc.of) || 0;
+
+    $("#introText").innerHTML = `${esc(model)} listens to ${stimuli.length} short sounds ` +
+      `(${synthetic} synthetic, ${esc50} ESC-50 recordings) and says what it hears while one neuron of its ` +
+      `audio encoder is pushed. Each of the 24 audio blocks gets 6 random neurons, each pushed at -1 and +1.`;
+    $("#introQuestion").innerHTML = "“" + fmt(question) + "”";
+    $("#introEsc").innerHTML = `Even with no push, it mishears most of the real recordings: ` +
+      `<b>${baseCorrect} of ${of}</b> ESC-50 clips are answered correctly.`;
+    $("#introCount").textContent = `${groups.length} pushes · ${stimuli.length} sounds`;
+  }
+
+  function renderStats() {
+    const changed = Number(db.changed) || 0;
+    const pushes = Number(db.n_pushes) || 0;
+    const fixed = Number(db.esc && db.esc.fixed) || 0;
+    const broke = Number(db.esc && db.esc.broke) || 0;
+    $("#statGrid").innerHTML = `
+      <div class="stat">
+        <span class="stat-label">Answers changed</span>
+        <span class="stat-value">${pushes ? pct(changed, pushes) : "—"}</span>
+        <span class="stat-note">${changed} of ${pushes} pushes</span>
+      </div>
+      <div class="stat">
+        <span class="stat-label">Fixed</span>
+        <span class="stat-value">${fixed}</span>
+        <span class="stat-note">pushes that turned a wrong answer right</span>
+      </div>
+      <div class="stat">
+        <span class="stat-label">Broke</span>
+        <span class="stat-value">${broke}</span>
+        <span class="stat-note">pushes that turned a right answer wrong</span>
+      </div>`;
+  }
+
+  function renderSounds() {
+    stopActive();
+    $("#soundGrid").innerHTML = stimuli.map(stim => {
+      const expected = stim.expected == null ? "—" : stim.expected;
+      const baseline = stim.baseline == null ? "—" : stim.baseline;
+      return `<article class="sound-card" data-id="${esc(stim.id)}">
+        <div class="sound-head">
+          <button class="sound-name" type="button" data-id="${esc(stim.id)}" aria-pressed="false">${labelStim(stim.id)}</button>
+          <span class="kind">${esc(stim.kind)}</span>
+        </div>
+        <div class="sound-meta">True class: <b>${fmt(expected)}</b></div>
+        <div class="sound-answer">Unpushed answer: <b>${fmt(baseline)}</b></div>
+        <div class="sound-foot">
+          <button class="playbtn" type="button" data-label="${esc("sound " + stim.id)}">${playIcons()}</button>
+          ${audioTag(stimulusUrl(stim))}
+          <span class="sound-play-label">Play clip</span>
+        </div>
+      </article>`;
+    }).join("");
+    $("#soundsCount").textContent = stimuli.length + " sounds";
+    wirePlayButtons($("#soundGrid"));
+    updateSoundSelection();
+  }
+
+  function updateSoundSelection() {
+    $$(".sound-card").forEach(card => {
+      const selected = card.dataset.id === state.s;
+      card.classList.toggle("is-selected", selected);
+      const btn = $(".sound-name", card);
+      if (btn) btn.setAttribute("aria-pressed", String(selected));
+    });
+  }
+
+  function renderAnswers() {
+    const stim = stimById.get(state.s);
+    if (!stim) return;
+
+    const rows = groups.map(group => {
+      const replies = group.replies || {};
+      const answer = replies[stim.id];
+      return { group, answer, changed: answerChanged(group, stim.id) };
+    }).sort((a, b) =>
+      Number(a.group.layer) - Number(b.group.layer) ||
+      Number(a.group.neuron) - Number(b.group.neuron) ||
+      Number(a.group.dose) - Number(b.group.dose)
+    );
+
+    const changedRows = rows.filter(row => row.changed);
+    const shown = state.changedOnly ? changedRows : rows;
+    const expected = stim.expected == null ? "—" : stim.expected;
+    const baseline = stim.baseline == null ? "—" : stim.baseline;
+
+    $("#answersMeta").innerHTML =
+      `<span><span class="mono muted">Sound</span> <b>${labelStim(stim.id)}</b></span>` +
+      `<span><span class="mono muted">True class</span> <b>${fmt(expected)}</b></span>` +
+      `<span><span class="mono muted">Unpushed answer</span> <b>${fmt(baseline)}</b></span>`;
+    $("#answersCount").textContent = shown.length + " of " + rows.length + " rows";
+    $("#answerFilterNote").textContent = changedRows.length + " changed answers for this sound";
+
+    const body = shown.length ? shown.map(row => {
+      const group = row.group;
+      const answer = row.answer == null || row.answer === "" ? "—" : row.answer;
+      return `<tr data-key="${esc(groupKey(group))}"${groupKey(group) === state.n ? ' class="is-selected"' : ""}>
+        <td>${esc(groupLabel(group))}</td>
+        <td><span>${fmt(answer)}</span>${row.changed ? '<span class="badge">changed</span>' : ""}</td>
+      </tr>`;
+    }).join("") : `<tr><td colspan="2" class="empty">No pushes changed this answer.</td></tr>`;
+
+    $("#answersTable").innerHTML = `<table>
+      <caption>Every pushed neuron and dose for “${labelStim(stim.id)}”, sorted by block. ${changedRows.length} of ${rows.length} answers differ from the unpushed answer.</caption>
+      <thead><tr><th>Push</th><th>Answer</th></tr></thead>
+      <tbody>${body}</tbody>
+    </table>`;
+    updateAnswerSelection();
+  }
+
+  function updateAnswerSelection() {
+    $$("#answersTable tbody tr[data-key]").forEach(row => {
+      row.classList.toggle("is-selected", !!state.n && row.dataset.key === state.n);
+    });
+  }
+
+  function renderGroups() {
+    $("#groupList").innerHTML = topGroups.map((group, i) => {
+      const forcedK = Number(group.forced_k) || 0;
+      const n = Number(group.n) || 22;
+      const forced = group.forced == null || group.forced === "" ? "no answer" : group.forced;
+      return `<article class="group-card" data-key="${esc(groupKey(group))}" data-i="${i}">
+        <button class="group-toggle" type="button" aria-expanded="false" aria-controls="group-panel-${i}">
+          <span class="group-main">
+            <span class="group-name">${esc(groupLabel(group))}</span>
+            <span class="group-summary">makes <b>${forcedK} of ${n}</b> sounds “${fmt(forced)}”</span>
+          </span>
+          <span class="caret" aria-hidden="true">+</span>
+        </button>
+        <div class="group-panel" id="group-panel-${i}" hidden></div>
+      </article>`;
+    }).join("");
+    updateGroupSelection();
+  }
+
+  function buildGroupPanel(card) {
+    const panel = $(".group-panel", card);
+    if (!panel || panel.dataset.built) return;
+    const group = topGroups[Number(card.dataset.i)];
+    if (!group) return;
+    panel.innerHTML = stimuli.map(stim => {
+      const replies = group.replies || {};
+      const answer = replies[stim.id];
+      const changed = answerChanged(group, stim.id);
+      const text = answer == null || answer === "" ? "—" : answer;
+      return `<div class="answer-row">
+        <button class="playbtn" type="button" data-label="${esc("sound " + stim.id)}">${playIcons()}</button>
+        ${audioTag(stimulusUrl(stim))}
+        <div class="answer-main">
+          <span class="answer-stim">${labelStim(stim.id)} · ${fmt(stim.expected == null ? "—" : stim.expected)}</span>
+          <span class="answer-text">${fmt(text)}</span>
+        </div>
+        ${changed ? '<span class="badge">changed</span>' : ""}
+      </div>`;
+    }).join("");
+    panel.dataset.built = "1";
+    wirePlayButtons(panel);
+  }
+
+  function setGroupOpen(card, open) {
+    const btn = $(".group-toggle", card);
+    const panel = $(".group-panel", card);
+    const caret = $(".caret", card);
+    if (!btn || !panel) return;
+    if (open) buildGroupPanel(card);
+    panel.hidden = !open;
+    btn.setAttribute("aria-expanded", String(open));
+    if (caret) caret.textContent = open ? "−" : "+";
+  }
+
+  function updateGroupSelection() {
+    $$(".group-card").forEach(card => {
+      card.classList.toggle("is-selected", !!state.n && card.dataset.key === state.n);
+    });
+  }
+
+  function revealGroup(key, scroll) {
+    const cards = $$(".group-card").filter(card => card.dataset.key === key);
+    if (!cards.length) return false;
+    setGroupOpen(cards[0], true);
+    if (scroll) {
+      const behavior = matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
+      cards[0].scrollIntoView({ block: "center", behavior });
+    }
+    return true;
+  }
+
+  function renderChart() {
+    const W = 800, H = 340;
+    const m = { t: 18, r: 18, b: 48, l: 54 };
+    const innerW = W - m.l - m.r;
+    const innerH = H - m.t - m.b;
+    const band = innerW / (MAX_BLOCK + 1);
+    const barW = band * 0.62;
+
+    let maxShare = 0;
+    for (const stat of layerStats) maxShare = Math.max(maxShare, stat.share);
+    const maxPct = Math.max(1, maxShare * 100);
+    let step;
+    if (maxPct <= 5) step = 1;
+    else if (maxPct <= 10) step = 2;
+    else if (maxPct <= 25) step = 5;
+    else if (maxPct <= 60) step = 10;
+    else step = 20;
+    const top = Math.ceil(maxPct / step) * step;
+
+    const X = layer => m.l + (Number(layer) + 0.5) * band;
+    const Y = value => m.t + innerH - (Number(value) / top) * innerH;
+
+    let svg = `<svg viewBox="0 0 ${W} ${H}" role="group" aria-label="Share of pushed answers that changed, by audio block">`;
+
+    for (let tick = 0; tick <= top + 0.001; tick += step) {
+      const y = Y(tick);
+      svg += `<line class="grid-line" x1="${m.l}" x2="${W - m.r}" y1="${y}" y2="${y}"/>`;
+      svg += `<text class="axis-text" x="${m.l - 8}" y="${y + 3.5}" text-anchor="end">${tick}%</text>`;
+    }
+
+    for (const layer of [0, 4, 8, 12, 16, 20, 23]) {
+      const x = X(layer);
+      svg += `<text class="axis-text" x="${x}" y="${m.t + innerH + 16}" text-anchor="middle">B${layer}</text>`;
+    }
+    svg += `<text class="axis-unit" x="${m.l}" y="${H - 8}">audio block</text>`;
+    svg += `<text class="axis-unit" x="${m.l - 8}" y="${m.t - 6}" text-anchor="end">share changed</text>`;
+
+    layerStats.forEach((stat, i) => {
+      const x = X(stat.layer) - barW / 2;
+      const y = Y(stat.share * 100);
+      const h = Math.max(0, m.t + innerH - y);
+      const label = `Block B${stat.layer}: ${stat.changed} of ${stat.n} answers changed, ${pct(stat.changed, stat.n)}.`;
+      svg += `<rect class="bar-mark" x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${barW.toFixed(2)}" height="${h.toFixed(2)}" rx="2" data-i="${i}" tabindex="0" role="img" aria-label="${esc(label)}"/>`;
+    });
+
+    svg += "</svg>";
+    $("#chartWrap").innerHTML = svg;
+    renderChartTable();
+  }
+
+  function renderChartTable() {
+    const body = layerStats.map(stat =>
+      `<tr><td>B${stat.layer}</td><td>${stat.changed}</td><td>${stat.n}</td><td>${pct(stat.changed, stat.n)}</td></tr>`
+    ).join("");
+    $("#chartTable").innerHTML = `<table>
+      <caption>Share of pushed answers that changed, by audio block.</caption>
+      <thead><tr><th>Block</th><th>Changed</th><th>Pushes</th><th>Share</th></tr></thead>
+      <tbody>${body}</tbody>
+    </table>`;
+  }
+
+  function selectStim(id) {
+    if (!stimById.has(id) || id === state.s) return;
+    state.s = id;
+    writeHash();
+    updateSoundSelection();
+    renderAnswers();
+    announce("Selected " + id + ". Pushed answers updated.");
+  }
+
+  function applyHash(hash, options) {
+    const opts = options || {};
+    const nextS = hash.s && stimById.has(hash.s) ? hash.s : state.s;
+    const nextN = hash.n && groupByKey.has(hash.n) ? hash.n : null;
+    const nChanged = nextN !== state.n;
+    state.s = nextS;
+    state.n = nextN;
+    updateSoundSelection();
+    renderAnswers();
+    updateGroupSelection();
+    updateAnswerSelection();
+    if (nextN) revealGroup(nextN, !!opts.scroll && nChanged);
+    if (!nextN && opts.clearPanels) {
+      $$(".group-card").forEach(card => setGroupOpen(card, false));
+    }
+    writeHash();
+  }
+
+  function renderAll() {
+    renderIntro();
+    renderStats();
+    renderSounds();
+    renderAnswers();
+    renderGroups();
+    renderChart();
+  }
+
+  async function load() {
+    const status = $("#status");
+    const main = $("#main");
+    status.hidden = false;
+    status.className = "status";
+    status.setAttribute("role", "status");
+    status.innerHTML = `<span class="spinner" aria-hidden="true"></span><span>Loading the hearing experiment…</span>`;
+    main.hidden = true;
+    try {
+      const response = await fetch(DATA + "site/hear.json", { cache: "no-store" });
+      if (!response.ok) throw new Error("Server returned HTTP " + response.status);
+      const data = await response.json();
+      if (!data || !Array.isArray(data.stimuli) || !data.stimuli.length ||
+          !Array.isArray(data.groups) || !data.groups.length || !data.by_layer) {
+        throw new Error("The hearing data is missing its stimuli, groups, or block counts.");
+      }
+      db = data;
+      buildData();
+      if (!stimuli.length || !groups.length) throw new Error("The hearing data has no sounds or pushes.");
+
+      const hash = parseHash();
+      state.s = hash.s && stimById.has(hash.s) ? hash.s : stimuli[0].id;
+      state.n = hash.n && groupByKey.has(hash.n) ? hash.n : null;
+
+      status.hidden = true;
+      main.hidden = false;
+      renderAll();
+      writeHash();
+      if (state.n) setTimeout(() => revealGroup(state.n, true), 80);
+    } catch (error) {
+      status.className = "status error";
+      status.setAttribute("role", "alert");
+      status.innerHTML = `<div class="status-body"><b>Could not load the hearing data.</b>${esc(error && error.message ? error.message : "Unknown error")}. Check the connection and try again.</div><button type="button" id="retry">Try again</button>`;
+    }
+  }
+
+  $("#status").addEventListener("click", event => {
+    if (event.target.closest("#retry")) load();
+  });
+
+  $("#soundGrid").addEventListener("click", event => {
+    if (event.target.closest(".playbtn")) return;
+    const card = event.target.closest(".sound-card");
+    if (!card) return;
+    selectStim(card.dataset.id);
+  });
+
+  $("#answerFilter").addEventListener("click", () => {
+    state.changedOnly = !state.changedOnly;
+    const btn = $("#answerFilter");
+    btn.setAttribute("aria-pressed", String(state.changedOnly));
+    btn.textContent = state.changedOnly ? "Showing changed only" : "Changed only";
+    renderAnswers();
+    announce(state.changedOnly ? "Showing only changed answers." : "Showing all answers.");
+  });
+
+  $("#groupList").addEventListener("click", event => {
+    const btn = event.target.closest(".group-toggle");
+    if (!btn) return;
+    const card = btn.closest(".group-card");
+    if (!card) return;
+    const panel = $(".group-panel", card);
+    const open = !!panel && panel.hidden;
+    state.n = card.dataset.key;
+    writeHash();
+    updateGroupSelection();
+    updateAnswerSelection();
+    setGroupOpen(card, open);
+    announce((open ? "Opened " : "Closed ") + card.dataset.key + ".");
+  });
+
+  $("#chartWrap").addEventListener("pointermove", event => {
+    const bar = event.target.closest(".bar-mark");
+    if (!bar) {
+      hideTip();
+      return;
+    }
+    showTip(event.clientX, event.clientY, barTipHtml(Number(bar.dataset.i)));
+  });
+
+  $("#chartWrap").addEventListener("pointerleave", hideTip);
+
+  $("#chartWrap").addEventListener("focusin", event => {
+    const bar = event.target.closest(".bar-mark");
+    if (!bar) return;
+    showTipAt(bar, barTipHtml(Number(bar.dataset.i)));
+  });
+
+  $("#chartWrap").addEventListener("focusout", hideTip);
+
+  $("#chartTableBtn").addEventListener("click", () => {
+    const btn = $("#chartTableBtn");
+    const panel = $("#chartTable");
+    const show = panel.hidden;
+    panel.hidden = !show;
+    btn.setAttribute("aria-expanded", String(show));
+    btn.textContent = show ? "Hide table" : "Table";
+    hideTip();
+  });
+
+  document.addEventListener("scroll", hideTip, true);
+
+  window.addEventListener("hashchange", () => {
+    if (!db) return;
+    const hash = parseHash();
+    applyHash(hash, { scroll: true, clearPanels: !hash.n });
+  });
+
+  function resolvedTheme() {
+    const attr = document.documentElement.dataset.theme;
+    if (attr === "light" || attr === "dark") return attr;
+    return themeMQ.matches ? "dark" : "light";
+  }
+
+  function updateThemeButton() {
+    const resolved = resolvedTheme();
+    themeBtn.dataset.resolved = resolved;
+    const next = resolved === "dark" ? "light" : "dark";
+    const label = `Switch to ${next} theme`;
+    themeBtn.setAttribute("aria-label", label);
+    themeBtn.title = label;
+  }
+
+  function setTheme(mode) {
+    document.documentElement.dataset.theme = mode;
+    try { localStorage.setItem(THEME_KEY, mode); } catch (error) {}
+    updateThemeButton();
+  }
+
+  try {
+    const saved = localStorage.getItem(THEME_KEY);
+    if (saved === "light" || saved === "dark") document.documentElement.dataset.theme = saved;
+  } catch (error) {}
+  updateThemeButton();
+  themeBtn.addEventListener("click", () => setTheme(resolvedTheme() === "dark" ? "light" : "dark"));
+  themeMQ.addEventListener?.("change", () => {
+    if (!document.documentElement.dataset.theme) updateThemeButton();
+  });
+
+  load();
+})();
+</script>
+</body>
+</html>

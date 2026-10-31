@@ -872,3 +872,7 @@ derangement null, not "persona vs not".
 - Gemma 4 audio (`analysis/gemma_audio.py`, judge-free): 2,269 of 6,336 pushes change the answer; 4 of 16 ESC-50 clips
   right unpushed; pushes fix 176, break 277; "dog barking" is the attractor (556 of the changed answers). Gemma's
   blank-image run first failed: its processor wants `images=[[img]] * batch`; `_prepare_inputs` now retries nested.
+- Gemma 4 blank canvas: 103 of 2,304 pushes hallucinate (regex extended for Gemma's terse "Black screen." /
+  "Solid gray background."; Qwen's count is unchanged at 285); judge own 9 / random 9 / neither 85; consistency 23/29
+  vs shuffled 13/29 (not separable: nearly all are textures). Layers: 46 from L0, 23 from L15 (last). The first
+  upload missed meta.json/acts.parquet because `blank_vision.py` never closed its uploader; it does now.

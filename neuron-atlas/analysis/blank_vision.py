@@ -93,6 +93,7 @@ def main():
     if up:
         up.submit(os.path.join(a.out, "acts.parquet"), up.remote("acts.parquet"))
         up.submit(os.path.join(a.out, "meta.json"), up.remote("meta.json"))
+        up.close()  # flush now: the batched commit is otherwise left to timing
     print(f"activations: {len(picks)} neurons x {len(items)} stimuli", flush=True)
 
     mm._resid_median = lambda *args: resid
