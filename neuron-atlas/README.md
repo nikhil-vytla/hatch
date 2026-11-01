@@ -278,6 +278,21 @@ first).
     opposite sign's tokens stay below chance in all three. The J-lens beats the logit lens on LFM2 (12× vs 9×) and
     0.8B (26× vs 22×) but not on 2B (22× vs 25×). LFM2 is also the most fragile model here at ±0.8: only 16% of
     pushes leave its default assistant intact, 27% are incoherent, and 5.8% give a persona, mostly a human one.
+31. **A steering vector beats the best single neuron by far, and needs dozens of neurons to imitate.** Qwen3.5-4B,
+    finding 17's 48 concept words. At the layer of each concept's top J-lens neuron, the same-size push (dose ×
+    median residual norm, exactly a neuron push's size) along: that neuron; a contrastive steering vector (mean
+    activation over the model's replies with vs without "You are a {concept}." on 8 other questions); the vector
+    with the part shared by all 48 removed; the vector rebuilt from k neurons of that layer; a random direction.
+    "Clean" = the judge says the model became the concept and stayed coherent (95% intervals over concepts): the
+    vector 67% (55–78%) at 0.8; the concept-specific vector 51% (39–64%) at 1.2; a 64-neuron rebuild 49% (37–62%), 16
+    neurons 21% (13–30%), 1 neuron 4%; the top lens neuron alone 9% (2–18%) at its best dose and 3% at 0.8; random 0%.
+    The vector and its best neuron are nearly orthogonal (cosine 0.04); 64 neurons rebuild the vector only to cosine
+    0.56 but recover three quarters of its effect, so the effect sits in a small part of the direction. 65% of each
+    vector (cosine with the mean) is shared by all concepts, a generic "I was told to be someone" direction; with it
+    removed, the J-lens names the concept in its top 20 tokens for 63% of vectors vs 38% for the raw vector. The lens
+    neuron is among the 64 rebuilding neurons for only 25% of concepts: the neurons that say a word and the neurons a
+    vector uses for it are mostly different. (Finding 17's 18% for lens-picked neurons at 0.8 averaged up to six per
+    concept; here only the top-ranked one is pushed.)
 
 ## How it works
 

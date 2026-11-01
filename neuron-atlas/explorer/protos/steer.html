@@ -1,0 +1,1078 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Neurons vs vectors</title>
+<meta name="description" content="Compare single-neuron pushes with steering vectors built from concept prompts in Qwen3.5-4B.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Source+Sans+3:ital,wght@0,400;0,600;1,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+:root {
+  --bg: #f5f4f8; --surface: #ffffff; --sunk: #ebe9f1; --line: #d9d5e3; --ink: #1f1c2c; --ink2: #5d5870; --ink3: #8a849c;
+  --eosin: #d6336c; --eosin-soft: #f9d9e5; --hema: #4b3fa8; --hema-soft: #dedaf5; --accent: #b0245a;
+  --plate: #17152a; --plate-ink: #ece9f7; --plate-ink2: #a29dbb; --plate-line: #2c2946;
+  --good: #1f8a5b; --warn: #b7791f;
+  --k-user: #2a78d6; --k-persona: #d6336c; --k-altered: #4b3fa8; --k-other: #1baf7a; --k-incoherent: #eda100; --k-default: #cfcbdc;
+  --display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --body: "Source Sans 3", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --r: 10px; --r-card: 14px;
+  --s1: 12px; --s2: 16px; --s3: 24px;
+  --card-shadow: 0 1px 2px rgb(0 0 0 / .04), 0 4px 16px rgb(0 0 0 / .04);
+  --card-shadow-hover: 0 2px 4px rgb(0 0 0 / .06), 0 8px 24px rgb(0 0 0 / .08);
+  --pill-shadow: 0 1px 2px rgb(0 0 0 / .08), 0 2px 6px rgb(0 0 0 / .06);
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #121019; --surface: #1b1826; --sunk: #242033; --line: #343048; --ink: #ece9f7; --ink2: #b3adc8; --ink3: #827c99;
+  --eosin: #ff6b9a; --eosin-soft: #4a1f33; --hema: #9d92ff; --hema-soft: #2d2858; --accent: #ff7aa6;
+  --plate: #0b0a12; --plate-ink: #ece9f7; --plate-ink2: #9a95b2; --plate-line: #24213a; --good: #4cc38a; --warn: #e0a84a;
+  --k-user: #3987e5; --k-persona: #e0447a; --k-altered: #8a7ef0; --k-other: #199e70; --k-incoherent: #c98500; --k-default: #3b3652;
+  --card-shadow: 0 1px 2px rgb(0 0 0 / .3), 0 4px 16px rgb(0 0 0 / .25);
+  --card-shadow-hover: 0 2px 4px rgb(0 0 0 / .38), 0 8px 24px rgb(0 0 0 / .35);
+  --pill-shadow: 0 1px 2px rgb(0 0 0 / .35), 0 2px 6px rgb(0 0 0 / .3);
+  color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #121019; --surface: #1b1826; --sunk: #242033; --line: #343048; --ink: #ece9f7; --ink2: #b3adc8; --ink3: #827c99;
+  --eosin: #ff6b9a; --eosin-soft: #4a1f33; --hema: #9d92ff; --hema-soft: #2d2858; --accent: #ff7aa6;
+  --plate: #0b0a12; --plate-ink: #ece9f7; --plate-ink2: #9a95b2; --plate-line: #24213a; --good: #4cc38a; --warn: #e0a84a;
+  --k-user: #3987e5; --k-persona: #e0447a; --k-altered: #8a7ef0; --k-other: #199e70; --k-incoherent: #c98500; --k-default: #3b3652;
+  --card-shadow: 0 1px 2px rgb(0 0 0 / .3), 0 4px 16px rgb(0 0 0 / .25);
+  --card-shadow-hover: 0 2px 4px rgb(0 0 0 / .38), 0 8px 24px rgb(0 0 0 / .35);
+  --pill-shadow: 0 1px 2px rgb(0 0 0 / .35), 0 2px 6px rgb(0 0 0 / .3);
+  color-scheme: dark }
+* { box-sizing: border-box }
+html, body { height: 100% }
+body { background: var(--bg); color: var(--ink); font: 15px/1.5 var(--body); margin: 0; overflow-x: clip;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+button, input, select { font: inherit; color: inherit }
+button { cursor: pointer }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px }
+
+[hidden] { display: none !important }
+.topbar { position: sticky; top: 0; z-index: 30; background: color-mix(in oklab, var(--bg) 88%, transparent);
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--line) }
+.topbar-inner { max-width: 1120px; margin: 0 auto; padding: 10px 0 8px; display: flex; flex-direction: column; gap: 8px }
+.top { display: flex; align-items: center; gap: 12px; min-width: 0 }
+.brand { display: flex; align-items: baseline; gap: 10px; min-width: 0; flex: 1 1 auto }
+.brand h1 { font: 800 24px/1 var(--display); letter-spacing: -0.02em; margin: 0; white-space: nowrap }
+.brand h1 i { font-style: normal; color: var(--eosin) }
+.brand .page { font: 600 15px/1 var(--body); color: var(--ink2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
+.theme-toggle { width: 36px; height: 36px; flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center;
+  padding: 0; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink2);
+  transition: border-color 120ms ease, color 120ms ease }
+.theme-toggle:hover { border-color: var(--hema); color: var(--ink) }
+.theme-toggle svg { width: 18px; height: 18px; display: none }
+.theme-toggle .i-sun { display: block }
+.theme-toggle[data-resolved="light"] .i-sun { display: block }
+.theme-toggle[data-resolved="light"] .i-moon { display: none }
+.theme-toggle[data-resolved="dark"] .i-sun { display: none }
+.theme-toggle[data-resolved="dark"] .i-moon { display: block }
+.nav { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; padding-bottom: 2px }
+.nav::-webkit-scrollbar { display: none }
+.nav a { border: 1px solid transparent; border-radius: 999px; padding: 5px 10px; color: var(--ink2);
+  text-decoration: none; white-space: nowrap; font: 600 13px/1.3 var(--body) }
+.nav a:hover { color: var(--ink); border-color: var(--line) }
+.nav a[aria-current="page"] { background: var(--ink); color: var(--bg); border-color: var(--ink) }
+
+.wrap { max-width: 1120px; margin: 0 auto; padding-block: 20px 48px }
+main { display: flex; flex-direction: column; gap: 18px }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-card); padding: 24px;
+  box-shadow: var(--card-shadow); min-width: 0 }
+.card h2 { font: 800 22px/1.15 var(--display); letter-spacing: -0.01em; margin: 0 0 6px }
+.card h3 { font: 800 18px/1.2 var(--display); letter-spacing: -0.01em; margin: 22px 0 6px }
+.lede { color: var(--ink2); margin: 0 0 14px; max-width: 74ch }
+.hint { color: var(--ink3); font: 12px/1.55 var(--mono); margin: 0 0 10px; overflow-wrap: anywhere }
+.muted { color: var(--ink3) }
+.controls { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: flex-end; margin: 0 0 12px }
+.controls.sub { margin: 12px 0 0; align-items: center }
+.field { display: flex; flex-direction: column; gap: 4px; font: 600 12px/1.2 var(--body); color: var(--ink2);
+  min-width: 0; max-width: 100% }
+.field > span { padding-left: 1px }
+select { height: 36px; max-width: 100%; border: 1px solid var(--line); background: var(--surface); border-radius: 8px;
+  padding: 0 30px 0 10px; font: 600 13px/1 var(--body); min-width: 0 }
+.seg { display: inline-flex; max-width: 100%; overflow-x: auto; border: 1px solid var(--line); border-radius: 8px;
+  background: var(--surface); scrollbar-width: none }
+.seg::-webkit-scrollbar { display: none }
+.seg button { border: 0; background: transparent; padding: 8px 12px; font: 600 13px/1 var(--body); color: var(--ink2); white-space: nowrap }
+.seg button + button { border-left: 1px solid var(--line) }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--bg) }
+.btn { height: 34px; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 0 13px;
+  font: 600 13px/1 var(--body); color: var(--ink); white-space: nowrap;
+  transition: border-color 120ms ease, box-shadow 120ms ease }
+.btn:hover { border-color: var(--hema); box-shadow: 0 0 0 2px color-mix(in oklab, var(--hema) 18%, transparent) }
+.chips { display: flex; flex-wrap: wrap; gap: 6px }
+.chip { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 5px 11px;
+  font: 600 12px/1.35 var(--body); color: var(--ink2); transition: border-color 120ms ease, color 120ms ease }
+.chip:hover { border-color: var(--hema); color: var(--ink) }
+.chip[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink) }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 4px 0 10px; font: 12px/1.4 var(--body); color: var(--ink2) }
+.legend span { display: inline-flex; align-items: center; gap: 6px }
+.legend-note { color: var(--ink3) }
+.sw { width: 10px; height: 10px; border-radius: 2px; flex: 0 0 auto; display: inline-block;
+  border: 1px solid color-mix(in oklab, var(--ink) 12%, transparent) }
+.sw.line { width: 17px; height: 2px; border: 0; border-radius: 999px }
+.chart { width: 100%; min-width: 0; min-height: 80px; overflow-x: auto; -webkit-overflow-scrolling: touch }
+.chart svg { display: block; width: 100%; height: auto; touch-action: pan-y }
+.chart text { fill: var(--ink3); font-family: var(--mono); font-size: 10px }
+.chart text.lab { fill: var(--ink3) }
+.chart .axis-label { fill: var(--ink3); font-size: 10px }
+.chart .grid { stroke: var(--line); stroke-width: 1; shape-rendering: crispEdges }
+
+.table-wrap { overflow-x: auto; margin-top: 10px; -webkit-overflow-scrolling: touch; max-width: 100% }
+table { border-collapse: collapse; width: 100%; min-width: 520px; font: 12px/1.45 var(--mono) }
+table caption { caption-side: top; text-align: left; color: var(--ink2); font: 600 12px/1.4 var(--body); padding: 0 0 6px }
+th, td { padding: 6px 8px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap }
+th:first-child, td:first-child { text-align: left }
+thead th { color: var(--ink2); font-weight: 600; background: var(--surface); position: sticky; top: 0 }
+
+.stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px }
+.stat { border: 1px solid var(--line); border-radius: var(--r); padding: 13px 14px; background: var(--surface);
+  display: flex; flex-direction: column; gap: 4px; min-width: 0 }
+.stat-label { font: 600 10px/1.3 var(--mono); letter-spacing: .05em; text-transform: uppercase; color: var(--ink3) }
+.stat-value { font: 800 30px/1 var(--display); color: var(--ink); letter-spacing: -.02em; font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere }
+.stat-value .vs { font: 600 12px/1 var(--mono); letter-spacing: 0; color: var(--ink3); margin: 0 5px; text-transform: uppercase }
+.stat-note { font-size: 12px; color: var(--ink2); overflow-wrap: anywhere }
+
+.replies { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px }
+.reply-card { border: 1px solid var(--line); border-radius: var(--r); padding: 11px 12px; background: var(--surface);
+  min-width: 0; display: flex; flex-direction: column; gap: 7px }
+.reply-card.key-vector { border-color: var(--hema) }
+.reply-card.key-neuron { border-color: var(--eosin) }
+.reply-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; min-width: 0 }
+.reply-name { font: 700 14px/1.3 var(--display); color: var(--ink); letter-spacing: -.01em; overflow-wrap: anywhere }
+.reply-arm { font: 10px/1.4 var(--mono); color: var(--ink3); white-space: nowrap; flex: 0 0 auto }
+.reply-text { margin: 0; font-size: 13px; line-height: 1.45; color: var(--ink); overflow-wrap: anywhere }
+.badges { display: flex; flex-wrap: wrap; gap: 5px; min-height: 1px }
+.badge { display: inline-block; font: 600 9.5px/1 var(--mono); letter-spacing: .05em; text-transform: uppercase;
+  padding: 4px 7px; border-radius: 999px; color: var(--ink); white-space: nowrap }
+.badge.became { background: var(--eosin-soft) }
+.badge.incoherent { background: color-mix(in oklab, var(--warn) 20%, var(--surface)) }
+.baseline { border: 1px dashed var(--line); border-radius: var(--r); padding: 10px 12px; margin: 0 0 12px;
+  font-size: 13px; line-height: 1.5; color: var(--ink2); overflow-wrap: anywhere }
+.baseline b { color: var(--ink); font-weight: 600 }
+
+.token-row { display: grid; grid-template-columns: minmax(150px, 210px) minmax(0, 1fr); gap: 6px 12px;
+  align-items: start; padding: 9px 0; border-bottom: 1px solid var(--line) }
+.token-row:last-child { border-bottom: 0 }
+.token-title { font: 600 12px/1.45 var(--body); color: var(--ink2) }
+.tokens { display: flex; flex-wrap: wrap; gap: 5px; min-width: 0 }
+.token { font: 12px/1.4 var(--mono); color: var(--ink); background: var(--sunk); border-radius: 5px;
+  padding: 3px 6px; overflow-wrap: anywhere; max-width: 100% }
+
+.cos-rows { display: flex; flex-direction: column; gap: 7px; max-width: 620px }
+.cos-row { display: grid; grid-template-columns: 128px minmax(0, 1fr) 46px; gap: 9px; align-items: center;
+  font: 11px/1.5 var(--mono); color: var(--ink2) }
+.cos-label { min-width: 0; overflow-wrap: anywhere }
+.cos-bar { height: 8px; background: var(--sunk); border-radius: 999px; overflow: hidden }
+.cos-bar span { display: block; height: 100%; border-radius: 999px }
+.cos-row b { font-weight: 600; color: var(--ink); text-align: right; font-variant-numeric: tabular-nums }
+
+.recipe { display: grid; grid-template-columns: repeat(auto-fill, minmax(156px, 1fr)); gap: 6px }
+.recipe-item { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding: 7px 9px;
+  border: 1px solid var(--line); border-radius: 7px; text-decoration: none; color: var(--ink);
+  font: 11px/1.4 var(--mono); min-width: 0; transition: border-color 120ms ease, background-color 120ms ease }
+.recipe-item:hover { border-color: var(--hema); background: var(--sunk) }
+.recipe-loc { white-space: nowrap }
+.recipe-coef { color: var(--ink2); text-align: right; white-space: nowrap }
+
+.status { max-width: 720px; margin: 48px auto; padding: 26px; text-align: center; color: var(--ink2);
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-card); box-shadow: var(--card-shadow) }
+.status strong { color: var(--ink); font: 800 20px/1.2 var(--display) }
+.status p { margin: 6px 0 }
+.status.error { text-align: left; border-color: var(--eosin) }
+.status-detail { color: var(--ink2); overflow-wrap: anywhere }
+.status .btn { margin-top: 10px }
+.spinner { width: 18px; height: 18px; margin: 0 auto 10px; border: 2px solid var(--line);
+  border-top-color: var(--eosin); border-radius: 50%; animation: spin 800ms linear infinite }
+@keyframes spin { to { transform: rotate(360deg) } }
+
+#tip { position: fixed; z-index: 100; pointer-events: none; max-width: min(300px, calc(100vw - 24px));
+  background: var(--surface); border: 1px solid var(--line); border-radius: 8px; box-shadow: var(--card-shadow-hover);
+  padding: 8px 10px; font: 12px/1.5 var(--body); color: var(--ink); opacity: 0; transform: translateY(2px);
+  transition: opacity 90ms ease, transform 90ms ease }
+#tip.on { opacity: 1; transform: none }
+#tip .t-k { color: var(--ink3) }
+#tip b { font-family: var(--mono); font-weight: 600 }
+.tt-row { display: flex; align-items: baseline; gap: 6px; min-width: 0 }
+.tt-row .tt-name { min-width: 0; overflow-wrap: anywhere }
+.tt-row .tt-sub { color: var(--ink3); font: 10px var(--mono); margin-left: auto; padding-left: 6px }
+.tt-dot { width: 8px; height: 8px; border-radius: 2px; flex: 0 0 auto; display: inline-block; transform: translateY(-1px) }
+
+@media (max-width: 760px) {
+  .card { padding: 16px }
+  .brand h1 { font-size: 21px }
+  .brand .page { font-size: 13px }
+  .stat-grid { grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)) }
+  .token-row { grid-template-columns: minmax(0, 1fr) }
+  .cos-row { grid-template-columns: 104px minmax(0, 1fr) 42px }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important; scroll-behavior: auto !important }
+  .spinner { animation: none; border-top-color: var(--line) }
+  #tip { transition: none }
+}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="top">
+      <div class="brand">
+        <h1>Neuron Atlas <i>&middot;</i></h1>
+        <span class="page">Neurons vs vectors</span>
+      </div>
+      <button class="theme-toggle" id="themeToggle" type="button" aria-label="Switch to dark theme" title="Switch theme">
+        <svg class="i-sun" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="1.6"></circle>
+          <path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M19.1 4.9l-1.4 1.4M6.3 17.7l-1.4 1.4"
+            fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path>
+        </svg>
+        <svg class="i-moon" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5Z" fill="none"
+            stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"></path>
+        </svg>
+      </button>
+    </div>
+    <nav class="nav" aria-label="Prototypes">
+      <a href="../index.html">Explorer</a>
+      <a href="index.html">Prototypes</a>
+      <a href="vision.html">Vision lab</a>
+      <a href="janus.html">Image pushes</a>
+      <a href="music.html">Sound pushes</a>
+      <a href="hear.html">Hearing</a>
+      <a href="stories.html">Story casting</a>
+      <a href="lenses.html">Says vs does</a>
+      <a href="steer.html" aria-current="page">Neurons vs vectors</a>
+      <a href="identity.html">Identity lab</a>
+      <a href="evidence.html">Evidence</a>
+    </nav>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="status" id="status" role="status" aria-live="polite">
+    <div class="spinner" aria-hidden="true"></div>
+    <p>Loading steering data&hellip;</p>
+  </div>
+
+  <main id="app" hidden>
+    <section class="card" id="sec-intro">
+      <h2>Neurons vs vectors</h2>
+      <p class="lede">A single-neuron push adds one fixed direction to the model&rsquo;s running state; a steering vector is any direction, and here each one is built by contrasting the model&rsquo;s replies with and without &ldquo;You are a {concept}.&rdquo; Every arm below adds a push of exactly the same size at the same layer, so they compare fairly. &ldquo;Clean&rdquo; means a judge says the model became the concept and stayed coherent.</p>
+      <p class="hint" id="modelNote"></p>
+    </section>
+
+    <section class="card" id="sec-chart">
+      <h2>Clean share by dose</h2>
+      <p class="lede">Each line is one kind of push at four doses; higher is better, meaning the reply both showed the concept and stayed coherent. Colors match the legend, and the neuron and contrast vector are drawn heavier.</p>
+      <div class="legend" id="chartLegend"></div>
+      <div class="chart" id="chartHost"></div>
+      <p class="hint" id="chartNote"></p>
+      <div class="controls sub">
+        <button class="btn" id="chartTableBtn" type="button" aria-controls="chartTable" aria-expanded="false">Table</button>
+      </div>
+      <div class="table-wrap" id="chartTable" hidden></div>
+    </section>
+
+    <section class="card" id="sec-geometry">
+      <h2>Geometry</h2>
+      <p class="lede">These numbers compare the pushed neuron&rsquo;s direction with vectors built from many examples, and check how well a handful of neurons can stand in for the full vector. Cosines run from 0 (unrelated) to 1 (same direction).</p>
+      <div class="stat-grid" id="geometryGrid"></div>
+    </section>
+
+    <section class="card" id="sec-concept">
+      <h2>One concept at a time</h2>
+      <p class="lede">Pick a concept, a prompt and a dose; each card shows the judge&rsquo;s record for one arm, and the token rows show what the lens reads from three directions. The 16-neuron recipe lists the neurons that rebuild the vector closest.</p>
+      <div class="controls">
+        <label class="field" for="conceptSelect">Concept
+          <select id="conceptSelect"></select>
+        </label>
+        <div class="field">
+          <span>Prompt</span>
+          <div class="seg" id="promptSeg" role="group" aria-label="Prompt"></div>
+        </div>
+        <div class="field">
+          <span>Dose</span>
+          <div class="chips" id="doseChips" role="group" aria-label="Dose"></div>
+        </div>
+      </div>
+      <p class="hint" id="conceptMeta"></p>
+      <div class="baseline" id="baselineNote"></div>
+      <div class="replies" id="replyGrid"></div>
+
+      <h3>Lens readouts</h3>
+      <p class="hint">Each chip is one token the lens ranks highly. The three rows use the same concept, prompt and layer.</p>
+      <div id="lensRows"></div>
+
+      <h3>Cosines for this concept</h3>
+      <p class="hint">How much of the concept vector is recovered by the neuron, by the shared concept mean, and by keeping only a few neurons.</p>
+      <div class="cos-rows" id="conceptCos"></div>
+
+      <h3>16-neuron recipe</h3>
+      <p class="hint">Each item opens that neuron in the explorer.</p>
+      <div class="recipe" id="recipeList"></div>
+    </section>
+  </main>
+</div>
+
+<div id="tip" role="tooltip"></div>
+
+<script>
+(() => {
+  'use strict';
+
+  const DATA = "https://huggingface.co/datasets/nikhilxvytla/neuron-atlas/resolve/main/";
+  const NS = "http://www.w3.org/2000/svg";
+  const $ = (sel, root = document) => root.querySelector(sel);
+  const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
+  const PALETTE = ["var(--k-user)", "var(--k-other)", "var(--warn)", "var(--k-incoherent)", "var(--good)", "var(--k-default)"];
+
+  let DB = null;
+  const state = { concept: "", dose: 0.8, p: 0 };
+  const emphasized = { vector: "", neuron: "" };
+  const colors = Object.create(null);
+
+  const esc = value => String(value == null ? "" : value).replace(/[&<>"']/g, ch => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+  }[ch]));
+
+  const fmt = value => esc(value)
+    .replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>")
+    .replace(/\n/g, "<br>");
+
+  const pct = (value, digits = 1) => {
+    const n = Number(value);
+    return Number.isFinite(n) ? (n * 100).toFixed(digits) + "%" : "\u2014";
+  };
+
+  const num = (value, digits = 2) => {
+    const n = Number(value);
+    return Number.isFinite(n) ? n.toFixed(digits) : "\u2014";
+  };
+
+  const sameDose = (a, b) => Math.abs(Number(a) - Number(b)) < 1e-6;
+
+  const fmtDose = value => {
+    const n = Number(value);
+    return Number.isFinite(n) ? (n > 0 ? "+" : "") + n.toFixed(1) : "\u2014";
+  };
+
+  const fmtCoef = value => {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return String(value == null ? "\u2014" : value);
+    return (n > 0 ? "+" : "") + n.toFixed(2);
+  };
+
+  const clamp = (value, lo, hi) => Math.max(lo, Math.min(hi, value));
+
+  const nearestPoint = (points, x) => {
+    if (!points || !points.length) return null;
+    let best = points[0];
+    let dist = Math.abs(best.x - x);
+    for (let i = 1; i < points.length; i++) {
+      const d = Math.abs(points[i].x - x);
+      if (d < dist) { best = points[i]; dist = d; }
+    }
+    return best;
+  };
+
+  const svgEl = (tag, attrs = {}, text = null) => {
+    const node = document.createElementNS(NS, tag);
+    Object.entries(attrs).forEach(([key, value]) => {
+      if (value != null) node.setAttribute(key, String(value));
+    });
+    if (text != null) node.textContent = String(text);
+    return node;
+  };
+
+  const tip = () => $("#tip");
+
+  const showTip = (html, event) => {
+    const el = tip();
+    el.innerHTML = html;
+    el.classList.add("on");
+    const r = el.getBoundingClientRect();
+    const pad = 10;
+    let x = event.clientX + 14;
+    let y = event.clientY + 14;
+    if (x + r.width > window.innerWidth - pad) x = event.clientX - r.width - 14;
+    if (y + r.height > window.innerHeight - pad) y = event.clientY - r.height - 14;
+    el.style.left = Math.max(pad, x) + "px";
+    el.style.top = Math.max(pad, y) + "px";
+  };
+
+  const hideTip = () => tip().classList.remove("on");
+
+  const legendHTML = entries => entries.map(entry => {
+    let style = "background:" + entry.color + ";";
+    if (entry.opacity != null) style += "opacity:" + entry.opacity + ";";
+    return '<span><i class="sw' + (entry.line ? " line" : "") + '" style="' + style + '"></i>' + esc(entry.label) + "</span>";
+  }).join("");
+
+  const tableHTML = (caption, headers, rows) => {
+    let html = "<table><caption>" + esc(caption) + "</caption><thead><tr>";
+    html += headers.map(h => '<th scope="col">' + esc(h) + "</th>").join("");
+    html += "</tr></thead><tbody>";
+    rows.forEach(row => {
+      html += "<tr>";
+      row.forEach((cell, index) => {
+        html += index === 0
+          ? '<th scope="row">' + esc(cell) + "</th>"
+          : "<td>" + cell + "</td>";
+      });
+      html += "</tr>";
+    });
+    return html + "</tbody></table>";
+  };
+
+  const labelFor = arm => {
+    const labels = DB && DB.arm_labels ? DB.arm_labels : {};
+    const label = labels[arm];
+    return String(label == null || label === "" ? arm : label);
+  };
+
+  const entryFor = (arm, dose) => {
+    const table = DB && DB.table ? DB.table : {};
+    const id = String(arm);
+    const direct = table[id + "@" + dose];
+    if (direct) return direct;
+    const keys = Object.keys(table);
+    for (let i = 0; i < keys.length; i++) {
+      const key = keys[i];
+      const at = key.lastIndexOf("@");
+      if (at < 0) continue;
+      if (key.slice(0, at) === id && sameDose(key.slice(at + 1), dose)) return table[key];
+    }
+    return null;
+  };
+
+  const cleanAt = (arm, dose) => {
+    const entry = entryFor(arm, dose);
+    const value = entry ? Number(entry.clean) : NaN;
+    return Number.isFinite(value) ? value : null;
+  };
+
+  const defaultDose = data => {
+    const doses = data && Array.isArray(data.doses) ? data.doses : [];
+    const found = doses.find(dose => sameDose(dose, 0.8));
+    return found != null ? Number(found) : (doses.length ? Number(doses[0]) : 0.8);
+  };
+
+  const findVectorArm = data => {
+    const arms = Array.isArray(data.arms) ? data.arms : [];
+    const labels = data.arm_labels || {};
+    const byLabel = name => /vector|steer|contrast/i.test(String(labels[name] || name));
+    const candidate = arms.find(id => /vector/i.test(String(id)) && !/sparse|mean|neuron|random/i.test(String(id)) && byLabel(id));
+    if (candidate) return String(candidate);
+    const loose = arms.find(id => /vector/i.test(String(id)) && !/sparse|mean|neuron|random/i.test(String(id)));
+    if (loose) return String(loose);
+    const labelled = arms.find(id => /vector|steer|contrast/i.test(String(labels[id] || "")));
+    return labelled ? String(labelled) : "";
+  };
+
+  const findNeuronArm = data => {
+    const arms = Array.isArray(data.arms) ? data.arms : [];
+    const labels = data.arm_labels || {};
+    const candidate = arms.find(id => /neuron/i.test(String(id)) && !/sparse|vector|random/i.test(String(id)));
+    if (candidate) return String(candidate);
+    const labelled = arms.find(id => /neuron/i.test(String(labels[id] || "")));
+    return labelled ? String(labelled) : "";
+  };
+
+  const assignColors = () => {
+    let index = 0;
+    (DB.arms || []).forEach(arm => {
+      const id = String(arm);
+      if (emphasized.vector && id === emphasized.vector) colors[id] = "var(--hema)";
+      else if (emphasized.neuron && id === emphasized.neuron) colors[id] = "var(--eosin)";
+      else colors[id] = PALETTE[index++ % PALETTE.length];
+    });
+  };
+
+  const readHash = data => {
+    const params = new URLSearchParams(location.hash.replace(/^#/, ""));
+    const concepts = data.concepts || {};
+    const keys = Object.keys(concepts);
+    const requested = params.get("c");
+    if (requested && Object.prototype.hasOwnProperty.call(concepts, requested)) state.concept = requested;
+    else state.concept = Object.prototype.hasOwnProperty.call(concepts, "angel") ? "angel" : (keys[0] || "");
+    const dose = Number(params.get("d"));
+    const doses = Array.isArray(data.doses) ? data.doses : [];
+    const match = doses.find(d => sameDose(d, dose));
+    state.dose = match != null ? Number(match) : defaultDose(data);
+    const p = params.get("p");
+    const prompts = Array.isArray(data.prompts) ? data.prompts : [];
+    if (p != null && /^\d+$/.test(p) && Number(p) >= 0 && Number(p) < prompts.length) state.p = Number(p);
+    else state.p = 0;
+  };
+
+  const writeHash = () => {
+    const params = new URLSearchParams();
+    params.set("c", state.concept);
+    params.set("d", String(state.dose));
+    params.set("p", String(state.p));
+    const hash = "#" + params.toString();
+    if (location.hash !== hash) history.replaceState(null, "", hash);
+  };
+
+  const baselineFor = prompt => {
+    const baseline = DB && DB.baseline ? DB.baseline : null;
+    if (baseline == null) return null;
+    if (typeof baseline === "string") return baseline;
+    if (Array.isArray(baseline)) return baseline[state.p] != null ? baseline[state.p] : null;
+    if (baseline[prompt] != null) return baseline[prompt];
+    if (baseline.text != null) return baseline.text;
+    if (baseline.reply != null) return baseline.reply;
+    if (baseline[String(state.p)] != null) return baseline[String(state.p)];
+    if (baseline.prompt != null) return baseline.prompt;
+    return null;
+  };
+
+  const findReply = (concept, arm, dose, promptIndex) => {
+    const replies = Array.isArray(concept.replies) ? concept.replies : [];
+    for (let i = 0; i < replies.length; i++) {
+      const row = replies[i];
+      if (!Array.isArray(row) || row.length < 4) continue;
+      if (String(row[0]) !== String(arm)) continue;
+      if (!sameDose(row[1], dose)) continue;
+      if (Number(row[2]) !== Number(promptIndex)) continue;
+      return { text: row[3], becomes: row[4], coherent: row[5] };
+    }
+    return null;
+  };
+
+  const isBecame = value => value === true || value === 1 || value === "true";
+  const isIncoherent = value => value === false || value === 0 || value === "false";
+
+  const recipeParts = (item, concept) => {
+    if (Array.isArray(item)) {
+      if (item.length >= 3) {
+        const a = Number(item[0]);
+        const b = Number(item[1]);
+        const c = Number(item[2]);
+        if (Number.isFinite(a) && Number.isFinite(b) && Number.isFinite(c)) {
+          if (a <= 200 && b > 200) return { layer: a, neuron: b, coef: c };
+          if (c <= 200 && a > 200) return { layer: c, neuron: a, coef: b };
+          return { layer: a, neuron: b, coef: c };
+        }
+        return { layer: item[0], neuron: item[1], coef: item[2] };
+      }
+      return { layer: concept.layer, neuron: item[0], coef: item[1] };
+    }
+    if (item && typeof item === "object") {
+      return {
+        layer: item.layer != null ? item.layer : concept.layer,
+        neuron: item.neuron,
+        coef: item.coef != null ? item.coef : (item.coefficient != null ? item.coefficient : item.weight)
+      };
+    }
+    return { layer: concept.layer, neuron: item, coef: null };
+  };
+
+  const drawChart = () => {
+    const host = $("#chartHost");
+    if (!host) return;
+    host.innerHTML = "";
+    const arms = (DB.arms || []).map(String);
+    const doses = (DB.doses || []).map(Number).filter(Number.isFinite).sort((a, b) => a - b);
+    if (!arms.length || !doses.length) {
+      host.innerHTML = '<p class="muted">No chart data in this file.</p>';
+      return;
+    }
+    let xMin = doses[0];
+    let xMax = doses[doses.length - 1];
+    if (xMax === xMin) { xMin -= 0.1; xMax += 0.1; }
+
+    const series = arms.map(arm => ({
+      arm,
+      name: labelFor(arm),
+      color: colors[arm] || "var(--ink3)",
+      key: arm === emphasized.vector || arm === emphasized.neuron,
+      points: doses.map(dose => {
+        const value = cleanAt(arm, dose);
+        return value == null ? null : { x: dose, y: value, label: pct(value) };
+      }).filter(Boolean)
+    }));
+
+    const W = Math.max(280, Math.floor(host.clientWidth || 320));
+    const H = 330;
+    const m = { l: 44, r: 14, t: 24, b: 44 };
+    const pw = W - m.l - m.r;
+    const ph = H - m.t - m.b;
+    const X = value => m.l + ((value - xMin) / (xMax - xMin)) * pw;
+    const Y = value => m.t + (1 - value) * ph;
+
+    const svg = svgEl("svg", {
+      viewBox: "0 0 " + W + " " + H,
+      width: W,
+      height: H,
+      role: "img",
+      "aria-label": "Clean share by dose for " + arms.length + " arms"
+    });
+
+    svg.appendChild(svgEl("text", { x: m.l, y: 13, class: "axis-label" }, "Clean share"));
+
+    for (let i = 0; i <= 4; i++) {
+      const value = i / 4;
+      const y = Y(value);
+      svg.appendChild(svgEl("line", { x1: m.l, x2: m.l + pw, y1: y, y2: y, class: "grid" }));
+      svg.appendChild(svgEl("text", { x: m.l - 7, y: y + 3.5, "text-anchor": "end" }, Math.round(value * 100) + "%"));
+    }
+
+    doses.forEach(dose => {
+      const x = X(dose);
+      svg.appendChild(svgEl("line", { x1: x, x2: x, y1: m.t, y2: m.t + ph, class: "grid" }));
+      svg.appendChild(svgEl("text", { x, y: H - 23, "text-anchor": "middle", class: "lab" }, fmtDose(dose)));
+    });
+
+    svg.appendChild(svgEl("text", { x: m.l + pw / 2, y: H - 5, "text-anchor": "middle", class: "axis-label" }, "Dose"));
+
+    const ordered = series.filter(item => !item.key).concat(series.filter(item => item.key));
+    ordered.forEach(item => {
+      if (!item.points.length) return;
+      const points = item.points.slice().sort((a, b) => a.x - b.x);
+      const d = points.map((point, index) => {
+        return (index ? "L" : "M") + X(point.x).toFixed(1) + " " + Y(point.y).toFixed(1);
+      }).join(" ");
+      const path = svgEl("path", {
+        d,
+        fill: "none",
+        "stroke-width": item.key ? 2 : 1.25,
+        "stroke-linejoin": "round",
+        "stroke-linecap": "round",
+        opacity: item.key ? 1 : 0.82
+      });
+      path.style.stroke = item.color;
+      svg.appendChild(path);
+      points.forEach(point => {
+        const dot = svgEl("circle", { cx: X(point.x), cy: Y(point.y), r: item.key ? 2.8 : 1.9 });
+        dot.style.fill = item.color;
+        if (!item.key) dot.style.opacity = "0.85";
+        svg.appendChild(dot);
+      });
+    });
+
+    const cross = svgEl("line", {
+      x1: m.l, x2: m.l, y1: m.t, y2: m.t + ph, visibility: "hidden", "pointer-events": "none"
+    });
+    cross.style.stroke = "var(--ink3)";
+    cross.setAttribute("stroke-dasharray", "3 3");
+    svg.appendChild(cross);
+
+    const dotLayer = svgEl("g", { "pointer-events": "none" });
+    svg.appendChild(dotLayer);
+    const hoverDots = series.map(item => {
+      const dot = svgEl("circle", {
+        r: item.key ? 3.6 : 3, fill: "var(--surface)", "stroke-width": 2, visibility: "hidden"
+      });
+      dot.style.stroke = item.color;
+      dotLayer.appendChild(dot);
+      return dot;
+    });
+
+    const hit = svgEl("rect", { x: m.l, y: m.t, width: pw, height: ph, fill: "transparent" });
+    hit.style.cursor = "crosshair";
+    svg.appendChild(hit);
+
+    const hideCross = () => {
+      cross.setAttribute("visibility", "hidden");
+      hoverDots.forEach(dot => dot.setAttribute("visibility", "hidden"));
+      hideTip();
+    };
+
+    const tooltipHTML = value => {
+      let html = '<div class="t-k">Dose ' + esc(fmtDose(value)) + "</div>";
+      series.forEach(item => {
+        const point = nearestPoint(item.points, value);
+        if (!point) return;
+        const entry = entryFor(item.arm, point.x);
+        const n = entry && entry.n != null ? '<span class="tt-sub">n=' + esc(entry.n) + "</span>" : "";
+        html += '<div class="tt-row"><i class="tt-dot" style="background:' + item.color + '"></i>' +
+          '<span class="tt-name">' + esc(item.name) + "</span><b>" + esc(pct(point.y)) + "</b>" + n + "</div>";
+      });
+      return html;
+    };
+
+    const onMove = event => {
+      const rect = svg.getBoundingClientRect();
+      const pixel = (event.clientX - rect.left) * (W / rect.width);
+      const relative = clamp((pixel - m.l) / pw, 0, 1);
+      const raw = xMin + relative * (xMax - xMin);
+      let value = doses[0];
+      let best = Math.abs(value - raw);
+      doses.forEach(dose => {
+        const dist = Math.abs(dose - raw);
+        if (dist < best) { value = dose; best = dist; }
+      });
+      const xPixel = X(value);
+      cross.setAttribute("x1", xPixel);
+      cross.setAttribute("x2", xPixel);
+      cross.setAttribute("visibility", "visible");
+      series.forEach((item, index) => {
+        const point = nearestPoint(item.points, value);
+        const dot = hoverDots[index];
+        if (point) {
+          dot.setAttribute("cx", X(point.x));
+          dot.setAttribute("cy", Y(point.y));
+          dot.setAttribute("visibility", "visible");
+        } else {
+          dot.setAttribute("visibility", "hidden");
+        }
+      });
+      showTip(tooltipHTML(value), event);
+    };
+
+    hit.addEventListener("pointerenter", onMove);
+    hit.addEventListener("pointermove", onMove);
+    hit.addEventListener("pointerleave", hideCross);
+    host.appendChild(svg);
+  };
+
+  const bestEntry = () => {
+    let best = null;
+    (DB.arms || []).forEach(arm => {
+      (DB.doses || []).forEach(dose => {
+        const value = cleanAt(arm, dose);
+        if (value == null) return;
+        if (!best || value > best.value) best = { arm: String(arm), dose: Number(dose), value };
+      });
+    });
+    return best;
+  };
+
+  const bestFor = arm => {
+    if (!arm) return null;
+    let best = null;
+    (DB.doses || []).forEach(dose => {
+      const value = cleanAt(arm, dose);
+      if (value == null) return;
+      if (!best || value > best.value) best = { dose: Number(dose), value };
+    });
+    return best;
+  };
+
+  const renderChart = () => {
+    const best = bestEntry();
+    const neuronBest = bestFor(emphasized.neuron);
+    const legend = [];
+    (DB.arms || []).forEach(arm => {
+      const id = String(arm);
+      legend.push({
+        label: labelFor(id),
+        color: colors[id] || "var(--ink3)",
+        line: true,
+        opacity: id === emphasized.vector || id === emphasized.neuron ? 1 : 0.82
+      });
+    });
+    const keyNames = [emphasized.neuron, emphasized.vector].filter(Boolean).map(labelFor);
+    let legendHTMLText = legendHTML(legend);
+    if (keyNames.length) {
+      legendHTMLText += '<span class="legend-note">Heavier lines: ' + esc(keyNames.join(" and ")) + ".</span>";
+    }
+    $("#chartLegend").innerHTML = legendHTMLText;
+
+    if (best) {
+      let text = "Computed from the table, the best arm is <b>" + esc(labelFor(best.arm)) +
+        "</b> at dose <b>" + esc(fmtDose(best.dose)) + "</b> with <b>" + esc(pct(best.value)) + "</b> clean";
+      if (neuronBest) {
+        text += ", and the top lens neuron peaks at <b>" + esc(pct(neuronBest.value)) +
+          "</b> at dose <b>" + esc(fmtDose(neuronBest.dose)) + "</b>.";
+      } else {
+        text += ".";
+      }
+      $("#chartNote").innerHTML = text;
+    } else {
+      $("#chartNote").textContent = "The table has no clean-share values.";
+    }
+
+    const headers = ["Arm"].concat((DB.doses || []).map(dose => fmtDose(dose)));
+    const rows = (DB.arms || []).map(arm => {
+      const id = String(arm);
+      return [labelFor(id)].concat((DB.doses || []).map(dose => {
+        const value = cleanAt(id, dose);
+        return value == null ? "\u2014" : pct(value);
+      }));
+    });
+    $("#chartTable").innerHTML = tableHTML("Clean share by arm and dose", headers, rows);
+
+    drawChart();
+  };
+
+  const renderGeometry = () => {
+    const g = DB.geometry || {};
+    const conceptCount = Object.keys(DB.concepts || {}).length;
+    const tiles = [
+      {
+        label: "best neuron vs the vector",
+        value: num(g.cos_neuron_vector),
+        note: "cosine; 0 means unrelated, 1 means same direction"
+      },
+      {
+        label: "share common to all " + conceptCount + " concepts",
+        value: num(g.cos_vector_mean),
+        note: "cosine to the mean concept vector"
+      },
+      {
+        label: "64 neurons rebuild the vector",
+        value: num(g.sparse64_cos),
+        note: "cosine to the full vector"
+      },
+      {
+        label: "lens names the concept",
+        html: esc(pct(g.lens_specific_names_concept, 0)) + '<span class="vs">vs</span>' + esc(pct(g.lens_vector_names_concept, 0)),
+        note: "concept-specific vectors vs raw vectors"
+      }
+    ];
+    $("#geometryGrid").innerHTML = tiles.map(tile => {
+      return '<div class="stat"><div class="stat-label">' + esc(tile.label) + "</div>" +
+        '<div class="stat-value">' + (tile.html != null ? tile.html : esc(tile.value)) + "</div>" +
+        '<div class="stat-note">' + esc(tile.note) + "</div></div>";
+    }).join("");
+  };
+
+  const tokenRow = (title, tokens) => {
+    const list = Array.isArray(tokens) ? tokens : [];
+    const html = list.length
+      ? list.map(token => {
+        const text = String(token == null ? "" : token).trim();
+        return '<span class="token">' + esc(text || "\u2205") + "</span>";
+      }).join("")
+      : '<span class="muted">No tokens in this file.</span>';
+    return '<div class="token-row"><div class="token-title">' + esc(title) + '</div><div class="tokens">' + html + "</div></div>";
+  };
+
+  const renderConcept = () => {
+    const concept = DB.concepts ? DB.concepts[state.concept] : null;
+    if (!concept) return;
+
+    const meta = [state.concept];
+    if (concept.layer != null) meta.push("L" + concept.layer);
+    if (concept.neuron != null) meta.push("N" + concept.neuron);
+    if (concept.sign != null) meta.push("sign " + (Number(concept.sign) > 0 ? "+" : "") + concept.sign);
+    $("#conceptMeta").textContent = meta.join(" \u00b7 ");
+
+    const prompt = DB.prompts && DB.prompts[state.p] != null ? DB.prompts[state.p] : "";
+    const baseline = baselineFor(prompt);
+    $("#baselineNote").innerHTML = baseline == null
+      ? '<span class="muted">No unpushed baseline in the file.</span>'
+      : "<b>No push:</b> " + fmt(baseline);
+
+    $("#replyGrid").innerHTML = (DB.arms || []).map(arm => {
+      const id = String(arm);
+      const reply = findReply(concept, id, state.dose, state.p);
+      const keyClass = id === emphasized.vector ? " key-vector" : (id === emphasized.neuron ? " key-neuron" : "");
+      const label = labelFor(id);
+      let badges = "";
+      if (reply) {
+        if (isBecame(reply.becomes)) badges += '<span class="badge became">became</span>';
+        if (isIncoherent(reply.coherent)) badges += '<span class="badge incoherent">incoherent</span>';
+      }
+      const text = reply && reply.text != null
+        ? fmt(reply.text)
+        : '<span class="muted">No reply recorded for this arm at this dose and prompt.</span>';
+      return '<article class="reply-card' + keyClass + '">' +
+        '<div class="reply-head"><span class="reply-name">' + fmt(label) + "</span>" +
+        (label !== id ? '<span class="reply-arm">' + esc(id) + "</span>" : "") + "</div>" +
+        '<p class="reply-text">' + text + "</p>" +
+        (badges ? '<div class="badges">' + badges + "</div>" : "") +
+        "</article>";
+    }).join("");
+
+    $("#lensRows").innerHTML =
+      tokenRow("the neuron says", concept.lens_neuron) +
+      tokenRow("the vector says", concept.lens_vector) +
+      tokenRow("the vector without the shared part says", concept.lens_specific);
+
+    const g = DB.geometry || {};
+    const sparse = concept.sparse_cos || {};
+    const cosineRows = [
+      { label: "neuron vs vector", value: concept.cos_neuron_vector != null ? concept.cos_neuron_vector : g.cos_neuron_vector, color: "var(--hema)" },
+      { label: "vector vs shared mean", value: concept.cos_vector_mean != null ? concept.cos_vector_mean : g.cos_vector_mean, color: "var(--eosin)" },
+      { label: "1 neuron rebuild", value: sparse["1"] != null ? sparse["1"] : g.sparse1_cos, color: "var(--ink3)" },
+      { label: "4 neuron rebuild", value: sparse["4"] != null ? sparse["4"] : g.sparse4_cos, color: "var(--ink3)" },
+      { label: "16 neuron rebuild", value: sparse["16"] != null ? sparse["16"] : g.sparse16_cos, color: "var(--ink3)" },
+      { label: "64 neuron rebuild", value: sparse["64"] != null ? sparse["64"] : g.sparse64_cos, color: "var(--ink3)" }
+    ];
+    $("#conceptCos").innerHTML = cosineRows.map(row => {
+      const value = Number(row.value);
+      const safe = Number.isFinite(value) ? clamp(value, 0, 1) : 0;
+      return '<div class="cos-row"><span class="cos-label">' + esc(row.label) + "</span>" +
+        '<span class="cos-bar"><span style="width:' + (safe * 100).toFixed(1) + "%;background:" + row.color + '"></span></span>' +
+        "<b>" + esc(num(row.value)) + "</b></div>";
+    }).join("");
+
+    const recipe = Array.isArray(concept.recipe16) ? concept.recipe16 : [];
+    if (!recipe.length) {
+      $("#recipeList").innerHTML = '<p class="muted">No 16-neuron recipe in this file.</p>';
+    } else {
+      $("#recipeList").innerHTML = recipe.map(item => {
+        const parts = recipeParts(item, concept);
+        const layer = parts.layer == null ? "?" : parts.layer;
+        const neuron = parts.neuron == null ? "?" : parts.neuron;
+        const href = "../index.html#qwen3-5-4b-L" + encodeURIComponent(layer) + "-N" + encodeURIComponent(neuron);
+        return '<a class="recipe-item" href="' + href + '" title="Open L' + esc(layer) + " N" + esc(neuron) +
+          ' in the explorer"><span class="recipe-loc">L' + esc(layer) + " N" + esc(neuron) +
+          '</span><span class="recipe-coef">&middot; ' + esc(fmtCoef(parts.coef)) + "</span></a>";
+      }).join("");
+    }
+  };
+
+  const syncConceptControls = () => {
+    const select = $("#conceptSelect");
+    if (select) select.value = state.concept;
+    $$("[data-p]", $("#promptSeg")).forEach(button => {
+      button.setAttribute("aria-pressed", String(Number(button.dataset.p) === state.p));
+    });
+    $$("[data-dose]", $("#doseChips")).forEach(button => {
+      button.setAttribute("aria-pressed", String(sameDose(button.dataset.dose, state.dose)));
+    });
+  };
+
+  const populateConceptControls = () => {
+    const concepts = DB.concepts || {};
+    const keys = Object.keys(concepts).sort((a, b) => a.localeCompare(b));
+    $("#conceptSelect").innerHTML = keys.map(key => {
+      return '<option value="' + esc(key) + '">' + esc(key) + "</option>";
+    }).join("");
+    $("#promptSeg").innerHTML = (DB.prompts || []).map((prompt, index) => {
+      return '<button type="button" data-p="' + index + '" aria-pressed="' + (index === state.p) + '">' + esc(prompt) + "</button>";
+    }).join("");
+    $("#doseChips").innerHTML = (DB.doses || []).map(dose => {
+      return '<button type="button" class="chip" data-dose="' + esc(dose) + '" aria-pressed="' + sameDose(dose, state.dose) + '">' + esc(fmtDose(dose)) + "</button>";
+    }).join("");
+  };
+
+  const resolvedTheme = () => document.documentElement.dataset.theme ||
+    (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+
+  const syncThemeButton = () => {
+    const button = $("#themeToggle");
+    if (!button) return;
+    const theme = resolvedTheme();
+    button.dataset.resolved = theme;
+    button.setAttribute("aria-label", "Switch to " + (theme === "dark" ? "light" : "dark") + " theme");
+    button.title = "Switch theme";
+  };
+
+  const bindControls = () => {
+    $("#themeToggle").addEventListener("click", () => {
+      const next = resolvedTheme() === "dark" ? "light" : "dark";
+      document.documentElement.dataset.theme = next;
+      try { localStorage.setItem("atlas-theme", next); } catch (error) {}
+      syncThemeButton();
+    });
+
+    $("#chartTableBtn").addEventListener("click", event => {
+      const button = event.currentTarget;
+      const table = $("#chartTable");
+      const show = table.hidden;
+      table.hidden = !show;
+      button.setAttribute("aria-expanded", String(show));
+      button.textContent = show ? "Hide table" : "Table";
+    });
+
+    $("#conceptSelect").addEventListener("change", event => {
+      if (!DB) return;
+      const value = event.currentTarget.value;
+      if (Object.prototype.hasOwnProperty.call(DB.concepts || {}, value)) {
+        state.concept = value;
+        renderConcept();
+        writeHash();
+      }
+    });
+
+    $("#promptSeg").addEventListener("click", event => {
+      const button = event.target.closest("[data-p]");
+      if (!button || !DB) return;
+      state.p = Number(button.dataset.p);
+      syncConceptControls();
+      renderConcept();
+      writeHash();
+    });
+
+    $("#doseChips").addEventListener("click", event => {
+      const button = event.target.closest("[data-dose]");
+      if (!button || !DB) return;
+      state.dose = Number(button.dataset.dose);
+      syncConceptControls();
+      renderConcept();
+      writeHash();
+    });
+
+    let resizeTimer = 0;
+    window.addEventListener("resize", () => {
+      clearTimeout(resizeTimer);
+      resizeTimer = window.setTimeout(() => {
+        if (DB) drawChart();
+      }, 160);
+    });
+
+    window.addEventListener("hashchange", () => {
+      if (!DB) return;
+      readHash(DB);
+      writeHash();
+      syncConceptControls();
+      renderConcept();
+    });
+  };
+
+  const boot = async () => {
+    const status = $("#status");
+    const app = $("#app");
+    status.hidden = false;
+    status.classList.remove("error");
+    app.hidden = true;
+    status.innerHTML = '<div class="spinner" aria-hidden="true"></div><p>Loading steering data&hellip;</p>';
+
+    try {
+      const response = await fetch(DATA + "site/steer.json");
+      if (!response.ok) throw new Error("Server returned " + response.status + " " + response.statusText);
+      const data = await response.json();
+      if (!data || !Array.isArray(data.arms) || !Array.isArray(data.doses) || !Array.isArray(data.prompts) ||
+          !data.table || !data.concepts) {
+        throw new Error("The data file did not contain the expected sections.");
+      }
+      DB = data;
+      emphasized.vector = findVectorArm(DB);
+      emphasized.neuron = findNeuronArm(DB);
+      assignColors();
+      readHash(DB);
+      writeHash();
+      status.hidden = true;
+      app.hidden = false;
+      populateConceptControls();
+      syncConceptControls();
+      $("#modelNote").textContent = (DB.model || "Model") + " \u00b7 " + DB.arms.length + " arms \u00b7 doses " +
+        DB.doses.map(fmtDose).join(", ") + " \u00b7 one layer, equal push size";
+      renderChart();
+      renderGeometry();
+      renderConcept();
+    } catch (error) {
+      app.hidden = true;
+      status.hidden = false;
+      status.classList.add("error");
+      status.innerHTML = "<strong>Could not load steering data.</strong>" +
+        '<p class="status-detail">' + esc(error && error.message ? error.message : "Network error") + "</p>" +
+        '<p class="status-detail">Check your connection and try again.</p>' +
+        '<button class="btn" id="retryBtn" type="button">Try again</button>';
+      $("#retryBtn").addEventListener("click", boot);
+    }
+  };
+
+  try {
+    const stored = localStorage.getItem("atlas-theme");
+    if (stored === "light" || stored === "dark") document.documentElement.dataset.theme = stored;
+  } catch (error) {}
+  syncThemeButton();
+
+  bindControls();
+  boot();
+})();
+</script>
+</body>
+</html>

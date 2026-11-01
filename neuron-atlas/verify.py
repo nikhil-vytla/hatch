@@ -261,6 +261,17 @@ def new_models():
             hits += bool(lhit(ln[nn][0 if d > 0 else 1], words)); n += 1
     out.append(dict(id="30", claim="LFM2-350M: pushes adding a word the neuron's fitted J-lens names", stated=0.167, value=hits / n, tol=0.004,
                     unit="share", source="LiquidAI__LFM2-350M/jlens + sweep/steer"))
+    # 31: neurons vs steering vectors (stored judge labels)
+    sv = json.load(open(hub("Qwen__Qwen3.5-4B/experiments/steer_vectors/judged.json")))["items"]
+    def clean(arm, dose):
+        xs = [x for x in sv if x["arm"] == arm and x["dose"] == dose and x["becomes"] is not None and x["coherent"] is not None]
+        return sum(bool(x["becomes"]) and bool(x["coherent"]) for x in xs) / len(xs)
+    for cid, arm, dose, stated in (("31v", "vector", 0.8, 0.667), ("31s", "sparse64", 1.2, 0.49), ("31n", "neuron", 1.6, 0.094)):
+        out.append(dict(id=cid, claim=f"steering: '{arm}' at {dose} makes the model become the concept, coherently", stated=stated,
+                        value=clean(arm, dose), tol=0.003, unit="share (DeepSeek judge)", source="Qwen__Qwen3.5-4B/experiments/steer_vectors/judged.json"))
+    vec = json.load(open(hub("Qwen__Qwen3.5-4B/experiments/steer_vectors/vectors.json")))["vectors"]
+    out.append(dict(id="31g", claim="steering: mean cosine of a concept vector with the mean of all 48", stated=0.65,
+                    value=sum(v["cos_vector_mean"] for v in vec) / len(vec), tol=0.005, unit="cosine", source="…/steer_vectors/vectors.json"))
     # 29: Gemma 4 audio
     h = json.load(open(hub("google__gemma-4-E4B-it/audio/hear_summary.json")))
     out.append(dict(id="29", claim="Gemma 4 audio: pushes that change what it hears", stated=0.36, value=h["changed"] / h["n_pushes"], tol=0.005,

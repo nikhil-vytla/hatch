@@ -918,3 +918,8 @@ derangement null, not "persona vs not".
   divine, gentle, whispered". A `pkill -f` pattern again matched its own launcher; launches are now plain.
 - `analysis/steer_vectors_eval.py`: blind DeepSeek judge (becomes + coherent; arms shuffled across judge batches),
   headline "clean steer" = becomes and coherent.
+- Result (judged, n = 96 per arm × dose): clean steer vector 67% @0.8, specific 51% @1.2, 64-neuron rebuild 49%
+  @1.2, 16 → 21%, 4 → 21% @1.2, 1 → 4%, top lens neuron 9% @1.6 (3% @0.8), random ≤1%. Geometry: cos(neuron,
+  vector) 0.036; cos(vector, mean of 48) 0.65; OMP cos 0.22/0.31/0.42/0.56 for k = 1/4/16/64; lens neuron in the
+  64-neuron rebuild for 25% of concepts; J-lens top-20 names the concept for 38% of raw vectors, 63% of specific
+  ones. Bootstrap intervals over concepts in the README. Note the neuron arm is only finding 17's top-ranked neuron.

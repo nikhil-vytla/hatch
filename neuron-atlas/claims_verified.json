@@ -434,6 +434,46 @@
   "status": "PASS"
  },
  {
+  "id": "31v",
+  "claim": "steering: 'vector' at 0.8 makes the model become the concept, coherently",
+  "stated": 0.667,
+  "value": 0.6666666666666666,
+  "tol": 0.003,
+  "unit": "share (DeepSeek judge)",
+  "source": "Qwen__Qwen3.5-4B/experiments/steer_vectors/judged.json",
+  "status": "PASS"
+ },
+ {
+  "id": "31s",
+  "claim": "steering: 'sparse64' at 1.2 makes the model become the concept, coherently",
+  "stated": 0.49,
+  "value": 0.4895833333333333,
+  "tol": 0.003,
+  "unit": "share (DeepSeek judge)",
+  "source": "Qwen__Qwen3.5-4B/experiments/steer_vectors/judged.json",
+  "status": "PASS"
+ },
+ {
+  "id": "31n",
+  "claim": "steering: 'neuron' at 1.6 makes the model become the concept, coherently",
+  "stated": 0.094,
+  "value": 0.09375,
+  "tol": 0.003,
+  "unit": "share (DeepSeek judge)",
+  "source": "Qwen__Qwen3.5-4B/experiments/steer_vectors/judged.json",
+  "status": "PASS"
+ },
+ {
+  "id": "31g",
+  "claim": "steering: mean cosine of a concept vector with the mean of all 48",
+  "stated": 0.65,
+  "value": 0.648841256275773,
+  "tol": 0.005,
+  "unit": "cosine",
+  "source": "\u2026/steer_vectors/vectors.json",
+  "status": "PASS"
+ },
+ {
   "id": "29",
   "claim": "Gemma 4 audio: pushes that change what it hears",
   "stated": 0.36,

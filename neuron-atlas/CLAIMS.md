@@ -47,6 +47,10 @@ judge labels; the judges are audited in `AUDIT.md`.
 | 28-dpo | OLMo-2 1B dpo: persona share of pushes | 0.059 | 0.059 |  | PASS | `allenai__OLMo-2-0425-1B/training/dpo/sweep_stats.parquet` |
 | 28-instruct | OLMo-2 1B instruct: persona share of pushes | 0.055 | 0.055 |  | PASS | `allenai__OLMo-2-0425-1B/training/instruct/sweep_stats.parquet` |
 | 30 | LFM2-350M: pushes adding a word the neuron's fitted J-lens names | 0.167 | 0.167 |  | PASS | `LiquidAI__LFM2-350M/jlens + sweep/steer` |
+| 31v | steering: 'vector' at 0.8 makes the model become the concept, coherently | 0.667 | 0.667 |  | PASS | `Qwen__Qwen3.5-4B/experiments/steer_vectors/judged.json` |
+| 31s | steering: 'sparse64' at 1.2 makes the model become the concept, coherently | 0.490 | 0.490 |  | PASS | `Qwen__Qwen3.5-4B/experiments/steer_vectors/judged.json` |
+| 31n | steering: 'neuron' at 1.6 makes the model become the concept, coherently | 0.094 | 0.094 |  | PASS | `Qwen__Qwen3.5-4B/experiments/steer_vectors/judged.json` |
+| 31g | steering: mean cosine of a concept vector with the mean of all 48 | 0.650 | 0.649 |  | PASS | `…/steer_vectors/vectors.json` |
 | 29 | Gemma 4 audio: pushes that change what it hears | 0.360 | 0.358 |  | PASS | `google__gemma-4-E4B-it/audio/hear_summary.json` |
 | 29f | … pushes that turn a misheard ESC-50 clip right | 176.000 | 176.000 |  | PASS | `same` |
 | 29b | … pushes that turn a correctly heard clip wrong | 277.000 | 277.000 |  | PASS | `same` |
@@ -54,4 +58,4 @@ judge labels; the judges are audited in `AUDIT.md`.
 | 16a | J-lens tokens appear in the pushed reply | 0.095 | 0.095 | 0.094–0.096 | PASS | `Qwen__Qwen3.5-4B/jlens, sweep/steer` |
 | 16b | ... another neuron's tokens (chance) | 0.005 | 0.005 | 0.004–0.005 | PASS | `same` |
 
-47 of 47 claims pass.
+51 of 51 claims pass.
