@@ -903,3 +903,18 @@ derangement null, not "persona vs not".
   found. 16/16 recordings right unpushed; 93% of pushes change the answer, 5,446 of 6,144 pushes on correct clips
   break it (89%), 0 fixes; "music" is the attractor; L25 N1014 +1 makes all 22 sounds "speech". Hearing page has a
   Gemma/Omni switch. verify 47/47.
+
+## Neurons vs steering vectors (Nov 1)
+
+- `analysis/steer_vectors.py` (Qwen3.5-4B, finding 17's 48 concepts): at each concept's best J-lens neuron's layer,
+  push (a) that neuron's direction, (b) a contrastive persona-style steering vector (response-token means with vs
+  without "You are a {concept}." on 8 training questions that are not the eval prompts), (c) the vector minus the
+  mean of all 48 vectors ("specific"), (d) sparse rebuilds of (b) and (c) from k = 1/4/16/64 neurons of that layer
+  (orthogonal matching pursuit over W_down columns), (e) a random direction. All are residual adds of the same norm
+  (dose × median residual norm), which is exactly a single-neuron push's size. Smoke test (2 concepts): doses 2 and
+  4 turn every arm into noise, so the run uses 0.4/0.8/1.2/1.6; the best neuron is nearly orthogonal to the vector
+  (cos 0.02–0.09); 64 neurons rebuild the vector to cos ~0.5; the 1-neuron rebuild picked the same neuron for
+  "angel" and "bird" (a shared component), hence the "specific" arm. The J-lens reads the angel vector as "prayer,
+  divine, gentle, whispered". A `pkill -f` pattern again matched its own launcher; launches are now plain.
+- `analysis/steer_vectors_eval.py`: blind DeepSeek judge (becomes + coherent; arms shuffled across judge batches),
+  headline "clean steer" = becomes and coherent.
