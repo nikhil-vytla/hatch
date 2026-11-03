@@ -923,3 +923,30 @@ derangement null, not "persona vs not".
   vector) 0.036; cos(vector, mean of 48) 0.65; OMP cos 0.22/0.31/0.42/0.56 for k = 1/4/16/64; lens neuron in the
   64-neuron rebuild for 25% of concepts; J-lens top-20 names the concept for 38% of raw vectors, 63% of specific
   ones. Bootstrap intervals over concepts in the README. Note the neuron arm is only finding 17's top-ranked neuron.
+
+## Where personality lives (Nov 3): Persona Cartography adapters × the Qwen3-8B atlas
+
+Sources read: Goodfire "Neural networks are already clean" (neurons are mostly legible; negative poles matter; dial vs
+detector neurons; recursive generalization), DPN-LE (arXiv 2604.27929: ~0.5% personality neurons by Cohen's d with
+mutually exclusive opposite-trait sets), Persona Cartography (arXiv 2607.07916: OCEAN amplify/suppress LoRAs, ~additive,
+monotone), mvonebers "personality neurons" (what the Qwen3-8B O/N adapters do to MLP neurons: opposite adapters reverse
+the same neurons; changes pile up at reply starts; neurons sufficient-not-necessary), rikiyat "weight-space
+programming" (an LLM reads and writes weights). The monorepo has Qwen3-8B adapters for all 5 traits × 2 directions
+plus a recipe-matched control, the paired high/low training answers, and their evals at scales −4× … +4×.
+- `analysis/persona/paper_evals.py` → their MMLU (300 q) and trait log-prob MCQ (1,500 items, all five traits scored
+  on every run). Findings from these alone: negating the amplifier lowers O/E/C/A as much as or more than the trained
+  suppressor (O 0.62 vs 0.76, E 0.43 vs 0.53, C 0.89 vs 0.89, A 0.83 vs 0.84), but not N (0.192 vs base 0.187 vs
+  suppressor 0.135): neuroticism is one-sided. Side effects at +1×: o+ raises E +0.104 (≈ its own +0.105), e+ raises O
+  +0.058 (Plasticity), a− raises N +0.076 (Stability). Capability cliffs (MMLU < 0.60): suppressors at +1.75× (E),
+  +2× (O), +3× (A); amplifiers ≥ +3× except none for C/E; the reversed O amplifier at −1.25×; control at +3×.
+- `analysis/persona/lexicon.py` (Qwen3-8B J-lens poles × an OCEAN adjective lexicon): 24,188 of 442,368 neurons (5.5%)
+  name a trait word at a pole; the opposite end at the other pole is rare (A− up/A+ down 17 vs 2.9 chance, C+ 7 vs
+  1.9, E 4–5 vs 1, O and N at chance). The bipolar ones are intensity dials (gentle↔aggressive, quiet↔loud,
+  thrilling↔gentle) and a precision dial (meticulous↔messy), mostly layers 12–18.
+- Scripts for GPU (DeepSeek-written, reviewed): `weights.py` (read the adapters from weights: module edit sizes,
+  per-neuron input/output edits, adapter-pair Frobenius cosines, decoded top singular directions), `acts.py` (per-neuron
+  activation change of each adapter on identical tokens; pair correlations; reply-start share), `write_trait.py` (write
+  a trait with LoRA / steering vector / DPN-LE neurons / adapter neurons / lens-picked neurons; judge replies + MMLU).
+  Review fixes: transformers-5 chat-template return type; residual-norm unit (per-example means are shorter than
+  per-token residuals; switched to the atlas's per-token medians). Two opencode jobs at once lock its database; run
+  them in sequence.
