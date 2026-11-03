@@ -1,0 +1,17 @@
+{
+  "name": "textjs-doom",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "wad": "bash scripts/fetch-wad.sh",
+    "dev": "text dev",
+    "build": "text build --adapter static",
+    "start": "text start",
+    "terminal": "text run"
+  },
+  "dependencies": {
+    "@textjs/app": "^1.2.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
+  }
+}

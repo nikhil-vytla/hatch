@@ -1,0 +1,12 @@
+{"size":"64x25","bits":"8","spans":1354,"encodeMs":9.6,"pageFps":13.7,"devtoolsFps":12.8,"lagFrames":10,"budget":"1e9"}
+{"size":"80x31","bits":"8","spans":2146,"encodeMs":16.6,"pageFps":10.1,"devtoolsFps":8.6,"lagFrames":46,"budget":"1e9"}
+{"size":"100x38","bits":"8","spans":2981,"encodeMs":47.2,"pageFps":14.7,"devtoolsFps":5.7,"lagFrames":122,"budget":"1e9"}
+{"size":"100x38","bits":"4","spans":2589,"encodeMs":22.1,"pageFps":15.5,"devtoolsFps":8.7,"lagFrames":77,"budget":"1e9"}
+{"size":"120x46","bits":"8","spans":4289,"encodeMs":42.4,"pageFps":13,"devtoolsFps":5.9,"lagFrames":104,"budget":"1e9"}
+{"size":"160x61","bits":"8","spans":5825,"encodeMs":49.3,"pageFps":5.2,"devtoolsFps":2.4,"lagFrames":79,"budget":"1e9"}
+{"size":"64x25","bits":"8","spans":1363,"encodeMs":9.6,"pageFps":10.8,"devtoolsFps":9.5,"lagFrames":14,"budget":"15000"}
+{"size":"80x31","bits":"8","spans":2044,"encodeMs":19,"pageFps":6.6,"devtoolsFps":6.4,"lagFrames":9,"budget":"15000"}
+{"size":"100x38","bits":"8","spans":2998,"encodeMs":24.3,"pageFps":5,"devtoolsFps":4.2,"lagFrames":10,"budget":"15000"}
+{"size":"120x46","bits":"8","spans":4221,"encodeMs":44,"pageFps":4,"devtoolsFps":3.3,"lagFrames":7,"budget":"15000"}
+{"size":"160x61","bits":"8","spans":6664,"encodeMs":57.4,"pageFps":1.8,"devtoolsFps":1.6,"lagFrames":4,"budget":"15000"}
+{"size":"160x61","bits":"4","spans":6343,"encodeMs":48.3,"pageFps":2.3,"devtoolsFps":2,"lagFrames":7,"budget":"15000"}

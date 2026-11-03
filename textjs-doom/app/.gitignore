@@ -1,0 +1,5 @@
+node_modules
+dist
+public/doom1.wad
+.text
+test/*.ansi
