@@ -98,3 +98,62 @@ apps render inside the DevTools console via `console.log("%c...", css...)`.
   ~27 KB/frame of row-diffed ANSI, vs ~1 MB per console.log frame at a similar size.
 - Gotcha for me: `pkill -f <pattern>` inside a bash command kills the shell running it when the
   pattern appears in its own command line.
+
+# Round 2: sound, CSS trimming, adaptive pacing
+
+## Working mode
+- deepseek-flash (DeepSeek-V4.1-Flash via api.deepseek.com, proxy-injected key) wrote the code drafts:
+  console-tap.ts, doomgeneric_textjs_sound.c, doom-audio.js, span-shaper.ts and the
+  record-audio.mjs / ack-probe harnesses. I wrote the specs, reviewed every file, fixed issues and
+  ran all measurements. Helper: a ~20-line script that POSTs a spec plus context files to
+  /chat/completions and extracts the fenced block.
+- Tried to run opencode (installed fine, v1.19.5) with deepseek-flash as an autonomous agent with
+  bash allowed; the session's safety classifier blocked launching an agent with unrestricted shell,
+  so delegation stayed "model writes, I apply and test".
+- Review catches: console-tap rewrote args of non-%c console.log calls (restricted it); sound module
+  named statics S_Init/M_Init, which clash with Doom's own S_Init/M_Init prototypes (renamed TXS_/TXM_);
+  generated JS was 2x the requested length but correct; fence labels like ```file.c broke my
+  extractor (made it accept any label).
+
+## Item 3 first: can the page see what DevTools has rendered? No.
+- Probe (headed Chromium + DevTools): `%c` with `background-image:url(http://127.0.0.1/ack?n=..)`
+  -> zero requests. DevTools does not fetch remote images for console styles.
+- `window.devtoolsFormatters` header() -> never called (custom formatters are off by default;
+  and V8 builds custom previews at log time, not when the frontend paints, so even if enabled it
+  would not reflect the DevTools backlog). No backpressure channel exists from the page's side.
+- So "adaptive" = control what the page can control: spans per frame.
+
+## Item 2: trimming per-span CSS (lib/console-tap.ts wraps console.log; ?css=)
+Text.js's driver logs via the global console at call time (`this.target ?? console`), so wrapping
+console.log can rewrite every %c style. 100x38, unpaced, DevTools frames shown per second:
+| css | bytes/frame | DevTools fps | look |
+|---|---|---|---|
+| full | 507 KB | 4.9 | baseline, vertical 1px seams |
+| nofont (drop font-family) | 367 KB | 6.0 | same |
+| min (also drop font-size -> DevTools' 11px) | 294 KB | 8.1 | same, slightly smaller, fewer seams |
+| bare (colours only) | 134 KB | 8.1 | horizontal seams between rows: broken |
+Span count is the same in all four -> per-span bytes/CSS work matter, not just span count.
+`min` made the default in the browser.
+
+## Item 1: sound
+- Rebuilt with -DFEATURE_SOUND + mus2mid.c + a stub SDL_mixer.h (i_sound.c includes it) and two
+  config globals (use_libsamplerate, libsamplerate_scale). wasm 402 -> 408 KB.
+- C passes raw DMX lumps / MUS->MIDI bytes to JS imports; doom-audio.js plays SFX as AudioBuffers
+  with gain + stereo pan and music via a small MIDI synth (oscillators by GM program, noise drums).
+  Not OPL: it sounds like a chiptune cover, not the Sound Blaster original.
+- Verified in headless Chromium (--autoplay-policy=no-user-gesture-required) by tapping the master
+  bus into a ScriptProcessor: 11 SFX, music playing, 149 notes, 0 errors in 14 s; spectrogram shows
+  the E1M1 riff and pistol shots. Browser needs a key press before audio starts (autoplay policy).
+
+## Item 3: adaptive span shaping (lib/span-shaper.ts; ?fps= ?maxtol=)
+- Lossy RLE: along each cell row, a cell whose top and bottom colours are within Chebyshev distance
+  T of the current span's anchor colours is snapped to them. fitSpans bisects for the smallest T
+  with spans <= budget / targetFps. My span count = Text.js spanCount - ~2/row (line ends, HUD), so
+  pacing now uses our exact count (+2*rows) instead of Text.js's throttled stats.
+- Sweep (results/devtools-round2.jsonl), DevTools fps: 100x38 3.0 -> 8.1, 120x46 2.1 -> 8.8,
+  160x61 1.3 -> 7.9 with fps=10/budget 18k, but lag 16-25 frames (page outran DevTools) and
+  160x61 needed tol 36: ugly horizontal smearing. tol <= ~24 looks fine at 100x38.
+- Defaults chosen (all reversible via URL): css=min, fps=8, maxtol=24, budget=14000.
+  No-parameter run: DevTools 7.1 / 7.1 / 5.4 fps at 100x38 / 120x46 / 160x61, lag 3-11 frames,
+  mean abs error 2.5 / 4.3 / 5.3 (of 255). Previous defaults: 3.0 / 2.1 / 1.3 fps.
+- Side effect: longer spans -> far fewer of the 1px seams.

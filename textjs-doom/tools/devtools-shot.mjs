@@ -88,9 +88,12 @@ if (process.env.MODE === "throughput") {
   const p1 = await pageFrame(), d1 = await shownFrame(), secs = (Date.now() - t0) / 1000;
   const st = (await page.send("Runtime.evaluate", { expression: "JSON.stringify(text.stats())", returnByValue: true })).result?.result?.value;
   const { cols, rows, spanCount, encodeMs } = JSON.parse(st);
-  const res = { size: `${cols}x${rows}`, bits: process.env.BITS ?? 8, spans: spanCount, encodeMs: +encodeMs.toFixed(1), pageFps: +((p1 - p0) / secs).toFixed(1), devtoolsFps: +((d1 - d0) / secs).toFixed(1), lagFrames: p1 - d1 };
+  const res = { size: `${cols}x${rows}`, bits: process.env.BITS ?? 8, spans: spanCount, encodeMs: +encodeMs.toFixed(1), pageFps: +((p1 - p0) / secs).toFixed(1), devtoolsFps: +((d1 - d0) / secs).toFixed(1), lagFrames: p1 - d1, tapBytesPerFrame: JSON.parse((await page.send("Runtime.evaluate", { expression: "JSON.stringify(globalThis.doomTap ?? null)", returnByValue: true })).result?.result?.value ?? "null") };
+  const shape = (await page.send("Runtime.evaluate", { expression: "JSON.stringify(globalThis.doomShape ?? null)", returnByValue: true })).result?.result?.value;
+  if (shape) { const sh = JSON.parse(shape); res.tol = sh.tol; res.err = +(+sh.err).toFixed(2); }
+  if (res.tapBytesPerFrame) res.tapBytesPerFrame = Math.round(res.tapBytesPerFrame.bytes / Math.max(1, res.tapBytesPerFrame.calls));
   console.log("THROUGHPUT " + JSON.stringify(res));
-  await shot(`throughput-${res.size}`);
+  await shot(`throughput-${res.size}${process.env.TAG ? "-" + process.env.TAG.replace(/[^a-z0-9=]/gi, "_") : ""}`);
   devtools.close(); page.close(); chrome.kill(); process.exit(0);
 }
 // Wait for Doom to boot (the HUD line appears once frames flow), then start a game.

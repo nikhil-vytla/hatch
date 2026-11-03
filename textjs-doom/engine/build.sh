@@ -6,14 +6,14 @@ DG=${1:?path to doomgeneric checkout}/doomgeneric
 OUT=${2:-$(dirname "$0")/../app/public/doom.wasm}
 HERE=$(cd "$(dirname "$0")" && pwd)
 ZIG=${ZIG:-"python3 -m ziglang"}
-SRCS=$(cd "$DG" && grep '^SRC_DOOM' Makefile | sed 's/SRC_DOOM = //; s/\.o/.c/g; s/doomgeneric_xlib.c//')
+SRCS="$(cd "$DG" && grep '^SRC_DOOM' Makefile | sed 's/SRC_DOOM = //; s/\.o/.c/g; s/doomgeneric_xlib.c//') mus2mid.c"
 mkdir -p "$(dirname "$OUT")"
 args=()
 for s in $SRCS; do args+=("$DG/$s"); done
 $ZIG cc -target wasm32-wasi -Os -s -mexec-model=reactor \
-  -DDOOMGENERIC_RESX=320 -DDOOMGENERIC_RESY=200 -D_WASI_EMULATED_SIGNAL -D_WASI_EMULATED_PROCESS_CLOCKS \
+  -DFEATURE_SOUND -I"$HERE/stub" -DDOOMGENERIC_RESX=320 -DDOOMGENERIC_RESY=200 -D_WASI_EMULATED_SIGNAL -D_WASI_EMULATED_PROCESS_CLOCKS \
   -Wno-everything -I"$DG" \
-  "${args[@]}" "$HERE/doomgeneric_textjs.c" \
+  "${args[@]}" "$HERE/doomgeneric_textjs.c" "$HERE/doomgeneric_textjs_sound.c" \
   -lwasi-emulated-signal -lwasi-emulated-process-clocks \
   -Wl,--export=malloc \
   -o "$OUT"

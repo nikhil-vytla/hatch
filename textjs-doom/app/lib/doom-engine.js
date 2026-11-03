@@ -138,16 +138,26 @@ export const DoomKey = {
 /**
  * Boot Doom.
  * @param {{ wasm: BufferSource | WebAssembly.Module, wad: Uint8Array, log?: (line: string) => void,
- *           onFrame?: () => void, now?: () => number }} opts
+ *           onFrame?: () => void, now?: () => number,
+ *           audio?: (env: { getMemory: () => WebAssembly.Memory }) => { imports: Record<string, Function> } }} opts
+ * `audio` builds the sound/music imports (see doom-audio.js); without it sound is silently dropped.
  */
-export async function createDoom({ wasm, wad, log = () => {}, onFrame = () => {}, now = () => performance.now() }) {
+export async function createDoom({ wasm, wad, log = () => {}, onFrame = () => {}, now = () => performance.now(), audio }) {
   const files = new Map([["doom1.wad", wad]]);
   const w = makeWasi(files, log);
   const t0 = now();
   let frames = 0;
+  let memory = null;
+  const silent = {
+    sfx_start: (ch) => ch, sfx_stop() {}, sfx_update() {}, sfx_playing: () => 0,
+    mus_play() {}, mus_stop() {}, mus_volume() {}, mus_pause() {},
+  };
+  const sound = audio ? audio({ getMemory: () => memory }) : null;
   const imports = {
     wasi_snapshot_preview1: w.imports,
     textjs: {
+      ...silent,
+      ...(sound?.imports ?? {}),
       ticks_ms: () => (now() - t0) >>> 0,
       frame: () => { frames++; onFrame(); },
     },
@@ -156,6 +166,7 @@ export async function createDoom({ wasm, wad, log = () => {}, onFrame = () => {}
   const instance = await WebAssembly.instantiate(module, imports);
   const ex = instance.exports;
   w.setMemory(ex.memory);
+  memory = ex.memory;
   ex._initialize?.();
   ex.tx_init(0);
 
@@ -164,7 +175,7 @@ export async function createDoom({ wasm, wad, log = () => {}, onFrame = () => {}
   let exited = null;
 
   return {
-    width, height, files, t0,
+    width, height, files, t0, sound,
     /** The game's own tic counter (35Hz) at time `ms` on the same clock as `now`. */
     ticAt(ms) { return Math.floor(((ms - t0) * 35) / 1000); },
     get frames() { return frames; },

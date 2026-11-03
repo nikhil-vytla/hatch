@@ -1,0 +1,16 @@
+{"size":"100x38","bits":"8","spans":3088,"encodeMs":23.3,"pageFps":15.1,"devtoolsFps":4.9,"lagFrames":126,"tapBytesPerFrame":507218,"budget":"1e9","extra":"css=full"}
+{"size":"100x38","bits":"8","spans":2955,"encodeMs":31.9,"pageFps":13.7,"devtoolsFps":6,"lagFrames":125,"tapBytesPerFrame":366698,"budget":"1e9","extra":"css=nofont"}
+{"size":"100x38","bits":"8","spans":3076,"encodeMs":16.9,"pageFps":11.6,"devtoolsFps":8.1,"lagFrames":59,"tapBytesPerFrame":293850,"budget":"1e9","extra":"css=min"}
+{"size":"100x38","bits":"8","spans":2950,"encodeMs":13.5,"pageFps":14.3,"devtoolsFps":8.1,"lagFrames":72,"tapBytesPerFrame":133773,"budget":"1e9","extra":"css=bare"}
+{"size":"100x38","bits":"8","spans":2957,"encodeMs":23.1,"pageFps":3.4,"devtoolsFps":3,"lagFrames":9,"tapBytesPerFrame":566575,"tol":0,"err":0,"budget":"12000","extra":"css=full"}
+{"size":"100x38","bits":"8","spans":3071,"encodeMs":23.3,"pageFps":4.6,"devtoolsFps":4.2,"lagFrames":18,"tapBytesPerFrame":319392,"tol":0,"err":0,"budget":"18000","extra":"css=min"}
+{"size":"100x38","bits":"8","spans":1768,"encodeMs":13,"pageFps":9.5,"devtoolsFps":8.1,"lagFrames":16,"tapBytesPerFrame":162585,"tol":18,"err":2.35,"budget":"18000","extra":"css=min&fps=10"}
+{"size":"120x46","bits":"8","spans":4094,"encodeMs":33.1,"pageFps":2.1,"devtoolsFps":2.1,"lagFrames":1,"tapBytesPerFrame":774967,"tol":0,"err":0,"budget":"12000","extra":"css=full"}
+{"size":"120x46","bits":"8","spans":3848,"encodeMs":24.1,"pageFps":3,"devtoolsFps":3,"lagFrames":1,"tapBytesPerFrame":402277,"tol":0,"err":0,"budget":"18000","extra":"css=min"}
+{"size":"120x46","bits":"8","spans":1823,"encodeMs":16.8,"pageFps":10.8,"devtoolsFps":8.8,"lagFrames":25,"tapBytesPerFrame":159810,"tol":24,"err":5.46,"budget":"18000","extra":"css=min&fps=10"}
+{"size":"160x61","bits":"8","spans":6932,"encodeMs":95.8,"pageFps":1.3,"devtoolsFps":1.3,"lagFrames":2,"tapBytesPerFrame":1180935,"tol":0,"err":0,"budget":"12000","extra":"css=full"}
+{"size":"160x61","bits":"8","spans":6980,"encodeMs":47.1,"pageFps":1.6,"devtoolsFps":1.6,"lagFrames":2,"tapBytesPerFrame":646930,"tol":0,"err":0,"budget":"18000","extra":"css=min"}
+{"size":"160x61","bits":"8","spans":1398,"encodeMs":11.9,"pageFps":9.6,"devtoolsFps":7.9,"lagFrames":21,"tapBytesPerFrame":178332,"tol":36,"err":8.41,"budget":"18000","extra":"css=min&fps=10"}
+{"size":"100x38","bits":8,"spans":1683,"encodeMs":11.3,"pageFps":7.4,"devtoolsFps":7.1,"lagFrames":5,"tapBytesPerFrame":196794,"tol":12,"err":2.51,"budget":"default","extra":"defaults (css=min, fps=8, maxtol=24, budget=14000)"}
+{"size":"120x46","bits":8,"spans":1682,"encodeMs":9.4,"pageFps":7.7,"devtoolsFps":7.1,"lagFrames":11,"tapBytesPerFrame":201435,"tol":21,"err":4.26,"budget":"default","extra":"defaults (css=min, fps=8, maxtol=24, budget=14000)"}
+{"size":"160x61","bits":8,"spans":2201,"encodeMs":26.2,"pageFps":5.6,"devtoolsFps":5.4,"lagFrames":3,"tapBytesPerFrame":275730,"tol":24,"err":5.26,"budget":"default","extra":"defaults (css=min, fps=8, maxtol=24, budget=14000)"}
