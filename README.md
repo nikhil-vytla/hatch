@@ -7,7 +7,11 @@ For these experiments, all I hope is that I get to learn something new! I have a
 ## Experiments
 
 <!-- index:start -->
-10 experiments, newest first.
+11 experiments, newest first.
+
+### [Doom in Text.js](textjs-doom/) (2026-11-04)
+
+Shareware Doom runs inside the browser DevTools console as a [Text.js](https://textjs.org) App Router page. The stock [doomgeneric](https://github.com/ozkl/doomgeneric) sources compile to a ~400 KB wasm32-wasi module with `zig cc`, and a small in-memory WASI shim runs it. The page draws frames as half-block cells through Text.js's `<Image>`, plays sound effects and synthesized music with Web Audio, and the same page also runs in a terminal via `text run`. The main result is that the DevTools Console panel, not Doom or Text.js, limits the frame rate. A second round, with code drafted by deepseek-flash and reviewed and measured by hand, raised the rate DevTools can actually display by 2.4–4x.
 
 ### [Neuron Atlas](neuron-atlas/) (2026-10-28)
 
