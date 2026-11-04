@@ -13,52 +13,90 @@
   --eosin: #d6336c; --eosin-soft: #f9d9e5; --hema: #4b3fa8; --hema-soft: #dedaf5; --accent: #b0245a;
   --plate: #17152a; --plate-ink: #ece9f7; --plate-ink2: #a29dbb; --plate-line: #2c2946;
   --good: #1f8a5b; --warn: #b7791f;
+  --k-user: #2a78d6; --k-persona: #d6336c; --k-altered: #4b3fa8; --k-other: #1baf7a; --k-incoherent: #eda100; --k-default: #cfcbdc;
   --display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
   --body: "Source Sans 3", "Segoe UI", system-ui, -apple-system, sans-serif;
   --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-  --r: 10px;
+  --r: 10px; --r-card: 14px;
+  --s1: 12px; --s2: 16px; --s3: 24px;
+  --card-shadow: 0 1px 2px rgb(0 0 0 / .04), 0 4px 16px rgb(0 0 0 / .04);
+  --card-shadow-hover: 0 2px 4px rgb(0 0 0 / .06), 0 8px 24px rgb(0 0 0 / .08);
+  --pill-shadow: 0 1px 2px rgb(0 0 0 / .08), 0 2px 6px rgb(0 0 0 / .06);
 }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
   --bg: #121019; --surface: #1b1826; --sunk: #242033; --line: #343048; --ink: #ece9f7; --ink2: #b3adc8; --ink3: #827c99;
   --eosin: #ff6b9a; --eosin-soft: #4a1f33; --hema: #9d92ff; --hema-soft: #2d2858; --accent: #ff7aa6;
   --plate: #0b0a12; --plate-ink: #ece9f7; --plate-ink2: #9a95b2; --plate-line: #24213a; --good: #4cc38a; --warn: #e0a84a;
+  --k-user: #3987e5; --k-persona: #e0447a; --k-altered: #8a7ef0; --k-other: #199e70; --k-incoherent: #c98500; --k-default: #3b3652;
+  --card-shadow: 0 1px 2px rgb(0 0 0 / .3), 0 4px 16px rgb(0 0 0 / .25);
+  --card-shadow-hover: 0 2px 4px rgb(0 0 0 / .38), 0 8px 24px rgb(0 0 0 / .35);
+  --pill-shadow: 0 1px 2px rgb(0 0 0 / .35), 0 2px 6px rgb(0 0 0 / .3);
   color-scheme: dark } }
 :root[data-theme="dark"] {
   --bg: #121019; --surface: #1b1826; --sunk: #242033; --line: #343048; --ink: #ece9f7; --ink2: #b3adc8; --ink3: #827c99;
   --eosin: #ff6b9a; --eosin-soft: #4a1f33; --hema: #9d92ff; --hema-soft: #2d2858; --accent: #ff7aa6;
   --plate: #0b0a12; --plate-ink: #ece9f7; --plate-ink2: #9a95b2; --plate-line: #24213a; --good: #4cc38a; --warn: #e0a84a;
+  --k-user: #3987e5; --k-persona: #e0447a; --k-altered: #8a7ef0; --k-other: #199e70; --k-incoherent: #c98500; --k-default: #3b3652;
+  --card-shadow: 0 1px 2px rgb(0 0 0 / .3), 0 4px 16px rgb(0 0 0 / .25);
+  --card-shadow-hover: 0 2px 4px rgb(0 0 0 / .38), 0 8px 24px rgb(0 0 0 / .35);
+  --pill-shadow: 0 1px 2px rgb(0 0 0 / .35), 0 2px 6px rgb(0 0 0 / .3);
   color-scheme: dark }
 * { box-sizing: border-box }
 html, body { height: 100% }
-body { background: var(--bg); color: var(--ink); font: 16px/1.5 var(--body); margin: 0;
+body { background: var(--bg); color: var(--ink); font: 15px/1.5 var(--body); margin: 0; overflow-x: clip;
   padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
 button, input, select { font: inherit; color: inherit }
 button { cursor: pointer }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px }
-.wrap { max-width: 1480px; margin: 0 auto; padding-block: 18px 40px; display: flex; flex-direction: column; gap: 14px }
+.wrap { max-width: 1480px; margin: 0 auto; padding-block: 0 40px; display: flex; flex-direction: column; gap: var(--s3) }
 
-header.top { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px }
-.brand { display: flex; align-items: baseline; gap: 10px; min-width: 0 }
-.brand h1 { font: 800 28px/1 var(--display); letter-spacing: -0.02em; margin: 0; text-wrap: balance }
+.topbar { position: sticky; top: 0; z-index: 30; display: flex; flex-direction: column; gap: var(--s1);
+  padding-block: var(--s1); background: color-mix(in oklab, var(--bg) 85%, transparent);
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--line) }
+.top { display: flex; align-items: center; gap: 12px; min-width: 0 }
+.brand { display: flex; align-items: baseline; gap: 10px; min-width: 0; flex: 0 0 auto }
+.brand h1 { font: 800 28px/1 var(--display); letter-spacing: -0.02em; margin: 0; text-wrap: balance; white-space: nowrap }
 .brand h1 i { font-style: normal; color: var(--eosin) }
-.brand .sub { color: var(--ink2); font-size: 14px }
-.models { display: flex; flex-wrap: wrap; gap: 6px }
+.models { display: flex; flex-wrap: nowrap; gap: 6px; overflow-x: auto; min-width: 0; flex: 1 1 auto;
+  scrollbar-width: none; -webkit-overflow-scrolling: touch; padding-block: 2px }
+.models::-webkit-scrollbar { display: none }
 .chip { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 4px 12px; font-size: 14px;
-  display: inline-flex; gap: 6px; align-items: baseline; white-space: nowrap }
+  display: inline-flex; gap: 6px; align-items: baseline; white-space: nowrap;
+  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease }
 .chip small { color: var(--ink3); font: 12px var(--mono) }
+.chip:hover { border-color: var(--hema) }
 .chip[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink) }
 .chip[aria-pressed="true"] small { color: var(--bg); opacity: .7 }
-.spacer { flex: 1 }
-.actions { display: flex; gap: 8px; flex-wrap: wrap }
-.btn { border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 6px 12px; font-size: 14px; font-weight: 600 }
+.actions { display: flex; gap: 8px; flex-wrap: nowrap; flex: 0 0 auto; align-items: center }
+.btn { height: 36px; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 0 14px;
+  font: 600 14px/1 var(--body); text-decoration: none; white-space: nowrap;
+  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease, box-shadow 120ms ease }
+a.btn { text-decoration: none; color: inherit }
 .btn.primary { background: var(--eosin); color: #fff; border-color: var(--eosin) }
-.btn:hover { border-color: var(--ink3) }
+.btn:hover { border-color: var(--hema); box-shadow: 0 0 0 2px color-mix(in oklab, var(--hema) 18%, transparent) }
+.btn.primary:hover { border-color: var(--eosin); box-shadow: 0 0 0 2px color-mix(in oklab, var(--hema) 35%, transparent) }
+.btn:focus-visible { outline: 2px solid var(--hema); outline-offset: 2px }
+.theme-toggle { width: 36px; height: 36px; flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center;
+  padding: 0; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink2);
+  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease }
+.theme-toggle:hover { border-color: var(--hema); color: var(--ink) }
+.theme-toggle:focus-visible { outline: 2px solid var(--hema); outline-offset: 2px }
+.theme-toggle svg { width: 18px; height: 18px; display: none }
+.theme-toggle .i-sun { display: block }
+.theme-toggle[data-resolved="light"] .i-sun { display: block }
+.theme-toggle[data-resolved="light"] .i-moon { display: none }
+.theme-toggle[data-resolved="dark"] .i-sun { display: none }
+.theme-toggle[data-resolved="dark"] .i-moon { display: block }
 
 .searchrow { display: flex; flex-wrap: wrap; gap: 8px; align-items: center }
 .search { position: relative; flex: 1 1 340px; min-width: 0 }
 .search input { width: 100%; border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 8px 12px; font-size: 15px }
-.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--surface) }
-.seg button { border: 0; background: none; padding: 7px 12px; font-size: 14px; color: var(--ink2) }
+.searchrow .sub { margin-left: auto; min-width: 0; color: var(--ink3); font-size: 13px; line-height: 1.35 }
+.seg { display: inline-flex; max-width: 100%; overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); scrollbar-width: none }
+.seg::-webkit-scrollbar { display: none }
+.seg button { border: 0; background: none; padding: 7px 12px; font-size: 14px; color: var(--ink2); white-space: nowrap;
+  transition: background-color 120ms ease, color 120ms ease }
 .seg button[aria-pressed="true"] { background: var(--sunk); color: var(--ink); font-weight: 600 }
 .results { position: absolute; left: 0; right: 0; top: calc(100% + 4px); background: var(--surface); border: 1px solid var(--line);
   border-radius: 8px; max-height: 360px; overflow: auto; z-index: 20; box-shadow: 0 10px 30px rgba(20, 10, 40, .18) }
@@ -66,9 +104,27 @@ header.top { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px
 .results button:hover, .results button.on { background: var(--sunk) }
 .results .k { font: 12px var(--mono); color: var(--ink3); white-space: nowrap }
 
-nav.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); overflow-x: auto }
-nav.tabs button { border: 0; background: none; padding: 8px 14px; font: 600 15px var(--body); color: var(--ink2); border-bottom: 2px solid transparent; white-space: nowrap }
-nav.tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--eosin) }
+.startband { position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-card); padding: 10px 40px 10px 12px }
+.startband p { flex: 1 1 320px; min-width: 0; margin: 0; color: var(--ink2); font-size: 14px }
+.start-actions { display: flex; flex-wrap: wrap; gap: 8px }
+.start-x { position: absolute; top: 4px; right: 4px; width: 28px; height: 28px; padding: 0; border: 0;
+  border-radius: 6px; background: none; color: var(--ink3); font-size: 20px; line-height: 1 }
+.start-x:hover { background: var(--sunk); color: var(--ink) }
+@media (max-width: 600px) { .startband { padding-right: 36px } .start-actions { flex: 1 1 100% } }
+
+nav.tabs { display: flex; gap: 2px; padding: 4px; border: 1px solid var(--line); border-radius: 999px; background: var(--sunk);
+  overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch }
+nav.tabs::-webkit-scrollbar { display: none }
+nav.tabs button { border: 0; background: none; padding: 7px 14px; font: 600 14px var(--body); color: var(--ink2); border-radius: 999px;
+  white-space: nowrap; transition: background-color 120ms ease, color 120ms ease, box-shadow 120ms ease }
+nav.tabs button:hover { color: var(--ink) }
+nav.tabs button[aria-selected="true"] { color: var(--ink); background: var(--surface);
+  box-shadow: var(--pill-shadow) }
+.tabpane { display: flex; flex-direction: column; gap: var(--s2) }
+.subtabs { display: flex; flex-wrap: wrap; gap: 8px; align-items: center }
+.sweephint { margin: 0 0 6px }
+.sweephint a { color: var(--accent); font-weight: 600 }
 
 .bench { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 16px; align-items: start }
 @media (max-width: 900px) { .bench { grid-template-columns: minmax(0, 1fr) } }
@@ -87,7 +143,8 @@ nav.tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: 
 .ribbon button[aria-pressed="true"] { outline: 2px solid #fff; opacity: 1 }
 .ribbon-cap { display: flex; justify-content: space-between; padding: 0 12px 10px; font: 11px var(--mono); color: var(--plate-ink2) }
 
-.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 18px; display: flex; flex-direction: column; gap: 16px; min-width: 0 }
+.card { background: var(--surface); border: 0; border-radius: var(--r-card); padding: var(--s3); display: flex; flex-direction: column; gap: var(--s2); min-width: 0;
+  box-shadow: var(--card-shadow) }
 .card h2 { font: 700 26px/1.15 var(--display); margin: 0; letter-spacing: -0.01em; text-wrap: balance }
 .card h3 { font: 600 12px var(--body); text-transform: uppercase; letter-spacing: .08em; color: var(--ink3); margin: 0 0 6px }
 .idline { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font: 13px var(--mono); color: var(--ink2) }
@@ -102,9 +159,12 @@ nav.tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: 
 .stat b { display: block; font: 600 16px var(--mono); font-variant-numeric: tabular-nums }
 .stat span { font-size: 12px; color: var(--ink3) }
 .lens { display: flex; flex-wrap: wrap; gap: 4px }
+.lens .lbl { font: 11px var(--mono); color: var(--ink3); align-self: center; margin-right: 2px }
 .tok { font: 13px var(--mono); background: var(--sunk); border-radius: 4px; padding: 1px 6px; white-space: pre }
 .tok.up { background: var(--eosin-soft); color: var(--eosin) }
 .tok.down { background: var(--hema-soft); color: var(--hema) }
+.says-hit { background: var(--eosin-soft); color: inherit; border-radius: 3px; padding: 0 1px }
+.says-legend { margin: 0 0 8px }
 .ex { font: 13px/1.75 var(--mono); padding: 6px 10px; border-left: 3px solid var(--line); background: var(--bg); border-radius: 0 6px 6px 0;
   overflow-wrap: anywhere; white-space: pre-wrap }
 .ex + .ex { margin-top: 6px }
@@ -118,23 +178,91 @@ nav.tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: 
 @media (max-width: 600px) { .chat { grid-template-columns: minmax(0, 1fr) } }
 .bubble { border-radius: 12px; padding: 8px 11px; font-size: 14px; background: var(--sunk); overflow-wrap: anywhere; min-width: 0 }
 .bubble .who { display: block; font: 600 11px var(--mono); color: var(--ink3); margin-bottom: 3px }
+.bubble .pmeta { margin-bottom: 4px }
 .bubble.minus { background: var(--hema-soft) }
 .bubble.plus { background: var(--eosin-soft) }
+.sweeprow { border-left: 3px solid transparent; padding-left: 10px }
+.sweeprow + .sweeprow { margin-top: 10px }
+.sweeprow.flagged { border-left-color: var(--eosin) }
+.sweeprow .prompt { margin: 0 0 6px }
+.sweepdose { font: 600 11px var(--mono); color: var(--ink3) }
 .prompt { font-style: italic; color: var(--ink2); margin: 10px 0 6px }
 .muted { color: var(--ink3); font-size: 14px }
 .nbrs { display: flex; flex-wrap: wrap; gap: 6px }
-.nbrs button { border: 1px solid var(--line); background: var(--bg); border-radius: 8px; padding: 4px 9px; font-size: 13px; text-align: left; max-width: 100% }
+.nbrs button { border: 1px solid var(--line); background: var(--bg); border-radius: 8px; padding: 4px 9px; font-size: 13px; text-align: left; max-width: 100%;
+  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease }
+.nbrs button:hover { border-color: var(--hema) }
 .nbrs button .k { font: 11px var(--mono); color: var(--ink3); margin-right: 4px }
 
-.grid-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); gap: 12px }
-.push { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; text-align: left; min-width: 0 }
-.push:hover { border-color: var(--ink3) }
+.grid-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); gap: var(--s1) }
+.push { background: var(--surface); border: 0; border-radius: var(--r-card); padding: var(--s1) var(--s2); display: flex; flex-direction: column; gap: 6px; text-align: left; min-width: 0;
+  box-shadow: var(--card-shadow); transition: box-shadow 120ms ease }
+.push:hover { box-shadow: var(--card-shadow-hover) }
 .push .reply { font-size: 14px; overflow-wrap: anywhere }
 .push .meta { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; font: 12px var(--mono); color: var(--ink3) }
-.filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px }
+.filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: var(--s1) }
+[hidden] { display: none !important }
 .filters select, .filters input { border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 6px 10px; font-size: 14px }
+.pgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: var(--s1) }
+.persona { background: var(--surface); border: 0; border-radius: var(--r-card); padding: var(--s1) var(--s2); display: flex; flex-direction: column; gap: 6px; min-width: 0;
+  box-shadow: var(--card-shadow) }
+.persona .ptitle { font: 700 18px/1.2 var(--display); margin: 0; letter-spacing: -0.01em; text-wrap: balance }
+.pmeta { display: flex; gap: 6px; flex-wrap: wrap; align-items: center }
+.pactions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: auto }
+.bubble.clamped { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 5; overflow: hidden; cursor: pointer }
 
-.tablewrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r) }
+.card-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: flex-start }
+.repro { position: relative; display: inline-block }
+.repro > summary { list-style: none; cursor: pointer }
+.repro > summary::-webkit-details-marker { display: none }
+.repro[open] > summary { border-color: var(--hema) }
+.repro-menu { position: absolute; left: 0; top: calc(100% + 4px); z-index: 45; min-width: 164px; padding: 4px;
+  display: flex; flex-direction: column; gap: 2px; background: var(--surface); border: 1px solid var(--line);
+  border-radius: 8px; box-shadow: var(--card-shadow-hover) }
+.repro-menu button { border: 0; background: none; text-align: left; padding: 7px 10px; border-radius: 6px;
+  font: 600 13px/1.2 var(--body); white-space: nowrap }
+.repro-menu button:hover { background: var(--sunk) }
+.dosestrip { display: flex; flex-direction: column; gap: 8px }
+.dosebtns { display: inline-flex; flex-wrap: wrap; gap: 2px; align-items: center; padding: 3px; max-width: 100%;
+  border: 1px solid var(--line); border-radius: 8px; background: var(--surface); width: fit-content }
+.dosebtns button { border: 0; background: none; border-radius: 6px; padding: 3px 8px; font: 600 11px var(--mono);
+  color: var(--ink2); white-space: nowrap }
+.dosebtns button:hover { background: var(--sunk); color: var(--ink) }
+.dosebtns button[aria-pressed="true"] { background: var(--sunk); color: var(--ink) }
+.dosebtns button.neg { color: var(--hema) }
+.dosebtns button.pos { color: var(--eosin) }
+.dosebtns button[aria-pressed="true"].neg, .dosebtns button[aria-pressed="true"].pos { color: var(--ink) }
+.dosesep { color: var(--ink3); font: 12px var(--mono); padding: 0 2px }
+.notice { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 60;
+  background: var(--ink); color: var(--bg); border-radius: 999px; padding: 9px 16px;
+  font: 600 13px var(--body); box-shadow: var(--card-shadow-hover) }
+.notice.err { background: var(--eosin); color: #fff }
+
+.mixprompt textarea { width: 100%; min-height: 58px; font: inherit; border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; background: var(--surface); color: var(--ink); resize: vertical }
+.mixprompt { margin-bottom: var(--s1) }
+#mixlive input[type="range"] { accent-color: var(--eosin); vertical-align: middle }
+#mixlive output { font: 600 12px var(--mono); color: var(--ink2) }
+#mixliveout .bubble { min-height: 130px; white-space: pre-wrap }
+#mixrecipe { margin-top: var(--s1); align-items: center }
+#mixrecipe .btn { height: 30px; padding: 0 10px; font-size: 13px }
+.runs-all { margin-top: 12px; border-top: 1px solid var(--line); padding-top: 12px }
+.runs-all > summary { cursor: pointer; font: 600 12px var(--body); text-transform: uppercase; letter-spacing: .08em; color: var(--ink3) }
+.runs-all[open] > summary { margin-bottom: 10px }
+.run-row { border-top: 1px solid var(--line); padding: 8px 0 }
+.run-row:first-child { border-top: 0 }
+.run-row > summary { cursor: pointer }
+.run-compact { display: flex; flex-direction: column; gap: 5px; min-width: 0 }
+.run-head { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; min-width: 0; font: 13px var(--mono); color: var(--ink2) }
+.run-head b { font-weight: 700; color: var(--ink) }
+.run-pills { display: flex; gap: 4px; flex-wrap: wrap; align-items: center; min-width: 0 }
+.run-load { height: 26px; padding: 0 8px; font-size: 12px }
+.run-line { display: flex; gap: 8px; align-items: flex-start; font-size: 13px; min-width: 0 }
+.run-line.plus { color: var(--ink2) }
+.run-line .who { flex: 0 0 auto; min-width: 54px; padding-top: 3px; font: 600 10px var(--mono); color: var(--ink3); text-transform: uppercase; letter-spacing: .04em }
+.run-reply { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; min-width: 0; white-space: pre-wrap }
+.run-full { margin-top: 10px }
+
+.tablewrap { overflow-x: auto; background: var(--surface); border: 0; border-radius: var(--r-card); box-shadow: var(--card-shadow) }
 table { border-collapse: collapse; width: 100%; font-size: 14px }
 th, td { padding: 7px 10px; text-align: left; border-bottom: 1px solid var(--line); vertical-align: top }
 th { font: 600 12px var(--body); text-transform: uppercase; letter-spacing: .06em; color: var(--ink3); background: var(--sunk); position: sticky; top: 0; cursor: pointer; white-space: nowrap }
@@ -146,7 +274,9 @@ tbody tr:hover { background: var(--sunk) }
 .game .score { display: flex; gap: 16px; font: 600 15px var(--mono); color: var(--ink2); flex-wrap: wrap }
 .choices { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px }
 @media (max-width: 600px) { .choices { grid-template-columns: minmax(0, 1fr) } }
-.choices button { border: 1.5px solid var(--line); background: var(--surface); border-radius: 10px; padding: 12px; text-align: left; font-size: 15px }
+.choices button { border: 1.5px solid var(--line); background: var(--surface); border-radius: 10px; padding: 12px; text-align: left; font-size: 15px;
+  transition: background-color 120ms ease, border-color 120ms ease }
+.choices button:hover { border-color: var(--hema) }
 .choices button.right { border-color: var(--good); background: color-mix(in oklab, var(--good) 12%, var(--surface)) }
 .choices button.wrong { border-color: var(--eosin); background: var(--eosin-soft) }
 
@@ -156,41 +286,111 @@ textarea.sql { width: 100%; min-height: 110px; font: 13px var(--mono); border: 1
 .err { color: var(--eosin) }
 .foot { color: var(--ink3); font-size: 13px; max-width: 80ch }
 .foot a { color: var(--ink2) }
+
+/* overview */
+.ov-controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: var(--s1) }
+.ov-controls select { border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 6px 10px; font-size: 14px }
+.ov-controls .spacer { flex: 1 1 auto }
+.ovstats { grid-template-columns: repeat(4, minmax(0, 1fr)); margin-bottom: var(--s2) }
+.ovstats .stat { padding: 10px 12px }
+.ovstats .stat b { display: block; font: 700 24px/1.15 var(--mono); font-variant-numeric: tabular-nums; letter-spacing: -.02em }
+.ovstats .stat span { font-size: 12px; color: var(--ink3) }
+@media (max-width: 700px) { .ovstats { grid-template-columns: repeat(2, minmax(0, 1fr)) } }
+.ov-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s2) }
+.ov-chart { gap: var(--s1) }
+.card h3.ov-title { font: 700 20px/1.2 var(--display); text-transform: none; letter-spacing: -.01em; color: var(--ink); margin: 0 }
+.ov-sub { margin: 2px 0 0; color: var(--ink3); font-size: 13px }
+.ov-legend { display: flex; flex-wrap: wrap; gap: 12px; font-size: 12px; color: var(--ink2) }
+.ov-key { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap }
+.ov-swatch { width: 10px; height: 10px; border-radius: 3px; flex: 0 0 auto }
+.ov-svgwrap { position: relative; min-width: 0 }
+.ov-svgwrap svg { display: block; width: 100%; height: auto }
+.ov-tip { position: absolute; pointer-events: none; background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: 8px;
+  padding: 6px 9px; font-size: 12px; box-shadow: var(--card-shadow-hover); z-index: 5; max-width: 220px; line-height: 1.35 }
+.ov-tip .k { font: 11px var(--mono); color: var(--ink3) }
+.ov-tip b { font-weight: 600 }
+.ov-col, .ov-mark { cursor: pointer; outline: none }
+.ov-col:focus-visible .ov-hit, .ov-mark:focus-visible .ov-hit { stroke: var(--accent); stroke-width: 2 }
+.ov-tables { overflow-x: auto }
+.ov-table caption { caption-side: top; text-align: left; padding: 0 10px 8px; color: var(--ink3); font-size: 12px }
+.ov-table th { position: static; cursor: default }
+.ov-table th[scope="row"] { background: none; text-transform: none; letter-spacing: 0; font-weight: 600; color: var(--ink2) }
+.ov-none { color: var(--ink3); font-size: 14px; margin: 8px 0 }
+
+.skel { background: linear-gradient(100deg, var(--sunk) 30%, color-mix(in oklab, var(--surface) 65%, var(--sunk)) 50%, var(--sunk) 70%);
+  background-size: 200% 100%; border-radius: 8px; animation: shimmer 1.2s ease-in-out infinite }
+.skel.line { height: 12px; margin: 7px 0 }
+.skel.line.short { width: 62% }
+.skel-card { height: 132px; border-radius: var(--r-card) }
+@keyframes shimmer { from { background-position: 200% 0 } to { background-position: -200% 0 } }
+
+@media (max-width: 760px) {
+  .bench { grid-template-columns: minmax(0, 1fr); gap: var(--s2) }
+  .plate canvas { height: 60vh }
+  .card { padding: var(--s2) }
+  .brand h1 { font-size: 22px }
+  .btn { padding: 0 11px; font-size: 13px }
+  .theme-toggle { width: 34px; height: 34px }
+  .chip { padding: 4px 9px; font-size: 13px }
+  .searchrow .sub { flex: 1 1 100%; margin-left: 0 }
+}
+@media (max-width: 420px) {
+  .brand h1 { font-size: 19px }
+  .actions { gap: 6px }
+  .actions .btn { padding: 0 8px; font-size: 12px }
+  .theme-toggle { width: 32px; height: 32px }
+}
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important } }
 </style>
 
 <div class="wrap">
-  <header class="top">
-    <div class="brand"><h1>Neuron <i>Atlas</i></h1><span class="sub" id="sub">loading models…</span></div>
-    <div class="models" id="models" role="group" aria-label="Model"></div>
-    <div class="spacer"></div>
-    <div class="actions">
-      <button class="btn primary" id="surprise" title="Open a random well-labeled neuron">Surprise me</button>
+  <header class="topbar">
+    <div class="top">
+      <div class="brand"><h1>Neuron <i>Atlas</i></h1></div>
+      <div class="models" id="models" role="group" aria-label="Model"></div>
+      <div class="actions">
+        <a class="btn" href="protos/index.html" title="Experimental views: vision, image pushes, says vs does, identity">Prototypes</a>
+        <button class="btn primary" id="surprise" title="Open a random well-labeled neuron">Surprise me</button>
+        <button class="theme-toggle" id="theme" type="button" aria-label="Switch theme" title="Switch theme">
+          <svg class="i-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.42-1.42M17.66 6.34l1.41-1.41"/></svg>
+          <svg class="i-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="searchrow">
+      <div class="search">
+        <input id="q" type="search" autocomplete="off" placeholder="Search labels, e.g. “numbers”, “French”, “past tense”" aria-label="Search neurons">
+        <div class="results" id="results" hidden></div>
+      </div>
+      <div class="seg" role="group" aria-label="Search by" id="qmode">
+        <button aria-pressed="true" data-m="label">label</button>
+        <button aria-pressed="false" data-m="fires">fires on token</button>
+        <button aria-pressed="false" data-m="says">promotes token</button>
+      </div>
+      <span class="sub" id="sub">loading models…</span>
     </div>
   </header>
 
-  <div class="searchrow">
-    <div class="search">
-      <input id="q" type="search" autocomplete="off" placeholder="Search labels, e.g. “numbers”, “French”, “past tense”" aria-label="Search neurons">
-      <div class="results" id="results" hidden></div>
+  <div class="startband" id="startband" role="region" aria-label="Start here" hidden>
+    <p>Every MLP neuron of open language models: what it fires on, what it says, and what happens when you push it.</p>
+    <div class="start-actions">
+      <button class="btn" id="start-surprise" type="button">Surprise me</button>
+      <button class="btn" id="start-personas" type="button">Browse personas</button>
+      <button class="btn" id="start-become" type="button">Become…</button>
+      <a class="btn" href="protos/evidence.html">Evidence</a>
     </div>
-    <div class="seg" role="group" aria-label="Search by" id="qmode">
-      <button aria-pressed="true" data-m="label">label</button>
-      <button aria-pressed="false" data-m="fires">fires on token</button>
-      <button aria-pressed="false" data-m="says">promotes token</button>
-    </div>
+    <button class="start-x" id="start-dismiss" type="button" aria-label="Dismiss Start here">×</button>
   </div>
 
   <nav class="tabs" role="tablist" id="tabs">
-    <button role="tab" aria-selected="true" data-t="map">Map</button>
-    <button role="tab" aria-selected="false" data-t="pushes">Pushes</button>
-    <button role="tab" aria-selected="false" data-t="mix">Mix</button>
-    <button role="tab" aria-selected="false" data-t="board">Leaderboard</button>
-    <button role="tab" aria-selected="false" data-t="compare">Across models</button>
-    <button role="tab" aria-selected="false" data-t="guess">Guess the neuron</button>
-    <button role="tab" aria-selected="false" data-t="sql">SQL</button>
+    <button role="tab" aria-selected="true" aria-controls="p-explore" data-t="explore" tabindex="0">Explore</button>
+    <button role="tab" aria-selected="false" aria-controls="p-personas" data-t="personas" tabindex="-1">Personas</button>
+    <button role="tab" aria-selected="false" aria-controls="p-play" data-t="play" tabindex="-1">Play</button>
+    <button role="tab" aria-selected="false" aria-controls="p-data" data-t="data" tabindex="-1">Data</button>
   </nav>
 
+  <section id="p-explore" class="tabpane">
   <section id="v-map" class="bench">
     <div class="plate">
       <div class="hud">
@@ -205,6 +405,34 @@ textarea.sql { width: 100%; min-height: 110px; font: 13px var(--mono); border: 1
     </div>
     <article class="card" id="panel" aria-live="polite"><p class="muted">Loading…</p></article>
   </section>
+  </section>
+
+  <section id="p-personas" class="tabpane" hidden>
+    <div class="subtabs">
+      <div class="seg" id="sub-personas" role="group" aria-label="Personas view"></div>
+      <div class="seg" id="psweep" role="group" aria-label="Sweep" hidden>
+        <button aria-pressed="true" data-s="model">Who are you? · the model</button>
+        <button aria-pressed="false" data-s="user">Who am I? · the user</button>
+      </div>
+    </div>
+  <section id="v-overview" hidden>
+    <div class="ov-controls">
+      <select id="ovprompt" aria-label="Prompt">
+        <option value="">both prompts</option>
+        <option value="0">Who are you?</option>
+        <option value="1">Tell me a short story.</option>
+      </select>
+      <select id="ovpush" aria-label="Push direction">
+        <option value="">both directions</option>
+        <option value="up">push up (+)</option>
+        <option value="down">push down (−)</option>
+      </select>
+      <span class="spacer"></span>
+      <button class="chip" id="ovtable" type="button" aria-pressed="false">Table view</button>
+    </div>
+    <p class="muted" id="ovempty" hidden>No sweep for this model yet</p>
+    <div id="ovbody"></div>
+  </section>
 
   <section id="v-pushes" hidden>
     <div class="filters">
@@ -216,21 +444,114 @@ textarea.sql { width: 100%; min-height: 110px; font: 13px var(--mono); border: 1
     <div class="grid-cards" id="pushgrid"></div>
   </section>
 
+  <section id="v-personas" hidden>
+    <p class="muted" id="pempty" hidden>No persona library for this model yet</p>
+    <div class="filters" id="pfilters">
+      <input id="psearch" type="search" autocomplete="off" placeholder="Search personas, changes, replies…" aria-label="Search personas" style="flex:1 1 260px">
+      <div class="seg" id="pkinds" role="group" aria-label="Kind of reply">
+        <button aria-pressed="true" data-k="persona">persona</button>
+        <button aria-pressed="false" data-k="altered_assistant">altered assistant</button>
+        <button aria-pressed="false" data-k="other">other</button>
+      </div>
+      <select id="pprompt" aria-label="Prompt">
+        <option value="">both prompts</option>
+        <option value="0">Who are you?</option>
+        <option value="1">Tell me a short story.</option>
+      </select>
+      <select id="pdose" aria-label="Dose">
+        <option value="">either dose</option>
+        <option value="up">up (+)</option>
+        <option value="down">down (−)</option>
+      </select>
+      <label class="muted">layer <input id="plmin" type="number" min="0" step="1" placeholder="min" aria-label="Minimum layer" style="width:5.5em"> – <input id="plmax" type="number" min="0" step="1" placeholder="max" aria-label="Maximum layer" style="width:5.5em"></label>
+      <label class="muted"><input type="checkbox" id="pone" checked> one per name</label>
+      <select id="ppsort" aria-label="Sort">
+        <option value="neurons">most neurons</option>
+        <option value="layer">by layer</option>
+        <option value="shuffle">shuffle</option>
+      </select>
+      <button class="btn" id="pcsv">Download CSV</button>
+    </div>
+    <div class="status" id="ppcount"></div>
+    <div class="filters" id="pgroups" hidden></div>
+    <div class="pgrid" id="pgrid"></div>
+    <div id="pmorow" style="margin-top:12px"><button class="btn" id="pmore" hidden>Show more</button></div>
+  </section>
+  </section>
+
+  <section id="p-play" class="tabpane" hidden>
+    <div class="subtabs">
+      <div class="seg" id="sub-play" role="group" aria-label="Play view"></div>
+    </div>
   <section id="v-mix" hidden>
     <div class="card">
       <div><h2>Mix neurons</h2><p class="muted">Open a neuron and press <b>Add to mix</b>, then tune its dose. The recipe uses the <a href="https://neuronary.org" target="_blank" rel="noopener">neuronary</a> format.</p></div>
       <div class="filters" id="mixterms"></div>
-      <div class="filters">
-        <span class="pill" id="mixstr" style="font-family: var(--mono)">L0N0+0.5</span>
-        <button class="btn" id="mixcopy">Copy</button>
-        <a class="btn" id="mixlink" href="https://neuronary.org/" target="_blank" rel="noopener">open on neuronary</a>
+      <div class="filters" id="mixstarters" hidden></div>
+
+      <div id="mixlive" hidden>
+        <div class="mixprompt"><textarea id="mixprompt" rows="2" placeholder="Ask the model something…"></textarea></div>
+        <div class="filters" id="mixchips">
+          <button class="chip" type="button" data-prompt="Who are you?">Who are you?</button>
+          <button class="chip" type="button" data-prompt="Who am I?">Who am I?</button>
+          <button class="chip" type="button" data-prompt="Tell me a short story.">Tell me a short story.</button>
+        </div>
+        <div class="filters">
+          <label class="muted">Dose scale <input id="mixscale" type="range" min="0" max="2" step="0.05" value="1"> <output id="mixscaleval">1.00×</output></label>
+          <button class="btn primary" id="mixrun" type="button">Run live</button>
+          <span class="pill" id="mixlivebeta" hidden>beta</span>
+          <span class="status" id="mixlivestatus"></span>
+        </div>
+        <p class="muted" id="mixlivenote">Runs in your browser; first run downloads the model (cached)</p>
+        <p class="muted" id="mixbetanote" hidden></p>
       </div>
-      <p class="muted">Generation runs in <code>app.py</code> / the molab notebook — this static page has no model.</p>
+
+      <p class="muted" id="mixhint">This model is too big to run in your browser; below is what each neuron does on its own. Live mixing works for SmolLM2.</p>
+
+      <div class="filters" id="mixrecipe">
+        <span class="pill" id="mixstr" style="font-family: var(--mono)">—</span>
+        <button class="btn" id="mixcopy">Copy recipe</button>
+        <a class="btn" id="mixlink" href="https://neuronary.org/" target="_blank" rel="noopener">open on neuronary</a>
+        <div id="mixrepro"></div>
+      </div>
     </div>
-    <h3 style="margin:18px 0 8px">Recipe runs</h3>
+
+    <div class="card" id="mixliveout" hidden>
+      <div class="compare">
+        <div class="bubble"><span class="who">normal</span><div id="mixnormal">Waiting to run…</div></div>
+        <div class="bubble plus"><span class="who">mixed</span><div id="mixpushed">Waiting to run…</div></div>
+      </div>
+    </div>
+
+    <div id="mixevidence" hidden></div>
+    <p class="muted" id="mixloadnote" hidden></p>
     <div id="mixruns"></div>
   </section>
 
+  <section id="v-guess" hidden>
+    <div class="game">
+      <div class="score"><span id="gscore">score 0 / 0</span><span id="gstreak">streak 0</span><span class="muted" id="gmodel"></span></div>
+      <p class="muted">Here is where a neuron fires hardest (the boxed token is its peak). Which label did the labeler give it?</p>
+      <div id="gex"></div>
+      <div class="choices" id="gchoices"></div>
+      <div><button class="btn" id="gnext">Next neuron</button> <button class="btn" id="gopen" hidden>Open in map</button></div>
+    </div>
+  </section>
+
+  <section id="v-become" hidden>
+    <div class="card">
+      <div><h2>Become…</h2><p class="muted">Type a word. These neurons write it, by the Jacobian lens (what a neuron's output is disposed to make the model say). Push one and ask the model who it is.</p></div>
+      <div class="filters"><input id="becomeq" type="search" autocomplete="off" placeholder="cat, ocean, ghost, moon, king…" aria-label="Word to become" style="flex:1 1 260px"></div>
+      <div class="filters" id="becomechips" role="group" aria-label="Example words"></div>
+      <div id="becomeout"></div>
+    </div>
+  </section>
+  </section>
+
+  <section id="p-data" class="tabpane" hidden>
+    <div class="subtabs">
+      <div class="seg" id="sub-data" role="group" aria-label="Data view"></div>
+    </div>
   <section id="v-board" hidden>
     <div class="filters"><input id="bq" placeholder="filter labels" aria-label="Filter labels"><span class="status" id="bcount"></span></div>
     <div class="tablewrap"><table><thead><tr id="bhead"></tr></thead><tbody id="bbody"></tbody></table></div>
@@ -246,16 +567,6 @@ textarea.sql { width: 100%; min-height: 110px; font: 13px var(--mono); border: 1
     <div class="compare" id="cout"></div>
   </section>
 
-  <section id="v-guess" hidden>
-    <div class="game">
-      <div class="score"><span id="gscore">score 0 / 0</span><span id="gstreak">streak 0</span><span class="muted" id="gmodel"></span></div>
-      <p class="muted">Here is where a neuron fires hardest (the boxed token is its peak). Which label did the labeler give it?</p>
-      <div id="gex"></div>
-      <div class="choices" id="gchoices"></div>
-      <div><button class="btn" id="gnext">Next neuron</button> <button class="btn" id="gopen" hidden>Open in map</button></div>
-    </div>
-  </section>
-
   <section id="v-sql" hidden>
     <p class="muted">DuckDB-WASM over the current model's parquet files. Tables: <code>neurons</code>, <code>labels</code>, <code>steer</code>, <code>tokens</code>, <code>examples</code> (all layers).</p>
     <div class="filters" id="sqlx"></div>
@@ -263,21 +574,120 @@ textarea.sql { width: 100%; min-height: 110px; font: 13px var(--mono); border: 1
 from labels l join neurons n using (layer, neuron)
 order by detect desc nulls last, confidence desc limit 25</textarea>
     <div class="filters"><button class="btn primary" id="sqlrun">Run query</button><span class="status" id="sqlstat"></span></div>
-    <div class="tablewrap"><table id="sqlout"></table></div>
+        <div class="tablewrap"><table id="sqlout"></table></div>
+  </section>
   </section>
 
-  <p class="foot" id="foot">Each point is one MLP neuron, placed by its output direction (UMAP of the down-projection column), so neurons that write similar things sit together. <b>Fires on</b>: the corpus documents with the highest activation, stained by activation per token. <b>Promotes</b>: the logit lens of the neuron's output direction. <b>Pushes</b>: replies with the neuron's activation raised or lowered at every token, by a dose in units of the median residual-stream norm. Labels and the held-out check come from an LLM labeler, so treat them as hypotheses.</p>
+  <p class="foot" id="foot">
+Each point is one MLP neuron, placed by its output direction (UMAP of the down-projection column), so neurons that write similar things sit together. <b>Fires on</b>: the corpus documents with the highest activation, stained by activation per token. <b>Promotes</b>: the logit lens of the neuron's output direction. <b>Says</b>: the output direction read through a Jacobian lens (J-lens, Anthropic 2026) or its LRP variant (R-lens), which carry it to the last layers before decoding; lenses for Qwen3.5-4B from camilablank/workspace-lenses. <b>Pushes</b>: replies with the neuron's activation raised or lowered at every token, by a dose in units of the median residual-stream norm. Labels and the held-out check come from an LLM labeler, so treat them as hypotheses.</p>
 </div>
 
 <script type="module">
-import { parquetReadObjects, parquetMetadataAsync, asyncBufferFromUrl } from "https://cdn.jsdelivr.net/npm/hyparquet@1.31.2/+esm";
+import { parquetRead, parquetReadObjects, parquetMetadataAsync, asyncBufferFromUrl } from "https://cdn.jsdelivr.net/npm/hyparquet@1.31.2/+esm";
 import { compressors } from "https://cdn.jsdelivr.net/npm/hyparquet-compressors@1.1.1/+esm";
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const mdHTML = s => esc(s).replace(/\*\*(?!\*)([\s\S]+?)\*\*/g, "<b>$1</b>").replace(/\*([^*\n]+?)\*/g, "<i>$1</i>");
+const stripMd = s => String(s ?? "").replace(/\*\*(?!\*)([\s\S]+?)\*\*/g, "$1").replace(/\*([^*\n]+?)\*/g, "$1");
 const showTok = s => esc(s).replace(/\n/g, "↵").replace(/\t/g, "⇥").replace(/\ufffd+/g, "·") || "∅";
 const fmt = (v, d = 2) => v == null || Number.isNaN(v) ? "–" : Math.abs(v) >= 100 ? v.toFixed(0) : v.toFixed(d);
+const fmtBytes = b => !b ? "" : b >= 1e9 ? `~${(b / 1e9).toFixed(1)} GB` : `~${Math.round(b / 1e6)} MB`;
 const store = { get(k) { try { return localStorage.getItem(k) } catch { return null } }, set(k, v) { try { localStorage.setItem(k, v) } catch {} } };
+
+/* ---------- reproduce / share helpers ---------- */
+const TOOLS_URL = "https://github.com/nikhil-vytla/hatch/tree/main/neuron-atlas/tools";
+const MOLAB_URL = "https://molab.marimo.io/github/nikhil-vytla/hatch/blob/main/neuron-atlas/tools/play.py";
+const shellQuote = s => '"' + String(s).replace(/(["\\$`])/g, "\\$1") + '"';
+function pythonCommand(model, recipe, prompt) {
+  return `# ${TOOLS_URL}  (pip install torch transformers)\npython push.py --model ${model} --recipe ${shellQuote(recipe)} --prompt ${shellQuote(prompt)}`;
+}
+function programJSON(name, model, recipe) {
+  const { terms } = recipeAddTerms(recipe);
+  return JSON.stringify({
+    name: name || "recipe",
+    model,
+    terms: terms.map(t => ({ layer: t.layer, neuron: t.neuron, op: "add", value: t.dose, unit: "resid", when: "all" })),
+  }, null, 2);
+}
+function reproDetailsHTML(o) {
+  const live = o.livePrompt ? ` data-live-prompt="${esc(o.livePrompt)}"` : "";
+  return `<details class="repro" data-name="${esc(o.name || "recipe")}" data-model="${esc(o.model || "")}" data-recipe="${esc(o.recipe || "")}" data-prompt="${esc(o.prompt || "Who are you?")}"${live}>
+    <summary class="btn" title="Copy Python or JSON, or open this push in molab">Reproduce</summary>
+    <div class="repro-menu">
+      <button type="button" data-repro="py">Copy Python</button>
+      <button type="button" data-repro="json">Copy JSON</button>
+      <button type="button" data-repro="molab">Open in molab</button>
+    </div>
+  </details>`;
+}
+async function copyText(text) {
+  try { await navigator.clipboard.writeText(text); return true; } catch { return false; }
+}
+let noticeTimer = 0;
+function showNotice(text, err) {
+  let el = document.getElementById("atlas-notice");
+  if (!el) {
+    el = document.createElement("div"); el.id = "atlas-notice"; el.className = "notice"; el.setAttribute("role", "status");
+    document.body.appendChild(el);
+  }
+  el.textContent = text; el.classList.toggle("err", !!err); el.hidden = false;
+  clearTimeout(noticeTimer);
+  noticeTimer = setTimeout(() => { el.hidden = true; }, 2800);
+}
+document.addEventListener("click", async e => {
+  const b = e.target.closest("button[data-repro]");
+  if (!b) return;
+  const d = b.closest("details.repro"); if (!d) return;
+  e.preventDefault();
+  const action = b.dataset.repro;
+  const model = d.dataset.model, name = d.dataset.name || "recipe", recipe = d.dataset.recipe || "";
+  const prompt = d.dataset.livePrompt === "mix" ? ($("mixprompt")?.value.trim() || "Who are you?") : (d.dataset.prompt || "Who are you?");
+  if (action === "molab") {
+    const q = `model=${encodeURIComponent(model)}&recipe=${encodeURIComponent(recipe)}&prompt=${encodeURIComponent(prompt)}`;
+    window.open(`${MOLAB_URL}?${q}`, "_blank", "noopener");
+    d.open = false;
+    return;
+  }
+  const text = action === "py" ? pythonCommand(model, recipe, prompt) : programJSON(name, model, recipe);
+  const ok = await copyText(text);
+  const old = b.textContent;
+  b.textContent = ok ? "Copied" : "Copy failed";
+  setTimeout(() => { b.textContent = old; }, 1200);
+});
+document.addEventListener("click", e => {
+  const b = e.target.closest(".dosestrip button[data-dose]");
+  if (!b) return;
+  const strip = b.closest(".dosestrip"); if (!strip) return;
+  strip.querySelectorAll(".dosebtns button").forEach(x => x.setAttribute("aria-pressed", x === b));
+  strip.querySelectorAll(".doseitem").forEach(x => { x.hidden = x.dataset.dose !== b.dataset.dose; });
+});
+document.addEventListener("click", e => {
+  document.querySelectorAll("details.repro[open]").forEach(d => { if (!d.contains(e.target)) d.open = false; });
+});
+
+const THEME_KEY = "atlas-theme";
+const themeMQ = matchMedia("(prefers-color-scheme: dark)");
+const themeBtn = $("theme");
+const storedTheme = store.get(THEME_KEY);
+let themeMode = ["light", "dark", "system"].includes(storedTheme) ? storedTheme : "system";
+function themeNext(mode) { return mode === "light" ? "dark" : mode === "dark" ? "system" : "light"; }
+function applyTheme(mode, persist = true) {
+  themeMode = mode;
+  if (persist) store.set(THEME_KEY, mode);
+  if (mode === "system") delete document.documentElement.dataset.theme;
+  else document.documentElement.dataset.theme = mode;
+  const resolved = mode === "system" ? (themeMQ.matches ? "dark" : "light") : mode;
+  themeBtn.dataset.mode = mode;
+  themeBtn.dataset.resolved = resolved;
+  const next = themeNext(mode);
+  const label = `Theme: ${mode}${mode === "system" ? ` (${resolved})` : ""}. Switch to ${next}`;
+  themeBtn.setAttribute("aria-label", label);
+  themeBtn.title = label;
+}
+applyTheme(themeMode, false);
+themeBtn.onclick = () => applyTheme(themeNext(themeMode));
+themeMQ.addEventListener?.("change", () => { if (themeMode === "system") applyTheme("system", false); });
 
 function dataBase() {
   let b = null;
@@ -308,11 +718,15 @@ async function readPq(url, columns) {
   const file = await fetchBuf(url);
   return parquetReadObjects({ file, columns, compressors });
 }
+async function readPqColumns(url, columns, onChunk) {
+  const file = await fetchBuf(url);
+  return parquetRead({ file, columns, onChunk, compressors });
+}
 async function tryPq(url, columns) { try { return await readPq(url, columns) } catch { return null } }
 const PQ_SOURCES = new Map(); // url -> Promise<{ file: AsyncBuffer, metadata }>
 function pqSource(url) {
   if (!PQ_SOURCES.has(url)) {
-    const p = asyncBufferFromUrl({ url }).then(async file => ({ file, metadata: await parquetMetadataAsync(file) }));
+    const p = asyncBufferFromUrl({ url }).then(async file => ({ file, metadata: await parquetMetadataAsync(file, { initialFetchSize: 1 << 16 }) }));
     PQ_SOURCES.set(url, p);
   }
   return PQ_SOURCES.get(url);
@@ -346,8 +760,117 @@ async function readNeuronRows(url, neuron) {
   return rows.filter(r => Number(r.neuron) === neuron);
 }
 
+let saysLens = "j";
+const SAYS_FIELDS = { j: ["j_up", "j_down"], r: ["r_up", "r_down"], logit: ["logit_up", "logit_down"] };
+function writesHTML(row) {
+  return `<div><h3>Writes (logit lens)</h3><div class="lens">${row.lens_up.slice(0, 10).map(t => `<span class="tok up">${showTok(t)}</span>`).join("")}</div>
+      <div class="lens" style="margin-top:4px">${row.lens_down.slice(0, 10).map(t => `<span class="tok down">${showTok(t)}</span>`).join("")}</div></div>`;
+}
+function saysRowsHTML(row) {
+  const [uk, dk] = SAYS_FIELDS[saysLens] || SAYS_FIELDS.j;
+  const toks = (list, cls) => (list || []).slice(0, 10).map(t => `<span class="tok ${cls}">${showTok(t)}</span>`).join("");
+  return `<div class="lens"><span class="lbl">push up →</span>${toks(row[uk], "up")}</div>
+      <div class="lens" style="margin-top:4px"><span class="lbl">push down →</span>${toks(row[dk], "down")}</div>`;
+}
+function saysboxHTML(M, row) {
+  if (!M.info.jlens) return writesHTML(row);
+  const btn = (k, label) => `<button type="button" data-lens="${k}" aria-pressed="${saysLens === k}">${label}</button>`;
+  return `<div id="saysbox"><h3>Says</h3>
+      <div class="seg" id="saysseg" role="group" aria-label="Says lens" style="margin-bottom:6px">${btn("j", "J-lens")}${btn("r", "R-lens")}${btn("logit", "logit lens")}</div>
+      <div id="saysout"><div class="skel line" aria-hidden="true"></div><div class="skel line short" aria-hidden="true"></div></div>
+      <p class="muted">What the neuron's output direction is disposed to make the model say: the J-lens carries it to the last layers with the model's average Jacobian before reading it as tokens; the logit lens reads it directly and is unreliable before the late layers.</p></div>`;
+}
+const SAYS_LENS_LABEL = { j: "J-lens", r: "R-lens", logit: "logit lens" };
+function saysTokenSets(row) {
+  const [uk, dk] = SAYS_FIELDS[saysLens] || SAYS_FIELDS.j;
+  const norm = list => (list || []).map(t => String(t).trim().toLowerCase()).filter(t => /^\p{L}{3,}$/u.test(t));
+  return { up: norm(row?.[uk]), down: norm(row?.[dk]) };
+}
+function markSaysText(node, tokens) {
+  const text = node.nodeValue || "";
+  if (!tokens.length || !text) return false;
+  const re = /[\p{L}\p{M}]+(?:['’][\p{L}\p{M}]+)*/gu;
+  let m, last = 0, hit = false, frag = null;
+  while ((m = re.exec(text))) {
+    const word = m[0];
+    if (!tokens.some(t => word.toLowerCase().startsWith(t))) continue;
+    if (!frag) frag = document.createDocumentFragment();
+    if (m.index > last) frag.append(text.slice(last, m.index));
+    const mark = document.createElement("mark");
+    mark.className = "says-hit";
+    mark.textContent = word;
+    frag.append(mark);
+    last = m.index + word.length;
+    hit = true;
+  }
+  if (!hit) return false;
+  if (last < text.length) frag.append(text.slice(last));
+  node.replaceWith(frag);
+  return true;
+}
+function markSaysElement(el, tokens) {
+  if (!tokens.length) return false;
+  const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, {
+    acceptNode(n) {
+      if (!n.nodeValue?.trim()) return NodeFilter.FILTER_REJECT;
+      if (n.parentElement?.closest(".who, .pmeta")) return NodeFilter.FILTER_REJECT;
+      return NodeFilter.FILTER_ACCEPT;
+    }
+  });
+  const nodes = [];
+  while (walker.nextNode()) nodes.push(walker.currentNode);
+  let hit = false;
+  nodes.forEach(n => { if (markSaysText(n, tokens)) hit = true; });
+  return hit;
+}
+function applySaysHighlights(row) {
+  const panel = $("panel"); if (!panel) return;
+  panel.querySelectorAll("mark.says-hit").forEach(m => m.replaceWith(...m.childNodes));
+  const tokens = saysTokenSets(row);
+  let hits = false;
+  panel.querySelectorAll("[data-says-dose]").forEach(el => {
+    const dose = Number(el.dataset.saysDose);
+    if (!Number.isFinite(dose) || dose === 0) return;
+    if (markSaysElement(el, dose > 0 ? tokens.up : tokens.down)) hits = true;
+  });
+  const box = $("sweepbox");
+  if (!box) return;
+  let legend = box.querySelector(".says-legend");
+  if (!hits) { if (legend) legend.remove(); return; }
+  if (!legend) {
+    legend = document.createElement("p");
+    legend.className = "muted says-legend";
+    const h3 = box.querySelector("h3");
+    if (h3) h3.insertAdjacentElement("afterend", legend); else box.prepend(legend);
+  }
+  legend.textContent = `Highlighted: words the neuron's ${SAYS_LENS_LABEL[saysLens] || saysLens} readout says, in the matching push direction.`;
+}
+
 /* ---------- state ---------- */
-const S = { models: [], M: null, cache: new Map(), tab: "map", qmode: "label", isolate: -1, colorby: "layer", sel: -1 };
+const S = { models: [], M: null, cache: new Map(), tab: "map", qmode: "label", isolate: -1, colorby: "layer", sel: -1, sweep: "model" };
+const SWEEP_KINDS = {
+  model: [["persona", "persona", true], ["altered_assistant", "altered assistant", false], ["other", "other", false]],
+  user: [["user_identity", "user identity", true], ["model_persona", "model persona", true], ["altered_assistant", "altered assistant", false], ["other", "other", false]],
+};
+function renderKindChips() {
+  const kinds = SWEEP_KINDS[S.sweep] || SWEEP_KINDS.model;
+  $("pkinds").innerHTML = kinds.map(([k, label, on]) => `<button aria-pressed="${on}" data-k="${k}">${label}</button>`).join("");
+}
+function updateSweepUI() {
+  const hasUser = !!S.M?.info.user_sweep, user = S.sweep === "user";
+  ["psweep"].forEach(id => {
+    const el = $(id); if (!el) return;
+    el.hidden = !hasUser;
+    [...el.children].forEach(b => b.setAttribute("aria-pressed", b.dataset.s === S.sweep));
+  });
+  $("pprompt").hidden = user;
+  $("ovprompt").hidden = user;
+}
+function setSweep(sweep, resetKinds = true) {
+  S.sweep = sweep === "user" && S.M?.info.user_sweep ? "user" : "model";
+  updateSweepUI();
+  if (resetKinds) renderKindChips();
+}
 
 async function loadModel(id) {
   if (S.cache.has(id)) return S.cache.get(id);
@@ -355,21 +878,37 @@ async function loadModel(id) {
   const dir = BASE + info.slug + "/";
   // sharded: map.parquet has every neuron's position; full rows come per layer (neurons/Lxx.parquet) on demand.
   // steer_sharded: pushes come per layer (steer/Lxx.parquet) on demand; only the baselines load up front.
-  const [rows, labels, steer, uptake, recipes, baseline] = await Promise.all([
-    readPq(dir + (info.sharded ? "map.parquet" : "neurons.parquet")),
+  const N = info.n_neurons, d = info.d_mlp;
+  const M = { info, dir, N, d, rows: new Array(N), layerP: new Map(), steerP: new Map(), sweepP: new Map(), x: new Float32Array(N), y: new Float32Array(N), layer: new Int16Array(N), z: new Float32Array(N),
+    lab: new Map(), steer: new Map(), up: new Map(), base: [], ex: new Map(), exN: new Map(), toks: null, recipes: [], sweepBase: null, sweepPrompts: null, saysP: new Map(), lensGuidedP: null };
+  const metaP = Promise.all([
     tryPq(dir + "labels.parquet"), info.steer_sharded ? null : tryPq(dir + "steer.parquet"),
     tryPq(dir + "uptake.parquet"), tryPq(dir + "recipes.parquet"),
     info.steer_sharded ? tryPq(dir + "steer/baseline.parquet") : null]);
-  const N = info.n_neurons, d = info.d_mlp;
-  const M = { info, dir, N, d, rows: new Array(N), layerP: new Map(), steerP: new Map(), x: new Float32Array(N), y: new Float32Array(N), layer: new Int16Array(N), z: new Float32Array(N),
-    lab: new Map(), steer: new Map(), up: new Map(), base: [], ex: new Map(), exN: new Map(), toks: null, recipes: recipes || [] };
-  const q = rows[0]?.qx != null;
-  rows.forEach((r, i) => {
-    const k = q ? i : r.layer * d + r.neuron;
-    M.x[k] = q ? r.qx / 65535 : r.x; M.y[k] = q ? r.qy / 65535 : r.y;
-    M.layer[k] = q ? Math.floor(i / d) : r.layer; M.z[k] = q ? r.qz / 10 : r.zmax;
-    if (!info.sharded) M.rows[k] = r;
-  });
+  let rows = null, q = false;
+  if (info.sharded) {
+    let qx = false;
+    try {
+      await readPqColumns(dir + "map.parquet", ["qx", "qy", "qz"], ({ columnName, columnData, rowStart }) => {
+        if (columnName === "qx") { qx = true; for (let j = 0; j < columnData.length; j++) M.x[rowStart + j] = columnData[j] / 65535; }
+        else if (columnName === "qy") for (let j = 0; j < columnData.length; j++) M.y[rowStart + j] = columnData[j] / 65535;
+        else if (columnName === "qz") for (let j = 0; j < columnData.length; j++) M.z[rowStart + j] = columnData[j] / 10;
+      });
+    } catch { qx = false; }
+    if (qx) { q = true; for (let i = 0; i < N; i++) M.layer[i] = Math.floor(i / d); }
+    else rows = await readPq(dir + "map.parquet");
+  } else rows = await readPq(dir + "neurons.parquet");
+  if (rows) {
+    q = rows[0]?.qx != null;
+    rows.forEach((r, i) => {
+      const k = q ? i : r.layer * d + r.neuron;
+      M.x[k] = q ? r.qx / 65535 : r.x; M.y[k] = q ? r.qy / 65535 : r.y;
+      M.layer[k] = q ? Math.floor(i / d) : r.layer; M.z[k] = q ? r.qz / 10 : r.zmax;
+      if (!info.sharded) M.rows[k] = r;
+    });
+  }
+  const [labels, steer, uptake, recipes, baseline] = await metaP;
+  M.recipes = recipes || [];
   if (!info.sharded) for (let L = 0; L < info.n_layers; L++) M.layerP.set(L, Promise.resolve());
   (labels || []).forEach(l => M.lab.set(l.layer * d + l.neuron, l));
   (uptake || []).forEach(u => M.up.set(u.layer * d + u.neuron, u));
@@ -395,6 +934,32 @@ async function layerSteer(M, L) {
     M.steerP.delete(L); throw e;
   });
   M.steerP.set(L, p);
+  return p;
+}
+function sweepBaselines(M) {
+  if (!M.sweepBase) M.sweepBase = tryPq(M.dir + "sweepcard/baseline.parquet").then(rows => {
+    const base = []; (rows || []).forEach(r => { base[Number(r.prompt)] = r.text; }); return base;
+  }).catch(() => []);
+  return M.sweepBase;
+}
+function sweepPrompts(M) {
+  if (!M.sweepPrompts) M.sweepPrompts = fetch(M.dir + "sweepcard/prompts.json")
+    .then(r => r.ok ? r.json() : [])
+    .then(list => { M.sweepPromptList = Array.isArray(list) ? list : []; return M.sweepPromptList; })
+    .catch(() => []);
+  return M.sweepPrompts;
+}
+function neuronSweep(M, L, n) {
+  const key = `${L}:${n}`;
+  if (M.sweepP.has(key)) return M.sweepP.get(key);
+  const p = Promise.all([
+    readNeuronRows(M.dir + `sweepcard/L${String(L).padStart(2, "0")}.parquet`, n),
+    sweepBaselines(M), sweepPrompts(M),
+  ]).then(([rows, base, prompts]) => ({ rows, base, prompts })).catch(e => {
+    if (String(e?.message || e).includes("404")) return { rows: [], base: [], prompts: [] };
+    M.sweepP.delete(key); throw e;
+  });
+  M.sweepP.set(key, p);
   return p;
 }
 function ensureLayer(M, L) {
@@ -472,7 +1037,7 @@ function renderPoints() {
   octx.globalAlpha = 1;
 }
 function draw() {
-  const M = S.M, W = cv.width, H = cv.height; ctx.clearRect(0, 0, W, H); if (!M) return;
+  const M = S.M, W = cv.width, H = cv.height; ctx.clearRect(0, 0, W, H); if (!M || !W || !H || !off.width || !off.height) return;
   const dpr = devicePixelRatio || 1, dim = S.isolate >= 0 || hits;
   ctx.drawImage(off, 0, 0);
   if (hits) { ctx.fillStyle = "#fff"; for (const k of hits) { const [sx, sy] = toScreen(M.x[k], M.y[k]); ctx.beginPath(); ctx.arc(sx, sy, 3.2 * dpr, 0, 7); ctx.fill(); } }
@@ -560,30 +1125,109 @@ function neighbors(M, k, n = 8) {
   return out.map(o => [o[0], null]);
 }
 function keyName(M, k) { const L = Math.floor(k / M.d); return `L${L} · N${k - L * M.d}`; }
+function sweepDoseLabel(d) {
+  const v = Number(d);
+  if (!Number.isFinite(v)) return "";
+  return (v < 0 ? "−" : "+") + String(Math.round(Math.abs(v) * 100) / 100);
+}
+function sweepBubbleHTML(r, variant, fallback) {
+  if (!r) return `<div class="bubble ${variant}"><span class="who">${fallback}</span></div>`;
+  const label = r.reply_kind ? PERSONA_KIND_LABEL[r.reply_kind] || r.reply_kind : "";
+  const dose = Number(r.dose);
+  const doseAttr = Number.isFinite(dose) && dose !== 0 ? ` data-says-dose="${dose}"` : "";
+  return `<div class="bubble ${variant}"${doseAttr}><div class="pmeta"><span class="sweepdose">${sweepDoseLabel(r.dose)}</span>${label ? `<span class="pill eo">${esc(label)}</span>` : ""}${r.who ? `<b>${esc(r.who)}</b>` : ""}</div>${mdHTML(r.text ?? "")}</div>`;
+}
+function sweepHintHTML() {
+  if (!S.M?.info.sweep_cards) return "";
+  return `<p class="muted sweephint">Every neuron of this model was pushed at ±0.8; <a href="#overview" data-goto-overview>see Personas</a> for what that does across the model.</p>`;
+}
+function doseStripLabel(d) {
+  const v = Number(d), a = Math.abs(v);
+  return (v < 0 ? "−" : "+") + (Number.isInteger(a) ? a.toFixed(1) : String(Math.round(a * 100) / 100));
+}
+function oldPushesByDose(M, k, pi) {
+  const out = new Map();
+  (M?.steer.get(k) || []).forEach(s => {
+    if (Number(s.prompt) !== pi) return;
+    const d = Number(s.dose);
+    if (Number.isFinite(d) && !out.has(d)) out.set(d, s);
+  });
+  return out;
+}
+function doseStripHTML(M, k, pi, rs, base, prompts) {
+  const byDose = new Map();
+  oldPushesByDose(M, k, pi).forEach((s, d) => byDose.set(d, s));
+  rs.forEach(r => byDose.set(Number(r.dose), r));
+  const doses = [...byDose.keys()].filter(d => Number.isFinite(d) && d !== 0).sort((a, b) => a - b);
+  const pick = doses.includes(0.8) ? 0.8 : doses.filter(d => d > 0).sort((a, b) => b - a)[0];
+  const def = pick != null ? String(pick) : doses.length ? String(doses[0]) : "normal";
+  const btn = d => `<button type="button" class="${d < 0 ? "neg" : "pos"}" data-dose="${d}" aria-pressed="${String(d) === def}">${doseStripLabel(d)}</button>`;
+  const neg = doses.filter(d => d < 0), pos = doses.filter(d => d > 0);
+  const sep = `<span class="dosesep" aria-hidden="true">·</span>`;
+  const bubbles = doses.map(d => `<div class="doseitem" data-dose="${d}"${String(d) === def ? "" : " hidden"}>${sweepBubbleHTML(byDose.get(d), d > 0 ? "plus" : "minus", doseStripLabel(d))}</div>`).join("");
+  const normal = `<div class="doseitem" data-dose="normal"${def === "normal" ? "" : " hidden"}><div class="bubble"><span class="who">normal</span>${mdHTML(base?.[pi] ?? "")}</div></div>`;
+  return `<div class="dosestrip">
+    <div class="dosebtns" role="group" aria-label="dose">${neg.map(btn).join("")}${neg.length ? sep : ""}<button type="button" data-dose="normal" aria-pressed="${def === "normal"}">normal</button>${pos.length ? sep : ""}${pos.map(btn).join("")}</div>
+    <div class="dosebubbles">${normal}${bubbles}</div>
+  </div>`;
+}
+function sweepCardHTML(data, M, k) {
+  const { rows, base, prompts } = data;
+  if (!rows?.length) return sweepHintHTML() + `<h3>What pushing it does</h3><p class="muted">No sweep replies for this neuron.</p>`;
+  const by = new Map();
+  rows.forEach(r => { const pi = Number(r.prompt); if (!by.has(pi)) by.set(pi, []); by.get(pi).push(r); });
+  return sweepHintHTML() + `<h3>What pushing it does</h3>` + [...by.keys()].sort((a, b) => a - b).map(pi => {
+    const rs = by.get(pi);
+    const minus = rs.filter(r => Number(r.dose) < 0).sort((a, b) => Number(a.dose) - Number(b.dose))[0];
+    const plus = rs.filter(r => Number(r.dose) > 0).sort((a, b) => Number(b.dose) - Number(a.dose))[0];
+    const flagged = rs.some(r => ["persona", "user_identity", "model_persona"].includes(r.reply_kind));
+    const sweepDoses = new Set(rs.map(r => Number(r.dose)));
+    const strip = [...oldPushesByDose(M, k, pi).keys()].some(d => !sweepDoses.has(d));
+    const body = strip ? doseStripHTML(M, k, pi, rs, base, prompts) : `<div class="compare">
+        ${sweepBubbleHTML(minus, "minus", "−0.8")}
+        <div class="bubble"><span class="who">normal</span>${mdHTML(base?.[pi] ?? "")}</div>
+        ${sweepBubbleHTML(plus, "plus", "+0.8")}
+      </div>`;
+    return `<div class="sweeprow${flagged ? " flagged" : ""}">
+      <p class="prompt">“${esc(prompts?.[pi] ?? "")}”</p>
+      ${body}</div>`;
+  }).join("");
+}
 function pushCardHTML(M, k, st) {
   const up = M.up.get(k);
   const upPill = up && up.up_n ? `<div style="margin-bottom:8px"><span class="pill ${up.uptake >= .25 ? "good" : ""}" title="the chance is the same replies checked against other pushed neurons' lens words">writes its own lens words in ${up.up_hits}/${up.up_n} pushed replies (chance ${Math.round(100 * (up.up_null || 0))}%)</span></div>` : "";
   const prompts = M.info.steer?.prompts || [];
+  if (!st.length && M.info.sweep_cards) return "";
   if (!st.length) return `<p class="muted">Not pushed in this run. The sweep pushes the most peaked neurons of each layer plus random controls; run <code>python -m atlas.steer --all</code> on a GPU to cover every neuron.</p>`;
   return `<div><h3>Pushes</h3>${upPill}` + prompts.map((p, pi) => {
     const rs = st.filter(s => s.prompt === pi).sort((a, b) => a.dose - b.dose); if (!rs.length) return "";
     const minus = rs.filter(s => s.dose < 0).at(0), plus = rs.filter(s => s.dose > 0).at(-1);
+    const minusDose = Number(minus?.dose), plusDose = Number(plus?.dose);
+    const minusAttr = Number.isFinite(minusDose) && minusDose !== 0 ? ` data-says-dose="${minusDose}"` : "";
+    const plusAttr = Number.isFinite(plusDose) && plusDose !== 0 ? ` data-says-dose="${plusDose}"` : "";
     return `<p class="prompt">“${esc(p)}”</p><div class="chat">
-      <div class="bubble minus"><span class="who">push ${minus ? minus.dose : "–"}${minus?.reply_kind ? " · " + (KIND_LABEL[minus.reply_kind] || "") : ""}</span>${esc(minus?.text ?? "")}</div>
-      <div class="bubble"><span class="who">normal</span>${esc(M.base[pi] ?? "")}</div>
-      <div class="bubble plus"><span class="who">push +${plus ? plus.dose : "–"}${plus?.reply_kind ? " · " + (KIND_LABEL[plus.reply_kind] || "") : ""}</span>${esc(plus?.text ?? "")}</div></div>`;
+      <div class="bubble minus"${minusAttr}><span class="who">push ${minus ? minus.dose : "–"}${minus?.reply_kind ? " · " + (KIND_LABEL[minus.reply_kind] || "") : ""}</span>${mdHTML(minus?.text ?? "")}</div>
+      <div class="bubble"><span class="who">normal</span>${mdHTML(M.base[pi] ?? "")}</div>
+      <div class="bubble plus"${plusAttr}><span class="who">push +${plus ? plus.dose : "–"}${plus?.reply_kind ? " · " + (KIND_LABEL[plus.reply_kind] || "") : ""}</span>${mdHTML(plus?.text ?? "")}</div></div>`;
   }).join("") + `</div>`;
 }
 async function openNeuron(k, opts = {}) {
   const M = S.M; S.sel = k; draw();
+  let saysRow = null;
   if (opts.focus) focusOn(k);
   const L = Math.floor(k / M.d), n = k - L * M.d, lb = M.lab.get(k);
+  const rowP = !M.rows[k] && M.info.sharded ? readNeuronRows(M.dir + `neurons/L${String(L).padStart(2, "0")}.parquet`, n) : null;
+  const steerP = M.info.steer_sharded ? layerSteer(M, L) : null;
+  const sweepP = M.info.sweep_cards ? neuronSweep(M, L, n) : null;
+  const exP = neuronExamples(M, L, n);
+  const jlensP = M.info.jlens ? readNeuronRows(M.dir + `jlens/L${String(L).padStart(2, "0")}.parquet`, n) : null;
+  rowP?.catch(() => {}); steerP?.catch(() => {}); sweepP?.catch(() => {}); exP.catch(() => {}); jlensP?.catch(() => {});
   try { history.replaceState(null, "", `#${M.info.id}-L${L}-N${n}`) } catch {}
   const P = $("panel");
   if (!M.rows[k]) {
     if (M.info.sharded) {
       P.innerHTML = `<p class="muted">Loading neuron ${n}…</p>`;
-      const rs = await readNeuronRows(M.dir + `neurons/L${String(L).padStart(2, "0")}.parquet`, n);
+      const rs = await rowP;
       rs.forEach(r => { M.rows[r.layer * M.d + r.neuron] = r; });
       if (S.sel !== k) return;
     } else {
@@ -591,6 +1235,7 @@ async function openNeuron(k, opts = {}) {
     }
   }
   const row = M.rows[k];
+  const sweepHTML = M.info.sweep_cards ? `<div id="sweepbox">${sweepHintHTML()}<h3>What pushing it does</h3><div class="skel line" aria-hidden="true"></div><div class="skel line short" aria-hidden="true"></div></div>` : "";
   const steerHTML = M.info.steer_sharded ? `<div id="pushbox"><p class="muted">Loading pushes…</p></div>` : pushCardHTML(M, k, M.steer.get(k) || []);
   const badges = lb ? [
     `<span class="pill">confidence ${lb.confidence}/5</span>`,
@@ -599,7 +1244,11 @@ async function openNeuron(k, opts = {}) {
   P.innerHTML = `
     <div>
       <div class="idline"><span>${esc(M.info.model)}</span><span>·</span><b>${keyName(M, k)}</b>${badges}</div>
-      <div style="margin-top:8px"><button class="btn" id="addmix" title="Add this neuron to the Mix tab at dose +0.5">Add to mix</button></div>
+      <div class="card-actions" style="margin-top:8px">
+        <button class="btn primary" id="addmix" title="Add this neuron to the Mix tab at dose +0.5">Add to mix</button>
+        ${reproDetailsHTML({ name: `L${L}N${n}`, model: M.info.model, recipe: `L${L}N${n}+${M.info.sweep_cards ? "0.8" : "0.5"}`, prompt: "Who are you?" })}
+        ${M.info.live ? `<button class="btn" id="trylive" title="Add this neuron at +0.5 and run it live in your browser">Try live${M.info.live.beta ? " (beta)" : ""}</button>` : ""}
+      </div>
       <div style="display:flex;gap:12px;align-items:center;margin-top:8px">${lb ? `<span class="emoji">${esc(lb.emoji)}</span>` : ""}
         <h2>${lb ? esc(lb.label) : `Promotes ${row.lens_up.slice(0, 3).map(t => "“" + esc(t.trim() || t) + "”").join(", ")}`}</h2></div>
       ${lb ? `<p class="desc">${esc(lb.description)}</p>${lb.push && lb.push !== "nothing clear" ? `<p class="desc"><b>Push:</b> ${esc(lb.push)}</p>` : ""}` : ""}
@@ -611,12 +1260,17 @@ async function openNeuron(k, opts = {}) {
       <div class="stat"><b>${fmt(row.std, 3)}</b><span>std</span></div>
       <div class="stat"><b>${Math.round(row.frac_pos * 100)}%</b><span>tokens &gt; 0</span></div>
     </div>
-    <div><h3>Writes (logit lens)</h3><div class="lens">${row.lens_up.slice(0, 10).map(t => `<span class="tok up">${showTok(t)}</span>`).join("")}</div>
-      <div class="lens" style="margin-top:4px">${row.lens_down.slice(0, 10).map(t => `<span class="tok down">${showTok(t)}</span>`).join("")}</div></div>
-    <div id="exbox"><h3>Fires on</h3><p class="muted">loading examples…</p></div>
+    ${saysboxHTML(M, row)}
+    <div id="exbox"><h3>Fires on</h3><div class="skel line" aria-hidden="true"></div><div class="skel line short" aria-hidden="true"></div></div>
+    ${sweepHTML}
     ${steerHTML}
     <div><h3>${row.nbrs ? "Writes like (cosine of output directions)" : "Neighbors on the map"}</h3><div class="nbrs" id="nbrs"></div></div>`;
+  if (window.innerWidth < 760) {
+    const behavior = matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth";
+    requestAnimationFrame(() => P.scrollIntoView({ behavior, block: "start" }));
+  }
   $("addmix").onclick = () => addMix(k);
+  if ($("trylive")) $("trylive").onclick = () => tryLiveNeuron(k);
   const nb = neighbors(M, k), nbCos = new Map(nb);
   const nbText = j => { const l = M.lab.get(j), r = M.rows[j];
     return l ? esc(l.emoji + " " + l.label) : r ? r.lens_up.slice(0, 3).map(showTok).join(" ") : "…"; };
@@ -632,13 +1286,44 @@ async function openNeuron(k, opts = {}) {
     b.addEventListener("focus", load);
   });
   nbrs.onclick = e => { const b = e.target.closest("button"); if (b) openNeuron(+b.dataset.k, { focus: true }); };
+  if (M.info.jlens) {
+    const seg = $("saysseg");
+    if (seg) seg.onclick = e => {
+      const b = e.target.closest("button[data-lens]"); if (!b) return;
+      saysLens = b.dataset.lens;
+      [...seg.children].forEach(x => x.setAttribute("aria-pressed", x === b));
+      if (saysRow && $("saysout")) $("saysout").innerHTML = saysRowsHTML(saysRow);
+      applySaysHighlights(saysRow);
+    };
+    const rs = await jlensP.catch(() => null);
+    if (S.sel !== k) return;
+    saysRow = rs?.[0] || null;
+    if (saysRow && seg) {  // models with a fitted J-lens only (no R-lens) hide the lenses they lack
+      [...seg.children].forEach(b => { b.hidden = !saysRow[SAYS_FIELDS[b.dataset.lens][0]]; });
+      if (!saysRow[SAYS_FIELDS[saysLens][0]]) saysLens = "j";
+      [...seg.children].forEach(b => b.setAttribute("aria-pressed", b.dataset.lens === saysLens));
+    }
+    if (saysRow && $("saysout")) $("saysout").innerHTML = saysRowsHTML(saysRow);
+    else { const box = $("saysbox"); if (box) box.outerHTML = writesHTML(row); }
+    applySaysHighlights(saysRow);
+  }
+  if (sweepP) {
+    const sd = await sweepP.catch(() => null);
+    if (M.info.steer_sharded) await steerP.catch(() => {});
+    if (S.sel !== k) return;
+    const box = $("sweepbox");
+    if (box) box.innerHTML = sd ? sweepCardHTML(sd, M, k) : sweepHintHTML() + `<h3>What pushing it does</h3><p class="muted">No sweep replies for this neuron.</p>`;
+    if (M.info.jlens) applySaysHighlights(saysRow);
+    if (opts.sweep && box) requestAnimationFrame(() => box.scrollIntoView({ block: "start", behavior: "smooth" }));
+  }
   if (M.info.steer_sharded) {
-    await layerSteer(M, L);
+    await steerP;
     if (S.sel !== k) return;
     const box = $("pushbox");
     if (box) box.innerHTML = pushCardHTML(M, k, M.steer.get(k) || []);
+    if (M.info.jlens) applySaysHighlights(saysRow);
   }
-  const by = await neuronExamples(M, L, n);
+  const by = await exP;
   if (S.sel !== k) return;
   const ex = by.sort((a, b) => b.sign - a.sign || a.rank - b.rank);
   const toks = ex.some(e => !e.toks) ? await tokens(M) : null;
@@ -696,20 +1381,103 @@ $("qmode").onclick = e => { const b = e.target.closest("button"); if (!b) return
 function goodNeurons(M) { const g = M.labKeys.filter(k => { const l = M.lab.get(k); return l.confidence >= 4 && (l.detect ?? 0) >= .75; }); return g.length > 10 ? g : M.labKeys; }
 $("surprise").onclick = () => { const M = S.M; const g = goodNeurons(M); if (!g.length) return; setTab("map"); openNeuron(g[Math.floor(Math.random() * g.length)], { focus: true }); };
 
-/* ---------- tabs ---------- */
-const TABS = ["map", "pushes", "mix", "board", "compare", "guess", "sql"];
-function setTab(t) {
-  S.tab = t; TABS.forEach(x => { $("v-" + x).hidden = x !== t; });
-  [...$("tabs").children].forEach(b => b.setAttribute("aria-selected", b.dataset.t === t));
-  if (t === "map") requestAnimationFrame(sizeCanvas);
-  if (t === "pushes") renderPushes();
-  if (t === "mix") renderMix();
-  if (t === "board") renderBoard();
-  if (t === "guess" && !G.cur) nextGuess();
-  if (t === "sql") sqlInit();
-  if (t !== "map") { try { history.replaceState(null, "", "#" + t) } catch {} }
+/* ---------- start here ---------- */
+const startBand = $("startband");
+if (startBand) {
+  const deepNeuron = /^.+?-L\d+-N\d+$/.test((location.hash || "").slice(1));
+  if (!deepNeuron && store.get("atlas-start-dismissed") !== "1") startBand.hidden = false;
+  $("start-dismiss").onclick = () => { startBand.hidden = true; store.set("atlas-start-dismissed", "1"); };
+  $("start-surprise").onclick = () => { if (S.M) $("surprise").onclick(); };
+  $("start-personas").onclick = () => { if (!S.M) return; applyPersonaHash(new URLSearchParams("kinds=persona")); setTab("personas"); };
+  $("start-become").onclick = () => { if (!S.M) return; applyBecomeHash(new URLSearchParams("w=moon")); setTab("become"); };
 }
-$("tabs").onclick = e => { const b = e.target.closest("button"); if (b) setTab(b.dataset.t); };
+
+/* ---------- tabs ---------- */
+const TABS = ["map", "overview", "pushes", "personas", "mix", "board", "compare", "guess", "become", "sql"];
+const TOP_TABS = ["explore", "personas", "play", "data"];
+const TAB_OF = { map: "explore", overview: "personas", pushes: "personas", personas: "personas", mix: "play", guess: "play", become: "play", board: "data", compare: "data", sql: "data" };
+const TOP_DEFAULT = { explore: "map", personas: null, play: "mix", data: "board" };
+const lastSub = { explore: "map", personas: null, play: null, data: null };
+function subviewsFor(top) {
+  if (top === "personas") {
+    const subs = [["overview", "Overview"], ["personas", "Library"]];
+    if (!S.M?.info.personas) subs.push(["pushes", "Pushes"]);
+    return subs;
+  }
+  if (top === "play") return [["mix", "Mix"], ["guess", "Guess the neuron"], ["become", "Become…"]];
+  if (top === "data") return [["board", "Leaderboard"], ["compare", "Across models"], ["sql", "SQL"]];
+  return [["map", "Map"]];
+}
+function hasSub(top, view) { return subviewsFor(top).some(([v]) => v === view); }
+function defaultSub(top) { return top === "personas" ? (S.M?.info.personas ? "personas" : "pushes") : TOP_DEFAULT[top]; }
+function renderSubNav() {
+  ["personas", "play", "data"].forEach(top => {
+    const el = $("sub-" + top); if (!el) return;
+    const subs = subviewsFor(top), sig = subs.map(([v]) => v).join("|");
+    if (el.dataset.sig !== sig) {
+      el.innerHTML = subs.map(([v, label]) => `<button type="button" data-v="${v}" aria-pressed="false">${label}</button>`).join("");
+      el.dataset.sig = sig;
+    }
+    const active = hasSub(top, lastSub[top]) ? lastSub[top] : defaultSub(top);
+    [...el.children].forEach(b => b.setAttribute("aria-pressed", b.dataset.v === active));
+  });
+}
+function paintTab(top, view) {
+  TOP_TABS.forEach(x => { $("p-" + x).hidden = x !== top; });
+  TABS.forEach(x => { $("v-" + x).hidden = x !== view; });
+  [...$("tabs").children].forEach(b => {
+    const on = b.dataset.t === top;
+    b.setAttribute("aria-selected", on);
+    b.tabIndex = on ? 0 : -1;
+  });
+  renderSubNav();
+}
+function setTab(t) {
+  if (TOP_TABS.includes(t) && !TABS.includes(t)) {
+    const top = t;
+    return setTab(hasSub(top, lastSub[top]) ? lastSub[top] : defaultSub(top));
+  }
+  if (!TABS.includes(t)) return;
+  const top = TAB_OF[t], view = t;
+  S.tab = view; lastSub[top] = view;
+  paintTab(top, view);
+  if (view === "map") requestAnimationFrame(sizeCanvas);
+  if (view === "overview") renderOverview();
+  if (view === "pushes") renderPushes();
+  if (view === "personas") renderPersonas();
+  if (view === "mix") renderMix();
+  if (view === "board") renderBoard();
+  if (view === "guess" && !G.cur) nextGuess();
+  if (view === "become") renderBecome();
+  if (view === "sql") sqlInit();
+  if (view === "personas") syncPersonasHash();
+  else if (view === "overview") syncOverviewHash();
+  else if (view === "become") syncBecomeHash();
+  else if (view === "mix") syncMixHash();
+  else if (view === "map") { try { history.replaceState(null, "", "#map") } catch {} }
+  else { try { history.replaceState(null, "", "#" + view) } catch {} }
+}
+function openTop(top) {
+  setTab(hasSub(top, lastSub[top]) ? lastSub[top] : defaultSub(top));
+}
+$("tabs").onclick = e => { const b = e.target.closest("button"); if (b) openTop(b.dataset.t); };
+$("tabs").addEventListener("keydown", e => {
+  if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) return;
+  const tabs = [...$("tabs").children], i = tabs.indexOf(document.activeElement);
+  if (i < 0) return;
+  e.preventDefault();
+  const n = e.key === "Home" ? 0 : e.key === "End" ? tabs.length - 1
+    : (i + (e.key === "ArrowRight" ? 1 : -1) + tabs.length) % tabs.length;
+  tabs[n].focus();
+  openTop(tabs[n].dataset.t);
+});
+["personas", "play", "data"].forEach(top => {
+  $("sub-" + top).onclick = e => { const b = e.target.closest("button[data-v]"); if (b) setTab(b.dataset.v); };
+});
+document.addEventListener("click", e => {
+  const a = e.target.closest("[data-goto-overview]");
+  if (a) { e.preventDefault(); setTab("overview"); }
+});
 
 /* ---------- pushes ---------- */
 const KIND_LABEL = { persona: "persona", altered_assistant: "changed assistant", default_assistant: "normal assistant", other: "off-topic", incoherent: "incoherent" };
@@ -749,10 +1517,671 @@ async function renderPushes() {
   const prompts = M.info.steer?.prompts || [];
   $("pushgrid").innerHTML = items.slice(0, 120).map(([k, s]) => { const l = M.lab.get(k);
     return `<button class="push" data-k="${k}"><div class="meta"><span>${keyName(M, k)}</span><span class="pill ${s.dose > 0 ? "eo" : ""}">push ${s.dose > 0 ? "+" : ""}${s.dose}</span>${s.reply_kind ? `<span class="pill">${KIND_LABEL[s.reply_kind] || s.reply_kind}</span>` : ""}${s.kind === "random" ? `<span class="pill warn">random control</span>` : ""}</div>
-      ${s.who ? `<b>${esc(s.who)}</b>` : ""}<div class="muted">“${esc(prompts[s.prompt] || "")}” ${l ? `· ${esc(l.emoji)} ${esc(l.label)}` : ""}</div><div class="reply">${esc(s.text)}</div></button>` }).join("") || `<p class="muted">This model has no steering run yet.</p>`;
+      ${s.who ? `<b>${esc(s.who)}</b>` : ""}<div class="muted">“${esc(prompts[s.prompt] || "")}” ${l ? `· ${esc(l.emoji)} ${esc(l.label)}` : ""}</div><div class="reply">${mdHTML(s.text)}</div></button>` }).join("") || `<p class="muted">This model has no steering run yet.</p>`;
 }
 ["pk", "psort", "pcoh"].forEach(id => $(id).onchange = renderPushes);
 $("pushgrid").onclick = e => { const b = e.target.closest(".push"); if (b) { setTab("map"); openNeuron(+b.dataset.k, { focus: true }); } };
+
+/* ---------- personas ---------- */
+const PERSONA_KIND_LABEL = { persona: "persona", user_identity: "user identity", model_persona: "model persona", altered_assistant: "altered assistant", other: "other", incoherent: "incoherent", default_assistant: "default assistant" };
+const P = { M: null, sweep: null, all: [], rows: [], groups: new Map(), hasGroup: false, total: 0, names: 0, shown: 60, group: "", seq: 0 };
+function loadPersonas(M, sweep = S.sweep) {
+  const key = sweep === "user" ? "userPersonasP" : "personasP";
+  const file = sweep === "user" ? "user_personas.parquet" : "personas.parquet";
+  if (!M[key]) M[key] = tryPq(M.dir + file).then(rows => {
+    if (!rows) return null;
+    let hasGroup = false;
+    rows.forEach(r => {
+      r._who = norm(r.who || "");
+      r._hay = [r.who, r.what_changed, r.text, r.group].filter(v => v != null && v !== "").join(" ").toLowerCase();
+      if (r.group != null && r.group !== "") hasGroup = true;
+    });
+    rows.hasGroup = hasGroup;
+    return rows;
+  }).catch(() => null);
+  return M[key];
+}
+function personaHash() {
+  const p = new URLSearchParams();
+  const q = $("psearch").value.trim(); if (q) p.set("q", q);
+  if (S.sweep === "user") p.set("sweep", "user");
+  p.set("kinds", [...$("pkinds").querySelectorAll('button[aria-pressed="true"]')].map(b => b.dataset.k).join(","));
+  if (S.sweep !== "user" && $("pprompt").value) p.set("prompt", $("pprompt").value);
+  if ($("pdose").value) p.set("dose", $("pdose").value);
+  if ($("plmin").value !== "") p.set("lmin", $("plmin").value);
+  if ($("plmax").value !== "") p.set("lmax", $("plmax").value);
+  if (!$("pone").checked) p.set("one", "0");
+  p.set("sort", $("ppsort").value);
+  if (P.group) p.set("group", P.group);
+  return p;
+}
+function syncPersonasHash() {
+  if (S.tab !== "personas" || !S.M) return;
+  const p = personaHash().toString();
+  try { history.replaceState(null, "", `#${S.M.info.id}-personas${p ? "?" + p : ""}`) } catch {}
+}
+function applyPersonaHash(params) {
+  const q = params.get("q"); if (q != null) $("psearch").value = q;
+  const wantUser = params.get("sweep") === "user" && !!S.M?.info.user_sweep;
+  if ((wantUser ? "user" : "model") !== S.sweep) setSweep(wantUser ? "user" : "model", true);
+  const kinds = params.get("kinds");
+  if (kinds != null) {
+    const set = new Set(kinds.split(",").filter(Boolean));
+    [...$("pkinds").children].forEach(b => b.setAttribute("aria-pressed", set.has(b.dataset.k)));
+  }
+  const prompt = params.get("prompt"); if (S.sweep !== "user" && prompt != null && ["0", "1"].includes(prompt)) $("pprompt").value = prompt;
+  const dose = params.get("dose"); if (dose === "up" || dose === "down") $("pdose").value = dose;
+  const lmin = params.get("lmin"); if (lmin != null) $("plmin").value = lmin;
+  const lmax = params.get("lmax"); if (lmax != null) $("plmax").value = lmax;
+  const one = params.get("one"); if (one != null) $("pone").checked = one !== "0";
+  const sort = params.get("sort"); if (["neurons", "layer", "shuffle"].includes(sort)) $("ppsort").value = sort;
+  P.group = params.get("group") || "";
+}
+const ATLAS_PROMPTS = ["Who are you?", "Tell me a short story."];
+function personaPrompt(M, r) {
+  const i = Number(r.prompt);
+  for (const list of [M?.sweepPromptList, M?.info?.steer?.prompts]) {
+    if (Array.isArray(list) && typeof list[i] === "string" && list[i].trim()) return list[i];
+  }
+  return ATLAS_PROMPTS[i] || "Who are you?";
+}
+function personaDeepLink(M, r) {
+  const p = personaHash();
+  const layer = String(Number(r.layer));
+  p.set("q", r.who || "");
+  p.set("lmin", layer);
+  p.set("lmax", layer);
+  const u = new URL(location.href);
+  u.hash = `${M.info.id}-personas?${p.toString()}`;
+  return u.href;
+}
+async function sharePersona(M, r, btn) {
+  const ok = await copyText(personaDeepLink(M, r));
+  const old = btn.textContent;
+  btn.textContent = ok ? "Link copied" : "Copy failed";
+  setTimeout(() => { btn.textContent = old; }, 1400);
+}
+function canvasRoundRect(ctx, x, y, w, h, r) {
+  const rr = Math.min(r, w / 2, h / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + rr, y); ctx.arcTo(x + w, y, x + w, y + h, rr);
+  ctx.arcTo(x + w, y + h, x, y + h, rr); ctx.arcTo(x, y + h, x, y, rr);
+  ctx.arcTo(x, y, x + w, y, rr); ctx.closePath();
+}
+function fitCanvasFont(ctx, text, weight, family, size, min, maxWidth) {
+  let s = size;
+  while (s > min) {
+    ctx.font = `${weight} ${s}px ${family}`;
+    if (ctx.measureText(text).width <= maxWidth) break;
+    s -= 2;
+  }
+  ctx.font = `${weight} ${s}px ${family}`;
+  return s;
+}
+function wrapCanvasText(ctx, text, maxWidth, maxLines) {
+  const source = String(text || "").replace(/\s+/g, " ").trim();
+  if (!source) return [];
+  const words = [];
+  for (const word of source.split(" ")) {
+    if (ctx.measureText(word).width <= maxWidth) { words.push(word); continue; }
+    let chunk = "";
+    for (const ch of word) {
+      if (chunk && ctx.measureText(chunk + ch).width > maxWidth) { words.push(chunk); chunk = ch; }
+      else chunk += ch;
+    }
+    if (chunk) words.push(chunk);
+  }
+  const elide = lines => {
+    let last = lines[maxLines - 1] || "";
+    while (last && ctx.measureText(last + "…").width > maxWidth) last = last.slice(0, -1);
+    lines[maxLines - 1] = last + "…";
+    return lines;
+  };
+  const lines = [];
+  let line = "";
+  for (let i = 0; i < words.length; i++) {
+    const test = line ? line + " " + words[i] : words[i];
+    if (ctx.measureText(test).width <= maxWidth) { line = test; continue; }
+    if (line) {
+      lines.push(line); line = "";
+      if (lines.length === maxLines) return elide(lines);
+    }
+    line = words[i];
+  }
+  if (line) lines.push(line);
+  if (lines.length > maxLines) { lines.length = maxLines; return elide(lines); }
+  return lines;
+}
+async function downloadPersonaImage(M, r, btn) {
+  const old = btn?.textContent || "Download image";
+  if (btn) { btn.disabled = true; btn.textContent = "Drawing…"; }
+  try {
+    const canvas = document.createElement("canvas");
+    canvas.width = 1200; canvas.height = 630;
+    const ctx = canvas.getContext("2d");
+    if (!ctx || typeof canvas.toBlob !== "function") throw new Error("canvas export unavailable");
+    if (document.fonts?.ready) await document.fonts.ready;
+    const root = getComputedStyle(document.documentElement);
+    const v = (n, f) => root.getPropertyValue(n).trim() || f;
+    const bg = v("--bg", "#f5f4f8"), surface = v("--surface", "#fff"), ink = v("--ink", "#1f1c2c"),
+      ink2 = v("--ink2", "#5d5870"), ink3 = v("--ink3", "#8a849c"), line = v("--line", "#d9d5e3"),
+      eosin = v("--eosin", "#d6336c"), hema = v("--hema", "#4b3fa8"), eoSoft = v("--eosin-soft", "#f9d9e5");
+    const DISPLAY = `"Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif`;
+    const BODY = `"Source Sans 3", "Segoe UI", system-ui, -apple-system, sans-serif`;
+    const MONO = `"JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace`;
+    ctx.fillStyle = bg; ctx.fillRect(0, 0, 1200, 630);
+    ctx.save(); ctx.shadowColor = "rgba(20,10,40,.18)"; ctx.shadowBlur = 36; ctx.shadowOffsetY = 12;
+    canvasRoundRect(ctx, 36, 36, 1128, 558, 28); ctx.fillStyle = surface; ctx.fill(); ctx.restore();
+    ctx.save(); canvasRoundRect(ctx, 36, 36, 1128, 558, 28); ctx.clip();
+    ctx.globalAlpha = .13; ctx.fillStyle = eosin; ctx.beginPath(); ctx.arc(1080, 70, 290, 0, 7); ctx.fill();
+    ctx.fillStyle = hema; ctx.beginPath(); ctx.arc(130, 655, 250, 0, 7); ctx.fill();
+    ctx.globalAlpha = 1;
+    const lg = ctx.createLinearGradient(0, 76, 0, 514); lg.addColorStop(0, eosin); lg.addColorStop(1, hema);
+    ctx.fillStyle = lg; ctx.fillRect(72, 76, 7, 438);
+    ctx.restore();
+    const x = 112, w = 980;
+    ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+    ctx.fillStyle = ink3; ctx.font = `600 15px ${MONO}`;
+    ctx.fillText("NEURON ATLAS · PERSONA", x, 112);
+    const kind = PERSONA_KIND_LABEL[r.reply_kind] || r.reply_kind || "reply";
+    ctx.font = `600 16px ${BODY}`;
+    const kw = ctx.measureText(kind).width, ph = 34, pw = kw + 28, px = 1128 - 56 - pw, py = 86;
+    canvasRoundRect(ctx, px, py, pw, ph, ph / 2); ctx.fillStyle = eoSoft; ctx.fill();
+    ctx.fillStyle = eosin; ctx.fillText(kind, px + 14, py + 23);
+    let name = r.who || r.what_changed || "Untitled persona";
+    ctx.fillStyle = ink;
+    fitCanvasFont(ctx, name, 800, DISPLAY, 60, 30, w);
+    if (ctx.measureText(name).width > w) {
+      while (name.length > 1 && ctx.measureText(name + "…").width > w) name = name.slice(0, -1);
+      name += "…";
+    }
+    ctx.fillText(name, x, 190);
+    ctx.strokeStyle = line; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x, 216); ctx.lineTo(x + w, 216); ctx.stroke();
+    ctx.fillStyle = ink; ctx.font = `400 29px ${BODY}`;
+    wrapCanvasText(ctx, stripMd(r.text || ""), w, 6).forEach((ln, i) => ctx.fillText(ln, x, 264 + i * 42));
+    const L = Number(r.layer), n = Number(r.neuron), d = Number(r.dose);
+    const dose = Number.isFinite(d) ? (d > 0 ? "+" : "") + (Math.round(d * 100) / 100) : "–";
+    ctx.fillStyle = ink2; ctx.font = `600 18px ${MONO}`;
+    ctx.fillText(`${M.info.model} · L${L} · N${n} · ${dose}`, x, 558);
+    ctx.textAlign = "right"; ctx.font = `800 24px ${DISPLAY}`;
+    ctx.fillStyle = eosin; ctx.fillText("Atlas", 1128 - 56, 558);
+    const aw = ctx.measureText("Atlas").width + 7;
+    ctx.fillStyle = ink3; ctx.fillText("Neuron ", 1128 - 56 - aw, 558);
+    ctx.textAlign = "left";
+    await new Promise((resolve, reject) => {
+      try {
+        canvas.toBlob(blob => {
+          try {
+            if (!blob) { reject(new Error("no blob")); return; }
+            const a = document.createElement("a"), url = URL.createObjectURL(blob);
+            const slug = String(name).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 48) || "persona";
+            a.href = url; a.download = `${M.info.id}-${slug}-L${L}N${n}.png`;
+            document.body.appendChild(a); a.click(); a.remove();
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+            resolve();
+          } catch (err) { reject(err); }
+        }, "image/png");
+      } catch (err) { reject(err); }
+    });
+    showNotice("Image downloaded");
+  } catch {
+    showNotice("Could not export image", true);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = old; }
+  }
+}
+function personaCardHTML(M, r, i) {
+  const k = Number(r.layer) * M.d + Number(r.neuron), d = r.dose == null ? NaN : Number(r.dose);
+  const dose = Number.isFinite(d) ? (d > 0 ? "+" : "") + (Math.round(d * 100) / 100) : "–";
+  const recipeDose = Number.isFinite(d) ? d : 0.8;
+  const recipe = `L${r.layer}N${r.neuron}${recipeDose >= 0 ? "+" : ""}${Math.round(recipeDose * 1000) / 1000}`;
+  const merged = r._merged > 1 ? `<span class="pill warn">×${r._merged}</span>` : "";
+  return `<article class="persona" data-i="${i}">
+    <h3 class="ptitle">${esc(r.who || r.what_changed || "Untitled")}</h3>
+    <div class="pmeta"><span class="pill eo">${esc(PERSONA_KIND_LABEL[r.reply_kind] || r.reply_kind || "reply")}</span><span class="pill">${keyName(M, k)}</span><span class="pill ${d > 0 ? "eo" : ""}">${dose}</span>${merged}</div>
+    ${r.what_changed ? `<div class="muted">${esc(r.what_changed)}</div>` : ""}
+    <div class="bubble clamped" title="Click to expand">${mdHTML(r.text)}</div>
+    <div class="pactions">
+      <button class="btn" data-act="open" data-i="${i}">Open neuron</button>
+      <button class="btn primary" data-act="mix" data-i="${i}">Add to mix</button>
+      <button class="btn" data-act="share" data-i="${i}">Share</button>
+      <button class="btn" data-act="shot" data-i="${i}">Download image</button>
+      ${reproDetailsHTML({ name: r.who || r.what_changed || `L${r.layer}N${r.neuron}`, model: M.info.model, recipe, prompt: personaPrompt(M, r) })}
+    </div>
+  </article>`;
+}
+function renderPersonaGroups() {
+  const box = $("pgroups");
+  if (!P.hasGroup) { box.hidden = true; box.innerHTML = ""; return; }
+  const items = [...P.groups].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, 20);
+  box.hidden = !items.length;
+  box.innerHTML = items.map(([g, n]) => `<button class="chip" aria-pressed="${g === P.group}" data-g="${esc(g)}">${esc(g)} <small>${n.toLocaleString()}</small></button>`).join("");
+}
+function renderPersonaGrid() {
+  const M = S.M, rows = P.rows, n = Math.min(P.shown, rows.length);
+  $("pgrid").innerHTML = n ? rows.slice(0, n).map((r, i) => personaCardHTML(M, r, i)).join("") : `<p class="muted">No replies match these filters.</p>`;
+  $("pmore").hidden = n >= rows.length;
+  $("ppcount").textContent = `${P.total.toLocaleString()} replies · ${P.names.toLocaleString()} distinct names · showing ${n.toLocaleString()}`;
+}
+function renderPersonaResults() {
+  const M = S.M; if (!M || P.M !== M || P.sweep !== S.sweep) return;
+  const q = norm($("psearch").value), words = q ? q.split(/\s+/) : [];
+  const kinds = new Set([...$("pkinds").querySelectorAll('button[aria-pressed="true"]')].map(b => b.dataset.k));
+  const prompt = S.sweep === "user" ? "" : $("pprompt").value, dose = $("pdose").value;
+  const lmin = $("plmin").value === "" ? -Infinity : Number($("plmin").value);
+  const lmax = $("plmax").value === "" ? Infinity : Number($("plmax").value);
+  const one = $("pone").checked, gsel = P.group;
+  const out = [], gcounts = new Map(), ncounts = new Map();
+  for (const r of P.all) {
+    if (words.length && !words.every(w => r._hay.includes(w))) continue;
+    if (!kinds.has(r.reply_kind)) continue;
+    if (prompt !== "" && Number(r.prompt) !== Number(prompt)) continue;
+    const d = Number(r.dose);
+    if (dose === "up" && !(d > 0)) continue;
+    if (dose === "down" && !(d < 0)) continue;
+    const L = Number(r.layer);
+    if (L < lmin || L > lmax) continue;
+    if (P.hasGroup) { const g = r.group == null ? "" : String(r.group); if (g) gcounts.set(g, (gcounts.get(g) || 0) + 1); }
+    if (gsel && String(r.group ?? "") !== gsel) continue;
+    out.push(r);
+    if (r._who) ncounts.set(r._who, (ncounts.get(r._who) || 0) + 1);
+  }
+  let items;
+  if (one) {
+    const seen = new Set(); items = [];
+    for (const r of out) {
+      if (r._who) { if (seen.has(r._who)) continue; seen.add(r._who); }
+      items.push(r);
+    }
+  } else items = out.slice();
+  const cnt = r => r._who ? ncounts.get(r._who) || 1 : 1;
+  const sort = $("ppsort").value;
+  if (sort === "neurons") items.sort((a, b) => cnt(b) - cnt(a) || Number(a.layer) - Number(b.layer) || Number(a.neuron) - Number(b.neuron));
+  else if (sort === "layer") items.sort((a, b) => Number(a.layer) - Number(b.layer) || Number(a.neuron) - Number(b.neuron) || Number(a.dose) - Number(b.dose));
+  else for (let i = items.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [items[i], items[j]] = [items[j], items[i]]; }
+  items.forEach(r => r._merged = one && r._who ? cnt(r) : 1);
+  P.rows = items; P.groups = gcounts; P.total = out.length; P.names = ncounts.size;
+  renderPersonaGroups();
+  renderPersonaGrid();
+}
+async function renderPersonas() {
+  const M = S.M; if (!M) return;
+  const seq = ++P.seq, sweep = S.sweep;
+  updateSweepUI();
+  const hasPersonas = sweep === "user" ? M.info.user_sweep : M.info.personas;
+  if (!hasPersonas) {
+    P.M = null; P.sweep = null; P.all = []; P.rows = []; P.total = 0; P.names = 0; P.group = "";
+    $("pempty").textContent = sweep === "user" ? "No user persona library for this model yet" : "No persona library for this model yet";
+    $("pempty").hidden = false; $("pfilters").hidden = true; $("ppcount").hidden = true; $("pgroups").hidden = true; $("pmorow").hidden = true; $("pgrid").innerHTML = "";
+    return;
+  }
+  $("pempty").hidden = true; $("pfilters").hidden = false; $("ppcount").hidden = false; $("pmorow").hidden = false;
+  if (P.M !== M || P.sweep !== sweep) { P.M = M; P.sweep = sweep; P.all = []; P.rows = []; P.total = 0; P.names = 0; P.group = ""; P.shown = 60; }
+  const cacheKey = sweep === "user" ? "userPersonasP" : "personasP";
+  if (!M[cacheKey]) {
+    $("ppcount").textContent = "loading personas…";
+    $("pgrid").innerHTML = Array.from({ length: 6 }, () => `<div class="skel skel-card" aria-hidden="true"></div>`).join("");
+    $("pgroups").hidden = true;
+  }
+  const rows = await loadPersonas(M, sweep);
+  if (seq !== P.seq || S.M !== M || S.sweep !== sweep) return;
+  if (!rows) {
+    P.M = null; P.sweep = null; P.all = []; P.rows = []; P.total = 0; P.names = 0;
+    $("pempty").textContent = sweep === "user" ? "No user persona library for this model yet" : "No persona library for this model yet";
+    $("pempty").hidden = false; $("pfilters").hidden = true; $("ppcount").hidden = true; $("pgroups").hidden = true; $("pmorow").hidden = true; $("pgrid").innerHTML = "";
+    return;
+  }
+  P.M = M; P.sweep = sweep; P.all = rows; P.hasGroup = !!rows.hasGroup;
+  if (P.shown < 60) P.shown = 60;
+  renderPersonaResults();
+  syncPersonasHash();
+}
+function personaFilterChanged() {
+  if (S.tab !== "personas") return;
+  P.shown = 60;
+  renderPersonaResults();
+  syncPersonasHash();
+}
+let personaSearchT = 0;
+$("psearch").addEventListener("input", () => {
+  syncPersonasHash();
+  clearTimeout(personaSearchT);
+  personaSearchT = setTimeout(() => { if (S.tab === "personas") { P.shown = 60; renderPersonaResults(); } }, 150);
+});
+$("pkinds").onclick = e => {
+  const b = e.target.closest("button"); if (!b) return;
+  b.setAttribute("aria-pressed", b.getAttribute("aria-pressed") !== "true");
+  personaFilterChanged();
+};
+["psweep"].forEach(id => $(id).onclick = e => {
+  const b = e.target.closest("button"); if (!b || b.dataset.s === S.sweep) return;
+  setSweep(b.dataset.s, true);
+  if (S.tab === "personas") { P.shown = 60; P.group = ""; renderPersonas(); syncPersonasHash(); }
+  else if (S.tab === "overview") { OV.rows = null; OV.persons = null; renderOverview(); syncOverviewHash(); }
+});
+renderKindChips();
+["pprompt", "pdose", "ppsort"].forEach(id => $(id).onchange = personaFilterChanged);
+$("plmin").oninput = personaFilterChanged; $("plmax").oninput = personaFilterChanged; $("pone").onchange = personaFilterChanged;
+$("pgroups").onclick = e => {
+  const b = e.target.closest("button[data-g]"); if (!b) return;
+  P.group = P.group === b.dataset.g ? "" : b.dataset.g;
+  personaFilterChanged();
+};
+$("pgrid").onclick = e => {
+  const b = e.target.closest("button[data-act]");
+  if (b) {
+    const r = P.rows[+b.dataset.i]; if (!r) return;
+    const k = Number(r.layer) * S.M.d + Number(r.neuron);
+    if (b.dataset.act === "open") { setTab("map"); openNeuron(k, { focus: true, sweep: true }); }
+    else if (b.dataset.act === "share") sharePersona(S.M, r, b);
+    else if (b.dataset.act === "shot") downloadPersonaImage(S.M, r, b);
+    else addMix(k, Number(r.dose));
+    return;
+  }
+  const bubble = e.target.closest(".bubble"); if (bubble) bubble.classList.toggle("clamped");
+};
+$("pmore").onclick = () => { P.shown += 60; renderPersonaGrid(); };
+const csvCell = v => { const s = v == null ? "" : String(v); return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
+$("pcsv").onclick = () => {
+  const M = S.M; if (!M) return;
+  const head = ["model", "layer", "neuron", "dose", "prompt", "kind", "who", "what_changed", "text"];
+  const body = P.rows.map(r => [M.info.id, r.layer, r.neuron, Math.round(Number(r.dose) * 1000) / 1000, r.prompt, r.reply_kind, r.who, r.what_changed, stripMd(r.text)]);
+  const csv = [head, ...body].map(row => row.map(csvCell).join(",")).join("\r\n") + "\r\n";
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const a = document.createElement("a"), url = URL.createObjectURL(blob);
+  a.href = url; a.download = `${M.info.id}-personas.csv`; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+};
+
+/* ---------- overview ---------- */
+const OV_KINDS_MODEL = ["persona", "altered_assistant", "other", "incoherent", "default_assistant"];
+const OV_KINDS_USER = ["user_identity", "model_persona", "altered_assistant", "other", "incoherent", "default_assistant"];
+const OV_KIND_LABEL = { persona: "persona", user_identity: "user identity", model_persona: "model persona", altered_assistant: "altered assistant", other: "other", incoherent: "incoherent", default_assistant: "default assistant" };
+const OV_KIND_VAR = { persona: "--k-persona", user_identity: "--k-user", model_persona: "--k-persona", altered_assistant: "--k-altered", other: "--k-other", incoherent: "--k-incoherent", default_assistant: "--k-default" };
+const OV = { M: null, sweep: null, rows: null, persons: null, prompt: "", push: "", table: false, seq: 0 };
+const ovKinds = () => S.sweep === "user" ? OV_KINDS_USER : OV_KINDS_MODEL;
+const ovFocusKind = () => S.sweep === "user" ? "user_identity" : "persona";
+const ovColor = k => `var(${OV_KIND_VAR[k]})`;
+const ovPct = v => v <= 0 ? "0" : v >= 99.95 ? "100" : v >= 10 ? v.toFixed(0) : v.toFixed(1);
+const ovShort = v => v >= 1e6 ? (v / 1e6).toFixed(v >= 1e7 ? 0 : 1) + "M" : v >= 1e3 ? (v / 1e3).toFixed(v >= 1e4 ? 0 : 1) + "k" : String(Math.round(v));
+const ovFull = v => Math.round(v).toLocaleString();
+const ovTrunc = (s, n) => s.length > n ? s.slice(0, n - 1) + "…" : s;
+
+function ovSweep(M, sweep = S.sweep) {
+  const key = sweep === "user" ? "userSweepP" : "sweepP";
+  const file = sweep === "user" ? "user_sweep_stats.parquet" : "sweep_stats.parquet";
+  if (!M[key]) M[key] = tryPq(M.dir + file, ["layer", "prompt", "sign", "reply_kind", "n_est", "n_labeled"]).catch(() => null);
+  return M[key];
+}
+function syncOverviewHash() {
+  if (S.tab !== "overview" || !S.M) return;
+  const p = new URLSearchParams();
+  if (S.sweep === "user") p.set("sweep", "user");
+  try { history.replaceState(null, "", `#${S.M.info.id}-overview${p.toString() ? "?" + p : ""}`) } catch {}
+}
+function applyOverviewHash(params) {
+  const wantUser = params.get("sweep") === "user" && !!S.M?.info.user_sweep;
+  const sweep = wantUser ? "user" : "model";
+  if (sweep !== S.sweep) setSweep(sweep, true);
+}
+function ovRowOk(r, prompt, push) {
+  if (!ovKinds().includes(r.reply_kind)) return false;
+  if (prompt !== "" && Number(r.prompt) !== Number(prompt)) return false;
+  const s = Number(r.sign);
+  if (push === "up" && !(s > 0)) return false;
+  if (push === "down" && !(s < 0)) return false;
+  return true;
+}
+function ovAgg(rows, prompt, push) {
+  const nL = S.M.info.n_layers, kinds = ovKinds(), focus = ovFocusKind();
+  const layers = Array.from({ length: nL }, (_, L) => ({ L, total: 0, by: Object.fromEntries(kinds.map(k => [k, 0])) }));
+  let total = 0, persona = 0;
+  for (const r of rows) {
+    if (!ovRowOk(r, prompt, push)) continue;
+    const L = Number(r.layer), n = Number(r.n_est) || 0;
+    if (!layers[L]) continue;
+    layers[L].by[r.reply_kind] += n; layers[L].total += n;
+    total += n; if (r.reply_kind === focus) persona += n;
+  }
+  return { layers, total, persona };
+}
+function ovPersonaLayers(rows, prompt) {
+  const nL = S.M.info.n_layers, kinds = ovKinds(), focus = ovFocusKind();
+  const data = Array.from({ length: nL }, (_, L) => ({ L, up: 0, down: 0, upN: 0, downN: 0 }));
+  for (const r of rows) {
+    if (!kinds.includes(r.reply_kind)) continue;
+    if (prompt !== "" && Number(r.prompt) !== Number(prompt)) continue;
+    const L = Number(r.layer), n = Number(r.n_est) || 0, d = data[L];
+    if (!d) continue;
+    if (Number(r.sign) > 0) { d.upN += n; if (r.reply_kind === focus) d.up += n; }
+    else if (Number(r.sign) < 0) { d.downN += n; if (r.reply_kind === focus) d.down += n; }
+  }
+  data.forEach(d => { d.upPct = d.upN ? 100 * d.up / d.upN : 0; d.downPct = d.downN ? 100 * d.down / d.downN : 0; });
+  return data;
+}
+function ovPersonaOk(r, prompt, push) {
+  if (r.reply_kind !== ovFocusKind()) return false;
+  if (prompt !== "" && Number(r.prompt) !== Number(prompt)) return false;
+  const d = Number(r.dose);
+  if (push === "up" && !(d > 0)) return false;
+  if (push === "down" && !(d < 0)) return false;
+  return true;
+}
+function ovCharacters(persons, prompt, push) {
+  const by = new Map();
+  if (!persons) return [];
+  for (const r of persons) {
+    if (!ovPersonaOk(r, prompt, push) || !r._who) continue;
+    const key = Number(r.layer) * S.M.d + Number(r.neuron);
+    let e = by.get(r._who);
+    if (!e) { e = { name: r._who, neurons: new Set(), replies: 0 }; by.set(r._who, e); }
+    e.neurons.add(key); e.replies++;
+  }
+  return [...by.values()].map(e => ({ name: e.name, count: e.neurons.size, replies: e.replies }))
+    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+}
+function ovLegend(items) {
+  return items.map(([label, color]) => `<span class="ov-key"><span class="ov-swatch" style="background:${color}"></span>${esc(label)}</span>`).join("");
+}
+function ovCard(id, title, sub, legend, svg, table, empty) {
+  const body = empty
+    ? `<p class="ov-none">${esc(empty)}</p>`
+    : `<div class="ov-svgwrap"${OV.table ? " hidden" : ""}>${svg}<div class="ov-tip" hidden></div></div><div class="ov-tables"${OV.table ? "" : " hidden"}>${table}</div>`;
+  return `<article class="card ov-chart" data-chart="${id}">
+    <div><h3 class="ov-title">${esc(title)}</h3><p class="ov-sub">${esc(sub)}</p></div>
+    <div class="ov-legend">${legend}</div>
+    ${body}
+  </article>`;
+}
+// draw at the card's real width so SVG text stays ~11px on phones instead of shrinking with the viewBox
+const ovWidth = () => Math.max(300, Math.min(1200, ($("v-overview").clientWidth || 900) - 48));
+function ovChart1(layers) {
+  const kinds = ovKinds();
+  const W = ovWidth(), H = W < 560 ? 260 : 340, ml = 44, mr = 13, mt = 12, mb = 30;
+  const pw = W - ml - mr, ph = H - mt - mb, bottom = mt + ph;
+  const slot = pw / Math.max(1, layers.length), barW = Math.max(2, Math.min(26, slot * .66));
+  const grid = [0, 25, 50, 75, 100].map(p => {
+    const y = mt + ph * (1 - p / 100);
+    return `<line x1="${ml}" y1="${y}" x2="${W - mr}" y2="${y}" stroke="var(--line)" stroke-width="1"/><text x="${ml - 6}" y="${y + 3}" text-anchor="end" font-size="10" fill="var(--ink3)">${p}%</text>`;
+  }).join("");
+  const cols = layers.map(d => {
+    const x = ml + slot * (d.L + .5) - barW / 2;
+    let acc = 0;
+    const segs = kinds.map(k => ({ k, v: d.by[k], share: d.total ? 100 * d.by[k] / d.total : 0 })).filter(s => s.v > 0 && s.share > 0);
+    const marks = segs.map((s, i) => {
+      const yTop = mt + ph * (1 - (acc + s.share) / 100), yBot = mt + ph * (1 - acc / 100);
+      acc += s.share;
+      const isTop = i === segs.length - 1, h = Math.max(.5, (yBot - yTop) - (i === 0 ? 0 : 2));
+      const tip = `data-layer="${d.L}" data-kind="${s.k}" data-share="${s.share.toFixed(1)}" data-count="${Math.round(s.v)}"`;
+      if (isTop) {
+        const r = Math.min(4, barW / 2, h);
+        return `<path d="M${x},${yTop + h} L${x},${yTop + r} Q${x},${yTop} ${x + r},${yTop} L${x + barW - r},${yTop} Q${x + barW},${yTop} ${x + barW},${yTop + r} L${x + barW},${yTop + h} Z" fill="${ovColor(s.k)}" ${tip}/>`;
+      }
+      return `<rect x="${x}" y="${yTop}" width="${barW}" height="${h}" fill="${ovColor(s.k)}" ${tip}/>`;
+    }).join("");
+    const summary = segs.map(s => `${s.k}:${s.share.toFixed(1)}:${Math.round(s.v)}`).join(";");
+    const label = d.total ? `layer ${d.L}: ` + segs.map(s => `${OV_KIND_LABEL[s.k]} ${ovPct(s.share)}%`).join(", ") : `layer ${d.L}: no replies`;
+    const xt = d.L % 4 === 0 ? `<text x="${ml + slot * (d.L + .5)}" y="${bottom + 14}" text-anchor="middle" font-size="10" fill="var(--ink3)">${d.L}</text>` : "";
+    return `<g class="ov-col" data-layer="${d.L}" data-summary="${summary}" tabindex="0" role="button" aria-label="${esc(label)}"><rect class="ov-hit" x="${ml + slot * d.L}" y="${mt}" width="${slot}" height="${ph}" fill="transparent" pointer-events="all"/>${marks}${xt}</g>`;
+  }).join("");
+  const svg = `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="What a push does, by layer">${grid}${cols}</svg>`;
+  const head = `<tr><th scope="col">Layer</th>${kinds.map(k => `<th scope="col">${OV_KIND_LABEL[k]}</th>`).join("")}<th scope="col">replies (est.)</th></tr>`;
+  const body = layers.map(d => `<tr><th scope="row">${d.L}</th>${kinds.map(k => `<td class="num">${d.total ? (100 * d.by[k] / d.total).toFixed(1) + "%" : "–"}</td>`).join("")}<td class="num">${ovFull(d.total)}</td></tr>`).join("");
+  const table = `<table class="ov-table"><caption>Share of estimated replies by kind, for each layer.</caption><thead>${head}</thead><tbody>${body}</tbody></table>`;
+  return { svg, table };
+}
+function ovChart2(data) {
+  const focus = ovFocusKind(), focusLabel = OV_KIND_LABEL[focus];
+  const W = ovWidth(), ml = 46, mr = 18, mt = 34, mb = 10, rowH = 18;
+  const H = mt + mb + data.length * rowH;
+  const pw = W - ml - mr, cx = ml + pw / 2, half = pw / 2;
+  const maxV = Math.max(1, ...data.flatMap(d => [d.upPct, d.downPct]));
+  const scale = Math.min(100, Math.max(2, maxV * 1.15));
+  const len = v => Math.max(0, Math.min(half - 4, half * v / scale));
+  const bh = Math.max(6, rowH - 7);
+  const big = new Set([...data].sort((a, b) => Math.max(b.upPct, b.downPct) - Math.max(a.upPct, a.downPct)).slice(0, 3).map(d => d.L));
+  const rows = data.map(d => {
+    const y = mt + d.L * rowH + rowH / 2;
+    const wu = len(d.upPct), wd = len(d.downPct);
+    const up = d.upPct > 0 ? `<g class="ov-mark" tabindex="0" role="img" data-layer="${d.L}" data-kind="push up" data-share="${d.upPct.toFixed(1)}" data-count="${Math.round(d.up)}" aria-label="layer ${d.L}, push up, ${focusLabel} ${ovPct(d.upPct)} percent"><rect class="ov-hit" x="${cx}" y="${y - bh / 2}" width="${Math.max(1, wu)}" height="${bh}" fill="${ovColor(focus)}"/></g>` : "";
+    const down = d.downPct > 0 ? `<g class="ov-mark" tabindex="0" role="img" data-layer="${d.L}" data-kind="push down" data-share="${d.downPct.toFixed(1)}" data-count="${Math.round(d.down)}" aria-label="layer ${d.L}, push down, ${focusLabel} ${ovPct(d.downPct)} percent"><rect class="ov-hit" x="${cx - Math.max(1, wd)}" y="${y - bh / 2}" width="${Math.max(1, wd)}" height="${bh}" fill="${ovColor("altered_assistant")}"/></g>` : "";
+    const labels = big.has(d.L) ? (d.upPct > 0 ? `<text x="${cx + wu + 4}" y="${y + 3.5}" font-size="10" fill="var(--ink2)">${ovPct(d.upPct)}%</text>` : "") + (d.downPct > 0 ? `<text x="${cx - wd - 4}" y="${y + 3.5}" text-anchor="end" font-size="10" fill="var(--ink2)">${ovPct(d.downPct)}%</text>` : "") : "";
+    return `<text x="${ml - 6}" y="${y + 3.5}" text-anchor="end" font-size="10" fill="var(--ink3)">${d.L}</text>${down}${up}${labels}`;
+  }).join("");
+  const svg = `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="${esc(focusLabel)} rate of push-up and push-down replies, by layer"><line x1="${cx}" y1="${mt - 4}" x2="${cx}" y2="${H - mb}" stroke="var(--ink3)" stroke-width="1"/><text x="${cx - 8}" y="${mt - 12}" text-anchor="end" font-size="11" fill="var(--ink2)">push down ←</text><text x="${cx + 8}" y="${mt - 12}" font-size="11" fill="var(--ink2)">→ push up</text>${rows}</svg>`;
+  const table = `<table class="ov-table"><caption>${esc(focusLabel)} share of push-down and push-up replies, for each layer.</caption><thead><tr><th scope="col">Layer</th><th scope="col">push down</th><th scope="col">push up</th></tr></thead><tbody>${data.map(d => `<tr><th scope="row">${d.L}</th><td class="num">${d.downN ? d.downPct.toFixed(1) + "%" : "–"}</td><td class="num">${d.upN ? d.upPct.toFixed(1) + "%" : "–"}</td></tr>`).join("")}</tbody></table>`;
+  return { svg, table };
+}
+function ovChart3(names) {
+  const user = S.sweep === "user", focus = ovFocusKind(), focusLabel = OV_KIND_LABEL[focus];
+  const W = ovWidth(), ml = Math.min(190, Math.round(W * .38)), mr = 56, mt = 10, mb = 10, rowH = 26;
+  const H = mt + mb + names.length * rowH;
+  const pw = W - ml - mr, max = Math.max(1, ...names.map(n => n.count));
+  const rows = names.map((n, i) => {
+    const y = mt + i * rowH + rowH / 2, w = Math.max(1, pw * n.count / max);
+    return `<g class="ov-mark" data-name="${esc(n.name)}" data-count="${n.count}" data-replies="${n.replies}" tabindex="0" role="button" aria-label="${esc(n.name)}, ${n.count} distinct neurons"><rect class="ov-hit" x="${ml}" y="${y - 8}" width="${pw}" height="16" fill="transparent" pointer-events="all"/><text x="${ml - 8}" y="${y + 4}" text-anchor="end" font-size="12" fill="var(--ink)">${esc(ovTrunc(n.name, Math.max(10, Math.floor((ml - 12) / 6.6))))}<title>${esc(n.name)}</title></text><rect x="${ml}" y="${y - 7}" width="${w}" height="14" rx="3" fill="${ovColor(focus)}"/><text x="${ml + w + 6}" y="${y + 4}" font-size="10" fill="var(--ink2)">${ovFull(n.count)}</text></g>`;
+  }).join("");
+  const svg = `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="${user ? "Most common names given to the user" : "Most common character names"}">${rows}</svg>`;
+  const table = `<table class="ov-table"><caption>${user ? "Most common names given to the user by distinct neurons." : "Most common character names by distinct neurons."}</caption><thead><tr><th scope="col">${user ? "Name" : "Character"}</th><th scope="col">distinct neurons</th><th scope="col">${esc(focusLabel)} replies</th></tr></thead><tbody>${names.map(n => `<tr><th scope="row">${esc(n.name)}</th><td class="num">${ovFull(n.count)}</td><td class="num">${ovFull(n.replies)}</td></tr>`).join("")}</tbody></table>`;
+  return { svg, table };
+}
+function ovTipHTML(el) {
+  if (el.dataset.name != null) { const user = S.sweep === "user"; return `<div class="k">${user ? "name" : "character"}</div><b>${esc(el.dataset.name)}</b><div>${ovFull(+el.dataset.count)} distinct neurons · ${ovFull(+el.dataset.replies)} ${user ? "user identity" : "persona"} replies</div>`; }
+  const layer = el.dataset.layer;
+  if (el.dataset.kind) return `<div class="k">layer ${layer}</div><b>${esc(el.dataset.kind.startsWith("push") ? el.dataset.kind : (OV_KIND_LABEL[el.dataset.kind] || el.dataset.kind))}</b><div>${Number(el.dataset.share).toFixed(1)}% · ${ovFull(+el.dataset.count)} replies (est.)</div>`;
+  const summary = el.dataset.summary || "";
+  if (!summary) return `<div class="k">layer ${layer}</div><div>No replies</div>`;
+  return `<div class="k">layer ${layer}</div>${summary.split(";").map(s => { const [k, share, count] = s.split(":"); return `<div>${OV_KIND_LABEL[k] || k}: <b>${Number(share).toFixed(1)}%</b> · ${ovFull(+count)}</div>`; }).join("")}`;
+}
+function ovHideTips() { $("ovbody").querySelectorAll(".ov-tip").forEach(t => { t.hidden = true }); }
+function ovShowTip(el, ev) {
+  const wrap = el.closest(".ov-svgwrap"); if (!wrap) return;
+  const tip = wrap.querySelector(".ov-tip"); if (!tip) return;
+  tip.innerHTML = ovTipHTML(el); tip.hidden = false;
+  const wr = wrap.getBoundingClientRect();
+  let x, y;
+  if (ev) { x = ev.clientX - wr.left + 14; y = ev.clientY - wr.top + 14; }
+  else { const er = el.getBoundingClientRect(); x = er.left - wr.left + er.width / 2 + 10; y = er.top - wr.top + er.height / 2 + 10; }
+  tip.style.left = Math.max(4, Math.min(x, wr.width - 230)) + "px";
+  tip.style.top = Math.max(4, Math.min(y, wr.height - 80)) + "px";
+}
+function ovApplyTable() {
+  $("ovtable").setAttribute("aria-pressed", OV.table);
+  $("ovbody").querySelectorAll(".ov-svgwrap").forEach(el => { el.hidden = OV.table });
+  $("ovbody").querySelectorAll(".ov-tables").forEach(el => { el.hidden = !OV.table });
+  ovHideTips();
+}
+function ovOpenLayer(L) {
+  const p = new URLSearchParams();
+  p.set("q", ""); p.set("kinds", ovFocusKind()); p.set("lmin", String(L)); p.set("lmax", String(L));
+  if (S.sweep === "user") p.set("sweep", "user");
+  applyPersonaHash(p);
+  setTab("personas");
+}
+function ovOpenName(name) {
+  $("psearch").value = name;
+  setTab("personas");
+}
+async function renderOverview() {
+  const M = S.M; if (!M) return;
+  const seq = ++OV.seq, empty = $("ovempty"), body = $("ovbody"), sweep = S.sweep, user = sweep === "user";
+  updateSweepUI();
+  OV.prompt = user ? "" : $("ovprompt").value; OV.push = $("ovpush").value;
+  if (!(user ? M.info.user_sweep : M.info.sweep_stats)) {
+    OV.M = null; OV.sweep = null; OV.rows = null; OV.persons = null;
+    empty.hidden = false; body.hidden = true; body.innerHTML = "";
+    return;
+  }
+  empty.hidden = true; body.hidden = false;
+  if (OV.M !== M || OV.sweep !== sweep) { OV.M = M; OV.sweep = sweep; OV.rows = null; OV.persons = null; }
+  if (!OV.rows) {
+    body.innerHTML = `<div class="card"><p class="muted">Loading sweep stats…</p></div>`;
+    const [rows, persons] = await Promise.all([ovSweep(M, sweep), loadPersonas(M, sweep)]);
+    if (seq !== OV.seq || S.M !== M || S.sweep !== sweep) return;
+    if (!rows) { empty.hidden = false; body.hidden = true; body.innerHTML = ""; return; }
+    OV.rows = rows; OV.persons = persons;
+  }
+  if (seq !== OV.seq || S.M !== M || S.sweep !== sweep) return;
+  const agg = ovAgg(OV.rows, OV.prompt, OV.push);
+  const chars = ovCharacters(OV.persons, OV.prompt, OV.push);
+  const kinds = ovKinds(), focus = ovFocusKind(), focusLabel = OV_KIND_LABEL[focus];
+  const c1 = agg.total ? ovChart1(agg.layers) : { empty: "No replies match these controls." };
+  const c2data = ovPersonaLayers(OV.rows, OV.prompt);
+  const c2 = c2data.some(d => d.upN || d.downN) ? ovChart2(c2data) : { empty: "No push replies match this prompt." };
+  const c3 = chars.length ? ovChart3(chars.slice(0, 15)) : { empty: OV.persons ? `No ${focusLabel} names match these controls.` : `No ${user ? "user persona" : "persona"} library for this model yet.` };
+  const pct = agg.total ? 100 * agg.persona / agg.total : 0;
+  const stats = `<div class="stats ovstats">
+    <div class="stat"><b>${M.N.toLocaleString()}</b><span>neurons pushed</span></div>
+    <div class="stat"><b title="${ovFull(agg.total)}">${ovShort(agg.total)}</b><span>replies (estimated total)</span></div>
+    <div class="stat"><b title="${ovFull(agg.persona)}">${ovShort(agg.persona)}</b><span>${user ? "user identity" : "persona"} replies · ${ovPct(pct)}% of all</span></div>
+    <div class="stat"><b>${chars.length.toLocaleString()}</b><span>${user ? "distinct names given to the user" : "distinct character names"}</span></div>
+  </div>`;
+  const legend1 = ovLegend(kinds.map(k => [OV_KIND_LABEL[k], ovColor(k)]));
+  const legend2 = ovLegend([["push up", ovColor(focus)], ["push down", ovColor("altered_assistant")]]);
+  const legend3 = ovLegend([["distinct neurons", ovColor(focus)]]);
+  body.innerHTML = stats + `<div class="ov-grid">
+    ${ovCard("1", "What a push does, by layer", "Each bar is one layer; the colors show what kind of reply the push produced.", legend1, c1.svg || "", c1.table || "", c1.empty)}
+    ${ovCard("2", user ? "User persona rate, up vs down" : "Persona rate, up vs down", user ? "How often pushing up or down makes the reply say who the user is (both directions shown)." : "How often pushing up or down turns the reply into a persona (both directions shown).", legend2, c2.svg || "", c2.table || "", c2.empty)}
+    ${ovCard("3", user ? "Who the user becomes" : "Most common characters", user ? "The 15 names the user is given across the most pushed neurons." : "The 15 names that appear across the most pushed neurons.", legend3, c3.svg || "", c3.table || "", c3.empty)}
+  </div>`;
+  ovApplyTable();
+}
+$("ovbody").addEventListener("pointermove", e => {
+  const el = e.target.closest("[data-kind],[data-name],[data-summary]");
+  if (!el) { ovHideTips(); return; }
+  ovHideTips(); ovShowTip(el, e);
+});
+$("ovbody").addEventListener("pointerleave", ovHideTips);
+$("ovbody").addEventListener("focusin", e => {
+  const el = e.target.closest("[data-kind],[data-name],[data-summary]");
+  if (el) { ovHideTips(); ovShowTip(el); }
+});
+$("ovbody").addEventListener("focusout", ovHideTips);
+$("ovbody").addEventListener("click", e => {
+  const col = e.target.closest(".ov-col");
+  if (col) {
+    const kind = e.target.closest("[data-kind]")?.dataset.kind;
+    if (!kind || kind === ovFocusKind()) ovOpenLayer(+col.dataset.layer);
+    return;
+  }
+  const nameEl = e.target.closest("[data-name]");
+  if (nameEl) ovOpenName(nameEl.dataset.name);
+});
+$("ovbody").addEventListener("keydown", e => {
+  if (e.key !== "Enter" && e.key !== " ") return;
+  const col = e.target.closest(".ov-col");
+  if (col) { e.preventDefault(); ovOpenLayer(+col.dataset.layer); return; }
+  const nameEl = e.target.closest("[data-name]");
+  if (nameEl) { e.preventDefault(); ovOpenName(nameEl.dataset.name); }
+});
+["ovprompt", "ovpush"].forEach(id => $(id).onchange = () => { if (S.tab === "overview") renderOverview(); });
+$("ovtable").onclick = () => { OV.table = !OV.table; ovApplyTable(); };
+let ovResizeT = 0;
+addEventListener("resize", () => {
+  if (S.tab !== "overview") return;
+  clearTimeout(ovResizeT);
+  ovResizeT = setTimeout(() => { if (S.tab === "overview") renderOverview(); }, 150);
+});
 
 /* ---------- mix ---------- */
 const MIX = [];
@@ -766,29 +2195,166 @@ function recipeHTML(s) {
   }).join("");
 }
 function mixLink() { return "https://neuronary.org/?q=" + encodeURIComponent(mixString().split(" ")[0] || ""); }
-function addMix(k, dose = 0.5) {
+function syncMixHash() {
+  if (!S.M) return;
+  const recipe = mixString();
+  try { history.replaceState(null, "", `#${S.M.info.id}-mix` + (recipe ? "?r=" + encodeURIComponent(recipe) : "")) } catch {}  // recipes are per model
+}
+function recipeHasTerm(recipe, t) {
+  return new RegExp(`L${t.layer}N${t.neuron}(?!\\d)`, "i").test(String(recipe || ""));
+}
+function addMix(k, dose = 0.5, stay = false) {
   const M = S.M; if (!M) return;
   const L = Math.floor(k / M.d), n = k - L * M.d;
   const t = MIX.find(x => x.layer === L && x.neuron === n);
   if (t) t.dose = dose; else MIX.push({ layer: L, neuron: n, dose });
-  renderMix(); setTab("mix");
+  syncMixHash();
+  if (stay) renderMixTerms(); else { renderMix(); setTab("mix"); }
 }
-function renderMix() {
-  const M = S.M; if (!M) return;
+async function tryLiveNeuron(k) {
+  const M = S.M; const live = M?.info.live;
+  if (!live?.model) return;
+  if (live.webgpu_only && !(await liveSupported(live))) {
+    const btn = $("trylive");
+    if (btn) { btn.disabled = true; btn.title = WEBGPU_ONLY_MSG; }
+    const run = $("mixrun");
+    if (run) run.disabled = true;
+    const note = $("mixlivenote");
+    if (note) note.textContent = WEBGPU_ONLY_MSG;
+    showNotice(WEBGPU_ONLY_MSG, true);
+    return;
+  }
+  addMix(k, 0.5);
+  if (!$("mixprompt").value.trim()) { $("mixprompt").value = "Who are you?"; renderMixChips(); }
+  if (!liveBusy) await runMixLive();
+}
+
+let mixSeq = 0;
+let liveEngine = null;
+let liveEngineFor = null;
+let liveBusy = false;
+const WEBGPU_ONLY_MSG = "This model needs WebGPU (a recent Chrome or Edge on a machine with a GPU). SmolLM2 runs live everywhere.";
+let engineModuleP = null;
+function loadEngineModule() {
+  if (!engineModuleP) engineModuleP = import(new URL("engine.js", location.href).href);
+  return engineModuleP;
+}
+async function liveSupported(live) {
+  if (!live?.webgpu_only) return true;
+  try {
+    const mod = await loadEngineModule();
+    return await mod.webgpuAvailable();
+  } catch {
+    return false;
+  }
+}
+function mixStatus(text, err) {
+  const el = $("mixlivestatus");
+  el.innerHTML = err ? `<span class="err">${esc(text)}</span>` : esc(text);
+}
+function mixStarters() {
+  const M = S.M; if (!M) return [];
+  return [...M.lab.entries()]
+    .filter(([, l]) => l.push_kind === "persona")
+    .sort((a, b) => (b[1].confidence ?? 0) - (a[1].confidence ?? 0) || (b[1].detect ?? 0) - (a[1].detect ?? 0))
+    .slice(0, 3);
+}
+function renderMixRepro() {
+  const M = S.M, box = $("mixrepro"); if (!M || !box) return;
+  box.innerHTML = reproDetailsHTML({ name: "mix", model: M.info.model, recipe: mixString(), prompt: $("mixprompt")?.value.trim() || "Who are you?", livePrompt: "mix" });
+}
+function renderMixTerms() {
+  const M = S.M;
   $("mixterms").innerHTML = MIX.length ? MIX.map((t, i) => {
     const lb = M.lab.get(t.layer * M.d + t.neuron);
     return `<span class="pill" style="display:inline-flex;gap:6px;align-items:center">${lb ? esc(lb.emoji) + " " : ""}<b>L${t.layer} · N${t.neuron}</b>
       <input type="number" min="-3" max="3" step="0.1" value="${t.dose}" data-i="${i}" aria-label="dose" style="width:5.5em;border:1px solid var(--line);background:var(--surface);border-radius:6px;padding:2px 6px;font:12px var(--mono)">
-      <button class="btn" data-rm="${i}" style="padding:2px 7px" aria-label="remove">×</button></span>`;
+      <button class="pill" data-rm="${i}" style="border:0;cursor:pointer" aria-label="remove">×</button></span>`;
   }).join("") : `<span class="muted">No neurons yet. Open a neuron and press “Add to mix”.</span>`;
   $("mixstr").textContent = mixString() || "—";
   $("mixlink").href = mixLink();
-  renderRuns(M);
+  renderMixRepro();
 }
-function renderRuns(M) {
+function renderMixStarters() {
+  const box = $("mixstarters");
+  if (MIX.length) { box.hidden = true; box.innerHTML = ""; return; }
+  const starters = mixStarters();
+  box.hidden = !starters.length;
+  box.innerHTML = starters.map(([k, l]) => {
+    const L = Math.floor(k / S.M.d), n = k - L * S.M.d;
+    return `<button class="chip" type="button" data-starter="${k}" title="Add ${esc(l.label)} to the mix">${esc(l.emoji || "")} ${esc(l.label)} <small>L${L}·N${n}</small></button>`;
+  }).join("");
+}
+function mixSweepHTML(M, t, data) {
+  const lb = M.lab.get(t.layer * M.d + t.neuron);
+  const sign = t.dose > 0 ? 1 : -1;
+  const variant = sign > 0 ? "plus" : "minus";
+  const fallback = sign > 0 ? "+0.8" : "−0.8";
+  const prompts = data?.prompts || [];
+  const by = new Map();
+  (data?.rows || []).forEach(r => {
+    const pi = Number(r.prompt);
+    if (!by.has(pi)) by.set(pi, []);
+    by.get(pi).push(r);
+  });
+  const body = [...by.keys()].sort((a, b) => a - b).map(pi => {
+    const rs = by.get(pi);
+    const r = sign > 0
+      ? rs.filter(x => Number(x.dose) > 0).sort((a, b) => Number(b.dose) - Number(a.dose))[0]
+      : rs.filter(x => Number(x.dose) < 0).sort((a, b) => Number(a.dose) - Number(b.dose))[0];
+    if (!r) return "";
+    return `<div class="sweeprow"><p class="prompt">“${esc(prompts[pi] ?? "")}”</p>${sweepBubbleHTML(r, variant, fallback)}</div>`;
+  }).join("");
+  return `<div class="card" style="margin-bottom:12px">
+    <div class="idline"><b>L${t.layer} · N${t.neuron}</b><span class="pill ${sign > 0 ? "eo" : ""}">dose ${t.dose > 0 ? "+" : ""}${mixNum(t.dose)} → ${fallback}</span>${lb ? `<span class="pill eo">${esc(lb.emoji)} ${esc(lb.label)}</span>` : ""}</div>
+    ${body || `<p class="muted">No stored sweep replies for this neuron.</p>`}
+  </div>`;
+}
+async function renderMixEvidence(M) {
+  const seq = mixSeq;
+  const box = $("mixevidence");
+  if (!MIX.length) { box.hidden = true; box.innerHTML = ""; return; }
+  box.hidden = false;
+  box.innerHTML = `<h3 style="margin:18px 0 8px">What each neuron does alone (stored sweep, ±0.8)</h3><div id="mixevbody"><p class="muted">Loading stored sweeps…</p></div>`;
+  const terms = MIX.slice();
+  const data = await Promise.all(terms.map(t => neuronSweep(M, t.layer, t.neuron).catch(() => null)));
+  if (seq !== mixSeq || S.M !== M) return;
+  const body = $("mixevbody");
+  if (body) body.innerHTML = terms.map((t, i) => mixSweepHTML(M, t, data[i])).join("");
+}
+function recipeAddTerms(recipe) {
+  const terms = [], skipped = [];
+  const re = /L(\d+)N(\d+)\s*([=*+\-])?\s*([+-]?\d*\.?\d+(?:[eE][+-]?\d+)?)/gi;
+  let m;
+  while ((m = re.exec(String(recipe || "")))) {
+    const op = m[3] || "+";
+    if (op === "=" || op === "*") { skipped.push(m[0].trim()); continue; }
+    let dose = Number(m[4]);
+    if (op === "-") dose = -Math.abs(dose);
+    if (Number.isFinite(dose)) terms.push({ layer: +m[1], neuron: +m[2], dose });
+  }
+  return { terms, skipped };
+}
+function loadRecipeIntoMix(recipe) {
+  const { terms, skipped } = recipeAddTerms(recipe);
+  MIX.splice(0, MIX.length, ...terms);
+  renderMix();
+  syncMixHash();
+  const note = $("mixloadnote");
+  if (note) {
+    note.hidden = !skipped.length;
+    note.textContent = skipped.length
+      ? `Loaded ${terms.length} add/sub term${terms.length === 1 ? "" : "s"}; skipped ${skipped.length} set/multiply term${skipped.length === 1 ? "" : "s"} (${skipped.join(", ")}).`
+      : "";
+  }
+}
+function applyMixHash(params) {
+  loadRecipeIntoMix(params.get("r") || "");
+}
+function renderRuns(M, terms = null) {
   const rows = M.recipes || [];
   if (!rows.length) {
-    $("mixruns").innerHTML = `<p class="muted">No <code>recipes.parquet</code> for this model yet. Run <code>python -m atlas.steer --recipe …</code> to make one.</p>`;
+    $("mixruns").innerHTML = `<h3 style="margin:18px 0 8px">Recipe runs</h3><p class="muted">No <code>recipes.parquet</code> for this model yet. Run <code>python -m atlas.steer --recipe …</code> to make one.</p>`;
     return;
   }
   const base = new Map(), groups = new Map();
@@ -798,33 +2364,208 @@ function renderRuns(M) {
     if (!groups.has(key)) groups.set(key, { name: r.name, recipe: r.recipe, rows: [] });
     groups.get(key).rows.push(r);
   });
-  $("mixruns").innerHTML = [...groups.values()].map(g => {
+  const all = [...groups.values()];
+  const matching = terms && terms.length ? all.filter(g => terms.some(t => recipeHasTerm(g.recipe, t))) : [];
+  const rest = matching.length ? all.filter(g => !matching.includes(g)) : all;
+  const groupHTML = g => {
     const by = new Map();
     g.rows.forEach(r => { const p = String(r.prompt); if (!by.has(p)) by.set(p, []); by.get(p).push(r); });
     const body = [...by].map(([p, rs]) => `<p class="prompt">“${esc(p)}”</p><div class="compare">
-      <div class="bubble"><span class="who">normal</span>${esc(base.get(p) ?? "(no baseline)")}</div>
-      ${rs.sort((a, b) => a.scale - b.scale).map(r => `<div class="bubble plus"><span class="who">scale ${esc(r.scale)}</span>${esc(r.text)}</div>`).join("")}
+      <div class="bubble"><span class="who">normal</span>${mdHTML(base.get(p) ?? "(no baseline)")}</div>
+      ${rs.sort((a, b) => a.scale - b.scale).map(r => `<div class="bubble plus"><span class="who">scale ${esc(r.scale)}</span>${mdHTML(r.text)}</div>`).join("")}
     </div>`).join("");
-    return `<div class="card" style="margin-bottom:12px"><div class="idline"><b>${esc(g.name)}</b><span>${recipeHTML(g.recipe)}</span></div>${body}</div>`;
-  }).join("");
+    return `<div class="card" style="margin-bottom:12px"><div class="idline"><b>${esc(g.name)}</b><span>${recipeHTML(g.recipe)}</span><button class="btn run-load" type="button" data-loadmix="${esc(g.recipe)}">Load into mix</button></div>${body}</div>`;
+  };
+  const compactHTML = (g, i) => {
+    const prompts = [...new Set(g.rows.map(r => String(r.prompt)))];
+    const p = prompts.find(x => x.trim().toLowerCase() === "who are you?") ?? prompts[0] ?? "";
+    const rs = g.rows.filter(r => String(r.prompt) === p).sort((a, b) => Number(a.scale) - Number(b.scale));
+    const scaled = rs.find(r => Number(r.scale) === 1) || rs[0];
+    return `<details class="run-row" data-run="${i}"><summary><span class="run-compact">
+      <span class="run-head"><b>${esc(g.name)}</b><span class="run-pills">${recipeHTML(g.recipe)}</span><button class="btn run-load" type="button" data-loadmix="${esc(g.recipe)}">Load into mix</button></span>
+      <span class="run-line"><span class="who">normal</span><span class="run-reply">${mdHTML(base.get(p) ?? "(no baseline)")}</span></span>
+      <span class="run-line plus"><span class="who">scale ${scaled ? esc(scaled.scale) : "1"}</span><span class="run-reply">${mdHTML(scaled ? scaled.text : "(no scale-1 reply)")}</span></span>
+    </span></summary><div class="run-full"></div></details>`;
+  };
+  let html = "";
+  if (matching.length) html += `<h3 style="margin:18px 0 8px">Stored recipe runs with these neurons</h3>` + matching.map(groupHTML).join("");
+  if (rest.length) html += `<details class="runs-all"><summary>All stored recipe runs (${rest.length})</summary><div class="runs-all-body"></div></details>`;
+  else if (!matching.length) html += `<h3 style="margin:18px 0 8px">Recipe runs</h3><p class="muted">No stored recipe runs for this model.</p>`;
+  else html += `<p class="muted">No other stored recipe runs for this model.</p>`;
+  $("mixruns").innerHTML = html;
+  const det = $("mixruns").querySelector("details.runs-all");
+  if (det) {
+    let built = false;
+    det.addEventListener("toggle", () => {
+      if (!det.open || built) return;
+      built = true;
+      const body = det.querySelector(".runs-all-body");
+      if (!body) return;
+      body.innerHTML = rest.map(compactHTML).join("");
+      body.querySelectorAll("details.run-row").forEach(row => {
+        row.addEventListener("toggle", () => {
+          if (!row.open) return;
+          const full = row.querySelector(".run-full");
+          const g = rest[+row.dataset.run];
+          if (full && g && !full.dataset.built) { full.innerHTML = groupHTML(g); full.dataset.built = "1"; }
+        });
+      });
+    });
+  }
+}
+async function runMixLive() {
+  const M = S.M; if (!M || liveBusy) return;
+  const live = M.info.live;
+  if (!live || !live.model) return;
+  const prompt = $("mixprompt").value.trim();
+  if (!prompt) { mixStatus("Enter a prompt first.", true); return; }
+  liveBusy = true;
+  let blocked = false;
+  $("mixrun").disabled = true;
+  $("mixrun").textContent = "Running…";
+  $("mixliveout").hidden = false;
+  $("mixnormal").textContent = "";
+  $("mixpushed").textContent = "";
+  mixStatus("Loading engine…");
+  try {
+    const mod = await loadEngineModule();
+    if (live.webgpu_only && !(await mod.webgpuAvailable())) {
+      blocked = true;
+      $("mixlivenote").textContent = WEBGPU_ONLY_MSG;
+      mixStatus(WEBGPU_ONLY_MSG, true);
+      return;
+    }
+    if (!liveEngine || liveEngineFor !== live.model) {
+      liveEngine = await mod.loadEngine(live.model, {
+        requireWebGPU: !!live.webgpu_only,
+        onProgress(received, total, cached) {
+          if (cached) { mixStatus("Model loaded from cache."); return; }
+          const mb = (received / 1e6).toFixed(1);
+          mixStatus(total > 0 ? `Downloading model… ${mb} / ${(total / 1e6).toFixed(1)} MB` : `Downloading model… ${mb} MB`);
+        },
+        onStatus(text, kind) {
+          if (!kind || kind === "warn") mixStatus(text);
+        },
+      });
+      liveEngineFor = live.model;
+    }
+    mixStatus(MIX.length ? `Running · ${MIX.length} neuron${MIX.length === 1 ? "" : "s"} pushed` : "Running · zero steer");
+    const result = await liveEngine.generate({
+      prompt,
+      terms: MIX.map(t => ({ layer: t.layer, neuron: t.neuron, dose: t.dose })),
+      scale: Number($("mixscale").value),
+      maxTokens: 48,
+      onToken(stream, text) {
+        if (stream === "normal") $("mixnormal").innerHTML = mdHTML(text);
+        else $("mixpushed").innerHTML = mdHTML(text);
+      },
+    });
+    $("mixnormal").innerHTML = mdHTML(result.normal);
+    $("mixpushed").innerHTML = mdHTML(result.pushed);
+    mixStatus(`${result.tokensPerSecond.toFixed(1)} tok/s`);
+  } catch (e) {
+    mixStatus("Live run failed: " + (e?.message || e), true);
+  } finally {
+    liveBusy = false;
+    $("mixrun").disabled = blocked;
+    $("mixrun").textContent = "Run live";
+  }
+}
+function renderMix() {
+  const M = S.M; if (!M) return;
+  mixSeq++;
+  const live = !!(M.info.live && M.info.live.model);
+  const linfo = M.info.live || {};
+  const size = fmtBytes(linfo.bytes);
+  $("mixlivebeta").hidden = !linfo.beta;
+  const betaNote = $("mixbetanote");
+  betaNote.hidden = !linfo.note;
+  betaNote.textContent = linfo.note || "";
+  $("mixlivenote").textContent = `Runs in your browser; first run downloads the model${size ? ` (${size}, cached)` : " (cached)"}`;
+  if (!liveBusy) $("mixrun").disabled = !!linfo.webgpu_only;
+  if (linfo.webgpu_only) {
+    liveSupported(linfo).then(ok => {
+      if (S.M !== M) return;
+      if (!ok) {
+        $("mixrun").disabled = true;
+        $("mixlivenote").textContent = WEBGPU_ONLY_MSG;
+      } else if (!liveBusy) {
+        $("mixrun").disabled = false;
+      }
+    });
+  }
+  const evidence = !live && !!M.info.sweep_cards;
+  const loadNote = $("mixloadnote");
+  if (loadNote) { loadNote.hidden = true; loadNote.textContent = ""; }
+  renderMixTerms();
+  renderMixStarters();
+  $("mixlive").hidden = !live;
+  $("mixliveout").hidden = !live;
+  if (!live) {
+    $("mixnormal").textContent = "";
+    $("mixpushed").textContent = "";
+    $("mixlivestatus").textContent = "";
+  }
+  $("mixhint").hidden = !evidence;
+  renderMixChips();
+  $("mixevidence").hidden = !evidence;
+  if (!evidence) $("mixevidence").innerHTML = "";
+  renderRuns(M, evidence ? MIX : null);
+  if (evidence) renderMixEvidence(M);
+  syncMixHash();
 }
 $("mixterms").addEventListener("input", e => {
   const inp = e.target.closest("input[data-i]"); if (!inp) return;
   MIX[+inp.dataset.i].dose = Math.max(-3, Math.min(3, Number(inp.value) || 0));
   $("mixstr").textContent = mixString() || "—";
   $("mixlink").href = mixLink();
+  renderMixRepro();
+  syncMixHash();
+  if (S.M?.info.sweep_cards && !S.M.info.live) { mixSeq++; renderRuns(S.M, MIX); renderMixEvidence(S.M); }
 });
 $("mixterms").addEventListener("click", e => {
   const b = e.target.closest("[data-rm]"); if (!b) return;
   MIX.splice(+b.dataset.rm, 1); renderMix();
 });
+$("mixstarters").addEventListener("click", e => {
+  const b = e.target.closest("[data-starter]"); if (!b) return;
+  addMix(+b.dataset.starter);
+});
+const MIX_PROMPTS = ["Who are you?", "Who am I?", "Tell me a short story."];
+let mixPromptInit = false;
+function renderMixChips() {
+  if (!mixPromptInit) {
+    mixPromptInit = true;
+    if (!$("mixprompt").value) $("mixprompt").value = MIX_PROMPTS[0];
+  }
+  const value = $("mixprompt").value.trim();
+  const seen = new Set();
+  $("mixchips").innerHTML = MIX_PROMPTS.filter(p => !seen.has(p) && (seen.add(p), true)).map(p =>
+    `<button class="chip" type="button" data-prompt="${esc(p)}" aria-pressed="${p === value}">${esc(p)}</button>`).join("");
+}
+$("mixchips").onclick = e => {
+  const b = e.target.closest("button[data-prompt]"); if (!b) return;
+  $("mixprompt").value = b.dataset.prompt;
+  renderMixChips();
+  $("mixprompt").focus();
+};
+$("mixprompt").addEventListener("input", renderMixChips);
+$("mixscale").oninput = () => { $("mixscaleval").textContent = Number($("mixscale").value).toFixed(2) + "×"; };
+$("mixrun").onclick = runMixLive;
 $("mixcopy").onclick = async () => {
   try { await navigator.clipboard.writeText(mixString()); $("mixcopy").textContent = "Copied"; }
   catch { $("mixcopy").textContent = "Copy failed"; }
-  setTimeout(() => { $("mixcopy").textContent = "Copy" }, 1200);
+  setTimeout(() => { $("mixcopy").textContent = "Copy recipe" }, 1200);
 };
 $("mixruns").onclick = e => {
+  const load = e.target.closest("button[data-loadmix]");
+  if (load) {
+    e.preventDefault();
+    loadRecipeIntoMix(load.dataset.loadmix);
+    return;
+  }
   const b = e.target.closest("button[data-open]"); if (!b) return;
+  e.preventDefault();
   const [L, n] = b.dataset.open.split(":").map(Number), M = S.M;
   setTab("map"); openNeuron(L * M.d + n, { focus: true });
 };
@@ -887,6 +2628,146 @@ $("gchoices").onclick = e => {
 };
 $("gnext").onclick = nextGuess;
 $("gopen").onclick = () => { setTab("map"); openNeuron(G.cur.k, { focus: true }); };
+
+/* ---------- become ---------- */
+const BECOME_EXAMPLES = ["cat", "ocean", "ghost", "moon", "king", "fire", "angel", "river", "music", "doctor", "horse", "snow"];
+let becomeSeq = 0, becomeTimer = 0, becomeRows = [];
+function saysShard(M, letter) {
+  if (!M.saysP) M.saysP = new Map();
+  if (!M.saysP.has(letter)) {
+    const p = tryPq(M.dir + `saysindex/${letter}.parquet`, ["word", "layer", "neuron", "sign", "rank"])
+      .then(rows => rows || []);
+    M.saysP.set(letter, p);
+  }
+  return M.saysP.get(letter);
+}
+function lensGuidedRows(M) {
+  if (!M.lensGuidedP) M.lensGuidedP = tryPq(M.dir + "experiments/lens_guided.parquet", ["name", "recipe", "text", "becomes"])
+    .catch(() => tryPq(M.dir + "experiments/lens_guided.parquet", ["name", "text"]))
+    .then(rows => rows || []);
+  return M.lensGuidedP;
+}
+function becomeParseName(name) {
+  const m = /^([^:]+):([^:]+):L(\d+)N(\d+)[+-]?$/.exec(String(name || ""));
+  return m ? { lens: m[1], word: m[2].toLowerCase(), layer: +m[3], neuron: +m[4] } : null;
+}
+function becomeReplyHTML(r) {
+  const p = becomeParseName(r.name); if (!p) return "";
+  const text = String(r.text ?? "");
+  const clipped = text.length > 220 ? text.slice(0, 219) + "…" : text;
+  const m = /([+-])(\d*\.?\d+)\s*$/.exec(String(r.recipe || "")), dose = m ? `${m[1] === "-" ? "−" : "+"}${m[2]}` : "±0.8";
+  return `<div class="push"><div class="reply" style="white-space:pre-wrap">${mdHTML(clipped)}</div><div class="meta">L${p.layer} N${p.neuron} ${dose} · ${p.lens === "j" ? "J-lens" : p.lens === "r" ? "R-lens" : "logit lens"}${r.becomes ? " · became it" : ""}</div></div>`;
+}
+function becomeNoIndexHTML(M) {
+  const target = S.models.find(m => /Qwen3\.5-4B/i.test(m.id) || /Qwen3\.5-4B/i.test(m.model || ""));
+  const btn = target && target.id !== M.info.id ? ` <button class="btn" type="button" data-become-model="${esc(target.id)}">Switch to ${esc(target.name || target.model || "Qwen3.5-4B")}</button>` : "";
+  return `<p class="muted">No lens index for this model yet; try Qwen3.5-4B.${btn}</p>`;
+}
+function becomeRowHTML(M, r, i) {
+  const L = Number(r.layer), n = Number(r.neuron), k = L * M.d + n;
+  const lb = M.lab.get(k), sign = Number(r.sign) > 0 ? 1 : -1, rank = Number(r.rank);
+  return `<div class="run-row"><div class="run-head"><b>L${L} · N${n}</b><span class="pill ${sign > 0 ? "eo" : ""}">${sign > 0 ? "push up" : "push down"}</span><span class="pill">${Number.isFinite(rank) ? "#" + (rank + 1) : "#–"}</span>${lb ? `<span>${esc(lb.emoji)} ${esc(lb.label)}</span>` : ""}<span style="margin-left:auto;display:inline-flex;gap:6px;flex-wrap:wrap"><button class="btn run-load" type="button" data-become-mix="${i}">Add to mix</button><button class="btn run-load" type="button" data-become-open="${i}">Open</button></span></div></div>`;
+}
+function syncBecomeHash() {
+  if (S.tab !== "become" || !S.M) return;
+  const w = $("becomeq").value.trim();
+  try { history.replaceState(null, "", `#${S.M.info.id}-become` + (w ? "?w=" + encodeURIComponent(w) : "")) } catch {}
+}
+function applyBecomeHash(params) {
+  const w = params.get("w");
+  if (w != null) $("becomeq").value = w;
+}
+function renderBecomeChips() {
+  $("becomechips").innerHTML = BECOME_EXAMPLES.map(w => `<button class="chip" type="button" data-become-word="${w}">${w}</button>`).join("");
+}
+async function runBecome() {
+  const M = S.M, out = $("becomeout");
+  if (!M) return;
+  const word = $("becomeq").value.trim().toLowerCase();
+  const seq = ++becomeSeq;
+  becomeRows = [];
+  syncBecomeHash();
+  if (!M.info.says_index) { out.innerHTML = becomeNoIndexHTML(M); return; }
+  if (!word) { out.innerHTML = ""; return; }
+  const letter = word[0];
+  if (!/^[a-z]$/.test(letter)) { out.innerHTML = `<p class="muted">No neuron's top tokens include “${esc(word)}”. Try a common noun.</p>`; return; }
+  out.innerHTML = `<p class="muted">Loading “${esc(word)}”…</p>`;
+  const [shard, lens] = await Promise.all([
+    saysShard(M, letter),
+    M.info.lens_guided ? lensGuidedRows(M).catch(() => []) : [],
+  ]);
+  if (seq !== becomeSeq || S.M !== M) return;
+  const rows = (shard || []).filter(r => String(r.word ?? "").toLowerCase() === word)
+    .sort((a, b) => Number(a.rank) - Number(b.rank) || Number(b.layer) - Number(a.layer) || Number(a.neuron) - Number(b.neuron));
+  const replies = [];
+  (lens || []).forEach(r => {
+    const p = becomeParseName(r.name);
+    if (p && p.word === word && String(r.text ?? "").trim()) replies.push(r);
+  });
+  replies.sort((a, b) => Number(!!b.becomes) - Number(!!a.becomes));
+  const seenReply = new Set();  // the same neuron is often picked by more than one lens: show its reply once
+  const uniq = replies.filter(r => {
+    const p = becomeParseName(r.name), key = `${p.layer}:${p.neuron}:${r.text}`;
+    return seenReply.has(key) ? false : (seenReply.add(key), true);
+  });
+  replies.length = 0; replies.push(...uniq);
+  let html = "";
+  if (replies.length) html += `<h3 style="margin:0 0 8px">We pushed these</h3><div class="grid-cards" style="margin-bottom:16px">${replies.slice(0, 6).map(becomeReplyHTML).join("")}</div>`;
+  if (!rows.length) {
+    html += `<p class="muted">No neuron's top tokens include “${esc(word)}”. Try a common noun.</p>`;
+  } else {
+    becomeRows = rows.slice(0, 24);
+    html += becomeRows.map((r, i) => becomeRowHTML(M, r, i)).join("");
+    if (rows.length > becomeRows.length) html += `<p class="muted">Showing ${becomeRows.length} of ${rows.length} neurons.</p>`;
+  }
+  out.innerHTML = html;
+}
+function renderBecome() {
+  const M = S.M, out = $("becomeout");
+  if (!M) return;
+  if (!M.info.says_index) { becomeRows = []; out.innerHTML = becomeNoIndexHTML(M); return; }
+  if ($("becomeq").value.trim()) runBecome(); else { becomeRows = []; out.innerHTML = ""; }
+}
+renderBecomeChips();
+$("becomeq").addEventListener("input", () => {
+  syncBecomeHash();
+  clearTimeout(becomeTimer);
+  becomeTimer = setTimeout(() => { if (S.tab === "become") runBecome(); }, 250);
+});
+$("becomeq").addEventListener("keydown", e => {
+  if (e.key !== "Enter") return;
+  e.preventDefault();
+  clearTimeout(becomeTimer);
+  runBecome();
+});
+$("becomechips").onclick = e => {
+  const b = e.target.closest("button[data-become-word]"); if (!b) return;
+  $("becomeq").value = b.dataset.becomeWord;
+  clearTimeout(becomeTimer);
+  runBecome();
+};
+$("becomeout").onclick = async e => {
+  const sw = e.target.closest("button[data-become-model]");
+  if (sw) { await selectModel(sw.dataset.becomeModel); return; }
+  const mix = e.target.closest("button[data-become-mix]");
+  if (mix) {
+    const M = S.M, r = becomeRows[+mix.dataset.becomeMix]; if (!M || !r) return;
+    const L = Number(r.layer), n = Number(r.neuron), k = L * M.d + n;
+    const sign = Number(r.sign) > 0 ? 1 : -1;
+    const dose = M.N > 100000 ? 0.8 : 0.5;
+    addMix(k, sign * dose, true);
+    showNotice(`Added ${keyName(M, k)} at ${sign > 0 ? "+" : "−"}${dose}`);
+    mix.textContent = "Added";
+    setTimeout(() => { if (mix.isConnected) mix.textContent = "Add to mix"; }, 1200);
+    return;
+  }
+  const open = e.target.closest("button[data-become-open]");
+  if (open) {
+    const M = S.M, r = becomeRows[+open.dataset.becomeOpen]; if (!M || !r) return;
+    const k = Number(r.layer) * M.d + Number(r.neuron);
+    setTab("map"); openNeuron(k, { focus: true });
+  }
+};
 
 /* ---------- SQL (DuckDB-WASM, lazy) ---------- */
 const SQLX = [
@@ -977,16 +2858,24 @@ $("sqltext").onkeydown = e => { if ((e.metaKey || e.ctrlKey) && e.key === "Enter
 async function selectModel(id) {
   $("sub").textContent = "loading…";
   const M = await loadModel(id); S.M = M; S.sel = -1; hits = null; S.isolate = -1; view.s = 1; view.tx = view.ty = 0; G.cur = null; MIX.length = 0;
+  liveEngine = null; liveEngineFor = null; liveBusy = false;
+  $("mixnormal").textContent = "Waiting to run…"; $("mixpushed").textContent = "Waiting to run…"; $("mixlivestatus").textContent = "";
+  if (!M.info.user_sweep && S.sweep !== "model") setSweep("model", true); else updateSweepUI();
+  const top = TAB_OF[S.tab];
+  lastSub[top] = S.tab;
+  paintTab(top, S.tab);
   store.set("atlas-model", id);
   [...$("models").children].forEach(b => b.setAttribute("aria-pressed", b.dataset.id === id));
   $("sub").textContent = `${M.N.toLocaleString()} neurons · ${M.info.n_layers} layers · ${M.info.n_tokens.toLocaleString()} corpus tokens`;
   buildGrid(); renderRibbon(); renderPoints(); draw();
   if ($("q").value) runSearch();
-  if (S.tab === "pushes") renderPushes(); if (S.tab === "mix") renderMix(); if (S.tab === "board") renderBoard();
+  if (S.tab === "pushes") renderPushes(); if (S.tab === "personas") renderPersonas(); if (S.tab === "mix") renderMix(); if (S.tab === "board") renderBoard();
+  if (S.tab === "overview") renderOverview();
   if (S.tab === "guess") nextGuess(); if (S.tab === "sql") sqlInit();
+  if (S.tab === "become") renderBecome();
   return M;
 }
-$("models").onclick = async e => { const b = e.target.closest("button"); if (!b) return; const M = await selectModel(b.dataset.id); openStart(M); };
+$("models").onclick = async e => { const b = e.target.closest("button"); if (!b) return; const M = await selectModel(b.dataset.id); if (S.tab === "personas") syncPersonasHash(); else if (S.tab === "overview") syncOverviewHash(); else if (S.tab === "become") syncBecomeHash(); else if (S.tab === "mix") syncMixHash(); else openStart(M); };
 function openStart(M) {
   const g = goodNeurons(M).slice().sort((a, b) => { const la = M.lab.get(a), lb = M.lab.get(b); return ((lb.detect ?? 0) + lb.confidence / 5 + (M.up.get(b)?.uptake ?? 0) * .3) - ((la.detect ?? 0) + la.confidence / 5 + (M.up.get(a)?.uptake ?? 0) * .3); });
   openNeuron(g.length ? g[0] : 0, { focus: g.length > 0 });
@@ -1000,13 +2889,27 @@ async function boot() {
     $("panel").innerHTML = `<p class="err">Could not read ${esc(BASE)}models.json. Serve this page next to a data folder, or pass <code>?data=&lt;hf-user&gt;/&lt;dataset&gt;</code>.</p>`; return;
   }
   $("models").innerHTML = S.models.map(m => `<button class="chip" data-id="${m.id}" aria-pressed="false">${esc(m.name || m.model.split("/").pop())}<small>${(m.n_neurons / 1000).toFixed(0)}k</small></button>`).join("");
-  const h = (location.hash || "").slice(1), hm = h.match(/^(.+)-L(\d+)-N(\d+)$/);
-  let id = hm && S.models.some(m => m.id === hm[1]) ? hm[1] : store.get("atlas-model");
+  const h = (location.hash || "").slice(1), hm = h.match(/^(.+)-L(\d+)-N(\d+)$/), hp = h.match(/^(.+)-personas(?:\?(.*))?$/), ho = h.match(/^(.+)-overview(?:\?(.*))?$/), hb = h.match(/^become(?:\?(.*))?$/), hmb = h.match(/^(.+)-become(?:\?(.*))?$/), hmi = h.match(/^mix(?:\?(.*))?$/), hmm = h.match(/^(.+)-mix(?:\?(.*))?$/);
+  let id = hm && S.models.some(m => m.id === hm[1]) ? hm[1] : hp && S.models.some(m => m.id === hp[1]) ? hp[1] : ho && S.models.some(m => m.id === ho[1]) ? ho[1] : hmb && S.models.some(m => m.id === hmb[1]) ? hmb[1] : hmm && S.models.some(m => m.id === hmm[1]) ? hmm[1] : store.get("atlas-model");
   const richest = [...S.models].sort((a, b) => (b.files || []).length - (a.files || []).length || b.n_neurons - a.n_neurons)[0];
   if (!S.models.some(m => m.id === id)) id = richest.id;
   const M = await selectModel(id);
-  if (hm && hm[1] === id) openNeuron(+hm[2] * M.d + +hm[3], { focus: true }); else openStart(M);
-  if (TABS.includes(h)) setTab(h);
+  if (hp && hp[1] === id) { applyPersonaHash(new URLSearchParams(hp[2] || "")); setTab("personas"); }
+  else if (ho && ho[1] === id) { applyOverviewHash(new URLSearchParams(ho[2] || "")); setTab("overview"); }
+  else if (hmb && hmb[1] === id) { applyBecomeHash(new URLSearchParams(hmb[2] || "")); setTab("become"); }
+  else if (hb) { applyBecomeHash(new URLSearchParams(hb[1] || "")); setTab("become"); }
+  else if (hmm && hmm[1] === id) { applyMixHash(new URLSearchParams(hmm[2] || "")); setTab("mix"); }
+  else if (hmi) { applyMixHash(new URLSearchParams(hmi[1] || "")); setTab("mix"); }
+  else {
+    if (hm && hm[1] === id) openNeuron(+hm[2] * M.d + +hm[3], { focus: true }); else openStart(M);
+    if (TABS.includes(h) || TOP_TABS.includes(h)) setTab(h);
+  }
 }
+window.addEventListener("hashchange", () => {
+  const h = (location.hash || "").slice(1), mm = h.match(/^(.+)-mix(?:\?(.*))?$/), m = h.match(/^mix(?:\?(.*))?$/);
+  if (!(m || (mm && S.M && mm[1] === S.M.info.id)) || !S.M) return;
+  applyMixHash(new URLSearchParams((m ? m[1] : mm[2]) || ""));
+  setTab("mix");
+});
 boot();
 </script>

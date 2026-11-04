@@ -32,14 +32,36 @@ def load_corpus(path, limit=None):
 SKIP = 2  # leading positions never counted: first tokens act as attention sinks with huge, meaningless activations
 
 
-def tokenize(nm: NeuronModel, docs, max_len):
-    """-> list of (src_id, kind, ids, skip). skip also covers the chat-template prefix every chat shares
-    (e.g. a default system prompt), which would otherwise fill top-example lists with the same text."""
+def tokenize(nm: NeuronModel, docs, max_len, roles=False):
+    """-> list of (src_id, kind, ids, skip, roles). skip also covers the chat-template prefix every chat shares
+    (e.g. a default system prompt), which would otherwise fill top-example lists with the same text. roles marks
+    user (1) and assistant (2) message spans; template tokens and web docs stay 0."""
     out = []
     for d in docs:
         ids = nm.tok(nm.render(d), add_special_tokens=True, truncation=True, max_length=max_len)["input_ids"]
         if len(ids) >= 8:
-            out.append([d["id"], d["kind"], ids, SKIP])
+            rids = [0] * len(ids)
+            if roles and d["kind"] == "chat":
+                def ids_for(msgs):
+                    if not msgs:
+                        return []
+                    return nm.tok(nm.render({**d, "messages": msgs}), add_special_tokens=True,
+                                  truncation=True, max_length=max_len)["input_ids"]
+                for i, msg in enumerate(d["messages"]):
+                    role = 1 if msg["role"] == "user" else 2 if msg["role"] == "assistant" else 0
+                    if not role:
+                        continue
+                    b = ids_for(d["messages"][:i] + [{"role": msg["role"], "content": ""}])
+                    c = ids_for(d["messages"][:i + 1])
+                    q = 0
+                    while q < len(b) and q < len(c) and b[q] == c[q]:
+                        q += 1
+                    s = 0
+                    while s < len(b) - q and s < len(c) - q and b[-1 - s] == c[-1 - s]:
+                        s += 1
+                    for p in range(q, min(len(c) - s, len(ids))):
+                        rids[p] = role
+            out.append([d["id"], d["kind"], ids, SKIP, rids])
     chats = [x[2] for x in out if x[1] == "chat"]
     if len(chats) > 1:
         p = 0
@@ -61,15 +83,17 @@ def pad(nm, chunk):
     ids = torch.full((len(chunk), L), nm.tok.pad_token_id, dtype=torch.long)
     mask = torch.zeros((len(chunk), L), dtype=torch.bool)
     count = torch.zeros_like(mask)
-    for b, (_, _, x, skip) in enumerate(chunk):
+    roles = torch.zeros((len(chunk), L), dtype=torch.long)
+    for b, (_, _, x, skip, r) in enumerate(chunk):
         ids[b, :len(x)] = torch.tensor(x)
         mask[b, :len(x)] = True
         count[b, skip:len(x)] = True
-    return ids.to(nm.device), mask.to(nm.device), count.to(nm.device)
+        roles[b, :len(x)] = torch.tensor(r)
+    return ids.to(nm.device), mask.to(nm.device), count.to(nm.device), roles.to(nm.device)
 
 
 @torch.no_grad()
-def pass1(nm: NeuronModel, toks, bs, k_pos, k_neg):
+def pass1(nm: NeuronModel, toks, bs, k_pos, k_neg, roles=False):
     nL, d = nm.n_layers, nm.d_mlp
     dev = nm.device
     st = {
@@ -83,6 +107,9 @@ def pass1(nm: NeuronModel, toks, bs, k_pos, k_neg):
         "nv": torch.full((nL, max(k_neg, 1), d), math.inf, device=dev), "nd": torch.zeros(nL, max(k_neg, 1), d, dtype=torch.long, device=dev),
         "np": torch.zeros(nL, max(k_neg, 1), d, dtype=torch.long, device=dev),
     }
+    if roles:
+        for k in ("sum_user", "sum_assistant", "n_user", "n_assistant"):
+            st[k] = torch.zeros(nL, d, dtype=torch.float64, device=dev)
     count = 0
     resid = [[] for _ in range(nL)]
     ctx = {}
@@ -95,6 +122,14 @@ def pass1(nm: NeuronModel, toks, bs, k_pos, k_neg):
             st["sum"][L] += (a * mf).sum((0, 1)).double()
             st["sq"][L] += (a * a * mf).sum((0, 1)).double()
             st["npos"][L] += ((a > 0) & m[..., None]).sum((0, 1)).double()
+            r = ctx["roles"]
+            if r is not None:
+                mu = ((r == 1) & m).float()
+                ma = ((r == 2) & m).float()
+                st["sum_user"][L] += (a * mu[..., None]).sum((0, 1)).double()
+                st["sum_assistant"][L] += (a * ma[..., None]).sum((0, 1)).double()
+                st["n_user"][L] += mu.sum((0, 1)).double()
+                st["n_assistant"][L] += ma.sum((0, 1)).double()
             hi = a.masked_fill(~m[..., None], -math.inf)
             dmax, darg = hi.max(1)                   # per-document peak (B, d)
             st["max"][L] = torch.maximum(st["max"][L], dmax.max(0).values)
@@ -116,8 +151,9 @@ def pass1(nm: NeuronModel, toks, bs, k_pos, k_neg):
     t0 = time.time()
     try:
         for i, chunk in batches(toks, bs):
-            ids, mask, m = pad(nm, chunk)
+            ids, mask, m, rids = pad(nm, chunk)
             ctx["mask"] = m
+            ctx["roles"] = rids if roles else None
             ctx["doc_idx"] = torch.arange(i, i + len(chunk), device=nm.device)
             out = nm.model(input_ids=ids, attention_mask=mask, output_hidden_states=True, use_cache=False)
             count += int(m.sum())
@@ -173,7 +209,7 @@ def pass2(nm: NeuronModel, toks, bs, entries):
             local[torch.tensor(order[j:j + len(chunk)])] = torch.arange(len(chunk))
             ctx["local"] = local
             ctx["lens"] = torch.tensor([len(x[2]) for x in chunk])
-            ids, mask, _ = pad(nm, chunk)
+            ids, mask, _, _ = pad(nm, chunk)
             nm.model(input_ids=ids, attention_mask=mask, use_cache=False)
     finally:
         for h in hooks:
@@ -219,7 +255,8 @@ def list_col(rows2d, typ):
     return pa.ListArray.from_arrays(pa.array(np.arange(0, n * w + 1, w, dtype=np.int32)), pa.array(rows2d.reshape(-1), type=typ))
 
 
-def run(model, corpus, out, max_len=128, bs=16, k_pos=8, k_neg=None, limit=None, do_layout=True, device=None):
+def run(model, corpus, out, max_len=128, bs=16, k_pos=8, k_neg=None, limit=None, do_layout=True, device=None,
+        roles=False, variant=None):
     t0 = time.time()
     nm = NeuronModel(model, device=device)
     gated = nm.model_type not in ("gpt2", "gpt_neox", "phi", "gptj", "opt")
@@ -227,11 +264,11 @@ def run(model, corpus, out, max_len=128, bs=16, k_pos=8, k_neg=None, limit=None,
         k_neg = 4 if gated else 0
     print(f"{model}: {nm.n_layers} layers x {nm.d_mlp} neurons = {nm.n_layers * nm.d_mlp:,} ({'gated' if gated else 'plain'} MLP) on {nm.device}")
     docs = load_corpus(corpus, limit)
-    toks = tokenize(nm, docs, max_len)
+    toks = tokenize(nm, docs, max_len, roles)
     toks.sort(key=lambda x: len(x[2]))           # less padding; doc index below is into this sorted list
     print(f"{len(toks)} docs, {sum(len(x[2]) for x in toks):,} tokens")
 
-    st, count, resid_median = pass1(nm, toks, bs, k_pos, k_neg)
+    st, count, resid_median = pass1(nm, toks, bs, k_pos, k_neg, roles)
     mean = (st["sum"] / count).float()
     std = (st["sq"] / count - (st["sum"] / count) ** 2).clamp(min=0).sqrt().float()
     print(f"pass1 done {time.time() - t0:.0f}s")
@@ -257,15 +294,15 @@ def run(model, corpus, out, max_len=128, bs=16, k_pos=8, k_neg=None, limit=None,
     up, down = logit_lens(nm)
     print(f"logit lens done {time.time() - t0:.0f}s")
 
-    slug = slugify(model)
+    slug = slugify(model + "-" + variant) if variant else slugify(model)
     od = os.path.join(out, slug)
     os.makedirs(os.path.join(od, "examples"), exist_ok=True)
 
     # tokens table: every corpus doc as token strings (the explorer cuts windows from it)
     pq.write_table(pa.table({
         "doc": pa.array(np.arange(len(toks), dtype=np.int32)),
-        "kind": [k for _, k, _, _ in toks],
-        "src_id": pa.array([i for i, _, _, _ in toks], type=pa.int32()),
+        "kind": [k for _, k, _, _, _ in toks],
+        "src_id": pa.array([i for i, _, _, _, _ in toks], type=pa.int32()),
         "skip": pa.array([x[3] for x in toks], type=pa.int16()),
         "toks": [nm.token_strings(x[2]) for x in toks],
     }), os.path.join(od, "tokens.parquet"), compression="zstd")
@@ -299,6 +336,18 @@ def run(model, corpus, out, max_len=128, bs=16, k_pos=8, k_neg=None, limit=None,
     LL = np.repeat(np.arange(nL), d); NN = np.tile(np.arange(d), nL)
     zmax = ((st["max"] - mean) / (std + 1e-6)).numpy().reshape(-1)
     zmin = ((mean - st["min"]) / (std + 1e-6)).numpy().reshape(-1)
+    role_counts = None
+    if roles:
+        mu = st["sum_user"] / st["n_user"].clamp(min=1)
+        ma = st["sum_assistant"] / st["n_assistant"].clamp(min=1)
+        rd = ((mu - ma) / (std.double() + 1e-6)).float()
+        pq.write_table(pa.table({
+            "layer": pa.array(LL.astype(np.int16)), "neuron": pa.array(NN.astype(np.int32)),
+            "mean_user": pa.array(mu.float().numpy().reshape(-1)),
+            "mean_assistant": pa.array(ma.float().numpy().reshape(-1)),
+            "role_d": pa.array(rd.numpy().reshape(-1)),
+        }), os.path.join(od, "roles.parquet"), compression="zstd")
+        role_counts = {"n_user": int(st["n_user"][0, 0].item()), "n_assistant": int(st["n_assistant"][0, 0].item())}
     tbl = pa.table({
         "layer": pa.array(LL.astype(np.int16)), "neuron": pa.array(NN.astype(np.int32)),
         "mean": mean.numpy().reshape(-1), "std": std.numpy().reshape(-1),
@@ -320,6 +369,10 @@ def run(model, corpus, out, max_len=128, bs=16, k_pos=8, k_neg=None, limit=None,
         "corpus": os.path.basename(corpus), "seconds": round(time.time() - t0, 1), "device": nm.device,
         "created": time.strftime("%Y-%m-%d"),
     }
+    if variant:
+        meta["variant"] = variant
+    if role_counts is not None:
+        meta["roles"] = role_counts
     with open(os.path.join(od, "meta.json"), "w") as f:
         json.dump(meta, f, indent=1)
     from .neighbors import add as add_neighbors
@@ -341,6 +394,9 @@ if __name__ == "__main__":
     ap.add_argument("--k", type=int, default=8)
     ap.add_argument("--limit", type=int)
     ap.add_argument("--no-layout", action="store_true")
+    ap.add_argument("--roles", action="store_true")
+    ap.add_argument("--variant")
     ap.add_argument("--device")
     a = ap.parse_args()
-    run(a.model, a.corpus, a.out, a.max_len, a.batch, a.k, limit=a.limit, do_layout=not a.no_layout, device=a.device)
+    run(a.model, a.corpus, a.out, a.max_len, a.batch, a.k, limit=a.limit, do_layout=not a.no_layout, device=a.device,
+        roles=a.roles, variant=a.variant)
