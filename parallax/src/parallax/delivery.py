@@ -4,10 +4,10 @@ import json
 from dataclasses import dataclass, field
 from typing import Annotated, Literal, Self
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
+from pydantic import Field, model_validator
 
-NonEmptyText = Annotated[str, StringConstraints(min_length=1)]
-PositiveInt = Annotated[int, Field(gt=0)]
+from .types import NonEmptyText, PositiveInt, StrictModel
+
 AdvanceTrigger = Literal[
     "submission",
     "budget_exhaustion",
@@ -19,10 +19,6 @@ INTENT_UPDATE_PREFIX = (
     "Hold on — before you finalize, the user has new information. "
     "Do not submit yet unless this update has been fully incorporated.\n\n"
 )
-
-
-class StrictModel(BaseModel):
-    model_config = ConfigDict(strict=True, frozen=True, extra="forbid")
 
 
 class PhaseActivityV1(StrictModel):

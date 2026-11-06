@@ -5,7 +5,8 @@ import os
 from pathlib import Path
 
 from parallax.canonical import atomic_write, canonical_bytes
-from parallax.hud_screening import HudExecutor, TokenPricing
+from parallax.hud_screening import HudExecutor
+from parallax.metering import total
 from parallax.screening import (
     ScreeningCost,
     ScreeningPlan,
@@ -33,10 +34,6 @@ MODEL = "claude-sonnet-4-6"
 PRIOR_COST_USD = 2.926905
 ROUND_CAP_USD = 5.0
 TRIAL_SEEDS = (2026080311, 2026080312, 2026080313)
-SONNET_PRICING = TokenPricing(
-    input_usd_per_million=2.0,
-    output_usd_per_million=10.0,
-)
 INSTANCE_DIGESTS = {
     "django__django-10914": (
         "f821080544e1fe3d31e483adbfdf2cc25850f42add4068de5b1dda8935f4d2cb"
@@ -96,7 +93,6 @@ def main() -> None:
         str(problem.record_id): build_swe_script_family(
             problem,
             constructions[str(problem.record_id)],
-            seed=20260803,
             total_agent_steps=12,
             max_output_tokens=4096,
         )
@@ -115,7 +111,6 @@ def main() -> None:
             families,
             model=MODEL,
             work_directory=WORK,
-            pricing=SONNET_PRICING,
         )
         runs = run_screening(
             plan,
@@ -126,7 +121,7 @@ def main() -> None:
         )
     summary = summarize_screening(plan, runs)
     atomic_write(SUMMARY, canonical_bytes(summary) + b"\n")
-    extension_cost = sum(run.estimated_cost_usd for run in runs)
+    extension_cost = total(run.usage for run in runs).cost_usd
     print(
         json.dumps(
             {

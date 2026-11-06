@@ -8,6 +8,8 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from .checkpoint_evolution import CheckpointError, EntrypointContract, Workspace
 from .checkpoint_runner import CheckpointDelivery, MeteredWorkspace, StageUsage
 from .evolving_intent import Message
+from .hud_wire import strip_json_fence
+from .metering import pricing_for
 from .outcome import BudgetError
 from .provider import (
     OpenAICompatibleProvider,
@@ -16,9 +18,6 @@ from .provider import (
     ProviderResponse,
 )
 from .types import NonEmptyText, StrictModel
-
-JSON_FENCE_PREFIX = "```json\n"
-JSON_FENCE_SUFFIX = "\n```"
 
 STAGE_PROTOCOL = (
     "You are completing one checkpoint of an evolving command-line "
@@ -40,9 +39,10 @@ class StagePricing(StrictModel):
     output_usd_per_million: Annotated[float, Field(ge=0, allow_inf_nan=False)]
 
 
+STAGE_MODEL = "claude-haiku-4-5"
 HAIKU_STAGE_PRICING = StagePricing(
-    input_usd_per_million=1.0,
-    output_usd_per_million=5.0,
+    input_usd_per_million=pricing_for(STAGE_MODEL).input_usd_per_million,
+    output_usd_per_million=pricing_for(STAGE_MODEL).output_usd_per_million,
 )
 
 
@@ -78,9 +78,7 @@ def render_stage_messages(
 
 
 def parse_file_map(text: str) -> Workspace:
-    payload = text
-    if payload.startswith(JSON_FENCE_PREFIX) and payload.endswith(JSON_FENCE_SUFFIX):
-        payload = payload[len(JSON_FENCE_PREFIX) : -len(JSON_FENCE_SUFFIX)]
+    payload = strip_json_fence(text)
     try:
         reply = _FileMapReply.model_validate_json(payload)
     except ValidationError as error:

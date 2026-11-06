@@ -83,10 +83,12 @@ The preregistered HUD screening completed five SWE-bench instances with two
 static Claude Opus 4.8 trials each. Both Django instances passed 2/2; Astropy,
 Matplotlib, and Requests passed 0/2. At five sources the interval is far wider
 than any effect worth measuring, so the run locates an operating point rather
-than supporting a comparison. Known metered spend was $1.669650, with a
-conservative $2.147440 all-in bound for unmetered construction failures under
-the $5 cap. Candidate patches were graded from a pinned SWE-bench source
-checkout after its wheel omitted a required harness fixture.
+than supporting a comparison. Metered spend was $0.518250, with a $0.541029
+all-in bound for the unmetered construction failures, under the $5 cap. The
+round's own receipts say $1.669650 because they were written at the retired
+Opus 4.1 rate card; `research/spend-audit-20260803/` re-meters every run from
+its retained tokens. Candidate patches were graded from a pinned SWE-bench
+source checkout after its wheel omitted a required harness fixture.
 
 Screening round 2 found three Claude Opus 4.8 boundary instances at 2/3:
 Astropy 14508, Django 13786, and Xarray 4695. Actual token-metered round-two

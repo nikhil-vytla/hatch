@@ -30,7 +30,6 @@ def family():
     return build_swe_script_family(
         problem,
         construction(),
-        seed=7,
         total_agent_steps=12,
         max_output_tokens=4096,
     )
@@ -53,7 +52,7 @@ def evaluation(
     )
 
 
-def test_admission_runs_all_gates_in_pipeline_order(tmp_path: Path) -> None:
+def test_admission_runs_both_execution_gates_in_pipeline_order(tmp_path: Path) -> None:
     candidate = family()
     patches = []
 
@@ -156,7 +155,41 @@ def test_noop_requires_applied_patch_and_real_f2p_failure(tmp_path: Path) -> Non
     )
 
     assert record.decision == "rejected"
-    assert not record.gates[4].passed
+    assert not next(gate for gate in record.gates if gate.gate == "noop").passed
+
+
+def test_scheduling_refuses_an_admission_receipt_from_another_family(
+    tmp_path: Path,
+) -> None:
+    candidate = family()
+
+    def harness(task, environment, patch, run_directory):
+        if patch == IDENTITY_PATCH:
+            return evaluation(Verdict.WRONG)
+        return evaluation(
+            Verdict.PASS,
+            fail_to_pass_success=task.sealed.fail_to_pass,
+        )
+
+    record = admit_swe_family(
+        candidate,
+        work_directory=tmp_path,
+        run_harness=harness,
+    )
+    drifted = build_swe_script_family(
+        candidate.static.problem,
+        construction(),
+        total_agent_steps=12,
+        max_output_tokens=2048,
+    )
+
+    with pytest.raises(ValueError, match="admission identity differs"):
+        build_admitted_screening_plan(
+            (AdmittedSweFamily(family=drifted, admission=record),),
+            model="boundary-model",
+            trial_seeds=(1,),
+            arms=("static",),
+        )
 
 
 def test_construction_failure_rejects_all_arms_uniformly() -> None:

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import math
 from collections import Counter, defaultdict
 from pathlib import Path
 from typing import assert_never
@@ -9,6 +8,7 @@ from typing import assert_never
 from .canonical import atomic_write, canonical_digest
 from .evolving_intent import Arm
 from .outcome import Outcome, RunFailure, Verification
+from .paired import paired_bounds
 from .runner import (
     ARMS,
     EvidenceRecord,
@@ -169,53 +169,27 @@ def _failure(outcome: Outcome) -> RunFailure:
 def build_report(records: tuple[EvidenceRecord, ...]) -> dict[str, object]:
     rows, source_count = _validated(records)
     units = sorted({(source, trial) for source, trial, _ in rows})
-    bounds: dict[SourceId, list[tuple[float, float]]] = defaultdict(list)
-    complete: dict[SourceId, list[int]] = defaultdict(list)
+    pairs: dict[SourceId, list[tuple[int | None, int | None]]] = defaultdict(list)
     missing: Counter[str] = Counter()
     reasons: Counter[str] = Counter()
-    paired = 0
     for source, trial in units:
         matched = rows[(source, trial, "matched")].outcome
         evolved = rows[(source, trial, "evolved")].outcome
         matched_y, evolved_y = _y(matched), _y(evolved)
+        pairs[source].append((evolved_y, matched_y))
         if matched_y is not None and evolved_y is not None:
-            lower = upper = float(evolved_y - matched_y)
-            complete[source].append(evolved_y - matched_y)
-            paired += 1
-        elif matched_y is not None:
-            lower, upper = float(-matched_y), float(1 - matched_y)
+            continue
+        if matched_y is not None:
             missing["evolved_failure"] += 1
             reasons[f"evolved:{_failure(evolved).failure_kind}"] += 1
         elif evolved_y is not None:
-            lower, upper = float(evolved_y - 1), float(evolved_y)
             missing["matched_failure"] += 1
             reasons[f"matched:{_failure(matched).failure_kind}"] += 1
         else:
-            lower, upper = -1.0, 1.0
             missing["both_failure"] += 1
             reasons[f"matched:{_failure(matched).failure_kind}"] += 1
             reasons[f"evolved:{_failure(evolved).failure_kind}"] += 1
-        bounds[source].append((lower, upper))
-    source_bounds = [
-        (
-            sum(item[0] for item in values) / len(values),
-            sum(item[1] for item in values) / len(values),
-        )
-        for _, values in sorted(bounds.items())
-    ]
-    identification = (
-        sum(item[0] for item in source_bounds) / source_count,
-        sum(item[1] for item in source_bounds) / source_count,
-    )
-    source_means = [
-        sum(values) / len(values) for _, values in sorted(complete.items()) if values
-    ]
-    difference = sum(source_means) / len(source_means) if source_means else None
-    epsilon = math.sqrt(2 * math.log(40) / source_count)
-    interval = (
-        max(-1.0, identification[0] - epsilon),
-        min(1.0, identification[1] + epsilon),
-    )
+    bounds = paired_bounds(pairs, estimand="evolved_minus_matched_pass_rate")
     return {
         "population": {
             "source_clusters": source_count,
@@ -223,19 +197,19 @@ def build_report(records: tuple[EvidenceRecord, ...]) -> dict[str, object]:
             "scheduled_rows": len(rows),
         },
         "arm_rates": {arm: _rates(rows, arm) for arm in ARMS},
-        "paired_count": paired,
-        "difference": difference,
+        "paired_count": bounds.paired_complete,
+        "difference": bounds.point_delta_complete_pairs,
         "identification_bounds": {
-            "lower": identification[0],
-            "upper": identification[1],
+            "lower": bounds.identification_lower,
+            "upper": bounds.identification_upper,
         },
         "interval": {
             "confidence": 0.95,
             "method": "source_clustered_hoeffding",
-            "epsilon": epsilon,
-            "lower": interval[0],
-            "minimum_detectable_effect": epsilon,
-            "upper": interval[1],
+            "epsilon": bounds.epsilon,
+            "lower": bounds.interval_lower,
+            "minimum_detectable_effect": bounds.minimum_detectable_effect,
+            "upper": bounds.interval_upper,
         },
         "missing_pairs": {
             **{

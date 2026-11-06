@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -8,16 +10,21 @@ from test_swebench import INSTANCE_ID, row, runtime
 
 import parallax.screening as screening_module
 from parallax.gsm8k import Verdict, Verification
+from parallax.metering import MeteredUsage
 from parallax.runner import RunFailure
 from parallax.screening import (
+    EvidenceLockedError,
     ScreeningCost,
     ScreeningExecution,
     ScreeningExecutionError,
+    ScreeningUnit,
     SpendApprovalRequired,
     build_screening_plan,
+    classify_operating_point,
     initialize_screening_manifest,
     read_screening_jsonl,
     run_screening,
+    single_writer,
     summarize_screening,
     write_screening_plan,
 )
@@ -36,9 +43,7 @@ def execution(verdict: Verdict) -> ScreeningExecution:
     return ScreeningExecution(
         outcome=Verification(verdict=verdict, reason="scripted"),
         reported_model="boundary-model",
-        prompt_tokens=10,
-        completion_tokens=5,
-        estimated_cost_usd=0.01,
+        usage=MeteredUsage(prompt_tokens=10, completion_tokens=5, cost_usd=0.01),
     )
 
 
@@ -321,9 +326,7 @@ def test_provider_model_mismatch_is_retained_as_run_failure(
     mismatched = ScreeningExecution(
         outcome=Verification(verdict=Verdict.PASS, reason="scripted"),
         reported_model="other-model",
-        prompt_tokens=10,
-        completion_tokens=5,
-        estimated_cost_usd=0.01,
+        usage=MeteredUsage(prompt_tokens=10, completion_tokens=5, cost_usd=0.01),
     )
 
     runs = run_screening(
@@ -350,9 +353,11 @@ def test_observed_cost_stops_and_preserves_partial_evidence(
     expensive = ScreeningExecution(
         outcome=Verification(verdict=Verdict.PASS, reason="scripted"),
         reported_model="boundary-model",
-        prompt_tokens=1_000,
-        completion_tokens=1_000,
-        estimated_cost_usd=5.01,
+        usage=MeteredUsage(
+            prompt_tokens=1_000,
+            completion_tokens=1_000,
+            cost_usd=5.01,
+        ),
     )
 
     with pytest.raises(SpendApprovalRequired, match="observed cost"):
@@ -396,3 +401,118 @@ def test_screening_reader_rejects_design_digest_drift(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="design digest mismatch"):
         read_screening_jsonl(path)
+
+
+def test_a_second_writer_to_one_evidence_file_is_refused(tmp_path: Path) -> None:
+    plan = build_screening_plan(
+        (problem(),),
+        model="boundary-model",
+        trial_seeds=(11,),
+    )
+    path = tmp_path / "screening.jsonl"
+
+    def racing(unit: ScreeningUnit) -> ScreeningExecution:
+        with pytest.raises(EvidenceLockedError, match="already writing"):
+            run_screening(
+                plan,
+                lambda other: execution(Verdict.PASS),
+                output_path=path,
+                approve_spend=True,
+            )
+        return execution(Verdict.PASS)
+
+    runs = run_screening(
+        plan,
+        racing,
+        output_path=path,
+        approve_spend=True,
+    )
+
+    assert len(runs) == 1
+    assert len(read_screening_jsonl(path)) == 2
+
+
+def test_a_second_session_cannot_take_the_lock_this_session_holds(
+    tmp_path: Path,
+) -> None:
+    """The incident this guards was two operating system processes, not two
+    calls, so exclusion is checked across a real process boundary."""
+    path = tmp_path / "screening.jsonl"
+    probe = (
+        "import sys;"
+        "from pathlib import Path;"
+        "from parallax.screening import EvidenceLockedError, single_writer;"
+        "\ntry:\n"
+        f"    ctx = single_writer(Path({str(path)!r}))\n"
+        "    ctx.__enter__()\n"
+        "except EvidenceLockedError:\n"
+        "    sys.exit(17)\n"
+        "sys.exit(0)\n"
+    )
+
+    with single_writer(path):
+        blocked = subprocess.run(
+            [sys.executable, "-c", probe],
+            capture_output=True,
+            text=True,
+            timeout=60,
+            check=False,
+        )
+    allowed = subprocess.run(
+        [sys.executable, "-c", probe],
+        capture_output=True,
+        text=True,
+        timeout=60,
+        check=False,
+    )
+
+    assert blocked.returncode == 17, blocked.stderr
+    assert allowed.returncode == 0, allowed.stderr
+
+
+def test_the_evidence_lock_is_released_for_the_next_run(tmp_path: Path) -> None:
+    plan = build_screening_plan(
+        (problem(),),
+        model="boundary-model",
+        trial_seeds=(11,),
+    )
+    path = tmp_path / "screening.jsonl"
+
+    run_screening(
+        plan,
+        lambda unit: execution(Verdict.PASS),
+        output_path=path,
+        approve_spend=True,
+    )
+
+    with single_writer(path):
+        pass
+
+
+def test_operating_point_margins_leave_room_at_the_floor_and_ceiling() -> None:
+    assert classify_operating_point(None) == "unknown"
+    assert classify_operating_point(0.0) == "floor"
+    assert classify_operating_point(0.1) == "floor"
+    assert classify_operating_point(1 / 3) == "boundary"
+    assert classify_operating_point(0.9) == "ceiling"
+    assert classify_operating_point(1.0) == "ceiling"
+
+
+def test_margin_rule_diverges_from_exact_equality_only_past_nine_trials() -> None:
+    """Pins why a driver's `== 0`/`== 1` copy of this rule went unnoticed."""
+
+    def exact_equality(rate: float) -> str:
+        if rate == 0:
+            return "floor"
+        if rate == 1:
+            return "ceiling"
+        return "boundary"
+
+    def agrees_at(trials: int) -> bool:
+        return all(
+            exact_equality(passes / trials) == classify_operating_point(passes / trials)
+            for passes in range(trials + 1)
+        )
+
+    assert all(agrees_at(trials) for trials in range(1, 10))
+    assert not agrees_at(10)
